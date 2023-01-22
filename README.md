@@ -38,10 +38,10 @@ There is no need to create and manage the effect objects. All is done automatica
 
 ## Installation
 1. Clone the repository to your local machine
-git clone https://github.com/walmis/VPforce-TelemFFB.git
+`git clone https://github.com/walmis/VPforce-TelemFFB.git`
 
 2. Install the required packages
-pip install -r requirements.txt
+`pip install -r requirements.txt`
 
 3. When running the program for the first time, it will prompt you to install the export.lua script in your `user/Saved Games/DCS` folder. This script is necessary for the program to receive telemetry data from DCS World.
 
