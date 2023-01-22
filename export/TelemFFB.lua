@@ -1,10 +1,10 @@
 local JSON = loadfile("Scripts\\JSON.lua")()
-local socket = require("socket")
 
 local f_telemFFB = {
   Start = function(self)
     package.path = package.path .. ";.\\LuaSocket\\?.lua"
     package.cpath = package.cpath .. ";.\\LuaSocket\\?.dll"
+    socket = require("socket")
     
     local connect_init =
       socket.protect(
@@ -24,7 +24,7 @@ local f_telemFFB = {
     local data_send =
       socket.protect(
       function()
-        if self.connect_ffb then
+        if self.sock_udp then
           local t = LoGetModelTime()
           local altAsl = LoGetAltitudeAboveSeaLevel()
           local altAgl = LoGetAltitudeAboveGroundLevel()
@@ -908,7 +908,7 @@ local f_telemFFB = {
 
           stringToSend = string.format("%s;WeightOnWheels=%s;MechInfo=%s", stringToSend, WoW, mech)
 
-          socket.try(self.connect_ffb:send(stringToSend))
+          socket.try(self.sock_udp:send(stringToSend))
         end
       end
     )
@@ -918,9 +918,9 @@ local f_telemFFB = {
     local connection_close =
       socket.protect(
       function()
-        if self.connect_ffb then
-          socket.try(self.connect_ffb:send("DISCONNECT"))
-          self.connect_ffb:close()
+        if self.sock_udp then
+          socket.try(self.sock_udp:send("DISCONNECT"))
+          self.sock_udp:close()
         end
       end
     )

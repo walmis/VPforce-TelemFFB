@@ -47,8 +47,7 @@ args = parser.parse_args()
 vid_pid = [int(x, 16) for x in args.device.split(":")]
 HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
 
-# check and install/update export lua script
-utils.install_export_lua()
+
 
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
@@ -197,6 +196,9 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+
+    # check and install/update export lua script
+    utils.install_export_lua()
 
     window = MainWindow()
     window.show()
