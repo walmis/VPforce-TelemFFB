@@ -19,7 +19,7 @@ Also this early version is very bare-bones and community-driven development is v
 - This framework is made to be very easy to manage FFB effect lifecycles and develop additional effects or specialize specific aircraft effects.
 Main action is going on in `aircrafts.py`. 
 For example to create an effect that plays a "bump" when a gun round is fired:
-```
+```python
         if self.has_changed("Gun") or self.has_changed("CannonShells"): 
             effects["cm"].stop() # stop if effect was previously running
             #start Sine effect with frequency 10Hz, preconfigured intensity, 45 deg angle and total duration of 50ms
