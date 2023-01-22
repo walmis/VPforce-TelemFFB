@@ -13,6 +13,7 @@ Also this early version is very bare-bones and community-driven development is v
 - Rolling and touchdown effects that simulate the sensation of the wheels touching the ground
 - Angle of attack buffeting, which simulates the shaking and vibrations felt when an aircraft approaches its critical angle of attack.
 - Helicopter effective translational lift (ETL) effects.
+- Shows a debug window that displays the received telemetry data.
 
 ## Development
 
