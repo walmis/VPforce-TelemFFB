@@ -19,6 +19,7 @@ import math
 from typing import List, Dict
 from ffb_rhino import HapticEffect
 import utils
+import logging
 
 #unit conversions (to m/s)
 knots = 0.514444
@@ -49,22 +50,29 @@ class Aircraft(object):
     weapon_release_intensity : float = 0.12
 
     ####
-    def __init__(self, name : str):
-        self.name = name
-        self.changes = {}
-        self.telem_data = None
+    def __init__(self, name : str, **kwargs):
+        self._name = name
+        self._changes = {}
+        self._telem_data = None
+
+        #self.__dict__.update(kwargs)
+        for k,v in kwargs.items():
+            Tp = type(getattr(self, k, None))
+            if Tp is not type(None):
+                logging.info(f"set {k} = {Tp(v)}")
+                setattr(self, k, Tp(v))
+
         #clear any existing effects
         for e in effects.values(): e.destroy()
         effects.clear()
 
     def has_changed(self, item : str) -> bool:
-        prev_val = self.changes.get(item)
-        new_val = self.telem_data.get(item)
-        self.changes[item] = new_val
+        prev_val = self._changes.get(item)
+        new_val = self._telem_data.get(item)
+        self._changes[item] = new_val
         if prev_val != new_val and prev_val is not None and new_val is not None:
             return (prev_val,new_val)
         return False
-
 
     def _calc_buffeting(self, aoa, speed) -> tuple:
         """Calculate buffeting amount and frequency
@@ -82,7 +90,7 @@ class Aircraft(object):
         airflow_factor = utils.scale_clamp(speed, (0, max_airflow_speed), (0, 1.0))
         buffeting_factor = utils.scale_clamp(aoa, (self.buffet_aoa, self.stall_aoa), (0.0, 1.0))
         #todo calc frequency
-        return (12.0, airflow_factor * buffeting_factor * self.buffeting_intensity)
+        return (13.0, airflow_factor * buffeting_factor * self.buffeting_intensity)
 
     def _update_runway_rumble(self, telem_data):
         """Add wheel based rumble effects for immersion
@@ -114,6 +122,8 @@ class Aircraft(object):
         buffeting = self._calc_buffeting(aoa, tas)
         # manage periodic effect for buffeting
         effects["buffeting"].periodic(buffeting[0], buffeting[1], 0).start()
+        effects["buffeting2"].periodic(buffeting[0], buffeting[1], 45, phase=120).start()
+
 
         telem_data["dbg_buffeting"] = buffeting # save debug value
 
@@ -135,7 +145,7 @@ class Aircraft(object):
         :param new_data: New telemetry data
         :type new_data: dict
         """
-        self.telem_data = telem_data
+        self._telem_data = telem_data
 
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
@@ -148,7 +158,6 @@ class Aircraft(object):
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop/WW2 aircraft"""
 
-    aoa_shaker_enable = True
     engine_rumble : bool            = True
     engine_rumble_intensity : float = 0.02
     max_aoa_cf_force : float           = 0.2 # CF force sent to device at %stall_aoa
@@ -210,6 +219,7 @@ class JetAircraft(Aircraft):
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
+    buffeting_intensity = 0
 
     etl_start_speed = 6 # m/s
     etl_stop_speed = 22 # m/s
@@ -247,7 +257,7 @@ class Helicopter(Aircraft):
 
 
 class TF51D(PropellerAircraft):
-    aoa_shaker_enable = False # implemented by DCS
+    buffeting_intensity = 0 # implement
     runway_rumble_intensity = 1.0
     engine_rumble = True # rumble based on RPM
 

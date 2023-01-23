@@ -14,7 +14,7 @@ local f_telemFFB = {
         self.sock_udp = socket.try(socket.udp())
         socket.try(self.sock_udp:settimeout(.001))
         socket.try(self.sock_udp:setoption('broadcast', true))
-        socket.try(self.sock_udp:setpeername("127.255.255.255", 29380))
+        socket.try(self.sock_udp:setpeername("127.255.255.255", 34380))
         socket.try(self.sock_udp:send("CONNECT"))
       end
     )

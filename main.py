@@ -17,6 +17,7 @@
 
 import json
 import logging
+import re
 import sys
 import argparse
 
@@ -30,6 +31,7 @@ import utils
 import aircrafts
 import traceback
 from ffb_rhino import HapticEffect
+from configobj import ConfigObj
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -48,10 +50,9 @@ vid_pid = [int(x, 16) for x in args.device.split(":")]
 HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
 
 
-
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
-    utils.teleplot.configure(args.teleplot)
+    
 
 def format_dict(data, prefix=""):
     output = ""
@@ -61,6 +62,7 @@ def format_dict(data, prefix=""):
         else:
             output += prefix + key + " = " + str(value) + "\n"
     return output
+
 
 
 class TelemManager(QObject, threading.Thread):
@@ -84,7 +86,7 @@ class TelemManager(QObject, threading.Thread):
         s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
 
         s.settimeout(0.1)
-        port = 29380
+        port = 34380
         s.bind(("", port))
         logging.info(f"Listening on UDP :{port}")
 
@@ -106,6 +108,10 @@ class TelemManager(QObject, threading.Thread):
             data = data[0].decode("utf-8").split(";")
             items = {}
 
+            if data[0] == "DISCONNECT":
+                logging.info("Telemetry disconnected")
+                self.currentAircraftName = None
+
             for i in data:
                 try:
                     k,v = i.split("=")
@@ -122,18 +128,31 @@ class TelemManager(QObject, threading.Thread):
             aircraft_name = items.get("N")
 
             if aircraft_name and aircraft_name != self.currentAircraftName:
-                if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
-                    cls = aircrafts.classes.get(aircraft_name, None)
-                    if cls:
-                        logging.info(f"Creating handler for {aircraft_name}: {cls}")
-                        #instantiate new aircraft handler
-                        self.currentAircraft = cls(aircraft_name)
-                    else:
-                        cls = aircrafts.classes.get("default", None)
-                        logging.warning(f"No handler for {aircraft_name}, using {cls}")
+                # reload config
+                global config
+                config = ConfigObj("config.ini")
 
-                        self.currentAircraft = cls(aircraft_name)
-                
+                if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
+                    cls = None
+                    params = {}
+                    # find matching aircraft in config
+                    for k,v in config.items():
+                        if re.match(k, aircraft_name):
+                            logging.info(f"Found aircraft {aircraft_name} in config")
+                            cls = getattr(aircrafts, v["type"], None)
+                            params = v
+                            if not cls:
+                                logging.error(f"No such class {v['type']}")
+
+                    if not cls:
+                        logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
+                        cls = aircrafts.Aircraft
+                        params = config["default"]
+
+                    logging.info(f"Creating handler for {aircraft_name}: {cls}")
+                    #instantiate new aircraft handler
+                    self.currentAircraft = cls(aircraft_name, **params)
+
                 self.currentAircraftName = aircraft_name
 
             if self.currentAircraft:
