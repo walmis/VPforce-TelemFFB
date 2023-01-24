@@ -158,7 +158,6 @@ class Aircraft(object):
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop/WW2 aircraft"""
 
-    engine_rumble : bool            = True
     engine_rumble_intensity : float = 0.02
     max_aoa_cf_force : float           = 0.2 # CF force sent to device at %stall_aoa
 
