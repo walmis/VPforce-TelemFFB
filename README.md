@@ -57,8 +57,10 @@ git pull
 ```
 
 ## Usage
-1. Run the application with optional arguments
+1. Run the application
+
 `python main.py`
+
 optional arguments: 
 - `--help` show the available parameters
 - `--teleplot` is the destination IP:port address for teleplot.fr telemetry plotting service (default is "127.0.0.1:47269"). This service allows you to plot telemetry data over time.
