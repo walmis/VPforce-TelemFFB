@@ -46,9 +46,21 @@ There is no need to create and manage the effect objects. All is done automatica
 
 3. When running the program for the first time, it will prompt you to install the export.lua script in your `user/Saved Games/DCS` folder. This script is necessary for the program to receive telemetry data from DCS World.
 
+## Updating
+`git pull` - pulls the latest revision
+
+If local changes conflict with remote, you can reset to the latest version:
+
+```
+git reset --hard origin/master
+git pull
+```
+
 ## Usage
 1. Run the application with optional arguments
-`python main.py --teleplot IP:PORT -p telemetry_item1 telemetry_item2 -D ffff:2055`
+`python main.py`
+optional arguments: 
+- `--help` show the available parameters
 - `--teleplot` is the destination IP:port address for teleplot.fr telemetry plotting service (default is "127.0.0.1:47269"). This service allows you to plot telemetry data over time.
 - `-p` or `--plot` is used to specify telemetry item names to send to teleplot, separated by spaces
 - `-D` or `--device` is used to specify the Rhino device USB VID:PID (default is "ffff:2055")
