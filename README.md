@@ -43,6 +43,7 @@ There is no need to create and manage the effect objects. All is done automatica
 0. Open a power shell/CMD window where you want to download the TelemFFB source
 
 1. Clone the repository to your local machine, this will create a directory `VPforce-TelemFFB`
+
    `git clone https://github.com/walmis/VPforce-TelemFFB.git`
 
 2. Install the required Python packages
