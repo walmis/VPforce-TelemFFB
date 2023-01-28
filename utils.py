@@ -245,34 +245,38 @@ def to_body_vector(yaw, pitch, roll, world_coordinates):
 from PyQt5.QtWidgets import QMessageBox
 
 def install_export_lua():
-    path = os.path.join(os.path.expanduser('~'), 'Saved Games', 'DCS', 'Scripts')
-    os.makedirs(path, exist_ok=True)
-    out_path = os.path.join(path, "TelemFFB.lua")
+    for dirname in ["DCS", "DCS.openbeta"]:
+        if not os.path.exists(os.path.join(os.path.expanduser('~'), 'Saved Games', dirname)):
+            continue
 
-    try:
-        data = open(os.path.join(path, "export.lua")).read()
-    except:
-        data = ""
+        path = os.path.join(os.path.expanduser('~'), 'Saved Games', dirname, 'Scripts')
+        os.makedirs(path, exist_ok=True)
+        out_path = os.path.join(path, "TelemFFB.lua")
 
-    def write_script():
-        data = open("export/TelemFFB.lua").read()
-        logging.info(f"Writing to {out_path}")
-        open(out_path, "w").write(data)
+        try:
+            data = open(os.path.join(path, "export.lua")).read()
+        except:
+            data = ""
 
-    if "telemffblfs" in data:
-        if os.path.getmtime(out_path) < os.path.getmtime("export/TelemFFB.lua"):
-            dia = QMessageBox.question(None, "Confirm", f"Update export script {out_path} ?")
+        def write_script():
+            data = open("export/TelemFFB.lua").read()
+            logging.info(f"Writing to {out_path}")
+            open(out_path, "w").write(data)
+
+        if "telemffblfs" in data:
+            if os.path.getmtime(out_path) < os.path.getmtime("export/TelemFFB.lua"):
+                dia = QMessageBox.question(None, "Confirm", f"Update export script {out_path} ?")
+                if dia == QMessageBox.StandardButton.Yes:
+                    write_script()
+        else:
+            dia = QMessageBox.question(None, "Confirm", f"Install export script into {path}?")
             if dia == QMessageBox.StandardButton.Yes:
+                logging.info("Updating export.lua")
+                line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
+                f = open(os.path.join(path, "export.lua"), "a+")
+                f.write("\n" + line)
+                f.close()
                 write_script()
-    else:
-        dia = QMessageBox.question(None, "Confirm", f"Install export script into {path}?")
-        if dia == QMessageBox.StandardButton.Yes:
-            logging.info("Updating export.lua")
-            line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
-            f = open(os.path.join(path, "export.lua"), "a+")
-            f.write("\n" + line)
-            f.close()
-            write_script()
 
 
 if __name__ == "__main__":
