@@ -131,6 +131,8 @@ class TelemManager(QObject, threading.Thread):
                 # reload config
                 global config
                 config = ConfigObj("config.ini")
+                #load [default] values
+                defaults = dict(config["default"])
 
                 if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
                     cls = None
@@ -140,14 +142,15 @@ class TelemManager(QObject, threading.Thread):
                         if re.match(k, aircraft_name):
                             logging.info(f"Found aircraft {aircraft_name} in config")
                             cls = getattr(aircrafts, v["type"], None)
-                            params = v
+                            params = defaults
+                            params.update(v)
                             if not cls:
                                 logging.error(f"No such class {v['type']}")
 
                     if not cls:
                         logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
                         cls = aircrafts.Aircraft
-                        params = config["default"]
+                        params = defaults
 
                     logging.info(f"Creating handler for {aircraft_name}: {cls}")
                     #instantiate new aircraft handler
