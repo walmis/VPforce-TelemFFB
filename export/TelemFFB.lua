@@ -442,7 +442,7 @@ local f_telemFFB = {
             -- F-86F sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Gr-RedLight=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
+              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Gr-RedLight=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
               t,
               obj.Name,
               myselfData,
@@ -564,7 +564,7 @@ local f_telemFFB = {
 
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;10_Gr-RedLight=%s;d=0;Wind=%s;d=0;AoA=%.2f;PayloadInfoInfo=%s;d=0;d=0;d=0;d=0;d=0;TAS=%.2f",
+              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;10_Gr-RedLight=%s;d=0;Wind=%s;d=0;AoA=%.2f;PayloadInfo=%s;d=0;d=0;d=0;d=0;d=0;TAS=%.2f",
               t,
               obj.Name,
               myselfData,
@@ -586,7 +586,7 @@ local f_telemFFB = {
 
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;10_Gr-RedLight=%s;d=0;Wind=%s;d=0;AoA=%.2f;PayloadInfoInfo=%s;d=0;d=0;d=0;d=0;d=0;TAS=%.2f",
+              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;10_Gr-RedLight=%s;d=0;Wind=%s;d=0;AoA=%.2f;PayloadInfo=%s;d=0;d=0;d=0;d=0;d=0;TAS=%.2f",
               t,
               obj.Name,
               myselfData,
@@ -643,7 +643,7 @@ local f_telemFFB = {
             -- M-2000C sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;d=0.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
+              "T=%.3f;N=%s;SelfData=%s;d=0.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
               t,
               obj.Name,
               myselfData,
@@ -668,7 +668,7 @@ local f_telemFFB = {
             -- F-5E sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
+              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
               t,
               obj.Name,
               myselfData,
@@ -693,7 +693,7 @@ local f_telemFFB = {
             -- AJS37 sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
+              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
               t,
               obj.Name,
               myselfData,
@@ -717,7 +717,7 @@ local f_telemFFB = {
             -- AV8BNA sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
+              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
               t,
               obj.Name,
               myselfData,
@@ -754,12 +754,12 @@ local f_telemFFB = {
 			end
 			
             -- FA-18C sends to SimShaker
-            stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, RPM,  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
+            stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, RPM,  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
 
             -- FA-18C sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
+              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
               t,
               obj.Name,
               myselfData,
@@ -815,7 +815,7 @@ local f_telemFFB = {
             -- F-14 sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s;%s",
+              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s;%s",
               t,
               obj.Name,
               myselfData,
@@ -839,19 +839,19 @@ local f_telemFFB = {
           elseif obj.Name == "Yak-52" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- YAK-52 sends to SimShaker
-            stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
+            stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           elseif obj.Name == "Christen Eagle II" then
 
           -- Christen Eagle II sends to SimShaker
-          stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
+          stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           elseif obj.Name == "MiG-19P" then
 
           -- MiG-19P sends to SimShaker
-          stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfoInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
+          stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           else -- FC3 Planes
