@@ -21,7 +21,7 @@ import re
 import sys
 import argparse
 
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox
 from PyQt5.QtCore import QObject, pyqtSignal, Qt
 
 from time import monotonic
@@ -45,9 +45,6 @@ parser.add_argument('-p', '--plot', type=str, nargs='+',
 parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default="ffff:2055")
 
 args = parser.parse_args()
-
-vid_pid = [int(x, 16) for x in args.device.split(":")]
-HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
 
 
 if args.teleplot:
@@ -221,6 +218,13 @@ def main():
 
     # check and install/update export lua script
     utils.install_export_lua()
+	
+    vid_pid = [int(x, 16) for x in args.device.split(":")]
+    try:
+        HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
+    except:
+        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}")
+        return
 
     window = MainWindow()
     window.show()

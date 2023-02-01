@@ -40,8 +40,8 @@ class Aircraft(object):
     """Base class for Aircraft based FFB"""
     ####
     buffeting_intensity : float = 0.2 # peak AoA buffeting intensity  0 to disable
-    buffet_aoa : float          = 10 # AoA when buffeting starts
-    stall_aoa : float           = 15 # Stall AoA
+    buffet_aoa : float          = 10.0 # AoA when buffeting starts
+    stall_aoa : float           = 15.0 # Stall AoA
 
     runway_rumble_intensity : float = 1.0 # peak runway intensity, 0 to disable
 
@@ -218,13 +218,13 @@ class JetAircraft(Aircraft):
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
-    buffeting_intensity = 0
+    buffeting_intensity = 0.0
 
-    etl_start_speed = 6 # m/s
-    etl_stop_speed = 22 # m/s
+    etl_start_speed = 6.0 # m/s
+    etl_stop_speed = 22.0 # m/s
     etl_effect_intensity = 0.2 # [ 0.0 .. 1.0]
-    etl_shake_frequency = 14
-    overspeed_shake_start = 70 # m/s
+    etl_shake_frequency = 14.0
+    overspeed_shake_start = 70.0 # m/s
     overspeed_shake_intensity = 0.2
 
     def _calc_etl_effect(self, telem_data):
