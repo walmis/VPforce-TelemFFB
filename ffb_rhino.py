@@ -25,9 +25,11 @@ import time
 import ctypes
 import logging
 from utils import DirectionModulator
+import os
 
 try:
-    ctypes.cdll.LoadLibrary("dll/hidapi.dll")
+    hidapi_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')
+    ctypes.cdll.LoadLibrary(hidapi_path)
 except:
     pass
 

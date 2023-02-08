@@ -30,6 +30,7 @@ import threading
 import utils
 import aircrafts
 import traceback
+import os
 from ffb_rhino import HapticEffect
 from configobj import ConfigObj
 
@@ -46,6 +47,11 @@ parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID',
 
 args = parser.parse_args()
 
+config_path = os.path.join(os.path.dirname(__file__), "config.ini")
+try:
+    config = ConfigObj(config_path)
+    logging.info(f"Using Config: {config_path}")
+except: pass
 
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
@@ -126,8 +132,7 @@ class TelemManager(QObject, threading.Thread):
 
             if aircraft_name and aircraft_name != self.currentAircraftName:
                 # reload config
-                global config
-                config = ConfigObj("config.ini")
+                config.reload()
                 #load [default] values
                 defaults = dict(config["default"])
 
