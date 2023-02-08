@@ -37,7 +37,7 @@ from configobj import ConfigObj
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
 # Add destination telemetry address argument
-parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default="127.0.0.1:47269",
+parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default=None,
                     help='Destination IP:port address for teleplot.fr telemetry plotting service')
 
 parser.add_argument('-p', '--plot', type=str, nargs='+',
