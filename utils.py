@@ -22,6 +22,7 @@ import select
 from time import monotonic
 import logging
 import sys
+import winpaths
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -245,13 +246,16 @@ def to_body_vector(yaw, pitch, roll, world_coordinates):
 from PyQt5.QtWidgets import QMessageBox
 
 def install_export_lua():
+    saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
+    logging.info(f"Found Saved Games directory: {saved_games}")
+
     for dirname in ["DCS", "DCS.openbeta"]:
-        p = os.path.join(os.path.expanduser('~'), 'Saved Games', dirname)
+        p = os.path.join(saved_games, dirname)
         if not os.path.exists(p):
             logging.info(f"{p} does not exist, ignoring")
             continue
 
-        path = os.path.join(os.path.expanduser('~'), 'Saved Games', dirname, 'Scripts')
+        path = os.path.join(saved_games, dirname, 'Scripts')
         os.makedirs(path, exist_ok=True)
         out_path = os.path.join(path, "TelemFFB.lua")
 
