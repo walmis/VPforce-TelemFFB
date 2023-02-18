@@ -460,7 +460,6 @@ local f_telemFFB = {
             )
           elseif obj.Name == "A-10C" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local AoAunits = MainPanel:get_argument_value(4) * 30
             local FlapsPos = MainPanel:get_argument_value(653)
             local Canopy = MainPanel:get_argument_value(7)
             local Engine_RPM_left = string.format("%.0f", MainPanel:get_argument_value(78) * 100)
@@ -483,7 +482,7 @@ local f_telemFFB = {
               "000",
               windVelocityVectors,
               altAsl,
-              AoAunits,
+              aoa,
               PayloadInfo,
               FlapsPos,
               Canopy,
