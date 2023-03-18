@@ -21,17 +21,20 @@ jobs:
         name: VPforce-TelemFFB
         path: dist/windows/VPforce-TelemFFB
         
-    - name: release
-      uses: actions/create-release@v1
+    - name: Create Release
       id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
       with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          Changes in this Release
+          - First Change
+          - Second Change
         draft: false
         prerelease: false
-        release_name: ${{ github.ref }} #${{ steps.version.outputs.version }}
-        tag_name: ${{ github.ref }}
-        #body_path: CHANGELOG.md
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
         
     - name: upload windows artifact
       uses: actions/upload-release-asset@v1
