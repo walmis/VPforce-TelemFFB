@@ -29,10 +29,6 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
-        body: |
-          Changes in this Release
-          - First Change
-          - Second Change
         draft: false
         prerelease: false
         
@@ -42,6 +38,6 @@ jobs:
         GITHUB_TOKEN: ${{ github.token }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./bin/VPforce-TelemFFB.zip
+        asset_path:  dist/windows/VPforce-TelemFFB
         asset_name: VPforce-TelemFFB.zip
         asset_content_type: application/zip
