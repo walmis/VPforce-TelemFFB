@@ -30,8 +30,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
       with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
         draft: false
         prerelease: false
         
@@ -42,5 +42,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path:  VPforce-TelemFFB.zip
-        asset_name: VPforce-TelemFFB-${{ github.ref_name }}.zip
+        asset_name: VPforce-TelemFFB-${{ github.ref }}.zip
         asset_content_type: application/zip
