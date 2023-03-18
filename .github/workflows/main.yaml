@@ -23,7 +23,7 @@ jobs:
         
     - name: Make Zip
       run: |
-        zip -r VPforce-TelemFFB dist/windows/VPforce-TelemFFB
+        cd dist/windows/VPforce-TelemFFB && zip -r ../../../VPforce-TelemFFB .
         
     - name: Create Release
       id: create_release
@@ -43,5 +43,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path:  VPforce-TelemFFB.zip
-        asset_name: VPforce-TelemFFB.zip
+        asset_name: VPforce-TelemFFB-${{ github.ref_name }}.zip
         asset_content_type: application/zip
