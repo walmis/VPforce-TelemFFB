@@ -62,7 +62,14 @@ exclude_bin = ["QtWebEngineProcess.exe",
 		"libEGL",
 		"DBus",
 		"geoservices",
-		"sensorgestures"]
+		"sensorgestures",
+		"libegl",
+		"libgles",
+		"dsengine",
+		"qtmedia",
+		"wmfengine",
+		"qwebp",
+		"qtaudio"]
 		
 exclude_data = ["qtwebengine", "translations", "icudtl"]
 

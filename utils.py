@@ -300,8 +300,8 @@ class OutLog(QtCore.QObject):
         color = alternate color (i.e. color stderr a different color)
         """
         self.edit = edit
-        self.out = None
-        self.color = color
+        self.out = out
+        self.color = QtGui.QColor(color) if color else None
         self.textReceived.connect(self.on_received, Qt.Qt.QueuedConnection)
 
     def on_received(self, m):
@@ -315,8 +315,8 @@ class OutLog(QtCore.QObject):
         if self.color:
             self.edit.setTextColor(tc)
 
-        #if self.out:
-        #    self.out.write(m)
+        if self.out:
+            self.out.write(m)
 
     def write(self, m):
         self.textReceived.emit(m)

@@ -17,8 +17,18 @@
 
 import json
 import logging
-import re
 import sys
+sys.path.insert(0, '') 
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    stream=sys.stdout,
+)
+
+import re
+  
 import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox
@@ -28,8 +38,9 @@ from PyQt5.QtGui import QFont
 from time import monotonic
 import socket
 import threading
-import utils
 import aircrafts
+import utils
+
 import traceback
 import os
 from ffb_rhino import HapticEffect
@@ -78,17 +89,6 @@ class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
         self.widget = QtWidgets.QPlainTextEdit(parent)
         self.widget.setReadOnly(True)
         self.widget.setFont(QFont("Courier New"))
-
-        sys.stdout = utils.OutLog(self.widget, sys.stdout)
-        sys.stderr = utils.OutLog(self.widget, sys.stderr)
-
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S',
-            stream=sys.stdout,
-            force=True
-        )
 
         layout = QtWidgets.QVBoxLayout()
         # Add the new logging box widget to the layout
@@ -251,6 +251,12 @@ def main():
     d = LogWindow()
     d.show()
 
+    sys.stdout = utils.OutLog(d.widget, sys.stdout)
+    sys.stderr = utils.OutLog(d.widget, sys.stderr)
+
+    logging.getLogger().handlers[0].setStream(sys.stdout)
+    logging.info("TelemFFB Starting")
+    
     # check and install/update export lua script
     utils.install_export_lua()
 	
