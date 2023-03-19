@@ -20,9 +20,10 @@ import logging
 import re
 import sys
 import argparse
-
+from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox
 from PyQt5.QtCore import QObject, pyqtSignal, Qt
+from PyQt5.QtGui import QFont
 
 from time import monotonic
 import socket
@@ -33,6 +34,7 @@ import traceback
 import os
 from ffb_rhino import HapticEffect
 from configobj import ConfigObj
+
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -67,6 +69,32 @@ def format_dict(data, prefix=""):
     return output
 
 
+class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Log Console")
+        self.resize(800, 500)
+
+        self.widget = QtWidgets.QPlainTextEdit(parent)
+        self.widget.setReadOnly(True)
+        self.widget.setFont(QFont("Courier New"))
+
+        sys.stdout = utils.OutLog(self.widget, sys.stdout)
+        sys.stderr = utils.OutLog(self.widget, sys.stderr)
+
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S',
+            stream=sys.stdout,
+            force=True
+        )
+
+        layout = QtWidgets.QVBoxLayout()
+        # Add the new logging box widget to the layout
+        layout.addWidget(self.widget)
+        self.setLayout(layout)
+		
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
@@ -191,7 +219,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.addWidget(label)
 
-        self.lbl_telem_data = QLabel("waiting for data...")
+        self.lbl_telem_data = QLabel("Waiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.lbl_telem_data)
 
@@ -220,6 +248,8 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    d = LogWindow()
+    d.show()
 
     # check and install/update export lua script
     utils.install_export_lua()
