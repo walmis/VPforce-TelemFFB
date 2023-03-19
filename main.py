@@ -127,7 +127,7 @@ class TelemManager(QObject, threading.Thread):
                 while utils.sock_readable(s):
                     data = s.recvfrom(4096) # get last frame in OS buffer, to minimize latency
                 
-            except TimeoutError:
+            except socket.timeout:
                 if self.currentAircraft and not self.timedOut:
                     self.currentAircraft.on_timeout()
                 self.timedOut = True

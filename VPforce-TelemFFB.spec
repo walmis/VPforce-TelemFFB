@@ -13,12 +13,74 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['PyQt5.QtQuick', 'PyQt5.QtQuickWidgets', 'PyQt5.QtQuick3D', 'PyQt5.QtQml', 'PyQt5.QtOpenGL'],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
 )
+
+exclude_bin = ["QtWebEngineProcess.exe",
+		"Quick.dll", 
+		"QuickWidgets.dll", 
+		"Xml",
+		"Sql",
+		"PositioningQuick",
+		"Positioning",
+		"Bluetooth",
+		"Network",
+		"Test",
+		"Nfc",
+		"WebChannel",
+		"WebSockets",
+		"RemoteObjects",
+		"PrintSupport",
+		"TextToSpeech",
+		"QmlModels",
+		"Help",
+		"api-ms-win", 
+		"opengl32sw.dll",
+		"MSVCP140_1.dll",
+		"Qt5Qml.dll",
+		"Qt5WebEngineCore.dll",
+		"d3dcompiler_47.dll",
+		"qsqlite.dll",
+		"dbghelp.dll",
+		"dbgcore.dll",
+		"VCRUNTIME",
+		"Bluetooth",
+		"MSVCP",
+		"ucrtbase.dll",
+		"Sensors",
+		"WebEngine",
+		"Location",
+		"GLES",
+		"Multimedia",
+		"crypto",
+		"ssl",
+		"libeay32.dll",
+		"libEGL",
+		"DBus",
+		"geoservices",
+		"sensorgestures"]
+		
+exclude_data = ["qtwebengine", "translations", "icudtl"]
+
+def filter_bin(a):
+	ret = not (True in [x in a[0] for x in exclude_bin])
+	if not ret:
+		print("EXCL", a[0])
+	return ret
+	
+def filter_data(a):
+	ret = not (True in [x in a[0] for x in exclude_data])
+	if not ret:
+		print("EXCL", a[0])
+	return ret
+	
+a.binaries = TOC(list(filter(filter_bin, a.binaries)))
+a.datas = TOC(list(filter(filter_data, a.datas)))
+	
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
