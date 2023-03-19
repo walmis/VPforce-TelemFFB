@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Package Application
-      uses: JackMcKew/pyinstaller-action-windows@main
+      uses: walmis/pyinstaller-action-windows@main
       with:
         path: .
 
