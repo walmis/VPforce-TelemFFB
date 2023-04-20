@@ -64,7 +64,8 @@ config_path = os.path.join(os.path.dirname(__file__), "config.ini")
 try:
     config = ConfigObj(config_path)
     logging.info(f"Using Config: {config_path}")
-except: pass
+except Exception as err:
+    logging.error(f"Failed to load Config: {err}")
 
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
