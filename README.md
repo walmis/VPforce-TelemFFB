@@ -1,7 +1,7 @@
 
-# DCS FFB Telemetry Effects (for VPforce FFB)
+# DCS/MSFS FFB Telemetry Effects (for VPforce FFB)
 
-This Python application takes input from DCS telemetry via UDP and generates augmented force feedback (FFB) effects for various aircrafts in DCS World, including jets, helicopters and warbirds. 
+This Python application takes input from DCS telemetry via UDP or MSFS Telemetry via SimConnect and generates augmented force feedback (FFB) effects for various aircrafts in DCS World or MSFS, including jets, helicopters and warbirds. 
 
 Please note that while some effects may not be fully realistic, the main goal is to make the stick more lively and increase immersion during gameplay. 
 Also this early version is very bare-bones and community-driven development is very welcome!
@@ -19,7 +19,7 @@ Also this early version is very bare-bones and community-driven development is v
 ## Development
 
 - This framework is made to be very easy to manage FFB effect lifecycles and develop additional effects or specialize specific aircraft effects.
-Main action is going on in `aircrafts.py`. 
+Main action is going on in `aircrafts_dcs.py` or `aircrafts_msfs.py`. 
 For example to create an effect that plays a "bump" when a gun round is fired:
 ```python
         if self.has_changed("Gun") or self.has_changed("CannonShells"): 
