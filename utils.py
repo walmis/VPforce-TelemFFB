@@ -23,8 +23,12 @@ from time import monotonic
 import logging
 import sys
 import winpaths
+import socket
+import math
+import time
 
-
+def mix(a, b, val):
+    return a*(1-val) + b*(val)
 
 def to_number(v):
     """Try to convert string to number
@@ -37,6 +41,12 @@ def to_number(v):
             return int(v)
     except ValueError:
         return v
+    
+def sanitize_dict(d):
+    out = {}
+    for k,v in d.items():
+        out[k] = to_number(v)
+    return out
         
 
 def sock_readable(s) -> bool:
@@ -45,6 +55,7 @@ def sock_readable(s) -> bool:
 
 def clamp(n, minn, maxn):
     return sorted((minn, n, maxn))[1]
+
 
 def scale(val, src : tuple, dst : tuple):
     """
@@ -78,15 +89,19 @@ class LowPassFilter:
         self.cutoff_freq_hz = cutoff_freq_hz
         self.alpha = 0.0
         self.x_filt = init_val
-        self.last_update = monotonic()
-
+        self.last_update = time.perf_counter()
+    def __call__(self, x):
+        return self.update(x)
     def update(self, x):
-        now = monotonic()
+        now = time.perf_counter()
         dt = now - self.last_update
         if dt > 1: self.x_filt = x # initialize filter
         self.last_update = now
         self.alpha = dt / (1.0 / self.cutoff_freq_hz + dt)
         self.x_filt = self.alpha * x + (1.0 - self.alpha) * self.x_filt
+        return self.x_filt
+    @property
+    def value(self):
         return self.x_filt
 
 class HighPassFilter:
@@ -96,9 +111,12 @@ class HighPassFilter:
         self.last_update = 0
         self.last_input = init_val
         self.value = init_val
+    
+    def __call__(self, x):
+        return self.update(x)
         
     def update(self, x):
-        now = monotonic()
+        now = time.perf_counter()
         dt = now - self.last_update
         if dt > 1: 
             self.last_input = x # initialize filter
@@ -109,18 +127,41 @@ class HighPassFilter:
         self.value = alpha * (self.value + x - self.last_input)
         self.last_input = x
         return self.value
+    
+class Derivative:
+    def __init__(self, filter_hz=None) -> None:
+        self.prev_update = 0
+        self.prev_value = 0
+        self.value = 0
+        self.lpf = None
+        if filter_hz:
+            self.lpf = LowPassFilter(filter_hz)
+
+    def update(self, value):
+        now = time.perf_counter()
+        dx = value - self.prev_value
+        self.prev_value = value
+        dt = now - self.prev_update
+        self.prev_update = now
+        val = dx / dt
+        if self.lpf:
+            val = self.lpf.update(val)
+        self.value = val   
+            
+        return self.value
+
 
 class DirectionModulator:
     pass
 
 class RandomDirectionModulator(DirectionModulator):
     def __init__(self, period = 10):
-        self.prev_upd = monotonic()
+        self.prev_upd = time.perf_counter()
         self.value = 0
         self.period = period
 
     def update(self):
-        now = monotonic()
+        now = time.perf_counter()
         #dt = now - self.prev_upd
         if now - self.prev_upd > self.period/1000:
             self.prev_upd = now
@@ -166,9 +207,7 @@ class Dispenser:
         if name in self.dict:
             del self.dict[name]
 
-import socket
-import math
-import time
+
 
 class Teleplot:
     def __init__(self):
@@ -305,21 +344,24 @@ class OutLog(QtCore.QObject):
         self.textReceived.connect(self.on_received, Qt.Qt.QueuedConnection)
 
     def on_received(self, m):
-        if self.color:
-            tc = self.edit.textColor()
-            self.edit.setTextColor(self.color)
+        try:
+            if self.color:
+                tc = self.edit.textColor()
+                self.edit.setTextColor(self.color)
 
-        self.edit.moveCursor(QtGui.QTextCursor.End)
-        self.edit.insertPlainText( m )
+            self.edit.moveCursor(QtGui.QTextCursor.End)
+            self.edit.insertPlainText( m )
 
-        if self.color:
-            self.edit.setTextColor(tc)
-
-        if self.out:
-            self.out.write(m)
+            if self.color:
+                self.edit.setTextColor(tc)
+        except: pass
 
     def write(self, m):
-        self.textReceived.emit(m)
+        try:
+            self.textReceived.emit(m)
+        except: pass
+        if self.out:
+            self.out.write(m)
 
     def flush(self): pass
 

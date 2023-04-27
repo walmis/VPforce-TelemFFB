@@ -18,6 +18,7 @@
 import json
 import logging
 import sys
+import time
 sys.path.insert(0, '') 
 
 logging.basicConfig(
@@ -38,13 +39,18 @@ from PyQt5.QtGui import QFont
 from time import monotonic
 import socket
 import threading
-import aircrafts
+import aircrafts_dcs
+import aircrafts_msfs
 import utils
 
 import traceback
 import os
 from ffb_rhino import HapticEffect
 from configobj import ConfigObj
+
+from sc_manager import SimConnectManager
+
+config : ConfigObj = None
 
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
@@ -57,18 +63,13 @@ parser.add_argument('-p', '--plot', type=str, nargs='+',
                     help='Telemetry item names to send to teleplot, separated by spaces')
 
 parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default="ffff:2055")
+parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
 
 args = parser.parse_args()
 
-config_path = os.path.join(os.path.dirname(__file__), "config.ini")
-try:
-    config = ConfigObj(config_path)
-    logging.info(f"Using Config: {config_path}")
-except: pass
-
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
-    
+    utils.teleplot.configure(args.teleplot)
 
 def format_dict(data, prefix=""):
     output = ""
@@ -79,6 +80,10 @@ def format_dict(data, prefix=""):
             output += prefix + key + " = " + str(value) + "\n"
     return output
 
+def reload_config():
+    global config
+    # reload config
+    config.reload()
 
 class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
     def __init__(self, parent=None):
@@ -99,7 +104,7 @@ class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
 
-    currentAircraft : aircrafts.Aircraft = None
+    currentAircraft : aircrafts_dcs.Aircraft = None
     currentAircraftName : str = None
     timedOut : bool = True
     lastFrameTime : float
@@ -126,7 +131,8 @@ class TelemManager(QObject, threading.Thread):
                 data = s.recvfrom(4096)
                 while utils.sock_readable(s):
                     data = s.recvfrom(4096) # get last frame in OS buffer, to minimize latency
-                
+            except ConnectionResetError:
+                continue
             except socket.timeout:
                 if self.currentAircraft and not self.timedOut:
                     self.currentAircraft.on_timeout()
@@ -134,10 +140,14 @@ class TelemManager(QObject, threading.Thread):
                 continue
 
             self.timedOut = False
-            # print(data)
+
+            # get UDP sender
+            sender = data[1]
+          
+            #print(sender)
             self.lastFrameTime = monotonic()
             data = data[0].decode("utf-8").split(";")
-            items = {}
+            telem_data = {}
 
             if data[0] == "DISCONNECT":
                 logging.info("Telemetry disconnected")
@@ -145,41 +155,46 @@ class TelemManager(QObject, threading.Thread):
 
             for i in data:
                 try:
-                    k,v = i.split("=")
-                    values = v.split("~")
-                    items[k] = [utils.to_number(v) for v in values] if len(values)>1 else utils.to_number(v)
-                except:
-                    pass
+                    section,conf = i.split("=")
+                    values = conf.split("~")
+                    telem_data[section] = [utils.to_number(v) for v in values] if len(values)>1 else utils.to_number(conf)
+                except Exception as e:
+                    print(e)
 
             try:
-                items["MechInfo"] = json.loads(items["MechInfo"])
+                telem_data["MechInfo"] = json.loads(telem_data["MechInfo"])
             except: pass
 
             #print(items)
-            aircraft_name = items.get("N")
+            aircraft_name = telem_data.get("N")
+            data_source = telem_data.get("src", None)
+            if data_source == "MSFS2020":
+                module = aircrafts_msfs
+            else:
+                module = aircrafts_dcs
 
             if aircraft_name and aircraft_name != self.currentAircraftName:
-                # reload config
-                config.reload()
+                reload_config()
                 #load [default] values
-                defaults = dict(config["default"])
+                defaults = utils.sanitize_dict(config["default"])
 
                 if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
                     cls = None
                     params = {}
                     # find matching aircraft in config
-                    for k,v in config.items():
-                        if re.match(k, aircraft_name):
+                    for section,conf in config.items():
+                        if re.match(section, aircraft_name):
+                            conf = utils.sanitize_dict(conf)
                             logging.info(f"Found aircraft {aircraft_name} in config")
-                            cls = getattr(aircrafts, v["type"], None)
+                            cls = getattr(module, conf["type"], None)
                             params = defaults
-                            params.update(v)
+                            params.update(conf)
                             if not cls:
-                                logging.error(f"No such class {v['type']}")
+                                logging.error(f"No such class {conf['type']}")
 
                     if not cls:
                         logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
-                        cls = aircrafts.Aircraft
+                        cls = module.Aircraft
                         params = defaults
 
                     logging.info(f"Creating handler for {aircraft_name}: {cls}")
@@ -190,18 +205,37 @@ class TelemManager(QObject, threading.Thread):
 
             if self.currentAircraft:
                 try:
-                    self.currentAircraft.on_telemetry(items)
+                    _tm = time.perf_counter()
+                    commands = self.currentAircraft.on_telemetry(telem_data)
+                    telem_data["perf"] = f"{(time.perf_counter() - _tm)*1000:.3f}ms"
+                    if commands:
+                        #send command back
+                        s.sendto(bytes(commands, "utf-8"), sender)
                 except:
                     traceback.print_exc()
 
             if args.plot:
                 for item in args.plot:
-                    if item in items:
-                        utils.teleplot.sendTelemetry(item, items[item])
+                    if item in telem_data:
+                        utils.teleplot.sendTelemetry(item, telem_data[item])
             
-            self.telemetryReceived.emit(items)
+            self.telemetryReceived.emit(telem_data)
 
 
+class SimConnectSock(SimConnectManager):
+    def __init__(self):
+        super().__init__()
+        self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    def fmt(self, val):
+        if isinstance(val, list):
+            return "~".join([str(x) for x in val])
+        return val
+
+    def emit_packet(self, data):
+        data["src"] = "MSFS2020"
+        packet = bytes(";".join([f"{k}={self.fmt(v)}" for k,v in data.items()]), "utf-8")
+        self.s.sendto(packet, ("127.0.0.1", 34380))
 
 
 
@@ -212,7 +246,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("TelemFFB")
 
-        label = QLabel("DCS Telemetry")
+        label = QLabel("Telemetry Data")
 
         #self.setFixedSize(QSize(400, 300))
 
@@ -229,20 +263,28 @@ class MainWindow(QMainWindow):
 
         # Set the central widget of the Window.
         #self.setCentralWidget(label)
+    
+    def closeEvent(self, event) -> None:
+        QApplication.exit()
 
     def update_telemetry(self, data : dict):
-        items = ""
-        for k,v in data.items():
-            if k == "MechInfo":
-                v = format_dict(v, "MechInfo.")
-                items += f"{v}"
-            else:
-                if type(v) == float:
-                    items += f"{k}: {v:.2f}\n"
+        try:
+            items = ""
+            for k,v in data.items():
+                if k == "MechInfo":
+                    v = format_dict(v, "MechInfo.")
+                    items += f"{v}"
                 else:
-                    items += f"{k}: {v}\n"
-            
-        self.lbl_telem_data.setText(items)
+                    if type(v) == float:
+                        items += f"{k}: {v:.3f}\n"
+                    else:
+                        if isinstance(v, list):
+                            v = "[" + ", ".join([f"{x:.3f}" if not isinstance(x, str) else x for x in v]) + "]"
+                        items += f"{k}: {v}\n"
+                
+            self.lbl_telem_data.setText(items)
+        except Exception as e:
+            traceback.print_exc()
 
 
 
@@ -262,10 +304,23 @@ def main():
 	
     vid_pid = [int(x, 16) for x in args.device.split(":")]
     try:
-        HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
+        dev = HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
+        if args.reset:
+            dev.resetEffects()
     except:
         QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}")
         return
+    
+
+    config_path = os.path.join(os.path.dirname(__file__), "config.ini")
+
+    try:
+        global config
+        config = ConfigObj(config_path)
+        logging.info(f"Using Config: {config_path}")
+    except: 
+        logging.exception(f"Cannot load config {config_path}")
+
 
     window = MainWindow()
     window.show()
@@ -274,6 +329,9 @@ def main():
     manager.start()
 
     manager.telemetryReceived.connect(window.update_telemetry)
+
+    sc = SimConnectSock()
+    sc.start()
 
 
     app.exec_()

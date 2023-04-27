@@ -1,24 +1,112 @@
 local JSON = loadfile("Scripts\\JSON.lua")()
+package.path = package.path .. ";.\\LuaSocket\\?.lua"
+package.cpath = package.cpath .. ";.\\LuaSocket\\?.dll"
+local socket = require("socket")
+
+-- Return if socket has data to read
+local function sock_readable(s)
+  local ret = socket.select({s}, {}, 0)
+  if ret[s] then
+    return true
+  end
+  return false
+end
+
+-- The ExportScript.Tools.dump function show the content of the specified variable.
+-- ExportScript.Tools.dump is similar to PHP function dump and show variables from type
+-- "nil, "number", "string", "boolean, "table", "function", "thread" and "userdata"
+local function dump(var, depth)
+  depth = depth or 0
+  if type(var) == "string" then
+      return 'string: "' .. var .. '"\n'
+  elseif type(var) == "nil" then
+      return 'nil\n'
+  elseif type(var) == "number" then
+      return 'number: "' .. var .. '"\n'
+  elseif type(var) == "boolean" then
+      return 'boolean: "' .. tostring(var) .. '"\n'
+  elseif type(var) == "function" then
+      if debug and debug.getinfo then
+          fcnname = tostring(var)
+          local info = debug.getinfo(var, "S")
+          if info.what == "C" then
+              return string.format('%q', fcnname .. ', C function') .. '\n'
+          else
+              if (string.sub(info.source, 1, 2) == [[./]]) then
+                  return string.format('%q', fcnname .. ', defined in (' .. info.linedefined .. '-' .. info.lastlinedefined .. ')' .. info.source) ..'\n'
+              else
+                  return string.format('%q', fcnname .. ', defined in (' .. info.linedefined .. '-' .. info.lastlinedefined .. ')') ..'\n'
+              end
+          end
+      else
+          return 'a function\n'
+      end
+  elseif type(var) == "thread" then
+      return 'thread\n'
+  elseif type(var) == "userdata" then
+      return tostring(var)..'\n'
+  elseif type(var) == "table" then
+          depth = depth + 1
+          out = "{\n"
+          for k,v in pairs(var) do
+                  out = out .. (" "):rep(depth*4).. "["..k.."] :: " .. dump(v, depth)
+          end
+          return out .. (" "):rep((depth-1)*4) .. "}\n"
+  else
+          return tostring(var) .. "\n"
+  end
+end
 
 local f_telemFFB = {
   Start = function(self)
-    package.path = package.path .. ";.\\LuaSocket\\?.lua"
-    package.cpath = package.cpath .. ";.\\LuaSocket\\?.dll"
-    socket = require("socket")
-    
-    local connect_init =
-      socket.protect(
-      function()
-        --host = "127.0.0.1"
-        --port1=29375
-        self.sock_udp = socket.try(socket.udp())
-        socket.try(self.sock_udp:settimeout(.001))
-        socket.try(self.sock_udp:setoption('broadcast', true))
-        socket.try(self.sock_udp:setpeername("127.255.255.255", 34380))
-        socket.try(self.sock_udp:send("CONNECT"))
+
+    self.recv_data = ""
+    self.prev_command_t = socket.gettime()
+
+    self.host = "127.0.0.1"
+    self.port = 34380
+
+    self.sock_udp = socket.try(socket.udp())
+    self.sock_rcv = socket.try(socket.udp())
+    socket.try(self.sock_rcv:setsockname("127.0.0.1", 34381))
+    socket.try(self.sock_rcv:settimeout(.001))
+
+    socket.try(self.sock_udp:settimeout(.001))
+    --socket.try(self.sock_udp:setoption('broadcast', true))
+    --socket.try(self.sock_udp:setpeername("127.0.0.1", 34380))
+
+    socket.try(self.sock_udp:sendto("CONNECT", self.host, self.port))
+
+  end,
+  BeforeNextFrame = function(self)
+    --LoSetCommand(2001, 0.25)
+    if self.sock_udp then
+      while sock_readable(self.sock_udp)
+      do
+        local data, addr = self.sock_udp:receivefrom()
+        self.prev_command_t = socket.gettime()
+        if data == nil then
+          data = ""
+        else
+          self.recv_data = data
+        end
       end
-    )
-    connect_init()
+
+      -- if no commands are received in 100ms, do not repeat last commands
+      if socket.gettime() - self.prev_command_t > 0.1 then
+        self.recv_data = ""
+      end
+
+      if self.recv_data ~= "" then
+        local f = loadstring(self.recv_data)
+        if f then
+          f()
+        end
+      end
+  
+
+    end
+    
   end,
   AfterNextFrame = function(self)
     local data_send =
@@ -86,9 +174,11 @@ local f_telemFFB = {
           local temparray = {}
 
           for i_st, st in pairs(stations) do
+            local name = LoGetNameByType(st.weapon.level1,st.weapon.level2,st.weapon.level3,st.weapon.level4);
             temparray[#temparray + 1] =
               string.format(
-              "%d%d%d%d*%d",
+              "%s-%d.%d.%d.%d*%d",
+              name,
               st.weapon.level1,
               st.weapon.level2,
               st.weapon.level3,
@@ -714,9 +804,21 @@ local f_telemFFB = {
           elseif obj.Name == "AV8BNA" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- AV8BNA sends to SimShaker
+
+            local AileronTrim = MainPanel:get_argument_value(473) * 0.3
+            local RudderTrim = MainPanel:get_argument_value(474)
+            local stickY = MainPanel:get_argument_value(701)
+            local stickX = MainPanel:get_argument_value(702)
+
+            -- local flt = GetDevice(28)
+            -- local sflt = (dump(flt) .. dump(getmetatable(flt)) )
+            -- if flt ~= nil then
+            --   flt:update_arguments()
+            -- end
+
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
+              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s;AileronTrim=%.3f;RudderTrim=%.3f;StickX=%.3f;StickY=%.3f;vv=%s",
               t,
               obj.Name,
               myselfData,
@@ -734,7 +836,12 @@ local f_telemFFB = {
               M_number,
               tas,
               CM.flare,
-              CM.chaff
+              CM.chaff,
+              AileronTrim,
+              RudderTrim,
+              stickX,
+              stickY,
+              self.recv_data
             )
           elseif obj.Name == "FA-18C_hornet" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -907,7 +1014,7 @@ local f_telemFFB = {
 
           stringToSend = string.format("%s;WeightOnWheels=%s;MechInfo=%s", stringToSend, WoW, mech)
 
-          socket.try(self.sock_udp:send(stringToSend))
+          socket.try(self.sock_udp:sendto(stringToSend, self.host, self.port))
         end
       end
     )
@@ -918,8 +1025,10 @@ local f_telemFFB = {
       socket.protect(
       function()
         if self.sock_udp then
-          socket.try(self.sock_udp:send("DISCONNECT"))
+          socket.try(self.sock_udp:sendto("DISCONNECT", self.host, self.port))
           self.sock_udp:close()
+          self.sock_udp = nil
+
         end
       end
     )
@@ -958,6 +1067,16 @@ do
     f_telemFFB:Stop()
     if SimLuaExportStop then
       SimLuaExportStop()
+    end
+  end
+end
+
+do
+  local SimLuaExportBeforeNextFrame = LuaExportBeforeNextFrame
+  LuaExportBeforeNextFrame = function()
+    f_telemFFB:BeforeNextFrame()
+    if SimLuaExportBeforeNextFrame then
+      SimLuaExportBeforeNextFrame()
     end
   end
 end
