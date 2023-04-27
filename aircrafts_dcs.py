@@ -17,7 +17,7 @@
  
 import math
 from typing import List, Dict
-from ffb_rhino import HapticEffect
+from ffb_rhino import HapticEffect, FFBReport_SetCondition
 import utils
 import logging
 
@@ -36,6 +36,7 @@ HPFs : Dict[str, utils.HighPassFilter]  = utils.Dispenser(utils.HighPassFilter)
 # Lowpass filter dispenser
 LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 
+
 class Aircraft(object):
     """Base class for Aircraft based FFB"""
     ####
@@ -48,6 +49,8 @@ class Aircraft(object):
     gun_vibration_intensity : float = 0.12
     cm_vibration_intensity : float = 0.12
     weapon_release_intensity : float = 0.12
+    rocket_release_intensity : float = 0.12
+    
 
     ####
     def __init__(self, name : str, **kwargs):
@@ -66,12 +69,38 @@ class Aircraft(object):
         for e in effects.values(): e.destroy()
         effects.clear()
 
+        self.spring = HapticEffect().spring()
+        #self.spring.effect.effect_id = 5
+        self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
+
     def has_changed(self, item : str) -> bool:
         prev_val = self._changes.get(item)
         new_val = self._telem_data.get(item)
+#        print(new_val)
         self._changes[item] = new_val
         if prev_val != new_val and prev_val is not None and new_val is not None:
-            return (prev_val,new_val)
+            side = None
+            weapon_type = None
+            if item == "PayloadInfo":
+                map_change = 0
+                l = len(new_val)
+                for num in range(l):
+                    if prev_val[num] != new_val[num]:
+                        map_change |= 1 << num
+                        weapon_type = prev_val[num].split("*")[0]
+                # logging.info(f"{bin(map_change)}")
+                # logging.info(f"{weapon_type}")
+                if map_change < 2**(l//2):
+                    side = "left"
+                elif map_change > 2**(l//2)-1:
+                    if (l % 2) == 0:
+                        side = "right"
+                    elif map_change > 2**((l//2)+1)-1:
+                        side = "right"
+                    else:
+                        side = "both"
+            return (prev_val,new_val,side,weapon_type)
         return False
 
     def _calc_buffeting(self, aoa, speed) -> tuple:
@@ -102,14 +131,32 @@ class Aircraft(object):
             hp_f_cutoff_hz = 3
             v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[1])) * self.runway_rumble_intensity
             v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[0]-WoW[2]) * self.runway_rumble_intensity
+            
+            # limit the intensity
+            if v1 > 1.0:
+                v1 = 1.0
+            elif v1 < -1.0:
+                v1 = -1.0
+            if v2 > 1.0:
+                v2 = 1.0
+            elif v2 < -1.0:
+                v2 = -1.0
 
             # modulate constant effects for X and Y axis
             # connect Y axis to nosewheel, X axis to the side wheels
             tot_weight = sum(WoW)
 
             if tot_weight:
-                effects["runway0"].constant(v1, 0).start()
-                effects["runway1"].constant(v2, 90).start()
+                # logging.info(f"v1 = {v1}")
+                if v1 > 0:
+                    effects["runway0"].constant(v1, 0).start()
+                else:
+                    effects["runway0"].constant(abs(v1), 180).start()
+                # logging.info(f"v2 = {v2}")
+                if v2 > 0:
+                    effects["runway1"].constant(v2, 90).start()
+                else:
+                    effects["runway1"].constant(abs(v2), 270).start()
             else:
                 effects.dispose("runway0")
                 effects.dispose("runway1")
@@ -119,22 +166,52 @@ class Aircraft(object):
         tas = telem_data.get("TAS", 0)
         agl = telem_data.get("altAgl", 0)
 
-        buffeting = self._calc_buffeting(aoa, tas)
+        freq, mag = self._calc_buffeting(aoa, tas)
         # manage periodic effect for buffeting
-        effects["buffeting"].periodic(buffeting[0], buffeting[1], 0).start()
-        effects["buffeting2"].periodic(buffeting[0], buffeting[1], 45, phase=120).start()
+        if mag:
+            effects["buffeting"].periodic(freq, mag, 0).start()
+            effects["buffeting2"].periodic(freq, mag, 45, phase=120).start()
 
-
-        telem_data["dbg_buffeting"] = buffeting # save debug value
+        telem_data["dbg_buffeting"] = (freq, mag) # save debug value
 
     def _update_cm_weapons(self, telem_data):
-        if self.has_changed("PayloadInfo"):
-            effects["cm"].stop()
-            effects["cm"].periodic(10, self.weapon_release_intensity, 45, duration=80).start()
+        a = self.has_changed("PayloadInfo")
+        if a:
+            # logging.info(f"side = {a[2]}")
+            if a[2] == "left":
+                if a[3] == "448292":
+                    effects["cm"].stop()
+                    effects["cm"].periodic(10, self.rocket_release_intensity, 0, duration=50).start()
+                elif a[3] == "44877" or a[3] == "448138" or a[3] == "44722":
+                    effects["cm"].stop()
+                    effects["cm"].periodic(2, self.weapon_release_intensity, 0, duration=100).start()
+                else:
+                    effects["cm"].stop()
+                    effects["cm"].periodic(2, self.weapon_release_intensity, 90, duration=100).start()
+                    effects["cm"].periodic(2, self.weapon_release_intensity, 270, duration=100).start()
+            elif a[2] == "right":
+                if a[3] == "448292":
+                    effects["cm"].stop()
+                    effects["cm"].periodic(10, self.rocket_release_intensity, 0, duration=50).start()
+                elif a[3] == "44877" or a[3] == "448138" or a[3] == "44722":
+                    effects["cm"].stop()
+                    effects["cm"].periodic(2, self.weapon_release_intensity, 0, duration=100).start()
+                else:
+                    effects["cm"].stop()
+                    effects["cm"].periodic(2, self.weapon_release_intensity, 270, duration=100).start()
+                    effects["cm"].periodic(2, self.weapon_release_intensity, 90, duration=100).start()
+            else:
+                if a[3] == "448292":
+                    effects["cm"].stop()
+                    effects["cm"].periodic(10, self.rocket_release_intensity, 0, duration=50).start()
+                else:
+                    effects["cm"].stop()
+                    effects["cm"].periodic(2, self.weapon_release_intensity, 0, duration=100).start()
+                    effects["cm"].periodic(2, self.weapon_release_intensity, 180, duration=100).start()
 
         if self.has_changed("Gun") or self.has_changed("CannonShells"):
             effects["cm"].stop()
-            effects["cm"].periodic(10, self.gun_vibration_intensity, 45, duration=50).start()
+            effects["cm"].periodic(10, self.gun_vibration_intensity, 0, duration=50).start()
         if self.has_changed("Flares") or self.has_changed("Chaff"):
             effects["cm"].stop()
             effects["cm"].periodic(5, self.cm_vibration_intensity, 45, duration=30).start()
@@ -150,6 +227,37 @@ class Aircraft(object):
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
+
+        # if stick position data is in the telemetry packet
+        if "StickX" in telem_data and "StickY" in telem_data:
+            x, y = HapticEffect.device.getInput()
+            telem_data["X"] = x
+            telem_data["Y"] = y
+
+            self.spring_x.positiveCoefficient = 4096
+            self.spring_x.negativeCoefficient = 4096
+            self.spring_y.positiveCoefficient = 4096
+            self.spring_y.negativeCoefficient = 4096
+            
+            # trim signal needs to be slow to avoid positive feedback
+            lp_y = LPFs.get("y", 2)
+            lp_x = LPFs.get("x", 2)
+
+            # estimate trim from real stick position and virtual stick position
+            offs_x = lp_x.update(telem_data['StickX'] - x + lp_x.value)
+            offs_y = lp_y.update(telem_data['StickY'] - y + lp_y.value)
+            self.spring_x.cpOffset = round(offs_x * 4096)
+            self.spring_y.cpOffset = round(offs_y * 4096)
+
+            #upload effect parameters to stick
+            self.spring.effect.setCondition(self.spring_x)
+            self.spring.effect.setCondition(self.spring_y)
+            #ensure effect is started
+            self.spring.start()
+
+            # override DCS input and set our own values           
+            return f"LoSetCommand(2001, {y - offs_y})\n"\
+                   f"LoSetCommand(2002, {x - offs_x})"
 
     def on_timeout(self):
         # stop all effects when telemetry stops

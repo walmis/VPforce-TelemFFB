@@ -24,8 +24,9 @@ with additional FFB effects.
 import time
 import ctypes
 import logging
-from utils import DirectionModulator
+from utils import DirectionModulator, clamp
 import os
+import weakref
 
 try:
     hidapi_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')
@@ -175,11 +176,28 @@ class FFBReport_BlockFree(BaseStructure):
                ]
     _defaults_ = { "reportId": HID_REPORT_ID_BLOCK_FREE } 
 
+class FFBReport_Input(BaseStructure):
+    _pack_ = 1
+    _fields_ = [("reportId", ctypes.c_uint8), # = 1
+                ("X", ctypes.c_int16),
+                ("Y", ctypes.c_int16),
+                ("Z", ctypes.c_int16),
+                ("Rz", ctypes.c_uint8),
+                ("Ry", ctypes.c_uint8),
+                ("Rx", ctypes.c_uint8),
+                ("Slider", ctypes.c_uint8),
+                ("Button", ctypes.c_uint32),
+                ("ButtonAux", ctypes.c_uint16),
+                ("hats", ctypes.c_uint16),
+               ]
+    _defaults_ = {}
+
 class FFBEffectHandle:
     def __init__(self, device, effect_id, type) -> None:
         self.ffb : FFBRhino = device
         self.effect_id = effect_id
         self.type = type
+        self._finalizer = weakref.finalize(self, self.destroy)
     
     def start(self, loopCount=1):
         op = FFBReport_EffectOperation(effectBlockIndex=self.effect_id, operation=OP_START, loopCount=loopCount)
@@ -193,6 +211,7 @@ class FFBEffectHandle:
 
     def destroy(self):
         if self.effect_id is not None:
+            logging.debug(f"Destroying effect {self.effect_id}")
             op = FFBReport_BlockFree(effectBlockIndex=self.effect_id)
             self.ffb.write(bytes(op))
             self.type = 0
@@ -224,6 +243,23 @@ class FFBEffectHandle:
         self.ffb.write(bytes(op))
         return self
 
+    def setEffect(self, **kwargs):
+        kw = {
+            "effectBlockIndex": self.effect_id,
+            "effectType": self.type,
+            "axesEnable": AXIS_ENABLE_X | AXIS_ENABLE_Y,
+            "gain": 4096
+        }
+        kwargs.update(kw)
+        op = FFBReport_SetEffect(**kwargs)
+        self.ffb.write(bytes(op))
+    
+    def setCondition(self, cond : FFBReport_SetCondition):
+        cond.effectBlockIndex = self.effect_id
+        cond.positiveCoefficient = clamp(cond.positiveCoefficient, -4096, 4096)
+        cond.negativeCoefficient = clamp(cond.negativeCoefficient, -4096, 4096)
+        self.ffb.write(bytes(cond))
+
     def setPeriodic(self, freq, magnitude, direction, **kwargs):
         assert(self.type in PERIODIC_EFFECTS)
         assert(magnitude >= 0 and magnitude <= 1.0)
@@ -247,9 +283,6 @@ class FFBEffectHandle:
         op = FFBReport_SetPeriodic(magnitude=round(4096*magnitude), effectBlockIndex=self.effect_id, period=period, **kwargs)
         self.ffb.write(bytes(op))
         return self
-    
-    def __del__(self):
-        self.destroy()
 
 
            
@@ -274,6 +307,11 @@ class FFBRhino:
     def write(self, data):
         if self.device.write(data) < 0:
             raise IOError("HID Write")
+        
+    def getInput(self):
+        data = self.device.get_input_report(1, ctypes.sizeof(FFBReport_Input))
+        s = FFBReport_Input.from_buffer_copy(data)
+        return (s.X/4096.0, s.Y/4096.0)
 
 
 class HapticEffect:
@@ -287,6 +325,13 @@ class HapticEffect:
         logging.info(f"Open Rhino HID {vid:04X}:{pid:04X}")
         cls.device = FFBRhino(vid, pid)
         return cls.device
+    
+    def spring(self):
+        if not self.effect:
+            self.effect = self.device.createEffect(EFFECT_SPRING)
+            self.effect.setEffect() # initialize defaults
+        return self
+
 
     def periodic(self, frequency, magnitude:float, direction:float, effect_type=EFFECT_SINE, *args, **kwargs):
         if not self.effect:
@@ -337,7 +382,6 @@ class HapticEffect:
 
     def destroy(self):
         if self.effect:
-            logging.info(f"Destroying effect {self.effect.effect_id}")
             self.effect.destroy()
             self.effect = None
 
