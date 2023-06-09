@@ -15,3 +15,7 @@ jobs:
       with:
         path: .
        
+    - uses: actions/upload-artifact@v3
+      with:
+        name: build
+        path: dist/windows/VPforce-TelemFFB
