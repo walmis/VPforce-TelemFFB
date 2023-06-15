@@ -58,9 +58,18 @@ parser.add_argument('-p', '--plot', type=str, nargs='+',
 
 parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default="ffff:2055")
 
+# Add config file argument, default config.ini
+parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
+
 args = parser.parse_args()
 
-config_path = os.path.join(os.path.dirname(__file__), "config.ini")
+# Use config file arguement in config_path
+config_path = os.path.join(os.path.dirname(__file__), args.configfile)
+
+# Log config file error here as try-except below does not catch missing file (no operations done on file that would trigger exception)
+if not os.path.exists(config_path):
+    logging.error(f"Failed to load Config: {config_path}")
+    
 try:
     config = ConfigObj(config_path)
     logging.info(f"Using Config: {config_path}")
