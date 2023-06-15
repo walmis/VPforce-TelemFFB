@@ -20,6 +20,8 @@ from typing import List, Dict
 from ffb_rhino import HapticEffect
 import utils
 import logging
+import random
+
 
 #unit conversions (to m/s)
 knots = 0.514444
@@ -48,6 +50,7 @@ class Aircraft(object):
     gun_vibration_intensity : float = 0.12
     cm_vibration_intensity : float = 0.12
     weapon_release_intensity : float = 0.12
+    weapon_effect_direction: str = 45
 
     ####
     def __init__(self, name : str, **kwargs):
@@ -130,14 +133,36 @@ class Aircraft(object):
     def _update_cm_weapons(self, telem_data):
         if self.has_changed("PayloadInfo"):
             effects["cm"].stop()
-            effects["cm"].periodic(10, self.weapon_release_intensity, 45, duration=80).start()
+            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
+            if self.weapon_effect_direction == -1:
+                #Init random number for effect direction
+                random_weapon_release_direction = random.randint(0, 359)
+                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start()
+            else:
+                effects["cm"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction, duration=80).start()
 
         if self.has_changed("Gun") or self.has_changed("CannonShells"):
             effects["cm"].stop()
-            effects["cm"].periodic(10, self.gun_vibration_intensity, 45, duration=50).start()
+            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
+            if self.weapon_effect_direction == -1:
+                #Init random number for effect direction
+                random_weapon_release_direction = random.randint(0, 359)
+                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start()
+            else:
+                effects["cm"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction, duration=80).start()
+        
         if self.has_changed("Flares") or self.has_changed("Chaff"):
             effects["cm"].stop()
-            effects["cm"].periodic(5, self.cm_vibration_intensity, 45, duration=30).start()
+            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
+            if self.weapon_effect_direction == -1:
+                #Init random number for effect direction
+                random_weapon_release_direction = random.randint(0, 359)
+                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(10, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start()
+            else:
+                effects["cm"].periodic(10, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start()
 
     def on_telemetry(self, telem_data : dict):
         """when telemetry frame is received, aircraft class receives data in dict format
