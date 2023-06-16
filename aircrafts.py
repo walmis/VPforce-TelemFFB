@@ -50,7 +50,7 @@ class Aircraft(object):
     gun_vibration_intensity : float = 0.12
     cm_vibration_intensity : float = 0.12
     weapon_release_intensity : float = 0.12
-    weapon_effect_direction: str = 45
+    weapon_effect_direction: int = 45
 
     ####
     def __init__(self, name : str, **kwargs):
