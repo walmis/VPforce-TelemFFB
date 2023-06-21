@@ -354,7 +354,7 @@ local f_telemFFB = {
             -- FW-190D9 sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Grn-Red-Lights=0;MP-MW=%.2f~%.2f;Wind=%s;altASL=%.2f;14_AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
+              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Grn-Red-Lights=0;MP-MW=%.2f~%.2f;Wind=%s;altASL=%.2f;14_AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
               t,
               obj.Name,
               myselfData,
@@ -390,7 +390,7 @@ local f_telemFFB = {
             -- Bf-109K-4 sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%i;9_ACCs=%s;10_Grn-Red-Lights=0;11_MP-MW=%.2f~%.2f;Wind=%s;altASL=%.2f;14_AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
+              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%i;9_ACCs=%s;10_Grn-Red-Lights=0;11_MP-MW=%.2f~%.2f;Wind=%s;altASL=%.2f;14_AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
               t,
               obj.Name,
               myselfData,
@@ -473,7 +473,7 @@ local f_telemFFB = {
             -- F-86F sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Gr-RedLight=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
+              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Gr-RedLight=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
               t,
               obj.Name,
               myselfData,
@@ -571,7 +571,7 @@ local f_telemFFB = {
             -- MiG-15Bis sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%i;VlctVectors=%s;altAgl=%.2f;PanShake=0;Gun=%s;ACCs=%s;Gr-RedLight=%s;d=0;Wind=%s;altASL=%.2f;AoA=%.2f;Payload=%s;Flaps=0;17d=0;18_Canopy=%.1f;19d=0;20d=0;TAS=%.2f",
+              "T=%.3f;N=%s;SelfData=%s;EngRPM=%i;VlctVectors=%s;altAgl=%.2f;PanShake=0;Gun=%s;ACCs=%s;Gr-RedLight=%s;d=0;Wind=%s;altASL=%.2f;AoA=%.2f;Payload=%s;Flaps=0;17d=0;18_Canopy=%.1f;19d=0;20d=0;TAS=%.2f",
               t,
               obj.Name,
               myselfData,
