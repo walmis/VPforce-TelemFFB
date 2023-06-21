@@ -372,6 +372,7 @@ local f_telemFFB = {
               PayloadInfo,
               tas
             )
+			
           elseif obj.Name == "Bf-109K-4" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local Manifold_Pressure = MainPanel:get_argument_value(32)
@@ -409,7 +410,7 @@ local f_telemFFB = {
             )
           elseif obj.Name == "SpitfireLFMkIX" or obj.Name == "SpitfireLFMkIXCW" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local Engine_RPM = MainPanel:get_argument_value(37)
+            local Engine_RPM = MainPanel:get_argument_value(37) * 10000
             local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
@@ -417,7 +418,37 @@ local f_telemFFB = {
               MainPanel:get_argument_value(143),
               MainPanel:get_argument_value(142)
             )
-            -- SPITFIRE sends to SimShaker
+            -- SPITFIRE sends to TelemFFB
+            stringToSend =
+              string.format(
+              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;CannonShells=%.0f;ACCs=%s;d10=0;d11=0~0;Wind=%s;altASL=%.2f;AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
+              t,
+              obj.Name,
+              myselfData,
+              Engine_RPM,
+              velocityVectors,
+              altAgl,
+              PanelShake,
+              CannonShells,
+              AccelerationUnits,
+              windVelocityVectors,
+              altAsl,
+              aoa,
+              PayloadInfo,
+              tas
+            )
+			elseif obj.Name == "P-47D-30" then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            local Engine_RPM = MainPanel:get_argument_value(23) * 4500
+
+            local PanelShake =
+              string.format(
+              "%.2f~%.2f~%.2f",
+              MainPanel:get_argument_value(180),
+              MainPanel:get_argument_value(181),
+              MainPanel:get_argument_value(189)
+            )
+            -- P47 sends to TelemFFB
             stringToSend =
               string.format(
               "T=%.3f;N=%s;SelfData=%s;EngRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;CannonShells=%.0f;ACCs=%s;d10=0;d11=0~0;Wind=%s;altASL=%.2f;AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
