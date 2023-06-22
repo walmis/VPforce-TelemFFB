@@ -411,7 +411,32 @@ local f_telemFFB = {
           elseif obj.Name == "SpitfireLFMkIX" or obj.Name == "SpitfireLFMkIXCW" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local Engine_RPM = MainPanel:get_argument_value(37) * 10000
-            local PanelShake =
+			local Oil_Pressure = MainPanel:get_argument_value(40) * 145.04
+			
+			
+			-- The raw RPM value is something like .1000000001154 so we need to strip the errant decimal values off the resulting RPM value
+			Engine_RPM = math.floor(Engine_RPM)
+			
+			--local raw_rpm = MainPanel:get_argument_value(37)
+			--log.info("raw engine RPM is: "..raw_rpm)
+			
+            -- Sptifire RPM gauge always reads a minimum of 1000 RPM, even when engine is not running.  Need to use oil pressure to determine if engine is running. Otherwise set RPM to 0 so no effect is registered downstream
+			if Oil_Pressure == 0 then
+				Engine_RPM = 0
+			end
+			if Engine_RPM == 1000 then
+				-- Spitfire oil pressure guage reads between 14 and 52 PSI when engine is running below 1000 RPM (RPM guage always reads minimum of 1000)
+				-- Since the minimum RPM is 1000, that is the minimum vibration value that will be sent, however we can estimate the RPM between idle and 1000 by applying linear mapping based on the oil pressure value
+				-- If we assume an idle RPM of IdleRPM 
+				local IdleRPM = 450
+				local oil_min = 14
+				local oil_max = 52
+				-- determine conversion factor based on configurable variables above
+				local conversion_factor = (1000 - IdleRPM) / (oil_max - oil_min)
+				-- set Engine_RPM based on current oil pressure and conversion factor
+				Engine_RPM = (Oil_Pressure - oil_min) * conversion_factor + IdleRPM
+			end
+			local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
               MainPanel:get_argument_value(144),
@@ -421,11 +446,12 @@ local f_telemFFB = {
             -- SPITFIRE sends to TelemFFB
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;CannonShells=%.0f;ACCs=%s;d10=0;d11=0~0;Wind=%s;altASL=%.2f;AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
+              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.0f;OilPressure=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;CannonShells=%.0f;ACCs=%s;d10=0;d11=0~0;Wind=%s;altASL=%.2f;AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
               t,
               obj.Name,
               myselfData,
               Engine_RPM,
+	      Oil_Pressure,
               velocityVectors,
               altAgl,
               PanelShake,
