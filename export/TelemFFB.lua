@@ -330,11 +330,26 @@ local f_telemFFB = {
               aoa,
               tas
             )
-          elseif obj.Name == "FW-190D9" then
+          elseif obj.Name == "FW-190D9" or obj.Name == "FW-190A8" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local Manifold_Pressure = MainPanel:get_argument_value(46)
-            local Engine_RPM = MainPanel:get_argument_value(47)
-
+            
+			local Manifold_Pressure = MainPanel:get_argument_value(46)
+			local Oil_Pressure = math.floor(MainPanel:get_argument_value(95) * 150)
+			local Engine_RPM = 0
+            -- the FW190 does not give an RPM reading.  It returns a percentage of deflection on the RPM gauge between the miniumum (600) and maximum (3500) of the gauge
+			local fw190_tach_min = 600
+			local fw190_tach_max = 3500
+			local engine_gauge_percentage = MainPanel:get_argument_value(47)
+		
+			-- only calculate engine RPM if the oil pressure gauge is reading above zero (engine is running)
+			if Oil_Pressure > 0 then
+				-- use linear interoplation to find the RPM based on the position of the needle between 0% and 100%
+				Engine_RPM = fw190_tach_min + (engine_gauge_percentage * (fw190_tach_max - fw190_tach_min))
+				-- remove extra decimal places
+				Engine_RPM = math.floor(Engine_RPM)
+			end
+			--local raw_rpm = MainPanel:get_argument_value(47)
+			--log.info("raw engine RPM is: "..raw_rpm)
             local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
@@ -354,11 +369,12 @@ local f_telemFFB = {
             -- FW-190D9 sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Grn-Red-Lights=0;MP-MW=%.2f~%.2f;Wind=%s;altASL=%.2f;14_AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
+              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.0f;OilPressure=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Grn-Red-Lights=0;MP-MW=%.2f~%.2f;Wind=%s;altASL=%.2f;14_AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
               t,
               obj.Name,
               myselfData,
               Engine_RPM,
+			  Oil_Pressure,
               velocityVectors,
               altAgl,
               PanelShake,
@@ -411,7 +427,7 @@ local f_telemFFB = {
           elseif obj.Name == "SpitfireLFMkIX" or obj.Name == "SpitfireLFMkIXCW" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local Engine_RPM = MainPanel:get_argument_value(37) * 10000
-			local Oil_Pressure = MainPanel:get_argument_value(40) * 145.04
+			local Oil_Pressure = MainPanel:get_argument_value(40) * 150
 			
 			
 			-- The raw RPM value is something like .1000000001154 so we need to strip the errant decimal values off the resulting RPM value
@@ -451,7 +467,7 @@ local f_telemFFB = {
               obj.Name,
               myselfData,
               Engine_RPM,
-	      Oil_Pressure,
+			  Oil_Pressure,
               velocityVectors,
               altAgl,
               PanelShake,
@@ -934,6 +950,7 @@ local f_telemFFB = {
                       "~" .. tostring(MCP.GearFailure) .. "~" .. tostring(MCP.MFDFailure) .. "~" ..tostring(MCP.HUDFailure) ..
                       "~" .. tostring(MCP.HelmetFailure) .. "~" .. tostring(MCP.FuelTankDamage)
             -- FC3 Plane sends to SimShaker
+			log.info("TELEMFFB THINKS THIS IS AN FC3 AIRCRAFT: "..obj.Name)
             stringToSend =
               string.format(
               "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;MCPState=%s;CannonShells=%.0f;ACCs=%s;LG=%.2f;DragChute=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;Flaps=%.2f;M=%.2f;Canopy=%.2f;Wings=%.2f;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
