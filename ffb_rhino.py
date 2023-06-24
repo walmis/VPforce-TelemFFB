@@ -26,7 +26,7 @@ import ctypes
 import logging
 from utils import DirectionModulator
 import os
-
+import inspect
 try:
     hidapi_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')
     ctypes.cdll.LoadLibrary(hidapi_path)
@@ -207,7 +207,10 @@ class FFBEffectHandle:
         :type direction: float
         """
         assert(self.type == EFFECT_CONSTANT)
-        assert(magnitude >= -1.0 and magnitude <= 1.0)
+        try:
+            assert(magnitude >= -1.0 and magnitude <= 1.0)
+        except AssertionError:
+            logging.error(f"Error: Magnitude = {magnitude}")
         direction %= 360
 
         kw = {
@@ -268,7 +271,10 @@ class FFBRhino:
         assert(r[0] == HID_REPORT_ID_PID_BLOCK_LOAD)
         effect_id = r[1]
         status = r[2]
-        assert(status == LOAD_SUCCESS)
+        try:
+            assert(status == LOAD_SUCCESS)
+        except AssertionError:
+            logging.error(f"Error: Load Status = FULL | May need to restart the simulator")
         return FFBEffectHandle(self, effect_id, type)
     
     def write(self, data):
@@ -325,18 +331,27 @@ class HapticEffect:
 
     def start(self):
         if self.effect and not self.started:
+            caller_frame = inspect.currentframe().f_back
+            caller_name = caller_frame.f_code.co_name
+            logging.debug(f"The function {caller_name} is starting effect {self.effect.effect_id}")
             logging.info(f"Start effect {self.effect.effect_id}")
             self.effect.start()
             self.started = True
     
     def stop(self):
         if self.effect and self.started:
+            caller_frame = inspect.currentframe().f_back
+            caller_name = caller_frame.f_code.co_name
+            logging.debug(f"The function {caller_name} is stopping effect {self.effect.effect_id}")
             logging.info(f"Stop effect {self.effect.effect_id}")
             self.effect.stop() 
             self.started = False
 
     def destroy(self):
         if self.effect:
+            caller_frame = inspect.currentframe().f_back
+            caller_name = caller_frame.f_code.co_name
+            logging.debug(f"The function {caller_name} is destryoing effect {self.effect.effect_id}")
             logging.info(f"Destroying effect {self.effect.effect_id}")
             self.effect.destroy()
             self.effect = None
