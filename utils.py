@@ -23,6 +23,7 @@ from time import monotonic
 import logging
 import sys
 import winpaths
+import winreg
 import socket
 import math
 import time
@@ -55,6 +56,9 @@ def sock_readable(s) -> bool:
 
 def clamp(n, minn, maxn):
     return sorted((minn, n, maxn))[1]
+
+def clamp_minmax(n, max):
+    return clamp(n, -max, max)
 
 
 def scale(val, src : tuple, dst : tuple):
@@ -364,6 +368,17 @@ class OutLog(QtCore.QObject):
             self.out.write(m)
 
     def flush(self): pass
+
+
+def winreg_get(path, key):
+    try:
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0,
+                                       winreg.KEY_READ)
+        value, regtype = winreg.QueryValueEx(registry_key, key)
+        winreg.CloseKey(registry_key)
+        return value
+    except WindowsError:
+        return None
 
 
 if __name__ == "__main__":
