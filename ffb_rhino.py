@@ -94,7 +94,6 @@ AXIS_ENABLE_Y = 2
 AXIS_ENABLE_DIR = 4
 
 class BaseStructure(ctypes.LittleEndianStructure):
-
     def __init__(self, **kwargs):
         """
         Ctypes.Structure with integrated default values.
@@ -286,17 +285,17 @@ class FFBEffectHandle:
 
 
            
-class FFBRhino:
-    def __init__(self, vid = 0xFFFF, pid=0x2055) -> None:
-        self.device =  hid.Device(vid, pid)
+class FFBRhino(hid.Device):
+    def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None) -> None:
+        super().__init__(vid, pid, serial)
 
     def resetEffects(self):
-        self.device.write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
+        super().write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
         time.sleep(0.01)
 
     def createEffect(self, type) -> FFBEffectHandle:
-        self.device.send_feature_report(bytes([HID_REPORT_ID_CREATE_EFFECT, type, 0, 0]))
-        r = bytearray(self.device.get_feature_report(HID_REPORT_ID_PID_BLOCK_LOAD, 5))
+        super().send_feature_report(bytes([HID_REPORT_ID_CREATE_EFFECT, type, 0, 0]))
+        r = bytearray(super().get_feature_report(HID_REPORT_ID_PID_BLOCK_LOAD, 5))
 
         assert(r[0] == HID_REPORT_ID_PID_BLOCK_LOAD)
         effect_id = r[1]
@@ -305,15 +304,15 @@ class FFBRhino:
         return FFBEffectHandle(self, effect_id, type)
     
     def write(self, data):
-        if self.device.write(data) < 0:
+        if super().write(data) < 0:
             raise IOError("HID Write")
         
     def getInput(self):
-        data = self.device.get_input_report(1, ctypes.sizeof(FFBReport_Input))
+        data = super().get_input_report(1, ctypes.sizeof(FFBReport_Input))
         s = FFBReport_Input.from_buffer_copy(data)
         return (s.X/4096.0, s.Y/4096.0)
 
-
+# Higher level effect interface
 class HapticEffect:
     effect : FFBEffectHandle = None
     device : FFBRhino = None
@@ -321,17 +320,41 @@ class HapticEffect:
     modulator = None
 
     @classmethod
-    def open(cls, vid = 0xFFFF, pid=0x2055) -> None:
+    def open(cls, vid = 0xFFFF, pid=0x2055, serial=None) -> None:
         logging.info(f"Open Rhino HID {vid:04X}:{pid:04X}")
-        cls.device = FFBRhino(vid, pid)
+        cls.device = FFBRhino(vid, pid, serial)
         return cls.device
     
-    def spring(self):
+    def _conditional_effect(self, type, coef_x = None, coef_y= None):
         if not self.effect:
-            self.effect = self.device.createEffect(EFFECT_SPRING)
+            self.effect = self.device.createEffect(EFFECT_INERTIA)
             self.effect.setEffect() # initialize defaults
-        return self
 
+        if coef_x is not None:
+            cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
+                                            positiveCoefficient=coef_x, 
+                                            negativeCoefficient=coef_x)
+            self.effect.setCondition(cond_x)
+
+        if coef_y is not None:
+            cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
+                                            positiveCoefficient=coef_y, 
+                                            negativeCoefficient=coef_y)
+            self.effect.setCondition(cond_y)
+
+        return self
+    
+    def inertia(self, coef_x = None, coef_y = None):
+        return self._conditional_effect(EFFECT_INERTIA, coef_x, coef_y)
+    
+    def damper(self, coef_x = None, coef_y = None):
+        return self._conditional_effect(EFFECT_DAMPER, coef_x, coef_y)
+    
+    def friction(self, coef_x = None, coef_y = None):
+        return self._conditional_effect(EFFECT_FRICTION, coef_x, coef_y) 
+    
+    def spring(self, coef_x = None, coef_y = None):
+        return self._conditional_effect(EFFECT_SPRING, coef_x, coef_y) 
 
     def periodic(self, frequency, magnitude:float, direction:float, effect_type=EFFECT_SINE, *args, **kwargs):
         if not self.effect:
