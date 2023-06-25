@@ -210,7 +210,7 @@ class FFBEffectHandle:
         try:
             assert(magnitude >= -1.0 and magnitude <= 1.0)
         except AssertionError:
-            logging.error(f"Error: Magnitude = {magnitude}")
+            logging.error(f"Constant Effect Magnitude violation: {magnitude}")
         direction %= 360
 
         kw = {
@@ -228,8 +228,12 @@ class FFBEffectHandle:
         return self
 
     def setPeriodic(self, freq, magnitude, direction, **kwargs):
+    
         assert(self.type in PERIODIC_EFFECTS)
-        assert(magnitude >= 0 and magnitude <= 1.0)
+        try:
+            assert(magnitude >= 0 and magnitude <= 1.0)
+        except AssertionError:
+            logging.error(f"Periodic Effect Magnitude violation: {magnitude}")
         direction %= 360
 
         kw = {
