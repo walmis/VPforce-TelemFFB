@@ -33,7 +33,7 @@ import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox, QPushButton
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QPixmap, QIcon
 
 from time import monotonic
 import socket
@@ -46,6 +46,7 @@ import os
 from ffb_rhino import HapticEffect
 from configobj import ConfigObj
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -221,25 +222,44 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("TelemFFB")
-
-        label = QLabel("DCS Telemetry")
-
-        #self.setFixedSize(QSize(400, 300))
-
+        # Get the absolute path of the script's directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # Create a layout for the main window
         layout = QVBoxLayout()
-        layout.addWidget(label)
+        
+        # Add a label for the image
+        
 
+        # Construct the absolute path of the image file
+        image_path = os.path.join(script_dir, "image/vpforcelogo.png")
+        self.image_label = QLabel()
+        pixmap = QPixmap(image_path)
+        self.image_label.setPixmap(pixmap)
+        # Construct the absolute path of the icon file
+        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
+        self.setWindowIcon(QIcon(icon_path))
+        # Add the image label to the layout
+        layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
+
+        # Add a label and telemetry data label
+        layout.addWidget(QLabel("DCS Telemetry"))
         self.lbl_telem_data = QLabel("Waiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.lbl_telem_data)
 
+        # Add the exit button
         exit_button = QPushButton("Exit")
+        exit_button.setMinimumWidth(200)  # Set the minimum width
+        exit_button.setMaximumWidth(200)  # Set the maximum width
         exit_button.clicked.connect(self.exit_application)
-        layout.addWidget(exit_button)
+        layout.addWidget(exit_button, alignment=Qt.AlignCenter)
 
-        centralWidget = QWidget()
-        centralWidget.setLayout(layout)
-        self.setCentralWidget(centralWidget)
+        # Create a central widget and set the layout
+        central_widget = QWidget()
+        central_widget.setLayout(layout)
+
+        # Set the central widget of the main window
+        self.setCentralWidget(central_widget)
 
     def exit_application(self):
         # Perform any cleanup or save operations here
