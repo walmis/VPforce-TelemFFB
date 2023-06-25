@@ -168,6 +168,8 @@ local f_telemFFB = {
           end
 
           local engine = LoGetEngineInfo()
+          local engineRPM = string.format("%.3f~%.3f", engine.RPM.left, engine.RPM.right)
+
           local CannonShells = LoGetPayloadInfo().Cannon.shells
           local stations = LoGetPayloadInfo().Stations
           local PayloadInfo = "empty"
@@ -207,21 +209,9 @@ local f_telemFFB = {
             -- Mi-8MTV2  sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;RotorRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;d=0;ACCs=%s;d=0;IAS=%.2f;Wind=%s;altASL=%.2f;14d=0;Payload=%s;d=0;d=0;d=0;d=0;d=0;TAS=%.2f;Flares=%s",
-              t,
-              obj.Name,
-              myselfData,
+              "RotorRPM=%.0f;PanShake=%s",
               mainRotorRPM,
-              velocityVectors,
-              altAgl,
-              PanelShake,
-              AccelerationUnits,
-              IAS,
-              windVelocityVectors,
-              altAsl,
-              PayloadInfo,
-              tas,
-              CM.flare
+              PanelShake
             )
           elseif obj.Name == "UH-1H" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -240,25 +230,12 @@ local f_telemFFB = {
             -- UH-1H  sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;RotorRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Shells=%i;ACCs=%s;IAS=%.2f;d=0;Wind=%s;altASL=%.2f;14d=0;PayloadInfo=%s;16d=0;17d=0;18_LDoor=%.2f;19_RDoor=%.2f;20_deadPilot=%.2f;TAS=%.2f;Flares=%s",
-              t,
-              obj.Name,
-              myselfData,
+              "RotorRPM=%.0f;PanShake=%s;LDoor=%.2f;RDoor=%.2f;deadPilot=%.2f",
               mainRotorRPM,
-              velocityVectors,
-              altAgl,
               PanelShake,
-              CannonShells,
-              AccelerationUnits,
-              IAS,
-              windVelocityVectors,
-              altAsl,
-              PayloadInfo,
               leftDoor,
               rightDoor,
-              deadPilot,
-              tas,
-              CM.flare
+              deadPilot
             )
           elseif obj.Name == "Ka-50" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -271,25 +248,9 @@ local f_telemFFB = {
             -- Ka-50  sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;RotorRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;IAS=%.2f;d=0;Wind=%s;13_altASL=%.2f;14d=0;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20_APU=%s;TAS=%.2f;Flares=%s;Chaff=%s",
-              t,
-              obj.Name,
-              myselfData,
+              "RotorRPM=%.0f;APU=%s",
               mainRotorRPM,
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              -- GunTrigger,
-              AccelerationUnits,
-              IAS,
-              windVelocityVectors,
-              altAsl,
-              PayloadInfo,
-              APU,
-              tas,
-              CM.flare,
-              CM.chaff
+              APU
             )
           elseif
             obj.Name == "SA342M" or obj.Name == "SA342L" or obj.Name == "SA342Mistral" or obj.Name == "SA342Minigun"
@@ -304,7 +265,8 @@ local f_telemFFB = {
             local StatusString =
               RAltimeterOnOff .. "~" .. RAltimeterFlagPanne .. "~" .. RAltimeterFlagMA .. "~" .. RAltimeterTest
             -- Gazelle  sends to SimShaker
-            stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;RotorRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Shells=%i;ACCs=%s;IAS=%.2f;d=0;Wind=%s;altASL=%.2f;14_RadarAltimeterMeter=%.2f;PayloadInfo=%s;16_RAltimeterStatus=%s;17d=0;18d=0;19d=0;20d=0;21_TAS=%.2f;Flares=%s",t,obj.Name,myselfData,mainRotorRPM,velocityVectors,altAgl,"000",CannonShells,AccelerationUnits,IAS,windVelocityVectors,altAsl,RAltimeterMeter,PayloadInfo, StatusString,tas, CM.flare)
+            stringToSend=string.format("RotorRPM=%.0f;RadarAltimeterMeter=%.2f;RAltimeterStatus=%s",
+            mainRotorRPM,RAltimeterMeter, StatusString)
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           elseif obj.Name == "P-51D" or obj.Name == "P-51D-30-NA" then
@@ -339,24 +301,11 @@ local f_telemFFB = {
             -- P-51D sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;CannonShells=%.0f;ACCs=%s;GreenLight=%.1f;11_MP-WEP=%.2f~%.2f;Wind=%s;altASL=%.2f;AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
+              "PanShake=%s;GreenLight=%.1f;MP-WEP=%.2f~%.2f",
               PanelShake,
-              CannonShells,
-              AccelerationUnits,
               LandingGearGreenLight,
               Manifold_Pressure,
-              WEPwire,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              tas
+              WEPwire
             )
           elseif obj.Name == "TF-51D" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -402,23 +351,8 @@ local f_telemFFB = {
             -- TF-51 sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;GreenLight=%.1f;MP-WEP=%.2f~%.2f;Wind=%s;altASL=%.2f;AoA=%.1f;15d=0;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
-              PanelShake,
-              "000",
-              AccelerationUnits,
-              LandingGearGreenLight,
-              Manifold_Pressure,
-              WEPwire,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              tas
+              "PanShake=%s",
+              PanelShake
             )
           elseif obj.Name == "FW-190D9" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -444,23 +378,10 @@ local f_telemFFB = {
             -- FW-190D9 sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Grn-Red-Lights=0;MP-MW=%.2f~%.2f;Wind=%s;altASL=%.2f;14_AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
-              PanelShake,
-              GunFireData,
-              AccelerationUnits,
+              "PanShake=%s;MP-MW=%.2f~%.2f",
+              PanelShake,            
               Manifold_Pressure,
-              MW,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              tas
+              MW
             )
           elseif obj.Name == "Bf-109K-4" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -479,23 +400,11 @@ local f_telemFFB = {
             -- Bf-109K-4 sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%i;9_ACCs=%s;10_Grn-Red-Lights=0;11_MP-MW=%.2f~%.2f;Wind=%s;altASL=%.2f;14_AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
+              "PanelShake=%s;MP-MW=%.2f~%.2f;PayloadInfo=%s",
               PanelShake,
-              CannonShells,
-              AccelerationUnits,
               Manifold_Pressure,
               MW,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              tas
+              PayloadInfo
             )
           elseif obj.Name == "SpitfireLFMkIX" or obj.Name == "SpitfireLFMkIXCW" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -510,44 +419,10 @@ local f_telemFFB = {
             -- SPITFIRE sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;CannonShells=%.0f;ACCs=%s;d10=0;d11=0~0;Wind=%s;altASL=%.2f;AoA=%.1f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
-              PanelShake,
-              CannonShells,
-              AccelerationUnits,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              tas
-            )
-          elseif obj.Name == "F-86F Sabre" then
-            ------------------------------------------------------------------------------------------------------------------------
-            local Engine_RPM = MainPanel:get_argument_value(16) * 100
-            -- F-86F sends to SimShaker
-            stringToSend =
-              string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Gr-RedLight=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;17d=0;18d=0;19d=0;20d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              AccelerationUnits,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              tas
-            )
+              "PanShake=%s",
+              PanelShake
+              )
+
           elseif obj.Name == "A-10C" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local FlapsPos = MainPanel:get_argument_value(653)
@@ -558,28 +433,10 @@ local f_telemFFB = {
             -- A-10C  sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;GunShells=%.0f;ACCs=%s;LG=%s;DragChute=%s;Wind=%s;altASL=%.2f;AoA=%.2f;Payload=%s;Flaps=%.2f;d=0;18_Canopy=%.2f;19d=0;APU=%.2f;TAS=%.2f;Flares=%s;Chaff=%s",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM_left .. "~" .. Engine_RPM_right,
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              AccelerationUnits,
-              "0",
-              "000",
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
+              "Flaps=%.2f;Canopy=%.2f;APU=%.2f",
               FlapsPos,
               Canopy,
-              APU,
-              tas,
-              CM.flare,
-              CM.chaff
+              APU
             )
           elseif obj.Name == "MiG-21Bis" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -597,100 +454,13 @@ local f_telemFFB = {
             -- MiG-21Bis sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;11d=0;d=0;Wind=%s;altASL=%.2f;AoA=%.2f;Payload=%s;Flaps=%.2f;d=0;Canopy=%.1f;19_SPS=%.1f;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              AccelerationUnits,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
+              "Flaps=%.2f;Canopy=%.1f;SPS=%.1f",
               Flaps3d,
               CanopyWarnLight,
-              SPS,
-              tas,
-              CM.flare,
-              CM.chaff
+              SPS
             )
-          elseif obj.Name == "MiG-15bis" then
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local VoltAmperMeter = MainPanel:get_argument_value(83) * 30
-            local GenOff = MainPanel:get_argument_value(57)
-            local TestBtn = MainPanel:get_argument_value(72) -- not presented in mainpanel_init.lua
 
-            local Engine_RPM = string.format("%.0f", MainPanel:get_argument_value(42) * 100)
-            local SpeedBrakeLamp = MainPanel:get_argument_value(124)
-            local Canopy = MainPanel:get_argument_value(225)
-            -- MiG-15Bis sends to SimShaker
-            stringToSend =
-              string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngineRPM=%i;VlctVectors=%s;altAgl=%.2f;PanShake=0;Gun=%s;ACCs=%s;Gr-RedLight=%s;d=0;Wind=%s;altASL=%.2f;AoA=%.2f;Payload=%s;Flaps=0;17d=0;18_Canopy=%.1f;19d=0;20d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
-              CannonShells,
-              AccelerationUnits,
-              "0",
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              Canopy,
-              tas
-            )
-          elseif obj.Name == "Hawk" then
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            -- Hawk  sends to SimShaker
 
-            stringToSend =
-              string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;10_Gr-RedLight=%s;d=0;Wind=%s;d=0;AoA=%.2f;PayloadInfo=%s;d=0;d=0;d=0;d=0;d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              "Engine_RPM=00",
-              velocityVectors,
-              altAgl,
-              "000",
-              "CannonShells=000",
-              AccelerationUnits,
-              "Gr-RedLight=0",
-              windVelocityVectors,
-              aoa,
-              PayloadInfo,
-              tas
-            )
-          elseif obj.Name == "C-101EB" then
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            -- C-101EB  sends to SimShaker
-
-            stringToSend =
-              string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;10_Gr-RedLight=%s;d=0;Wind=%s;d=0;AoA=%.2f;PayloadInfo=%s;d=0;d=0;d=0;d=0;d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              "Engine_RPM=00",
-              velocityVectors,
-              altAgl,
-              "000",
-              "CannonShells=000",
-              AccelerationUnits,
-              "Gr-RedLight=0",
-              windVelocityVectors,
-              aoa,
-              PayloadInfo,
-              tas
-            )
           elseif obj.Name == "L-39C" or obj.Name == "L-39ZA" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local TestBtn = MainPanel:get_argument_value(203) -- not presented in mainpanel_init.lua
@@ -702,23 +472,9 @@ local f_telemFFB = {
             local Engine_RPM = string.format("%.0f", MainPanel:get_argument_value(84) * 100)
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;Gr-RedLight=0;d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;17d=0;18Canopy1=%.2f;19Canopy2=%.2f;20d=0;TAS=%.2f",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              AccelerationUnits,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
+              "Canopy1=%.2f;Canopy2=%.2f",
               Canopy1,
-              Canopy2,
-              tas
+              Canopy2
             )
           elseif obj.Name == "M-2000C" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -732,74 +488,7 @@ local f_telemFFB = {
             -- M-2000C sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;d=0.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
-              t,
-              obj.Name,
-              myselfData,
-              velocityVectors,
-              altAgl,
-              PanelShake,
-              CannonShells,
-              AccelerationUnits,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              M_number,
-              tas,
-              CM.flare,
-              CM.chaff
-            )
-          elseif obj.Name == "F-5E" or obj.Name == "F-5E-3" then
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local Engine_RPM_left = MainPanel:get_argument_value(16) * 100
-            local Engine_RPM_right = MainPanel:get_argument_value(17) * 100
-            -- F-5E sends to SimShaker
-            stringToSend =
-              string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM_left .. "~" .. Engine_RPM_right,
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              AccelerationUnits,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              M_number,
-              tas,
-              CM.flare,
-              CM.chaff
-            )
-          elseif obj.Name == "AJS37" then
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local Engine_RPM = MainPanel:get_argument_value(139) * 100
-            -- AJS37 sends to SimShaker
-            stringToSend =
-              string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;11d=0;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
-              t,
-              obj.Name,
-              myselfData,
-              Engine_RPM,
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              AccelerationUnits,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              M_number,
-              tas,
-              CM.flare,
-              CM.chaff
+              "PanShake=%s", PanelShake
             )
           elseif obj.Name == "AV8BNA" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -818,146 +507,49 @@ local f_telemFFB = {
 
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s;AileronTrim=%.3f;RudderTrim=%.3f;StickX=%.3f;StickY=%.3f;vv=%s",
-              t,
-              obj.Name,
-              myselfData,
-              "0",
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              AccelerationUnits,
-              IAS,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              M_number,
-              tas,
-              CM.flare,
-              CM.chaff,
+              "AileronTrim=%.3f;RudderTrim=%.3f;StickX=%.3f;StickY=%.3f;vv=%s",
               AileronTrim,
               RudderTrim,
               stickX,
               stickY,
               self.recv_data
             )
-          elseif obj.Name == "FA-18C_hornet" then
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            -- let's try some dcs bios magic
-            local li = parse_indication(5)
-      if RPM == nil then 
-        RPM = "0~0"
-      end
-      
-			if li then
-              local LEngine_RPM = check(li.txt_RPM_L)
-              local REngine_RPM = check(li.txt_RPM_R)
-              if (string.len(LEngine_RPM) >=  2) and (string.len(REngine_RPM) >=  2)  then
-                RPM = LEngine_RPM.."~"..REngine_RPM
-              end
-			end
-			
-            -- FA-18C sends to SimShaker
-            stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, RPM,  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
 
-            -- FA-18C sends to SimShaker
-            stringToSend =
-              string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
-              t,
-              obj.Name,
-              myselfData,
-              RPM,
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              AccelerationUnits,
-              IAS,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              M_number,
-              tas,
-              CM.flare,
-              CM.chaff
-            )
-          elseif string.find(obj.Name, "F-14") then
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            --local sensor_data = obj.get_base_data()
-            local REngine_RPM = "0"
-            local LEngine_RPM = "0"
-            if getEngineRightRPM then
-              REngine_RPM = sensor_data.getEngineRightRPM()
-            end
-            if getEngineLeftRPM then
-              LEngine_RPM = sensor_data.getEngineLeftRPM()
-            end
-
-            local RPM = REngine_RPM .. "~" .. LEngine_RPM
-
-            if f14 == nil or f14 == false then
-              setupF14Export()
-            end
-			if f14 == true then
-              -- usual case after first time
-              additionalData=""
-              local epoxy = GetDevice(6)
-              if epoxy ~= nil and type(epoxy) ~= "number" and f14_i2n ~= nil then
-                local values = epoxy:get_values()
-                for i, v in ipairs(values) do
-                  f14_variables[f14_i2n[i]] = v
-                  additionalData = additionalData .. f14_i2n[i] .. "=" .. v .. ";"
+              elseif string.find(obj.Name, "F-14") then
+                -------------------------------------------------------------------------------------------------------------------------------------------------------
+                --local sensor_data = obj.get_base_data()
+                local REngine_RPM = "0"
+                local LEngine_RPM = "0"
+                if getEngineRightRPM then
+                  REngine_RPM = sensor_data.getEngineRightRPM()
                 end
-              end
-             -- log.info("additionalData:"..additionalData)
-	        else
-              additionalData=""  -- prevent nil error in string.format below at least
-            end
+                if getEngineLeftRPM then
+                  LEngine_RPM = sensor_data.getEngineLeftRPM()
+                end
 
-            -- F-14 sends to SimShaker
-            stringToSend =
-              string.format(
-              "T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s;%s",
-              t,
-              obj.Name,
-              myselfData,
-              RPM,
-              velocityVectors,
-              altAgl,
-              "000",
-              CannonShells,
-              AccelerationUnits,
-              IAS,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
-              M_number,
-              tas,
-              CM.flare,
-              CM.chaff,
-              additionalData
-            )
-          elseif obj.Name == "Yak-52" then
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            -- YAK-52 sends to SimShaker
-            stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
+                local RPM = REngine_RPM .. "~" .. LEngine_RPM
 
--------------------------------------------------------------------------------------------------------------------------------------------------------
-          elseif obj.Name == "Christen Eagle II" then
+                if f14 == nil or f14 == false then
+                  setupF14Export()
+                end
+                if f14 == true then
+                  -- usual case after first time
+                  additionalData = ""
+                  local epoxy = GetDevice(6)
+                  if epoxy ~= nil and type(epoxy) ~= "number" and f14_i2n ~= nil then
+                    local values = epoxy:get_values()
+                    for i, v in ipairs(values) do
+                      f14_variables[f14_i2n[i]] = v
+                      additionalData = additionalData .. f14_i2n[i] .. "=" .. v .. ";"
+                    end
+                  end
+                  -- log.info("additionalData:"..additionalData)
+                else
+                  additionalData = "" -- prevent nil error in string.format below at least
+                end
 
-          -- Christen Eagle II sends to SimShaker
-          stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
-
--------------------------------------------------------------------------------------------------------------------------------------------------------
-          elseif obj.Name == "MiG-19P" then
-
-          -- MiG-19P sends to SimShaker
-          stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
+                -- F-14 sends to SimShaker
+                stringToSend =  additionalData
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           else -- FC3 Planes
@@ -986,33 +578,26 @@ local f_telemFFB = {
             -- FC3 Plane sends to SimShaker
             stringToSend =
               string.format(
-              "T=%.3f;N=%s;SelfData=%s;EngRPM=%s;VlctVectors=%s;altAgl=%.2f;MCPState=%s;CannonShells=%.0f;ACCs=%s;LG=%.2f;DragChute=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;Flaps=%.2f;M=%.2f;Canopy=%.2f;Wings=%.2f;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
-              t,
-              obj.Name,
-              myselfData,
-              engineRPM,
-              velocityVectors,
-              altAgl,
+              "MCPState=%s;DragChute=%.2f;Flaps=%.2f;Canopy=%.2f;Wings=%.2f",
               MCPState,
-              CannonShells,
-              AccelerationUnits,
-              LandingGearState,
               DragChuteState,
-              windVelocityVectors,
-              altAsl,
-              aoa,
-              PayloadInfo,
               FlapsPos,
-              M_number,
               CanopyPos,
-              WingsPos,
-              tas,
-              CM.flare,
-              CM.chaff
+              WingsPos
             )
           end
-
-          stringToSend = string.format("%s;WeightOnWheels=%s;MechInfo=%s", stringToSend, WoW, mech)
+		 		  
+          -- Common variables
+          stringToSend = string.format("T=%.3f;N=%s;SelfData=%s;%s;EngRPM=%s;ACCs=%s;Gun=%s;Wind=%s;VlctVectors=%s;altASL=%.2f;altAgl=%.2f;AoA=%.2f;IAS=%.2f;TAS=%.2f;WeightOnWheels=%s;Flares=%s;Chaff=%s;PayloadInfo=%s;Mach=%.4f;MechInfo=%s",               
+            t,
+            obj.Name,
+            myselfData,
+            stringToSend,
+            engineRPM,
+            AccelerationUnits,
+            CannonShells,
+            windVelocityVectors,
+            velocityVectors, altAsl, altAgl, aoa, IAS, tas, WoW, CM.flare, CM.chaff, PayloadInfo, M_number, mech)
 
           socket.try(self.sock_udp:sendto(stringToSend, self.host, self.port))
         end
