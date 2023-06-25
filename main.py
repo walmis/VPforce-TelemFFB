@@ -42,6 +42,7 @@ import threading
 import aircrafts_dcs
 import aircrafts_msfs
 import utils
+import subprocess
 
 import traceback
 import os
@@ -51,7 +52,6 @@ from configobj import ConfigObj
 from sc_manager import SimConnectManager
 
 config : ConfigObj = None
-
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -84,6 +84,17 @@ def reload_config():
     global config
     # reload config
     config.reload()
+
+def get_config(name):
+    config_path = os.path.join(os.path.dirname(__file__), name)
+
+    try:
+        config = ConfigObj(config_path)
+        logging.info(f"Load Config: {config_path}")
+        return config
+    except: 
+        logging.exception(f"Cannot load config {config_path}")
+        return None
 
 class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
     def __init__(self, parent=None):
@@ -174,7 +185,11 @@ class TelemManager(QObject, threading.Thread):
                 module = aircrafts_dcs
 
             if aircraft_name and aircraft_name != self.currentAircraftName:
-                reload_config()
+                config = get_config("config.ini")
+                config_user = get_config("config.user.ini")
+                if config_user:
+                    config.update(config_user)
+                #print(config)
                 #load [default] values
                 defaults = utils.sanitize_dict(config["default"])
 
@@ -186,7 +201,8 @@ class TelemManager(QObject, threading.Thread):
                         if re.match(section, aircraft_name):
                             conf = utils.sanitize_dict(conf)
                             logging.info(f"Found aircraft {aircraft_name} in config")
-                            cls = getattr(module, conf["type"], None)
+                            type = conf.get("type", "Aircraft")
+                            cls = getattr(module, type, None)
                             params = defaults
                             params.update(conf)
                             if not cls:
@@ -196,6 +212,13 @@ class TelemManager(QObject, threading.Thread):
                         logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
                         cls = module.Aircraft
                         params = defaults
+
+                    vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
+                    if vpconf_path and "vpconf" in params:
+                        logging.info(f"Found VPforce Configurator at {vpconf_path}")
+                        serial = HapticEffect.device.serial
+                        subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial])
+
 
                     logging.info(f"Creating handler for {aircraft_name}: {cls}")
                     #instantiate new aircraft handler
@@ -331,7 +354,7 @@ def main():
     manager.telemetryReceived.connect(window.update_telemetry)
 
     sc = SimConnectSock()
-    sc.start()
+    #sc.start()
 
 
     app.exec_()
