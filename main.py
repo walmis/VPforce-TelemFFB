@@ -32,8 +32,8 @@ import re
 import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox, QPushButton
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication
-from PyQt5.QtGui import QFont, QPixmap, QIcon
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
 
 from time import monotonic
 import socket
@@ -240,13 +240,20 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(icon_path))
         # Add the image label to the layout
         layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
-
+        layout.addWidget(QLabel(f"Config File: {args.configfile}"))
         # Add a label and telemetry data label
         layout.addWidget(QLabel("DCS Telemetry"))
         self.lbl_telem_data = QLabel("Waiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.lbl_telem_data)
-
+        
+        # Add the edit button
+        edit_button = QPushButton("Edit Config File")
+        edit_button.setMinimumWidth(200)
+        edit_button.setMaximumWidth(200)
+        edit_button.clicked.connect(self.edit_config_file)
+        layout.addWidget(edit_button, alignment=Qt.AlignCenter)
+        
         # Add the exit button
         exit_button = QPushButton("Exit")
         exit_button.setMinimumWidth(200)  # Set the minimum width
@@ -279,7 +286,16 @@ class MainWindow(QMainWindow):
             
         self.lbl_telem_data.setText(items)
 
-
+    def edit_config_file(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        config_file = args.configfile
+        config_path = os.path.join(script_dir, config_file)
+        file_url = QUrl.fromLocalFile(config_path)
+        try:
+            QDesktopServices.openUrl(file_url)
+        except:
+            logging.error(f"There was an error opening the config file")
 
 def main():
     app = QApplication(sys.argv)
