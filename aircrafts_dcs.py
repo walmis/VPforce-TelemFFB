@@ -16,6 +16,7 @@
 #
  
 import math
+from random import randint
 from typing import List, Dict
 from ffb_rhino import HapticEffect, FFBReport_SetCondition
 import utils
@@ -132,15 +133,8 @@ class Aircraft(object):
             v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[1])) * self.runway_rumble_intensity
             v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[0]-WoW[2]) * self.runway_rumble_intensity
             
-            # limit the intensity
-            if v1 > 1.0:
-                v1 = 1.0
-            elif v1 < -1.0:
-                v1 = -1.0
-            if v2 > 1.0:
-                v2 = 1.0
-            elif v2 < -1.0:
-                v2 = -1.0
+            v1 = utils.clamp_minmax(v1, 0.5)
+            v2 = utils.clamp_minmax(v1, 0.5)
 
             # modulate constant effects for X and Y axis
             # connect Y axis to nosewheel, X axis to the side wheels
@@ -148,15 +142,9 @@ class Aircraft(object):
 
             if tot_weight:
                 # logging.info(f"v1 = {v1}")
-                if v1 > 0:
-                    effects["runway0"].constant(v1, 0).start()
-                else:
-                    effects["runway0"].constant(abs(v1), 180).start()
+                effects["runway0"].constant(v1, 0).start()
                 # logging.info(f"v2 = {v2}")
-                if v2 > 0:
-                    effects["runway1"].constant(v2, 90).start()
-                else:
-                    effects["runway1"].constant(abs(v2), 270).start()
+                effects["runway1"].constant(v2, 90).start()
             else:
                 effects.dispose("runway0")
                 effects.dispose("runway1")
@@ -214,7 +202,7 @@ class Aircraft(object):
             effects["cm"].periodic(10, self.gun_vibration_intensity, 0, duration=50).start()
         if self.has_changed("Flares") or self.has_changed("Chaff"):
             effects["cm"].stop()
-            effects["cm"].periodic(5, self.cm_vibration_intensity, 45, duration=30).start()
+            effects["cm"].periodic(5, self.cm_vibration_intensity, randint(0,359), duration=30).start()
 
     def on_telemetry(self, telem_data : dict):
         """when telemetry frame is received, aircraft class receives data in dict format
@@ -266,8 +254,9 @@ class Aircraft(object):
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop/WW2 aircraft"""
 
-    engine_rumble_intensity : float = 0.02
+    engine_rumble_intensity : float = 0.05
     max_aoa_cf_force : float           = 0.2 # CF force sent to device at %stall_aoa
+    rpm_scale : float = 30
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -285,9 +274,14 @@ class PropellerAircraft(Aircraft):
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
         rpm = telem_data.get("EngRPM", 0)
+        if isinstance(rpm, list):
+            rpm = [x * self.rpm_scale for x in rpm]
+            self._update_engine_rumble(rpm[0])
+        else:
+            rpm = self.rpm_scale
+        telem_data["EngRPM"] = rpm
 
         self._update_aoa_effect(telem_data)
-        self._update_engine_rumble(rpm)
 
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
@@ -308,11 +302,11 @@ class PropellerAircraft(Aircraft):
         freq = float(rpm) / 60
         
         if freq > 0:
-            effects["rpm0"].periodic(freq, self.engine_rumble_intensity, 0).start() # vib on X axis
-            effects["rpm1"].periodic(freq+2, self.engine_rumble_intensity, 90).start() # vib on Y axis
+            effects["rpm0"].periodic(freq, self.engine_rumble_intensity, randint(0,359)).start() # vib on X axis
+            #effects["rpm1"].periodic(freq+2, self.engine_rumble_intensity, 90).start() # vib on Y axis
         else:
             effects.dispose("rpm0")
-            effects.dispose("rpm1")
+            #effects.dispose("rpm1")
 
 
 
