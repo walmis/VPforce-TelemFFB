@@ -982,7 +982,7 @@ local f_telemFFB = {
 		  
 		stringToSend = 
 			string.format(
-			"%s;WeightOnWheels=%s;CanopyPos=%.3f;SpeedbrakePos=%.3f;FlapsPos=%.3f;GearPos=%.3f;FuelProbePos=%.3f;MechInfo=%s",
+			"%s;WeightOnWheels=%s;CanopyPos=%.4f;SpeedbrakePos=%.4f;FlapsPos=%.4f;GearPos=%.4f;FuelProbePos=%.4f;MechInfo=%s",
 			stringToSend,
 			WoW,
 			LoGetMechInfo().canopy.value,
