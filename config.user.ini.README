@@ -1,0 +1,6 @@
+# user changes to config file
+# Entries in this file will override the stock config.ini
+# Rename this file to config.user.ini
+
+[F-5]
+#vpconf=f-5.vpconf # Load the specified rhino configuration file
