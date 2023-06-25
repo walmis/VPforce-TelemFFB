@@ -31,8 +31,8 @@ import re
   
 import argparse
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox
-from PyQt5.QtCore import QObject, pyqtSignal, Qt
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox, QPushButton
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication
 from PyQt5.QtGui import QFont
 
 from time import monotonic
@@ -233,12 +233,17 @@ class MainWindow(QMainWindow):
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.lbl_telem_data)
 
+        exit_button = QPushButton("Exit")
+        exit_button.clicked.connect(self.exit_application)
+        layout.addWidget(exit_button)
+
         centralWidget = QWidget()
         centralWidget.setLayout(layout)
         self.setCentralWidget(centralWidget)
 
-        # Set the central widget of the Window.
-        #self.setCentralWidget(label)
+    def exit_application(self):
+        # Perform any cleanup or save operations here
+        QCoreApplication.instance().quit()
 
     def update_telemetry(self, data : dict):
         items = ""
