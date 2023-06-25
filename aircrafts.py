@@ -219,9 +219,9 @@ class Aircraft(object):
     def _update_canopy(self, canopypos):
         #canopypos = telem_data.get("CanopyPos", 0)
         if self.has_changed("CanopyPos"):
-            logging.debug(f"Flaps Pos: {canopypos}")
+            logging.debug(f"Canopy Pos: {canopypos}")
             effects["canopymovement"].periodic(150, self.canopy_motion_intensity, 0, 3).start()
-            effects["canopymovement2"].periodic(150, self.canopy_motion_intensity, 45, 3).start()
+            effects["canopymovement2"].periodic(150, self.canopy_motion_intensity, 45, 3, phase=120).start()
         else:
             effects.dispose("canopymovement")
             effects.dispose("canopymovement2")
@@ -276,10 +276,14 @@ class PropellerAircraft(Aircraft):
         if self.engine_rumble:
             self._update_engine_rumble(rpm)
    
-        super()._update_speed_brakes(self._telem_data.get("SpeedbrakePos", 0))
-        super()._update_landing_gear(self._telem_data.get("GearPos", 0))
-        super()._update_flaps(self._telem_data.get("FlapsPos", 0))
-        super()._update_canopy(self._telem_data.get("CanopyPos", 0))
+        if self.speedbrake_motion_intensity > 0:
+            super()._update_speed_brakes(self._telem_data.get("SpeedbrakePos", 0))
+        if self.gear_motion_intensity > 0:
+            super()._update_landing_gear(self._telem_data.get("GearPos", 0))
+        if self.flaps_motion_intensity > 0:
+            super()._update_flaps(self._telem_data.get("FlapsPos", 0))
+        if self.canopy_motion_intensity > 0:
+            super()._update_canopy(self._telem_data.get("CanopyPos", 0))
 
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
@@ -332,15 +336,19 @@ class PropellerAircraft(Aircraft):
 
 class JetAircraft(Aircraft):
     """Generic Class for Jets"""
-    flaps_motion_intensity = 0.0
+    #flaps_motion_intensity = 0.0
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
         
-        super()._update_speed_brakes(self._telem_data.get("SpeedbrakePos", 0))
-        super()._update_landing_gear(self._telem_data.get("GearPos", 0))
-        super()._update_flaps(self._telem_data.get("FlapsPos", 0))
-        super()._update_canopy(self._telem_data.get("CanopyPos", 0))
+        if self.speedbrake_motion_intensity > 0:
+            super()._update_speed_brakes(self._telem_data.get("SpeedbrakePos", 0))
+        if self.gear_motion_intensity > 0:
+            super()._update_landing_gear(self._telem_data.get("GearPos", 0))
+        if self.flaps_motion_intensity > 0:
+            super()._update_flaps(self._telem_data.get("FlapsPos", 0))
+        if self.canopy_motion_intensity > 0:
+            super()._update_canopy(self._telem_data.get("CanopyPos", 0))
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
