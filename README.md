@@ -40,16 +40,19 @@ There is no need to create and manage the effect objects. All is done automatica
 - DCS World and a VPforce Rhino FFB Joystick/kit
 
 ## Installation
-0. Open a power shell/CMD window where you want to download the TelemFFB source
 
-1. Clone the repository to your local machine, this will create a directory `VPforce-TelemFFB`
+* Go to [releases](https://github.com/walmis/VPforce-TelemFFB/releases) page and download the latest precompiled version
 
-   `git clone https://github.com/walmis/VPforce-TelemFFB.git`
+* To make some changes in the scripts, you can download the repository and play around with the sources:
 
-2. Install the required Python packages
-`pip install -r requirements.txt`
+	1. Open a power shell/CMD window where you want to download the TelemFFB source
+	2. Clone the repository to your local machine, this will create a directory `VPforce-TelemFFB`
+	
+		`git clone https://github.com/walmis/VPforce-TelemFFB.git`
 
-3. When running the program for the first time, it will prompt you to install the export.lua script in your `user/Saved Games/DCS` folder. This script is necessary for the program to receive telemetry data from DCS World.
+	3. Install the required Python packages	`pip install -r requirements.txt`
+
+	4. When running the program for the first time, it will prompt you to install the export.lua script in your `user/Saved Games/DCS` folder. This script is necessary for the program to receive telemetry data from DCS World.
 
 ## Updating
 `git pull` - pulls the latest revision
