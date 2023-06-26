@@ -124,7 +124,7 @@ class Aircraft:
         data["_elev_coeff"] = elevator_coeff
         data["_aile_coeff"] = aileron_coeff
 
-		_aoa_term =  math.sin(_elevator_aoa*rad) * self.aoa_gain
+        _aoa_term =  math.sin(_elevator_aoa*rad) * self.aoa_gain
         data["_aoa_term"] = _aoa_term
         #data["_G_term"] = (self.g_force_gain * g_force)
 

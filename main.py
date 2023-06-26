@@ -32,9 +32,9 @@ import re
   
 import argparse
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox
-from PyQt5.QtCore import QObject, pyqtSignal, Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox, QPushButton
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
 
 from time import monotonic
 import socket
@@ -52,6 +52,7 @@ from configobj import ConfigObj
 from sc_manager import SimConnectManager
 
 config : ConfigObj = None
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -64,6 +65,9 @@ parser.add_argument('-p', '--plot', type=str, nargs='+',
 
 parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default="ffff:2055")
 parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
+
+# Add config file argument, default config.ini
+parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
 
 args = parser.parse_args()
 
@@ -185,7 +189,7 @@ class TelemManager(QObject, threading.Thread):
                 module = aircrafts_dcs
 
             if aircraft_name and aircraft_name != self.currentAircraftName:
-                config = get_config("config.ini")
+                config = get_config(args.configfile)
                 config_user = get_config("config.user.ini")
                 if config_user:
                     config.update(config_user)
@@ -269,26 +273,60 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("TelemFFB")
 
-        label = QLabel("Telemetry Data")
-
-        #self.setFixedSize(QSize(400, 300))
-
+        # Get the absolute path of the script's directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # Create a layout for the main window
         layout = QVBoxLayout()
-        layout.addWidget(label)
+        
+        # Add a label for the image
+        
 
+        # Construct the absolute path of the image file
+        image_path = os.path.join(script_dir, "image/vpforcelogo.png")
+        self.image_label = QLabel()
+        pixmap = QPixmap(image_path)
+        self.image_label.setPixmap(pixmap)
+        # Construct the absolute path of the icon file
+        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
+        self.setWindowIcon(QIcon(icon_path))
+        # Add the image label to the layout
+        layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
+        layout.addWidget(QLabel(f"Config File: {args.configfile}"))
+        # Add a label and telemetry data label
+        layout.addWidget(QLabel("DCS Telemetry"))
         self.lbl_telem_data = QLabel("Waiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.lbl_telem_data)
+        
+        # Add the edit button
+        edit_button = QPushButton("Edit Config File")
+        edit_button.setMinimumWidth(200)
+        edit_button.setMaximumWidth(200)
+        edit_button.clicked.connect(self.edit_config_file)
+        layout.addWidget(edit_button, alignment=Qt.AlignCenter)
+        
+        # Add the exit button
+        exit_button = QPushButton("Exit")
+        exit_button.setMinimumWidth(200)  # Set the minimum width
+        exit_button.setMaximumWidth(200)  # Set the maximum width
+        exit_button.clicked.connect(self.exit_application)
+        layout.addWidget(exit_button, alignment=Qt.AlignCenter)
 
-        centralWidget = QWidget()
-        centralWidget.setLayout(layout)
-        self.setCentralWidget(centralWidget)
+        # Create a central widget and set the layout
+        central_widget = QWidget()
+        central_widget.setLayout(layout)
 
         # Set the central widget of the Window.
         #self.setCentralWidget(label)
-    
+        self.setCentralWidget(central_widget)
+
     def closeEvent(self, event) -> None:
         QApplication.exit()
+        # Set the central widget of the main window
+
+    def exit_application(self):
+        # Perform any cleanup or save operations here
+        QCoreApplication.instance().quit()
 
     def update_telemetry(self, data : dict):
         try:
@@ -309,7 +347,16 @@ class MainWindow(QMainWindow):
         except Exception as e:
             traceback.print_exc()
 
-
+    def edit_config_file(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        config_file = args.configfile
+        config_path = os.path.join(script_dir, config_file)
+        file_url = QUrl.fromLocalFile(config_path)
+        try:
+            QDesktopServices.openUrl(file_url)
+        except:
+            logging.error(f"There was an error opening the config file")
 
 def main():
     app = QApplication(sys.argv)

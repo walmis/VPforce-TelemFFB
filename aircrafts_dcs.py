@@ -21,6 +21,8 @@ from typing import List, Dict
 from ffb_rhino import HapticEffect, FFBReport_SetCondition
 import utils
 import logging
+import random
+logging.debug(f"Read HapticEffectIndex from ffb_rhino")
 
 #unit conversions (to m/s)
 knots = 0.514444
@@ -41,17 +43,30 @@ LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 class Aircraft(object):
     """Base class for Aircraft based FFB"""
     ####
-    buffeting_intensity : float = 0.2 # peak AoA buffeting intensity  0 to disable
-    buffet_aoa : float          = 10.0 # AoA when buffeting starts
-    stall_aoa : float           = 15.0 # Stall AoA
+    buffeting_intensity : float = 0.2               # peak AoA buffeting intensity  0 to disable
+    buffet_aoa : float          = 10.0              # AoA when buffeting starts
+    stall_aoa : float           = 15.0              # Stall AoA
 
-    runway_rumble_intensity : float = 1.0 # peak runway intensity, 0 to disable
-
-    gun_vibration_intensity : float = 0.12
-    cm_vibration_intensity : float = 0.12
-    weapon_release_intensity : float = 0.12
-    rocket_release_intensity : float = 0.12
+    engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
     
+    runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
+
+    gun_vibration_intensity : float = 0.12          # peak gunfire vibration intensity, 0 to disable
+    cm_vibration_intensity : float = 0.12           # peak countermeasure release vibration intensity, 0 to disable
+    weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
+    weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
+    
+    speedbrake_motion_intensity : float = 0.0      # peak vibration intensity when speed brake is moving, 0 to disable
+    speedbrake_buffet_intensity : float = 0.0      # peak buffeting intensity when speed brake deployed,  0 to disable
+    
+    gear_motion_intensity : float = 0.0      # peak vibration intensity when gear is moving, 0 to disable
+    gear_buffet_intensity : float = 0.0      # peak buffeting intensity when gear down during flight,  0 to disable
+    
+    flaps_motion_intensity : float = 0.0      # peak vibration intensity when flaps are moving, 0 to disable
+    flaps_buffet_intensity : float = 0.0      # peak buffeting intensity when flaps are deployed,  0 to disable
+    
+    canopy_motion_intensity : float = 0.0      # peak vibration intensity when canopy is moving, 0 to disable
+    canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
 
     ####
     def __init__(self, name : str, **kwargs):
@@ -62,6 +77,9 @@ class Aircraft(object):
         #self.__dict__.update(kwargs)
         for k,v in kwargs.items():
             Tp = type(getattr(self, k, None))
+            #logging.debug(f"Type = {Tp}")
+            #logging.debug(f"Key = {k}")
+            #logging.debug(f"Val = {v}")
             if Tp is not type(None):
                 logging.info(f"set {k} = {Tp(v)}")
                 setattr(self, k, Tp(v))
@@ -121,6 +139,9 @@ class Aircraft(object):
         buffeting_factor = utils.scale_clamp(aoa, (self.buffet_aoa, self.stall_aoa), (0.0, 1.0))
         #todo calc frequency
         return (13.0, airflow_factor * buffeting_factor * self.buffeting_intensity)
+        
+ 
+        
 
     def _update_runway_rumble(self, telem_data):
         """Add wheel based rumble effects for immersion
@@ -163,47 +184,80 @@ class Aircraft(object):
         telem_data["dbg_buffeting"] = (freq, mag) # save debug value
 
     def _update_cm_weapons(self, telem_data):
-        a = self.has_changed("PayloadInfo")
-        if a:
-            # logging.info(f"side = {a[2]}")
-            if a[2] == "left":
-                if a[3] == "448292":
-                    effects["cm"].stop()
-                    effects["cm"].periodic(10, self.rocket_release_intensity, 0, duration=50).start()
-                elif a[3] == "44877" or a[3] == "448138" or a[3] == "44722":
-                    effects["cm"].stop()
-                    effects["cm"].periodic(2, self.weapon_release_intensity, 0, duration=100).start()
-                else:
-                    effects["cm"].stop()
-                    effects["cm"].periodic(2, self.weapon_release_intensity, 90, duration=100).start()
-                    effects["cm"].periodic(2, self.weapon_release_intensity, 270, duration=100).start()
-            elif a[2] == "right":
-                if a[3] == "448292":
-                    effects["cm"].stop()
-                    effects["cm"].periodic(10, self.rocket_release_intensity, 0, duration=50).start()
-                elif a[3] == "44877" or a[3] == "448138" or a[3] == "44722":
-                    effects["cm"].stop()
-                    effects["cm"].periodic(2, self.weapon_release_intensity, 0, duration=100).start()
-                else:
-                    effects["cm"].stop()
-                    effects["cm"].periodic(2, self.weapon_release_intensity, 270, duration=100).start()
-                    effects["cm"].periodic(2, self.weapon_release_intensity, 90, duration=100).start()
+        if self.has_changed("PayloadInfo"):
+            effects["cm"].stop()
+            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
+            if self.weapon_effect_direction == -1:
+                #Init random number for effect direction
+                random_weapon_release_direction = random.randint(0, 359)
+                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start()
             else:
-                if a[3] == "448292":
-                    effects["cm"].stop()
-                    effects["cm"].periodic(10, self.rocket_release_intensity, 0, duration=50).start()
-                else:
-                    effects["cm"].stop()
-                    effects["cm"].periodic(2, self.weapon_release_intensity, 0, duration=100).start()
-                    effects["cm"].periodic(2, self.weapon_release_intensity, 180, duration=100).start()
+                effects["cm"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction, duration=80).start()
 
         if self.has_changed("Gun") or self.has_changed("CannonShells"):
             effects["cm"].stop()
-            effects["cm"].periodic(10, self.gun_vibration_intensity, 0, duration=50).start()
+            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
+            if self.weapon_effect_direction == -1:
+                #Init random number for effect direction
+                random_weapon_release_direction = random.randint(0, 359)
+                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start()
+            else:
+                effects["cm"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction, duration=80).start()
+        
         if self.has_changed("Flares") or self.has_changed("Chaff"):
             effects["cm"].stop()
-            effects["cm"].periodic(5, self.cm_vibration_intensity, randint(0,359), duration=30).start()
-
+            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
+            if self.weapon_effect_direction == -1:
+                #Init random number for effect direction
+                random_weapon_release_direction = random.randint(0, 359)
+                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(10, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start()
+            else:
+                effects["cm"].periodic(10, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start()
+  
+  
+    def _update_speed_brakes(self, spdbrk):
+        #spdbrk = telem_data.get("SpeedbrakePos", 0)
+        if self.has_changed("SpeedbrakePos"):
+            logging.debug(f"Speedbrake Pos: {spdbrk}")
+            effects["speedbrakemovement"].periodic(150, self.speedbrake_motion_intensity, 0, 3).start()
+            effects["speedbrakemovement2"].periodic(150, self.speedbrake_motion_intensity, 45, 3).start()
+        else:
+            effects.dispose("speedbrakemovement")
+            effects.dispose("speedbrakemovement2")
+            
+    def _update_landing_gear(self, gearpos):
+        #gearpos = telem_data.get("GearPos", 0)
+        if self.has_changed("GearPos"):
+            logging.debug(f"Landing Gear Pos: {gearpos}")
+            effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
+            effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 45, 3, phase=120).start()
+        else:
+            effects.dispose("gearmovement")
+            effects.dispose("gearmovement2")
+         
+    def _update_flaps(self, flapspos):
+        #flapspos = telem_data.get("FlapsPos", 0)
+        if self.has_changed("FlapsPos"):
+            logging.debug(f"Flaps Pos: {flapspos}")
+            effects["flapsmovement"].periodic(150, self.flaps_motion_intensity, 0, 3).start()
+            effects["flapsmovement2"].periodic(150, self.flaps_motion_intensity, 45, 3, phase=120).start()
+        else:
+            effects.dispose("flapsmovement")
+            effects.dispose("flapsmovement2")
+    
+    def _update_canopy(self, canopypos):
+        #canopypos = telem_data.get("CanopyPos", 0)
+        if self.has_changed("CanopyPos"):
+            logging.debug(f"Canopy Pos: {canopypos}")
+            effects["canopymovement"].periodic(150, self.canopy_motion_intensity, 0, 3).start()
+            effects["canopymovement2"].periodic(150, self.canopy_motion_intensity, 45, 3, phase=120).start()
+        else:
+            effects.dispose("canopymovement")
+            effects.dispose("canopymovement2")
+            
     def on_telemetry(self, telem_data : dict):
         """when telemetry frame is received, aircraft class receives data in dict format
 
@@ -215,6 +269,7 @@ class Aircraft(object):
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
+       
 
         # if stick position data is in the telemetry packet
         if "StickX" in telem_data and "StickY" in telem_data:
@@ -253,15 +308,19 @@ class Aircraft(object):
 
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop/WW2 aircraft"""
-
-    engine_rumble_intensity : float = 0.05
-    max_aoa_cf_force : float           = 0.2 # CF force sent to device at %stall_aoa
-    rpm_scale : float = 30
+    engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
+    
+    engine_rumble_intensity : float = 0.02
+    engine_rumble_lowrpm = 450
+    engine_rumble_lowrpm_intensity: float = 0.12
+    engine_rumble_highrpm = 2800
+    engine_rumble_highrpm_intensity: float = 0.06
+    max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
-
+       
         #(wx,wz,wy) = telem_data["12_Wind"]
         #yaw, pitch, roll = telem_data.get("SelfData", (0,0,0))
         #wnd = utils.to_body_vector(yaw, pitch, roll, (wx,wy,wz) )
@@ -282,6 +341,18 @@ class PropellerAircraft(Aircraft):
         telem_data["EngRPM"] = rpm
 
         self._update_aoa_effect(telem_data)
+        
+        if self.engine_rumble:
+            self._update_engine_rumble(rpm)
+   
+        if self.speedbrake_motion_intensity > 0:
+            super()._update_speed_brakes(self._telem_data.get("SpeedbrakePos", 0))
+        if self.gear_motion_intensity > 0:
+            super()._update_landing_gear(self._telem_data.get("GearPos", 0))
+        if self.flaps_motion_intensity > 0:
+            super()._update_flaps(self._telem_data.get("FlapsPos", 0))
+        if self.canopy_motion_intensity > 0:
+            super()._update_canopy(self._telem_data.get("CanopyPos", 0))
 
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
@@ -302,21 +373,51 @@ class PropellerAircraft(Aircraft):
         freq = float(rpm) / 60
         
         if freq > 0:
-            effects["rpm0"].periodic(freq, self.engine_rumble_intensity, randint(0,359)).start() # vib on X axis
-            #effects["rpm1"].periodic(freq+2, self.engine_rumble_intensity, 90).start() # vib on Y axis
+            dynamic_rumble_intensity = self._calc_engine_intensity(rpm)
+            logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
+            #logging.info(f"EngineRPM {freq}")
+            ## Experimenting with random direction for engine rumble effect
+            #effects["rpm0"].periodic(freq, self.engine_rumble_intensity, random.choice([0, 180])).start() # vib on X axis
+            #effects["rpm1"].periodic(freq+4, self.engine_rumble_intensity, random.choice([90, 270])).start() # vib on Y axis
+            effects["rpm0"].periodic(freq, dynamic_rumble_intensity, 0).start() # vib on X axis
+            effects["rpm1"].periodic(freq+2, dynamic_rumble_intensity, 90).start() # vib on Y axis
         else:
             effects.dispose("rpm0")
-            #effects.dispose("rpm1")
-
+            effects.dispose("rpm1")
+    
+    def _calc_engine_intensity(self, rpm) -> float:
+        """
+        Calculate the intensity to use based on the configurable high and low intensity settings and high and low RPM settings
+        intensity will decrease from max to min settings as the RPM increases from min to max settings
+        lower RPM = more rumble effect
+        """
+        min_rpm = self.engine_rumble_lowrpm
+        max_rpm = self.engine_rumble_highrpm
+        max_intensity = self.engine_rumble_lowrpm_intensity
+        min_intensity = self.engine_rumble_highrpm_intensity
+        
+        rpm_percentage = 1 - ((rpm - min_rpm) / (max_rpm - min_rpm))
+        logging.debug(f"rpm percent: {rpm_percentage}")
+        interpolated_intensity = min_intensity + (max_intensity - min_intensity) * rpm_percentage
+        
+        return interpolated_intensity
 
 
 class JetAircraft(Aircraft):
     """Generic Class for Jets"""
-       
+    #flaps_motion_intensity = 0.0
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
-
+        
+        if self.speedbrake_motion_intensity > 0:
+            super()._update_speed_brakes(self._telem_data.get("SpeedbrakePos", 0))
+        if self.gear_motion_intensity > 0:
+            super()._update_landing_gear(self._telem_data.get("GearPos", 0))
+        if self.flaps_motion_intensity > 0:
+            super()._update_flaps(self._telem_data.get("FlapsPos", 0))
+        if self.canopy_motion_intensity > 0:
+            super()._update_canopy(self._telem_data.get("CanopyPos", 0))
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
@@ -360,7 +461,7 @@ class Helicopter(Aircraft):
 class TF51D(PropellerAircraft):
     buffeting_intensity = 0 # implement
     runway_rumble_intensity = 1.0
-    engine_rumble = True # rumble based on RPM
+    
 
 # Specialized class for Mig-21
 class Mig21(JetAircraft):

@@ -74,10 +74,13 @@ optional arguments:
 - `--teleplot` is the destination IP:port address for teleplot.fr telemetry plotting service (default is "127.0.0.1:47269"). This service allows you to plot telemetry data over time.
 - `-p` or `--plot` is used to specify telemetry item names to send to teleplot, separated by spaces
 - `-D` or `--device` is used to specify the Rhino device USB VID:PID (default is "ffff:2055")
+- `-c` or `--configfile` is used to specify a config file to load (default is "config.ini")
 
 2. Telemetry effects mainly uses Constant Force and Periodic effects. On the Rhino it was tested with **50% Periodic** effect slider, and **100% CF** effect slider setting.
 3. Run DCS World
 4. Enjoy enhanced FFB effects while flying various aircrafts in DCS World!
+
+Note: If you have multiple VPForce FFB Enabled devices (Rhino, DIY Pedals, etc) it is possible to run multiple instances of TelemFFB if you specify the VID:PID when launching.  You can use the config file option to tune the effects for each peripheral in separate config files
 
 ## Contributing
 If you're interested in contributing to the project, feel free to submit pull requests or open issues on the Github page. Your feedback and suggestions are always welcome!
