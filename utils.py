@@ -49,6 +49,16 @@ def sanitize_dict(d):
         out[k] = to_number(v)
     return out
         
+def _flatten_dict_gen(d, parent_key, sep):
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, dict):
+            yield from flatten_dict(v, new_key, sep=sep).items()
+        else:
+            yield new_key, v
+
+def flatten_dict(d, parent_key: str = '', sep: str = '_'):
+    return dict(_flatten_dict_gen(d, parent_key, sep))
 
 def sock_readable(s) -> bool:
     r,_,_ = select.select([s], [],[], 0)

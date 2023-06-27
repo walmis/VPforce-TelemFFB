@@ -17,6 +17,7 @@
  
 import math
 from random import randint
+import time
 from typing import List, Dict
 from ffb_rhino import HapticEffect, FFBReport_SetCondition
 import utils
@@ -93,33 +94,19 @@ class Aircraft(object):
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
-    def has_changed(self, item : str) -> bool:
-        prev_val = self._changes.get(item)
+    def has_changed(self, item : str, delta_ms = 0) -> bool:
+        prev_val, tm = self._changes.get(item, (None, 0))
         new_val = self._telem_data.get(item)
 #        print(new_val)
-        self._changes[item] = new_val
+        if prev_val != new_val:
+            self._changes[item] = (new_val, time.perf_counter())
+
         if prev_val != new_val and prev_val is not None and new_val is not None:
-            side = None
-            weapon_type = None
-            if item == "PayloadInfo":
-                map_change = 0
-                l = len(new_val)
-                for num in range(l):
-                    if prev_val[num] != new_val[num]:
-                        map_change |= 1 << num
-                        weapon_type = prev_val[num].split("*")[0]
-                # logging.info(f"{bin(map_change)}")
-                # logging.info(f"{weapon_type}")
-                if map_change < 2**(l//2):
-                    side = "left"
-                elif map_change > 2**(l//2)-1:
-                    if (l % 2) == 0:
-                        side = "right"
-                    elif map_change > 2**((l//2)+1)-1:
-                        side = "right"
-                    else:
-                        side = "both"
-            return (prev_val,new_val,side,weapon_type)
+            return (prev_val,new_val)
+        
+        if time.perf_counter() - tm < delta_ms/1000.0:
+            return True
+
         return False
 
     def _calc_buffeting(self, aoa, speed) -> tuple:
@@ -178,8 +165,8 @@ class Aircraft(object):
         freq, mag = self._calc_buffeting(aoa, tas)
         # manage periodic effect for buffeting
         if mag:
-            effects["buffeting"].periodic(freq, mag, 0).start()
-            effects["buffeting2"].periodic(freq, mag, 45, phase=120).start()
+            effects["buffeting"].periodic(freq, mag, utils.RandomDirectionModulator).start()
+            #effects["buffeting2"].periodic(freq, mag, 45, phase=120).start()
 
         telem_data["dbg_buffeting"] = (freq, mag) # save debug value
 
@@ -213,50 +200,48 @@ class Aircraft(object):
                 #Init random number for effect direction
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(10, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start()
+                effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start()
             else:
-                effects["cm"].periodic(10, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start()
+                effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start()
   
   
-    def _update_speed_brakes(self, spdbrk):
-        #spdbrk = telem_data.get("SpeedbrakePos", 0)
-        if self.has_changed("SpeedbrakePos"):
+    def _update_speed_brakes(self):
+        spdbrk = self._telem_data.get("speedbrakes_value", 0)
+        if self.has_changed("speedbrakes_value", 50):
             logging.debug(f"Speedbrake Pos: {spdbrk}")
-            effects["speedbrakemovement"].periodic(150, self.speedbrake_motion_intensity, 0, 3).start()
-            effects["speedbrakemovement2"].periodic(150, self.speedbrake_motion_intensity, 45, 3).start()
+            effects["speedbrakemovement"].periodic(200, self.speedbrake_motion_intensity, 0, 3).start()
         else:
             effects.dispose("speedbrakemovement")
-            effects.dispose("speedbrakemovement2")
             
-    def _update_landing_gear(self, gearpos):
-        #gearpos = telem_data.get("GearPos", 0)
-        if self.has_changed("GearPos"):
-            logging.debug(f"Landing Gear Pos: {gearpos}")
+    def _update_landing_gear(self):
+        gearpos = self._telem_data.get("gear_value", 0)
+        if self.has_changed("gear_value", 50):
+            #logging.debug(f"Landing Gear Pos: {gearpos}")
             effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
-            effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 45, 3, phase=120).start()
+            #effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 45, 3, phase=120).start()
         else:
             effects.dispose("gearmovement")
-            effects.dispose("gearmovement2")
+            #effects.dispose("gearmovement2")
          
-    def _update_flaps(self, flapspos):
-        #flapspos = telem_data.get("FlapsPos", 0)
-        if self.has_changed("FlapsPos"):
+    def _update_flaps(self):
+        flapspos = self._telem_data.get("flaps_value", 0)
+        if self.has_changed("flaps_value", 50):
             logging.debug(f"Flaps Pos: {flapspos}")
-            effects["flapsmovement"].periodic(150, self.flaps_motion_intensity, 0, 3).start()
-            effects["flapsmovement2"].periodic(150, self.flaps_motion_intensity, 45, 3, phase=120).start()
+            effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, 0, 3).start()
+            #effects["flapsmovement2"].periodic(150, self.flaps_motion_intensity, 45, 3, phase=120).start()
         else:
             effects.dispose("flapsmovement")
-            effects.dispose("flapsmovement2")
+            #effects.dispose("flapsmovement2")
     
-    def _update_canopy(self, canopypos):
-        #canopypos = telem_data.get("CanopyPos", 0)
-        if self.has_changed("CanopyPos"):
+    def _update_canopy(self):
+        canopypos = self._telem_data.get("canopy_value", 0)
+        if self.has_changed("canopy_value", 50):
             logging.debug(f"Canopy Pos: {canopypos}")
-            effects["canopymovement"].periodic(150, self.canopy_motion_intensity, 0, 3).start()
-            effects["canopymovement2"].periodic(150, self.canopy_motion_intensity, 45, 3, phase=120).start()
+            effects["canopymovement"].periodic(120, self.canopy_motion_intensity, 0, 3).start()
+            #effects["canopymovement2"].periodic(150, self.canopy_motion_intensity, 45, 3, phase=120).start()
         else:
             effects.dispose("canopymovement")
-            effects.dispose("canopymovement2")
+            #effects.dispose("canopymovement2")
             
     def on_telemetry(self, telem_data : dict):
         """when telemetry frame is received, aircraft class receives data in dict format
@@ -270,6 +255,14 @@ class Aircraft(object):
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
        
+        if self.speedbrake_motion_intensity > 0:
+            self._update_speed_brakes()
+        if self.gear_motion_intensity > 0:
+            self._update_landing_gear()
+        if self.flaps_motion_intensity > 0:
+            self._update_flaps()
+        if self.canopy_motion_intensity > 0:
+            self._update_canopy()
 
         # if stick position data is in the telemetry packet
         if "StickX" in telem_data and "StickY" in telem_data:
@@ -344,15 +337,6 @@ class PropellerAircraft(Aircraft):
         
         if self.engine_rumble:
             self._update_engine_rumble(rpm)
-   
-        if self.speedbrake_motion_intensity > 0:
-            super()._update_speed_brakes(self._telem_data.get("SpeedbrakePos", 0))
-        if self.gear_motion_intensity > 0:
-            super()._update_landing_gear(self._telem_data.get("GearPos", 0))
-        if self.flaps_motion_intensity > 0:
-            super()._update_flaps(self._telem_data.get("FlapsPos", 0))
-        if self.canopy_motion_intensity > 0:
-            super()._update_canopy(self._telem_data.get("CanopyPos", 0))
 
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
@@ -410,14 +394,7 @@ class JetAircraft(Aircraft):
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
         
-        if self.speedbrake_motion_intensity > 0:
-            super()._update_speed_brakes(self._telem_data.get("SpeedbrakePos", 0))
-        if self.gear_motion_intensity > 0:
-            super()._update_landing_gear(self._telem_data.get("GearPos", 0))
-        if self.flaps_motion_intensity > 0:
-            super()._update_flaps(self._telem_data.get("FlapsPos", 0))
-        if self.canopy_motion_intensity > 0:
-            super()._update_canopy(self._telem_data.get("CanopyPos", 0))
+
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""

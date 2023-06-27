@@ -84,6 +84,7 @@ def format_dict(data, prefix=""):
             output += prefix + key + " = " + str(value) + "\n"
     return output
 
+
 def reload_config():
     global config
     # reload config
@@ -177,7 +178,11 @@ class TelemManager(QObject, threading.Thread):
                     print(e)
 
             try:
-                telem_data["MechInfo"] = json.loads(telem_data["MechInfo"])
+                j = json.loads(telem_data["MechInfo"])
+                out = utils.flatten_dict(j, "", "_")
+                for k,v in out.items():
+                    telem_data[k] = v
+                del telem_data["MechInfo"]
             except: pass
 
             #print(items)
