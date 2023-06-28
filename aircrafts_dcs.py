@@ -78,6 +78,8 @@ class Aircraft(object):
         #self.__dict__.update(kwargs)
         for k,v in kwargs.items():
             Tp = type(getattr(self, k, None))
+            if v in ("True", "False", "true", "false"):
+                Tp = bool
             #logging.debug(f"Type = {Tp}")
             #logging.debug(f"Key = {k}")
             #logging.debug(f"Val = {v}")
@@ -97,6 +99,11 @@ class Aircraft(object):
     def has_changed(self, item : str, delta_ms = 0) -> bool:
         prev_val, tm = self._changes.get(item, (None, 0))
         new_val = self._telem_data.get(item)
+        
+        # round floating point numbers
+        if type(new_val) == float:
+            new_val = round(new_val, 3)
+            prev_val = round(prev_val, 3)
 #        print(new_val)
         if prev_val != new_val:
             self._changes[item] = (new_val, time.perf_counter())
@@ -309,6 +316,7 @@ class PropellerAircraft(Aircraft):
     engine_rumble_highrpm = 2800
     engine_rumble_highrpm_intensity: float = 0.06
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
+    rpm_scale : float = 45
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -326,17 +334,20 @@ class PropellerAircraft(Aircraft):
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
         rpm = telem_data.get("EngRPM", 0)
-        if isinstance(rpm, list):
-            rpm = [x * self.rpm_scale for x in rpm]
-            self._update_engine_rumble(rpm[0])
-        else:
-            rpm = self.rpm_scale
-        telem_data["EngRPM"] = rpm
+        if not "ActualRPM" in telem_data:
+            if isinstance(rpm, list):
+                rpm = [x * self.rpm_scale for x in rpm]
+            else:
+                rpm = rpm * self.rpm_scale
+            telem_data["ActualRPM"] = rpm
+
+
+        if self.engine_rumble:
+            self._update_engine_rumble(telem_data["ActualRPM"])
+
 
         self._update_aoa_effect(telem_data)
-        
-        if self.engine_rumble:
-            self._update_engine_rumble(rpm)
+
 
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
@@ -354,6 +365,9 @@ class PropellerAircraft(Aircraft):
             effects["aoa"].constant(mag, dir).start()
 
     def _update_engine_rumble(self, rpm):
+        if type(rpm) == list:
+            rpm = rpm[0]
+            
         freq = float(rpm) / 60
         
         if freq > 0:
