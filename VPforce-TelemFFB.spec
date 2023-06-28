@@ -8,7 +8,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[('dll/hidapi.dll', 'dll')],
-    datas=[('export/*', 'export'), ('config.ini', '.')],
+    datas=[('export/*', 'export'), ('config.ini', '.'), ('config.user.ini.README', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
