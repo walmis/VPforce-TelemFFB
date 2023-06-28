@@ -302,19 +302,30 @@ class PropellerAircraft(Aircraft):
 
     def _update_engine_rumble(self, rpm):
         freq = float(rpm) / 60
+        median_modulation = 2
+        freq2 = freq+median_modulation
+        
+        modulation_pos = 1
+        modulation_neg = 1
+        freq2 = freq+median_modulation
+        precision = 2
+
+        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation-modulation_neg, median_modulation+modulation_pos, precision, time_period=5  )
+        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation-modulation_neg, median_modulation+modulation_pos, precision, time_period=5  )
         
         if freq > 0:
             dynamic_rumble_intensity = self._calc_engine_intensity(rpm)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
-            #logging.info(f"EngineRPM {freq}")
-            ## Experimenting with random direction for engine rumble effect
-            #effects["rpm0"].periodic(freq, self.engine_rumble_intensity, random.choice([0, 180])).start() # vib on X axis
-            #effects["rpm1"].periodic(freq+4, self.engine_rumble_intensity, random.choice([90, 270])).start() # vib on Y axis
-            effects["rpm0"].periodic(freq, dynamic_rumble_intensity, 0).start() # vib on X axis
-            effects["rpm1"].periodic(freq+2, dynamic_rumble_intensity, 90).start() # vib on Y axis
+            
+            effects["rpm0-1"].periodic(freq, dynamic_rumble_intensity, 0).start() # vib on X axis
+            effects["rpm0-2"].periodic(freq+r1_modulation, dynamic_rumble_intensity, 0).start() # vib on X axis
+            effects["rpm1-1"].periodic(freq2, dynamic_rumble_intensity, 90).start() # vib on Y axis
+            effects["rpm1-2"].periodic(freq2+r2_modulation, dynamic_rumble_intensity, 90).start() # vib on Y axis
         else:
-            effects.dispose("rpm0")
-            effects.dispose("rpm1")
+            effects.dispose("rpm0-1")
+            effects.dispose("rpm1-1")
+            effects.dispose("rpm0-2")
+            effects.dispose("rpm1-2")
     
     def _calc_engine_intensity(self, rpm) -> float:
         """
