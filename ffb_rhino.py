@@ -272,6 +272,7 @@ class FFBEffectHandle:
             logging.error(f"Periodic Effect Magnitude violation: {magnitude}")
         direction %= 360
 
+
         kw = {
             "effectBlockIndex": self.effect_id,
             "effectType": self.type,
@@ -281,14 +282,26 @@ class FFBEffectHandle:
         }
         kw.update(kwargs)
         op = FFBReport_SetEffect(**kw)
-        self.ffb.write(bytes(op))
+        op = bytes(op)
+
+        # update only when data changes
+        if op != getattr(self, "last_SetEffect", None):
+            self.last_SetEffect = (op)
+            self.ffb.write((op))
 
         if freq == 0:
             period = 0
         else:
             period = round(1000.0/freq)
-        op = FFBReport_SetPeriodic(magnitude=round(4096*magnitude), effectBlockIndex=self.effect_id, period=period, **kwargs)
-        self.ffb.write(bytes(op))
+        mag = round(4096*magnitude)
+
+        op = FFBReport_SetPeriodic(magnitude=mag, effectBlockIndex=self.effect_id, period=period, **kwargs)
+        op = bytes(op)
+        # update only when data changes
+        if op != getattr(self, "last_SetPeriodic", None):
+            self.last_SetPeriodic = op
+            self.ffb.write(op)
+
         return self
 
 
