@@ -23,9 +23,30 @@ from time import monotonic
 import logging
 import sys
 import winpaths
+import time
 
+def get_random_within_range(item, input_number, range_start, range_end, decimal_places=2, time_period=None):
+    """ Return a random number between range_start and range_end with a precision level of decimal_places
+        if time_period (in seconds) is given, the function will return the same random number during any given
+        interval of time_period for 'item' """
+    current_time = int(time.time())  # Get the current timestamp in seconds
+    random_seed = item
 
+    # If time_period is not provided, generate a random number on every call
+    if time_period is None:
+        random.seed()
+    else:
+        time_period_index = current_time // time_period
+        random_seed += str(time_period_index)
+        random.seed(random_seed)
 
+    # Generate a random number within the specified range with the specified number of decimal places
+    factor = 10 ** decimal_places
+    random_number = round(random.uniform(range_start, range_end), decimal_places)
+    random_number = round(random_number * factor) / factor
+
+    return random_number
+    
 def to_number(v):
     """Try to convert string to number
     If unable, return the original string
