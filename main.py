@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, '') 
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     stream=sys.stdout,
@@ -31,7 +31,8 @@ import re
   
 import argparse
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox, QPushButton,QDialog, QRadioButton, QListView
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
+    QRadioButton, QListView, QScrollArea
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
 # from PyQt5.QtWidgets import *
@@ -226,14 +227,14 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("TelemFFB")
+        self.resize(400,700)
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
         # Create a layout for the main window
         layout = QVBoxLayout()
-        
-        # Add a label for the image
-        
 
+
+        # Add a label for the image
         # Construct the absolute path of the image file
         image_path = os.path.join(script_dir, "image/vpforcelogo.png")
         self.image_label = QLabel()
@@ -247,10 +248,22 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel(f"Config File: {args.configfile}"))
         # Add a label and telemetry data label
         layout.addWidget(QLabel("DCS Telemetry"))
+
+        # Create a scrollable area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        # Create the QLabel widget and set its properties
         self.lbl_telem_data = QLabel("Waiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        layout.addWidget(self.lbl_telem_data)
-        
+        self.lbl_telem_data.setWordWrap(True)
+
+        # Set the QLabel widget as the widget inside the scroll area
+        scroll_area.setWidget(self.lbl_telem_data)
+
+        # Add the scroll area to the layout
+        layout.addWidget(scroll_area)
+
         # Add the edit button
         edit_button = QPushButton("Edit Config File")
         edit_button.setMinimumWidth(200)
@@ -263,16 +276,13 @@ class MainWindow(QMainWindow):
         self.log_button.setMaximumWidth(200)
         self.log_button.clicked.connect(self.toggle_log_window)
         layout.addWidget(self.log_button, alignment=Qt.AlignCenter)
+
         # Add the exit button
         exit_button = QPushButton("Exit")
         exit_button.setMinimumWidth(200)  # Set the minimum width
         exit_button.setMaximumWidth(200)  # Set the maximum width
         exit_button.clicked.connect(self.exit_application)
         layout.addWidget(exit_button, alignment=Qt.AlignCenter)
-
-        # self.counter_button = QPushButton("Increment Effect")
-        # self.counter_button.clicked.connect(self.increment_counter)
-        # layout.addWidget(self.counter_button)
 
         central_widget = QWidget()
         central_widget.setLayout(layout)
