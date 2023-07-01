@@ -23,7 +23,24 @@ from time import monotonic
 import logging
 import sys
 import winpaths
+import random
 import time
+
+
+def to_number(v):
+    """Try to convert string to number
+    If unable, return the original string
+    """
+    try:
+        if "." in v:
+            return float(v)
+        else:
+            return int(v)
+    except ValueError:
+        return v
+        
+
+
 
 def get_random_within_range(item, input_number, range_start, range_end, decimal_places=2, time_period=None):
     """ Return a random number between range_start and range_end with a precision level of decimal_places
@@ -46,19 +63,6 @@ def get_random_within_range(item, input_number, range_start, range_end, decimal_
     random_number = round(random_number * factor) / factor
 
     return random_number
-    
-def to_number(v):
-    """Try to convert string to number
-    If unable, return the original string
-    """
-    try:
-        if "." in v:
-            return float(v)
-        else:
-            return int(v)
-    except ValueError:
-        return v
-        
 
 def sock_readable(s) -> bool:
     r,_,_ = select.select([s], [],[], 0)
@@ -340,7 +344,10 @@ class OutLog(QtCore.QObject):
             self.out.write(m)
 
     def write(self, m):
-        self.textReceived.emit(m)
+        try:
+            self.textReceived.emit(m)
+        except: pass
+
 
     def flush(self): pass
 

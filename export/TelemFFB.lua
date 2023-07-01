@@ -110,7 +110,7 @@ local f_telemFFB = {
               MainPanel:get_argument_value(282)
             )
 
-            -- Mi-8MTV2  sends to SimShaker
+            --  Mi-8MTV2  sends to SimShaker
             stringToSend =
               string.format(
               "T=%.3f;N=%s;SelfData=%s;RotorRPM=%.0f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;d=0;ACCs=%s;d=0;IAS=%.2f;Wind=%s;altASL=%.2f;14d=0;Payload=%s;d=0;d=0;d=0;d=0;d=0;TAS=%.2f;Flares=%s",
@@ -233,6 +233,7 @@ local f_telemFFB = {
             local Fuel_Pressure = MainPanel:get_argument_value(32) * 25
 
             --local myselfData = string.format("%.2f~%.2f~%.2f", obj.Heading, obj.Pitch, obj.Bank)
+			
             local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
@@ -820,15 +821,19 @@ local f_telemFFB = {
                 RPM = LEngine_RPM.."~"..REngine_RPM
               end
 			end
+			local Throttle_1 = MainPanel:get_argument_value(104)
+			local Throttle_2 = MainPanel:get_argument_value(105)
 			
             -- FA-18C sends to TelemFFB
             stringToSend =
 				string.format(
-				"T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
+				"T=%.3f;N=%s;SelfData=%s;Engine_RPM=%s;Throttle_1=%.2f;Throttle_2=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
 				t,
 				obj.Name,
 				myselfData,
 				RPM,
+				Throttle_1,
+				Throttle_2,
 				velocityVectors,
 				altAgl,
 				"000",
@@ -909,6 +914,34 @@ local f_telemFFB = {
             -- YAK-52 sends to SimShaker
             stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
 
+         elseif obj.Name == "F-16C_50" then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            -- F-16 sends to TelemFFB
+            local Throttle_1 = MainPanel:get_argument_value(755)
+            local engineRPM = MainPanel:get_argument_value(95) * 100
+
+            stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f~;Throttle_1=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s",
+             t,
+             obj.Name,
+             myselfData,
+             engineRPM,
+             Throttle_1,
+             velocityVectors,
+             altAgl,
+             "000",
+             CannonShells,
+             AccelerationUnits,
+             IAS,
+             windVelocityVectors,
+             altAsl,
+             aoa,
+             PayloadInfo,
+             M_number,
+             tas,
+             CM.flare,
+             CM.chaff
+             )
+
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           elseif obj.Name == "Christen Eagle II" then
 
@@ -921,15 +954,18 @@ local f_telemFFB = {
 			-- MiG-19P sends to SimShaker
 			stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
 		
-		  elseif obj.Name == "F-15ESE" then
-
-			-- F15 sends to TelemFFB
-			stringToSend=string.format("T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
+-- 		  elseif obj.Name == "F-15ESE" then
+--
+-- 			-- F15 sends to TelemFFB
+--
+-- 			local rpm_L = string.format("%.0f", LoGetEngineInfo().RPM.left)
+--             local rpm_R = string.format("%.0f", LoGetEngineInfo().RPM.right)
+--             stringToSend=string.format("RPM-L=%s;RPM-R=%s",rpm_L,rpm_R)
+-- 			stringToSend=string.format("%s;T=%.3f;N=%s;SelfData=%s;Engine_RPM=%.2f;VlctVectors=%s;altAgl=%.2f;PanShake=%s;Gun=%s;ACCs=%s;d10=0;IAS=%.2f;Wind=%s;altASL=%.2f;AoA=%.2f;PayloadInfo=%s;16d=0;M=%.4f;18d=0;19d=0;20d=0;TAS=%.2f;Flares=%s;Chaff=%s", stringToSend,t, obj.Name, myselfData, "0",  velocityVectors, altAgl, "000", CannonShells, AccelerationUnits, IAS, windVelocityVectors, altAsl, aoa, PayloadInfo, M_number, tas, CM.flare, CM.chaff)
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           else -- FC3 Planes
             local engine = LoGetEngineInfo()
-
             local LandingGearState = LoGetMechInfo().gear.value
             local SpeedBrakePos = LoGetMechInfo().speedbrakes.value
             local CanopyPos = LoGetMechInfo().canopy.value
@@ -939,7 +975,19 @@ local f_telemFFB = {
             local MechState = string.format("%.2f-%.2f", DragChuteState, 100 * LoGetMechInfo().gear.value)
             local MCP = LoGetMCPState()
 
-            local engineRPM = string.format("%.0f~%.0f", LoGetEngineInfo().RPM.left, LoGetEngineInfo().RPM.right)
+            --local engineRPM = string.format("%.0f~%.0f", LoGetEngineInfo().RPM.left, LoGetEngineInfo().RPM.right)
+            local success, result = pcall(function()
+                return string.format("%.0f~%.0f", LoGetEngineInfo().RPM.left, LoGetEngineInfo().RPM.right)
+            end)
+
+            local engineRPM
+            if success then
+                engineRPM = result
+            else
+                engineRPM = "N/A"
+            end
+
+
             local MCPState =
               tostring(MCP.LeftEngineFailure) .. "~" .. tostring(MCP.RightEngineFailure) .. "~" .. tostring(MCP.HydraulicsFailure) ..
                       "~" .. tostring(MCP.ACSFailure) .. "~" .. tostring(MCP.AutopilotFailure) .. "~" .. tostring(MCP.MasterWarning) ..

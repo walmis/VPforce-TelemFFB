@@ -31,9 +31,12 @@ import re
   
 import argparse
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox, QPushButton
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox, QPushButton,QDialog, QRadioButton, QListView
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
+# from PyQt5.QtWidgets import *
+# from PyQt5.QtCore import *
+# from PyQt5.QtGui import *
 
 from time import monotonic
 import socket
@@ -45,6 +48,7 @@ import traceback
 import os
 from ffb_rhino import HapticEffect
 from configobj import ConfigObj
+
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -253,7 +257,12 @@ class MainWindow(QMainWindow):
         edit_button.setMaximumWidth(200)
         edit_button.clicked.connect(self.edit_config_file)
         layout.addWidget(edit_button, alignment=Qt.AlignCenter)
-        
+
+        self.log_button = QPushButton("Open/Hide Log")
+        self.log_button.setMinimumWidth(200)
+        self.log_button.setMaximumWidth(200)
+        self.log_button.clicked.connect(self.toggle_log_window)
+        layout.addWidget(self.log_button, alignment=Qt.AlignCenter)
         # Add the exit button
         exit_button = QPushButton("Exit")
         exit_button.setMinimumWidth(200)  # Set the minimum width
@@ -261,13 +270,38 @@ class MainWindow(QMainWindow):
         exit_button.clicked.connect(self.exit_application)
         layout.addWidget(exit_button, alignment=Qt.AlignCenter)
 
-        # Create a central widget and set the layout
+        # self.counter_button = QPushButton("Increment Effect")
+        # self.counter_button.clicked.connect(self.increment_counter)
+        # layout.addWidget(self.counter_button)
+
         central_widget = QWidget()
         central_widget.setLayout(layout)
-
-        # Set the central widget of the main window
         self.setCentralWidget(central_widget)
 
+        # Set the central widget of the main window
+        # self.setCentralWidget(central_widget)
+
+        # # Add the FFBTestTool button
+        # self.ffb_test_button = QPushButton("Show FFBTestTool")
+        # self.ffb_test_button.clicked.connect(self.show_ffb_test_tool)
+        # layout.addWidget(self.ffb_test_button)
+
+    # def show_ffb_test_tool(self):
+    #     try:
+    #         self.ffb_test_tool = FFBTestToolDialog()
+    #         self.ffb_test_tool.show()
+    #     except Exception as e:
+    #         logging.error(f"Error: {e}")
+    #
+    # def increment_counter(self):
+    #     global periodic_effect_index
+    #     periodic_effect_index += 1
+    #     print("periodic_effect_index:", periodic_effect_index)
+    def toggle_log_window(self):
+        if d.isVisible():
+            d.hide()
+        else:
+            d.show()
     def exit_application(self):
         # Perform any cleanup or save operations here
         QCoreApplication.instance().quit()
@@ -296,18 +330,46 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(file_url)
         except:
             logging.error(f"There was an error opening the config file")
+# class FFBTestToolDialog(QDialog):
+#     def __init__(self):
+#         super().__init__()
+#         self.ui = Ui_FFBTestTool()
+#         self.ui.setupUi(self)
+# class Ui_FFBTestTool(object):
+#     def setupUi(self, FFBTestTool):
+#         if not FFBTestTool.objectName():
+#             FFBTestTool.setObjectName(u"FFBTestTool")
+#         FFBTestTool.resize(562, 462)
+#         self.radioButton = QRadioButton(FFBTestTool)
+#         self.radioButton.setObjectName(u"radioButton")
+#         self.radioButton.setGeometry(QRect(60, 60, 82, 17))
+#         self.listView = QListView(FFBTestTool)
+#         self.listView.setObjectName(u"listView")
+#         self.listView.setGeometry(QRect(40, 120, 256, 192))
+#
+#         self.retranslateUi(FFBTestTool)
+#
+#         QMetaObject.connectSlotsByName(FFBTestTool)
+#     # setupUi
+
+    # def retranslateUi(self, FFBTestTool):
+    #     FFBTestTool.setWindowTitle(QCoreApplication.translate("FFBTestTool", u"FFB Test Tool", None))
+    #     self.radioButton.setText(QCoreApplication.translate("FFBTestTool", u"RadioButton", None))
+    # # retranslateUi
+
 
 def main():
     app = QApplication(sys.argv)
+    global d
     d = LogWindow()
-    d.show()
+    #d.show()
 
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
 
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info("TelemFFB Starting")
-    
+
     # check and install/update export lua script
     utils.install_export_lua()
 	
