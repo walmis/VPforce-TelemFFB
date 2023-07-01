@@ -575,6 +575,7 @@ local f_telemFFB = {
                       "~" .. tostring(MCP.MLWSFailure) .. "~" .. tostring(MCP.RWSFailure) .. "~" .. tostring(MCP.ECMFailure) ..
                       "~" .. tostring(MCP.GearFailure) .. "~" .. tostring(MCP.MFDFailure) .. "~" ..tostring(MCP.HUDFailure) ..
                       "~" .. tostring(MCP.HelmetFailure) .. "~" .. tostring(MCP.FuelTankDamage)
+     
             -- FC3 Plane sends to SimShaker
             stringToSend =
               string.format(
@@ -586,9 +587,11 @@ local f_telemFFB = {
               WingsPos
             )
           end
+
+          local AB = string.format("%.2f~%.2f", LoGetAircraftDrawArgumentValue(28), LoGetAircraftDrawArgumentValue(29))
 		 		  
           -- Common variables
-          stringToSend = string.format("T=%.3f;N=%s;SelfData=%s;%s;EngRPM=%s;ACCs=%s;Gun=%s;Wind=%s;VlctVectors=%s;altASL=%.2f;altAgl=%.2f;AoA=%.2f;IAS=%.2f;TAS=%.2f;WeightOnWheels=%s;Flares=%s;Chaff=%s;PayloadInfo=%s;Mach=%.4f;MechInfo=%s",               
+          stringToSend = string.format("T=%.3f;N=%s;SelfData=%s;%s;EngRPM=%s;ACCs=%s;Gun=%s;Wind=%s;VlctVectors=%s;altASL=%.2f;altAgl=%.2f;AoA=%.2f;IAS=%.2f;TAS=%.2f;WeightOnWheels=%s;Flares=%s;Chaff=%s;PayloadInfo=%s;Mach=%.4f;MechInfo=%s;Afterburner=%s",               
             t,
             obj.Name,
             myselfData,
@@ -597,7 +600,7 @@ local f_telemFFB = {
             AccelerationUnits,
             CannonShells,
             windVelocityVectors,
-            velocityVectors, altAsl, altAgl, aoa, IAS, tas, WoW, CM.flare, CM.chaff, PayloadInfo, M_number, mech)
+            velocityVectors, altAsl, altAgl, aoa, IAS, tas, WoW, CM.flare, CM.chaff, PayloadInfo, M_number, mech, AB)
 
           socket.try(self.sock_udp:sendto(stringToSend, self.host, self.port))
         end
