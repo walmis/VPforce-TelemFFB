@@ -1027,10 +1027,12 @@ local f_telemFFB = {
               CM.chaff
             )
           end
-		  
+
+		local AB = string.format("%.2f~%.2f", LoGetAircraftDrawArgumentValue(28), LoGetAircraftDrawArgumentValue(29))
+
 		stringToSend = 
 			string.format(
-			"%s;WeightOnWheels=%s;CanopyPos=%.4f;SpeedbrakePos=%.4f;FlapsPos=%.4f;GearPos=%.4f;FuelProbePos=%.4f;MechInfo=%s",
+			"%s;WeightOnWheels=%s;CanopyPos=%.4f;SpeedbrakePos=%.4f;FlapsPos=%.4f;GearPos=%.4f;FuelProbePos=%.4f;MechInfo=%s;Afterburner=%s",
 			stringToSend,
 			WoW,
 			LoGetMechInfo().canopy.value,
@@ -1038,7 +1040,8 @@ local f_telemFFB = {
 			LoGetMechInfo().flaps.value,
 			LoGetMechInfo().gear.value,
 			LoGetMechInfo().refuelingboom.value,
-			mech
+			mech,
+			AB
 		  )
 
           socket.try(self.sock_udp:send(stringToSend))
