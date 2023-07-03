@@ -460,25 +460,26 @@ class JetAircraft(Aircraft):
         #logging.debug(f"Afterburner = {afterburner_pos}")
         r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation-modulation_neg, median_modulation+modulation_pos, precision, time_period=5  )
         r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation-modulation_neg, median_modulation+modulation_pos, precision, time_period=5  )
+        try:
+            if super().has_changed("Afterburner") or super().anything_has_changed("Modulation", r1_modulation):
+                #logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
+                intensity = self.afterburner_effect_intensity * afterburner_pos
+                effects["ab_rumble_1_1"].periodic(frequency, intensity, 0, Aircraft.effect_index_set).start()
+                effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0, Aircraft.effect_index_set).start()
+                effects["ab_rumble_2_1"].periodic(frequency2, intensity, 45, 4, phase=120, offset=60).start()
+                effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120, offset=60).start()
+                logging.debug(f"Modul1= {r1_modulation} | Modul2 = {r2_modulation}")
+                self._ab_is_playing = 1
+            elif afterburner_pos == 0:
 
-        if super().has_changed("Afterburner") or super().anything_has_changed("Modulation", r1_modulation):
-            #logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
-            intensity = self.afterburner_effect_intensity * afterburner_pos
-            effects["ab_rumble_1_1"].periodic(frequency, intensity, 0, Aircraft.effect_index_set).start()
-            effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0, Aircraft.effect_index_set).start()
-            effects["ab_rumble_2_1"].periodic(frequency2, intensity, 45, 4, phase=120, offset=60).start()
-            effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120, offset=60).start()
-            logging.debug(f"Modul1= {r1_modulation} | Modul2 = {r2_modulation}")
-            self._ab_is_playing = 1
-        elif afterburner_pos == 0:
-            
-            #logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
-            effects.dispose("ab_rumble_1_1")
-            effects.dispose("ab_rumble_1_2")
-            effects.dispose("ab_rumble_2_1")
-            effects.dispose("ab_rumble_2_2")
-            self._ab_is_playing = 0
-    
+                #logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
+                effects.dispose("ab_rumble_1_1")
+                effects.dispose("ab_rumble_1_2")
+                effects.dispose("ab_rumble_2_1")
+                effects.dispose("ab_rumble_2_2")
+                self._ab_is_playing = 0
+        except:
+            logging.error("Error playing Afterburner effect")
     
  #    def _calculate_ab_effect(self, intensity, min_throt, max_throt, eng1, eng2=-1):
  #        eng1_intensity = 0
