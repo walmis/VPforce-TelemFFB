@@ -22,7 +22,7 @@ import time
 sys.path.insert(0, '') 
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     stream=sys.stdout,
@@ -32,9 +32,13 @@ import re
   
 import argparse
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout,QMessageBox, QPushButton
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
+    QRadioButton, QListView, QScrollArea
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
+# from PyQt5.QtWidgets import *
+# from PyQt5.QtCore import *
+# from PyQt5.QtGui import *
 
 from time import monotonic
 import socket
@@ -52,6 +56,7 @@ from configobj import ConfigObj
 from sc_manager import SimConnectManager
 
 config : ConfigObj = None
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
@@ -277,15 +282,14 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("TelemFFB")
-
+        self.resize(400,700)
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
         # Create a layout for the main window
         layout = QVBoxLayout()
-        
-        # Add a label for the image
-        
 
+
+        # Add a label for the image
         # Construct the absolute path of the image file
         image_path = os.path.join(script_dir, "image/vpforcelogo.png")
         self.image_label = QLabel()
@@ -299,19 +303,35 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel(f"Config File: {args.configfile}"))
         # Add a label and telemetry data label
         layout.addWidget(QLabel("DCS Telemetry"))
+
+        # Create a scrollable area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+
+        # Create the QLabel widget and set its properties
         self.lbl_telem_data = QLabel("Waiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        layout.addWidget(self.lbl_telem_data)
+        self.lbl_telem_data.setWordWrap(True)
 
-        layout.addStretch()
-        
+        # Set the QLabel widget as the widget inside the scroll area
+        scroll_area.setWidget(self.lbl_telem_data)
+
+        # Add the scroll area to the layout
+        layout.addWidget(scroll_area)
+
         # Add the edit button
         edit_button = QPushButton("Edit Config File")
         edit_button.setMinimumWidth(200)
         edit_button.setMaximumWidth(200)
         edit_button.clicked.connect(self.edit_config_file)
         layout.addWidget(edit_button, alignment=Qt.AlignCenter)
-        
+
+        self.log_button = QPushButton("Open/Hide Log")
+        self.log_button.setMinimumWidth(200)
+        self.log_button.setMaximumWidth(200)
+        self.log_button.clicked.connect(self.toggle_log_window)
+        layout.addWidget(self.log_button, alignment=Qt.AlignCenter)
+
         # Add the exit button
         exit_button = QPushButton("Exit")
         exit_button.setMinimumWidth(200)  # Set the minimum width
@@ -319,18 +339,34 @@ class MainWindow(QMainWindow):
         exit_button.clicked.connect(self.exit_application)
         layout.addWidget(exit_button, alignment=Qt.AlignCenter)
 
-        # Create a central widget and set the layout
         central_widget = QWidget()
         central_widget.setLayout(layout)
-
-        # Set the central widget of the Window.
-        #self.setCentralWidget(label)
         self.setCentralWidget(central_widget)
 
-    def closeEvent(self, event) -> None:
-        QApplication.exit()
         # Set the central widget of the main window
+        # self.setCentralWidget(central_widget)
 
+        # # Add the FFBTestTool button
+        # self.ffb_test_button = QPushButton("Show FFBTestTool")
+        # self.ffb_test_button.clicked.connect(self.show_ffb_test_tool)
+        # layout.addWidget(self.ffb_test_button)
+
+    # def show_ffb_test_tool(self):
+    #     try:
+    #         self.ffb_test_tool = FFBTestToolDialog()
+    #         self.ffb_test_tool.show()
+    #     except Exception as e:
+    #         logging.error(f"Error: {e}")
+    #
+    # def increment_counter(self):
+    #     global periodic_effect_index
+    #     periodic_effect_index += 1
+    #     print("periodic_effect_index:", periodic_effect_index)
+    def toggle_log_window(self):
+        if d.isVisible():
+            d.hide()
+        else:
+            d.show()
     def exit_application(self):
         # Perform any cleanup or save operations here
         QCoreApplication.instance().quit()
@@ -364,18 +400,46 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(file_url)
         except:
             logging.error(f"There was an error opening the config file")
+# class FFBTestToolDialog(QDialog):
+#     def __init__(self):
+#         super().__init__()
+#         self.ui = Ui_FFBTestTool()
+#         self.ui.setupUi(self)
+# class Ui_FFBTestTool(object):
+#     def setupUi(self, FFBTestTool):
+#         if not FFBTestTool.objectName():
+#             FFBTestTool.setObjectName(u"FFBTestTool")
+#         FFBTestTool.resize(562, 462)
+#         self.radioButton = QRadioButton(FFBTestTool)
+#         self.radioButton.setObjectName(u"radioButton")
+#         self.radioButton.setGeometry(QRect(60, 60, 82, 17))
+#         self.listView = QListView(FFBTestTool)
+#         self.listView.setObjectName(u"listView")
+#         self.listView.setGeometry(QRect(40, 120, 256, 192))
+#
+#         self.retranslateUi(FFBTestTool)
+#
+#         QMetaObject.connectSlotsByName(FFBTestTool)
+#     # setupUi
+
+    # def retranslateUi(self, FFBTestTool):
+    #     FFBTestTool.setWindowTitle(QCoreApplication.translate("FFBTestTool", u"FFB Test Tool", None))
+    #     self.radioButton.setText(QCoreApplication.translate("FFBTestTool", u"RadioButton", None))
+    # # retranslateUi
+
 
 def main():
     app = QApplication(sys.argv)
+    global d
     d = LogWindow()
-    d.show()
+    #d.show()
 
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
 
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info("TelemFFB Starting")
-    
+
     # check and install/update export lua script
     utils.install_export_lua()
 	

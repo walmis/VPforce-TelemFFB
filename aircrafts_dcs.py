@@ -23,6 +23,10 @@ from ffb_rhino import HapticEffect, FFBReport_SetCondition
 import utils
 import logging
 import random
+# from PyQt5.QtWidgets import QPushButton
+#
+# from effect_settings import periodic_effect_index
+periodic_effect_index = 4
 logging.debug(f"Read HapticEffectIndex from ffb_rhino")
 
 #unit conversions (to m/s)
@@ -56,22 +60,26 @@ class Aircraft(object):
     weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
     weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
     
-    speedbrake_motion_intensity : float = 0.0      # peak vibration intensity when speed brake is moving, 0 to disable
-    speedbrake_buffet_intensity : float = 0.0      # peak buffeting intensity when speed brake deployed,  0 to disable
+    speedbrake_motion_intensity : float = 0.12      # peak vibration intensity when speed brake is moving, 0 to disable
+    speedbrake_buffet_intensity : float = 0.15      # peak buffeting intensity when speed brake deployed,  0 to disable
     
-    gear_motion_intensity : float = 0.0      # peak vibration intensity when gear is moving, 0 to disable
-    gear_buffet_intensity : float = 0.0      # peak buffeting intensity when gear down during flight,  0 to disable
+    gear_motion_intensity : float = 0.12      # peak vibration intensity when gear is moving, 0 to disable
+    gear_buffet_intensity : float = 0.15      # peak buffeting intensity when gear down during flight,  0 to disable
     
-    flaps_motion_intensity : float = 0.0      # peak vibration intensity when flaps are moving, 0 to disable
+    flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable
     flaps_buffet_intensity : float = 0.0      # peak buffeting intensity when flaps are deployed,  0 to disable
     
-    canopy_motion_intensity : float = 0.0      # peak vibration intensity when canopy is moving, 0 to disable
+    canopy_motion_intensity : float = 0.12      # peak vibration intensity when canopy is moving, 0 to disable
     canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
 
+    afterburner_effect_intensity = 0.2      # peak intensity for afterburner rumble effect
+
     ####
+    _engine_rumble_is_playing = 0
     def __init__(self, name : str, **kwargs):
         self._name = name
         self._changes = {}
+        self._change_counter = {}
         self._telem_data = None
 
         #self.__dict__.update(kwargs)
@@ -89,6 +97,33 @@ class Aircraft(object):
         #clear any existing effects
         for e in effects.values(): e.destroy()
         effects.clear()
+    #effect_index_set = 4
+    # def incr_clicked():
+    #     if Aircraft.effect_index_set == 7:
+    #         Aircraft.effect_index_set = 3
+    #         logging.debug("Resetting Effect Index to 3")
+    #         return
+    #     Aircraft.effect_index_set += 1
+    #     print("INCR button clicked!")
+    #
+    # def decr_clicked():
+    #     if Aircraft.effect_index_set == 3:
+    #         Aircraft.effect_index_set = 7
+    #         logging.debug("Resetting Effect Index to 7")
+    #         return
+    #     Aircraft.effect_index_set -= 1
+    #     print("DECR button clicked!")
+    # def add_button_to_main_window(main_window):
+    #     # Create a button
+    #     button = QPushButton("Increment")
+    #     button.clicked.connect(Aircraft.incr_clicked)
+    #     main_window.layout().addWidget(button)
+
+    # def add_button2_to_main_window(main_window):
+    #     # Create a button
+    #     button = QPushButton("Decrement")
+    #     button.clicked.connect(Aircraft.decr_clicked)
+    #     main_window.layout().addWidget(button)
 
         self.spring = HapticEffect().spring()
         #self.spring.effect.effect_id = 5
@@ -114,6 +149,15 @@ class Aircraft(object):
 
         return False
 
+    def anything_has_changed(self, item : str, value) -> bool:
+        # track if any parameter, given as key "item" has changed between two consecutive calls of the function
+        prev_val = self._changes.get(item)
+        new_val = value
+        self._changes[item] = new_val
+        if prev_val != new_val and prev_val is not None and new_val is not None:
+            return (prev_val,new_val)
+        return False
+    
     def _calc_buffeting(self, aoa, speed) -> tuple:
         """Calculate buffeting amount and frequency
 
@@ -172,7 +216,13 @@ class Aircraft(object):
             effects["buffeting"].periodic(freq, mag, utils.RandomDirectionModulator).start()
             #effects["buffeting2"].periodic(freq, mag, 45, phase=120).start()
 
-        telem_data["dbg_buffeting"] = (freq, mag) # save debug value
+        telem_data["dbg_buffeting"] = mag # save debug value
+
+    def _update_drag_buffet(self, telem_data : dict, type : str):
+            drag_buffet_threshold = 100     #indicated TAS via telemetry
+            tas = telem_data.get("TAS", 0)
+            if tas < drag_buffet_threshold:
+                return 0
 
     def _update_cm_weapons(self, telem_data):
         if self.has_changed("PayloadInfo"):
@@ -208,14 +258,6 @@ class Aircraft(object):
             else:
                 effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start()
   
-  
-    def _update_speed_brakes(self):
-        spdbrk = self._telem_data.get("speedbrakes_value", 0)
-        if self.has_changed("speedbrakes_value", 50):
-            logging.debug(f"Speedbrake Pos: {spdbrk}")
-            effects["speedbrakemovement"].periodic(200, self.speedbrake_motion_intensity, 0, 3).start()
-        else:
-            effects.dispose("speedbrakemovement")
             
     def _update_landing_gear(self):
         gearpos = self._telem_data.get("gear_value", 0)
@@ -223,9 +265,52 @@ class Aircraft(object):
             #logging.debug(f"Landing Gear Pos: {gearpos}")
             effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
             #effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 45, 3, phase=120).start()
+
+    def _update_speed_brakes(self, spd_thresh=70):
+        tas = self._telem_data.get("TAS",0)
+
+        spdbrk = self._telem_data.get("speedbrakes_value", 0)
+        if self.has_changed("speedbrakes_value", 50):
+            logging.debug(f"Speedbrake Pos: {spdbrk}")
+            effects["speedbrakemovement"].periodic(200, self.speedbrake_motion_intensity, 0, 3).start()
         else:
+            effects.dispose("speedbrakemovement")
+
+        if tas > spd_thresh and spdbrk > .1:
+            #calculate insensity based on deployment percentage
+            realtime_intensity = self.speedbrake_buffet_intensity * spdbrk
+            effects["speedbrakebuffet"].periodic(13, realtime_intensity, 0, 4).start()
+            effects["speedbrakebuffet2"].periodic(13, realtime_intensity, 45, 4).start()
+           # logging.debug(f"PLAYING SPEEDBRAKE RUMBLE intensity:{realtime_intensity}")
+        else:
+            effects.dispose("speedbrakebuffet")
+            effects.dispose("speedbrakebuffet2")
+
+    def _update_landing_gear(self, spd_thresh_low=100, spd_thresh_high=150):
+        gearpos = self._telem_data.get("gear_value", 0)
+
+        tas =  self._telem_data.get("TAS", 0)
+        if self.has_changed("gear_value", 50):
+            #logging.debug(f"Landing Gear Pos: {gearpos}")
+            effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
+            effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 45, 3, phase=120).start()
+        else:
+            #data has reached 20 consecutive calls with no data, destroy effects, reset counter to 0
             effects.dispose("gearmovement")
-            #effects.dispose("gearmovement2")
+            effects.dispose("gearmovement2")
+
+        if tas > spd_thresh_low and gearpos > .1:
+            #calculate insensity based on deployment percentage
+            #intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
+
+            realtime_intensity = utils.scale(tas, (spd_thresh_low, spd_thresh_high), (0, self.gear_buffet_intensity)) * gearpos
+
+            effects["gearbuffet"].periodic(13, realtime_intensity, 0, 3).start()
+            effects["gearbuffet2"].periodic(13, realtime_intensity, 90, 3).start()
+            logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
+        else:
+            effects.dispose("gearbuffet")
+            effects.dispose("gearbuffet2")
          
     def _update_flaps(self):
         flapspos = self._telem_data.get("flaps_value", 0)
@@ -261,15 +346,15 @@ class Aircraft(object):
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
        
-        if self.speedbrake_motion_intensity > 0:
+        if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
             self._update_speed_brakes()
-        if self.gear_motion_intensity > 0:
+        if self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0:
             self._update_landing_gear()
         if self.flaps_motion_intensity > 0:
             self._update_flaps()
         if self.canopy_motion_intensity > 0:
             self._update_canopy()
-
+            
         # if stick position data is in the telemetry packet
         if "StickX" in telem_data and "StickY" in telem_data:
             x, y = HapticEffect.device.getInput()
@@ -317,12 +402,11 @@ class PropellerAircraft(Aircraft):
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
     rpm_scale : float = 45
 
+    _engine_rumble_is_playing = 0
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
     
-
-
         wind = telem_data.get("Wind", (0,0,0))
         wnd = math.sqrt(wind[0]**2 + wind[1]**2 + wind[2]**2)
 
@@ -337,15 +421,12 @@ class PropellerAircraft(Aircraft):
                 rpm = [x * self.rpm_scale for x in rpm]
             else:
                 rpm = rpm * self.rpm_scale
-            telem_data["ActualRPM"] = rpm
-
+            telem_data["ActualRPM"] = rpm # inject ActualRPM into telemetry
 
         if self.engine_rumble:
             self._update_engine_rumble(telem_data["ActualRPM"])
 
-
         self._update_aoa_effect(telem_data)
-
 
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
@@ -366,21 +447,33 @@ class PropellerAircraft(Aircraft):
         if type(rpm) == list:
             rpm = rpm[0]
             
-        freq = float(rpm) / 60
+        frequency = float(rpm) / 60
         
-        if freq > 0:
+        #frequency = 20
+        median_modulation = 2
+        modulation_pos = 2
+        modulation_neg = 1
+        frequency2 = frequency + median_modulation
+        precision = 2
+        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+        if frequency > 0 or self._engine_rumble_is_playing:
             dynamic_rumble_intensity = self._calc_engine_intensity(rpm)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
-            #logging.info(f"EngineRPM {freq}")
-            ## Experimenting with random direction for engine rumble effect
-            #effects["rpm0"].periodic(freq, self.engine_rumble_intensity, random.choice([0, 180])).start() # vib on X axis
-            #effects["rpm1"].periodic(freq+4, self.engine_rumble_intensity, random.choice([90, 270])).start() # vib on Y axis
-            effects["rpm0"].periodic(freq, dynamic_rumble_intensity, 0).start() # vib on X axis
-            effects["rpm1"].periodic(freq+2, dynamic_rumble_intensity, 90).start() # vib on Y axis
+
+
+            effects["rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start() # vib on X axis
+            effects["rpm0-2"].periodic(frequency+r1_modulation, dynamic_rumble_intensity, 0).start() # vib on X axis
+            effects["rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start() # vib on Y axis
+            effects["rpm1-2"].periodic(frequency2+r2_modulation, dynamic_rumble_intensity, 90).start() # vib on Y axis
+            self._engine_rumble_is_playing = 1
         else:
-            effects.dispose("rpm0")
-            effects.dispose("rpm1")
-    
+            self._engine_rumble_is_playing = 0
+            effects.dispose("rpm0-1")
+            effects.dispose("rpm0-2")
+            effects.dispose("rpm1-1")
+            effects.dispose("rpm1-2")
+
     def _calc_engine_intensity(self, rpm) -> float:
         """
         Calculate the intensity to use based on the configurable high and low intensity settings and high and low RPM settings
@@ -402,12 +495,124 @@ class PropellerAircraft(Aircraft):
 class JetAircraft(Aircraft):
     """Generic Class for Jets"""
     #flaps_motion_intensity = 0.0
+
+    _ab_is_playing = 0
+    def _read_effect_index(self):
+        global periodic_effect_index
+        logging.debug(f"periodic_effect_index: {periodic_effect_index}")
+        
+    def _update_ab_effect(self, intensity, telem_data):
+        frequency = 20
+        median_modulation = 2
+        modulation_pos = 2
+        modulation_neg = 1
+        frequency2 = frequency+median_modulation
+        precision = 2
+        try:
+            afterburner_pos = max(telem_data.get("Afterburner")[0], telem_data.get("Afterburner")[1])
+        except: pass
+        #logging.debug(f"Afterburner = {afterburner_pos}")
+        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation-modulation_neg, median_modulation+modulation_pos, precision, time_period=5  )
+        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation-modulation_neg, median_modulation+modulation_pos, precision, time_period=5  )
+        try:
+            if super().has_changed("Afterburner") or super().anything_has_changed("Modulation", r1_modulation):
+                #logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
+                intensity = self.afterburner_effect_intensity * afterburner_pos
+                effects["ab_rumble_1_1"].periodic(frequency, intensity, 0, Aircraft.effect_index_set).start()
+                effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0, Aircraft.effect_index_set).start()
+                effects["ab_rumble_2_1"].periodic(frequency2, intensity, 45, 4, phase=120, offset=60).start()
+                effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120, offset=60).start()
+                logging.debug(f"Modul1= {r1_modulation} | Modul2 = {r2_modulation}")
+                self._ab_is_playing = 1
+            elif afterburner_pos == 0:
+
+                #logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
+                effects.dispose("ab_rumble_1_1")
+                effects.dispose("ab_rumble_1_2")
+                effects.dispose("ab_rumble_2_1")
+                effects.dispose("ab_rumble_2_2")
+                self._ab_is_playing = 0
+        except:
+            logging.error("Error playing Afterburner effect")
+    
+ #    def _calculate_ab_effect(self, intensity, min_throt, max_throt, eng1, eng2=-1):
+ #        eng1_intensity = 0
+ #        eng2_intensity = 0
+ #        effect_factor = 1
+ #        if eng1 < min_throt and eng2 < min_throt:
+ #            return 0
+ #        # Determine if calling aircraft is single or multi-engine (eng2 will be -1 if eng2 argument was not sent)
+ #        if eng2 == -1:
+ #            percentage1 = (eng1 - min_throt) / (max_throt - min_throt)
+ #            eng1_intensity = intensity * (0.1 + (0.9 * percentage1))
+ #            return eng1_intensity
+ #
+ #        # If twin-engine, and only one engine is above the afterburner threshold, we will return 80% of the highest engine's calculated intensity
+ #        # Else we will return 100% of the highest engine's calculated intensity
+ #        if eng1 < min_throt or eng2 < min_throt:
+ #            effect_factor = 0.6
+ #
+ #        # Calculate both effect factors
+ #        percentage1 = (eng1 - min_throt) / (max_throt - min_throt)
+ #        eng1_intensity = intensity * (0.1 + (0.9 * percentage1))
+ #
+ #        percentage2 = (eng2 - min_throt) / (max_throt - min_throt)
+ #        eng2_intensity = intensity * (0.1 + (0.9 * percentage2))
+ #        #return highest throttle setting to use for intensity
+ #        return max(eng1_intensity, eng2_intensity) * effect_factor
+ # #_calculate_ab_effect(0.3, .8, 1.0, .5, .5)
+    
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
-        
 
+        if self.afterburner_effect_intensity > 0:
+            self._update_ab_effect(self.afterburner_effect_intensity, telem_data)
 
+class FA18(JetAircraft):
+    def on_telemetry(self, telem_data):
+        super().on_telemetry(telem_data)
+        # try:
+        #     eng1 = telem_data.get("Engine_RPM")[0]
+        # except:
+        #     logging.error("Error getting engine RPM data")
+        #     eng1 = 0
+        #
+        # try:
+        #     eng2 = telem_data.get("Engine_RPM")[1]
+        # except:
+        #     logging.error("Error getting engine RPM data")
+        #     eng2 = 0
+        # logging.debug(f"F18 - Eng1={eng1}, Eng2={eng2}")
+        # if eng1 > 0 or eng2 > 0:
+        #     if self.afterburner_effect_intensity > 0:
+        #         super()._update_ab_effect(self.afterburner_effect_intensity, telem_data, 0.8, 1.0, self._telem_data.get("Throttle_1", 0), self._telem_data.get("Throttle_2", 0))
+
+class F16(JetAircraft):
+    def on_telemetry(self, telem_data):
+        super().on_telemetry(telem_data)
+        # try:
+        #     eng1 = telem_data.get("Engine_RPM")[0]
+        # except:
+        #     logging.error("Error getting engine RPM data")
+        #     eng1 = 0
+        # logging.debug(f"F16 - Eng1={eng1}")
+        # if eng1 > 0:
+        #     if self.afterburner_effect_intensity > 0:
+        #         super()._update_ab_effect(self.afterburner_effect_intensity, telem_data, 0.7, 1.0, self._telem_data.get("Throttle_1", 0))
+
+class SU33(JetAircraft):
+    def on_telemetry(self, telem_data):
+        super().on_telemetry(telem_data)
+        # try:
+        #     eng1 = telem_data.get("Engine_RPM")[0]
+        #     eng2 = telem_data.get("Engine_RPM")[1]
+        # except:
+        #     logging.error("Error getting engine RPM data")
+        # logging.debug(f"F18 - Eng1={eng1}, Eng2={eng2}")
+        # if eng1 > 0 or eng2 > 0:
+        #     if self.afterburner_effect_intensity > 0:
+        #         super()._update_ab_effect(self.afterburner_effect_intensity, telem_data, 0.8, 1.0, self._telem_data.get("Throttle_1", 0), self._telem_data.get("Throttle_2", 0))
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
     buffeting_intensity = 0.0
@@ -478,5 +683,7 @@ classes = {
     "MiG-29A": JetAircraft,
     "MiG-29S": JetAircraft,
     "MiG-29G": JetAircraft,
+    "F-16C_50": F16,
+    "FA-18C_hornet": FA18,
     "default": Aircraft
 }

@@ -94,6 +94,9 @@ AXIS_ENABLE_X = 1
 AXIS_ENABLE_Y = 2
 AXIS_ENABLE_DIR = 4
 
+
+
+
 class BaseStructure(ctypes.LittleEndianStructure):
     def __init__(self, **kwargs):
         """

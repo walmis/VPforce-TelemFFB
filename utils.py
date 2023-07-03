@@ -27,6 +27,9 @@ import winreg
 import socket
 import math
 import time
+import random
+import time
+import hashlib
 
 def mix(a, b, val):
     return a*(1-val) + b*(val)
@@ -59,6 +62,30 @@ def _flatten_dict_gen(d, parent_key, sep):
 
 def flatten_dict(d, parent_key: str = '', sep: str = '_'):
     return dict(_flatten_dict_gen(d, parent_key, sep))
+
+
+
+def get_random_within_range(item, input_number, range_start, range_end, decimal_places=2, time_period=None):
+    """ Return a random number between range_start and range_end with a precision level of decimal_places
+        if time_period (in seconds) is given, the function will return the same random number during any given
+        interval of time_period for 'item' """
+    current_time = int(time.time())  # Get the current timestamp in seconds
+    random_seed = item
+
+    # If time_period is not provided, generate a random number on every call
+    if time_period is None:
+        random.seed()
+    else:
+        time_period_index = current_time // time_period
+        random_seed += str(time_period_index)
+        random.seed(random_seed)
+
+    # Generate a random number within the specified range with the specified number of decimal places
+    factor = 10 ** decimal_places
+    random_number = round(random.uniform(range_start, range_end), decimal_places)
+    random_number = round(random_number * factor) / factor
+
+    return random_number
 
 def sock_readable(s) -> bool:
     r,_,_ = select.select([s], [],[], 0)
@@ -97,6 +124,12 @@ def pressure_from_altitude(altitude_m):
     """
     return 101.3 * ((288 - 0.0065 * altitude_m) / 288) ** 5.256
 
+def calculate_checksum(file_path, algorithm='md5'):
+    hash_obj = hashlib.new(algorithm)
+    with open(file_path, 'rb') as file:
+        for chunk in iter(lambda: file.read(4096), b''):
+            hash_obj.update(chunk)
+    return hash_obj.hexdigest()
 
 class LowPassFilter:
     def __init__(self, cutoff_freq_hz, init_val=0.0):
@@ -323,8 +356,10 @@ def install_export_lua():
         export_installed = "telemffblfs" in data
 
         if export_installed and os.path.exists(out_path):
-            if os.path.getmtime(out_path) < os.path.getmtime(local_telemffb):
-                dia = QMessageBox.question(None, "Confirm", f"Update export script {out_path} ?")
+            # if os.path.getmtime(out_path) < os.path.getmtime(local_telemffb):
+            # Use file checksum rather than timestamp to determine if contents have changed - useful when changing installed versions
+            if calculate_checksum(out_path, algorithm="md5") != calculate_checksum(local_telemffb, algorithm="md5"):
+                dia = QMessageBox.question(None, "Contents of TelemFFB.lua export script have changed\nConfirm", f"Update export script {out_path} ?")
                 if dia == QMessageBox.StandardButton.Yes:
                     write_script()
         else:
@@ -376,6 +411,12 @@ class OutLog(QtCore.QObject):
         except: pass
         if self.out:
             self.out.write(m)
+
+    def write(self, m):
+        try:
+            self.textReceived.emit(m)
+        except: pass
+
 
     def flush(self): pass
 
