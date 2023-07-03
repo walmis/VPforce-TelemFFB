@@ -40,7 +40,6 @@ HPFs : Dict[str, utils.HighPassFilter]  = utils.Dispenser(utils.HighPassFilter)
 # Lowpass filter dispenser
 LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 
-
 class Aircraft(object):
     """Base class for Aircraft based FFB"""
     ####
@@ -103,8 +102,7 @@ class Aircraft(object):
         # round floating point numbers
         if type(new_val) == float:
             new_val = round(new_val, 3)
-            prev_val = round(prev_val, 3)
-#        print(new_val)
+
         if prev_val != new_val:
             self._changes[item] = (new_val, time.perf_counter())
 
@@ -133,9 +131,7 @@ class Aircraft(object):
         buffeting_factor = utils.scale_clamp(aoa, (self.buffet_aoa, self.stall_aoa), (0.0, 1.0))
         #todo calc frequency
         return (13.0, airflow_factor * buffeting_factor * self.buffeting_intensity)
-        
- 
-        
+              
 
     def _update_runway_rumble(self, telem_data):
         """Add wheel based rumble effects for immersion
@@ -149,20 +145,21 @@ class Aircraft(object):
             v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[0]-WoW[2]) * self.runway_rumble_intensity
             
             v1 = utils.clamp_minmax(v1, 0.5)
-            v2 = utils.clamp_minmax(v1, 0.5)
+            v2 = utils.clamp_minmax(v2, 0.5)
 
             # modulate constant effects for X and Y axis
             # connect Y axis to nosewheel, X axis to the side wheels
             tot_weight = sum(WoW)
 
-            if tot_weight:
-                # logging.info(f"v1 = {v1}")
-                effects["runway0"].constant(v1, 0).start()
-                # logging.info(f"v2 = {v2}")
-                effects["runway1"].constant(v2, 90).start()
-            else:
-                effects.dispose("runway0")
-                effects.dispose("runway1")
+            if telem_data.get("T", 0) > 2: # wait a bit for data to settle
+                if tot_weight:
+                    # logging.info(f"v1 = {v1}")
+                    effects["runway0"].constant(v1, 0).start()
+                    # logging.info(f"v2 = {v2}")
+                    effects["runway1"].constant(v2, 90).start()
+                else:
+                    effects.dispose("runway0")
+                    effects.dispose("runway1")
 
     def _update_buffeting(self, telem_data : dict):
         aoa = telem_data.get("AoA", 0)
@@ -250,6 +247,8 @@ class Aircraft(object):
             effects.dispose("canopymovement")
             #effects.dispose("canopymovement2")
             
+
+
     def on_telemetry(self, telem_data : dict):
         """when telemetry frame is received, aircraft class receives data in dict format
 
@@ -321,10 +320,9 @@ class PropellerAircraft(Aircraft):
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
-       
-        #(wx,wz,wy) = telem_data["12_Wind"]
-        #yaw, pitch, roll = telem_data.get("SelfData", (0,0,0))
-        #wnd = utils.to_body_vector(yaw, pitch, roll, (wx,wy,wz) )
+    
+
+
         wind = telem_data.get("Wind", (0,0,0))
         wnd = math.sqrt(wind[0]**2 + wind[1]**2 + wind[2]**2)
 
