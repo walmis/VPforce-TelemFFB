@@ -25,6 +25,7 @@ import sys
 import winpaths
 import random
 import time
+import hashlib
 
 
 def to_number(v):
@@ -97,6 +98,12 @@ def pressure_from_altitude(altitude_m):
     """
     return 101.3 * ((288 - 0.0065 * altitude_m) / 288) ** 5.256
 
+def calculate_checksum(file_path, algorithm='md5'):
+    hash_obj = hashlib.new(algorithm)
+    with open(file_path, 'rb') as file:
+        for chunk in iter(lambda: file.read(4096), b''):
+            hash_obj.update(chunk)
+    return hash_obj.hexdigest()
 
 class LowPassFilter:
     def __init__(self, cutoff_freq_hz, init_val=0.0):
@@ -295,8 +302,10 @@ def install_export_lua():
         export_installed = "telemffblfs" in data
 
         if export_installed and os.path.exists(out_path):
-            if os.path.getmtime(out_path) < os.path.getmtime(local_telemffb):
-                dia = QMessageBox.question(None, "Confirm", f"Update export script {out_path} ?")
+            # if os.path.getmtime(out_path) < os.path.getmtime(local_telemffb):
+            # Use file checksum rather than timestamp to determine if contents have changed - useful when changing installed versions
+            if calculate_checksum(out_path, algorithm="md5") != calculate_checksum(local_telemffb, algorithm="md5"):
+                dia = QMessageBox.question(None, "Contents of TelemFFB.lua export script have changed\nConfirm", f"Update export script {out_path} ?")
                 if dia == QMessageBox.StandardButton.Yes:
                     write_script()
         else:
