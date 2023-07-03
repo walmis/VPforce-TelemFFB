@@ -1,7 +1,9 @@
 local JSON = loadfile("Scripts\\JSON.lua")()
-package.path = package.path .. ";.\\LuaSocket\\?.lua"
+package.path = package.path .. ";.\\LuaSocket\\?.lua;Scripts\\?.lua;"
 package.cpath = package.cpath .. ";.\\LuaSocket\\?.dll"
 local socket = require("socket")
+
+require("Vector")
 
 -- Return if socket has data to read
 local function sock_readable(s)
@@ -10,6 +12,29 @@ local function sock_readable(s)
     return true
   end
   return false
+end
+
+
+-- Function to calculate air density based on altitude
+function calculateAirDensity(altitude)
+  -- Constants for the barometric formula
+  local seaLevelPressure = 1013.25 -- Sea level pressure in hPa
+  local temperatureLapseRate = 0.0065 -- Temperature lapse rate in K/m
+  local gravitationalConstant = 9.80665 -- Gravitational constant in m/s^2
+  local molarGasConstant = 8.31446261815324 -- Molar gas constant in J/(mol K)
+  local molarMassOfDryAir = 0.0289644 -- Molar mass of dry air in kg/mol
+
+  -- Calculate temperature at the given altitude
+  local temperature = 288.15 - temperatureLapseRate * altitude
+
+  -- Calculate pressure at the given altitude
+  local pressure = seaLevelPressure * math.pow(1 - (temperatureLapseRate * altitude) / 288.15, 
+    gravitationalConstant * molarMassOfDryAir / (temperatureLapseRate * molarGasConstant))
+
+  -- Calculate air density based on the ideal gas law
+  local airDensity = pressure * molarMassOfDryAir / (temperature * molarGasConstant)
+
+  return airDensity*100
 end
 
 -- The ExportScript.Tools.dump function show the content of the specified variable.
@@ -113,6 +138,8 @@ local f_telemFFB = {
       socket.protect(
       function()
         if self.sock_udp then
+          local stringToSend = ""
+
           local t = LoGetModelTime()
           local altAsl = LoGetAltitudeAboveSeaLevel()
           local altAgl = LoGetAltitudeAboveGroundLevel()
@@ -122,10 +149,13 @@ local f_telemFFB = {
           local AccelerationUnits = "0.00~0.00~0.00"
           local IAS = LoGetIndicatedAirSpeed() -- m/s
           local M_number = LoGetMachNumber()
+          local AirPressure = LoGetBasicAtmospherePressure() -- * 13.60 -- mmHg to kg/m2
 
           local LeftGear = LoGetAircraftDrawArgumentValue(6)
           local NoseGear = LoGetAircraftDrawArgumentValue(1)
           local RightGear = LoGetAircraftDrawArgumentValue(4)
+
+          local AB = string.format("%.2f~%.2f", LoGetAircraftDrawArgumentValue(28), LoGetAircraftDrawArgumentValue(29))
 
           local WoW = string.format("%.2f~%.2f~%.2f", LeftGear, NoseGear, RightGear)
 
@@ -140,7 +170,7 @@ local f_telemFFB = {
           local myselfData
 
           if obj then
-            myselfData = string.format("%.2f~%.2f~%.2f", obj.Heading, obj.Pitch, obj.Bank)
+            myselfData = string.format("%.2f~%.2f~%.2f", math.deg(obj.Heading), math.deg(obj.Pitch), math.deg(obj.Bank))
           end
 
           local vectorVel = LoGetVectorVelocity()
@@ -150,8 +180,35 @@ local f_telemFFB = {
             end
           end
 
-          local velocityVectors = string.format("%.2f~%.2f~%.2f", vectorVel.x, vectorVel.y, vectorVel.z)
           local wind = LoGetVectorWindVelocity()
+          local wind_vec = Vector(wind.x, wind.y, wind.z)
+
+          local velocityVectors = string.format("%.2f~%.2f~%.2f", vectorVel.x, vectorVel.y, vectorVel.z)
+
+          local incidence_vec = Vector(vectorVel.x, vectorVel.y, vectorVel.z)
+          incidence_vec = incidence_vec - wind_vec
+          incidence_vec = incidence_vec:rotY(-(2.0 * math.pi - obj.Heading))
+          incidence_vec = incidence_vec:rotZ(-obj.Pitch)
+          incidence_vec = incidence_vec:rotX(-obj.Bank)
+          local incidence = string.format("%.3f~%.3f~%.3f", incidence_vec.x, incidence_vec.y, incidence_vec.z)
+
+          -- calculate relative wind in body frame
+          local rel_wind = Vector(wind.x, wind.y, wind.z)
+          rel_wind = wind_vec
+          rel_wind = rel_wind:rotY(-(2.0 * math.pi - obj.Heading))
+          rel_wind = rel_wind:rotZ(-obj.Pitch)
+          rel_wind = rel_wind:rotX(-obj.Bank)
+          rel_wind = string.format("%.3f~%.3f~%.3f", rel_wind.x, rel_wind.y, rel_wind.z)
+
+          local tas = LoGetTrueAirSpeed() --ms^2
+          local calc_alpha = 0
+          local calc_beta = 0
+          if tas > 0 then
+            calc_alpha = math.deg(math.atan(-incidence_vec.y / incidence_vec.x))
+            calc_beta = math.deg(math.atan(incidence_vec.z / math.sqrt(incidence_vec.y^2 + incidence_vec.x^2)))
+          end
+
+
           local windVelocityVectors =
             string.format(
             "%.2f~%.2f~%.2f",
@@ -159,9 +216,11 @@ local f_telemFFB = {
             wind.y,
             wind.z
           )
-          local tas = LoGetTrueAirSpeed()
           local CM = LoGetSnares()
           local MainPanel = GetDevice(0)
+
+          local AirDensity = calculateAirDensity(altAsl)
+          local DynamicPressure = 0.5 * AirDensity * tas^2 -- kg/ms^2
 
           if MainPanel ~= nil then
             MainPanel:update_arguments()
@@ -190,7 +249,7 @@ local f_telemFFB = {
             PayloadInfo = table.concat(temparray, "~")
           end
 
-          local stringToSend
+          
 
           -------------------------------------------------------------------------------------------------------------------------------------------------------
           if obj.Name == "Mi-8MT" then
@@ -586,21 +645,60 @@ local f_telemFFB = {
               CanopyPos,
               WingsPos
             )
-          end
-
-          local AB = string.format("%.2f~%.2f", LoGetAircraftDrawArgumentValue(28), LoGetAircraftDrawArgumentValue(29))
+          end      
 		 		  
+          local items = {
+            {"T", "%.3f", t},
+            {"N", "%s", obj.Name},
+            {"SelfData", "%s", myselfData},
+            {"EngRPM", "%s", engineRPM},
+            {"ACCs", "%s", AccelerationUnits},
+            {"Gun", "%s", CannonShells},
+            {"Wind", "%s", windVelocityVectors},
+            {"VlctVectors", "%s", velocityVectors},
+            {"altASL", "%.2f", altAsl},
+            {"altAgl", "%.2f", altAgl},
+            {"AoA", "%.2f", aoa},
+            {"IAS", "%.2f", IAS},
+            {"TAS", "%.2f", tas},
+            {"WeightOnWheels", "%s", WoW},
+            {"Flares", "%s", CM.flare},
+            {"Chaff", "%s", CM.chaff},
+            {"PayloadInfo", "%s", PayloadInfo},
+            {"Mach", "%.4f", M_number},
+            {"MechInfo", "%s", mech},
+            {"Afterburner", "%s", AB},
+            {"DynamicPressure", "%.3f", DynamicPressure},
+            {"Incidence", "%s", incidence},  -- relative airstream in body frame
+            {"AirDensity", "%.3f", AirDensity},
+            {"CAlpha", "%.3f", calc_alpha},
+            {"CBeta", "%.3f", calc_beta}, -- sideslip angle deg
+            {"RelWind", "%s", rel_wind}, --wind in body frame
+          }
+          
+          local formattedValues = {}
+          for _, item in ipairs(items) do
+            local value = item[3]
+            if value ~= nil then
+              local formattedValue = string.format(item[2], value)
+              table.insert(formattedValues, item[1] .. "=" .. formattedValue)
+            end
+
+          end
+          
+          stringToSend = stringToSend .. ";" .. table.concat(formattedValues, ";")
+          
           -- Common variables
-          stringToSend = string.format("T=%.3f;N=%s;SelfData=%s;%s;EngRPM=%s;ACCs=%s;Gun=%s;Wind=%s;VlctVectors=%s;altASL=%.2f;altAgl=%.2f;AoA=%.2f;IAS=%.2f;TAS=%.2f;WeightOnWheels=%s;Flares=%s;Chaff=%s;PayloadInfo=%s;Mach=%.4f;MechInfo=%s;Afterburner=%s",               
-            t,
-            obj.Name,
-            myselfData,
-            stringToSend,
-            engineRPM,
-            AccelerationUnits,
-            CannonShells,
-            windVelocityVectors,
-            velocityVectors, altAsl, altAgl, aoa, IAS, tas, WoW, CM.flare, CM.chaff, PayloadInfo, M_number, mech, AB)
+          -- stringToSend = string.format("T=%.3f;N=%s;SelfData=%s;%s;EngRPM=%s;ACCs=%s;Gun=%s;Wind=%s;VlctVectors=%s;altASL=%.2f;altAgl=%.2f;AoA=%.2f;IAS=%.2f;TAS=%.2f;WeightOnWheels=%s;Flares=%s;Chaff=%s;PayloadInfo=%s;Mach=%.4f;MechInfo=%s;Afterburner=%s",               
+          --   t,
+          --   obj.Name,
+          --   myselfData,
+          --   stringToSend,
+          --   engineRPM,
+          --   AccelerationUnits,
+          --   CannonShells,
+          --   windVelocityVectors,
+          --   velocityVectors, altAsl, altAgl, aoa, IAS, tas, WoW, CM.flare, CM.chaff, PayloadInfo, M_number, mech, AB)
 
           socket.try(self.sock_udp:sendto(stringToSend, self.host, self.port))
         end
