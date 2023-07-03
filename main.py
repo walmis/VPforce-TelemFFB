@@ -302,6 +302,8 @@ class MainWindow(QMainWindow):
         self.lbl_telem_data = QLabel("Waiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.lbl_telem_data)
+
+        layout.addStretch()
         
         # Add the edit button
         edit_button = QPushButton("Edit Config File")
