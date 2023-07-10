@@ -23,15 +23,17 @@ jobs:
     - name: Make Zip
       id: zip
       run: |
-        cd dist/windows/VPforce-TelemFFB && zip -r ../../../VPforce-TelemFFB .
-        echo "::set-output name=tag_name::$(git tag --sort version:refname | tail -n 1)"
+        commit_id=$(git rev-parse --short HEAD)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        zip_filename="VPforce-TelemFFB-${branch_name}-${commit_id}.zip"
+        cd dist/windows/VPforce-TelemFFB && zip -r "../../../${zip_filename}" .
         
     - name: Deploy to Server
       uses: easingthemes/ssh-deploy@main
       env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-v"
-          SOURCE: "VPforce-TelemFFB.zip"
+          SOURCE: "VPforce-TelemFFB*.zip"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ${{ secrets.REMOTE_TARGET }}
