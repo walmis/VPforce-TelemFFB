@@ -19,3 +19,20 @@ jobs:
       with:
         name: build
         path: dist/windows/VPforce-TelemFFB
+        
+    - name: Make Zip
+      id: zip
+      run: |
+        cd dist/windows/VPforce-TelemFFB && zip -r ../../../VPforce-TelemFFB .
+        echo "::set-output name=tag_name::$(git tag --sort version:refname | tail -n 1)"
+        
+    - name: Deploy to Server
+      uses: easingthemes/ssh-deploy@main
+      env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-v"
+          SOURCE: "VPforce-TelemFFB.zip"
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          TARGET: ${{ secrets.REMOTE_TARGET }}
+          #EXCLUDE: "/dist/, /node_modules/"
