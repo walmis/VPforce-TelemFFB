@@ -73,6 +73,7 @@ class Aircraft(object):
     canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
 
     afterburner_effect_intensity = 0.2      # peak intensity for afterburner rumble effect
+    jet_engine_rumble_intensity = 0.12      # peak intensity for jet engine rumble effect
 
     ####
     _engine_rumble_is_playing = 0
@@ -497,6 +498,8 @@ class JetAircraft(Aircraft):
     #flaps_motion_intensity = 0.0
 
     _ab_is_playing = 0
+    _jet_rumble_is_playing = 0
+    engine_rumble = 0
     def _read_effect_index(self):
         global periodic_effect_index
         logging.debug(f"periodic_effect_index: {periodic_effect_index}")
@@ -510,7 +513,9 @@ class JetAircraft(Aircraft):
         precision = 2
         try:
             afterburner_pos = max(telem_data.get("Afterburner")[0], telem_data.get("Afterburner")[1])
-        except: pass
+        except Exception as e:
+            logging.error(f"Error getting afterburner position, sim probably disconnected, bailing: {e}")
+            return
         #logging.debug(f"Afterburner = {afterburner_pos}")
         r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation-modulation_neg, median_modulation+modulation_pos, precision, time_period=5  )
         r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation-modulation_neg, median_modulation+modulation_pos, precision, time_period=5  )
@@ -523,7 +528,7 @@ class JetAircraft(Aircraft):
             effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
             effects["ab_rumble_2_1"].periodic(frequency2, intensity, 45, 4, phase=120, offset=60).start()
             effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120, offset=60).start()
-            logging.info(f"Modul1= {r1_modulation} | Modul2 = {r2_modulation}")
+            logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
             self._ab_is_playing = 1
         elif afterburner_pos == 0:
             #logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
@@ -534,8 +539,53 @@ class JetAircraft(Aircraft):
             self._ab_is_playing = 0
         #except:
         #    logging.error("Error playing Afterburner effect")
-    
- #    def _calculate_ab_effect(self, intensity, min_throt, max_throt, eng1, eng2=-1):
+
+    def _update_jet_engine_rumble(self, telem_data):
+        super().on_telemetry(telem_data)
+        frequency = 55
+        median_modulation = 10
+        modulation_pos = 2
+        modulation_neg = 2
+        frequency2 = frequency + median_modulation
+        precision = 2
+        effect_index = 4
+        phase_offset = 120
+        try:
+            jet_eng_rpm = max(telem_data.get("EngRPM")[0], telem_data.get("EngRPM")[1])
+        except Exception as e:
+            logging.error(f"Error getting Engine RPM, sim probably disconnected, bailing: {e}")
+            return
+        # logging.debug(f"Afterburner = {afterburner_pos}")
+        r1_modulation = utils.get_random_within_range("jetengine_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+        r2_modulation = utils.get_random_within_range("jetengine_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+       # r1_modulation = round(r1_modulation,4)
+       # r2_modulation = round(r2_modulation,4)
+        # try:
+        # print(r1_modulation)
+        if self.engine_rumble and (self.has_changed("EngRPM") or self.anything_has_changed("JetEngineModul", r1_modulation)):
+            # logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
+            intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
+            rt_freq = round(frequency + (5 * (jet_eng_rpm / 100)),4)
+            rt_freq2 = round(rt_freq + median_modulation, 4)
+            effects["je_rumble_1_1"].periodic(rt_freq, intensity,0, effect_index).start()
+            effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity,0, effect_index).start()
+            effects["je_rumble_2_1"].periodic(rt_freq2, intensity, 90, effect_index, phase=phase_offset).start()
+            effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
+            logging.debug(f"RPM={jet_eng_rpm}")
+            logging.debug(f"Intensty={intensity}")
+            logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
+            self._jet_rumble_is_playing = 1
+        elif jet_eng_rpm == 0:
+            # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
+            effects.dispose("je_rumble_1_1")
+            effects.dispose("je_rumble_1_2")
+            effects.dispose("je_rumble_2_1")
+            effects.dispose("je_rumble_2_2")
+            self._jet_rumble_is_playing = 0
+        # except:
+        #    logging.error("Error playing Afterburner effect")
+
+    #    def _calculate_ab_effect(self, intensity, min_throt, max_throt, eng1, eng2=-1):
  #        eng1_intensity = 0
  #        eng2_intensity = 0
  #        effect_factor = 1
@@ -561,58 +611,70 @@ class JetAircraft(Aircraft):
  #        #return highest throttle setting to use for intensity
  #        return max(eng1_intensity, eng2_intensity) * effect_factor
  # #_calculate_ab_effect(0.3, .8, 1.0, .5, .5)
-    
+
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
 
         if self.afterburner_effect_intensity > 0:
             self._update_ab_effect(self.afterburner_effect_intensity, telem_data)
+        if Aircraft.jet_engine_rumble_intensity > 0:
+            self._update_jet_engine_rumble(telem_data)
 
-class FA18(JetAircraft):
-    def on_telemetry(self, telem_data):
-        super().on_telemetry(telem_data)
-        # try:
-        #     eng1 = telem_data.get("Engine_RPM")[0]
-        # except:
-        #     logging.error("Error getting engine RPM data")
-        #     eng1 = 0
-        #
-        # try:
-        #     eng2 = telem_data.get("Engine_RPM")[1]
-        # except:
-        #     logging.error("Error getting engine RPM data")
-        #     eng2 = 0
-        # logging.debug(f"F18 - Eng1={eng1}, Eng2={eng2}")
-        # if eng1 > 0 or eng2 > 0:
-        #     if self.afterburner_effect_intensity > 0:
-        #         super()._update_ab_effect(self.afterburner_effect_intensity, telem_data, 0.8, 1.0, self._telem_data.get("Throttle_1", 0), self._telem_data.get("Throttle_2", 0))
 
-class F16(JetAircraft):
-    def on_telemetry(self, telem_data):
-        super().on_telemetry(telem_data)
-        # try:
-        #     eng1 = telem_data.get("Engine_RPM")[0]
-        # except:
-        #     logging.error("Error getting engine RPM data")
-        #     eng1 = 0
-        # logging.debug(f"F16 - Eng1={eng1}")
-        # if eng1 > 0:
-        #     if self.afterburner_effect_intensity > 0:
-        #         super()._update_ab_effect(self.afterburner_effect_intensity, telem_data, 0.7, 1.0, self._telem_data.get("Throttle_1", 0))
+#####
+# No longer required now that we have afterburner telemetry - keep as placeholder
+#####
+# class FA18(JetAircraft):
+#     def on_telemetry(self, telem_data):
+#         super().on_telemetry(telem_data)
+#         # try:
+#         #     eng1 = telem_data.get("Engine_RPM")[0]
+#         # except:
+#         #     logging.error("Error getting engine RPM data")
+#         #     eng1 = 0
+#         #
+#         # try:
+#         #     eng2 = telem_data.get("Engine_RPM")[1]
+#         # except:
+#         #     logging.error("Error getting engine RPM data")
+#         #     eng2 = 0
+#         # logging.debug(f"F18 - Eng1={eng1}, Eng2={eng2}")
+#         # if eng1 > 0 or eng2 > 0:
+#         #     if self.afterburner_effect_intensity > 0:
+#         #         super()._update_ab_effect(self.afterburner_effect_intensity, telem_data, 0.8, 1.0, self._telem_data.get("Throttle_1", 0), self._telem_data.get("Throttle_2", 0))
 
-class SU33(JetAircraft):
-    def on_telemetry(self, telem_data):
-        super().on_telemetry(telem_data)
-        # try:
-        #     eng1 = telem_data.get("Engine_RPM")[0]
-        #     eng2 = telem_data.get("Engine_RPM")[1]
-        # except:
-        #     logging.error("Error getting engine RPM data")
-        # logging.debug(f"F18 - Eng1={eng1}, Eng2={eng2}")
-        # if eng1 > 0 or eng2 > 0:
-        #     if self.afterburner_effect_intensity > 0:
-        #         super()._update_ab_effect(self.afterburner_effect_intensity, telem_data, 0.8, 1.0, self._telem_data.get("Throttle_1", 0), self._telem_data.get("Throttle_2", 0))
+#####
+# No longer required now that we have afterburner telemetry - keep as placeholder
+#####
+# class F16(JetAircraft):
+#     def on_telemetry(self, telem_data):
+#         super().on_telemetry(telem_data)
+#         # try:
+#         #     eng1 = telem_data.get("Engine_RPM")[0]
+#         # except:
+#         #     logging.error("Error getting engine RPM data")
+#         #     eng1 = 0
+#         # logging.debug(f"F16 - Eng1={eng1}")
+#         # if eng1 > 0:
+#         #     if self.afterburner_effect_intensity > 0:
+#         #         super()._update_ab_effect(self.afterburner_effect_intensity, telem_data, 0.7, 1.0, self._telem_data.get("Throttle_1", 0))
+
+#####
+# No longer required now that we have afterburner telemetry - keep as placeholder
+#####
+# class SU33(JetAircraft):
+#     def on_telemetry(self, telem_data):
+#         super().on_telemetry(telem_data)
+#         # try:
+#         #     eng1 = telem_data.get("Engine_RPM")[0]
+#         #     eng2 = telem_data.get("Engine_RPM")[1]
+#         # except:
+#         #     logging.error("Error getting engine RPM data")
+#         # logging.debug(f"F18 - Eng1={eng1}, Eng2={eng2}")
+#         # if eng1 > 0 or eng2 > 0:
+#         #     if self.afterburner_effect_intensity > 0:
+#         #         super()._update_ab_effect(self.afterburner_effect_intensity, telem_data, 0.8, 1.0, self._telem_data.get("Throttle_1", 0), self._telem_data.get("Throttle_2", 0))
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
     buffeting_intensity = 0.0
@@ -683,7 +745,5 @@ classes = {
     "MiG-29A": JetAircraft,
     "MiG-29S": JetAircraft,
     "MiG-29G": JetAircraft,
-    "F-16C_50": F16,
-    "FA-18C_hornet": FA18,
     "default": Aircraft
 }
