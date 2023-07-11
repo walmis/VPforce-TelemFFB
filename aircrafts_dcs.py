@@ -74,6 +74,7 @@ class Aircraft(object):
 
     afterburner_effect_intensity = 0.2      # peak intensity for afterburner rumble effect
     jet_engine_rumble_intensity = 0.12      # peak intensity for jet engine rumble effect
+    jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
     ####
     _engine_rumble_is_playing = 0
@@ -273,7 +274,7 @@ class Aircraft(object):
         spdbrk = self._telem_data.get("speedbrakes_value", 0)
         if self.has_changed("speedbrakes_value", 50):
             logging.debug(f"Speedbrake Pos: {spdbrk}")
-            effects["speedbrakemovement"].periodic(200, self.speedbrake_motion_intensity, 0, 3).start()
+            effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, 0, 3).start()
         else:
             effects.dispose("speedbrakemovement")
 
@@ -542,10 +543,10 @@ class JetAircraft(Aircraft):
 
     def _update_jet_engine_rumble(self, telem_data):
         super().on_telemetry(telem_data)
-        frequency = 55
+        frequency = self.jet_engine_rumble_freq
         median_modulation = 10
-        modulation_pos = 2
-        modulation_neg = 2
+        modulation_pos = 3
+        modulation_neg = 3
         frequency2 = frequency + median_modulation
         precision = 2
         effect_index = 4
@@ -556,8 +557,8 @@ class JetAircraft(Aircraft):
             logging.error(f"Error getting Engine RPM, sim probably disconnected, bailing: {e}")
             return
         # logging.debug(f"Afterburner = {afterburner_pos}")
-        r1_modulation = utils.get_random_within_range("jetengine_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
-        r2_modulation = utils.get_random_within_range("jetengine_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+        r1_modulation = utils.get_random_within_range("jetengine_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=1)
+        r2_modulation = utils.get_random_within_range("jetengine_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=2)
        # r1_modulation = round(r1_modulation,4)
        # r2_modulation = round(r2_modulation,4)
         # try:
@@ -565,7 +566,7 @@ class JetAircraft(Aircraft):
         if self.engine_rumble and (self.has_changed("EngRPM") or self.anything_has_changed("JetEngineModul", r1_modulation)):
             # logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
             intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
-            rt_freq = round(frequency + (5 * (jet_eng_rpm / 100)),4)
+            rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)),4)
             rt_freq2 = round(rt_freq + median_modulation, 4)
             effects["je_rumble_1_1"].periodic(rt_freq, intensity,0, effect_index).start()
             effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity,0, effect_index).start()

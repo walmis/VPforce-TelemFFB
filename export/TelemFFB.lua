@@ -497,6 +497,21 @@ local f_telemFFB = {
               Canopy,
               APU
             )
+            elseif obj.Name == "A-10C_2" then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            local FlapsPos = MainPanel:get_argument_value(653)
+            local Canopy = MainPanel:get_argument_value(7)
+            local Engine_RPM_left = string.format("%.0f", MainPanel:get_argument_value(78) * 100)
+            local Engine_RPM_right = string.format("%.0f", MainPanel:get_argument_value(80) * 100)
+            local APU = MainPanel:get_argument_value(13)
+            -- A-10C  sends to SimShaker
+            stringToSend =
+              string.format(
+              "Flaps=%.2f;Canopy=%.2f;APU=%.2f",
+              FlapsPos,
+              Canopy,
+              APU
+            )
           elseif obj.Name == "MiG-21Bis" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local Voltmeter = MainPanel:get_argument_value(124) * 30
@@ -577,6 +592,7 @@ local f_telemFFB = {
               elseif string.find(obj.Name, "F-14") then
                 -------------------------------------------------------------------------------------------------------------------------------------------------------
                 --local sensor_data = obj.get_base_data()
+                log.info("TELEMFFB FOUND AIRCRAFT: "..obj.Name)
                 local REngine_RPM = "0"
                 local LEngine_RPM = "0"
                 if getEngineRightRPM then
@@ -634,7 +650,7 @@ local f_telemFFB = {
                       "~" .. tostring(MCP.MLWSFailure) .. "~" .. tostring(MCP.RWSFailure) .. "~" .. tostring(MCP.ECMFailure) ..
                       "~" .. tostring(MCP.GearFailure) .. "~" .. tostring(MCP.MFDFailure) .. "~" ..tostring(MCP.HUDFailure) ..
                       "~" .. tostring(MCP.HelmetFailure) .. "~" .. tostring(MCP.FuelTankDamage)
-     
+            log.info("TELEMFFB TREATING THIS AS AN FC3 AIRCRAFT: "..obj.Name)
             -- FC3 Plane sends to SimShaker
             stringToSend =
               string.format(
