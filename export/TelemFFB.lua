@@ -150,10 +150,15 @@ local f_telemFFB = {
           local IAS = LoGetIndicatedAirSpeed() -- m/s
           local M_number = LoGetMachNumber()
           local AirPressure = LoGetBasicAtmospherePressure() -- * 13.60 -- mmHg to kg/m2
-
+          local f14SpeedbrakePos = LoGetAircraftDrawArgumentValue(400)
           local LeftGear = LoGetAircraftDrawArgumentValue(6)
           local NoseGear = LoGetAircraftDrawArgumentValue(1)
           local RightGear = LoGetAircraftDrawArgumentValue(4)
+          local drawGearPos = LoGetAircraftDrawArgumentValue(3)
+          local drawFlapsPos1 = LoGetAircraftDrawArgumentValue(9)
+          local drawFlapsPos2 = LoGetAircraftDrawArgumentValue(10)
+          local drawSpeedBrake = LoGetAircraftDrawArgumentValue(21)
+          local drawRefuelBoom = LoGetAircraftDrawArgumentValue(22)
 
           local AB = string.format("%.2f~%.2f", LoGetAircraftDrawArgumentValue(28), LoGetAircraftDrawArgumentValue(29))
 
@@ -592,7 +597,9 @@ local f_telemFFB = {
               elseif string.find(obj.Name, "F-14") then
                 -------------------------------------------------------------------------------------------------------------------------------------------------------
                 --local sensor_data = obj.get_base_data()
-                log.info("TELEMFFB FOUND AIRCRAFT: "..obj.Name)
+                --log.info("TELEMFFB FOUND AIRCRAFT: "..obj.Name)
+                local f14SpeedbrakePos = LoGetAircraftDrawArgumentValue(400)
+                mech = mech:gsub('("speedbrakes":{"status":%d+%.?%d*,"value":)%d+%.?%d*', '%1' .. f14SpeedbrakePos)
                 local REngine_RPM = "0"
                 local LEngine_RPM = "0"
                 if getEngineRightRPM then
@@ -662,7 +669,7 @@ local f_telemFFB = {
               WingsPos
             )
           end      
-		 		  
+
           local items = {
             {"T", "%.3f", t},
             {"N", "%s", obj.Name},
