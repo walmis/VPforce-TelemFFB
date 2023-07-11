@@ -34,15 +34,34 @@ import hashlib
 def mix(a, b, val):
     return a*(1-val) + b*(val)
 
-def to_number(v):
+def to_number(v : str):
     """Try to convert string to number
     If unable, return the original string
     """
     try:
+        # handle boolean strings -> bool return
+        lower = v.lower()
+        if lower in ["true", "yes"]:
+            return True
+        if lower in ["false", "no"]:
+            return False 
+
+        scale = 1
+        if v.endswith("%"): # handle percent strings
+            scale = 0.01
+            v = v.strip("%")
+        if v.endswith("kt"): # handle unit conversion: kt->ms
+            scale = 0.51444
+            v = v.strip("kt")
+        if v.endswith("kph"): # handle unit conversion: kt->ms
+            scale = 1/3.6
+            v = v.strip("kph")
+
         if "." in v:
-            return float(v)
+            return float(v) * scale
         else:
-            return int(v)
+            return int(v) * scale
+        
     except ValueError:
         return v
     

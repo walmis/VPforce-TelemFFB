@@ -136,6 +136,20 @@ class TelemManager(QObject, threading.Thread):
         threading.Thread.__init__(self)
 
         self.daemon = True
+
+    def get_aircraft_config(self, aircraft_name):
+        # find matching aircraft in config
+        params = utils.sanitize_dict(config["default"])
+        type = "Aircraft"
+
+        for section,conf in config.items():
+            if re.match(section, aircraft_name):
+                conf = utils.sanitize_dict(conf)
+                logging.info(f"Found aircraft {aircraft_name} in config")
+                type = conf.get("type", "Aircraft")
+                params.update(conf)
+
+        return (params, type)
         
     def run(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
@@ -176,11 +190,13 @@ class TelemManager(QObject, threading.Thread):
 
             for i in data:
                 try:
-                    section,conf = i.split("=")
-                    values = conf.split("~")
-                    telem_data[section] = [utils.to_number(v) for v in values] if len(values)>1 else utils.to_number(conf)
+                    if len(i):
+                        section,conf = i.split("=")
+                        values = conf.split("~")
+                        telem_data[section] = [utils.to_number(v) for v in values] if len(values)>1 else utils.to_number(conf)
                 except Exception as e:
-                    print(e)
+                    traceback.print_exc()
+                    print("Suspect Parameter", repr(i))
 
             try:
                 j = json.loads(telem_data["MechInfo"])
@@ -203,29 +219,14 @@ class TelemManager(QObject, threading.Thread):
                 config_user = get_config("config.user.ini")
                 if config_user:
                     config.update(config_user)
-                #print(config)
-                #load [default] values
-                defaults = utils.sanitize_dict(config["default"])
 
                 if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
-                    cls = None
-                    params = {}
-                    # find matching aircraft in config
-                    for section,conf in config.items():
-                        if re.match(section, aircraft_name):
-                            conf = utils.sanitize_dict(conf)
-                            logging.info(f"Found aircraft {aircraft_name} in config")
-                            type = conf.get("type", "Aircraft")
-                            cls = getattr(module, type, None)
-                            params = defaults
-                            params.update(conf)
-                            if not cls:
-                                logging.error(f"No such class {conf['type']}")
+                    params, cls_name = self.get_aircraft_config(aircraft_name)
 
-                    if not cls:
+                    Class = getattr(module, cls_name, None)
+                    if not Class:
                         logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
-                        cls = module.Aircraft
-                        params = defaults
+                        Class = module.Aircraft
 
                     vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
                     if vpconf_path and "vpconf" in params:
@@ -233,10 +234,10 @@ class TelemManager(QObject, threading.Thread):
                         serial = HapticEffect.device.serial
                         subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial])
 
-
-                    logging.info(f"Creating handler for {aircraft_name}: {cls}")
+                    logging.info(f"Creating handler for {aircraft_name}: {Class}")
                     #instantiate new aircraft handler
-                    self.currentAircraft = cls(aircraft_name, **params)
+                    self.currentAircraft = Class(aircraft_name)
+                    self.currentAircraft.apply_settings(params)
 
                 self.currentAircraftName = aircraft_name
 

@@ -77,28 +77,18 @@ class Aircraft(object):
     jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
     ####
-    _engine_rumble_is_playing = 0
+    
     def __init__(self, name : str, **kwargs):
         self._name = name
         self._changes = {}
         self._change_counter = {}
         self._telem_data = None
-
-        #self.__dict__.update(kwargs)
-        for k,v in kwargs.items():
-            Tp = type(getattr(self, k, None))
-            if v in ("True", "False", "true", "false"):
-                Tp = bool
-            #logging.debug(f"Type = {Tp}")
-            #logging.debug(f"Key = {k}")
-            #logging.debug(f"Val = {v}")
-            if Tp is not type(None):
-                logging.info(f"set {k} = {Tp(v)}")
-                setattr(self, k, Tp(v))
+        self._engine_rumble_is_playing = 0
 
         #clear any existing effects
         for e in effects.values(): e.destroy()
         effects.clear()
+
     #effect_index_set = 4
     # def incr_clicked():
     #     if Aircraft.effect_index_set == 7:
@@ -131,6 +121,15 @@ class Aircraft(object):
         #self.spring.effect.effect_id = 5
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
+
+    def apply_settings(self, settings_dict):
+        for k,v in settings_dict.items():
+            if k in ["type"]: continue
+            if getattr(self, k, None) is None:
+                logging.warn(f"Unknown parameter {k}")
+                continue
+            logging.info(f"set {k} = {v}")
+            setattr(self, k, v)
 
     def has_changed(self, item : str, delta_ms = 0) -> bool:
         prev_val, tm = self._changes.get(item, (None, 0))
