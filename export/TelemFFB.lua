@@ -164,8 +164,7 @@ local f_telemFFB = {
 
           local WoW = string.format("%.2f~%.2f~%.2f", LeftGear, NoseGear, RightGear)
 
-          local mech = JSON:encode(LoGetMechInfo()):gsub("\n", "")
-
+          local mech = LoGetMechInfo()
 
           if acceleration then
             AccelerationUnits = string.format("%.2f~%.2f~%.2f", acceleration.x, acceleration.y, acceleration.z)
@@ -599,7 +598,9 @@ local f_telemFFB = {
                 --local sensor_data = obj.get_base_data()
                 --log.info("TELEMFFB FOUND AIRCRAFT: "..obj.Name)
                 local f14SpeedbrakePos = LoGetAircraftDrawArgumentValue(400)
-                mech = mech:gsub('("speedbrakes":{"status":%d+%.?%d*,"value":)%d+%.?%d*', '%1' .. f14SpeedbrakePos)
+                mech["speedbrakes"]["value"] = f14SpeedbrakePos
+                mech["speedbrakes"]["status"] = f14SpeedbrakePos >= 0.9999
+
                 local REngine_RPM = "0"
                 local LEngine_RPM = "0"
                 if getEngineRightRPM then
@@ -614,20 +615,19 @@ local f_telemFFB = {
                 if f14 == nil or f14 == false then
                   setupF14Export()
                 end
+                local additionalData = ""
+
                 if f14 == true then
                   -- usual case after first time
-                  additionalData = ""
                   local epoxy = GetDevice(6)
                   if epoxy ~= nil and type(epoxy) ~= "number" and f14_i2n ~= nil then
                     local values = epoxy:get_values()
                     for i, v in ipairs(values) do
                       f14_variables[f14_i2n[i]] = v
-                      additionalData = additionalData .. f14_i2n[i] .. "=" .. v .. ";"
+                      additionalData = additionalData .. "f14_" .. f14_i2n[i] .. "=" .. v .. ";" -- add f14_ prefix to mark these values
                     end
                   end
                   -- log.info("additionalData:"..additionalData)
-                else
-                  additionalData = "" -- prevent nil error in string.format below at least
                 end
 
                 -- F-14 sends to SimShaker
@@ -689,7 +689,7 @@ local f_telemFFB = {
             {"Chaff", "%s", CM.chaff},
             {"PayloadInfo", "%s", PayloadInfo},
             {"Mach", "%.4f", M_number},
-            {"MechInfo", "%s", mech},
+            {"MechInfo", "%s", JSON:encode(mech):gsub("\n", "")},
             {"Afterburner", "%s", AB},
             {"DynamicPressure", "%.3f", DynamicPressure},
             {"Incidence", "%s", incidence},  -- relative airstream in body frame
