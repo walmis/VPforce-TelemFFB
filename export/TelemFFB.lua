@@ -5,6 +5,10 @@ local socket = require("socket")
 
 require("Vector")
 
+local function scale(x, in_min, in_max, out_min, out_max)
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+end
+
 -- Return if socket has data to read
 local function sock_readable(s)
   local ret = socket.select({s}, {}, 0)
@@ -249,16 +253,20 @@ local f_telemFFB = {
               st.weapon.level3,
               st.weapon.level4,
               st.count
-            )
+              )
             PayloadInfo = table.concat(temparray, "~")
           end
-
-          
-
           -------------------------------------------------------------------------------------------------------------------------------------------------------
           if obj.Name == "Mi-8MT" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local mainRotorRPM = MainPanel:get_argument_value(42) * 100
+            -- Mi-8 Relevent Info (from mainpanel_init.lua):
+            -- RotorRPM.input				= {0.0, 110.0}
+            -- RotorRPM.output				= {0.0, 1.0}
+            -- Mi-8 raw data is in percentage of gauge
+            -- Per internet sources, max rotor RPM on the Mi-8 is aprox 220.  Cruise at 192rpm
+            -- Multiply received value by 220 to get (approximate) actual RPM
+
+            local mainRotorRPM = MainPanel:get_argument_value(42) * 220
             local IAS_L = MainPanel:get_argument_value(24)
 
             local PanelShake =
@@ -267,7 +275,7 @@ local f_telemFFB = {
               MainPanel:get_argument_value(264),
               MainPanel:get_argument_value(265),
               MainPanel:get_argument_value(282)
-            )
+              )
 
             -- Mi-8MTV2  sends to SimShaker
             stringToSend =
@@ -276,9 +284,15 @@ local f_telemFFB = {
               mainRotorRPM,
               PanelShake
             )
+
           elseif obj.Name == "UH-1H" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local mainRotorRPM = MainPanel:get_argument_value(123) * 100
+            -- UH1 Relevent Info (from mainpanel_init.lua):
+            -- RotorTach.input				= {0.0, 360.0}--{0.0, 300.0, 320.0, 339.0}
+            -- RotorTach.output			= {0.0, 1.0}--{0.0, 0.83, 0.94, 1.0}
+            -- UH-1 raw data is in RPM
+            -- Multiply received value by 360 to get actual RPM
+            local mainRotorRPM = MainPanel:get_argument_value(123) * 360
             local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
@@ -300,9 +314,13 @@ local f_telemFFB = {
               rightDoor,
               deadPilot
             )
+
           elseif obj.Name == "Ka-50" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local mainRotorRPM = MainPanel:get_argument_value(52) * 100
+            -- calculate gauge percentage reading from gauge deflection value
+            local mainRotorPercent = scale(MainPanel:get_argument_value(52), 0.000, 1.000, 0, 1.100)
+            -- calculate RotorRPM from gauge percentage (max = 350RPM per internet sources)
+            local mainRotorRPM = math.floor(scale(mainRotorPercent, 0, 1.000, 0, 350))
 
             local GunTrigger = MainPanel:get_argument_value(615)
             local APUoilP = MainPanel:get_argument_value(168)
@@ -315,11 +333,43 @@ local f_telemFFB = {
               mainRotorRPM,
               APU
             )
+
+          elseif obj.Name == "Mi-24P" then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            -- calculate gauge percentage reading from gauge deflection value
+            local mainRotorPercent = scale(MainPanel:get_argument_value(42), 0.000, 1.000, 0, 1.100)
+            -- calculate RotorRPM from gauge percentage (nominal %95 = 240RPM per internet sources)
+            local mainRotorRPM = math.floor(scale(mainRotorPercent, 0, 0.95, 0, 240))
+
+            -- Mi-24  sends to TelemFFB
+            stringToSend =
+              string.format(
+              "RotorRPM=%.3f",
+              mainRotorRPM
+            )
+
+--           elseif obj.Name == "AH-64D_BLK_II" then
+--             -- There is nothing of value to export from AH64 currently, placeholder only  -------------------------------------------------------------------------------------------------------------------------------------------------------
+--             -- calculate gauge percentage reading from gauge deflection value
+--             local mainRotorRPM = LoGetAircraftDrawArgumentValue(40)
+--
+--
+--             -- AH64  sends to TelemFFB
+--             stringToSend =
+--               string.format(
+--               "RotorRPM=%.3f",
+--               mainRotorRPM
+--             )
+
           elseif
             obj.Name == "SA342M" or obj.Name == "SA342L" or obj.Name == "SA342Mistral" or obj.Name == "SA342Minigun"
            then -- Gazelle
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local mainRotorRPM = MainPanel:get_argument_value(52) * 100
+            -- SA342 Relevent Info (from mainpanel_init.lua):
+            -- Rotor_RPM.input				= {0,		50,		100,	150,	200,	250,	262,	316.29,	361.05,	387,	400,	450}
+            -- Rotor_RPM.output			= {0.096,	0.191,	0.283,	0.374,	0.461,	0.549,	0.57,	0.665,	0.748,	0.802,	0.811,	0.904}
+            -- directly access rotor rpm with get_param_handle call
+            local mainRotorRPM = get_param_handle("Rotor_Rpm"):get()
+            --log.info("gazelleInfo:"..RRPM)
             local RAltimeterMeter = MainPanel:get_argument_value(94) * 1000
             local RAltimeterOnOff = MainPanel:get_argument_value(91)
             local RAltimeterFlagPanne = MainPanel:get_argument_value(98)
@@ -328,12 +378,28 @@ local f_telemFFB = {
             local StatusString =
               RAltimeterOnOff .. "~" .. RAltimeterFlagPanne .. "~" .. RAltimeterFlagMA .. "~" .. RAltimeterTest
             -- Gazelle  sends to SimShaker
-            stringToSend=string.format("RotorRPM=%.0f;RadarAltimeterMeter=%.2f;RAltimeterStatus=%s",
-            mainRotorRPM,RAltimeterMeter, StatusString)
+            stringToSend =
+              string.format(
+              "RotorRPM=%.0f;RadarAltimeterMeter=%.2f;RAltimeterStatus=%s",
+              mainRotorRPM,
+              RAltimeterMeter,
+              StatusString
+            )
+          elseif
+            obj.Name == "UH-60L" then
+            -- directly access rotor rpm percent with get_param_handle call
+            -- according to internet sources, nominal RPM of the UH60 is 258 RPM
+            local mainRotorPercent = get_param_handle("RRPM"):get()
+            local mainRotorRPM = scale(mainRotorPercent, 0, 100, 0, 258)
+            -- UH60  sends to TelemFFB
+            stringToSend =
+              string.format(
+              "RotorRPM=%.0f",
+              mainRotorRPM
+            )
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
-          elseif obj.Name == "P-51D" or obj.Name == "P-51D-30-NA" then
-            
+          elseif obj.Name == "P-51D" or obj.Name == "P-51D-30-NA" or obj.Name == "TF-51D" then
             local AirspeedNeedle = MainPanel:get_argument_value(11)*1000*1.852
             local Altimeter_10000_footPtr = MainPanel:get_argument_value(96)*100000
             local Altimeter_1000_footPtr = MainPanel:get_argument_value(24)*10000
@@ -342,7 +408,6 @@ local f_telemFFB = {
             local TurnNeedle = MainPanel:get_argument_value(27) * math.rad(3)
             local Landing_Gear_Handle = MainPanel:get_argument_value(150)
             local Manifold_Pressure = MainPanel:get_argument_value(10) * 65 + 10
-            local Engine_RPM = MainPanel:get_argument_value(23) * 4500
             local AHorizon_Pitch = MainPanel:get_argument_value(15) * math.pi / 3.0
             local AHorizon_Bank = MainPanel:get_argument_value(14) * math.pi
             local AHorizon_PitchShift = MainPanel:get_argument_value(16) * 10.0 * math.pi / 180.0
@@ -350,6 +415,10 @@ local f_telemFFB = {
             local Oil_Temperature = MainPanel:get_argument_value(30) * 100
             local Oil_Pressure = MainPanel:get_argument_value(31) * 200
             local Fuel_Pressure = MainPanel:get_argument_value(32) * 25
+            -- Calculate Engine RPM from redline value and engine.RPM value
+            local engine_redline_reference = 3000
+            local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
+            local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
 
             --local myselfData = string.format("%.2f~%.2f~%.2f", obj.Heading, obj.Pitch, obj.Bank)
             local PanelShake =
@@ -364,63 +433,67 @@ local f_telemFFB = {
             -- P-51D sends to SimShaker
             stringToSend =
               string.format(
-              "PanShake=%s;GreenLight=%.1f;MP-WEP=%.2f~%.2f",
+              "PanShake=%s;GreenLight=%.1f;MP-WEP=%.2f~%.2f;ActualRPM=%s",
               PanelShake,
               LandingGearGreenLight,
               Manifold_Pressure,
-              WEPwire
+              WEPwire,
+              actualRPM
             )
-          elseif obj.Name == "TF-51D" then
-            -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local AirspeedNeedle = MainPanel:get_argument_value(11) * 1000 * 1.852
-            local Altimeter_10000_footPtr = MainPanel:get_argument_value(96) * 100000
-            local Altimeter_1000_footPtr = MainPanel:get_argument_value(24) * 10000
-            local Altimeter_100_footPtr = MainPanel:get_argument_value(25) * 1000
-            local Variometer = MainPanel:get_argument_value(29)
-            local TurnNeedle = MainPanel:get_argument_value(27) * math.rad(3)
-            local Landing_Gear_Handle = MainPanel:get_argument_value(150)
-            local Manifold_Pressure = MainPanel:get_argument_value(10) * 65 + 10
-            local Engine_RPM = MainPanel:get_argument_value(23) * 4500
-            local AHorizon_Pitch = MainPanel:get_argument_value(15) * math.pi / 3.0
-            local AHorizon_Bank = MainPanel:get_argument_value(14) * math.pi
-            local AHorizon_PitchShift = MainPanel:get_argument_value(16) * 10.0 * math.pi / 180.0
-            local GyroHeading = MainPanel:get_argument_value(12) * 2.0 * math.pi
-            local Oil_Temperature = MainPanel:get_argument_value(30) * 100
-            local Oil_Pressure = MainPanel:get_argument_value(31) * 200
-            local Fuel_Pressure = MainPanel:get_argument_value(32) * 25
-            local Coolant_Temperature = MainPanel:get_argument_value(22) * 230 - 80
-            local Carb_Temperature = MainPanel:get_argument_value(21) * 230 - 80
-            local LandingGearGreenLight = MainPanel:get_argument_value(80)
-            local LandingGearRedLight = MainPanel:get_argument_value(82)
-            local Vacuum_Suction = MainPanel:get_argument_value(9) * 10
-            --local myselfData = string.format("%.2f~%.2f~%.2f", obj.Heading, obj.Pitch, obj.Bank)
-            local PanelShake =
-              string.format(
-              "%.2f~%.2f~%.2f",
-              MainPanel:get_argument_value(181),
-              MainPanel:get_argument_value(180),
-              MainPanel:get_argument_value(189)
-            )
-            local LandingGearGreenLight = MainPanel:get_argument_value(80)
-            local WEPwire = MainPanel:get_argument_value(190)
-            local extModelArguments =
-              string.format(
-              "%.2f~%.2f~%.2f~%.2f",
-              LoGetAircraftDrawArgumentValue(0),
-              LoGetAircraftDrawArgumentValue(1),
-              LoGetAircraftDrawArgumentValue(5),
-              LoGetAircraftDrawArgumentValue(6)
-            )
-            -- TF-51 sends to SimShaker
-            stringToSend =
-              string.format(
-              "PanShake=%s",
-              PanelShake
-            )
-          elseif obj.Name == "FW-190D9" then
+--           elseif obj.Name == "TF-51D" then
+--             -------------------------------------------------------------------------------------------------------------------------------------------------------
+--             local AirspeedNeedle = MainPanel:get_argument_value(11) * 1000 * 1.852
+--             local Altimeter_10000_footPtr = MainPanel:get_argument_value(96) * 100000
+--             local Altimeter_1000_footPtr = MainPanel:get_argument_value(24) * 10000
+--             local Altimeter_100_footPtr = MainPanel:get_argument_value(25) * 1000
+--             local Variometer = MainPanel:get_argument_value(29)
+--             local TurnNeedle = MainPanel:get_argument_value(27) * math.rad(3)
+--             local Landing_Gear_Handle = MainPanel:get_argument_value(150)
+--             local Manifold_Pressure = MainPanel:get_argument_value(10) * 65 + 10
+--             local Engine_RPM = MainPanel:get_argument_value(23) * 4500
+--             local AHorizon_Pitch = MainPanel:get_argument_value(15) * math.pi / 3.0
+--             local AHorizon_Bank = MainPanel:get_argument_value(14) * math.pi
+--             local AHorizon_PitchShift = MainPanel:get_argument_value(16) * 10.0 * math.pi / 180.0
+--             local GyroHeading = MainPanel:get_argument_value(12) * 2.0 * math.pi
+--             local Oil_Temperature = MainPanel:get_argument_value(30) * 100
+--             local Oil_Pressure = MainPanel:get_argument_value(31) * 200
+--             local Fuel_Pressure = MainPanel:get_argument_value(32) * 25
+--             local Coolant_Temperature = MainPanel:get_argument_value(22) * 230 - 80
+--             local Carb_Temperature = MainPanel:get_argument_value(21) * 230 - 80
+--             local LandingGearGreenLight = MainPanel:get_argument_value(80)
+--             local LandingGearRedLight = MainPanel:get_argument_value(82)
+--             local Vacuum_Suction = MainPanel:get_argument_value(9) * 10
+--             --local myselfData = string.format("%.2f~%.2f~%.2f", obj.Heading, obj.Pitch, obj.Bank)
+--             local PanelShake =
+--               string.format(
+--               "%.2f~%.2f~%.2f",
+--               MainPanel:get_argument_value(181),
+--               MainPanel:get_argument_value(180),
+--               MainPanel:get_argument_value(189)
+--             )
+--             local LandingGearGreenLight = MainPanel:get_argument_value(80)
+--             local WEPwire = MainPanel:get_argument_value(190)
+--             local extModelArguments =
+--               string.format(
+--               "%.2f~%.2f~%.2f~%.2f",
+--               LoGetAircraftDrawArgumentValue(0),
+--               LoGetAircraftDrawArgumentValue(1),
+--               LoGetAircraftDrawArgumentValue(5),
+--               LoGetAircraftDrawArgumentValue(6)
+--             )
+--             -- TF-51 sends to SimShaker
+--             stringToSend =
+--               string.format(
+--               "PanShake=%s",
+--               PanelShake
+--             )
+          elseif obj.Name == "FW-190D9" or obj.Name == "FW-190A8" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local Manifold_Pressure = MainPanel:get_argument_value(46)
-            local Engine_RPM = MainPanel:get_argument_value(47)
+            -- Calculate Engine RPM from redline value and engine.RPM value
+            local engine_redline_reference = 2700
+            local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
+            local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
 
             local PanelShake =
               string.format(
@@ -429,29 +502,24 @@ local f_telemFFB = {
               MainPanel:get_argument_value(204),
               MainPanel:get_argument_value(206)
             )
-            local GunFireData =
-              string.format(
-              "%.2f~%.2f~%.2f~%.2f",
-              MainPanel:get_argument_value(50),
-              MainPanel:get_argument_value(164),
-              MainPanel:get_argument_value(165),
-              MainPanel:get_argument_value(166)
-            )
             local MW = MainPanel:get_argument_value(106)
             -- FW-190D9 sends to SimShaker
             stringToSend =
               string.format(
-              "PanShake=%s;MP-MW=%.2f~%.2f",
-              PanelShake,            
+              "PanShake=%s;MP-MW=%.2f~%.2f;ActualRPM=%s",
+              PanelShake,
               Manifold_Pressure,
-              MW
+              MW,
+              actualRPM
             )
           elseif obj.Name == "Bf-109K-4" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local Manifold_Pressure = MainPanel:get_argument_value(32)
-            local Engine_RPM = MainPanel:get_argument_value(29)
-
             local myselfData = string.format("%.2f~%.2f~%.2f", obj.Heading, obj.Pitch, obj.Bank)
+            -- Calculate Engine RPM from redline value and engine.RPM value
+            local engine_redline_reference = 2800
+            local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
+            local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
             local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
@@ -463,15 +531,19 @@ local f_telemFFB = {
             -- Bf-109K-4 sends to SimShaker
             stringToSend =
               string.format(
-              "PanelShake=%s;MP-MW=%.2f~%.2f;PayloadInfo=%s",
+              "PanelShake=%s;MP-MW=%.2f~%.2f;ActualRPM=%s",
               PanelShake,
               Manifold_Pressure,
               MW,
-              PayloadInfo
+              actualRPM
             )
           elseif obj.Name == "SpitfireLFMkIX" or obj.Name == "SpitfireLFMkIXCW" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
-            local Engine_RPM = MainPanel:get_argument_value(37)
+            -- Calculate Engine RPM from redline value and engine.RPM value
+            local engine_redline_reference = 3000
+            local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
+            local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+
             local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
@@ -482,16 +554,51 @@ local f_telemFFB = {
             -- SPITFIRE sends to SimShaker
             stringToSend =
               string.format(
-              "PanShake=%s",
-              PanelShake
+              "PanShake=%s;ActualRPM=%s",
+              PanelShake,
+              actualRPM
               )
+          elseif string.find(obj.Name, "P-47D") then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            -- Calculate Engine RPM from redline value and engine.RPM value
+            local engine_redline_reference = 2700
+            local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
+            local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            -- P47 sends to TelemFFB
+            stringToSend =
+              string.format(
+              "ActualRPM=%s",
+              actualRPM
+              )
+          elseif string.find(obj.Name, "I-16") then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            -- Calculate Engine RPM from redline value and engine.RPM value
+            local engine_redline_reference = 2200
+            local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
+            local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            -- I-16 sends to TelemFFB
+            stringToSend =
+              string.format(
+              "ActualRPM=%s",
+              actualRPM
+            )
+            elseif string.find(obj.Name, "MosquitoFBMkVI") then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            -- Calculate Engine RPM from redline value and engine.RPM value
+            local engine_redline_reference = 3000
+            local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
+            local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            -- Mosquito sends to TelemFFB
+            stringToSend =
+              string.format(
+              "ActualRPM=%s",
+              actualRPM
+            )
 
           elseif obj.Name == "A-10C" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local FlapsPos = MainPanel:get_argument_value(653)
             local Canopy = MainPanel:get_argument_value(7)
-            local Engine_RPM_left = string.format("%.0f", MainPanel:get_argument_value(78) * 100)
-            local Engine_RPM_right = string.format("%.0f", MainPanel:get_argument_value(80) * 100)
             local APU = MainPanel:get_argument_value(13)
             -- A-10C  sends to SimShaker
             stringToSend =
@@ -505,8 +612,6 @@ local f_telemFFB = {
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local FlapsPos = MainPanel:get_argument_value(653)
             local Canopy = MainPanel:get_argument_value(7)
-            local Engine_RPM_left = string.format("%.0f", MainPanel:get_argument_value(78) * 100)
-            local Engine_RPM_right = string.format("%.0f", MainPanel:get_argument_value(80) * 100)
             local APU = MainPanel:get_argument_value(13)
             -- A-10C  sends to SimShaker
             stringToSend =
@@ -528,7 +633,6 @@ local f_telemFFB = {
             local AB12 = string.format("%.1f~%.1f~%.1f", Afterburner1, Afterburner2, LampCheck)
             local SPS = MainPanel:get_argument_value(624)
             local CanopyWarnLight = MainPanel:get_argument_value(541)
-            local Engine_RPM = string.format("%.0f", MainPanel:get_argument_value(50) * 100)
             -- MiG-21Bis sends to SimShaker
             stringToSend =
               string.format(
@@ -547,7 +651,6 @@ local f_telemFFB = {
             local Canopy1 = MainPanel:get_argument_value(139)
             local Canopy2 = MainPanel:get_argument_value(140)
 
-            local Engine_RPM = string.format("%.0f", MainPanel:get_argument_value(84) * 100)
             stringToSend =
               string.format(
               "Canopy1=%.2f;Canopy2=%.2f",
