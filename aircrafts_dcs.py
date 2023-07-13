@@ -400,6 +400,7 @@ class PropellerAircraft(Aircraft):
     engine_rumble_lowrpm_intensity: float = 0.12
     engine_rumble_highrpm = 2800
     engine_rumble_highrpm_intensity: float = 0.06
+    engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
     rpm_scale : float = 45
 
@@ -419,9 +420,9 @@ class PropellerAircraft(Aircraft):
         rpm = telem_data.get("EngRPM", 0)
         if not "ActualRPM" in telem_data:
             if isinstance(rpm, list):
-                rpm = [x * self.rpm_scale for x in rpm]
+                rpm = [(x / 100) * self.engine_max_rpm for x in rpm]
             else:
-                rpm = rpm * self.rpm_scale
+                rpm = (rpm / 100) * self.engine_max_rpm
             telem_data["ActualRPM"] = rpm # inject ActualRPM into telemetry
 
         if self.engine_rumble:
