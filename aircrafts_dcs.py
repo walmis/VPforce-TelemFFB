@@ -275,7 +275,7 @@ class Aircraft(object):
 
         spdbrk = self._telem_data.get("speedbrakes_value", 0)
         if self.has_changed("speedbrakes_value", 50):
-            logging.debug(f"Speedbrake Pos: {spdbrk}")
+            #logging.debug(f"Speedbrake Pos: {spdbrk}")
             effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, 0, 3).start()
         else:
             effects.dispose("speedbrakemovement")
@@ -290,14 +290,22 @@ class Aircraft(object):
             effects.dispose("speedbrakebuffet")
             effects.dispose("speedbrakebuffet2")
 
-    def _update_spoiler(self, spd_thresh=70):
+    def _update_spoiler(self, spd_thresh_low=25, spd_thresh_hi=60):
         tas = self._telem_data.get("TAS",0)
+        tas_intensity = utils.clamp_minmax(utils.scale(tas, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
 
         spoiler = self._telem_data.get("Spoilers", 0)
         if spoiler == 0:
             return
+        #average all spoiler values together
         if type(spoiler) == list:
-            spoiler = sum(spoiler) / len(spoiler)
+            if "F-14" in self._telem_data.get("N"):
+                #give %85 weight to inner spoilers for intensity calculation
+                spoiler_inner = (spoiler[1], spoiler[2])
+                spoiler_outer = (spoiler[0], spoiler[3])
+                spoiler = (0.85 * sum(spoiler_inner) + 0.15 * sum(spoiler_outer)) / 2
+            else:
+                spoiler = sum(spoiler) / len(spoiler)
 
         if self.speedbrake_motion_intensity > 0:
             if self.has_changed("Spoilers", 15):
@@ -308,14 +316,14 @@ class Aircraft(object):
                 effects.dispose("spoilermovement")
                 effects.dispose("spoilermovement2")
 
-        if tas > spd_thresh and spoiler > .1:
+        if tas > spd_thresh_low and spoiler > .1:
             #calculate insensity based on deployment percentage
-            realtime_intensity = self.spoiler_buffet_intensity * spoiler
+            realtime_intensity = self.spoiler_buffet_intensity * spoiler * tas_intensity
+            logging.debug(f"PLAYING SPOILER RUMBLE | intensity: {realtime_intensity}, d-factor: {spoiler}, s-factor: {tas_intensity}")
             effects["spoilerbuffet1-1"].periodic(15, realtime_intensity, 0, 4).start()
             effects["spoilerbuffet1-2"].periodic(16, realtime_intensity, 0, 4).start()
             effects["spoilerbuffet2-1"].periodic(14, realtime_intensity, 90, 4).start()
             effects["spoilerbuffet2-2"].periodic(18, realtime_intensity, 90, 4).start()
-            logging.debug(f"PLAYING SPOILER RUMBLE intensity:{realtime_intensity}")
         else:
             effects.dispose("spoilerbuffet1-1")
             effects.dispose("spoilerbuffet1-2")
