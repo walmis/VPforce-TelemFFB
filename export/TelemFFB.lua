@@ -703,7 +703,11 @@ local f_telemFFB = {
                 local f14SpeedbrakePos = LoGetAircraftDrawArgumentValue(400)
                 mech["speedbrakes"]["value"] = f14SpeedbrakePos
                 mech["speedbrakes"]["status"] = f14SpeedbrakePos >= 0.9999
-
+                local f14_Splr_L_Outer = LoGetAircraftDrawArgumentValue(1010)
+                local f14_Splr_L_Inner = LoGetAircraftDrawArgumentValue(1011)
+                local f14_Splr_R_Inner = LoGetAircraftDrawArgumentValue(1012)
+                local f14_Splr_R_Outer = LoGetAircraftDrawArgumentValue(1013)
+                local f14_DLC_Spoiler = string.format("%.2f~%.2f~%.2f~%.2f", f14_Splr_L_Outer, f14_Splr_L_Inner, f14_Splr_R_Inner, f14_Splr_R_Outer)
                 local REngine_RPM = "0"
                 local LEngine_RPM = "0"
                 if getEngineRightRPM then
@@ -734,7 +738,12 @@ local f_telemFFB = {
                 end
 
                 -- F-14 sends to SimShaker
-                stringToSend =  additionalData
+                stringToSend =
+                  string.format(
+                  "%s;Spoilers=%s",
+                  additionalData,
+                  f14_DLC_Spoiler
+                  )
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           else -- FC3 Planes
