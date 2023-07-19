@@ -131,7 +131,37 @@ def scale_clamp(val, src : tuple, dst : tuple):
     """   
     v = scale(val, src, dst)
     return clamp(v, dst[0], dst[1])
+def non_linear_scaling(x, min_val, max_val, curvature=1):
+    # Scale the input value to a value between 0 and 1 within the given range
+    scaled_value = (x - min_val) / (max_val - min_val)
 
+    # Apply the non-linear scaling based on the specified curvature
+    if curvature < 0:
+        result = scaled_value ** (1 / abs(curvature))
+    elif curvature > 0:
+        result = scaled_value ** curvature
+    else:
+        result = scaled_value
+
+    return result
+def gaussian_scaling(x, min_val, max_val, peak_percentage=0.5, curve_width=1.0):
+    # Calculate the midpoint of the range and the distance between the min and max values
+    midpoint = (min_val + max_val) / 2
+    range_distance = (max_val - min_val)
+
+    # Calculate the value of x as a percentage between 0 and 1 in the range
+    scaled_value = (x - min_val) / range_distance
+
+    # Calculate the distance of the scaled value from the peak_percentage
+    distance_from_peak = abs(scaled_value - peak_percentage)
+
+    # Apply the Gaussian distribution to get the scaling factor
+    scaling_factor = math.exp(-0.5 * ((distance_from_peak / (curve_width / 2)) ** 2))
+
+    # Scale the result back to the desired range (0 to 1)
+    result = scaling_factor
+
+    return result
 def pressure_from_altitude(altitude_m):
     """Calculate pressure at specified altitude
 
