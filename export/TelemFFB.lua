@@ -305,6 +305,10 @@ local f_telemFFB = {
             --local doors = string.format("%.2f~%.2f", MainPanel:get_argument_value(420), MainPanel:get_argument_value(422))
             local deadPilot = MainPanel:get_argument_value(248)
             -- UH-1H  sends to SimShaker
+            local LeftGear = LoGetAircraftDrawArgumentValue(104)
+            local NoseGear = LoGetAircraftDrawArgumentValue(104)
+            local RightGear = LoGetAircraftDrawArgumentValue(104)
+            WoW = string.format("%.2f~%.2f~%.2f", LeftGear, NoseGear, RightGear)
             stringToSend =
               string.format(
               "RotorRPM=%.0f;PanShake=%s;LDoor=%.2f;RDoor=%.2f;deadPilot=%.2f",
