@@ -349,15 +349,16 @@ local f_telemFFB = {
             )
 
 --           elseif obj.Name == "AH-64D_BLK_II" then
---             -- There is nothing of value to export from AH64 currently, placeholder only  -------------------------------------------------------------------------------------------------------------------------------------------------------
---             -- calculate gauge percentage reading from gauge deflection value
---             local mainRotorRPM = LoGetAircraftDrawArgumentValue(40)
+--             log.info("This is the Apache")
+-- --             -- There is nothing of value to export from AH64 currently, placeholder only
+-- --             -- Apache rotor RPM is max 265, send static 245 in telemetry
+-- --             local mainRotorRPM = "245.000"
 --
 --
 --             -- AH64  sends to TelemFFB
 --             stringToSend =
 --               string.format(
---               "RotorRPM=%.3f",
+--               "RotorRPM=%s",
 --               mainRotorRPM
 --             )
 
