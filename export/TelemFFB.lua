@@ -101,10 +101,10 @@ local f_telemFFB = {
     socket.try(self.sock_rcv:settimeout(.001))
 
     socket.try(self.sock_udp:settimeout(.001))
-    --socket.try(self.sock_udp:setoption('broadcast', true))
-    --socket.try(self.sock_udp:setpeername("127.0.0.1", 34380))
+    socket.try(self.sock_udp:setoption('broadcast', true))
+    socket.try(self.sock_udp:setpeername("127.255.255.255", 34380))
 
-    socket.try(self.sock_udp:sendto("CONNECT", self.host, self.port))
+    socket.try(self.sock_udp:send("CONNECT"))
 
   end,
   BeforeNextFrame = function(self)
@@ -840,7 +840,7 @@ local f_telemFFB = {
           --   windVelocityVectors,
           --   velocityVectors, altAsl, altAgl, aoa, IAS, tas, WoW, CM.flare, CM.chaff, PayloadInfo, M_number, mech, AB)
 
-          socket.try(self.sock_udp:sendto(stringToSend, self.host, self.port))
+          socket.try(self.sock_udp:send(stringToSend))
         end
       end
     )
@@ -851,7 +851,7 @@ local f_telemFFB = {
       socket.protect(
       function()
         if self.sock_udp then
-          socket.try(self.sock_udp:sendto("DISCONNECT", self.host, self.port))
+          socket.try(self.sock_udp:send("DISCONNECT"))
           self.sock_udp:close()
           self.sock_udp = nil
 
