@@ -190,13 +190,13 @@ class TelemManager(QObject, threading.Thread):
 
             for i in data:
                 try:
-                    if len(i):
+                    if len(i) and i != "CONNECT" and i != "DISCONNECT":
                         section,conf = i.split("=")
                         values = conf.split("~")
                         telem_data[section] = [utils.to_number(v) for v in values] if len(values)>1 else utils.to_number(conf)
                 except Exception as e:
                     traceback.print_exc()
-                    print("Suspect Parameter", repr(i))
+                    print("Error Parsing Parameter: ", repr(i))
 
             try:
                 j = json.loads(telem_data["MechInfo"])
