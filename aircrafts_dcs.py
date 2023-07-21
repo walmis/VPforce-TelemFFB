@@ -47,6 +47,11 @@ LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 class Aircraft(object):
     """Base class for Aircraft based FFB"""
     ####
+    #### Beta effects - set to 1 to enable
+    deceleration_effect_enable = 0
+    deceleration_effect_enable_areyoureallysure = 0
+    deceleration_max_force = 0.5
+    ###
     buffeting_intensity : float = 0.2               # peak AoA buffeting intensity  0 to disable
     buffet_aoa : float          = 10.0              # AoA when buffeting starts
     stall_aoa : float           = 15.0              # Stall AoA
@@ -161,7 +166,24 @@ class Aircraft(object):
         if prev_val != new_val and prev_val is not None and new_val is not None:
             return (prev_val,new_val)
         return False
-    
+    def _decel_effect(self, telem_data):
+        x_gs = telem_data.get("ACCs")[0]
+        if not self.anything_has_changed("decel", x_gs):
+            # logging.debug("nothing changed.,....")
+            return
+        if not sum(telem_data.get("WeightOnWheels")):
+            return
+        max_gs = self.deceleration_max_force
+        if x_gs < -0.03:
+            if effects["runway0"].started:
+                effects.dispose("runway0")
+                # logging.debug("disposing runway effect")
+            if abs(x_gs) > max_gs:
+                x_gs = -max_gs
+            # logging.debug(f"x_gs = {x_gs}")
+            effects["decel_x"].constant(abs(x_gs), 180).start()
+        else:
+            effects.dispose("decel_x")
     def _calc_buffeting(self, aoa, speed) -> tuple:
         """Calculate buffeting amount and frequency
 
@@ -387,6 +409,8 @@ class Aircraft(object):
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
+        if self.deceleration_effect_enable and self.deceleration_effect_enable_areyoureallysure:
+            self._decel_effect(telem_data)
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
