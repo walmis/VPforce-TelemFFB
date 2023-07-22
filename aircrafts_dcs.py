@@ -742,6 +742,9 @@ class Helicopter(Aircraft):
         mod = telem_data.get("N")
         tas = telem_data.get("TAS", 0)
         WoW = sum(telem_data.get("WeightOnWheels"))
+        if mod == "UH-60L":
+            # UH60 always shows positive value for tailwheel
+            WoW = telem_data.get("WeightOnWheels")[0] + telem_data.get("WeightOnWheels")[2]
         rotor = telem_data.get("RotorRPM")
         if WoW > 0:
             # logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
