@@ -72,9 +72,9 @@ class SimConnectManager(threading.Thread):
         #SimVar("AileronDeflPct", "AILERON AVERAGE DEFLECTION PCT", "Percent Over 100", scale=100),
         SimVar("RudderDefl", "RUDDER DEFLECTION", "degrees"),
         SimVar("RudderDeflPct", "RUDDER DEFLECTION PCT", "Percent Over 100"),
-        SimVar("RelWndX", "RELATIVE WIND VELOCITY BODY X", "meter/second"),
-        SimVar("RelWndY", "RELATIVE WIND VELOCITY BODY Y", "meter/second"),
-        SimVar("RelWndZ", "RELATIVE WIND VELOCITY BODY Z", "meter/second"),
+        #SimVar("RelWndX", "AIRCRAFT WIND X", "meter/second"),
+        #SimVar("RelWndY", "AIRCRAFT WIND Y", "meter/second"),
+        #SimVar("RelWndZ", "AIRCRAFT WIND Z", "meter/second"),
 
         SimVar("Pitch", "PLANE PITCH DEGREES", "degrees"),
         SimVar("Roll", "PLANE BANK DEGREES", "degrees"),
@@ -97,9 +97,9 @@ class SimConnectManager(threading.Thread):
         SimVar("AmbWindX", "AMBIENT WIND X", "meter/second"),
         SimVar("AmbWindY", "AMBIENT WIND Y", "meter/second"),
         SimVar("AmbWindZ", "AMBIENT WIND Z", "meter/second"),
-        #SimVar("VelX", "VELOCITY WORLD X", "meter/second"),
-        #SimVar("VelY", "VELOCITY WORLD Y", "meter/second"),
-        #SimVar("VelZ", "VELOCITY WORLD Z", "meter/second"),
+        SimVar("VelX", "VELOCITY WORLD X", "meter/second"),
+        SimVar("VelY", "VELOCITY WORLD Y", "meter/second"),
+        SimVar("VelZ", "VELOCITY WORLD Z", "meter/second"),
         SimVarArray("WeightOnWheels", "CONTACT POINT COMPRESSION", "Number", min=0, max=2)
     ]
     

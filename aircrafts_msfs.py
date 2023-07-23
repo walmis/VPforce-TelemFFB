@@ -26,6 +26,7 @@ import utils
 from utils import clamp, HighPassFilter, Derivative, Dispenser
 
 from ffb_rhino import HapticEffect, FFBReport_SetCondition
+from aircraft_base import AircraftBase
 
 hpf = Dispenser(HighPassFilter)
 
@@ -35,8 +36,9 @@ rad = 0.0174532925
 ft = 3.28084 # m to ft
 kt = 1.94384 # ms to kt
 
-class Aircraft:
+class Aircraft(AircraftBase):
     def __init__(self, name, **kwargs) -> None:
+        super().__init__(name)
         self.spring = HapticEffect().spring()
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
@@ -57,8 +59,6 @@ class Aircraft:
         self.wing_shadow_angle = 900.0*0.01745329
         self.stick_shaker_AoA = 16.0*0.01745329
 
-        self.elevator_area = 1
-        self.aileron_area = 1
         self.aoa_gain = 1.0
         self.g_force_gain = 0.1
         self.prop_diameter = 1.5
@@ -70,9 +70,6 @@ class Aircraft:
 
         #scale the dynamic pressure to ffb friendly values
         self.dyn_pressure_scale = 0.005
-    
-        print(kwargs)
-        self.__dict__.update(kwargs)
 
     def on_timeout(self):
         pass
@@ -87,17 +84,28 @@ class Aircraft:
         #print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
 
         slip_angle = data["SideSlip"]*rad
-        g_force = data["G"]
+        g_force = data["G"]-1
 
         #calculate air flow velocity exiting the prop
         #based on https://www.grc.nasa.gov/www/k-12/airplane/propth.html
-        _prop_air_vel = math.sqrt(2*data["PropThrust1"] / (data["AirDensity"] * (math.pi*(self.prop_diameter/2)**2)) + data["TrueAirspeed"]**2 )
+        
+        incidence_vec = utils.Vector(data["VelX"], data["VelY"], data["VelZ"])
+        wind_vec = utils.Vector(data["AmbWindX"], data["AmbWindY"], data["AmbWindZ"])
+        incidence_vec = incidence_vec - wind_vec
+        incidence_vec = incidence_vec.rotY(-(data["Heading"]*rad))
+        incidence_vec = incidence_vec.rotX(-data["Pitch"]*rad)
+        incidence_vec = incidence_vec.rotZ(-data["Roll"]*rad)
+        _airspeed = incidence_vec.z
 
-        if abs(data["RelWndY"]) > 0.5 and _prop_air_vel > 1:
-            _elevator_aoa = math.atan2(-data["RelWndY"], _prop_air_vel)*deg
+        _prop_air_vel = math.sqrt(2*data["PropThrust1"] / (data["AirDensity"] * (math.pi*(self.prop_diameter/2)**2)) + _airspeed**2 )
+
+        if abs(incidence_vec.y) > 0.5 and _prop_air_vel > 1:
+            _elevator_aoa = math.atan2(-incidence_vec.y, _prop_air_vel)*deg
         else:
             _elevator_aoa = 0
             
+
+        data["Incidence"] = [incidence_vec.x, incidence_vec.y, incidence_vec.z]
 
         # calculate dynamic pressure based on air flow from propeller
         # elevator_prop_flow_ratio defines how much prop wash the elevator receives
@@ -114,19 +122,19 @@ class Aircraft:
         data["_elevator_droop_term"] = _elevator_droop_term
 
         
-        aileron_coeff = _dyn_pressure * self.aileron_gain * slip_gain * self.aileron_area
+        aileron_coeff = _dyn_pressure * self.aileron_gain * slip_gain
 
 		# add data to telemetry packet so they become visible in the GUI output
         data["_prop_air_vel"] = _prop_air_vel 
         data["_elev_dyn_pressure"] = _elev_dyn_pressure
 
-        elevator_coeff = (_elev_dyn_pressure) * self.elevator_gain * slip_gain * self.elevator_area
+        elevator_coeff = (_elev_dyn_pressure) * self.elevator_gain * slip_gain
         data["_elev_coeff"] = elevator_coeff
         data["_aile_coeff"] = aileron_coeff
 
         _aoa_term =  math.sin(_elevator_aoa*rad) * self.aoa_gain
         data["_aoa_term"] = _aoa_term
-        #data["_G_term"] = (self.g_force_gain * g_force)
+        data["_G_term"] = (self.g_force_gain * g_force)
 
         hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
         data["_hpf_pitch_acc"] = hpf_pitch_acc # test stuff
@@ -144,6 +152,6 @@ class Aircraft:
 
 		# update constant forces
         #self.const_y.constant( clamp(self.hpf_pitch(-data["PitchRate"])*0.1, -0.1, 0.1), 0).start()
-        self.const_y.constant( clamp(- _elevator_droop_term + data["_aoa_term"] , -1, 1), 0).start()
+        self.const_y.constant( clamp(- _elevator_droop_term + data["_aoa_term"] - data["_G_term"] , -1, 1), 0).start()
 
         rudder_angle = rudder_angle - slip_angle
