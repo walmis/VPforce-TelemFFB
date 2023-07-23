@@ -89,6 +89,7 @@ LOAD_ERROR = 3
 OP_START = 1
 OP_START_SOLO  = 2
 OP_STOP = 3
+OP_START_OVERRIDE = 4
 
 AXIS_ENABLE_X = 1
 AXIS_ENABLE_Y = 2
@@ -202,8 +203,11 @@ class FFBEffectHandle:
         self.type = type
         self._finalizer = weakref.finalize(self, self.destroy)
     
-    def start(self, loopCount=1):
-        op = FFBReport_EffectOperation(effectBlockIndex=self.effect_id, operation=OP_START, loopCount=loopCount)
+    def start(self, loopCount=1, override=False):
+        op = OP_START
+        if override:
+            op = OP_START_OVERRIDE
+        op = FFBReport_EffectOperation(effectBlockIndex=self.effect_id, operation=op, loopCount=loopCount)
         self.ffb.write(bytes(op))
         return self
 
@@ -354,7 +358,7 @@ class HapticEffect:
     
     def _conditional_effect(self, type, coef_x = None, coef_y= None):
         if not self.effect:
-            self.effect = self.device.createEffect(EFFECT_INERTIA)
+            self.effect = self.device.createEffect(type)
             self.effect.setEffect() # initialize defaults
 
         if coef_x is not None:
@@ -418,14 +422,15 @@ class HapticEffect:
     def status(self) -> int:
         return self.started
 
-    def start(self):
+    def start(self, **kw):
         if self.effect and not self.started:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is starting effect {self.effect.effect_id}")
             logging.info(f"Start effect {self.effect.effect_id}")
-            self.effect.start()
+            self.effect.start(**kw)
             self.started = True
+        return self
     
     def stop(self):
         if self.effect and self.started:
@@ -435,6 +440,7 @@ class HapticEffect:
             logging.info(f"Stop effect {self.effect.effect_id}")
             self.effect.stop() 
             self.started = False
+        return self
 
     def destroy(self):
         if self.effect:
@@ -453,13 +459,23 @@ if __name__ == "__main__":
     d = FFBRhino(0xffff, 0x2055)
     d.resetEffects()
 
+    HapticEffect.open()
+    s1 = HapticEffect().spring(2048,2048)
+    s2 = HapticEffect().spring(1024,1024)
+
+    s1.start()
+    s2.start(override=True)
+    time.sleep(2)
+    s2.stop()
     #c = d.createEffect(EFFECT_CONSTANT)
     #c.setConstantForce(0.05, 90)
 
-    c = d.createEffect(EFFECT_SINE)
-    c.setPeriodic(10, 0.05, 0)
-    c.start()
+    #s = d.
 
-    time.sleep(2)
+    #c = d.createEffect(EFFECT_SINE)
+    #c.setPeriodic(10, 0.05, 0)
+    #c.start()
+    while True:
+        time.sleep(2)
     
     #c.start()
