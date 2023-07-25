@@ -86,7 +86,15 @@ class Aircraft(AircraftBase):
     jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
     ####
-    
+    #### Beta effects - set to 1 to enable
+    gforce_effect_enable = 0
+    gforce_effect_enable_areyoureallysure = 0
+    gforce_effect_max_intensity = 1.0
+    gforce_min_gs = 1.5  # G's where the effect starts playing
+    gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
+    ####
+    ####
+
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
 
@@ -129,6 +137,21 @@ class Aircraft(AircraftBase):
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
+
+    def _gforce_effect(self, telem_data):
+       # gforce_effect_enable = 1
+        gneg = -1.0
+        gmin = self.gforce_min_gs
+        gmax = self.gforce_max_gs
+       # if not gforce_effect_enable:
+       #     return
+        z_gs : float = telem_data.get("ACCs")[1]
+        if z_gs < gmin:
+            effects.dispose("gforce")
+            return
+        g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 3)
+        effects["gforce"].constant(g_factor, 180).start()
+        logging.debug(f"G's = {z_gs} | gfactor = {g_factor}")
 
     def _decel_effect(self, telem_data):
         x_gs = telem_data.get("ACCs")[0]
@@ -466,6 +489,9 @@ class PropellerAircraft(Aircraft):
 
         self._update_aoa_effect(telem_data)
 
+        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+            super()._gforce_effect(telem_data)
+
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
@@ -633,6 +659,8 @@ class JetAircraft(Aircraft):
             self._update_ab_effect(self.afterburner_effect_intensity, telem_data)
         if Aircraft.jet_engine_rumble_intensity > 0:
             self._update_jet_engine_rumble(telem_data)
+        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+            super()._gforce_effect(telem_data)
 
 
 #####
