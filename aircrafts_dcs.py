@@ -139,6 +139,7 @@ class Aircraft(AircraftBase):
 
 
     def _gforce_effect(self, telem_data):
+
        # gforce_effect_enable = 1
         gneg = -1.0
         gmin = self.gforce_min_gs
@@ -148,9 +149,13 @@ class Aircraft(AircraftBase):
         z_gs : float = telem_data.get("ACCs")[1]
         if z_gs < gmin:
             effects.dispose("gforce")
+            effects.dispose("gforce_damper")
             return
         g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 3)
+        g_factor = utils.clamp(g_factor, 0.0, 1.0)
         effects["gforce"].constant(g_factor, 180).start()
+      #  effects["gforce_damper"].damper(coef_y=1024).start()
+
         logging.debug(f"G's = {z_gs} | gfactor = {g_factor}")
 
     def _decel_effect(self, telem_data):
