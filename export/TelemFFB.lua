@@ -101,10 +101,10 @@ local f_telemFFB = {
     socket.try(self.sock_rcv:settimeout(.001))
 
     socket.try(self.sock_udp:settimeout(.001))
-    --socket.try(self.sock_udp:setoption('broadcast', true))
-    --socket.try(self.sock_udp:setpeername("127.0.0.1", 34380))
+    socket.try(self.sock_udp:setoption('broadcast', true))
+    socket.try(self.sock_udp:setpeername("127.255.255.255", 34380))
 
-    socket.try(self.sock_udp:sendto("CONNECT", self.host, self.port))
+    socket.try(self.sock_udp:send("CONNECT"))
 
   end,
   BeforeNextFrame = function(self)
@@ -305,6 +305,10 @@ local f_telemFFB = {
             --local doors = string.format("%.2f~%.2f", MainPanel:get_argument_value(420), MainPanel:get_argument_value(422))
             local deadPilot = MainPanel:get_argument_value(248)
             -- UH-1H  sends to SimShaker
+            local LeftGear = LoGetAircraftDrawArgumentValue(104)
+            local NoseGear = LoGetAircraftDrawArgumentValue(104)
+            local RightGear = LoGetAircraftDrawArgumentValue(104)
+            WoW = string.format("%.2f~%.2f~%.2f", LeftGear, NoseGear, RightGear)
             stringToSend =
               string.format(
               "RotorRPM=%.0f;PanShake=%s;LDoor=%.2f;RDoor=%.2f;deadPilot=%.2f",
@@ -349,15 +353,16 @@ local f_telemFFB = {
             )
 
 --           elseif obj.Name == "AH-64D_BLK_II" then
---             -- There is nothing of value to export from AH64 currently, placeholder only  -------------------------------------------------------------------------------------------------------------------------------------------------------
---             -- calculate gauge percentage reading from gauge deflection value
---             local mainRotorRPM = LoGetAircraftDrawArgumentValue(40)
+--             log.info("This is the Apache")
+-- --             -- There is nothing of value to export from AH64 currently, placeholder only
+-- --             -- Apache rotor RPM is max 265, send static 245 in telemetry
+-- --             local mainRotorRPM = "245.000"
 --
 --
 --             -- AH64  sends to TelemFFB
 --             stringToSend =
 --               string.format(
---               "RotorRPM=%.3f",
+--               "RotorRPM=%s",
 --               mainRotorRPM
 --             )
 
@@ -835,7 +840,7 @@ local f_telemFFB = {
           --   windVelocityVectors,
           --   velocityVectors, altAsl, altAgl, aoa, IAS, tas, WoW, CM.flare, CM.chaff, PayloadInfo, M_number, mech, AB)
 
-          socket.try(self.sock_udp:sendto(stringToSend, self.host, self.port))
+          socket.try(self.sock_udp:send(stringToSend))
         end
       end
     )
@@ -846,7 +851,7 @@ local f_telemFFB = {
       socket.protect(
       function()
         if self.sock_udp then
-          socket.try(self.sock_udp:sendto("DISCONNECT", self.host, self.port))
+          socket.try(self.sock_udp:send("DISCONNECT"))
           self.sock_udp:close()
           self.sock_udp = nil
 

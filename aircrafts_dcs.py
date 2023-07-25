@@ -48,6 +48,11 @@ LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
     ####
+    #### Beta effects - set to 1 to enable
+    deceleration_effect_enable = 0
+    deceleration_effect_enable_areyoureallysure = 0
+    deceleration_max_force = 0.5
+    ###
     buffeting_intensity : float = 0.2               # peak AoA buffeting intensity  0 to disable
     buffet_aoa : float          = 10.0              # AoA when buffeting starts
     stall_aoa : float           = 15.0              # Stall AoA
@@ -125,7 +130,24 @@ class Aircraft(AircraftBase):
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
 
-    
+    def _decel_effect(self, telem_data):
+        x_gs = telem_data.get("ACCs")[0]
+        if not self.anything_has_changed("decel", x_gs):
+            # logging.debug("nothing changed.,....")
+            return
+        if not sum(telem_data.get("WeightOnWheels")):
+            return
+        max_gs = self.deceleration_max_force
+        if x_gs < -0.03:
+            if effects["runway0"].started:
+                effects.dispose("runway0")
+                # logging.debug("disposing runway effect")
+            if abs(x_gs) > max_gs:
+                x_gs = -max_gs
+            # logging.debug(f"x_gs = {x_gs}")
+            effects["decel_x"].constant(abs(x_gs), 180).start()
+        else:
+            effects.dispose("decel_x")
     def _calc_buffeting(self, aoa, speed) -> tuple:
         """Calculate buffeting amount and frequency
 
@@ -271,7 +293,7 @@ class Aircraft(AircraftBase):
             else:
                 spoiler = sum(spoiler) / len(spoiler)
 
-        if self.speedbrake_motion_intensity > 0:
+        if self.spoiler_motion_intensity > 0:
             if self.has_changed("Spoilers", 15):
                 logging.debug(f"Spoilers Pos: {spoiler}")
                 effects["spoilermovement"].periodic(118, self.spoiler_motion_intensity, 0, 4).start()
@@ -349,11 +371,14 @@ class Aircraft(AircraftBase):
         :type new_data: dict
         """
         self._telem_data = telem_data
-
+        if telem_data.get("N") == None:
+            return
+        if self.deceleration_effect_enable and self.deceleration_effect_enable_areyoureallysure:
+            self._decel_effect(telem_data)
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
-       
+        #logging.debug(f"speedbrake== {self.speedbrake_motion_intensity}")
         if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
             self._update_speed_brakes()
         if self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0:
@@ -362,7 +387,7 @@ class Aircraft(AircraftBase):
             self._update_flaps()
         if self.canopy_motion_intensity > 0:
             self._update_canopy()
-        if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
+        if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             self._update_spoiler()
             
         # if stick position data is in the telemetry packet
@@ -416,6 +441,8 @@ class PropellerAircraft(Aircraft):
     _engine_rumble_is_playing = 0
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
+        if telem_data.get("N") == None:
+            return
         super().on_telemetry(telem_data)
     
         wind = telem_data.get("Wind", (0,0,0))
@@ -581,9 +608,9 @@ class JetAircraft(Aircraft):
             effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity,0, effect_index).start()
             effects["je_rumble_2_1"].periodic(rt_freq2, intensity, 90, effect_index, phase=phase_offset).start()
             effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
-            logging.debug(f"RPM={jet_eng_rpm}")
-            logging.debug(f"Intensty={intensity}")
-            logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
+            # logging.debug(f"RPM={jet_eng_rpm}")
+            # logging.debug(f"Intensty={intensity}")
+            # logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
             self._jet_rumble_is_playing = 1
         elif jet_eng_rpm == 0:
             # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
@@ -595,35 +622,11 @@ class JetAircraft(Aircraft):
         # except:
         #    logging.error("Error playing Afterburner effect")
 
-    #    def _calculate_ab_effect(self, intensity, min_throt, max_throt, eng1, eng2=-1):
- #        eng1_intensity = 0
- #        eng2_intensity = 0
- #        effect_factor = 1
- #        if eng1 < min_throt and eng2 < min_throt:
- #            return 0
- #        # Determine if calling aircraft is single or multi-engine (eng2 will be -1 if eng2 argument was not sent)
- #        if eng2 == -1:
- #            percentage1 = (eng1 - min_throt) / (max_throt - min_throt)
- #            eng1_intensity = intensity * (0.1 + (0.9 * percentage1))
- #            return eng1_intensity
- #
- #        # If twin-engine, and only one engine is above the afterburner threshold, we will return 80% of the highest engine's calculated intensity
- #        # Else we will return 100% of the highest engine's calculated intensity
- #        if eng1 < min_throt or eng2 < min_throt:
- #            effect_factor = 0.6
- #
- #        # Calculate both effect factors
- #        percentage1 = (eng1 - min_throt) / (max_throt - min_throt)
- #        eng1_intensity = intensity * (0.1 + (0.9 * percentage1))
- #
- #        percentage2 = (eng2 - min_throt) / (max_throt - min_throt)
- #        eng2_intensity = intensity * (0.1 + (0.9 * percentage2))
- #        #return highest throttle setting to use for intensity
- #        return max(eng1_intensity, eng2_intensity) * effect_factor
- # #_calculate_ab_effect(0.3, .8, 1.0, .5, .5)
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
+        if telem_data.get("N")== None:
+            return
         super().on_telemetry(telem_data)
 
         if self.afterburner_effect_intensity > 0:
@@ -692,36 +695,134 @@ class Helicopter(Aircraft):
     etl_start_speed = 6.0 # m/s
     etl_stop_speed = 22.0 # m/s
     etl_effect_intensity = 0.2 # [ 0.0 .. 1.0]
-    etl_shake_frequency = 14.0
+    etl_shake_frequency = 14.0 # value has been deprecated in favor of rotor RPM calculation
     overspeed_shake_start = 70.0 # m/s
     overspeed_shake_intensity = 0.2
+    heli_engine_rumble_intensity = 0.12
 
     def _calc_etl_effect(self, telem_data):
+        blade_ct = 2
+      #  rotor = 245
+        mod = telem_data.get("N")
         tas = telem_data.get("TAS", 0)
+        WoW = sum(telem_data.get("WeightOnWheels"))
+        if mod == "UH-60L":
+            # UH60 always shows positive value for tailwheel
+            WoW = telem_data.get("WeightOnWheels")[0] + telem_data.get("WeightOnWheels")[2]
+        rotor = telem_data.get("RotorRPM")
+        if WoW > 0:
+            # logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
+            return
+        if "UH=1H" in mod:
+            blade_ct = 2
+        elif "KA-50" in mod:
+            blade_ct = 3
+        elif "Mi-8MT" in mod:
+            blade_ct = 5
+        elif "Mi-24P" in mod:
+            blade_ct = 5
+        elif "AH-64" in mod:
+            blade_ct = 2
+            rotor = 245 # Apache does not have exportable data related to Rotor RPM
+        elif "UH-60L" in mod:
+            blade_ct = 4
+        elif "SA342" in mod:
+            blade_ct = 3
+        else:
+            blade_ct = 2
+            rotor = 250
+       # logging.debug(f"rotor is now {rotor}")
+
+        if rotor:
+            self.etl_shake_frequency = (rotor/60) * blade_ct
+
         etl_mid = (self.etl_start_speed + self.etl_stop_speed)/2.0
 
-        if tas < etl_mid and tas > self.etl_start_speed:
-            shake = utils.scale_clamp(tas, (self.etl_start_speed, etl_mid), (0.0, self.etl_effect_intensity))
-        elif tas >= etl_mid and tas < self.etl_stop_speed:
-            shake = utils.scale_clamp(tas, (etl_mid, self.etl_stop_speed), (self.etl_effect_intensity, 0.0))
-        elif tas > self.overspeed_shake_start:
-            shake = utils.scale_clamp(tas, (self.overspeed_shake_start, self.overspeed_shake_start+20), (0, self.overspeed_shake_intensity))
+        if tas >= self.etl_start_speed and tas <= self.etl_stop_speed:
+            shake = self.etl_effect_intensity * utils.gaussian_scaling(tas, self.etl_start_speed, self.etl_stop_speed, peak_percentage=0.5, curve_width=0.55)
+           # logging.debug(f"Gaussian Scaling calc = {shake}")
+           #  logging.debug(f"Playing ETL shake (freq = {self.etl_shake_frequency}, intens= {shake})")
+
+        elif tas >= self.overspeed_shake_start:
+            shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start, self.overspeed_shake_start+15, curvature=.7)
+            #shake = utils.scale_clamp(tas, (self.overspeed_shake_start, self.overspeed_shake_start+20), (0, self.overspeed_shake_intensity))
+            # logging.debug(f"Overspeed shake (freq = {self.etl_shake_frequency}, intens= {shake}) ")
         else:
             shake = 0
 
         #telem_data["dbg_shake"] = shake
 
         if shake:
-            effects["etlX"].periodic(self.etl_shake_frequency, shake, 45).start()
+            effects["etlY"].periodic(self.etl_shake_frequency, shake, 0).start()
+            effects["etlX"].periodic(self.etl_shake_frequency+4, shake, 90).start()
             #effects["etlY"].periodic(12, shake, 0).start()
         else:
             effects["etlX"].stop()
+            effects["etlY"].stop()
             #effects["etlY"].stop()
 
+    def _update_heli_engine_rumble(self, telem_data):
+        rrpm = telem_data.get("RotorRPM")
+        blade_ct = 2
+        mod = telem_data.get("N")
+        tas = telem_data.get("TAS", 0)
+        #rotor = telem_data.get("RotorRPM")
+        if "UH=1H" in mod:
+            blade_ct = 2
+        elif "KA-50" in mod:
+            blade_ct = 2
+        elif "Mi-8MT" in mod:
+            blade_ct = 5
+        elif "Mi-24P" in mod:
+            blade_ct = 5
+        elif "AH-64" in mod:
+            blade_ct = 2
+            rrpm = 245
+        elif "UH-60L" in mod:
+            blade_ct = 4
+        elif "SA342" in mod:
+            blade_ct = 2
+        else:
+            blade_ct = 2
+            rrpm = 250
+
+        frequency = float(rrpm) / 45 * blade_ct
+
+        # frequency = 20
+        median_modulation = 2
+        modulation_pos = 2
+        modulation_neg = 1
+        frequency2 = frequency + median_modulation
+        precision = 2
+        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg,
+                                                      median_modulation + modulation_pos, precision, time_period=3)
+        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg,
+                                                      median_modulation + modulation_pos, precision, time_period=5)
+        if frequency > 0 or self._engine_rumble_is_playing:
+            #rumble_intensity = 0.12
+            # logging.debug(f"Current Engine Rumble Intensity = {self.heli_engine_rumble_intensity}")
+
+            effects["rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity*.5, 0).start()  # vib on X axis
+            #effects["rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X axis
+            effects["rpm1-1"].periodic(frequency2, self.heli_engine_rumble_intensity*.5, 90).start()  # vib on Y axis
+            #effects["rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensit, 90).start()  # vib on Y axis
+            self._engine_rumble_is_playing = 1
+        else:
+            self._engine_rumble_is_playing = 0
+            effects.dispose("rpm0-1")
+            #effects.dispose("rpm0-2")
+            effects.dispose("rpm1-1")
+            #effects.dispose("rpm1-2")
+
     def on_telemetry(self, telem_data):
+        self.speedbrake_motion_intensity = 0.0
+        # logging.debug(f"Speedbrake === {Helicopter.speedbrake_motion_intensity}")
+        if telem_data.get("N") == None:
+            return
         super().on_telemetry(telem_data)
 
         self._calc_etl_effect(telem_data)
+        self._update_heli_engine_rumble(telem_data)
 
 
 class TF51D(PropellerAircraft):
