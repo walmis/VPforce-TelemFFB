@@ -16,6 +16,11 @@ Also this early version is very bare-bones and community-driven development is v
 - Helicopter effective translational lift (ETL) effects.
 - Shows a debug window that displays the received telemetry data.
 
+## Executable Versions
+If you are not git-savy or simply dont want to deal with python, git, and cloning repositories and would rather just use an all-in-one executable distribution...
+
+- The main (stable) branch release version is available here:   https://github.com/walmis/VPforce-TelemFFB/releases
+- The development (possibly unstable) branch auto-builds are available here after each commit to the repository: https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A
 ## Development
 
 - This framework is made to be very easy to manage FFB effect lifecycles and develop additional effects or specialize specific aircraft effects.
