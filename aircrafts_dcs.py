@@ -89,6 +89,7 @@ class Aircraft(AircraftBase):
     #### Beta effects - set to 1 to enable
     gforce_effect_enable = 0
     gforce_effect_enable_areyoureallysure = 0
+    gforce_effect_curvature = 2.2
     gforce_effect_max_intensity = 1.0
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
@@ -151,7 +152,8 @@ class Aircraft(AircraftBase):
             effects.dispose("gforce")
             effects.dispose("gforce_damper")
             return
-        g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 3)
+        #g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 4)
+        g_factor = round(utils.non_linear_scaling(z_gs, gmin, gmax, curvature=self.gforce_effect_curvature),4)
         g_factor = utils.clamp(g_factor, 0.0, 1.0)
         effects["gforce"].constant(g_factor, 180).start()
       #  effects["gforce_damper"].damper(coef_y=1024).start()
