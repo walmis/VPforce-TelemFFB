@@ -22,11 +22,23 @@ from ctypes import byref, cast, sizeof
 from time import sleep
 from pprint import pprint
 import sys
+import logging
 import utils
+from typing import List, Dict
 from utils import clamp, HighPassFilter, Derivative, Dispenser
 
 from ffb_rhino import HapticEffect, FFBReport_SetCondition
 from aircraft_base import AircraftBase
+
+# by accessing effects dict directly new effects will be automatically allocated
+# example: effects["myUniqueName"]
+effects : Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
+
+# Highpass filter dispenser
+HPFs : Dict[str, utils.HighPassFilter]  = utils.Dispenser(utils.HighPassFilter)
+
+# Lowpass filter dispenser
+LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 
 hpf = Dispenser(HighPassFilter)
 
@@ -71,87 +83,100 @@ class Aircraft(AircraftBase):
         #scale the dynamic pressure to ffb friendly values
         self.dyn_pressure_scale = 0.005
 
+        self.flaps_motion_intensity: float = 0.12  # peak vibration intensity when flaps are moving, 0 to disable
+        self.flaps_buffet_intensity: float = 0.0  # peak buffeting intensity when flaps are deployed,  0 to disable
+
     def on_timeout(self):
         pass
+    def _update_flight_controls(self, data):
+        # calculations loosely based on FLightGear FFB page:
+        # https://wiki.flightgear.org/Force_feedback
+        # https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
 
-    def on_telemetry(self, data):
-		# calculations loosely based on FLightGear FFB page: 
-		# https://wiki.flightgear.org/Force_feedback
-		# https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
+        rudder_angle = data["RudderDefl"] * rad  # + trim?
 
-        rudder_angle = data["RudderDefl"]*rad # + trim?
+        # print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
 
-        #print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
+        slip_angle = data["SideSlip"] * rad
+        g_force = data["G"] - 1
 
-        slip_angle = data["SideSlip"]*rad
-        g_force = data["G"]-1
+        # calculate air flow velocity exiting the prop
+        # based on https://www.grc.nasa.gov/www/k-12/airplane/propth.html
 
-        #calculate air flow velocity exiting the prop
-        #based on https://www.grc.nasa.gov/www/k-12/airplane/propth.html
-        
         incidence_vec = utils.Vector(data["VelX"], data["VelY"], data["VelZ"])
         wind_vec = utils.Vector(data["AmbWindX"], data["AmbWindY"], data["AmbWindZ"])
         incidence_vec = incidence_vec - wind_vec
-        incidence_vec = incidence_vec.rotY(-(data["Heading"]*rad))
-        incidence_vec = incidence_vec.rotX(-data["Pitch"]*rad)
-        incidence_vec = incidence_vec.rotZ(-data["Roll"]*rad)
+        incidence_vec = incidence_vec.rotY(-(data["Heading"] * rad))
+        incidence_vec = incidence_vec.rotX(-data["Pitch"] * rad)
+        incidence_vec = incidence_vec.rotZ(-data["Roll"] * rad)
         _airspeed = incidence_vec.z
 
-        _prop_air_vel = math.sqrt(2*data["PropThrust1"] / (data["AirDensity"] * (math.pi*(self.prop_diameter/2)**2)) + _airspeed**2 )
+        _prop_air_vel = math.sqrt(
+            2 * data["PropThrust1"] / (data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
 
         if abs(incidence_vec.y) > 0.5 and _prop_air_vel > 1:
-            _elevator_aoa = math.atan2(-incidence_vec.y, _prop_air_vel)*deg
+            _elevator_aoa = math.atan2(-incidence_vec.y, _prop_air_vel) * deg
         else:
             _elevator_aoa = 0
-            
 
         data["Incidence"] = [incidence_vec.x, incidence_vec.y, incidence_vec.z]
 
         # calculate dynamic pressure based on air flow from propeller
         # elevator_prop_flow_ratio defines how much prop wash the elevator receives
-        _elev_dyn_pressure = utils.mix(data["DynPressure"], 0.5 * data["AirDensity"] * _prop_air_vel**2, self.elevator_prop_flow_ratio) * self.dyn_pressure_scale
-        
-        #scale dynamic pressure to FFB friendly values
+        _elev_dyn_pressure = utils.mix(data["DynPressure"], 0.5 * data["AirDensity"] * _prop_air_vel ** 2,
+                                       self.elevator_prop_flow_ratio) * self.dyn_pressure_scale
+
+        # scale dynamic pressure to FFB friendly values
         _dyn_pressure = data["DynPressure"] * self.dyn_pressure_scale
 
         slip_gain = 1.0 - self.slip_gain * math.sin(slip_angle)
         data["_slip_gain"] = slip_gain
 
-		# increasing G force causes increase in elevator droop effect
+        # increasing G force causes increase in elevator droop effect
         _elevator_droop_term = self.elevator_droop_moment * g_force / (1 + _elev_dyn_pressure)
         data["_elevator_droop_term"] = _elevator_droop_term
 
-        
         aileron_coeff = _dyn_pressure * self.aileron_gain * slip_gain
 
-		# add data to telemetry packet so they become visible in the GUI output
-        data["_prop_air_vel"] = _prop_air_vel 
+        # add data to telemetry packet so they become visible in the GUI output
+        data["_prop_air_vel"] = _prop_air_vel
         data["_elev_dyn_pressure"] = _elev_dyn_pressure
 
         elevator_coeff = (_elev_dyn_pressure) * self.elevator_gain * slip_gain
+        # a, b, c = 0.5, 0.3, 0.1
+        # elevator_coeff = a * (_elev_dyn_pressure ** 2) + b * _elev_dyn_pressure * self.elevator_gain + c * slip_gain
+
         data["_elev_coeff"] = elevator_coeff
         data["_aile_coeff"] = aileron_coeff
 
-        _aoa_term =  math.sin(_elevator_aoa*rad) * self.aoa_gain
+        _aoa_term = math.sin(_elevator_aoa * rad) * self.aoa_gain
         data["_aoa_term"] = _aoa_term
         data["_G_term"] = (self.g_force_gain * g_force)
 
-        hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
-        data["_hpf_pitch_acc"] = hpf_pitch_acc # test stuff
+        #       hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
+        #       data["_hpf_pitch_acc"] = hpf_pitch_acc # test stuff
 
-        self.spring_y.positiveCoefficient = clamp(int(4096*elevator_coeff), 0, 4096)
+        self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), 0, 4096)
+        # logging.debug(f"Elev Coeef: {elevator_coeff}")
         self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
-        self.spring_y.cpOffset = 0 #-clamp(int(4096*elevator_offs), -4096, 4096)
+        self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
 
-        self.spring_x.positiveCoefficient = clamp(int(4096*aileron_coeff), 0, 4096)
+        self.spring_x.positiveCoefficient = clamp(int(4096 * aileron_coeff), 0, 4096)
         self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
 
-		# update spring data
+        # update spring data
         self.spring.effect.setCondition(self.spring_y)
         self.spring.effect.setCondition(self.spring_x)
 
-		# update constant forces
-        #self.const_y.constant( clamp(self.hpf_pitch(-data["PitchRate"])*0.1, -0.1, 0.1), 0).start()
-        self.const_y.constant( clamp(- _elevator_droop_term + data["_aoa_term"] - data["_G_term"] , -1, 1), 0).start()
+        # update constant forces
+        # self.const_y.constant( clamp(self.hpf_pitch(-data["PitchRate"])*0.1, -0.1, 0.1), 0).start()
+        self.const_y.constant(clamp(- _elevator_droop_term + data["_aoa_term"] - data["_G_term"], -1, 1), 0).start()
 
         rudder_angle = rudder_angle - slip_angle
+
+
+    def on_telemetry(self, data):
+        self._update_flight_controls(data)
+        self._update_flaps(data.get("Flaps"))
+        # flsp = data.get("Flaps")
+        # logging.debug(f"Flaps:{flsp}")

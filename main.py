@@ -473,7 +473,7 @@ def main():
     manager.telemetryReceived.connect(window.update_telemetry)
 
     sc = SimConnectSock()
-    #sc.start()
+    sc.start()
 
 
     app.exec_()

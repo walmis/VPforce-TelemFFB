@@ -100,7 +100,8 @@ class SimConnectManager(threading.Thread):
         SimVar("VelX", "VELOCITY WORLD X", "meter/second"),
         SimVar("VelY", "VELOCITY WORLD Y", "meter/second"),
         SimVar("VelZ", "VELOCITY WORLD Z", "meter/second"),
-        SimVarArray("WeightOnWheels", "CONTACT POINT COMPRESSION", "Number", min=0, max=2)
+        SimVarArray("WeightOnWheels", "CONTACT POINT COMPRESSION", "Number", min=0, max=2),
+        SimVar("Flaps", "TRAILING EDGE FLAPS LEFT PERCENT", "Percent Over 100")
     ]
     
     def __init__(self):

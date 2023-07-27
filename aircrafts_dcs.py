@@ -342,15 +342,15 @@ class Aircraft(AircraftBase):
             effects.dispose("gearbuffet")
             effects.dispose("gearbuffet2")
          
-    def _update_flaps(self):
-        flapspos = self._telem_data.get("flaps_value", 0)
-        if self.has_changed("flaps_value", 50):
-            logging.debug(f"Flaps Pos: {flapspos}")
-            effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, 0, 3).start()
-            #effects["flapsmovement2"].periodic(150, self.flaps_motion_intensity, 45, 3, phase=120).start()
-        else:
-            effects.dispose("flapsmovement")
-            #effects.dispose("flapsmovement2")
+    # def _update_flaps(self):
+    #     flapspos = self._telem_data.get("flaps_value", 0)
+    #     if self.has_changed("flaps_value", 50):
+    #         logging.debug(f"Flaps Pos: {flapspos}")
+    #         effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, 0, 3).start()
+    #         #effects["flapsmovement2"].periodic(150, self.flaps_motion_intensity, 45, 3, phase=120).start()
+    #     else:
+    #         effects.dispose("flapsmovement")
+    #         #effects.dispose("flapsmovement2")
     
     def _update_canopy(self):
         canopypos = self._telem_data.get("canopy_value", 0)
@@ -384,7 +384,7 @@ class Aircraft(AircraftBase):
         if self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0:
             self._update_landing_gear()
         if self.flaps_motion_intensity > 0:
-            self._update_flaps()
+            self._update_flaps(telem_data.get("Flaps"))
         if self.canopy_motion_intensity > 0:
             self._update_canopy()
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
