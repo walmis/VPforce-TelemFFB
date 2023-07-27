@@ -24,11 +24,8 @@ import utils
 import logging
 import random
 from aircraft_base import AircraftBase
-# from PyQt5.QtWidgets import QPushButton
-#
-# from effect_settings import periodic_effect_index
-periodic_effect_index = 4
-logging.debug(f"Read HapticEffectIndex from ffb_rhino")
+
+
 
 #unit conversions (to m/s)
 knots = 0.514444
@@ -86,7 +83,6 @@ class Aircraft(AircraftBase):
     jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
     ####
-    
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
 
@@ -96,273 +92,10 @@ class Aircraft(AircraftBase):
         for e in effects.values(): e.destroy()
         effects.clear()
 
-    #effect_index_set = 4
-    # def incr_clicked():
-    #     if Aircraft.effect_index_set == 7:
-    #         Aircraft.effect_index_set = 3
-    #         logging.debug("Resetting Effect Index to 3")
-    #         return
-    #     Aircraft.effect_index_set += 1
-    #     print("INCR button clicked!")
-    #
-    # def decr_clicked():
-    #     if Aircraft.effect_index_set == 3:
-    #         Aircraft.effect_index_set = 7
-    #         logging.debug("Resetting Effect Index to 7")
-    #         return
-    #     Aircraft.effect_index_set -= 1
-    #     print("DECR button clicked!")
-    # def add_button_to_main_window(main_window):
-    #     # Create a button
-    #     button = QPushButton("Increment")
-    #     button.clicked.connect(Aircraft.incr_clicked)
-    #     main_window.layout().addWidget(button)
-
-    # def add_button2_to_main_window(main_window):
-    #     # Create a button
-    #     button = QPushButton("Decrement")
-    #     button.clicked.connect(Aircraft.decr_clicked)
-    #     main_window.layout().addWidget(button)
-
         self.spring = HapticEffect().spring()
         #self.spring.effect.effect_id = 5
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
-
-
-    def _decel_effect(self, telem_data):
-        x_gs = telem_data.get("ACCs")[0]
-        if not self.anything_has_changed("decel", x_gs):
-            # logging.debug("nothing changed.,....")
-            return
-        if not sum(telem_data.get("WeightOnWheels")):
-            return
-        max_gs = self.deceleration_max_force
-        if x_gs < -0.03:
-            if effects["runway0"].started:
-                effects.dispose("runway0")
-                # logging.debug("disposing runway effect")
-            if abs(x_gs) > max_gs:
-                x_gs = -max_gs
-            # logging.debug(f"x_gs = {x_gs}")
-            effects["decel_x"].constant(abs(x_gs), 180).start()
-        else:
-            effects.dispose("decel_x")
-    def _calc_buffeting(self, aoa, speed) -> tuple:
-        """Calculate buffeting amount and frequency
-
-        :param aoa: Angle of attack in degrees
-        :type aoa: float
-        :param speed: Airspeed in m/s
-        :type speed: float
-        :return: Tuple (freq_hz, magnitude)
-        :rtype: tuple
-        """
-        if not self.buffeting_intensity:
-            return (0, 0)
-        max_airflow_speed = 70 # speed at which airflow_factor is 1.0
-        airflow_factor = utils.scale_clamp(speed, (0, max_airflow_speed), (0, 1.0))
-        buffeting_factor = utils.scale_clamp(aoa, (self.buffet_aoa, self.stall_aoa), (0.0, 1.0))
-        #todo calc frequency
-        return (13.0, airflow_factor * buffeting_factor * self.buffeting_intensity)
-              
-
-    def _update_runway_rumble(self, telem_data):
-        """Add wheel based rumble effects for immersion
-        Generates bumps/etc on touchdown, rolling, field landing etc
-        """
-        if self.runway_rumble_intensity:
-            WoW = telem_data.get("WeightOnWheels", (0,0,0)) # left, nose, right - wheels
-            # get high pass filters for wheel shock displacement data and update with latest data
-            hp_f_cutoff_hz = 3
-            v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[1])) * self.runway_rumble_intensity
-            v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[0]-WoW[2]) * self.runway_rumble_intensity
-            
-            v1 = utils.clamp_minmax(v1, 0.5)
-            v2 = utils.clamp_minmax(v2, 0.5)
-
-            # modulate constant effects for X and Y axis
-            # connect Y axis to nosewheel, X axis to the side wheels
-            tot_weight = sum(WoW)
-
-            if telem_data.get("T", 0) > 2: # wait a bit for data to settle
-                if tot_weight:
-                    # logging.info(f"v1 = {v1}")
-                    effects["runway0"].constant(v1, 0).start()
-                    # logging.info(f"v2 = {v2}")
-                    effects["runway1"].constant(v2, 90).start()
-                else:
-                    effects.dispose("runway0")
-                    effects.dispose("runway1")
-
-    def _update_buffeting(self, telem_data : dict):
-        aoa = telem_data.get("AoA", 0)
-        tas = telem_data.get("TAS", 0)
-        agl = telem_data.get("altAgl", 0)
-
-        freq, mag = self._calc_buffeting(aoa, tas)
-        # manage periodic effect for buffeting
-        if mag:
-            effects["buffeting"].periodic(freq, mag, utils.RandomDirectionModulator).start()
-            #effects["buffeting2"].periodic(freq, mag, 45, phase=120).start()
-
-        telem_data["dbg_buffeting"] = mag # save debug value
-
-    def _update_drag_buffet(self, telem_data : dict, type : str):
-            drag_buffet_threshold = 100     #indicated TAS via telemetry
-            tas = telem_data.get("TAS", 0)
-            if tas < drag_buffet_threshold:
-                return 0
-
-    def _update_cm_weapons(self, telem_data):
-        if self.has_changed("PayloadInfo"):
-            effects["cm"].stop()
-            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
-            if self.weapon_effect_direction == -1:
-                #Init random number for effect direction
-                random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start()
-            else:
-                effects["cm"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction, duration=80).start()
-
-        if self.has_changed("Gun") or self.has_changed("CannonShells"):
-            effects["cm"].stop()
-            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
-            if self.weapon_effect_direction == -1:
-                #Init random number for effect direction
-                random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start()
-            else:
-                effects["cm"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction, duration=80).start()
-        
-        if self.has_changed("Flares") or self.has_changed("Chaff"):
-            effects["cm"].stop()
-            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
-            if self.weapon_effect_direction == -1:
-                #Init random number for effect direction
-                random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start()
-            else:
-                effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start()
-  
-            
-    def _update_landing_gear(self):
-        gearpos = self._telem_data.get("gear_value", 0)
-        if self.has_changed("gear_value", 50):
-            #logging.debug(f"Landing Gear Pos: {gearpos}")
-            effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
-            #effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 45, 3, phase=120).start()
-
-    def _update_speed_brakes(self, spd_thresh=70):
-        tas = self._telem_data.get("TAS",0)
-
-        spdbrk = self._telem_data.get("speedbrakes_value", 0)
-        if self.has_changed("speedbrakes_value", 50):
-            #logging.debug(f"Speedbrake Pos: {spdbrk}")
-            effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, 0, 3).start()
-        else:
-            effects.dispose("speedbrakemovement")
-
-        if tas > spd_thresh and spdbrk > .1:
-            #calculate insensity based on deployment percentage
-            realtime_intensity = self.speedbrake_buffet_intensity * spdbrk
-            effects["speedbrakebuffet"].periodic(13, realtime_intensity, 0, 4).start()
-            effects["speedbrakebuffet2"].periodic(13, realtime_intensity, 45, 4).start()
-           # logging.debug(f"PLAYING SPEEDBRAKE RUMBLE intensity:{realtime_intensity}")
-        else:
-            effects.dispose("speedbrakebuffet")
-            effects.dispose("speedbrakebuffet2")
-
-    def _update_spoiler(self, spd_thresh_low=25, spd_thresh_hi=60):
-        tas = self._telem_data.get("TAS",0)
-        tas_intensity = utils.clamp_minmax(utils.scale(tas, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
-
-        spoiler = self._telem_data.get("Spoilers", 0)
-        if spoiler == 0:
-            return
-        #average all spoiler values together
-        if type(spoiler) == list:
-            if "F-14" in self._telem_data.get("N"):
-                #give %85 weight to inner spoilers for intensity calculation
-                spoiler_inner = (spoiler[1], spoiler[2])
-                spoiler_outer = (spoiler[0], spoiler[3])
-                spoiler = (0.85 * sum(spoiler_inner) + 0.15 * sum(spoiler_outer)) / 2
-            else:
-                spoiler = sum(spoiler) / len(spoiler)
-
-        if self.spoiler_motion_intensity > 0:
-            if self.has_changed("Spoilers", 15):
-                logging.debug(f"Spoilers Pos: {spoiler}")
-                effects["spoilermovement"].periodic(118, self.spoiler_motion_intensity, 0, 4).start()
-                effects["spoilermovement2"].periodic(118, self.spoiler_motion_intensity, 90, 4).start()
-            else:
-                effects.dispose("spoilermovement")
-                effects.dispose("spoilermovement2")
-
-        if tas > spd_thresh_low and spoiler > .1:
-            #calculate insensity based on deployment percentage
-            realtime_intensity = self.spoiler_buffet_intensity * spoiler * tas_intensity
-            logging.debug(f"PLAYING SPOILER RUMBLE | intensity: {realtime_intensity}, d-factor: {spoiler}, s-factor: {tas_intensity}")
-            effects["spoilerbuffet1-1"].periodic(15, realtime_intensity, 0, 4).start()
-            effects["spoilerbuffet1-2"].periodic(16, realtime_intensity, 0, 4).start()
-            effects["spoilerbuffet2-1"].periodic(14, realtime_intensity, 90, 4).start()
-            effects["spoilerbuffet2-2"].periodic(18, realtime_intensity, 90, 4).start()
-        else:
-            effects.dispose("spoilerbuffet1-1")
-            effects.dispose("spoilerbuffet1-2")
-            effects.dispose("spoilerbuffet2-1")
-            effects.dispose("spoilerbuffet2-2")
-
-    def _update_landing_gear(self, spd_thresh_low=100, spd_thresh_high=150):
-        gearpos = self._telem_data.get("gear_value", 0)
-
-        tas =  self._telem_data.get("TAS", 0)
-        if self.has_changed("gear_value", 50):
-            #logging.debug(f"Landing Gear Pos: {gearpos}")
-            effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
-            effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 45, 3, phase=120).start()
-        else:
-            #data has reached 20 consecutive calls with no data, destroy effects, reset counter to 0
-            effects.dispose("gearmovement")
-            effects.dispose("gearmovement2")
-
-        if tas > spd_thresh_low and gearpos > .1:
-            #calculate insensity based on deployment percentage
-            #intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
-
-            realtime_intensity = utils.scale(tas, (spd_thresh_low, spd_thresh_high), (0, self.gear_buffet_intensity)) * gearpos
-
-            effects["gearbuffet"].periodic(13, realtime_intensity, 0, 3).start()
-            effects["gearbuffet2"].periodic(13, realtime_intensity, 90, 3).start()
-            logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
-        else:
-            effects.dispose("gearbuffet")
-            effects.dispose("gearbuffet2")
-         
-    # def _update_flaps(self):
-    #     flapspos = self._telem_data.get("flaps_value", 0)
-    #     if self.has_changed("flaps_value", 50):
-    #         logging.debug(f"Flaps Pos: {flapspos}")
-    #         effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, 0, 3).start()
-    #         #effects["flapsmovement2"].periodic(150, self.flaps_motion_intensity, 45, 3, phase=120).start()
-    #     else:
-    #         effects.dispose("flapsmovement")
-    #         #effects.dispose("flapsmovement2")
-    
-    def _update_canopy(self):
-        canopypos = self._telem_data.get("canopy_value", 0)
-        if self.has_changed("canopy_value", 50):
-            logging.debug(f"Canopy Pos: {canopypos}")
-            effects["canopymovement"].periodic(120, self.canopy_motion_intensity, 0, 3).start()
-            #effects["canopymovement2"].periodic(150, self.canopy_motion_intensity, 45, 3, phase=120).start()
-        else:
-            effects.dispose("canopymovement")
-            #effects.dispose("canopymovement2")
-            
-
 
     def on_telemetry(self, telem_data : dict):
         """when telemetry frame is received, aircraft class receives data in dict format
@@ -370,6 +103,8 @@ class Aircraft(AircraftBase):
         :param new_data: New telemetry data
         :type new_data: dict
         """
+        if not "AircraftClass" in telem_data:
+            telem_data["AircraftClass"] = "Aircraft"
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
@@ -378,48 +113,18 @@ class Aircraft(AircraftBase):
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
-        #logging.debug(f"speedbrake== {self.speedbrake_motion_intensity}")
         if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
-            self._update_speed_brakes()
+            self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
         if self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0:
-            self._update_landing_gear()
+            self._update_landing_gear(telem_data.get("gear_value"), telem_data.get("TAS"))
         if self.flaps_motion_intensity > 0:
             self._update_flaps(telem_data.get("Flaps"))
         if self.canopy_motion_intensity > 0:
-            self._update_canopy()
+            self._update_canopy(telem_data.get("Canopy"))
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-            self._update_spoiler()
-            
-        # if stick position data is in the telemetry packet
-        if "StickX" in telem_data and "StickY" in telem_data:
-            x, y = HapticEffect.device.getInput()
-            telem_data["X"] = x
-            telem_data["Y"] = y
+            self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
+        self._update_stick_position(telem_data)
 
-            self.spring_x.positiveCoefficient = 4096
-            self.spring_x.negativeCoefficient = 4096
-            self.spring_y.positiveCoefficient = 4096
-            self.spring_y.negativeCoefficient = 4096
-            
-            # trim signal needs to be slow to avoid positive feedback
-            lp_y = LPFs.get("y", 2)
-            lp_x = LPFs.get("x", 2)
-
-            # estimate trim from real stick position and virtual stick position
-            offs_x = lp_x.update(telem_data['StickX'] - x + lp_x.value)
-            offs_y = lp_y.update(telem_data['StickY'] - y + lp_y.value)
-            self.spring_x.cpOffset = round(offs_x * 4096)
-            self.spring_y.cpOffset = round(offs_y * 4096)
-
-            #upload effect parameters to stick
-            self.spring.effect.setCondition(self.spring_x)
-            self.spring.effect.setCondition(self.spring_y)
-            #ensure effect is started
-            self.spring.start()
-
-            # override DCS input and set our own values           
-            return f"LoSetCommand(2001, {y - offs_y})\n"\
-                   f"LoSetCommand(2002, {x - offs_x})"
 
     def on_timeout(self):
         # stop all effects when telemetry stops
@@ -443,7 +148,9 @@ class PropellerAircraft(Aircraft):
     def on_telemetry(self, telem_data):
         if telem_data.get("N") == None:
             return
+        telem_data["AircraftClass"] = "PropellerAircraft"
         super().on_telemetry(telem_data)
+
     
         wind = telem_data.get("Wind", (0,0,0))
         wnd = math.sqrt(wind[0]**2 + wind[1]**2 + wind[2]**2)
@@ -497,7 +204,7 @@ class PropellerAircraft(Aircraft):
         r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
         if frequency > 0 or self._engine_rumble_is_playing:
             dynamic_rumble_intensity = self._calc_engine_intensity(rpm)
-            logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
+            # logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
 
 
             effects["rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start() # vib on X axis
@@ -524,7 +231,7 @@ class PropellerAircraft(Aircraft):
         min_intensity = self.engine_rumble_highrpm_intensity
         
         rpm_percentage = 1 - ((rpm - min_rpm) / (max_rpm - min_rpm))
-        logging.debug(f"rpm percent: {rpm_percentage}")
+        # logging.debug(f"rpm percent: {rpm_percentage}")
         interpolated_intensity = min_intensity + (max_intensity - min_intensity) * rpm_percentage
         
         return interpolated_intensity
@@ -537,10 +244,7 @@ class JetAircraft(Aircraft):
     _ab_is_playing = 0
     _jet_rumble_is_playing = 0
     engine_rumble = 0
-    def _read_effect_index(self):
-        global periodic_effect_index
-        logging.debug(f"periodic_effect_index: {periodic_effect_index}")
-        
+
     def _update_ab_effect(self, intensity, telem_data):
         frequency = 20
         median_modulation = 2
@@ -565,7 +269,7 @@ class JetAircraft(Aircraft):
             effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
             effects["ab_rumble_2_1"].periodic(frequency2, intensity, 45, 4, phase=120, offset=60).start()
             effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120, offset=60).start()
-            logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
+            # logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
             self._ab_is_playing = 1
         elif afterburner_pos == 0:
             #logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
@@ -627,6 +331,7 @@ class JetAircraft(Aircraft):
     def on_telemetry(self, telem_data):
         if telem_data.get("N")== None:
             return
+        telem_data["AircraftClass"] = "JetAircraft"
         super().on_telemetry(telem_data)
 
         if self.afterburner_effect_intensity > 0:
@@ -819,6 +524,7 @@ class Helicopter(Aircraft):
         # logging.debug(f"Speedbrake === {Helicopter.speedbrake_motion_intensity}")
         if telem_data.get("N") == None:
             return
+        telem_data["AircraftClass"] = "Helicopter"
         super().on_telemetry(telem_data)
 
         self._calc_etl_effect(telem_data)
