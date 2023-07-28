@@ -492,13 +492,8 @@ def main():
             "CRITICAL": logging.CRITICAL,
         }
         logger.setLevel(log_levels.get(ll, logging.DEBUG))
-        logging.info(f"Setting logging level to:{ll}")
-        logging.debug("Test Debug Log")
-        logging.info("Test Info Log")
-        logging.warning("Test Warning Log")
-        logging.error("Test Error Log")
-        logging.critical("Test Critical Log")
-    except: 
+        logging.critical(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
+    except:
         logging.exception(f"Cannot load config {config_path}")
 
 
@@ -511,8 +506,9 @@ def main():
     manager.telemetryReceived.connect(window.update_telemetry)
 
     sc = SimConnectSock()
-    msfs = config["system"].get("msfs_enabled", 0)
-    if msfs == 1:
+    msfs = config["system"].get("msfs_enabled", None)
+    logging.debug(f"MSFS={msfs}")
+    if msfs == "1":
         logging.info("MSFS Enabled in config:  Starting Simconnect Manager")
         sc.start()
 
