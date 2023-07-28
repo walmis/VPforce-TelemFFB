@@ -244,7 +244,7 @@ class AircraftBase(object):
 
     def _update_landing_gear(self, gearpos, tas, spd_thresh_low=100, spd_thresh_high=150):
         # gearpos = self._telem_data.get("gear_value", 0)
-
+        rumble_freq = 10
         # tas =  self._telem_data.get("TAS", 0)
         if self.anything_has_changed("gear_value", gearpos, 50):
             # logging.debug(f"Landing Gear Pos: {gearpos}")
@@ -261,8 +261,8 @@ class AircraftBase(object):
             realtime_intensity = utils.scale(tas, (spd_thresh_low, spd_thresh_high),
                                              (0, self.gear_buffet_intensity)) * gearpos
 
-            effects["gearbuffet"].periodic(13, realtime_intensity, 0, 3).start()
-            effects["gearbuffet2"].periodic(13, realtime_intensity, 90, 3).start()
+            effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, 4).start()
+            effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, 4).start()
             # logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
         else:
             effects.dispose("gearbuffet")
@@ -403,10 +403,8 @@ class AircraftBase(object):
         modulation_neg = 1
         frequency2 = frequency + median_modulation
         precision = 2
-        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=5)
-        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=5)
+        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
         if frequency > 0 or self._engine_rumble_is_playing:
             dynamic_rumble_intensity = self._calc_engine_intensity(rpm)
             # logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
@@ -572,14 +570,12 @@ class AircraftBase(object):
         etl_mid = (self.etl_start_speed + self.etl_stop_speed) / 2.0
 
         if tas >= self.etl_start_speed and tas <= self.etl_stop_speed:
-            shake = self.etl_effect_intensity * utils.gaussian_scaling(tas, self.etl_start_speed, self.etl_stop_speed,
-                                                                       peak_percentage=0.5, curve_width=0.55)
+            shake = self.etl_effect_intensity * utils.gaussian_scaling(tas, self.etl_start_speed, self.etl_stop_speed, peak_percentage=0.5, curve_width=1.0)
         # logging.debug(f"Gaussian Scaling calc = {shake}")
         #  logging.debug(f"Playing ETL shake (freq = {self.etl_shake_frequency}, intens= {shake})")
 
         elif tas >= self.overspeed_shake_start:
-            shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start,
-                                                                              self.overspeed_shake_start + 15,
+            shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start, self.overspeed_shake_start + 15,
                                                                               curvature=.7)
             # shake = utils.scale_clamp(tas, (self.overspeed_shake_start, self.overspeed_shake_start+20), (0, self.overspeed_shake_intensity))
             # logging.debug(f"Overspeed shake (freq = {self.etl_shake_frequency}, intens= {shake}) ")
