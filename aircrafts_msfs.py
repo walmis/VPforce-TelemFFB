@@ -47,10 +47,53 @@ slugft3 = 0.00194032 # SI to slugft3
 rad = 0.0174532925
 ft = 3.28084 # m to ft
 kt = 1.94384 # ms to kt
+kt2ms = 0.514444 #knots to m/s
 
 class Aircraft(AircraftBase):
+    """Base class for Aircraft based FFB"""
+    ####
+    #### Beta effects - set to 1 to enable
+    deceleration_effect_enable = 0
+    deceleration_effect_enable_areyoureallysure = 0
+    deceleration_max_force = 0.5
+    ###
+    buffeting_intensity: float = 0.2  # peak AoA buffeting intensity  0 to disable
+    buffet_aoa: float = 10.0  # AoA when buffeting starts
+    stall_aoa: float = 15.0  # Stall AoA
+
+    engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
+
+    runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
+
+    gun_vibration_intensity: float = 0.12  # peak gunfire vibration intensity, 0 to disable
+    cm_vibration_intensity: float = 0.12  # peak countermeasure release vibration intensity, 0 to disable
+    weapon_release_intensity: float = 0.12  # peak weapon release vibration intensity, 0 to disable
+    weapon_effect_direction: int = 45  # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
+
+    speedbrake_motion_intensity: float = 0.12  # peak vibration intensity when speed brake is moving, 0 to disable
+    speedbrake_buffet_intensity: float = 0.15  # peak buffeting intensity when speed brake deployed,  0 to disable
+
+    spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
+    spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
+
+    gear_motion_intensity: float = 0.12  # peak vibration intensity when gear is moving, 0 to disable
+    gear_buffet_intensity: float = 0.15  # peak buffeting intensity when gear down during flight,  0 to disable
+
+    flaps_motion_intensity: float = 0.12  # peak vibration intensity when flaps are moving, 0 to disable
+    flaps_buffet_intensity: float = 0.0  # peak buffeting intensity when flaps are deployed,  0 to disable
+
+    canopy_motion_intensity: float = 0.12  # peak vibration intensity when canopy is moving, 0 to disable
+    canopy_buffet_intensity: float = 0.0  # peak buffeting intensity when canopy is open during flight,  0 to disable
+
+    afterburner_effect_intensity = 0.2  # peak intensity for afterburner rumble effect
+    jet_engine_rumble_intensity = 0.12  # peak intensity for jet engine rumble effect
+    jet_engine_rumble_freq = 45  # base frequency for jet engine rumble effect (Hz)
+
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
+        # clear any existing effects
+        for e in effects.values(): e.destroy()
+        effects.clear()
         self.spring = HapticEffect().spring()
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
@@ -83,11 +126,16 @@ class Aircraft(AircraftBase):
         #scale the dynamic pressure to ffb friendly values
         self.dyn_pressure_scale = 0.005
 
-        self.flaps_motion_intensity: float = 0.12  # peak vibration intensity when flaps are moving, 0 to disable
-        self.flaps_buffet_intensity: float = 0.0  # peak buffeting intensity when flaps are deployed,  0 to disable
+
 
     def on_timeout(self):
-        pass
+        super().on_timeout()
+        logging.debug("Timeout, preparing to stop effects")
+        effects.clear()
+        for e in effects.values():
+            logging.debug(f"Timeout effect: {e}")
+            e.stop()
+
     def _update_flight_controls(self, data):
         # calculations loosely based on FLightGear FFB page:
         # https://wiki.flightgear.org/Force_feedback
@@ -177,6 +225,10 @@ class Aircraft(AircraftBase):
 
     def on_telemetry(self, data):
         self._update_flight_controls(data)
-        self._update_flaps(data.get("Flaps"))
-        # flsp = data.get("Flaps")
-        # logging.debug(f"Flaps:{flsp}")
+        if self.flaps_motion_intensity > 0:
+            logging.debug(f"Flaps: {self.flaps_motion_intensity}")
+            self._update_flaps(data.get("Flaps"))
+        if self.gear_motion_intensity > 0:
+            self._update_landing_gear(data.get("Gear"), data.get("TrueAirspeed"), spd_thresh_low=130*kt2ms, spd_thresh_high=200*kt2ms)
+
+
