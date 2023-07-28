@@ -19,14 +19,37 @@ import json
 import logging
 import sys
 import time
-sys.path.insert(0, '') 
+import os
+sys.path.insert(0, '')
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    stream=sys.stdout,
-)
+log_folder = './log'
+
+if not os.path.exists(log_folder):
+    os.makedirs(log_folder)
+
+log_file = os.path.join(log_folder, 'TelemFFB.log')
+
+# Create a logger instance
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+# Create a formatter for the log messages
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+# Create a StreamHandler to log messages to the console
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+
+# Create a FileHandler to log messages to the log file
+file_handler = logging.FileHandler(log_file, mode='w')
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(formatter)
+
+# Add the handlers to the logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+
 
 import re
   
@@ -460,6 +483,21 @@ def main():
         global config
         config = ConfigObj(config_path)
         logging.info(f"Using Config: {config_path}")
+        ll = config["system"].get("logging_level", "INFO")
+        log_levels = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL,
+        }
+        logger.setLevel(log_levels.get(ll, logging.DEBUG))
+        logging.info(f"Setting logging level to:{ll}")
+        logging.debug("Test Debug Log")
+        logging.info("Test Info Log")
+        logging.warning("Test Warning Log")
+        logging.error("Test Error Log")
+        logging.critical("Test Critical Log")
     except: 
         logging.exception(f"Cannot load config {config_path}")
 
@@ -473,7 +511,10 @@ def main():
     manager.telemetryReceived.connect(window.update_telemetry)
 
     sc = SimConnectSock()
-    #sc.start()
+    msfs = config["system"].get("msfs_enabled", 0)
+    if msfs == 1:
+        logging.info("MSFS Enabled in config:  Starting Simconnect Manager")
+        sc.start()
 
 
     app.exec_()
