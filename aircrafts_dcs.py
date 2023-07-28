@@ -250,6 +250,7 @@ class Aircraft(AircraftBase):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 #Init random number for effect direction
+                random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
                 effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start()
@@ -261,6 +262,7 @@ class Aircraft(AircraftBase):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 #Init random number for effect direction
+                random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
                 effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start()
@@ -272,6 +274,7 @@ class Aircraft(AircraftBase):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 #Init random number for effect direction
+                random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
                 effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start()
