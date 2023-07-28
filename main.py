@@ -20,39 +20,8 @@ import logging
 import sys
 import time
 import os
-sys.path.insert(0, '')
-
-log_folder = './log'
-
-if not os.path.exists(log_folder):
-    os.makedirs(log_folder)
-
-log_file = os.path.join(log_folder, 'TelemFFB.log')
-
-# Create a logger instance
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-
-# Create a formatter for the log messages
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-# Create a StreamHandler to log messages to the console
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(formatter)
-
-# Create a FileHandler to log messages to the log file
-file_handler = logging.FileHandler(log_file, mode='w')
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
-
-# Add the handlers to the logger
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
-
-
 import re
-  
+
 import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
@@ -98,6 +67,36 @@ parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store
 parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
 
 args = parser.parse_args()
+sys.path.insert(0, '')
+
+log_folder = './log'
+if not os.path.exists(log_folder):
+    os.makedirs(log_folder)
+logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", args.configfile, ".log"])
+log_file = os.path.join(log_folder, logname)
+
+# Create a logger instance
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+# Create a formatter for the log messages
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+# Create a StreamHandler to log messages to the console
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+
+# Create a FileHandler to log messages to the log file
+file_handler = logging.FileHandler(log_file, mode='w')
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(formatter)
+
+# Add the handlers to the logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+
+
 
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
