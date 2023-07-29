@@ -14,43 +14,7 @@
 # You should have received a copy of the GNU General Public License 
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-import json
-import logging
-import sys
-import time
-import os
-import re
-
 import argparse
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QListView, QScrollArea
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
-# from PyQt5.QtWidgets import *
-# from PyQt5.QtCore import *
-# from PyQt5.QtGui import *
-
-from time import monotonic
-import socket
-import threading
-import aircrafts_dcs
-import aircrafts_msfs
-import utils
-import subprocess
-
-import traceback
-import os
-from ffb_rhino import HapticEffect
-from configobj import ConfigObj
-
-from sc_manager import SimConnectManager
-
-config : ConfigObj = None
-
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
 # Add destination telemetry address argument
@@ -67,6 +31,11 @@ parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store
 parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
 
 args = parser.parse_args()
+import json
+import logging
+import sys
+import time
+import os
 sys.path.insert(0, '')
 
 log_folder = './log'
@@ -96,7 +65,34 @@ file_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
+import re
 
+from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
+    QRadioButton, QListView, QScrollArea
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
+# from PyQt5.QtWidgets import *
+# from PyQt5.QtCore import *
+# from PyQt5.QtGui import *
+
+from time import monotonic
+import socket
+import threading
+import aircrafts_dcs
+import aircrafts_msfs
+import utils
+import subprocess
+
+import traceback
+from ffb_rhino import HapticEffect
+from configobj import ConfigObj
+
+from sc_manager import SimConnectManager
+
+config : ConfigObj = None
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
@@ -491,7 +487,7 @@ def main():
             "CRITICAL": logging.CRITICAL,
         }
         logger.setLevel(log_levels.get(ll, logging.DEBUG))
-        logging.critical(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
+        logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
     except:
         logging.exception(f"Cannot load config {config_path}")
 
