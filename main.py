@@ -14,20 +14,37 @@
 # You should have received a copy of the GNU General Public License 
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import argparse
 
+parser = argparse.ArgumentParser(description='Send telemetry data over USB')
+
+# Add destination telemetry address argument
+parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default=None,
+                    help='Destination IP:port address for teleplot.fr telemetry plotting service')
+
+parser.add_argument('-p', '--plot', type=str, nargs='+',
+                    help='Telemetry item names to send to teleplot, separated by spaces')
+
+parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default="ffff:2055")
+parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
+
+# Add config file argument, default config.ini
+parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
+
+args = parser.parse_args()
 import json
 import logging
 import sys
 import time
 import os
+
 sys.path.insert(0, '')
 
 log_folder = './log'
-
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
-
-log_file = os.path.join(log_folder, 'TelemFFB.log')
+logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", args.configfile, ".log"])
+log_file = os.path.join(log_folder, logname)
 
 # Create a logger instance
 logger = logging.getLogger()
@@ -42,7 +59,7 @@ console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 
 # Create a FileHandler to log messages to the log file
-file_handler = logging.FileHandler(log_file, mode=w)
+file_handler = logging.FileHandler(log_file, mode='w')
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(formatter)
 
@@ -50,10 +67,8 @@ file_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
-
 import re
-  
-import argparse
+
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea
@@ -72,36 +87,19 @@ import utils
 import subprocess
 
 import traceback
-import os
 from ffb_rhino import HapticEffect
 from configobj import ConfigObj
 
 from sc_manager import SimConnectManager
 
-config : ConfigObj = None
+config: ConfigObj = None
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-
-parser = argparse.ArgumentParser(description='Send telemetry data over USB')
-
-# Add destination telemetry address argument
-parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default=None,
-                    help='Destination IP:port address for teleplot.fr telemetry plotting service')
-
-parser.add_argument('-p', '--plot', type=str, nargs='+',
-                    help='Telemetry item names to send to teleplot, separated by spaces')
-
-parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default="ffff:2055")
-parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
-
-# Add config file argument, default config.ini
-parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
-
-args = parser.parse_args()
 
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
     utils.teleplot.configure(args.teleplot)
+
 
 def format_dict(data, prefix=""):
     output = ""
@@ -118,6 +116,7 @@ def reload_config():
     # reload config
     config.reload()
 
+
 def get_config(name):
     config_path = os.path.join(os.path.dirname(__file__), name)
 
@@ -125,9 +124,10 @@ def get_config(name):
         config = ConfigObj(config_path)
         logging.info(f"Load Config: {config_path}")
         return config
-    except: 
-        logging.exception(f"Cannot load config {config_path}")
+    except Exception as e:
+        logging.error(f"Cannot load config {config_path}:  {e}")
         return None
+
 
 class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
     def __init__(self, parent=None):
@@ -143,16 +143,16 @@ class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
         # Add the new logging box widget to the layout
         layout.addWidget(self.widget)
         self.setLayout(layout)
-		
+
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
 
-    currentAircraft : aircrafts_dcs.Aircraft = None
-    currentAircraftName : str = None
-    timedOut : bool = True
-    lastFrameTime : float
-    numFrames : int = 0
+    currentAircraft: aircrafts_dcs.Aircraft = None
+    currentAircraftName: str = None
+    timedOut: bool = True
+    lastFrameTime: float
+    numFrames: int = 0
 
     def __init__(self) -> None:
         QObject.__init__(self)
@@ -165,7 +165,7 @@ class TelemManager(QObject, threading.Thread):
         params = utils.sanitize_dict(config["default"])
         type = "Aircraft"
 
-        for section,conf in config.items():
+        for section, conf in config.items():
             if re.match(section, aircraft_name):
                 conf = utils.sanitize_dict(conf)
                 logging.info(f"Found aircraft {aircraft_name} in config")
@@ -173,7 +173,7 @@ class TelemManager(QObject, threading.Thread):
                 params.update(conf)
 
         return (params, type)
-        
+
     def run(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -188,7 +188,7 @@ class TelemManager(QObject, threading.Thread):
             try:
                 data = s.recvfrom(4096)
                 while utils.sock_readable(s):
-                    data = s.recvfrom(4096) # get last frame in OS buffer, to minimize latency
+                    data = s.recvfrom(4096)  # get last frame in OS buffer, to minimize latency
             except ConnectionResetError:
                 continue
             except socket.timeout:
@@ -201,8 +201,8 @@ class TelemManager(QObject, threading.Thread):
 
             # get UDP sender
             sender = data[1]
-          
-            #print(sender)
+
+            # print(sender)
             self.lastFrameTime = monotonic()
             data = data[0].decode("utf-8").split(";")
             telem_data = {}
@@ -214,9 +214,9 @@ class TelemManager(QObject, threading.Thread):
             for i in data:
                 try:
                     if len(i) and i != "CONNECT" and i != "DISCONNECT":
-                        section,conf = i.split("=")
+                        section, conf = i.split("=")
                         values = conf.split("~")
-                        telem_data[section] = [utils.to_number(v) for v in values] if len(values)>1 else utils.to_number(conf)
+                        telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
                 except Exception as e:
                     traceback.print_exc()
                     print("Error Parsing Parameter: ", repr(i))
@@ -224,12 +224,13 @@ class TelemManager(QObject, threading.Thread):
             try:
                 j = json.loads(telem_data["MechInfo"])
                 out = utils.flatten_dict(j, "", "_")
-                for k,v in out.items():
+                for k, v in out.items():
                     telem_data[k] = v
                 del telem_data["MechInfo"]
-            except: pass
+            except:
+                pass
 
-            #print(items)
+            # print(items)
             aircraft_name = telem_data.get("N")
             data_source = telem_data.get("src", None)
             if data_source == "MSFS2020":
@@ -258,7 +259,7 @@ class TelemManager(QObject, threading.Thread):
                         subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial])
 
                     logging.info(f"Creating handler for {aircraft_name}: {Class}")
-                    #instantiate new aircraft handler
+                    # instantiate new aircraft handler
                     self.currentAircraft = Class(aircraft_name)
                     self.currentAircraft.apply_settings(params)
 
@@ -268,9 +269,9 @@ class TelemManager(QObject, threading.Thread):
                 try:
                     _tm = time.perf_counter()
                     commands = self.currentAircraft.on_telemetry(telem_data)
-                    telem_data["perf"] = f"{(time.perf_counter() - _tm)*1000:.3f}ms"
+                    telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
                     if commands:
-                        #send command back
+                        # send command back
                         s.sendto(bytes(commands, "utf-8"), sender)
                 except:
                     traceback.print_exc()
@@ -279,7 +280,7 @@ class TelemManager(QObject, threading.Thread):
                 for item in args.plot:
                     if item in telem_data:
                         utils.teleplot.sendTelemetry(item, telem_data[item])
-            
+
             self.telemetryReceived.emit(telem_data)
 
 
@@ -295,9 +296,8 @@ class SimConnectSock(SimConnectManager):
 
     def emit_packet(self, data):
         data["src"] = "MSFS2020"
-        packet = bytes(";".join([f"{k}={self.fmt(v)}" for k,v in data.items()]), "utf-8")
+        packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
         self.s.sendto(packet, ("127.0.0.1", 34380))
-
 
 
 # Subclass QMainWindow to customize your application's main window
@@ -306,12 +306,11 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("TelemFFB")
-        self.resize(400,700)
+        self.resize(400, 700)
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
         # Create a layout for the main window
         layout = QVBoxLayout()
-
 
         # Add a label for the image
         # Construct the absolute path of the image file
@@ -391,14 +390,15 @@ class MainWindow(QMainWindow):
             d.hide()
         else:
             d.show()
+
     def exit_application(self):
         # Perform any cleanup or save operations here
         QCoreApplication.instance().quit()
 
-    def update_telemetry(self, data : dict):
+    def update_telemetry(self, data: dict):
         try:
             items = ""
-            for k,v in data.items():
+            for k, v in data.items():
                 if k == "MechInfo":
                     v = format_dict(v, "MechInfo.")
                     items += f"{v}"
@@ -409,14 +409,14 @@ class MainWindow(QMainWindow):
                         if isinstance(v, list):
                             v = "[" + ", ".join([f"{x:.3f}" if not isinstance(x, str) else x for x in v]) + "]"
                         items += f"{k}: {v}\n"
-                
+
             self.lbl_telem_data.setText(items)
         except Exception as e:
             traceback.print_exc()
 
     def edit_config_file(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        
+
         config_file = args.configfile
         config_path = os.path.join(script_dir, config_file)
         file_url = QUrl.fromLocalFile(config_path)
@@ -424,6 +424,8 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(file_url)
         except:
             logging.error(f"There was an error opening the config file")
+
+
 # class FFBTestToolDialog(QDialog):
 #     def __init__(self):
 #         super().__init__()
@@ -446,17 +448,17 @@ class MainWindow(QMainWindow):
 #         QMetaObject.connectSlotsByName(FFBTestTool)
 #     # setupUi
 
-    # def retranslateUi(self, FFBTestTool):
-    #     FFBTestTool.setWindowTitle(QCoreApplication.translate("FFBTestTool", u"FFB Test Tool", None))
-    #     self.radioButton.setText(QCoreApplication.translate("FFBTestTool", u"RadioButton", None))
-    # # retranslateUi
+# def retranslateUi(self, FFBTestTool):
+#     FFBTestTool.setWindowTitle(QCoreApplication.translate("FFBTestTool", u"FFB Test Tool", None))
+#     self.radioButton.setText(QCoreApplication.translate("FFBTestTool", u"RadioButton", None))
+# # retranslateUi
 
 
 def main():
     app = QApplication(sys.argv)
     global d
     d = LogWindow()
-    #d.show()
+    # d.show()
 
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
@@ -466,16 +468,15 @@ def main():
 
     # check and install/update export lua script
     utils.install_export_lua()
-	
+
     vid_pid = [int(x, 16) for x in args.device.split(":")]
     try:
-        dev = HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
+        dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
         if args.reset:
             dev.resetEffects()
     except:
         QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}")
         return
-    
 
     config_path = os.path.join(os.path.dirname(__file__), args.configfile)
 
@@ -483,9 +484,18 @@ def main():
         global config
         config = ConfigObj(config_path)
         logging.info(f"Using Config: {config_path}")
-    except: 
+        ll = config["system"].get("logging_level", "INFO")
+        log_levels = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL,
+        }
+        logger.setLevel(log_levels.get(ll, logging.DEBUG))
+        logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
+    except:
         logging.exception(f"Cannot load config {config_path}")
-
 
     window = MainWindow()
     window.show()
@@ -496,10 +506,17 @@ def main():
     manager.telemetryReceived.connect(window.update_telemetry)
 
     sc = SimConnectSock()
-    sc.start()
-
+    try:
+        msfs = config["system"].get("msfs_enabled", None)
+        logging.debug(f"MSFS={msfs}")
+        if msfs == "1":
+            logging.info("MSFS Enabled in config:  Starting Simconnect Manager")
+            sc.start()
+    except:
+        logging.exception("Error loading MSFS enable flag from config file")
 
     app.exec_()
+
 
 if __name__ == "__main__":
     main()
