@@ -86,7 +86,16 @@ class Aircraft(AircraftBase):
     jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
     ####
-    
+    #### Beta effects - set to 1 to enable
+    gforce_effect_enable = 0
+    gforce_effect_enable_areyoureallysure = 0
+    gforce_effect_curvature = 2.2
+    gforce_effect_max_intensity = 1.0
+    gforce_min_gs = 1.5  # G's where the effect starts playing
+    gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
+    ####
+    ####
+
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
 
@@ -129,6 +138,27 @@ class Aircraft(AircraftBase):
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
+
+    def _gforce_effect(self, telem_data):
+
+       # gforce_effect_enable = 1
+        gneg = -1.0
+        gmin = self.gforce_min_gs
+        gmax = self.gforce_max_gs
+       # if not gforce_effect_enable:
+       #     return
+        z_gs : float = telem_data.get("ACCs")[1]
+        if z_gs < gmin:
+            effects.dispose("gforce")
+            effects.dispose("gforce_damper")
+            return
+        #g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 4)
+        g_factor = round(utils.non_linear_scaling(z_gs, gmin, gmax, curvature=self.gforce_effect_curvature),4)
+        g_factor = utils.clamp(g_factor, 0.0, 1.0)
+        effects["gforce"].constant(g_factor, 180).start()
+      #  effects["gforce_damper"].damper(coef_y=1024).start()
+
+        logging.debug(f"G's = {z_gs} | gfactor = {g_factor}")
 
     def _decel_effect(self, telem_data):
         x_gs = telem_data.get("ACCs")[0]
@@ -220,6 +250,7 @@ class Aircraft(AircraftBase):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 #Init random number for effect direction
+                random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
                 effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start()
@@ -231,6 +262,7 @@ class Aircraft(AircraftBase):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 #Init random number for effect direction
+                random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
                 effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start()
@@ -242,6 +274,7 @@ class Aircraft(AircraftBase):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 #Init random number for effect direction
+                random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
                 effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start()
@@ -466,6 +499,9 @@ class PropellerAircraft(Aircraft):
 
         self._update_aoa_effect(telem_data)
 
+        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+            super()._gforce_effect(telem_data)
+
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
@@ -633,6 +669,8 @@ class JetAircraft(Aircraft):
             self._update_ab_effect(self.afterburner_effect_intensity, telem_data)
         if Aircraft.jet_engine_rumble_intensity > 0:
             self._update_jet_engine_rumble(telem_data)
+        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+            super()._gforce_effect(telem_data)
 
 
 #####

@@ -14,23 +14,59 @@
 # You should have received a copy of the GNU General Public License 
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import argparse
+parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
+# Add destination telemetry address argument
+parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default=None,
+                    help='Destination IP:port address for teleplot.fr telemetry plotting service')
+
+parser.add_argument('-p', '--plot', type=str, nargs='+',
+                    help='Telemetry item names to send to teleplot, separated by spaces')
+
+parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default="ffff:2055")
+parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
+
+# Add config file argument, default config.ini
+parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
+
+args = parser.parse_args()
 import json
 import logging
 import sys
 import time
-sys.path.insert(0, '') 
+import os
+sys.path.insert(0, '')
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    stream=sys.stdout,
-)
+log_folder = './log'
+if not os.path.exists(log_folder):
+    os.makedirs(log_folder)
+logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", args.configfile, ".log"])
+log_file = os.path.join(log_folder, logname)
+
+# Create a logger instance
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+# Create a formatter for the log messages
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+# Create a StreamHandler to log messages to the console
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+
+# Create a FileHandler to log messages to the log file
+file_handler = logging.FileHandler(log_file, mode='w')
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(formatter)
+
+# Add the handlers to the logger
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 import re
-  
-import argparse
+
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea
@@ -49,7 +85,6 @@ import utils
 import subprocess
 
 import traceback
-import os
 from ffb_rhino import HapticEffect
 from configobj import ConfigObj
 
@@ -58,23 +93,6 @@ from sc_manager import SimConnectManager
 config : ConfigObj = None
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-
-parser = argparse.ArgumentParser(description='Send telemetry data over USB')
-
-# Add destination telemetry address argument
-parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default=None,
-                    help='Destination IP:port address for teleplot.fr telemetry plotting service')
-
-parser.add_argument('-p', '--plot', type=str, nargs='+',
-                    help='Telemetry item names to send to teleplot, separated by spaces')
-
-parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default="ffff:2055")
-parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
-
-# Add config file argument, default config.ini
-parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
-
-args = parser.parse_args()
 
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
@@ -460,7 +478,17 @@ def main():
         global config
         config = ConfigObj(config_path)
         logging.info(f"Using Config: {config_path}")
-    except: 
+        ll = config["system"].get("logging_level", "INFO")
+        log_levels = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL,
+        }
+        logger.setLevel(log_levels.get(ll, logging.DEBUG))
+        logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
+    except:
         logging.exception(f"Cannot load config {config_path}")
 
 
@@ -473,7 +501,11 @@ def main():
     manager.telemetryReceived.connect(window.update_telemetry)
 
     sc = SimConnectSock()
-    #sc.start()
+    msfs = config["system"].get("msfs_enabled", None)
+    logging.debug(f"MSFS={msfs}")
+    if msfs == "1":
+        logging.info("MSFS Enabled in config:  Starting Simconnect Manager")
+        sc.start()
 
 
     app.exec_()
