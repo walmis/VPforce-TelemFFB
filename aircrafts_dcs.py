@@ -83,6 +83,16 @@ class Aircraft(AircraftBase):
     jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
     ####
+    #### Beta effects - set to 1 to enable
+    gforce_effect_enable = 0
+    gforce_effect_enable_areyoureallysure = 0
+    gforce_effect_curvature = 2.2
+    gforce_effect_max_intensity = 1.0
+    gforce_min_gs = 1.5  # G's where the effect starts playing
+    gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
+
+    ####
+    ####
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
 
@@ -168,7 +178,8 @@ class PropellerAircraft(Aircraft):
             self._update_engine_rumble(telem_data["ActualRPM"])
         self._update_wind_effect(telem_data)
         self._update_aoa_effect(telem_data)
-
+        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+            super()._gforce_effect(telem_data)
 
 
 
@@ -190,7 +201,8 @@ class JetAircraft(Aircraft):
             self._update_ab_effect(telem_data)
         if Aircraft.jet_engine_rumble_intensity > 0:
             self._update_jet_engine_rumble(telem_data)
-
+        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+            super()._gforce_effect(telem_data)
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
