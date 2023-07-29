@@ -125,6 +125,27 @@ class AircraftBase(object):
                     effects.dispose("runway0")
                     effects.dispose("runway1")
 
+    def _gforce_effect(self, telem_data):
+
+        # gforce_effect_enable = 1
+        gneg = -1.0
+        gmin = self.gforce_min_gs
+        gmax = self.gforce_max_gs
+        # if not gforce_effect_enable:
+        #     return
+        z_gs: float = telem_data.get("ACCs")[1]
+        if z_gs < gmin:
+            effects.dispose("gforce")
+            # effects.dispose("gforce_damper")
+            return
+        # g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 4)
+        g_factor = round(utils.non_linear_scaling(z_gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
+        g_factor = utils.clamp(g_factor, 0.0, 1.0)
+        effects["gforce"].constant(g_factor, 180).start()
+        #  effects["gforce_damper"].damper(coef_y=1024).start()
+
+        logging.debug(f"G's = {z_gs} | gfactor = {g_factor}")
+
     def _decel_effect(self, telem_data):
         x_gs = telem_data.get("ACCs")[0]
         if not self.anything_has_changed("decel", x_gs):
@@ -192,9 +213,9 @@ class AircraftBase(object):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
+                random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction,
+                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction,
                                        duration=80).start()
             else:
                 effects["cm"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction,
@@ -205,9 +226,9 @@ class AircraftBase(object):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
+                random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction,
+                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction,
                                        duration=80).start()
             else:
                 effects["cm"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction,
@@ -218,9 +239,9 @@ class AircraftBase(object):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
+                random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction,
+                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction,
                                        duration=80).start()
             else:
                 effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction,
