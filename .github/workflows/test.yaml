@@ -42,11 +42,9 @@ jobs:
           TARGET: ${{ secrets.REMOTE_TARGET }}
           #EXCLUDE: "/dist/, /node_modules/"
           
-    - name: Invoke deployment hook
-      uses: distributhor/workflow-webhook@v3
-      env:
-        webhook_type: 'json-extended'
-        webhook_url: ${{ secrets.WEBHOOK_URL }}
-        #webhook_secret: ${{ secrets.WEBHOOK_SECRET }}
-        data: '{ "content" : "New build uploaded: https://vpforce.eu/downloads/TelemFFB/${{ env.ZIP_FILENAME }}" }'
-        verbose: true
+    - name: Invoke webhook
+      uses: joelwmale/webhook-action@master
+      with:
+        url: ${{ secrets.WEBHOOK_URL }}
+        #headers: '{"repository": "joelwmale/webhook-action"}'
+        body: '{"content": "New build published: https://vpforce.eu/downloads/TelemFFB/${{ env.ZIP_FILENAME }}" }'
