@@ -48,4 +48,5 @@ jobs:
         webhook_type: 'json-extended'
         webhook_url: ${{ secrets.WEBHOOK_URL }}
         #webhook_secret: ${{ secrets.WEBHOOK_SECRET }}
-        data: '{ "content" : "New build uploaded: https://vpforce.eu/downloads/${{ env.ZIP_FILENAME }}" }'
+        data: '{ "content" : "New build uploaded: https://vpforce.eu/downloads/TelemFFB/${{ env.ZIP_FILENAME }}" }'
+        verbose: true
