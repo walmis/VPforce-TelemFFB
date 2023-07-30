@@ -496,23 +496,24 @@ def install_export_lua():
         logging.info(f"Checking {path}")
 
         try:
-            data = open(os.path.join(path, "Export.lua")).read()
+            data = open(os.path.join(path, "Export.lua"), "rb").read()
         except:
             data = ""
 
         local_telemffb = os.path.dirname(__file__) + "/export/TelemFFB.lua"
         def write_script():
-            data = open(local_telemffb).read()
+            data = open(local_telemffb, "rb").read()
             logging.info(f"Writing to {out_path}")
-            open(out_path, "w").write(data)
+            open(out_path, "wb").write(data)
 
         export_installed = "telemffblfs" in data
 
         if export_installed and os.path.exists(out_path):
             # if os.path.getmtime(out_path) < os.path.getmtime(local_telemffb):
             # Use file checksum rather than timestamp to determine if contents have changed - useful when changing installed versions
-            if calculate_checksum(out_path) != calculate_checksum(local_telemffb):
-                dia = QMessageBox.question(None, "Contents of TelemFFB.lua export script have changed\nConfirm", f"Update export script {out_path} ?")
+            crc_a, crc_b = calculate_checksum(out_path), calculate_checksum(local_telemffb)
+            if crc_a != crc_b:
+                dia = QMessageBox.question(None, "Contents of TelemFFB.lua export script have changed", f"Update export script {out_path} ?")
                 if dia == QMessageBox.StandardButton.Yes:
                     write_script()
         else:
