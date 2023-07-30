@@ -90,8 +90,6 @@ from configobj import ConfigObj
 
 from sc_manager import SimConnectManager
 
-config : ConfigObj = None
-
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 if args.teleplot:
@@ -113,8 +111,8 @@ def reload_config():
     # reload config
     config.reload()
 
-def get_config(name):
-    config_path = os.path.join(os.path.dirname(__file__), name)
+def load_config(filename) -> ConfigObj:
+    config_path = os.path.join(os.path.dirname(__file__), filename)
 
     try:
         config = ConfigObj(config_path)
@@ -123,6 +121,19 @@ def get_config(name):
     except: 
         logging.exception(f"Cannot load config {config_path}")
         return None
+
+_config = None
+def get_config() -> ConfigObj:
+    global _config
+    # TODO: check if config files changed and reload
+    if _config: return _config
+
+    main = load_config(args.configfile)
+    user = load_config("config.user.ini")
+    if user and main:
+        main.update(user)
+    _config = main
+    return main
 
 class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
     def __init__(self, parent=None):
@@ -156,6 +167,7 @@ class TelemManager(QObject, threading.Thread):
         self.daemon = True
 
     def get_aircraft_config(self, aircraft_name):
+        config = get_config()
         # find matching aircraft in config
         params = utils.sanitize_dict(config["default"])
         type = "Aircraft"
@@ -233,11 +245,7 @@ class TelemManager(QObject, threading.Thread):
                 module = aircrafts_dcs
 
             if aircraft_name and aircraft_name != self.currentAircraftName:
-                config = get_config(args.configfile)
-                config_user = get_config("config.user.ini")
-                if config_user:
-                    config.update(config_user)
-
+                
                 if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
                     params, cls_name = self.get_aircraft_config(aircraft_name)
 
@@ -472,24 +480,17 @@ def main():
         return
     
 
-    config_path = os.path.join(os.path.dirname(__file__), args.configfile)
-
-    try:
-        global config
-        config = ConfigObj(config_path)
-        logging.info(f"Using Config: {config_path}")
-        ll = config["system"].get("logging_level", "INFO")
-        log_levels = {
-            "DEBUG": logging.DEBUG,
-            "INFO": logging.INFO,
-            "WARNING": logging.WARNING,
-            "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL,
-        }
-        logger.setLevel(log_levels.get(ll, logging.DEBUG))
-        logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
-    except:
-        logging.exception(f"Cannot load config {config_path}")
+    config = get_config()
+    ll = config["system"].get("logging_level", "INFO")
+    log_levels = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }
+    logger.setLevel(log_levels.get(ll, logging.DEBUG))
+    logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
 
     window = MainWindow()
