@@ -27,6 +27,9 @@ jobs:
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         zip_filename="VPforce-TelemFFB-${branch_name}-${commit_id}.zip"
         cd dist/windows/VPforce-TelemFFB && zip -r "../../../${zip_filename}" .
+        echo "BRANCH_NAME=${branch_name}" >> $GITHUB_ENV
+        echo "ZIP_FILENAME=${zip_filename}" >> $GITHUB_ENV
+
         
     - name: Deploy to Server
       uses: easingthemes/ssh-deploy@main
@@ -38,3 +41,11 @@ jobs:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ${{ secrets.REMOTE_TARGET }}
           #EXCLUDE: "/dist/, /node_modules/"
+          
+    - name: Invoke deployment hook
+      uses: distributhor/workflow-webhook@v3
+      env:
+        webhook_type: 'json-extended'
+        webhook_url: ${{ secrets.WEBHOOK_URL }}
+        #webhook_secret: ${{ secrets.WEBHOOK_SECRET }}
+        data: '{ "content" : "New build uploaded: https://vpforce.eu/downloads/${{ env.ZIP_FILENAME }}" }'
