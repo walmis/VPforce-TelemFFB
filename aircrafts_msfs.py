@@ -136,8 +136,8 @@ class Aircraft(AircraftBase):
         data["_aoa_term"] = _aoa_term
         data["_G_term"] = (self.g_force_gain * g_force)
 
-        hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
-        data["_hpf_pitch_acc"] = hpf_pitch_acc # test stuff
+        #hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
+        #data["_hpf_pitch_acc"] = hpf_pitch_acc # test stuff
 
         self.spring_y.positiveCoefficient = clamp(int(4096*elevator_coeff), 0, 4096)
         self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient

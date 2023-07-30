@@ -49,6 +49,7 @@ class SimVarArray:
                 self.vars.append(v)
                 self.values.append(0)
 
+EV_PAUSED = 0 # arbitrary id for paused event
     
 class SimConnectManager(threading.Thread):
     sim_vars = [
@@ -108,6 +109,8 @@ class SimConnectManager(threading.Thread):
         self.sc = None
         self._quit = False
 
+        self._sim_paused = False
+
         self.subscribed_vars = []
 
     def _subscribe(self):
@@ -153,14 +156,21 @@ class SimConnectManager(threading.Thread):
             #print(f"got {recv.__class__.__name__}")
             if isinstance(recv, RECV_EXCEPTION):
                 print(f"Got exception {recv.dwException}, sendID {recv.dwSendID}, index {recv.dwIndex}")
-            if isinstance(recv, RECV_QUIT):
+            elif isinstance(recv, RECV_QUIT):
                 print("Quit received")
                 break
+            elif isinstance(recv, RECV_EVENT):
+                #print("EVENT", recv.uEventID, recv.dwData)
+                if recv.uEventID == EV_PAUSED:
+                    self._sim_paused = recv.dwData
+
             elif isinstance(recv, RECV_SIMOBJECT_DATA):
                 #print(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
                 if recv.dwRequestID == REQ_ID:
                     #print(f"Matched request 0x{req_id:X}")
                     data = {}
+                    data["SimPaused"] = self._sim_paused
+
                     offset = RECV_SIMOBJECT_DATA.dwData.offset
                     for _ in range(recv.dwDefineCount):
                         idx = cast(byref(recv, offset), POINTER(DWORD))[0]
@@ -194,6 +204,7 @@ class SimConnectManager(threading.Thread):
             try:
                 print("Trying SimConnect")
                 with SimConnect("TelemFFB") as self.sc:
+                    self.sc.SubscribeToSystemEvent(EV_PAUSED, "Pause")
                     self._subscribe()
                     self._read_telem()
 
