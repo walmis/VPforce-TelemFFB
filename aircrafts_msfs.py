@@ -192,13 +192,13 @@ class Aircraft(AircraftBase):
         # increasing G force causes increase in elevator droop effect
         _elevator_droop_term = self.elevator_droop_moment * g_force / (1 + _elev_dyn_pressure)
         telem_data["_elevator_droop_term"] = _elevator_droop_term
-
+        logging.debug(f"ailer gain = {self.aileron_gain}")
         aileron_coeff = _dyn_pressure * self.aileron_gain * slip_gain
 
         # add data to telemetry packet so they become visible in the GUI output
         telem_data["_prop_air_vel"] = _prop_air_vel
         telem_data["_elev_dyn_pressure"] = _elev_dyn_pressure
-
+        logging.debug(f"elev gain = {self.elevator_gain}")
         elevator_coeff = (_elev_dyn_pressure) * self.elevator_gain * slip_gain
         # a, b, c = 0.5, 0.3, 0.1
         # elevator_coeff = a * (_elev_dyn_pressure ** 2) + b * _elev_dyn_pressure * self.elevator_gain + c * slip_gain
