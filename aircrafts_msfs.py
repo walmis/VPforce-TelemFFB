@@ -237,7 +237,7 @@ class Aircraft(AircraftBase):
             telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
         self._update_runway_rumble(telem_data)
         self._update_buffeting(telem_data)
-       # self._update_flight_controls(telem_data)
+        self._update_flight_controls(telem_data)
         if self.flaps_motion_intensity > 0:
             flps = max(telem_data.get("Flaps", 0))
             self._update_flaps(flps)
@@ -288,7 +288,7 @@ class PropellerAircraft(Aircraft):
             self._update_engine_rumble(current_rpm)
         self._update_aoa_effect(telem_data)
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-            sp = max(telem_data.get("Spoilers_L", 0), telem_data.get("Spoilers_R", 0))
+            sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=800*kt2ms, spd_thresh_hi=140*kt2ms )
         if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
             super()._gforce_effect(telem_data)
@@ -309,7 +309,7 @@ class JetAircraft(Aircraft):
         telem_data["AircraftClass"] = "JetAircraft"  # inject aircraft class into telemetry
         super().on_telemetry(telem_data)
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-            sp = max(telem_data.get("Spoilers_L", 0), telem_data.get("Spoilers_R", 0))
+            sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
         if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
             super()._gforce_effect(telem_data)
@@ -324,7 +324,7 @@ class TurbopropAircraft(Aircraft):
         telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
         super().on_telemetry(telem_data)
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-            sp = max(telem_data.get("Spoilers_L", 0), telem_data.get("Spoilers_R", 0))
+            sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
         if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
             super()._gforce_effect(telem_data)
@@ -337,7 +337,7 @@ class GliderAircraft(Aircraft):
         telem_data["AircraftClass"] = "GliderAircraft"  # inject aircraft class into telemetry
         super().on_telemetry(telem_data)
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-            sp = max(telem_data.get("Spoilers_L", 0), telem_data.get("Spoilers_R", 0))
+            sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
         if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
             super()._gforce_effect(telem_data)
