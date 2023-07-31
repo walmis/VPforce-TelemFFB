@@ -15,7 +15,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import argparse
-
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
 # Add destination telemetry address argument
@@ -37,7 +36,6 @@ import logging
 import sys
 import time
 import os
-
 sys.path.insert(0, '')
 
 log_folder = './log'
@@ -69,6 +67,7 @@ logger.addHandler(file_handler)
 
 import re
 
+import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea
@@ -92,14 +91,11 @@ from configobj import ConfigObj
 
 from sc_manager import SimConnectManager
 
-config: ConfigObj = None
-
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
     utils.teleplot.configure(args.teleplot)
-
 
 def format_dict(data, prefix=""):
     output = ""
@@ -116,9 +112,8 @@ def reload_config():
     # reload config
     config.reload()
 
-
-def get_config(name):
-    config_path = os.path.join(os.path.dirname(__file__), name)
+def load_config(filename) -> ConfigObj:
+    config_path = os.path.join(os.path.dirname(__file__), filename)
 
     try:
         config = ConfigObj(config_path)
@@ -128,6 +123,18 @@ def get_config(name):
         logging.error(f"Cannot load config {config_path}:  {e}")
         return None
 
+_config = None
+def get_config() -> ConfigObj:
+    global _config
+    # TODO: check if config files changed and reload
+    if _config: return _config
+
+    main = load_config(args.configfile)
+    user = load_config("config.user.ini")
+    if user and main:
+        main.update(user)
+    _config = main
+    return main
 
 class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
     def __init__(self, parent=None):
@@ -143,7 +150,7 @@ class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
         # Add the new logging box widget to the layout
         layout.addWidget(self.widget)
         self.setLayout(layout)
-
+		
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
@@ -161,11 +168,12 @@ class TelemManager(QObject, threading.Thread):
         self.daemon = True
 
     def get_aircraft_config(self, aircraft_name):
+        config = get_config()
         # find matching aircraft in config
         params = utils.sanitize_dict(config["default"])
         type = "Aircraft"
 
-        for section, conf in config.items():
+        for section,conf in config.items():
             if re.match(section, aircraft_name):
                 conf = utils.sanitize_dict(conf)
                 logging.info(f"Found aircraft {aircraft_name} in config")
@@ -173,7 +181,7 @@ class TelemManager(QObject, threading.Thread):
                 params.update(conf)
 
         return (params, type)
-
+        
     def run(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -239,11 +247,7 @@ class TelemManager(QObject, threading.Thread):
                 module = aircrafts_dcs
 
             if aircraft_name and aircraft_name != self.currentAircraftName:
-                config = get_config(args.configfile)
-                config_user = get_config("config.user.ini")
-                if config_user:
-                    config.update(config_user)
-
+                
                 if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
                     params, cls_name = self.get_aircraft_config(aircraft_name)
 
@@ -298,6 +302,7 @@ class SimConnectSock(SimConnectManager):
         data["src"] = "MSFS2020"
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
         self.s.sendto(packet, ("127.0.0.1", 34380))
+
 
 
 # Subclass QMainWindow to customize your application's main window
@@ -458,7 +463,7 @@ def main():
     app = QApplication(sys.argv)
     global d
     d = LogWindow()
-    # d.show()
+    #d.show()
 
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
@@ -468,34 +473,29 @@ def main():
 
     # check and install/update export lua script
     utils.install_export_lua()
-
+	
     vid_pid = [int(x, 16) for x in args.device.split(":")]
     try:
-        dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
+        dev = HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
         if args.reset:
             dev.resetEffects()
     except:
         QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}")
         return
 
-    config_path = os.path.join(os.path.dirname(__file__), args.configfile)
 
-    try:
-        global config
-        config = ConfigObj(config_path)
-        logging.info(f"Using Config: {config_path}")
-        ll = config["system"].get("logging_level", "INFO")
-        log_levels = {
-            "DEBUG": logging.DEBUG,
-            "INFO": logging.INFO,
-            "WARNING": logging.WARNING,
-            "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL,
-        }
-        logger.setLevel(log_levels.get(ll, logging.DEBUG))
-        logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
-    except:
-        logging.exception(f"Cannot load config {config_path}")
+    config = get_config()
+    ll = config["system"].get("logging_level", "INFO")
+    log_levels = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }
+    logger.setLevel(log_levels.get(ll, logging.DEBUG))
+    logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
+
 
     window = MainWindow()
     window.show()
