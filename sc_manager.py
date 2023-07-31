@@ -2,6 +2,7 @@ from simconnect import *
 from ctypes import byref, cast, sizeof
 import time
 import threading
+import logging
 
 REQ_ID = 0xfeed
 
@@ -31,7 +32,7 @@ class SimVar:
         return types[self.datatype]
 
 class SimVarArray:
-    def __init__(self, name, var, unit, type=DATATYPE_FLOAT64, scale=None, min=0, max=1):
+    def __init__(self, name, var, unit, type=DATATYPE_FLOAT64, scale=None, min=0, max=1, keywords=None):
         self.name = name
         self.unit = unit
         self.type = type
@@ -39,26 +40,40 @@ class SimVarArray:
         self.vars = []
         self.values = []
         self.min = min
-        for index in range(min, max+1):
-            if index < min:
-                self.values.append(0)
-            else:
-                v = SimVar(name, f"{var}:{index}", unit, None, type, scale)
+        if keywords is not None:
+            for key in keywords:
+                index = keywords.index(key)
+                simvar = var.replace("<>", key)
+                v = SimVar(name, simvar, unit, None, type, scale)
                 v.index = index
                 v.parent = self
                 self.vars.append(v)
                 self.values.append(0)
+        else:
+            for index in range(min, max+1):
+                if index < min:
+                    self.values.append(0)
+                else:
+                    v = SimVar(name, f"{var}:{index}", unit, None, type, scale)
+                    v.index = index
+                    v.parent = self
+                    self.vars.append(v)
+                    self.values.append(0)
 
-    
+
 class SimConnectManager(threading.Thread):
     sim_vars = [
+
+        SimVar("T", "ABSOLUTE TIME","Seconds" ),
         SimVar("N", "TITLE", "", type=DATATYPE_STRING128),
         SimVar("G", "G FORCE", "Number"),
+        SimVar("G_BODY_Z", "ACCELERATION BODY Z", "Number", scale=0.031081),
         SimVar("Gdot", "SEMIBODY LOADFACTOR YDOT", "Number"),
+        SimVar("TAS", "AIRSPEED TRUE", "meter/second"),
         SimVar("AirDensity", "AMBIENT DENSITY", "kilograms per cubic meter"),
         SimVar("AoA", "INCIDENCE ALPHA", "degrees"),
-        SimVar("SideSlip", "INCIDENCE BETA", "degrees"),
         SimVar("StallAoA", "STALL ALPHA", "degrees"),
+        SimVar("SideSlip", "INCIDENCE BETA", "degrees"),
         SimVar("ElevDefl", "ELEVATOR DEFLECTION", "degrees"),
         SimVar("ElevDeflPct", "ELEVATOR DEFLECTION PCT", "Percent Over 100"),
         SimVar("ElevTrim", "ELEVATOR TRIM POSITION", "degrees"),
@@ -67,7 +82,7 @@ class SimConnectManager(threading.Thread):
         SimVar("PropThrust1", "PROP THRUST:1", "kilograms", scale=10), #scaled to newtons
         SimVarArray("PropThrust", "PROP THRUST", "kilograms", min=1, max=4, scale=10),#scaled to newtons
         SimVarArray("PropRPM", "PROP RPM", "RPM", min=1, max=4),
-
+        SimVar("RotorRPM", "ROTOR RPM:1", "RPM"),
         SimVar("DynPressure", "DYNAMIC PRESSURE", "pascal"),
         #SimVar("AileronDeflPct", "AILERON AVERAGE DEFLECTION PCT", "Percent Over 100", scale=100),
         SimVar("RudderDefl", "RUDDER DEFLECTION", "degrees"),
@@ -75,7 +90,6 @@ class SimConnectManager(threading.Thread):
         #SimVar("RelWndX", "AIRCRAFT WIND X", "meter/second"),
         #SimVar("RelWndY", "AIRCRAFT WIND Y", "meter/second"),
         #SimVar("RelWndZ", "AIRCRAFT WIND Z", "meter/second"),
-
         SimVar("Pitch", "PLANE PITCH DEGREES", "degrees"),
         SimVar("Roll", "PLANE BANK DEGREES", "degrees"),
         SimVar("Heading", "PLANE HEADING DEGREES TRUE", "degrees"),
@@ -83,7 +97,6 @@ class SimConnectManager(threading.Thread):
         SimVar("RollRate", "ROTATION VELOCITY BODY Z", "degrees per second"),
         SimVar("PitchAccel", "ROTATION ACCELERATION BODY X", "degrees per second squared"),
         SimVar("RollAccel", "ROTATION ACCELERATION BODY Z", "degrees per second squared"),
-        SimVar("TrueAirspeed", "AIRSPEED TRUE", "meter/second"),
         #SimVar("LinearCLAlpha", "LINEAR CL ALPHA", "Per Radian"),
         #SimVar("SigmaSqrt", "SIGMA SQRT", "Per Radian"),
         SimVar("SimDisabled", "SIM DISABLED", "Bool"),
@@ -92,7 +105,6 @@ class SimConnectManager(threading.Thread):
         SimVar("SurfaceType", "SURFACE TYPE", "Enum"),
         SimVar("EngineType", "ENGINE TYPE", "Enum"),
         SimVarArray("EngVibration", "ENG VIBRATION", "Number", min=1, max=4),
-
         SimVar("NumEngines", "NUMBER OF ENGINES", "Number", type=DATATYPE_INT32),
         SimVar("AmbWindX", "AMBIENT WIND X", "meter/second"),
         SimVar("AmbWindY", "AMBIENT WIND Y", "meter/second"),
@@ -101,8 +113,15 @@ class SimConnectManager(threading.Thread):
         SimVar("VelY", "VELOCITY WORLD Y", "meter/second"),
         SimVar("VelZ", "VELOCITY WORLD Z", "meter/second"),
         SimVarArray("WeightOnWheels", "CONTACT POINT COMPRESSION", "Number", min=0, max=2),
-        SimVar("Flaps", "TRAILING EDGE FLAPS LEFT PERCENT", "Percent Over 100"),
-        SimVar("Gear", "GEAR LEFT POSITION", "Percent Over 100")
+        SimVar("Flaps_L", "TRAILING EDGE FLAPS LEFT PERCENT", "Percent Over 100"),
+        SimVar("Flaps_R", "TRAILING EDGE FLAPS RIGHT PERCENT", "Percent Over 100"),
+        SimVarArray("Flaps", "TRAILING EDGE FLAPS <> PERCENT", "Percent Over 100", keywords=("LEFT", "RIGHT")),
+        SimVarArray("Gear", "GEAR <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
+        SimVar("Spoilers_L", "SPOILERS LEFT POSITION", "Percent Over 100"),
+        SimVar("Spoilers_R", "SPOILERS RIGHT POSITION", "Percent Over 100"),
+        SimVarArray("Spoilers", "SPOILERS <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
+        SimVarArray("Afterburner", "TURB ENG AFTERBURNER", "Number", min=1, max=2),
+        SimVar("AfterburnerPct", "TURB ENG AFTERBURNERR PCT ACTIVE", "Percent Over 100")
     ]
     
     def __init__(self):
