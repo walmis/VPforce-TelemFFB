@@ -548,6 +548,9 @@ local f_telemFFB = {
             local engine_redline_reference = 3000
             local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            local spit_ldg_right = LoGetAircraftDrawArgumentValue(3)
+            mech["gear"]["value"] = spit_ldg_right
+
 
             local PanelShake =
               string.format(
@@ -790,6 +793,7 @@ local f_telemFFB = {
           local items = {
             {"T", "%.3f", t},
             {"N", "%s", obj.Name},
+            {"src", "%s", "DCS"},
             {"SelfData", "%s", myselfData},
             {"EngRPM", "%s", engineRPM},
             {"ACCs", "%s", AccelerationUnits},
