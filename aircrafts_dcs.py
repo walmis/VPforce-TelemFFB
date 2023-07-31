@@ -84,6 +84,7 @@ class Aircraft(AircraftBase):
 
     ####
     #### Beta effects - set to 1 to enable
+    gforce_effect_invert_force = 0  # case where "180" degrees does not equal "away from pilot"
     gforce_effect_enable = 0
     gforce_effect_enable_areyoureallysure = 0
     gforce_effect_curvature = 2.2
@@ -108,13 +109,14 @@ class Aircraft(AircraftBase):
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
     def on_telemetry(self, telem_data : dict):
+        ## Generic Aircraft Telemetry Handler
         """when telemetry frame is received, aircraft class receives data in dict format
 
         :param new_data: New telemetry data
         :type new_data: dict
         """
         if not "AircraftClass" in telem_data:
-            telem_data["AircraftClass"] = "Aircraft"   #inject aircraft class into telemetry
+            telem_data["AircraftClass"] = "GenericAircraft"   #inject aircraft class into telemetry
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
@@ -161,6 +163,7 @@ class PropellerAircraft(Aircraft):
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
+        ## Propeller Aircraft Telemetry Handler
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "PropellerAircraft"   #inject aircraft class into telemetry
@@ -192,6 +195,7 @@ class JetAircraft(Aircraft):
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
+        ## Jet Aircraft Telemetry Handler
         if telem_data.get("N")== None:
             return
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
@@ -219,7 +223,7 @@ class Helicopter(Aircraft):
 
     def on_telemetry(self, telem_data):
         self.speedbrake_motion_intensity = 0.0
-        # logging.debug(f"Speedbrake === {Helicopter.speedbrake_motion_intensity}")
+        ## Helicopter Aircraft Telemetry Handler
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "Helicopter"   #inject aircraft class into telemetry
