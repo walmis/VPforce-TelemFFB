@@ -101,8 +101,26 @@ class Aircraft(AircraftBase):
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
 
+    ###
+    ### AoA reduction force effect
+    ###
+    aoa_reduction_effect_enabled = 0
+    aoa_reduction_max_force = 0.0
+    critical_aoa_start = 22
+    critical_aoa_max = 25
+
     rotor_blade_count = 2
     heli_engine_rumble_intensity=0.15
+
+    aircraft_is_spring_centered = 0
+    spring_centered_elev_gain = 0.5
+    spring_centered_ailer_gain = 0.5
+    aileron_spring_gain = 0.25
+    elevator_spring_gain = 0.25
+
+    aircraft_is_fbw = 0
+    fbw_elevator_gain = 0.8
+    fbw_aileron_gain = 0.8
 
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
@@ -142,14 +160,44 @@ class Aircraft(AircraftBase):
         self.dyn_pressure_scale = 0.005
         self.max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
 
+    def _update_fbw_flight_controls(self, telem_data):
+        self.spring_y.positiveCoefficient = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
+        # logging.debug(f"Elev Coeef: {elevator_coeff}")
+        self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+        self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
+
+        self.spring_x.positiveCoefficient = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
+        self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+
+        # update spring data
+        self.spring.effect.setCondition(self.spring_y)
+        self.spring.effect.setCondition(self.spring_x)
+
+
     def _update_flight_controls(self, telem_data):
         # calculations loosely based on FLightGear FFB page:
         # https://wiki.flightgear.org/Force_feedback
         # https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
-        ac=telem_data.get("AircraftClass")
-        if telem_data.get("AircraftClass") == "Helicopter":
-            logging.debug("Returning")
+
+        elev_base_gain = 0
+        ailer_base_gain = 0
+        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
+            logging.debug ("FBW Setting enabled, running fbw_flight_controls")
+            self._update_fbw_flight_controls(telem_data)
             return
+        elif telem_data.get("AircraftClass") == "Helicopter":
+            logging.debug("Aircraft is Helicopter, aborting update_flight_controls")
+            return
+        if self.aircraft_is_spring_centered:
+            elev_base_gain = self.aileron_spring_gain
+            ailer_base_gain = self.elevator_spring_gain
+            logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{elev_base_gain}:{ailer_base_gain}")
+
+        base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
+        base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
+        logging.info(f"Base Elev/Ailer coeff = {base_elev_coeff}/{base_ailer_coeff}")
+
+
         rudder_angle = telem_data["RudderDefl"] * rad  # + trim?
 
         # print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
@@ -213,12 +261,15 @@ class Aircraft(AircraftBase):
         #       hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
         #       data["_hpf_pitch_acc"] = hpf_pitch_acc # test stuff
 
-        self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), 0, 4096)
-        # logging.debug(f"Elev Coeef: {elevator_coeff}")
+        self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
+        ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
+        logging.debug(f"Elev Coeef: {ec}")
         self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
         self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
+        ac = clamp(int(4096 * aileron_coeff), base_elev_coeff, 4096)
+        logging.debug(f"Ailer Coeef: {ac}")
 
-        self.spring_x.positiveCoefficient = clamp(int(4096 * aileron_coeff), 0, 4096)
+        self.spring_x.positiveCoefficient = clamp(int(4096 * aileron_coeff), base_ailer_coeff, 4096)
         self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
 
         # update spring data
@@ -247,6 +298,8 @@ class Aircraft(AircraftBase):
         if self.deceleration_effect_enable and self.deceleration_effect_enable_areyoureallysure:
             if telem_data.get("AircraftClass") != "Helicopter":
                 self._decel_effect(telem_data)
+        if self.aoa_reduction_effect_enabled:
+            self._aoa_reduction_force_effect(telem_data)
 
     def on_timeout(self):
         super().on_timeout()
