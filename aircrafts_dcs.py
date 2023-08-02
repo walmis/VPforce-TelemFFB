@@ -92,6 +92,14 @@ class Aircraft(AircraftBase):
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
 
+    ###
+    ### AoA reduction force effect
+    ###
+    aoa_reduction_effect_enabled = 0
+    aoa_reduction_max_force = 0.0
+    critical_aoa_start = 22
+    critical_aoa_max = 25
+
     ####
     ####
     def __init__(self, name : str, **kwargs):
@@ -205,6 +213,8 @@ class JetAircraft(Aircraft):
             self._update_ab_effect(telem_data)
         if Aircraft.jet_engine_rumble_intensity > 0:
             self._update_jet_engine_rumble(telem_data)
+        if self.aoa_reduction_effect_enabled:
+            self._aoa_reduction_force_effect(telem_data)
         if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
             super()._gforce_effect(telem_data)
 
