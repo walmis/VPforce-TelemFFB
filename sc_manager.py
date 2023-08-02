@@ -125,7 +125,8 @@ class SimConnectManager(threading.Thread):
         SimVarArray("Gear", "GEAR <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
         SimVarArray("Spoilers", "SPOILERS <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
         SimVarArray("Afterburner", "TURB ENG AFTERBURNER", "Number", min=1, max=2),
-        SimVar("AfterburnerPct", "TURB ENG AFTERBURNERR PCT ACTIVE", "Percent Over 100")
+        SimVar("AfterburnerPct", "TURB ENG AFTERBURNERR PCT ACTIVE", "Percent Over 100"),
+        SimVar("ACisFBW", "FLY BY WIRE FAC SWITCH", "bool")
     ]
     
     def __init__(self):
