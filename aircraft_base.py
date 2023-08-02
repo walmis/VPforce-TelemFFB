@@ -163,7 +163,19 @@ class AircraftBase(object):
         #  effects["gforce_damper"].damper(coef_y=1024).start()
 
         logging.debug(f"G's = {z_gs} | gfactor = {g_factor}")
-
+    def _aoa_reduction_force_effect(self, telem_data):
+        start_aoa = self.critical_aoa_start
+        end_aoa = self.critical_aoa_max
+        aoa = telem_data.get("AoA")
+        if aoa >= start_aoa:
+            force_factor = round(utils.non_linear_scaling(aoa, start_aoa, end_aoa, curvature=1.5), 4)
+            force_factor = self.aoa_reduction_max_force * force_factor
+            force_factor = utils.clamp(force_factor, 0.0, 1.0)
+            logging.info(f"AoA Reduction Effect:  AoA={aoa}, force={force_factor}, max allowed force={self.aoa_reduction_max_force}")
+            effects["crit_aoa"].constant(force_factor, 180).start()
+        else:
+            effects.dispose("crit_aoa")
+        return
     def _decel_effect(self, telem_data):
         if self._sim_is_dcs(telem_data):
             y_gs = telem_data.get("ACCs")[0]
