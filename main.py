@@ -29,6 +29,7 @@ parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store
 
 # Add config file argument, default config.ini
 parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
+parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS (default DCS', default="DCS")
 
 args = parser.parse_args()
 import json
@@ -116,12 +117,19 @@ def load_config(filename) -> ConfigObj:
     config_path = os.path.join(os.path.dirname(__file__), filename)
 
     try:
-        config = ConfigObj(config_path)
+        config = ConfigObj(config_path, raise_errors=True)
         logging.info(f"Load Config: {config_path}")
         return config
     except Exception as e:
         logging.error(f"Cannot load config {config_path}:  {e}")
-        return None
+        err = ConfigObj()
+        err["EXCEPTION"] = {}
+        err["EXCEPTION"]["ERROR"] = e
+        err["system"] = {}
+        err["system"]["logging_level"] = "DEBUG"
+        err["system"]["msfs_enabled"] = 0
+        err["system"]["dcs_enabled"] = 0
+        return err
 
 _config = None
 def get_config() -> ConfigObj:
@@ -330,14 +338,25 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
         layout.addWidget(QLabel(f"Config File: {args.configfile}"))
         # Add a label and telemetry data label
-        layout.addWidget(QLabel("DCS Telemetry"))
+        layout.addWidget(QLabel("Telemetry"))
 
         # Create a scrollable area
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
 
         # Create the QLabel widget and set its properties
-        self.lbl_telem_data = QLabel("Waiting for data...")
+        cfg = get_config()
+        if cfg.get("EXCEPTION"):
+            error = cfg["EXCEPTION"]["ERROR"]
+            logging.error(f"CONFIG ERROR: {error}")
+            self.lbl_telem_data = QLabel(f"CONFIG ERROR: {error}")
+        else:
+            dcs_enabled = 1
+            msfs_enabled = 0
+            tst = cfg["system"]["msfs_enabled"]
+            if args.sim == "MSFS" or cfg["system"].get("msfs_enabled") == "1":
+                msfs_enabled = 1
+            self.lbl_telem_data = QLabel(f"DCS Enabled: {dcs_enabled}\nMSFS Enabled: {msfs_enabled}\nWaiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_telem_data.setWordWrap(True)
 
@@ -509,8 +528,8 @@ def main():
     try:
         msfs = config["system"].get("msfs_enabled", None)
         logging.debug(f"MSFS={msfs}")
-        if msfs == "1":
-            logging.info("MSFS Enabled in config:  Starting Simconnect Manager")
+        if msfs == "1" or args.sim == "MSFS":
+            logging.info("MSFS Enabled:  Starting Simconnect Manager")
             sc.start()
     except:
         logging.exception("Error loading MSFS enable flag from config file")
