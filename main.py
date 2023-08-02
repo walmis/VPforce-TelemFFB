@@ -337,6 +337,14 @@ class MainWindow(QMainWindow):
         # Add the image label to the layout
         layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
         layout.addWidget(QLabel(f"Config File: {args.configfile}"))
+        cfg = get_config()
+        dcs_enabled = 1
+        msfs_enabled = 0
+        if args.sim == "MSFS" or cfg["system"].get("msfs_enabled") == "1":
+            msfs_enabled = 1
+        simlabel = QLabel(f"Sims Enabled: DCS: {dcs_enabled} | MSFS: {msfs_enabled}")
+        simlabel.setToolTip("Enable/Disable Sims in config file or use '-s DCS|MSFS' argument to specify")
+        layout.addWidget(simlabel)
         # Add a label and telemetry data label
         layout.addWidget(QLabel("Telemetry"))
 
@@ -345,18 +353,12 @@ class MainWindow(QMainWindow):
         scroll_area.setWidgetResizable(True)
 
         # Create the QLabel widget and set its properties
-        cfg = get_config()
         if cfg.get("EXCEPTION"):
             error = cfg["EXCEPTION"]["ERROR"]
             logging.error(f"CONFIG ERROR: {error}")
             self.lbl_telem_data = QLabel(f"CONFIG ERROR: {error}")
         else:
-            dcs_enabled = 1
-            msfs_enabled = 0
-            tst = cfg["system"]["msfs_enabled"]
-            if args.sim == "MSFS" or cfg["system"].get("msfs_enabled") == "1":
-                msfs_enabled = 1
-            self.lbl_telem_data = QLabel(f"DCS Enabled: {dcs_enabled}\nMSFS Enabled: {msfs_enabled}\nWaiting for data...")
+            self.lbl_telem_data = QLabel("Waiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_telem_data.setWordWrap(True)
 
