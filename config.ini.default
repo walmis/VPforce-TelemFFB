@@ -206,7 +206,7 @@ speedbrake_buffet_intensity = 0.15
 gear_buffet_intensity = 0.15
 gforce_effect_enable = 0
 aoa_reduction_effect_enabled = 1
-aoa_reduction_max_force = 0.7
+aoa_reduction_max_force = 1.0
 critical_aoa_start = 22
 critical_aoa_max = 25
 
@@ -399,12 +399,8 @@ flaps_motion_intensity = 0.0
 spoiler_motion_intensity = 0.2
 spoiler_buffet_intensity = 0.1
 aircraft_is_fbw = 1
-fbw_elevator_gain = 0.6
-fbw_aileron_gain = 0.6
-aoa_reduction_effect_enabled = 1
-aoa_reduction_max_force = 0.7
-critical_aoa_start = 22
-critical_aoa_max = 25
+fbw_elevator_gain = 0.8
+fbw_aileron_gain = 0.8
 
 
 #####################

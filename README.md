@@ -14,8 +14,56 @@ Also this early version is very bare-bones and community-driven development is v
 - Rolling and touchdown effects that simulate the sensation of the wheels touching the ground
 - Angle of attack buffeting, which simulates the shaking and vibrations felt when an aircraft approaches its critical angle of attack.
 - Helicopter effective translational lift (ETL) effects.
+- Helicopter overspeed shaking
 - Shows a debug window that displays the received telemetry data.
+## Work in progress / new features
 
+Many new features have been recently added including:
+
+- G-Loading - Stick force increases as the aircraft g-loading increases
+- Deceleration effect - applies forward force on stick when braking
+- Motion effects for gear / flaps / spoilers / speedbrake and canopy
+- Drag buffeting effects for gear and spoilers
+- Improved/Dynamic engine rumble effects for piston aircraft
+- Engine rumble for Jet Aircraft
+- Afterburner rumble
+- Engine rumble for Helicopters
+- Customizable weapons release effect direction (0-359) or random
+- AoA reduction force to simulate such features as in the F/A-18
+## Improved MSFS Support
+
+MSFS support in TelemFFB has been significantly extended.  A Majority of the ffects listed above are supported (where applicable).
+
+Primary Flight Controls
+- Dynamic Flight Control Spring Force (existing TelemFFB Feature)
+  - Recommend to use VPForce Configurator Stick Spring + Hardware Force Trim for Helicopters as TelemFFB
+does not yet support native force trim with MSFS.
+- FBW Flight Controls (static spring forces)
+- "Spring Centered" flight controls (such as in modern gliders)
+
+  
+New Effects
+ - G Loading Effect
+ - Deceleration Force Effect
+ - Aoa/Stall Buffeting
+ - Weight on Wheels (runway rumble, touchdown effects)
+ - Gear Motion
+ - Gear Turbulence
+ - Flaps Motion
+ - Speedbrake/Spoiler Motion
+ - Speedbrake/Spoiler Turbulence
+ - Piston engine rumble
+ - Afterburner Effect (see notes in config.ini)
+ - Helicopter Engine Rumble
+ - Helicopter ETL Effect
+
+## Enabling support for MSFS
+
+The DCS telemetry listener is always active, however the MSFS listener must be explicitly enabled.
+
+There are 2 way to enable support for MSFS in TelemFFB
+- Edit the config file and set the `msfs_enabled` flag to "1"
+- use the '-s' command line argument `-s MSFS`
 ## Executable Versions
 If you are not git-savy or simply dont want to deal with python, git, and cloning repositories and would rather just use an all-in-one executable distribution...
 
