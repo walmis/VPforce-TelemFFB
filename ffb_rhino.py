@@ -257,6 +257,11 @@ class FFBEffectHandle:
         :param direction: Direction in degrees [0..360]
         :type direction: float
         """
+
+        if self.effect_id is None:
+            logging.warn("setConstantForce on an invalidated effect")
+            return
+        
         assert(self.type == EFFECT_CONSTANT)
         assert(magnitude >= -1.0 and magnitude <= 1.0)
 
@@ -348,10 +353,11 @@ class FFBRhino(hid.Device):
         assert(r[0] == HID_REPORT_ID_PID_BLOCK_LOAD)
         effect_id = r[1]
         status = r[2]
-        try:
-            assert(status == LOAD_SUCCESS)
-        except AssertionError:
-            logging.error(f"Error: Load Status = FULL | May need to restart the simulator")
+
+        if(status != LOAD_SUCCESS):
+            logging.warn("Effects pool full, cannot create new effect")
+            return None
+
         return FFBEffectHandle(self, effect_id, type)
     
     def write(self, data):
@@ -382,6 +388,7 @@ class HapticEffect:
     def _conditional_effect(self, type, coef_x = None, coef_y= None):
         if not self.effect:
             self.effect = self.device.createEffect(type)
+            if not self.effect: return
             self.effect.setEffect() # initialize defaults
 
         if coef_x is not None:
@@ -413,6 +420,7 @@ class HapticEffect:
     def periodic(self, frequency, magnitude:float, direction:float, effect_type=EFFECT_SINE, *args, **kwargs):
         if not self.effect:
             self.effect = self.device.createEffect(effect_type)
+            if not self.effect: return
         
         if type(direction) == type and issubclass(direction, DirectionModulator):
             if not self.modulator:
@@ -432,6 +440,7 @@ class HapticEffect:
         """
         if not self.effect:
             self.effect = self.device.createEffect(EFFECT_CONSTANT)
+            if not self.effect: return
 
         if type(direction) == type and issubclass(direction, DirectionModulator):
             if not self.modulator:
