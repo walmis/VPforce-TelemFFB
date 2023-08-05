@@ -343,7 +343,7 @@ def average(l):
     return sum(l)/float(len(l))
 
 class LowPassFilter:
-    def __init__(self, cutoff_freq_hz, init_val=0.0):
+    def __init__(self, cutoff_freq_hz, init_val=0.0, **kwargs):
         self.cutoff_freq_hz = cutoff_freq_hz
         self.alpha = 0.0
         self.x_filt = init_val
@@ -363,7 +363,7 @@ class LowPassFilter:
         return self.x_filt
 
 class HighPassFilter:
-    def __init__(self, cutoff_freq_hz, init_val=0.0):
+    def __init__(self, cutoff_freq_hz, init_val=0.0, **kwargs):
         self.RC = 1.0 / (2 * math.pi * cutoff_freq_hz)
         self.value = 0
         self.last_update = 0
@@ -413,7 +413,7 @@ class DirectionModulator:
     pass
 
 class RandomDirectionModulator(DirectionModulator):
-    def __init__(self, period = 10):
+    def __init__(self, period = 0.1):
         self.prev_upd = time.perf_counter()
         self.value = 0
         self.period = period
@@ -435,7 +435,7 @@ class Dispenser:
     def get(self, name, *args, **kwargs):
         v = self.dict.get(name)
         if not v:
-            v = self.cls(*args, **kwargs)
+            v = self.cls(*args, **kwargs, name=name)
             self.dict[name] = v
         return v
 

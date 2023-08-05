@@ -376,6 +376,9 @@ class HapticEffect:
     started : bool = False
     modulator = None
 
+    def __init__(self, name=None):
+        self.name = name
+
     def __repr__(self):
         return f"HapticEffect({self.effect})"
 
@@ -459,7 +462,8 @@ class HapticEffect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is starting effect {self.effect.effect_id}")
-            logging.info(f"Start effect {self.effect.effect_id} ({self.effect.name})")
+            name = f" (\"{self.name}\")" if self.name else ""
+            logging.info(f"Start effect {self.effect.effect_id} ({self.effect.name}){name}")
             self.effect.start(**kw)
             self.started = True
         return self
@@ -469,7 +473,8 @@ class HapticEffect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is stopping effect {self.effect.effect_id}")
-            logging.info(f"Stop effect {self.effect.effect_id} ({self.effect.name})")
+            name = f" (\"{self.name}\")" if self.name else ""  
+            logging.info(f"Stop effect {self.effect.effect_id} ({self.effect.name}){name}")
             self.effect.stop() 
             self.started = False
         return self
@@ -479,7 +484,8 @@ class HapticEffect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is destryoing effect {self.effect.effect_id}")
-            logging.info(f"Destroying effect {self.effect.effect_id} ({self.effect.name})")
+            name = f" (\"{self.name}\")" if self.name else ""  
+            logging.info(f"Destroying effect {self.effect.effect_id} ({self.effect.name}){name}")
             self.effect.destroy()
             self.effect = None
 
