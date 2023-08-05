@@ -30,6 +30,7 @@ parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store
 # Add config file argument, default config.ini
 parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
 parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS (default DCS', default="DCS")
+parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default='joystick')
 
 args = parser.parse_args()
 import json
@@ -71,7 +72,7 @@ import re
 import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QListView, QScrollArea
+    QRadioButton, QListView, QScrollArea, QHBoxLayout
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
 # from PyQt5.QtWidgets import *
@@ -238,6 +239,7 @@ class TelemManager(QObject, threading.Thread):
             self.lastFrameTime = monotonic()
             data = data[0].decode("utf-8").split(";")
             telem_data = {}
+            telem_data["FFBType"] = args.type
 
             if data[0] == "DISCONNECT":
                 logging.info("Telemetry disconnected")
@@ -340,6 +342,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("TelemFFB")
+        self.setGeometry(100, 100, 400, 700)
         self.resize(400, 700)
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -359,10 +362,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
         layout.addWidget(QLabel(f"Config File: {args.configfile}"))
         cfg = get_config()
-        dcs_enabled = 1
-        msfs_enabled = 0
+        dcs_enabled = 'Yes'
+        msfs_enabled = 'No'
         if args.sim == "MSFS" or cfg["system"].get("msfs_enabled") == "1":
-            msfs_enabled = 1
+            msfs_enabled = 'Yes'
         simlabel = QLabel(f"Sims Enabled: DCS: {dcs_enabled} | MSFS: {msfs_enabled}")
         simlabel.setToolTip("Enable/Disable Sims in config file or use '-s DCS|MSFS' argument to specify")
         layout.addWidget(simlabel)
@@ -412,14 +415,28 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
+        self.layout = QVBoxLayout(central_widget)
 
-        # Set the central widget of the main window
-        # self.setCentralWidget(central_widget)
+        row_layout = QHBoxLayout()
+        self.doc_label = QLabel()
+        doc_url = 'https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.27yzpife8719'
+        label_txt = 'TelemFFB Documentation'
+        self.doc_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.doc_label.setOpenExternalLinks(True)
+        self.doc_label.setText(f'<a href="{doc_url}">{label_txt}</a>')
+        self.dl_label = QLabel()
+        doc_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
+        label_txt = 'Download Latest'
+        self.dl_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.dl_label.setOpenExternalLinks(True)
+        self.dl_label.setText(f'<a href="{doc_url}">{label_txt}</a>')
+        self.dl_label.setAlignment(Qt.AlignRight)
 
-        # # Add the FFBTestTool button
-        # self.ffb_test_button = QPushButton("Show FFBTestTool")
-        # self.ffb_test_button.clicked.connect(self.show_ffb_test_tool)
-        # layout.addWidget(self.ffb_test_button)
+        row_layout.addWidget(self.doc_label)
+        row_layout.addWidget(self.dl_label)
+
+        layout.addLayout(row_layout)
+        central_widget.setLayout(layout)
 
     # def show_ffb_test_tool(self):
     #     try:
