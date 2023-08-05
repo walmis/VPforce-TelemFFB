@@ -99,6 +99,8 @@ if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
     utils.teleplot.configure(args.teleplot)
 
+version = utils.get_version()
+
 def format_dict(data, prefix=""):
     output = ""
     for key, value in data.items():
@@ -332,8 +334,12 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("TelemFFB")
         self.setGeometry(100, 100, 400, 700)
+        if version:
+            self.setWindowTitle(f"TelemFFB ({version})")
+        else:
+            self.setWindowTitle(f"TelemFFB")
+
         self.resize(400, 700)
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -515,7 +521,7 @@ def main():
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
 
     logging.getLogger().handlers[0].setStream(sys.stdout)
-    logging.info("TelemFFB Starting")
+    logging.info(f"TelemFFB (version {version}) Starting")
 
     # check and install/update export lua script
     utils.install_export_lua()

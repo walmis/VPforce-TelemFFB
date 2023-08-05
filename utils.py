@@ -30,6 +30,7 @@ import time
 import random
 import time
 import zlib
+import subprocess
 
 class Vector2D:
     def __init__(self, x, y):
@@ -638,6 +639,19 @@ def winreg_get(path, key):
     except WindowsError:
         return None
 
+def get_version():
+    ver = "UNKNOWN"
+    try:
+        import version
+        ver = version.VERSION
+        return ver
+    except: pass
+
+    try:
+        ver = subprocess.check_output(['git', 'describe', '--always', '--abbrev=8', '--dirty']).decode('ascii').strip()
+        ver = f"local-{ver}"
+    except: pass
+    return ver
 
 if __name__ == "__main__":
     #test install

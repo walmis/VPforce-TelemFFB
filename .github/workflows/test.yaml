@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    
+    - name: Create Version file
+      run: |
+        echo VERSION = \"`git describe --always --abbrev=8 --dirty`\" > version.py
+
     - name: Package Application
       uses: walmis/pyinstaller-action-windows@main
       with:
