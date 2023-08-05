@@ -32,10 +32,13 @@ import time
 import zlib
 
 class Vector:
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
+    def __init__(self, x, y=None, z=None):
+        if isinstance(x, list):
+            self.x, self.y, self.z = x
+        else:
+            self.x = x
+            self.y = y
+            self.z = z
     
     def __eq__(self, p):
         return self.x == p.x and self.y == p.y and self.z == p.z
@@ -160,9 +163,14 @@ def to_number(v : str):
         if v.endswith("kt"): # handle unit conversion: kt->ms
             scale = 0.51444
             v = v.strip("kt")
-        if v.endswith("kph"): # handle unit conversion: kt->ms
+        if v.endswith("kph"): # handle unit conversion: kph->ms
             scale = 1/3.6
             v = v.strip("kph")
+        if v.endswith("mph"): # handle unit conversion: mph->ms
+            scale = 0.44704
+            v = v.strip("mph")
+        if v.endswith("deg"): # just strip out degrees suffix
+            v = v.strip("deg")
 
         if "." in v:
             return float(v) * scale
