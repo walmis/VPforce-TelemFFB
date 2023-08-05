@@ -132,6 +132,24 @@ def load_config(filename) -> ConfigObj:
         return err
 
 _config = None
+_config_mtime = 0
+
+# if update is true, update the current modified time
+def config_has_changed(update=False) -> bool:
+    global _config_mtime
+    global _config
+    
+    # "hash" both mtimes together
+    tm = int(os.path.getmtime(args.configfile))
+    tm += int(os.path.getmtime("config.user.ini"))
+    if update:
+        _config_mtime = tm
+
+    if _config_mtime != tm:
+        _config = None # force reloading config on next get_config call
+        return True
+    return False
+
 def get_config() -> ConfigObj:
     global _config
     # TODO: check if config files changed and reload
@@ -141,8 +159,10 @@ def get_config() -> ConfigObj:
     user = load_config("config.user.ini")
     if user and main:
         main.update(user)
+    config_has_changed(update=True)
     _config = main
     return main
+
 
 class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
     def __init__(self, parent=None):
@@ -278,6 +298,10 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraftName = aircraft_name
 
             if self.currentAircraft:
+                if config_has_changed():
+                    logging.info("Configuration has changed, reloading")
+                    params, cls_name = self.get_aircraft_config(aircraft_name)
+                    self.currentAircraft.apply_settings(params)
                 try:
                     _tm = time.perf_counter()
                     commands = self.currentAircraft.on_telemetry(telem_data)
@@ -293,8 +317,9 @@ class TelemManager(QObject, threading.Thread):
                     if item in telem_data:
                         utils.teleplot.sendTelemetry(item, telem_data[item])
 
-            self.telemetryReceived.emit(telem_data)
-
+            try: # sometime Qt object is destroyed first on exit and this may cause a runtime exception
+                self.telemetryReceived.emit(telem_data)
+            except: pass
 
 class SimConnectSock(SimConnectManager):
     def __init__(self):
