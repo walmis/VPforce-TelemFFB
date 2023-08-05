@@ -97,6 +97,7 @@ AXIS_ENABLE_DIR = 4
 
 # Create a pretty printable dictionary without the "Effect" prefix
 effect_names = {
+    0: "Invalid",
     1: "Constant",
     2: "Ramp",
     3: "Square",
@@ -215,7 +216,17 @@ class FFBEffectHandle:
         self.ffb : FFBRhino = device
         self.effect_id = effect_id
         self.type = type
-        self._finalizer = weakref.finalize(self, self.destroy)
+        self.f = weakref.finalize(self, lambda ref: ref() and ref().destroy(), weakref.ref(self))
+
+    def __del__(self):
+        self.destroy()
+
+    @property
+    def name(self):
+        return effect_names.get(self.type)
+    
+    def __repr__(self):
+        return f"FFBEffectHandle({self.effect_id}, {self.name})"
     
     def start(self, loopCount=1, override=False):
         op = OP_START
@@ -359,6 +370,9 @@ class HapticEffect:
     started : bool = False
     modulator = None
 
+    def __repr__(self):
+        return f"HapticEffect({self.effect})"
+
     @classmethod
     def open(cls, vid = 0xFFFF, pid=0x2055, serial=None) -> None:
         logging.info(f"Open Rhino HID {vid:04X}:{pid:04X}")
@@ -436,7 +450,7 @@ class HapticEffect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is starting effect {self.effect.effect_id}")
-            logging.info(f"Start effect {self.effect.effect_id} ({effect_names[self.effect.type]})")
+            logging.info(f"Start effect {self.effect.effect_id} ({self.effect.name})")
             self.effect.start(**kw)
             self.started = True
         return self
@@ -446,17 +460,17 @@ class HapticEffect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is stopping effect {self.effect.effect_id}")
-            logging.info(f"Stop effect {self.effect.effect_id} ({effect_names[self.effect.type]})")
+            logging.info(f"Stop effect {self.effect.effect_id} ({self.effect.name})")
             self.effect.stop() 
             self.started = False
         return self
 
     def destroy(self):
-        if self.effect:
+        if self.effect and self.effect.effect_id:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is destryoing effect {self.effect.effect_id}")
-            logging.info(f"Destroying effect {self.effect.effect_id} ({effect_names[self.effect.type]})")
+            logging.info(f"Destroying effect {self.effect.effect_id} ({self.effect.name})")
             self.effect.destroy()
             self.effect = None
 
