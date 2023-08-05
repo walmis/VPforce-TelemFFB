@@ -255,6 +255,7 @@ class AircraftBase(object):
             local_buffet_aoa = self.buffet_aoa
 
         if aoa < local_buffet_aoa:
+            effects.dispose("buffeting")
             return
         
         airflow_factor = utils.scale_clamp(tas, (0, max_airflow_speed), (0, 1.0))
