@@ -17,6 +17,7 @@
 
 import time
 import math
+from math import sin, cos, radians, sqrt, atan2
 from simconnect import *
 from ctypes import byref, cast, sizeof
 from time import sleep
@@ -195,33 +196,32 @@ class Aircraft(AircraftBase):
 
         base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
         base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
-        logging.info(f"Base Elev/Ailer coeff = {base_elev_coeff}/{base_ailer_coeff}")
-
+        #logging.info(f"Base Elev/Ailer coeff = {base_elev_coeff}/{base_ailer_coeff}")
 
         rudder_angle = telem_data["RudderDefl"] * rad  # + trim?
 
         # print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
 
         slip_angle = telem_data["SideSlip"] * rad
-        g_force = telem_data["G"] - 1
+        g_force = telem_data["G"] # this includes earths gravity
 
-        # calculate air flow velocity exiting the prop
-        # based on https://www.grc.nasa.gov/www/k-12/airplane/propth.html
-
-        incidence_vec = utils.Vector(telem_data["VelX"], telem_data["VelY"], telem_data["VelZ"])
-        wind_vec = utils.Vector(telem_data["AmbWindX"], telem_data["AmbWindY"], telem_data["AmbWindZ"])
+        incidence_vec = utils.Vector(telem_data["VelWorld"])
+        wind_vec = utils.Vector(telem_data["AmbWind"])
         incidence_vec = incidence_vec - wind_vec
+        # Rotate the vector from world frame into body frame
         incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
         incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
         incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
         _airspeed = incidence_vec.z
 
-        _prop_air_vel = math.sqrt(
+        # calculate air flow velocity exiting the prop
+        # based on https://www.grc.nasa.gov/www/k-12/airplane/propth.html
+        _prop_air_vel = sqrt(
             2 * telem_data["PropThrust1"] / (
                         telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
 
-        if abs(incidence_vec.y) > 0.5 and _prop_air_vel > 1:
-            _elevator_aoa = math.atan2(-incidence_vec.y, _prop_air_vel) * deg
+        if abs(incidence_vec.y) > 0.5 and _prop_air_vel > 1: # avoid edge cases
+            _elevator_aoa = atan2(-incidence_vec.y, _prop_air_vel) * deg
         else:
             _elevator_aoa = 0
 
@@ -229,34 +229,39 @@ class Aircraft(AircraftBase):
 
         # calculate dynamic pressure based on air flow from propeller
         # elevator_prop_flow_ratio defines how much prop wash the elevator receives
-        _elev_dyn_pressure = utils.mix(telem_data["DynPressure"], 0.5 * telem_data["AirDensity"] * _prop_air_vel ** 2, self.elevator_prop_flow_ratio) * self.dyn_pressure_scale
+        _elev_dyn_pressure = utils.mix(telem_data["DynPressure"], 
+                                       0.5 * telem_data["AirDensity"] * _prop_air_vel ** 2, 
+                                       self.elevator_prop_flow_ratio) * self.dyn_pressure_scale
 
         # scale dynamic pressure to FFB friendly values
         _dyn_pressure = telem_data["DynPressure"] * self.dyn_pressure_scale
 
-        slip_gain = 1.0 - self.slip_gain * math.sin(slip_angle)
-        telem_data["_slip_gain"] = slip_gain
+        _slip_gain = 1.0 - self.slip_gain * abs(sin(slip_angle))
+        telem_data["_slip_gain"] = _slip_gain
 
         # increasing G force causes increase in elevator droop effect
         _elevator_droop_term = self.elevator_droop_moment * g_force / (1 + _elev_dyn_pressure)
         telem_data["_elevator_droop_term"] = _elevator_droop_term
-        logging.debug(f"ailer gain = {self.aileron_gain}")
-        aileron_coeff = _dyn_pressure * self.aileron_gain * slip_gain
+        #logging.debug(f"ailer gain = {self.aileron_gain}")
+        aileron_coeff = _dyn_pressure * self.aileron_gain * _slip_gain
 
         # add data to telemetry packet so they become visible in the GUI output
         telem_data["_prop_air_vel"] = _prop_air_vel
         telem_data["_elev_dyn_pressure"] = _elev_dyn_pressure
-        logging.debug(f"elev gain = {self.elevator_gain}")
-        elevator_coeff = (_elev_dyn_pressure) * self.elevator_gain * slip_gain
+        #logging.debug(f"elev gain = {self.elevator_gain}")
+        elevator_coeff = (_elev_dyn_pressure) * self.elevator_gain * _slip_gain
         # a, b, c = 0.5, 0.3, 0.1
         # elevator_coeff = a * (_elev_dyn_pressure ** 2) + b * _elev_dyn_pressure * self.elevator_gain + c * slip_gain
 
         telem_data["_elev_coeff"] = elevator_coeff
         telem_data["_aile_coeff"] = aileron_coeff
 
-        _aoa_term = math.sin(_elevator_aoa * rad) * self.aoa_gain
+        # force is proportional to elevator deflection vs incoming airflow, this creates a dynamic elevator effect on top of spring
+        _aoa_term = sin(( _elevator_aoa - telem_data["ElevDefl"]) * rad) * self.aoa_gain * _elev_dyn_pressure * _slip_gain
         telem_data["_aoa_term"] = _aoa_term
-        telem_data["_G_term"] = (self.g_force_gain * g_force)
+
+        _G_term = (self.g_force_gain * g_force)
+        telem_data["_G_term"] = _G_term
 
         #       hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
         #       data["_hpf_pitch_acc"] = hpf_pitch_acc # test stuff
@@ -277,12 +282,21 @@ class Aircraft(AircraftBase):
         self.spring.effect.setCondition(self.spring_x)
 
         # update constant forces
-        # self.const_y.constant( clamp(self.hpf_pitch(-data["PitchRate"])*0.1, -0.1, 0.1), 0).start()
-        self.const_y.constant(clamp(- _elevator_droop_term + telem_data["_aoa_term"] - telem_data["_G_term"], -1, 1), 0).start()
+        cf_pitch = -_elevator_droop_term + _aoa_term - _G_term
+        cf_pitch = clamp(cf_pitch, -1.0, 1.0)
+
+        cf_roll = 0
+
+        cf = utils.Vector2D(cf_pitch, cf_roll)
+        mag, theta = cf.to_polar()
+        self.const_y.constant(mag, theta*deg).start()
 
         rudder_angle = rudder_angle - slip_angle
 
     def on_telemetry(self, telem_data):
+        if telem_data["Parked"]: # Aircraft is parked, do nothing
+            return
+
         ### Generic Aircraft Class Telemetry Handler
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
@@ -339,7 +353,7 @@ class PropellerAircraft(Aircraft):
             current_rpm = max(current_rpm)
         if self.engine_rumble:
             self._update_engine_rumble(current_rpm)
-        self._update_aoa_effect(telem_data)
+        #self._update_aoa_effect(telem_data) # currently calculated in  _update_flight_controls
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=800*kt2ms, spd_thresh_hi=140*kt2ms )

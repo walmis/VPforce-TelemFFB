@@ -163,6 +163,7 @@ class AircraftBase(object):
         #  effects["gforce_damper"].damper(coef_y=1024).start()
 
         logging.debug(f"G's = {z_gs} | gfactor = {g_factor}")
+
     def _aoa_reduction_force_effect(self, telem_data):
         start_aoa = self.critical_aoa_start
         end_aoa = self.critical_aoa_max
@@ -176,6 +177,7 @@ class AircraftBase(object):
         else:
             effects.dispose("crit_aoa")
         return
+    
     def _decel_effect(self, telem_data):
         if self._sim_is_dcs(telem_data):
             y_gs = telem_data.get("ACCs")[0]
@@ -228,21 +230,33 @@ class AircraftBase(object):
     def _update_buffeting(self, telem_data: dict):
         if not self.buffeting_intensity:
             return
-        stall_buffet_threshold_percent = 90
+        
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
 
         max_airflow_speed = 75*knots  # speed at which airflow_factor is 1.0
 
-        if self._sim_is_msfs(telem_data):
-            local_stall_aoa = telem_data.get("StallAoA", 0)  # Get stall AoA telemetry from MSFS
-            local_buffet_aoa = local_stall_aoa * (stall_buffet_threshold_percent / 100)
+        ds = telem_data.get("DesignSpeed", None)
+        if ds:
+            stall_aoa = telem_data.get("StallAoA", None)
+            #vc - This design constant represents the aircraft ideal cruising speed
+            #vs0 - This design constant represents the the stall speed when flaps are fully extended
+            #vs1 - This design constant represents the stall speed when flaps are fully retracted
+            vc, vs0, vs1 = ds
+            #max_airflow_speed = vc
+            
+        local_stall_aoa = telem_data.get("StallAoA", None)
+        if local_stall_aoa is not None:
+            flaps = utils.average(telem_data.get("Flaps", 0)) * 0.2 # flaps down increases stall threshold by 20%
+            stall_buffet_threshold_percent = 0.5 + flaps
+            local_buffet_aoa = local_stall_aoa * stall_buffet_threshold_percent
         else:
             local_stall_aoa = self.stall_aoa
             local_buffet_aoa = self.buffet_aoa
 
         if aoa < local_buffet_aoa:
             return
+        
         airflow_factor = utils.scale_clamp(tas, (0, max_airflow_speed), (0, 1.0))
         buffeting_factor = utils.scale_clamp(aoa, (local_buffet_aoa, local_stall_aoa), (0.0, 1.0))
         # todo calc frequency
@@ -251,11 +265,11 @@ class AircraftBase(object):
         # freq, mag = self._calc_buffeting(aoa, tas, telem_data)
         # manage periodic effect for buffeting
         mag = airflow_factor * buffeting_factor * self.buffeting_intensity
-        logging.debug(f"Buffeting: {mag}")
+        #logging.debug(f"Buffeting: {mag}")
         effects["buffeting"].periodic(freq, mag, utils.RandomDirectionModulator).start()
         # effects["buffeting2"].periodic(freq, mag, 45, phase=120).start()
 
-        telem_data["dbg_buffeting"] = mag  # save debug value
+        telem_data["_buffeting"] = mag  # save debug value
 
     def _update_drag_buffet(self, telem_data: dict, type: str):
         drag_buffet_threshold = 100  # indicated TAS via telemetry
