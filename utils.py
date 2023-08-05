@@ -31,6 +31,45 @@ import random
 import time
 import zlib
 
+class Vector2D:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __str__(self):
+        return f"Vector2D({self.x}, {self.y})"
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __add__(self, other):
+        return Vector2D(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other):
+        return Vector2D(self.x - other.x, self.y - other.y)
+
+    def __mul__(self, scalar):
+        return Vector2D(self.x * scalar, self.y * scalar)
+
+    def __rmul__(self, scalar):
+        return self.__mul__(scalar)
+
+    def __truediv__(self, scalar):
+        return Vector2D(self.x / scalar, self.y / scalar)
+
+    def magnitude(self):
+        return math.sqrt(self.x ** 2 + self.y ** 2)
+
+    def dot(self, other):
+        return self.x * other.x + self.y * other.y
+
+    def cross(self, other):
+        return self.x * other.y - self.y * other.x
+    
+    def to_polar(self):
+        r = self.magnitude()
+        theta_radians = math.atan2(self.y, self.x)
+        return r, theta_radians
 class Vector:
     def __init__(self, x, y=None, z=None):
         if isinstance(x, list):
@@ -291,6 +330,9 @@ def pressure_from_altitude(altitude_m):
 def calculate_checksum(file_path):
     crc = zlib.crc32(open(file_path, 'rb').read())
     return crc
+
+def average(l):
+    return sum(l)/float(len(l))
 
 class LowPassFilter:
     def __init__(self, cutoff_freq_hz, init_val=0.0):
@@ -575,12 +617,6 @@ class OutLog(QtCore.QObject):
         except: pass
         if self.out:
             self.out.write(m)
-
-    def write(self, m):
-        try:
-            self.textReceived.emit(m)
-        except: pass
-
 
     def flush(self): pass
 
