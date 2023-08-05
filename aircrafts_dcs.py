@@ -24,7 +24,7 @@ import utils
 import logging
 import random
 from aircraft_base import AircraftBase
-
+import json
 
 
 #unit conversions (to m/s)
@@ -123,6 +123,16 @@ class Aircraft(AircraftBase):
         :param new_data: New telemetry data
         :type new_data: dict
         """
+
+        try:
+            j = json.loads(telem_data["MechInfo"])
+            out = utils.flatten_dict(j, "", "_")
+            for k, v in out.items():
+                telem_data[k] = v
+            del telem_data["MechInfo"]
+        except:
+            pass
+
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"   #inject aircraft class into telemetry
         self._telem_data = telem_data

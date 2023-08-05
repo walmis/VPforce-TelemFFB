@@ -255,15 +255,6 @@ class TelemManager(QObject, threading.Thread):
                     traceback.print_exc()
                     print("Error Parsing Parameter: ", repr(i))
 
-            try:
-                j = json.loads(telem_data["MechInfo"])
-                out = utils.flatten_dict(j, "", "_")
-                for k, v in out.items():
-                    telem_data[k] = v
-                del telem_data["MechInfo"]
-            except:
-                pass
-
             # print(items)
             aircraft_name = telem_data.get("N")
             data_source = telem_data.get("src", None)
@@ -463,16 +454,12 @@ class MainWindow(QMainWindow):
         try:
             items = ""
             for k, v in data.items():
-                if k == "MechInfo":
-                    v = format_dict(v, "MechInfo.")
-                    items += f"{v}"
+                if type(v) == float:
+                    items += f"{k}: {v:.3f}\n"
                 else:
-                    if type(v) == float:
-                        items += f"{k}: {v:.3f}\n"
-                    else:
-                        if isinstance(v, list):
-                            v = "[" + ", ".join([f"{x:.3f}" if not isinstance(x, str) else x for x in v]) + "]"
-                        items += f"{k}: {v}\n"
+                    if isinstance(v, list):
+                        v = "[" + ", ".join([f"{x:.3f}" if not isinstance(x, str) else x for x in v]) + "]"
+                    items += f"{k}: {v}\n"
 
             self.lbl_telem_data.setText(items)
         except Exception as e:
