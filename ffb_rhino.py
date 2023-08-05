@@ -396,14 +396,14 @@ class HapticEffect:
 
         if coef_x is not None:
             cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
-                                            positiveCoefficient=coef_x, 
-                                            negativeCoefficient=coef_x)
+                                            positiveCoefficient=int(coef_x), 
+                                            negativeCoefficient=int(coef_x))
             self.effect.setCondition(cond_x)
 
         if coef_y is not None:
             cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
-                                            positiveCoefficient=coef_y, 
-                                            negativeCoefficient=coef_y)
+                                            positiveCoefficient=int(coef_y), 
+                                            negativeCoefficient=int(coef_y))
             self.effect.setCondition(cond_y)
 
         return self
