@@ -70,6 +70,13 @@ class Vector2D:
         r = self.magnitude()
         theta_radians = math.atan2(self.y, self.x)
         return r, theta_radians
+    
+    def normalize(self):
+        magnitude = self.magnitude()
+        if magnitude == 0:
+            raise ValueError("Cannot normalize a zero-length vector.")
+        return Vector2D(self.x / magnitude, self.y / magnitude)
+    
 class Vector:
     def __init__(self, x, y=None, z=None):
         if isinstance(x, list):

@@ -131,8 +131,7 @@ class Aircraft(AircraftBase):
         self.spring = HapticEffect().spring()
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
-        self.spring.start()
-        self.const_y = HapticEffect().constant(0, 0)
+        self.const_force = HapticEffect().constant(0, 0)
 
         # aileron_max_deflection = 20.0*0.01745329
         self.elevator_max_deflection = 12.0 * 0.01745329
@@ -147,6 +146,9 @@ class Aircraft(AircraftBase):
         self.wing_shadow_AoA = 900.0 * 0.01745329
         self.wing_shadow_angle = 900.0 * 0.01745329
         self.stick_shaker_AoA = 16.0 * 0.01745329
+
+        # FFB force value per lateral G
+        self.lateral_force_gain = 0.2 
 
         self.aoa_gain = 1.0
         self.g_force_gain = 0.1
@@ -285,11 +287,18 @@ class Aircraft(AircraftBase):
         cf_pitch = -_elevator_droop_term + _aoa_term - _G_term
         cf_pitch = clamp(cf_pitch, -1.0, 1.0)
 
-        cf_roll = 0
+        # add force on lateral axis (sideways)
+        _side_accel = -telem_data["AccBody"][0] * self.lateral_force_gain
+        cf_roll = _side_accel
 
         cf = utils.Vector2D(cf_pitch, cf_roll)
+        if cf.magnitude() > 1.0: 
+            cf = cf.normalize()
+
         mag, theta = cf.to_polar()
-        self.const_y.constant(mag, theta*deg).start()
+        
+        self.const_force.constant(mag, theta*deg).start()
+        self.spring.start() # ensure spring is started
 
         rudder_angle = rudder_angle - slip_angle
 
@@ -318,7 +327,8 @@ class Aircraft(AircraftBase):
     def on_timeout(self):
         super().on_timeout()
         logging.debug("Timeout, preparing to stop effects")
-        effects.clear()
+        self.const_force.stop()
+        self.spring.stop()
         for e in effects.values():
             logging.debug(f"Timeout effect: {e}")
             e.stop()
