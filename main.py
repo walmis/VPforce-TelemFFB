@@ -193,21 +193,32 @@ class TelemManager(QObject, threading.Thread):
         threading.Thread.__init__(self)
 
         self.daemon = True
+        self._run = True
 
-    def get_aircraft_config(self, aircraft_name):
+    def get_aircraft_config(self, aircraft_name, default_section=None):
         config = get_config()
-        # find matching aircraft in config
-        params = utils.sanitize_dict(config["default"])
+
+        if default_section:
+            logging.info(f"Loading parameters from '{default_section}' section")
+            params = utils.sanitize_dict(config[default_section])
+        else:
+            params = utils.sanitize_dict(config["default"])
+
         type = "Aircraft"
 
         for section,conf in config.items():
+            # find matching aircraft in config
             if re.match(section, aircraft_name):
                 conf = utils.sanitize_dict(conf)
-                logging.info(f"Found aircraft {aircraft_name} in config")
+                logging.info(f"Found aircraft '{aircraft_name}' in config")
                 type = conf.get("type", "Aircraft")
                 params.update(conf)
 
         return (params, type)
+    
+    def quit(self):
+        self._run = False
+        self.join()
         
     def run(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
@@ -219,7 +230,7 @@ class TelemManager(QObject, threading.Thread):
         s.bind(("", port))
         logging.info(f"Listening on UDP :{port}")
 
-        while True:
+        while self._run:
             try:
                 data = s.recvfrom(4096)
                 while utils.sock_readable(s):
@@ -268,7 +279,7 @@ class TelemManager(QObject, threading.Thread):
             if aircraft_name and aircraft_name != self.currentAircraftName:
                 
                 if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
-                    params, cls_name = self.get_aircraft_config(aircraft_name)
+                    params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
 
                     Class = getattr(module, cls_name, None)
                     if not Class:
@@ -281,7 +292,7 @@ class TelemManager(QObject, threading.Thread):
                         serial = HapticEffect.device.serial
                         subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial])
 
-                    logging.info(f"Creating handler for {aircraft_name}: {Class}")
+                    logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
                     # instantiate new aircraft handler
                     self.currentAircraft = Class(aircraft_name)
                     self.currentAircraft.apply_settings(params)
@@ -291,7 +302,7 @@ class TelemManager(QObject, threading.Thread):
             if self.currentAircraft:
                 if config_has_changed():
                     logging.info("Configuration has changed, reloading")
-                    params, cls_name = self.get_aircraft_config(aircraft_name)
+                    params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
                     self.currentAircraft.apply_settings(params)
                 try:
                     _tm = time.perf_counter()
@@ -568,6 +579,7 @@ def main():
         logging.exception("Error loading MSFS enable flag from config file")
 
     app.exec_()
+    manager.quit()
 
 
 if __name__ == "__main__":
