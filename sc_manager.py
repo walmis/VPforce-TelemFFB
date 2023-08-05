@@ -290,7 +290,7 @@ class SimConnectManager(threading.Thread):
                     self._read_telem()
 
             except OSError:
-                time.sleep(1)
+                time.sleep(10)
                 pass
 
 # run test
