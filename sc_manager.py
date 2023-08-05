@@ -6,11 +6,40 @@ import logging
 
 REQ_ID = 0xfeed
 
+surface_types = {
+    0: "Concrete",
+    1: "Grass",
+    2: "Water",
+    3: "Grass_bumpy",
+    4: "Asphalt",
+    5: "Short_grass",
+    6: "Long_grass",
+    7: "Hard_turf",
+    8: "Snow",
+    9: "Ice",
+    10: "Urban",
+    11: "Forest",
+    12: "Dirt",
+    13: "Coral",
+    14: "Gravel",
+    15: "Oil_treated",
+    16: "Steel_mats",
+    17: "Bituminus",
+    18: "Brick",
+    19: "Macadam",
+    20: "Planks",
+    21: "Sand",
+    22: "Shale",
+    23: "Tarmac",
+    24: "Wright flyer track",
+}
+
 class SimVar:
-    def __init__(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None):
+    def __init__(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
         self.name = name
         self.var = var
         self.scale = scale
+        self.mutator = mutator
         self.sc_unit = sc_unit
         self.unit = unit
         self.datatype = type
@@ -19,6 +48,15 @@ class SimVar:
         if self.sc_unit.lower() in ["bool", "enum"]:
             self.datatype = DATATYPE_INT32
 
+    def _calculate(self, input):
+        if self.mutator:
+            input = self.mutator(input)
+        if self.scale:
+            input = input*self.scale
+        return input
+
+    def __repr__(self) -> str:
+        return f"SimVar({self.name} '{self.var}')"
 
     @property
     def c_type(self):
@@ -66,17 +104,16 @@ EV_STOPPED = 65497  # id for stopped event
 EV_SIMSTATE = 65496
 class SimConnectManager(threading.Thread):
     sim_vars = [
-
         SimVar("T", "ABSOLUTE TIME","Seconds" ),
         SimVar("N", "TITLE", "", type=DATATYPE_STRING128),
         SimVar("G", "G FORCE", "Number"),
-        SimVar("G_BODY_Z", "ACCELERATION BODY Z", "feet per second squared", scale=0.031081), # todo replace usage with AccBody Array # scal fps/s to g
         SimVarArray("AccBody", "ACCELERATION BODY <>", "feet per second squared", scale=0.031081, keywords=("X", "Y", "Z")), #scale fps/s to g
         SimVar("Gdot", "SEMIBODY LOADFACTOR YDOT", "Number"),
         SimVar("TAS", "AIRSPEED TRUE", "meter/second"),
         SimVar("AirDensity", "AMBIENT DENSITY", "kilograms per cubic meter"),
         SimVar("AoA", "INCIDENCE ALPHA", "degrees"),
         SimVar("StallAoA", "STALL ALPHA", "degrees"),
+        #SimVar("ZeroLiftAoA", "ZERO LIFT ALPHA", "degrees"),
         SimVar("SideSlip", "INCIDENCE BETA", "degrees"),
         SimVar("ElevDefl", "ELEVATOR DEFLECTION", "degrees"),
         SimVar("ElevDeflPct", "ELEVATOR DEFLECTION PCT", "Percent Over 100"),
@@ -103,30 +140,26 @@ class SimConnectManager(threading.Thread):
         SimVar("PitchAccel", "ROTATION ACCELERATION BODY X", "degrees per second squared"), # todo replace usage with AccRotBody array
         SimVar("RollAccel", "ROTATION ACCELERATION BODY Z", "degrees per second squared"), # todo replace usage with AccRotBody array
         SimVarArray("AccRotBody", "ROTATION ACCELERATION BODY <>", "degrees per second squared", keywords=("X", "Y", "Z")),
+        SimVarArray("DesignSpeed", "DESIGN SPEED <>", "meter/second", keywords=("VC", "VS0", "VS1")),
         #SimVar("LinearCLAlpha", "LINEAR CL ALPHA", "Per Radian"),
         #SimVar("SigmaSqrt", "SIGMA SQRT", "Per Radian"),
         SimVar("SimDisabled", "SIM DISABLED", "Bool"),
         SimVar("SimOnGround", "SIM ON GROUND", "Bool"),
         SimVar("Parked", "PLANE IN PARKING STATE", "Bool"),
-        SimVar("SurfaceType", "SURFACE TYPE", "Enum"),
+        SimVar("SurfaceType", "SURFACE TYPE", "Enum", mutator=lambda x: surface_types.get(x, "unknown")),
         SimVar("EngineType", "ENGINE TYPE", "Enum"),
         SimVarArray("EngVibration", "ENG VIBRATION", "Number", min=1, max=4),
         SimVar("NumEngines", "NUMBER OF ENGINES", "Number", type=DATATYPE_INT32),
-        SimVar("AmbWindX", "AMBIENT WIND X", "meter/second"), # todo replace usage with AmbWind array
-        SimVar("AmbWindY", "AMBIENT WIND Y", "meter/second"), # todo replace usage with AmbWind array
-        SimVar("AmbWindZ", "AMBIENT WIND Z", "meter/second"), # todo replace usage with AmbWind array
         SimVarArray("AmbWind", "AMBIENT WIND <>", "meter/second", keywords= ("X", "Y", "Z")),
-        SimVar("VelX", "VELOCITY WORLD X", "meter/second"), # todo replace usage with VelWorld array
-        SimVar("VelY", "VELOCITY WORLD Y", "meter/second"), # todo replace usage with VelWorld array
-        SimVar("VelZ", "VELOCITY WORLD Z", "meter/second"), # todo replace usage with VelWorld array
         SimVarArray("VelWorld", "VELOCITY WORLD <>", "meter/second", keywords= ("X", "Y", "Z")),
         SimVarArray("WeightOnWheels", "CONTACT POINT COMPRESSION", "Number", min=0, max=2),
         SimVarArray("Flaps", "TRAILING EDGE FLAPS <> PERCENT", "Percent Over 100", keywords=("LEFT", "RIGHT")),
         SimVarArray("Gear", "GEAR <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
         SimVarArray("Spoilers", "SPOILERS <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
         SimVarArray("Afterburner", "TURB ENG AFTERBURNER", "Number", min=1, max=2),
-        SimVar("AfterburnerPct", "TURB ENG AFTERBURNERR PCT ACTIVE", "Percent Over 100"),
-        SimVar("ACisFBW", "FLY BY WIRE FAC SWITCH", "bool")
+        SimVar("AfterburnerPct", "TURB ENG AFTERBURNER PCT ACTIVE", "Percent Over 100"),
+        SimVar("ACisFBW", "FLY BY WIRE FAC SWITCH", "bool"),
+        SimVar("StallWarning", "STALL WARNING", "bool")
     ]
     
     def __init__(self):
@@ -149,10 +182,12 @@ class SimConnectManager(threading.Thread):
         for sv in (self.sim_vars):
             if isinstance(sv, SimVarArray):
                 for sv in sv.vars:
+                    logging.debug(f"Subscribe SimVar {i} {sv}")
                     self.sc.AddToDataDefinition(def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
                     self.subscribed_vars.append(sv)
                     i+=1
             else:    
+                logging.debug(f"Subscribe SimVar {i} {sv}")
                 self.sc.AddToDataDefinition(def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
                 self.subscribed_vars.append(sv)
                 i+=1
@@ -183,9 +218,9 @@ class SimConnectManager(threading.Thread):
             recv = ReceiverInstance.cast_recv(pRecv)
             #print(f"got {recv.__class__.__name__}")
             if isinstance(recv, RECV_EXCEPTION):
-                print(f"Got exception {recv.dwException}, sendID {recv.dwSendID}, index {recv.dwIndex}")
+                logging.error(f"SimConnect exception {recv.dwException}, sendID {recv.dwSendID}, index {recv.dwIndex}")
             elif isinstance(recv, RECV_QUIT):
-                print("Quit received")
+                logging.info("Quit received")
                 break
             elif isinstance(recv, RECV_EVENT):
                 if recv.uEventID == EV_PAUSED:
@@ -213,22 +248,21 @@ class SimConnectManager(threading.Thread):
                         idx = cast(byref(recv, offset), POINTER(DWORD))[0]
                         offset += sizeof(DWORD)
                         # DATATYPE_FLOAT64 => c_double
-                        var = self.subscribed_vars[idx]
+                        var : SimVar = self.subscribed_vars[idx]
                         c_type = var.c_type
                         if var.datatype == DATATYPE_STRING128: #fixme: other string types
                             val = str(cast(byref(recv, offset), POINTER(c_type))[0].value, "utf-8")
-
                         else:
                             val = cast(byref(recv, offset), POINTER(c_type))[0]
                         offset += sizeof(c_type)
-                        if var.scale is not None:
-                            val *= var.scale
+                        val = var._calculate(val)
                         
                         if var.parent: # var is part of array
                             var.parent.values[var.index-var.parent.min] = val
                             data[var.parent.name] = var.parent.values
                         else:
                             data[var.name] = val
+                            
                     if not self._sim_paused and not data["Parked"]:     # fixme: figure out why simstart/stop and sim events dont work right
                         self.emit_packet(data)
                         self._final_frame_sent = 0
