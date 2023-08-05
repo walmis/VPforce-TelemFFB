@@ -108,16 +108,11 @@ def format_dict(data, prefix=""):
     return output
 
 
-def reload_config():
-    global config
-    # reload config
-    config.reload()
-
-def load_config(filename) -> ConfigObj:
+def load_config(filename, raise_errors=True) -> ConfigObj:
     config_path = os.path.join(os.path.dirname(__file__), filename)
 
     try:
-        config = ConfigObj(config_path, raise_errors=True)
+        config = ConfigObj(config_path, raise_errors=raise_errors)
         logging.info(f"Load Config: {config_path}")
         return config
     except Exception as e:
@@ -141,7 +136,8 @@ def config_has_changed(update=False) -> bool:
     
     # "hash" both mtimes together
     tm = int(os.path.getmtime(args.configfile))
-    tm += int(os.path.getmtime("config.user.ini"))
+    if os.path.exists("config.user.ini"):
+        tm += int(os.path.getmtime("config.user.ini"))
     if update:
         _config_mtime = tm
 
@@ -156,7 +152,7 @@ def get_config() -> ConfigObj:
     if _config: return _config
 
     main = load_config(args.configfile)
-    user = load_config("config.user.ini")
+    user = load_config("config.user.ini", raise_errors=False)
     if user and main:
         main.update(user)
     config_has_changed(update=True)
