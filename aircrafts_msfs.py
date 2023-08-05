@@ -305,6 +305,8 @@ class Aircraft(AircraftBase):
     def on_telemetry(self, telem_data):
         if telem_data["Parked"]: # Aircraft is parked, do nothing
             return
+        
+        super().on_telemetry(telem_data)
 
         ### Generic Aircraft Class Telemetry Handler
         if not "AircraftClass" in telem_data:
@@ -313,7 +315,7 @@ class Aircraft(AircraftBase):
         self._update_runway_rumble(telem_data)
         self._update_buffeting(telem_data)
         self._update_flight_controls(telem_data)
-        
+
         if self.flaps_motion_intensity > 0:
             flps = max(telem_data.get("Flaps", 0))
             self._update_flaps(flps)

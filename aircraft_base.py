@@ -26,6 +26,9 @@ fpss2gs = 1 / 32.17405
 
 
 class AircraftBase(object):
+    damper_force = 0
+    inertia_force = 0
+
     def __init__(self, name: str, **kwargs):
         self._name = name
         self._changes = {}
@@ -753,5 +756,16 @@ class AircraftBase(object):
             logging.debug(f"Timeout effect: {e}")
             e.stop()
 
-    def on_telemetry(self, data):  # override me
-        pass
+    def on_telemetry(self, data): 
+
+        if self.damper_force:
+            force = utils.clamp(self.damper_force, 0.0, 1.0)
+            effects["damper"].damper(4096*force, 4096*force).start()
+        else:
+            effects["damper"].destroy()
+
+        if self.inertia_force:
+            force = utils.clamp(self.inertia_force, 0.0, 1.0)
+            effects["inertia"].damper(4096*force, 4096*force).start()
+        else:
+            effects["inertia"].destroy()
