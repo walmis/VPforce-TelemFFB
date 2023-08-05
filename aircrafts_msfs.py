@@ -150,7 +150,7 @@ class Aircraft(AircraftBase):
         # FFB force value per lateral G
         self.lateral_force_gain = 0.2 
 
-        self.aoa_gain = 1.0
+        self.aoa_gain = 0.3
         self.g_force_gain = 0.1
         self.prop_diameter = 1.5
 
