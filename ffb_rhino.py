@@ -95,7 +95,21 @@ AXIS_ENABLE_X = 1
 AXIS_ENABLE_Y = 2
 AXIS_ENABLE_DIR = 4
 
-
+# Create a pretty printable dictionary without the "Effect" prefix
+effect_names = {
+    1: "Constant",
+    2: "Ramp",
+    3: "Square",
+    4: "Sine",
+    5: "Triangle",
+    6: "Sawtooth Up",
+    7: "Sawtooth Down",
+    8: "Spring",
+    9: "Damper",
+    10: "Inertia",
+    11: "Friction",
+    12: "Custom"
+}
 
 
 class BaseStructure(ctypes.LittleEndianStructure):
@@ -218,7 +232,7 @@ class FFBEffectHandle:
 
     def destroy(self):
         if self.effect_id is not None:
-            logging.debug(f"Destroying effect {self.effect_id}")
+            logging.debug(f"Destroying effect {self.effect_id} ({effect_names[self.type]})")
             op = FFBReport_BlockFree(effectBlockIndex=self.effect_id)
             self.ffb.write(bytes(op))
             self.type = 0
@@ -233,10 +247,8 @@ class FFBEffectHandle:
         :type direction: float
         """
         assert(self.type == EFFECT_CONSTANT)
-        try:
-            assert(magnitude >= -1.0 and magnitude <= 1.0)
-        except AssertionError:
-            logging.error(f"Constant Effect Magnitude violation: {magnitude}")
+        assert(magnitude >= -1.0 and magnitude <= 1.0)
+
         direction %= 360
 
         kw = {
@@ -273,10 +285,7 @@ class FFBEffectHandle:
     def setPeriodic(self, freq, magnitude, direction, **kwargs):
     
         assert(self.type in PERIODIC_EFFECTS)
-        try:
-            assert(magnitude >= 0 and magnitude <= 1.0)
-        except AssertionError:
-            logging.error(f"Periodic Effect Magnitude violation: {magnitude}")
+        assert(magnitude >= 0 and magnitude <= 1.0)
         direction %= 360
 
 
@@ -427,7 +436,7 @@ class HapticEffect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is starting effect {self.effect.effect_id}")
-            logging.info(f"Start effect {self.effect.effect_id}")
+            logging.info(f"Start effect {self.effect.effect_id} ({effect_names[self.effect.type]})")
             self.effect.start(**kw)
             self.started = True
         return self
@@ -437,7 +446,7 @@ class HapticEffect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is stopping effect {self.effect.effect_id}")
-            logging.info(f"Stop effect {self.effect.effect_id}")
+            logging.info(f"Stop effect {self.effect.effect_id} ({effect_names[self.effect.type]})")
             self.effect.stop() 
             self.started = False
         return self
@@ -447,7 +456,7 @@ class HapticEffect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is destryoing effect {self.effect.effect_id}")
-            logging.info(f"Destroying effect {self.effect.effect_id}")
+            logging.info(f"Destroying effect {self.effect.effect_id} ({effect_names[self.effect.type]})")
             self.effect.destroy()
             self.effect = None
 
