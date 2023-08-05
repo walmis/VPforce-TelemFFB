@@ -262,7 +262,7 @@ class Aircraft(AircraftBase):
         _aoa_term = sin(( _elevator_aoa - telem_data["ElevDefl"]) * rad) * self.aoa_gain * _elev_dyn_pressure * _slip_gain
         telem_data["_aoa_term"] = _aoa_term
 
-        _G_term = (self.g_force_gain * g_force)
+        _G_term = (self.g_force_gain * telem_data["AccBody"][1])
         telem_data["_G_term"] = _G_term
 
         #       hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
@@ -309,9 +309,11 @@ class Aircraft(AircraftBase):
         ### Generic Aircraft Class Telemetry Handler
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
+
         self._update_runway_rumble(telem_data)
         self._update_buffeting(telem_data)
         self._update_flight_controls(telem_data)
+        
         if self.flaps_motion_intensity > 0:
             flps = max(telem_data.get("Flaps", 0))
             self._update_flaps(flps)
@@ -367,8 +369,8 @@ class PropellerAircraft(Aircraft):
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=800*kt2ms, spd_thresh_hi=140*kt2ms )
-        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
-            super()._gforce_effect(telem_data)
+        #if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+        #    super()._gforce_effect(telem_data)
 
 
 class JetAircraft(Aircraft):
