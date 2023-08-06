@@ -336,7 +336,7 @@ class SimConnectSock(SimConnectManager):
     def emit_packet(self, data):
         data["src"] = "MSFS2020"
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
-        self.s.sendto(packet, ("127.0.0.1", 34380))
+        self.s.sendto(packet, ("127.255.255.255", 34380))
 
 
 
