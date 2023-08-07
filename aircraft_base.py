@@ -514,7 +514,7 @@ class AircraftBase(object):
         r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
         r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
         if frequency > 0 or self._engine_rumble_is_playing:
-            dynamic_rumble_intensity = self._calc_engine_intensity(rpm)
+            dynamic_rumble_intensity = utils.clamp(self._calc_engine_intensity(rpm), 0, 1)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
 
             effects["rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()  # vib on X axis
@@ -541,8 +541,14 @@ class AircraftBase(object):
         min_intensity = self.engine_rumble_highrpm_intensity
 
         rpm_percentage = 1 - ((rpm - min_rpm) / (max_rpm - min_rpm))
-        logging.debug(f"rpm percent: {rpm_percentage}")
-        interpolated_intensity = min_intensity + (max_intensity - min_intensity) * rpm_percentage
+
+        if rpm < min_rpm:
+            #give some extra juice if RPM is very low (i.e. on engine start)
+            interpolated_intensity = utils.scale(rpm, (0, min_rpm), (max_intensity*2, max_intensity))
+        else:
+            #update to use scaling function
+            interpolated_intensity = utils.scale(rpm, (min_rpm, max_rpm), (max_intensity, min_intensity))
+        logging.debug(f"rpm = {rpm} | rpm percent of range: {rpm_percentage} | interpolated intensity: {interpolated_intensity}")
 
         return interpolated_intensity
 
