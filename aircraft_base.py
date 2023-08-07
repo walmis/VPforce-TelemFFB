@@ -29,6 +29,19 @@ class AircraftBase(object):
     damper_force = 0
     inertia_force = 0
 
+    engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
+
+    engine_rumble_intensity: float = 0.02
+    engine_rumble_lowrpm = 450
+    engine_rumble_lowrpm_intensity: float = 0.12
+    engine_rumble_highrpm = 2800
+    engine_rumble_highrpm_intensity: float = 0.06
+
+    max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
+    rpm_scale: float = 45
+
+    _engine_rumble_is_playing = 0
+
     def __init__(self, name: str, **kwargs):
         self._name = name
         self._changes = {}
@@ -513,8 +526,10 @@ class AircraftBase(object):
         precision = 2
         r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
         r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+
         if frequency > 0 or self._engine_rumble_is_playing:
-            dynamic_rumble_intensity = utils.clamp(self._calc_engine_intensity(rpm), 0, 1)
+            force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
+            dynamic_rumble_intensity = utils.clamp(self._calc_engine_intensity(rpm), 0, force_limit)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
 
             effects["rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()  # vib on X axis

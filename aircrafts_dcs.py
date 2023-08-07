@@ -106,8 +106,6 @@ class Aircraft(AircraftBase):
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
 
-        self._engine_rumble_is_playing = 0
-
         #clear any existing effects
         for e in effects.values(): e.destroy()
         effects.clear()
@@ -167,13 +165,7 @@ class Aircraft(AircraftBase):
 
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop/WW2 aircraft"""
-    engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
-    
-    engine_rumble_intensity : float = 0.02
-    engine_rumble_lowrpm = 450
-    engine_rumble_lowrpm_intensity: float = 0.12
-    engine_rumble_highrpm = 2800
-    engine_rumble_highrpm_intensity: float = 0.06
+
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
     rpm_scale : float = 45

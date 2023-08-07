@@ -393,18 +393,6 @@ class Aircraft(AircraftBase):
 
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop aircraft"""
-    engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
-
-    engine_rumble_intensity: float = 0.02
-    engine_rumble_lowrpm = 450
-    engine_rumble_lowrpm_intensity: float = 0.12
-    engine_rumble_highrpm = 2800
-    engine_rumble_highrpm_intensity: float = 0.06
-    engine_max_rpm = 2700  # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
-    max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
-    rpm_scale: float = 45
-
-    _engine_rumble_is_playing = 0
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -418,7 +406,7 @@ class PropellerAircraft(Aircraft):
         current_rpm = telem_data["PropRPM"]
         if isinstance(current_rpm, list):
             current_rpm = max(current_rpm)
-        if self.engine_rumble:
+        if self.engine_rumble or self._engine_rumble_is_playing:
             self._update_engine_rumble(current_rpm)
         #self._update_aoa_effect(telem_data) # currently calculated in  _update_flight_controls
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
