@@ -1,3 +1,4 @@
 pyqt5
 configobj
 pysimconnect
+traceback_with_variables

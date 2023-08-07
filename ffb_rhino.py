@@ -30,6 +30,10 @@ import weakref
 import inspect
 
 try:
+    from traceback_with_variables import activate_by_import
+except: pass
+
+try:
     hidapi_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')
     ctypes.cdll.LoadLibrary(hidapi_path)
 except:
@@ -509,7 +513,7 @@ if __name__ == "__main__":
     #c.setConstantForce(0.05, 90)
 
     #s = d.
-
+    t
     #c = d.createEffect(EFFECT_SINE)
     #c.setPeriodic(10, 0.05, 0)
     #c.start()
