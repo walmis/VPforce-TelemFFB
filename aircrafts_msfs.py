@@ -118,10 +118,17 @@ class Aircraft(AircraftBase):
     spring_centered_ailer_gain = 0.5
     aileron_spring_gain = 0.25
     elevator_spring_gain = 0.25
+    rudder_spring_gain = 0.25
 
     aircraft_is_fbw = 0
     fbw_elevator_gain = 0.8
     fbw_aileron_gain = 0.8
+    fbw_rudder_gain = 0.8
+
+    nosewheel_shimmy = 0
+    nosewheel_shimmy_intensity = 0.15
+    nosewheel_shimmy_min_speed = 7
+    nosewheel_shimmy_min_brakes = 0.6
 
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
@@ -158,24 +165,48 @@ class Aircraft(AircraftBase):
 
         # how much air flow the elevator receives from the propeller
         self.elevator_prop_flow_ratio = 1.0
+        self.rudder_prop_flow_ratio = 1.0
 
         # scale the dynamic pressure to ffb friendly values
         self.dyn_pressure_scale = 0.005
         self.max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
+    def _update_nosewheel_shimmy(self, telem_data):
+        curve = 2.5
+        freq = 8
+        brakes = telem_data.get("Brakes", (0, 0))
+        wow = sum(telem_data.get("WeightOnWheels", 0))
+        tas = telem_data.get("TAS", 0)
+        logging.debug(f"brakes = {brakes}")
+        avg_brakes = sum(brakes) / len(brakes)
+        if avg_brakes >= self.nosewheel_shimmy_min_brakes and tas > self.nosewheel_shimmy_min_speed:
+            shimmy = utils.non_linear_scaling(avg_brakes, self.nosewheel_shimmy_min_brakes, 1.0, curvature=curve)
+            logging.debug(f"Nosewheel Shimmy intensity calculation: (BrakesPct:{avg_brakes} | TAS:{tas} | RT Inensity: {shimmy}")
+            effects["nw_shimmy"].periodic(freq, shimmy, 90).start()
+        else:
+            effects.dispose("nw_shimmy")
 
     def _update_fbw_flight_controls(self, telem_data):
-        self.spring_y.positiveCoefficient = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
-        # logging.debug(f"Elev Coeef: {elevator_coeff}")
-        self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
-        self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
+        ffb_type = telem_data.get("FFBType", "joystick")
+        if ffb_type == "joystick":
+            self.spring_y.positiveCoefficient = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
+            # logging.debug(f"Elev Coeef: {elevator_coeff}")
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+            self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
 
-        self.spring_x.positiveCoefficient = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
-        self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            self.spring_x.positiveCoefficient = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
 
-        # update spring data
-        self.spring.effect.setCondition(self.spring_y)
-        self.spring.effect.setCondition(self.spring_x)
+            # update spring data
+            self.spring.effect.setCondition(self.spring_y)
+            self.spring.effect.setCondition(self.spring_x)
 
+        elif ffb_type == "pedals":
+            self.spring_x.positiveCoefficient = clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)
+            logging.debug(f"Elev Coeef: {clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)}")
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            self.spring_x.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
+            self.spring.effect.setCondition(self.spring_x)
+        self.spring.start()
 
     def _update_flight_controls(self, telem_data):
         # calculations loosely based on FLightGear FFB page:
@@ -184,6 +215,8 @@ class Aircraft(AircraftBase):
 
         elev_base_gain = 0
         ailer_base_gain = 0
+        rudder_base_gain = 0
+        ffb_type = telem_data.get("FFBType", "joystick")
         if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
             logging.debug ("FBW Setting enabled, running fbw_flight_controls")
             self._update_fbw_flight_controls(telem_data)
@@ -194,10 +227,14 @@ class Aircraft(AircraftBase):
         if self.aircraft_is_spring_centered:
             elev_base_gain = self.aileron_spring_gain
             ailer_base_gain = self.elevator_spring_gain
-            logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{elev_base_gain}:{ailer_base_gain}")
+            rudder_base_gain = self.rudder_spring_gain
+            logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{elev_base_gain}:{ailer_base_gain}, rudder base gain to {rudder_base_gain}")
+
 
         base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
         base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
+        base_rudder_coeff = round(clamp((rudder_base_gain * 4096), 0, 4096))
+
         #logging.info(f"Base Elev/Ailer coeff = {base_elev_coeff}/{base_ailer_coeff}")
 
         rudder_angle = telem_data["RudderDefl"] * rad  # + trim?
@@ -267,40 +304,54 @@ class Aircraft(AircraftBase):
 
         #       hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
         #       data["_hpf_pitch_acc"] = hpf_pitch_acc # test stuff
+        _rud_dyn_pressure = utils.mix(telem_data["DynPressure"], 0.5 * telem_data["AirDensity"] * _prop_air_vel ** 2,
+                                      self.rudder_prop_flow_ratio) * self.dyn_pressure_scale
+        rudder_coeff = _rud_dyn_pressure * self.rudder_gain * _slip_gain
+        telem_data["_rud_coeff"] = rudder_coeff
+        rud = (slip_angle - rudder_angle) * _dyn_pressure * _slip_gain
+        rud_force = clamp((rud * self.rudder_gain), -1, 1)
 
-        self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
-        ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
-        logging.debug(f"Elev Coeef: {ec}")
-        self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
-        self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
-        ac = clamp(int(4096 * aileron_coeff), base_elev_coeff, 4096)
-        logging.debug(f"Ailer Coeef: {ac}")
+        if ffb_type == 'joystick':
+            self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
+            ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
+            logging.debug(f"Elev Coeef: {ec}")
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+            self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
+            ac = clamp(int(4096 * aileron_coeff), base_elev_coeff, 4096)
+            logging.debug(f"Ailer Coeef: {ac}")
 
-        self.spring_x.positiveCoefficient = clamp(int(4096 * aileron_coeff), base_ailer_coeff, 4096)
-        self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            self.spring_x.positiveCoefficient = clamp(int(4096 * aileron_coeff), base_ailer_coeff, 4096)
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
 
-        # update spring data
-        self.spring.effect.setCondition(self.spring_y)
-        self.spring.effect.setCondition(self.spring_x)
+            # update spring data
+            self.spring.effect.setCondition(self.spring_y)
+            self.spring.effect.setCondition(self.spring_x)
 
-        # update constant forces
-        cf_pitch = -_elevator_droop_term + _aoa_term - _G_term
-        cf_pitch = clamp(cf_pitch, -1.0, 1.0)
+            # update constant forces
 
-        # add force on lateral axis (sideways)
-        _side_accel = -telem_data["AccBody"][0] * self.lateral_force_gain
-        cf_roll = _side_accel
+            # update constant forces
+            cf_pitch = -_elevator_droop_term + _aoa_term - _G_term
+            cf_pitch = clamp(cf_pitch, -1.0, 1.0)
 
-        cf = utils.Vector2D(cf_pitch, cf_roll)
-        if cf.magnitude() > 1.0: 
-            cf = cf.normalize()
+            # add force on lateral axis (sideways)
+            _side_accel = -telem_data["AccBody"][0] * self.lateral_force_gain
+            cf_roll = _side_accel
 
-        mag, theta = cf.to_polar()
-        
-        self.const_force.constant(mag, theta*deg).start()
-        self.spring.start() # ensure spring is started
+            cf = utils.Vector2D(cf_pitch, cf_roll)
+            if cf.magnitude() > 1.0:
+                cf = cf.normalize()
 
-        rudder_angle = rudder_angle - slip_angle
+            mag, theta = cf.to_polar()
+
+            self.const_force.constant(mag, theta*deg).start()
+            self.spring.start() # ensure spring is started
+        elif ffb_type == 'pedals':
+            self.spring_x.positiveCoefficient = clamp(int(4096 * rudder_coeff), base_rudder_coeff, 4096)
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            self.spring.effect.setCondition(self.spring_x)
+            self.const_force.constant(rud_force, 270).start()
+            telem_data["RudForce"] = rud_force
+            self.spring.start()
 
     def on_telemetry(self, telem_data):
         if telem_data["Parked"]: # Aircraft is parked, do nothing
@@ -327,6 +378,8 @@ class Aircraft(AircraftBase):
                 self._decel_effect(telem_data)
         if self.aoa_reduction_effect_enabled:
             self._aoa_reduction_force_effect(telem_data)
+        if self.nosewheel_shimmy and telem_data.get("FFBType") == "pedals" and not telem_data.get("IsTaildragger", 0):
+            self._update_nosewheel_shimmy(telem_data)
 
     def on_timeout(self):
         super().on_timeout()
