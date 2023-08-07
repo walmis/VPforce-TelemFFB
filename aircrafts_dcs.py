@@ -53,6 +53,7 @@ class Aircraft(AircraftBase):
     buffeting_intensity : float = 0.2               # peak AoA buffeting intensity  0 to disable
     buffet_aoa : float          = 10.0              # AoA when buffeting starts
     stall_aoa : float           = 15.0              # Stall AoA
+    wind_effect_enabled : int = 0
 
     engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
     
@@ -197,7 +198,8 @@ class PropellerAircraft(Aircraft):
 
         if self.engine_rumble:
             self._update_engine_rumble(telem_data["ActualRPM"])
-        self._update_wind_effect(telem_data)
+        if self.wind_effect_enabled:
+            self._update_wind_effect(telem_data)
         self._update_aoa_effect(telem_data)
         if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
             super()._gforce_effect(telem_data)
