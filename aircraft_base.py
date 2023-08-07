@@ -170,8 +170,10 @@ class AircraftBase(object):
     def _aoa_reduction_force_effect(self, telem_data):
         start_aoa = self.critical_aoa_start
         end_aoa = self.critical_aoa_max
-        aoa = telem_data.get("AoA")
-        if aoa >= start_aoa:
+        aoa = telem_data.get("AoA", 0)
+        tas = telem_data.get("TAS", 0)
+
+        if aoa >= start_aoa and tas > 10:
             force_factor = round(utils.non_linear_scaling(aoa, start_aoa, end_aoa, curvature=1.5), 4)
             force_factor = self.aoa_reduction_max_force * force_factor
             force_factor = utils.clamp(force_factor, 0.0, 1.0)
