@@ -280,7 +280,7 @@ class SimConnectManager(threading.Thread):
     def run(self):
         while not self._quit:
             try:
-                print("Trying SimConnect")
+                logging.info("Trying SimConnect")
                 with SimConnect("TelemFFB") as self.sc:
                     self.sc.SubscribeToSystemEvent(EV_PAUSED, "Pause")
                     self.sc.SubscribeToSystemEvent(EV_STARTED, "SimStart")
