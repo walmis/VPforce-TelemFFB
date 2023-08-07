@@ -1,6 +1,22 @@
 # user changes to config file
 # Entries in this file will override the stock config.ini
-# Rename this file to config.user.ini
+# Rename this file to config.user.ini or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o parameter
+# example "VPForce-TelemFFB.exe -o myconfig.user.ini" (starting TelemFFB without the override flag will look for the default config.user.ini)
+# Section names (i.e. [system]) must match exactly what is in config.ini for override to work
+# examples below
 
-[F-5]
+## override system setting and enable msfs support
+#[system]
+#msfs_enabled = 1
+
+## Load a VPforce Configurator config file when the F-5 is loaded
+#[F-5]
 #vpconf=f-5.vpconf # Load the specified rhino configuration file
+
+##override the airframe characteristics of the Flight Design CT
+#[FlightDesignCT Asobo]
+#type=PropellerAircraft
+#prop_diameter=1.7 # meters
+#rudder_area = 0.8 # sq meters
+#aileron_area = 0.7 # sq meters
+#elevator_area = 1.2 # sq meters
