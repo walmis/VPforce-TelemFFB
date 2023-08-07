@@ -14,6 +14,10 @@
 # You should have received a copy of the GNU General Public License 
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
+from traceback_with_variables import print_exc, prints_exc
+
+
 import argparse
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -220,7 +224,8 @@ class TelemManager(QObject, threading.Thread):
     def quit(self):
         self._run = False
         self.join()
-        
+    
+    @prints_exc
     def run(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -313,7 +318,7 @@ class TelemManager(QObject, threading.Thread):
                         # send command back
                         s.sendto(bytes(commands, "utf-8"), sender)
                 except:
-                    traceback.print_exc()
+                    print_exc()
 
             if args.plot:
                 for item in args.plot:

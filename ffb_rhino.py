@@ -261,7 +261,7 @@ class FFBEffectHandle:
         if self.effect_id is None:
             logging.warn("setConstantForce on an invalidated effect")
             return
-        
+
         assert(self.type == EFFECT_CONSTANT)
         assert(magnitude >= -1.0 and magnitude <= 1.0)
 
@@ -509,7 +509,7 @@ if __name__ == "__main__":
     #c.setConstantForce(0.05, 90)
 
     #s = d.
-
+    
     #c = d.createEffect(EFFECT_SINE)
     #c.setPeriodic(10, 0.05, 0)
     #c.start()
