@@ -28,7 +28,8 @@ parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID',
 parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
 
 # Add config file argument, default config.ini
-parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default="config.ini")
+parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default='config.ini')
+parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='config.user.ini')
 parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS (default DCS', default="DCS")
 parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default='joystick')
 
@@ -139,8 +140,8 @@ def config_has_changed(update=False) -> bool:
     
     # "hash" both mtimes together
     tm = int(os.path.getmtime(args.configfile))
-    if os.path.exists("config.user.ini"):
-        tm += int(os.path.getmtime("config.user.ini"))
+    if os.path.exists(args.overridefile):
+        tm += int(os.path.getmtime(args.overridefile))
     if update:
         _config_mtime = tm
 
@@ -155,7 +156,7 @@ def get_config() -> ConfigObj:
     if _config: return _config
 
     main = load_config(args.configfile)
-    user = load_config("config.user.ini", raise_errors=False)
+    user = load_config(args.overridefile, raise_errors=False)
     if user and main:
         main.update(user)
     config_has_changed(update=True)
@@ -368,7 +369,27 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon(icon_path))
         # Add the image label to the layout
         layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
-        layout.addWidget(QLabel(f"Config File: {args.configfile}"))
+        # layout.addWidget(QLabel(f"Config File: {args.configfile}"))
+        cfg_layout = QHBoxLayout()
+        self.cfg_label = QLabel()
+        self.cfg_label.setText(f"Config File: {args.configfile}")
+        self.cfg_label.setToolTip("You can use a custom configuration file by passing the -c argument to TelemFFB\n\nExample: \"VPForce-TelemFFB.exe -c customconfig.ini\"")
+
+        self.ovrd_label = QLabel()
+        if os.path.exists(args.overridefile):
+            self.ovrd_label.setText(f"User Override File: {args.overridefile}")
+        else:
+            self.ovrd_label.setText(f"User Override File: None")
+
+        self.ovrd_label.setToolTip("Rename \'config.user.ini.README\' to \'config.user.ini\' or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o argument\n\nExample \"VPForce-TelemFFB.exe -o myconfig.user.ini\" (starting TelemFFB without the override flag will look for the default config.user.ini)")
+        self.ovrd_label.setAlignment(Qt.AlignLeft)
+        self.cfg_label.setAlignment(Qt.AlignLeft)
+
+        cfg_layout.addWidget(self.cfg_label)
+        cfg_layout.addWidget(self.ovrd_label)
+
+        layout.addLayout(cfg_layout)
+
         cfg = get_config()
         dcs_enabled = 'Yes'
         msfs_enabled = 'No'
