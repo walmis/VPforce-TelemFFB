@@ -141,6 +141,7 @@ class SimConnectManager(threading.Thread):
         SimVar("RollAccel", "ROTATION ACCELERATION BODY Z", "degrees per second squared"), # todo replace usage with AccRotBody array
         SimVarArray("AccRotBody", "ROTATION ACCELERATION BODY <>", "degrees per second squared", keywords=("X", "Y", "Z")),
         SimVarArray("DesignSpeed", "DESIGN SPEED <>", "meter/second", keywords=("VC", "VS0", "VS1")),
+        SimVarArray("Brakes", "BRAKE <> POSITION", "Position", keywords=("LEFT", "RIGHT")),
         #SimVar("LinearCLAlpha", "LINEAR CL ALPHA", "Per Radian"),
         #SimVar("SigmaSqrt", "SIGMA SQRT", "Per Radian"),
         SimVar("SimDisabled", "SIM DISABLED", "Bool"),
