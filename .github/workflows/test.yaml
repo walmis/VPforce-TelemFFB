@@ -31,10 +31,10 @@ jobs:
         commit_id=$(git describe --always --abbrev=8)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         zip_filename="VPforce-TelemFFB-${branch_name}-${commit_id}.zip"
+        echo "{ \"filename\" : \"${zip_filename}\", \"date\": \"`date -Iseconds`\", \"version\": \"${commit_id}\" }" > latest.json
         cd dist/windows/VPforce-TelemFFB && zip -r "../../../${zip_filename}" .
         echo "BRANCH_NAME=${branch_name}" >> $GITHUB_ENV
         echo "ZIP_FILENAME=${zip_filename}" >> $GITHUB_ENV
-        echo "{ \"filename\" : \"${zip_filename}\", \"date\": \"`date -Iseconds`\", \"version\": \"${commit_id}\" }" > latest.json
 
         
     - name: Deploy to Server
