@@ -28,12 +28,13 @@ jobs:
     - name: Make Zip
       id: zip
       run: |
-        commit_id=$(git rev-parse --short HEAD)
+        commit_id=$(git describe --always --abbrev=8)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         zip_filename="VPforce-TelemFFB-${branch_name}-${commit_id}.zip"
         cd dist/windows/VPforce-TelemFFB && zip -r "../../../${zip_filename}" .
         echo "BRANCH_NAME=${branch_name}" >> $GITHUB_ENV
         echo "ZIP_FILENAME=${zip_filename}" >> $GITHUB_ENV
+        echo "{ \"filename\" : \"${zip_filename}\", \"date\": \"`date -Iseconds`\", \"version\": \"${commit_id}\" }" > latest.json
 
         
     - name: Deploy to Server
@@ -41,7 +42,7 @@ jobs:
       env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-v"
-          SOURCE: "VPforce-TelemFFB*.zip"
+          SOURCE: "VPforce-TelemFFB*.zip latest.json"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ${{ secrets.REMOTE_TARGET }}
@@ -52,4 +53,4 @@ jobs:
       with:
         url: ${{ secrets.WEBHOOK_URL }}
         #headers: '{"repository": "joelwmale/webhook-action"}'
-        body: '{"content": "New build published: https://vpforce.eu/downloads/TelemFFB/${{ env.ZIP_FILENAME }}" }'
+        body: '{"content": "🛠️ New Build Published: https://vpforce.eu/downloads/TelemFFB/${{ env.ZIP_FILENAME }}" }'
