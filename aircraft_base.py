@@ -527,7 +527,7 @@ class AircraftBase(object):
         r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
         r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
 
-        if frequency > 0 or self._engine_rumble_is_playing:
+        if frequency > 0:
             force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
             dynamic_rumble_intensity = utils.clamp(self._calc_engine_intensity(rpm), 0, force_limit)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")

@@ -188,7 +188,7 @@ class PropellerAircraft(Aircraft):
 
         super().on_telemetry(telem_data)
 
-        if self.engine_rumble:
+        if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
             self._update_engine_rumble(telem_data["ActualRPM"])
         if self.wind_effect_enabled:
             self._update_wind_effect(telem_data)
