@@ -759,7 +759,7 @@ class AircraftBase(object):
                                                       median_modulation + modulation_pos, precision, time_period=3)
         r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg,
                                                       median_modulation + modulation_pos, precision, time_period=5)
-        if frequency > 0 or self._engine_rumble_is_playing:
+        if frequency > 0:
             logging.debug(f"Current Heli Engine Rumble Intensity = {self.heli_engine_rumble_intensity}")
             effects["rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
             # effects["rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X axis
