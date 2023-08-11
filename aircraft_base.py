@@ -190,7 +190,7 @@ class AircraftBase(object):
             force_factor = round(utils.non_linear_scaling(aoa, start_aoa, end_aoa, curvature=1.5), 4)
             force_factor = self.aoa_reduction_max_force * force_factor
             force_factor = utils.clamp(force_factor, 0.0, 1.0)
-            logging.info(f"AoA Reduction Effect:  AoA={aoa}, force={force_factor}, max allowed force={self.aoa_reduction_max_force}")
+            logging.debug(f"AoA Reduction Effect:  AoA={aoa}, force={force_factor}, max allowed force={self.aoa_reduction_max_force}")
             effects["crit_aoa"].constant(force_factor, 180).start()
         else:
             effects.dispose("crit_aoa")
@@ -206,16 +206,13 @@ class AircraftBase(object):
         if not sum(telem_data.get("WeightOnWheels")):
             return
         max_gs = self.deceleration_max_force
-        if y_gs < -0.03:
-            if effects["runway0"].started:
-                effects.dispose("runway0")
-                logging.debug("disposing runway effect")
+        if y_gs < -0.1:
             if abs(y_gs) > max_gs:
                 y_gs = -max_gs
             logging.debug(f"y_gs = {y_gs}")
-            effects["decel_x"].constant(abs(y_gs), 180).start()
+            effects["decel"].constant(abs(y_gs), 180).start()
         else:
-            effects.dispose("decel_x")
+            effects.dispose("decel")
 
     def _calc_buffeting(self, aoa, speed, telem_data) -> tuple:
         """Calculate buffeting amount and frequency
