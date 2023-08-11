@@ -91,7 +91,7 @@ import aircrafts_dcs
 import aircrafts_msfs
 import utils
 import subprocess
-import requests
+import urllib.request
 
 import traceback
 from ffb_rhino import HapticEffect
@@ -108,26 +108,31 @@ if args.teleplot:
 version = utils.get_version()
 
 def _check_latest_version():
+    import ssl
+    ctx = ssl._create_unverified_context()
+
     current_version = version
     latest_version = None
     latest_url = None
     url = "https://vpforcecontrols.com/downloads/TelemFFB/"
     file = "latest.json"
     send_url = url + file
-    try:
-        latest = requests.get(send_url).json()
-        latest_version = latest["version"]
-        latest_url = url + latest["filename"]
-    except:
-        logging.error(f"Error checking latest version status: {url}")
 
+    try:
+        with urllib.request.urlopen(send_url, context=ctx) as req:
+            latest = json.loads(req.read().decode())
+            latest_version = latest["version"]
+            latest_url = url + latest["filename"]
+    except:
+        logging.exception(f"Error checking latest version status: {url}")
+ 
     if current_version != latest_version and latest_version is not None and latest_url is not None:
         logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
         return latest_version, latest_url
     elif current_version == latest_version:
-        return "up to date"
+        return False
     else:
-        return "UNKNOWN"
+        return None
 
 def format_dict(data, prefix=""):
     output = ""
@@ -497,15 +502,17 @@ class MainWindow(QMainWindow):
         self.version_label = QLabel()
         status_text = "UNKNOWN"
         status = _check_latest_version()
-        if status == "up to date":
+        if status == False:
             status_text = "Up To Date"
-        elif status == "UNKNOWN":
+        elif status == None:
             status_text = "UNKNOWN"
         else:
             status_text = f"New version <a href='{status[1]}'><b>{status[0]}</b></a> is available!"
+            
+        if status:
+            self.version_label.setToolTip(status[1])
         self.version_label.setText(f'Version Status: {status_text}')
         self.version_label.setOpenExternalLinks(True)
-        self.version_label.setToolTip(status[1])
 
         self.version_label.setAlignment(Qt.AlignLeft)
         layout.addLayout(row_layout)
