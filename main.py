@@ -77,7 +77,7 @@ import re
 import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QListView, QScrollArea, QHBoxLayout
+    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
 # from PyQt5.QtWidgets import *
@@ -196,21 +196,46 @@ def get_config() -> ConfigObj:
     return main
 
 
-class LogWindow(QtWidgets.QDialog, QtWidgets.QPlainTextEdit):
+class LogWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Log Console")
         self.resize(800, 500)
 
-        self.widget = QtWidgets.QPlainTextEdit(parent)
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+
+        self.widget = QPlainTextEdit(self.central_widget)
         self.widget.setReadOnly(True)
         self.widget.setFont(QFont("Courier New"))
 
-        layout = QtWidgets.QVBoxLayout()
-        # Add the new logging box widget to the layout
+        layout = QVBoxLayout(self.central_widget)
         layout.addWidget(self.widget)
-        self.setLayout(layout)
-		
+
+        # Create a menu bar
+        menubar = self.menuBar()
+
+        # Create a "Logging" menu
+        logging_menu = menubar.addMenu("Logging Level")
+
+        # Create "Debug Logging" action and add it to the "Logging" menu
+        debug_action = QAction("Debug Logging", self)
+        debug_action.triggered.connect(self.set_debug_logging)
+        logging_menu.addAction(debug_action)
+
+        # Create "Normal Logging" action and add it to the "Logging" menu
+        normal_action = QAction("Normal Logging", self)
+        normal_action.triggered.connect(self.set_info_logging)
+        logging_menu.addAction(normal_action)
+
+    def set_debug_logging(self):
+        logger.setLevel(logging.DEBUG)
+        logging.info(f"Logging level set to DEBUG")
+
+    def set_info_logging(self):
+        logger.setLevel(logging.INFO)
+        logging.info(f"Logging level set to INFO")
+
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
@@ -454,12 +479,26 @@ class MainWindow(QMainWindow):
         # Add the scroll area to the layout
         layout.addWidget(scroll_area)
 
-        # Add the edit button
         edit_button = QPushButton("Edit Config File")
         edit_button.setMinimumWidth(200)
         edit_button.setMaximumWidth(200)
-        edit_button.clicked.connect(self.edit_config_file)
+
         layout.addWidget(edit_button, alignment=Qt.AlignCenter)
+
+        # Create a sub-menu for the button
+        self.sub_menu = QMenu(edit_button)
+        primary_config_action = QAction("Primary Config", self)
+        primary_config_action.triggered.connect(lambda: self.edit_config_file("Primary"))
+        if os.path.exists(args.overridefile):
+            user_config_action = QAction("User Config", self)
+            user_config_action.triggered.connect(lambda: self.edit_config_file("User"))
+
+        self.sub_menu.addAction(primary_config_action)
+        if os.path.exists(args.overridefile):
+            self.sub_menu.addAction(user_config_action)
+
+        # Connect the button's click event to show the sub-menu
+        edit_button.clicked.connect(self.show_sub_menu)
 
         self.log_button = QPushButton("Open/Hide Log")
         self.log_button.setMinimumWidth(200)
@@ -519,6 +558,22 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.version_label)
         central_widget.setLayout(layout)
 
+    def show_sub_menu(self):
+        edit_button = self.sender()
+        self.sub_menu.popup(edit_button.mapToGlobal(edit_button.rect().bottomLeft()))
+
+    def edit_config_file(self, config_type):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if config_type == "Primary":
+            config_file = args.configfile
+        elif config_type == "User":
+            config_file = args.overridefile
+        config_path = os.path.join(script_dir, config_file)
+        file_url = QUrl.fromLocalFile(config_path)
+        try:
+            QDesktopServices.openUrl(file_url)
+        except:
+            logging.error(f"There was an error opening the config file")
     def toggle_log_window(self):
         if d.isVisible():
             d.hide()
@@ -544,16 +599,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             traceback.print_exc()
 
-    def edit_config_file(self):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-
-        config_file = args.configfile
-        config_path = os.path.join(script_dir, config_file)
-        file_url = QUrl.fromLocalFile(config_path)
-        try:
-            QDesktopServices.openUrl(file_url)
-        except:
-            logging.error(f"There was an error opening the config file")
 
 
 def main():
