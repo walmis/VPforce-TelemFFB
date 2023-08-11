@@ -91,7 +91,6 @@ import aircrafts_dcs
 import aircrafts_msfs
 import utils
 import subprocess
-import requests
 
 import traceback
 from ffb_rhino import HapticEffect
@@ -106,28 +105,6 @@ if args.teleplot:
     utils.teleplot.configure(args.teleplot)
 
 version = utils.get_version()
-
-def _check_latest_version():
-    current_version = version
-    latest_version = None
-    latest_url = None
-    url = "https://vpforcecontrols.com/downloads/TelemFFB/"
-    file = "latest.json"
-    send_url = url + file
-    try:
-        latest = requests.get(send_url).json()
-        latest_version = latest["version"]
-        latest_url = url + latest["filename"]
-    except:
-        logging.error(f"Error checking latest version status: {url}")
-
-    if current_version != latest_version and latest_version is not None and latest_url is not None:
-        logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
-        return latest_version, latest_url
-    elif current_version == latest_version:
-        return "up to date"
-    else:
-        return "UNKNOWN"
 
 def format_dict(data, prefix=""):
     output = ""
@@ -481,37 +458,31 @@ class MainWindow(QMainWindow):
         self.doc_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
         self.doc_label.setOpenExternalLinks(True)
         self.doc_label.setText(f'<a href="{doc_url}">{label_txt}</a>')
-        self.doc_label.setToolTip(doc_url)
         self.dl_label = QLabel()
-        dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
+        doc_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
         label_txt = 'Download Latest'
         self.dl_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
         self.dl_label.setOpenExternalLinks(True)
-        self.dl_label.setText(f'<a href="{dl_url}">{label_txt}</a>')
+        self.dl_label.setText(f'<a href="{doc_url}">{label_txt}</a>')
         self.dl_label.setAlignment(Qt.AlignRight)
-        self.dl_label.setToolTip(dl_url)
 
         row_layout.addWidget(self.doc_label)
         row_layout.addWidget(self.dl_label)
 
-        self.version_label = QLabel()
-        status_text = "UNKNOWN"
-        status = _check_latest_version()
-        if status == "up to date":
-            status_text = "Up To Date"
-        elif status == "UNKNOWN":
-            status_text = "UNKNOWN"
-        else:
-            status_text = f"New version <a href='{status[1]}'><b>{status[0]}</b></a> is available!"
-        self.version_label.setText(f'Version Status: {status_text}')
-        self.version_label.setOpenExternalLinks(True)
-        self.version_label.setToolTip(status[1])
-
-        self.version_label.setAlignment(Qt.AlignLeft)
         layout.addLayout(row_layout)
-        layout.addWidget(self.version_label)
         central_widget.setLayout(layout)
 
+    # def show_ffb_test_tool(self):
+    #     try:
+    #         self.ffb_test_tool = FFBTestToolDialog()
+    #         self.ffb_test_tool.show()
+    #     except Exception as e:
+    #         logging.error(f"Error: {e}")
+    #
+    # def increment_counter(self):
+    #     global periodic_effect_index
+    #     periodic_effect_index += 1
+    #     print("periodic_effect_index:", periodic_effect_index)
     def toggle_log_window(self):
         if d.isVisible():
             d.hide()
@@ -547,6 +518,34 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(file_url)
         except:
             logging.error(f"There was an error opening the config file")
+
+
+# class FFBTestToolDialog(QDialog):
+#     def __init__(self):
+#         super().__init__()
+#         self.ui = Ui_FFBTestTool()
+#         self.ui.setupUi(self)
+# class Ui_FFBTestTool(object):
+#     def setupUi(self, FFBTestTool):
+#         if not FFBTestTool.objectName():
+#             FFBTestTool.setObjectName(u"FFBTestTool")
+#         FFBTestTool.resize(562, 462)
+#         self.radioButton = QRadioButton(FFBTestTool)
+#         self.radioButton.setObjectName(u"radioButton")
+#         self.radioButton.setGeometry(QRect(60, 60, 82, 17))
+#         self.listView = QListView(FFBTestTool)
+#         self.listView.setObjectName(u"listView")
+#         self.listView.setGeometry(QRect(40, 120, 256, 192))
+#
+#         self.retranslateUi(FFBTestTool)
+#
+#         QMetaObject.connectSlotsByName(FFBTestTool)
+#     # setupUi
+
+# def retranslateUi(self, FFBTestTool):
+#     FFBTestTool.setWindowTitle(QCoreApplication.translate("FFBTestTool", u"FFB Test Tool", None))
+#     self.radioButton.setText(QCoreApplication.translate("FFBTestTool", u"RadioButton", None))
+# # retranslateUi
 
 
 def main():
