@@ -391,7 +391,7 @@ class HapticEffect:
     def _conditional_effect(self, type, coef_x = None, coef_y= None):
         if not self.effect:
             self.effect = self.device.createEffect(type)
-            if not self.effect: return
+            if not self.effect: return self
             self.effect.setEffect() # initialize defaults
 
         if coef_x is not None:
@@ -423,7 +423,7 @@ class HapticEffect:
     def periodic(self, frequency, magnitude:float, direction:float, effect_type=EFFECT_SINE, *args, **kwargs):
         if not self.effect:
             self.effect = self.device.createEffect(effect_type)
-            if not self.effect: return
+            if not self.effect: return self
         
         if type(direction) == type and issubclass(direction, DirectionModulator):
             if not self.modulator:
@@ -443,7 +443,7 @@ class HapticEffect:
         """
         if not self.effect:
             self.effect = self.device.createEffect(EFFECT_CONSTANT)
-            if not self.effect: return
+            if not self.effect: return self
 
         if type(direction) == type and issubclass(direction, DirectionModulator):
             if not self.modulator:
