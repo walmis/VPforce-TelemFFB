@@ -3,7 +3,7 @@ name: Package Application with Pyinstaller
 on: 
   push:
     branches:
-      - '*'
+      - 'wip'
 
 jobs:
   build:
@@ -19,12 +19,7 @@ jobs:
       uses: walmis/pyinstaller-action-windows@main
       with:
         path: .
-       
-    - uses: actions/upload-artifact@v3
-      with:
-        name: build
-        path: dist/windows/VPforce-TelemFFB
-        
+            
     - name: Make Zip
       id: zip
       run: |
