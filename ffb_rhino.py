@@ -406,7 +406,7 @@ class HapticEffect:
         return f"HapticEffect({self.effect})"
 
     @classmethod
-    def open(cls, vid = 0xFFFF, pid=0x2055, serial=None) -> None:
+    def open(cls, vid = 0xFFFF, pid=0x2055, serial=None) -> FFBRhino:
         logging.info(f"Open Rhino HID {vid:04X}:{pid:04X}")
         cls.device = FFBRhino(vid, pid, serial)
         return cls.device

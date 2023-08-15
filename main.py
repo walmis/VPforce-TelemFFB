@@ -593,6 +593,7 @@ def main():
         dev = HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
         if args.reset:
             dev.resetEffects()
+        logging.info(f"Rhino Firmware: {dev.get_firmware_version()}")
     except:
         QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}")
         return
