@@ -84,7 +84,6 @@ from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
 # from PyQt5.QtCore import *
 # from PyQt5.QtGui import *
 
-from time import monotonic
 import socket
 import threading
 import aircrafts_dcs
@@ -280,7 +279,7 @@ class TelemManager(QObject, threading.Thread):
             sender = data[1]
 
             # print(sender)
-            self.lastFrameTime = monotonic()
+            self.lastFrameTime = time.perf_counter()
             data = data[0].decode("utf-8").split(";")
             telem_data = {}
             telem_data["FFBType"] = args.type
@@ -358,6 +357,7 @@ class SimConnectSock(SimConnectManager):
     def __init__(self):
         super().__init__()
         self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
     def fmt(self, val):
         if isinstance(val, list):
