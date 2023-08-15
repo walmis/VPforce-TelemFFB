@@ -31,6 +31,8 @@ import random
 import time
 import zlib
 import subprocess
+import urllib.request
+import json
 
 class Vector2D:
     def __init__(self, x, y):
@@ -652,6 +654,33 @@ def get_version():
         ver = f"local-{ver}"
     except: pass
     return ver
+
+def fetch_latest_version():
+    import ssl
+    ctx = ssl._create_unverified_context()
+
+    current_version = get_version()
+    latest_version = None
+    latest_url = None
+    url = "https://vpforcecontrols.com/downloads/TelemFFB/"
+    file = "latest.json"
+    send_url = url + file
+
+    try:
+        with urllib.request.urlopen(send_url, context=ctx) as req:
+            latest = json.loads(req.read().decode())
+            latest_version = latest["version"]
+            latest_url = url + latest["filename"]
+    except:
+        logging.exception(f"Error checking latest version status: {url}")
+ 
+    if current_version != latest_version and latest_version is not None and latest_url is not None:
+        logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
+        return latest_version, latest_url
+    elif current_version == latest_version:
+        return False
+    else:
+        return None
 
 if __name__ == "__main__":
     #test install

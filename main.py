@@ -91,7 +91,6 @@ import aircrafts_dcs
 import aircrafts_msfs
 import utils
 import subprocess
-import urllib.request
 
 import traceback
 from ffb_rhino import HapticEffect
@@ -106,33 +105,6 @@ if args.teleplot:
     utils.teleplot.configure(args.teleplot)
 
 version = utils.get_version()
-
-def _check_latest_version():
-    import ssl
-    ctx = ssl._create_unverified_context()
-
-    current_version = version
-    latest_version = None
-    latest_url = None
-    url = "https://vpforcecontrols.com/downloads/TelemFFB/"
-    file = "latest.json"
-    send_url = url + file
-
-    try:
-        with urllib.request.urlopen(send_url, context=ctx) as req:
-            latest = json.loads(req.read().decode())
-            latest_version = latest["version"]
-            latest_url = url + latest["filename"]
-    except:
-        logging.exception(f"Error checking latest version status: {url}")
- 
-    if current_version != latest_version and latest_version is not None and latest_url is not None:
-        logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
-        return latest_version, latest_url
-    elif current_version == latest_version:
-        return False
-    else:
-        return None
 
 def format_dict(data, prefix=""):
     output = ""
@@ -540,7 +512,7 @@ class MainWindow(QMainWindow):
 
         self.version_label = QLabel()
         status_text = "UNKNOWN"
-        status = _check_latest_version()
+        status = utils.fetch_latest_version()
         if status == False:
             status_text = "Up To Date"
         elif status == None:
