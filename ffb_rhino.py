@@ -217,6 +217,20 @@ class FFBReport_Input(BaseStructure):
                ]
     _defaults_ = {}
 
+    # get if button is pressed, buttons start from 1
+    def isButtonPressed(self, button_number):
+        assert(button_number > 0)
+        btns = self.Button | (self.ButtonAux<<32)
+        return (btns & (1<<(button_number-1))) != 0
+    
+    # get main X and Y axis in range [-1.0 .. 1.0]
+    def axisXY(self):
+        return (self.X/4096.0, self.Y/4096.0)
+
+input_report_handlers = {
+    1: FFBReport_Input
+}
+
 class FFBEffectHandle:
     def __init__(self, device, effect_id, type) -> None:
         self.ffb : FFBRhino = device
@@ -348,9 +362,11 @@ class FFBRhino(hid.Device):
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None) -> None:
         self.vid = vid
         self.pid = pid
+        self._in_reports = {}
         
         super().__init__(vid, pid, serial)
-
+        self.nonblocking = True
+        
     def get_firmware_version(self):
         with usb1.USBContext() as context:
             handle = context.openByVendorIDAndProductID(
@@ -387,10 +403,22 @@ class FFBRhino(hid.Device):
         if super().write(data) < 0:
             raise IOError("HID Write")
         
-    def getInput(self):
-        data = super().get_input_report(1, ctypes.sizeof(FFBReport_Input))
-        s = FFBReport_Input.from_buffer_copy(data)
-        return (s.X/4096.0, s.Y/4096.0)
+    def getInput(self, report_id=1):
+        # read all input reports from the operating system buffer
+        # we only care about the latest ones, otherwise there will be latency!
+        # this function is non-blocking
+        while True:
+            tmp = super().read(64)
+            if tmp:
+                self._in_reports[tmp[0]] = tmp
+            else: break
+        
+        data = self._in_reports.get(report_id, None)
+        if data:
+            return input_report_handlers[report_id].from_buffer_copy(data)
+        
+        return data
+
 
 # Higher level effect interface
 class HapticEffect:
@@ -409,6 +437,7 @@ class HapticEffect:
     def open(cls, vid = 0xFFFF, pid=0x2055, serial=None) -> FFBRhino:
         logging.info(f"Open Rhino HID {vid:04X}:{pid:04X}")
         cls.device = FFBRhino(vid, pid, serial)
+
         return cls.device
     
     def _conditional_effect(self, type, coef_x = None, coef_y= None):

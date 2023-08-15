@@ -25,7 +25,7 @@ import logging
 import random
 from aircraft_base import AircraftBase
 import json
-
+import socket
 
 #unit conversions (to m/s)
 knots = 0.514444
@@ -101,6 +101,8 @@ class Aircraft(AircraftBase):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
+    trim_workaround = False
+
     ####
     ####
     def __init__(self, name : str, **kwargs):
@@ -152,7 +154,9 @@ class Aircraft(AircraftBase):
             self._update_canopy(telem_data.get("Canopy"))
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
-        self._update_stick_position(telem_data)
+        
+        if self.is_joystick():
+            self._update_stick_position(telem_data)
 
 
     def on_timeout(self):
@@ -162,6 +166,49 @@ class Aircraft(AircraftBase):
         for e in effects.values():
             logging.debug(f"Timeout effect: {e}")
             e.stop()
+
+    def send_commands(self, cmds):
+        cmds = "\n".join(cmds)
+        if not getattr(self, "_socket", None):
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+        
+        self._socket.sendto(bytes(cmds, "utf-8"), ("127.0.0.1", 34381))
+
+    def _update_stick_position(self, telem_data):
+        if not self.trim_workaround: return
+        if not ("StickX" in telem_data and "StickY" in telem_data): return
+
+        input_data = HapticEffect.device.getInput()
+        x, y = input_data.axisXY()
+        telem_data["X"] = x
+        telem_data["Y"] = y
+
+        self.spring_x.positiveCoefficient = 4096
+        self.spring_x.negativeCoefficient = 4096
+        self.spring_y.positiveCoefficient = 4096
+        self.spring_y.negativeCoefficient = 4096
+
+        # trim signal needs to be slow to avoid positive feedback
+        lp_y = LPFs.get("y", 10)
+        lp_x = LPFs.get("x", 10)
+
+        # estimate trim from real stick position and virtual stick position
+        offs_x = lp_x.update(telem_data['StickX'] - x + lp_x.value)
+        offs_y = lp_y.update(telem_data['StickY'] - y + lp_y.value)
+        
+        self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
+        self.spring_y.cpOffset = utils.clamp_minmax(round(offs_y * 4096), 4096)
+
+        # upload effect parameters to stick
+        self.spring.effect.setCondition(self.spring_x)
+        self.spring.effect.setCondition(self.spring_y)
+        # ensure effect is started
+        self.spring.start(override=True)
+
+        # override DCS input and set our own values
+        self.send_commands([f"LoSetCommand(2001, {y - offs_y})", 
+                            f"LoSetCommand(2002, {x - offs_x})"])
+                   
 
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop/WW2 aircraft"""

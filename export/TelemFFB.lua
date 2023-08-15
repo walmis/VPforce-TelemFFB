@@ -109,10 +109,10 @@ local f_telemFFB = {
   end,
   BeforeNextFrame = function(self)
     --LoSetCommand(2001, 0.25)
-    if self.sock_udp then
-      while sock_readable(self.sock_udp)
+    if self.sock_rcv then
+      while sock_readable(self.sock_rcv)
       do
-        local data, addr = self.sock_udp:receivefrom()
+        local data, addr = self.sock_rcv:receivefrom()
         self.prev_command_t = socket.gettime()
         if data == nil then
           data = ""

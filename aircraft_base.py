@@ -78,6 +78,12 @@ class AircraftBase(object):
             return True
 
         return False
+    
+    def is_joystick(self):
+        return self._telem_data.get("FFBType", "joystick") == "joystick"
+    
+    def is_pedals(self):
+        return self._telem_data.get("FFBType") == "pedals"
 
     def anything_has_changed(self, item: str, value, delta_ms=0):
         """track if any parameter, given as key "item" has changed between two consecutive calls of the function
@@ -441,37 +447,6 @@ class AircraftBase(object):
             effects.dispose("spoilerbuffet1-2")
             effects.dispose("spoilerbuffet2-1")
             effects.dispose("spoilerbuffet2-2")
-
-    def _update_stick_position(self, telem_data):
-        if "StickX" in telem_data and "StickY" in telem_data:
-            x, y = HapticEffect.device.getInput()
-            telem_data["X"] = x
-            telem_data["Y"] = y
-
-            self.spring_x.positiveCoefficient = 4096
-            self.spring_x.negativeCoefficient = 4096
-            self.spring_y.positiveCoefficient = 4096
-            self.spring_y.negativeCoefficient = 4096
-
-            # trim signal needs to be slow to avoid positive feedback
-            lp_y = LPFs.get("y", 2)
-            lp_x = LPFs.get("x", 2)
-
-            # estimate trim from real stick position and virtual stick position
-            offs_x = lp_x.update(telem_data['StickX'] - x + lp_x.value)
-            offs_y = lp_y.update(telem_data['StickY'] - y + lp_y.value)
-            self.spring_x.cpOffset = round(offs_x * 4096)
-            self.spring_y.cpOffset = round(offs_y * 4096)
-
-            # upload effect parameters to stick
-            self.spring.effect.setCondition(self.spring_x)
-            self.spring.effect.setCondition(self.spring_y)
-            # ensure effect is started
-            self.spring.start()
-            logging.debug(f"Updated stick offset X:{offs_x}, Y:{offs_y}")
-            # override DCS input and set our own values
-            return f"LoSetCommand(2001, {y - offs_y})\n" \
-                   f"LoSetCommand(2002, {x - offs_x})"
 
     def _update_wind_effect(self, telem_data):
 
