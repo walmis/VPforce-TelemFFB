@@ -28,6 +28,7 @@ from utils import DirectionModulator, clamp
 import os
 import weakref
 import inspect
+import usb1
 
 try:
     hidapi_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')
@@ -36,6 +37,11 @@ except:
     pass
 
 import hid
+
+USB_REQTYPE_DEVICE_TO_HOST = 0x80
+USB_REQTYPE_VENDOR = 0x40
+
+USB_CTRL_REQ_GET_VERSION = 16
 
 # RHINO specific report IDs
 HID_REPORT_ID_INPUT = 1
@@ -340,7 +346,24 @@ class FFBEffectHandle:
            
 class FFBRhino(hid.Device):
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None) -> None:
+        self.vid = vid
+        self.pid = pid
+        
         super().__init__(vid, pid, serial)
+
+    def get_firmware_version(self):
+        with usb1.USBContext() as context:
+            handle = context.openByVendorIDAndProductID(
+                self.vid,
+                self.pid,
+                skip_on_error=True,
+            )
+            #if handle is None:
+                # Device not present, or user is not allowed to access device.
+            ##request_type, request, value, index, length
+
+            return handle.controlRead(USB_REQTYPE_DEVICE_TO_HOST|USB_REQTYPE_VENDOR, 
+                                      USB_CTRL_REQ_GET_VERSION, 0, 0, 64).decode("utf-8")
 
     def resetEffects(self):
         super().write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
@@ -496,6 +519,7 @@ class HapticEffect:
 if __name__ == "__main__":
     d = FFBRhino(0xffff, 0x2055)
     d.resetEffects()
+    print(d.get_firmware_version())
 
     HapticEffect.open()
     s1 = HapticEffect().spring(2048,2048)
