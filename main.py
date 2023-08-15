@@ -15,6 +15,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import atexit
 from traceback_with_variables import print_exc, prints_exc
 
 
@@ -223,6 +224,9 @@ class TelemManager(QObject, threading.Thread):
 
         self.daemon = True
         self._run = True
+        self._cond = threading.Condition()
+        self._data = None
+        self._dropped_frames = 0
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
         config = get_config()
@@ -248,39 +252,37 @@ class TelemManager(QObject, threading.Thread):
     def quit(self):
         self._run = False
         self.join()
+
+    def submitFrame(self, data):
+        with self._cond:
+            if self._data is None:
+                self._data = data
+                self._cond.notify() # notify waiting thread of new data
+            else:
+                self._dropped_frames += 1
+                # log dropped frames, this is not necessarily a bad thing
+                # USB interrupt transfers (1ms) might take longer than one video frame
+                # we drop frames to keep latency to a minimum
+                logging.debug(f"Droppped frame (total {self._dropped_frames})")
     
     @prints_exc
     def run(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
-
-        s.settimeout(0.1)
-        port = 34380
-        s.bind(("", port))
-        logging.info(f"Listening on UDP :{port}")
 
         while self._run:
-            try:
-                data = s.recvfrom(4096)
-                while utils.sock_readable(s):
-                    data = s.recvfrom(4096)  # get last frame in OS buffer, to minimize latency
-            except ConnectionResetError:
-                continue
-            except socket.timeout:
-                if self.currentAircraft and not self.timedOut:
-                    self.currentAircraft.on_timeout()
-                self.timedOut = True
-                continue
-
-            self.timedOut = False
-
-            # get UDP sender
-            sender = data[1]
-
-            # print(sender)
+            with self._cond:
+                if not self._data and not self._cond.wait(0.1):
+                    if self.currentAircraft and not self.timedOut:
+                        self.currentAircraft.on_timeout()
+                    self.timedOut = True
+                    continue
+                else:
+                    self.timedOut = False
+                    assert(self._data is not None)
+                    data = self._data.decode("utf-8").split(";")
+                    self._data = None
+            
             self.lastFrameTime = time.perf_counter()
-            data = data[0].decode("utf-8").split(";")
+
             telem_data = {}
             telem_data["FFBType"] = args.type
 
@@ -336,11 +338,10 @@ class TelemManager(QObject, threading.Thread):
                     self.currentAircraft.apply_settings(params)
                 try:
                     _tm = time.perf_counter()
-                    commands = self.currentAircraft.on_telemetry(telem_data)
+                    self.currentAircraft._telem_data = telem_data
+                    self.currentAircraft.on_telemetry(telem_data)
                     telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
-                    if commands:
-                        # send command back
-                        s.sendto(bytes(commands, "utf-8"), sender)
+
                 except:
                     print_exc()
 
@@ -353,11 +354,39 @@ class TelemManager(QObject, threading.Thread):
                 self.telemetryReceived.emit(telem_data)
             except: pass
 
-class SimConnectSock(SimConnectManager):
-    def __init__(self):
+
+class NetworkThread(threading.Thread):
+    def __init__(self, telemetry : TelemManager, host = "", port = 34380):
         super().__init__()
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self._run = True
+        self._port = port
+        self._telem = telemetry
+
+    def run(self):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+
+        s.settimeout(0.1)
+        s.bind(("", self._port))
+        logging.info(f"Listening on UDP :{self._port}")  
+
+        while self._run:
+            try:
+                data, sender = s.recvfrom(4096)
+                self._telem.submitFrame(data)
+            except ConnectionResetError:
+                continue
+            except socket.timeout:
+                continue
+    
+    def quit(self):
+        self._run = False
+
+class SimConnectSock(SimConnectManager):
+    def __init__(self, telem : TelemManager):
+        super().__init__()
+        self._telem = telem
 
     def fmt(self, val):
         if isinstance(val, list):
@@ -367,7 +396,7 @@ class SimConnectSock(SimConnectManager):
     def emit_packet(self, data):
         data["src"] = "MSFS2020"
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
-        self.s.sendto(packet, ("127.255.255.255", 34380))
+        self._telem.submitFrame(packet)
 
 
 
@@ -546,6 +575,7 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(file_url)
         except:
             logging.error(f"There was an error opening the config file")
+            
     def toggle_log_window(self):
         if d.isVisible():
             d.hide()
@@ -611,27 +641,32 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
-
     window = MainWindow()
     window.show()
 
-    manager = TelemManager()
-    manager.start()
+    telem_manager = TelemManager()
+    telem_manager.start()
 
-    manager.telemetryReceived.connect(window.update_telemetry)
+    telem_manager.telemetryReceived.connect(window.update_telemetry)
 
-    sc = SimConnectSock()
+    dcs = NetworkThread(telem_manager, host="", port=34380)
+    dcs.start()
+
+    sim_connect = SimConnectSock(telem_manager)
     try:
         msfs = config["system"].get("msfs_enabled", None)
         logging.debug(f"MSFS={msfs}")
         if msfs == "1" or args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")
-            sc.start()
+            sim_connect.start()
     except:
         logging.exception("Error loading MSFS enable flag from config file")
 
     app.exec_()
-    manager.quit()
+
+    dcs.quit()
+    sim_connect.quit()
+    telem_manager.quit()
 
 
 if __name__ == "__main__":

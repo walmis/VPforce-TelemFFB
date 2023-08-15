@@ -238,7 +238,7 @@ class SimConnectManager(threading.Thread):
                     self._sim_state = recv.dwData
 
             elif isinstance(recv, RECV_SIMOBJECT_DATA):
-                logging.debug("Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
+                logging.debug(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
                 #print(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
                 if recv.dwRequestID == REQ_ID:
                     #print(f"Matched request 0x{req_id:X}")
@@ -277,6 +277,9 @@ class SimConnectManager(threading.Thread):
 
     def emit_packet(self, data):
         pass
+
+    def quit(self):
+        self._quit = True
 
     def run(self):
         while not self._quit:
