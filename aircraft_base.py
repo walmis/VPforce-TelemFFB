@@ -746,9 +746,8 @@ class AircraftBase(object):
             # effects.dispose("rpm1-2")
 
     def on_timeout(self):  # override me
-        logging.debug("Timeout, preparing to stop effects")
+        logging.info("Telemetry Timeout, stopping effects")
         for e in effects.values():
-            logging.debug(f"Timeout effect: {e}")
             e.stop()
 
     def on_telemetry(self, data): 

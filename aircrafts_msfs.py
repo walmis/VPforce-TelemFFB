@@ -400,13 +400,9 @@ class Aircraft(AircraftBase):
 
     def on_timeout(self):
         super().on_timeout()
-        logging.debug("Timeout, preparing to stop effects")
+
         self.const_force.stop()
         self.spring.stop()
-        for e in effects.values():
-            logging.debug(f"Timeout effect: {e}")
-            e.stop()
-
 
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop aircraft"""

@@ -160,12 +160,9 @@ class Aircraft(AircraftBase):
 
 
     def on_timeout(self):
-        # stop all effects when telemetry stops
         super().on_timeout()
-        logging.debug("Timeout, preparing to stop effects")
-        for e in effects.values():
-            logging.debug(f"Timeout effect: {e}")
-            e.stop()
+
+        self.spring.stop()
 
     def send_commands(self, cmds):
         cmds = "\n".join(cmds)

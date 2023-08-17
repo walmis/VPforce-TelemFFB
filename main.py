@@ -270,7 +270,7 @@ class TelemManager(QObject, threading.Thread):
 
         while self._run:
             with self._cond:
-                if not self._data and not self._cond.wait(0.1):
+                if not self._data and not self._cond.wait(0.2):
                     if self.currentAircraft and not self.timedOut:
                         self.currentAircraft.on_timeout()
                     self.timedOut = True
