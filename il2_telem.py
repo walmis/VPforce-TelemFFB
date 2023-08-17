@@ -193,7 +193,6 @@ class IL2Manager():
         ##
         ## Run Decoders
         ##
-        event_offset = 0
 
         if packet_header == 0x54000101:
             ## Telemetry/Event Packet
