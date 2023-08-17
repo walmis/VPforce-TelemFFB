@@ -765,8 +765,7 @@ class AircraftBase(object):
 
     def on_timeout(self):  # override me
         logging.info("Telemetry Timeout, stopping effects")
-        for e in effects.values():
-            e.stop()
+        effects.foreach(lambda e: e.stop())
 
     def on_telemetry(self, data): 
         pass

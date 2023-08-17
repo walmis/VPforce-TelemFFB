@@ -467,6 +467,10 @@ class Dispenser:
         if name in self.dict:
             del self.dict[name]
 
+    def foreach(self, func):
+        for i in self.values():
+            func(i)
+
 
 
 class Teleplot:
