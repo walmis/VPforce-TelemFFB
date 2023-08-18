@@ -101,6 +101,7 @@ class Aircraft(AircraftBase):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
+    pedal_spring_mode = 0    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
     trim_workaround = False
 
     ####
@@ -158,7 +159,8 @@ class Aircraft(AircraftBase):
         
         if self.is_joystick():
             self._update_stick_position(telem_data)
-
+        if self.is_pedals():
+            self.override_pedal_spring(telem_data)
 
     def on_timeout(self):
         super().on_timeout()
@@ -171,6 +173,22 @@ class Aircraft(AircraftBase):
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         
         self._socket.sendto(bytes(cmds, "utf-8"), ("127.0.0.1", 34381))
+
+    def override_pedal_spring(self, telem_data):
+
+        ## 0=spring disabled + damper enabled, 1=spring enabled at %100 (overriding DCS) + damper
+        if self.pedal_spring_mode == 0:
+            return
+        elif self.pedal_spring_mode == 1:
+            self.spring_x.positiveCoefficient = 0
+            self.spring_x.negativeCoefficient = 0
+        elif self.pedal_spring_mode == 2:
+            self.spring_x.positiveCoefficient = 4096
+            self.spring_x.negativeCoefficient = 4096
+
+        self.spring.effect.setCondition(self.spring_x)
+        # effects["damper"].damper(512, 512).start()
+        self.spring.start(override=True)
 
     def _update_stick_position(self, telem_data):
         if not self.trim_workaround: return
@@ -214,6 +232,7 @@ class PropellerAircraft(Aircraft):
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
     rpm_scale : float = 45
+    pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
     _engine_rumble_is_playing = 0
 
@@ -249,6 +268,8 @@ class JetAircraft(Aircraft):
 
     _ab_is_playing = 0
     _jet_rumble_is_playing = 0
+    pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
+
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -278,6 +299,7 @@ class Helicopter(Aircraft):
     overspeed_shake_start = 70.0 # m/s
     overspeed_shake_intensity = 0.2
     heli_engine_rumble_intensity = 0.12
+    pedal_spring_mode = 1    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
 
     def on_telemetry(self, telem_data):
