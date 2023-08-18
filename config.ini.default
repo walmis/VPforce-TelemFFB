@@ -13,7 +13,8 @@ logging_level = INFO                    # DEBUG | INFO | WARNING | ERROR | CRITI
 msfs_enabled = 0                        # 0=disable, 1=enable | can also run app with '-s MSFS' argument      # MSFS
 dcs_enabled = 1                         # not plumbed - for future use                                        # DCS
 
-[default]
+#DCS default parameters
+[DCS]
 type=Aircraft							# Valid Types 'Aircraft' | 'PropellerAircraft' | 'JetAircraft' | 'Helicopter'
 ##################################################################################
 #### Default Settings below
@@ -26,7 +27,7 @@ type=Aircraft							# Valid Types 'Aircraft' | 'PropellerAircraft' | 'JetAircraf
 buffeting_intensity = 0.2 				# peak AoA buffeting intensity  0 to disable (default 0.2)                                      # DCS/MSFS
 buffet_aoa          = 10				# AoA when buffeting starts (default 10)                                                        # DCS Only (MSFS gives needed aoa data per aircraft!)
 stall_aoa           = 15				# Stall AoA (default 15)                                                                        # DCS Only (MSFS gives needed aoa data per aircraft!)
-
+wind_effect_enabled = 1
 ######################################
 #### Runway Rumble / Touchdown Effect
 ######################################
@@ -94,13 +95,11 @@ overspeed_shake_intensity = 0.2         # max intensity of overspeed shaking [0.
 # Keep a firm grip on stick while decelerating or carrier landing!  If forces are too high and you trap in the F18,
 # the stick will smack the forward stop if you are not holding on to it!
 deceleration_effect_enable = 1                                                                              # DCS/MSFS
-deceleration_effect_enable_areyoureallysure = 1                                                             # DCS/MSFS
 deceleration_max_force = 0.6                                                                                # DCS/MSFS
 ## G force effect will increase the spring force against movement as the G-loading on the aircraft increases
 ## Keep a firm grip on stick while enabled.  Do not be surprised if the temperature of your y-axis motor skyrockets when
 ## using this effect
 gforce_effect_enable = 1                                                                                # DCS/MSFS
-gforce_effect_enable_areyoureallysure = 1                                                               # DCS/MSFS
 gforce_effect_curvature = 2.2           #adjust the onset characteristics of the effect                 # DCS/MSFS
 gforce_effect_max_intensity = 1.0                                                                       # DCS/MSFS
 gforce_min_gs = 1.5                     # G's where the effect starts playing                           # DCS/MSFS
@@ -114,24 +113,53 @@ aoa_reduction_max_force = 1.0           # Max 'constant' force to apply         
 critical_aoa_start = 22                 # AoA at which to begin applying force                          # DCS/MSFS
 critical_aoa_max = 25                   # AoA at which applied force maxes out                          # DCS/MSFS
 
+##############################################################################################################
+## Miscellaneous FFB Settings
+##
+
+#############
+# Elevator droop force for **Propeller Aircraft** will kick in below 20kts and will be at max of elevator_droop_force at 0kts
+#############
+elevator_droop_force = 8%
+
+#############
+## Pedal Spring Override - Heli default = 1, Fixed Wing default = 2 | Uncomment to change globally or add to aircraft block
+## REQUIRES VPforce Firmware 1.0.15 or later!!
+#############
+## pedal_spring_mode = 0    ## 0=DCS Default | 1=spring disabled, 2=spring enabled at %100 VPfConf value
+
+#############
+## Damper force - Uncomment or add to aircraft block | Set percentage of VPfConf slider value
+#############
+## damper_force = 100%
+
+#############
+## Inertia - Uncomment or add to aircraft block | Set percentage of VPfConf slider value
+#############
+## inertia_force = 100%
+
+
+
+# MSFS2020 default parameters
+[MSFS2020]
+type=Aircraft							# Valid Types 'Aircraft' | 'PropellerAircraft' | 'JetAircraft' | 'Helicopter'
 
 #############################
 ##### MSFS Specific Defaults
 #############################
 prop_diameter=1.7 # meters                  # MSFS Only
-rudder_area = 0.8 # sq meters               # MSFS Only
-aileron_area = 0.7 # sq meters              # MSFS Only
-elevator_area = 1.2 # sq meters             # MSFS Only
 aileron_gain = 0.2                          # MSFS Only
 elevator_gain = 0.3                         # MSFS Only
 rudder_gain = 0.3                           # MSFS Only
-elevator_prop_flow_ratio = 0.2              # MSFS Only
+elevator_prop_flow_ratio = 0.2              # MSFS Only, how much airflow the elevator receives from the prop wash
+rudder_prop_flow_ratio = 0.2
 ############################
 #### MSFS Only FBW Settings
 #### Some ac may not indicate they are FBW, use the enable flag to override (per aircraft)
 aircraft_is_fbw = 0         # Enable=1/Disable=0                        # MSFS Only
 fbw_elevator_gain = 0.6     # Fixed spring gain for FBW aircraft        # MSFS Only
 fbw_aileron_gain = 0.6      # Fixed spring gain for FBW aircraft        # MSFS Only
+fbw_rudder_gain = 0.5
 ###########################################
 #### MSFS Only 'Center Spring' settings
 #### Some aircraft (like modern gliders) have center sprung controls, but are still affected
@@ -139,7 +167,13 @@ fbw_aileron_gain = 0.6      # Fixed spring gain for FBW aircraft        # MSFS O
 aircraft_is_spring_centered = 0
 aileron_spring_gain = 0.25
 elevator_spring_gain = 0.25
+rudder_spring_gain = 0.25
 
+### VPforce DIY Rudder Pedals Effects
+nosewheel_shimmy = 0
+nosewheel_shimmy_intensity = 0.15
+nosewheel_shimmy_min_speed = 7
+nosewheel_shimmy_min_brakes = 0.65
 
 ##################################################
 ##################################################
@@ -214,8 +248,8 @@ runway_rumble_intensity=3.0
 flaps_motion_intensity = 0.0
 speedbrake_buffet_intensity = 0.15
 gear_buffet_intensity = 0.15
-gforce_effect_enable = 0
-aoa_reduction_effect_enabled = 1
+gforce_effect_enable = 1
+aoa_reduction_effect_enabled = 0
 aoa_reduction_max_force = 0.7
 critical_aoa_start = 22
 critical_aoa_max = 25
@@ -258,12 +292,13 @@ runway_rumble_intensity=2.0
 [AV8BNA]
 type=JetAircraft
 runway_rumble_intensity=2.0
+trim_workaround = True
 
 [M-2000C]
 type=JetAircraft
 runway_rumble_intensity=2.0
 
-[Mirage_F1]
+[Mirage-F1*]
 type=JetAircraft
 runway_rumble_intensity=2.0
 
@@ -411,7 +446,7 @@ spoiler_buffet_intensity = 0.1
 aircraft_is_fbw = 1
 fbw_elevator_gain = 0.6
 fbw_aileron_gain = 0.6
-aoa_reduction_effect_enabled = 1
+aoa_reduction_effect_enabled = 0
 aoa_reduction_max_force = 0.7
 critical_aoa_start = 22
 critical_aoa_max = 25
