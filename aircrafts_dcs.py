@@ -139,7 +139,7 @@ class Aircraft(AircraftBase):
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
-        if self.deceleration_effect_enable and self.deceleration_effect_enable_areyoureallysure:
+        if self.deceleration_effect_enable:
             self._decel_effect(telem_data)
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
@@ -237,7 +237,7 @@ class PropellerAircraft(Aircraft):
         if self.wind_effect_enabled:
             self._update_wind_effect(telem_data)
         self._update_aoa_effect(telem_data)
-        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+        if self.gforce_effect_enable:
             super()._gforce_effect(telem_data)
 
 
@@ -263,7 +263,7 @@ class JetAircraft(Aircraft):
             self._update_jet_engine_rumble(telem_data)
         if self.aoa_reduction_effect_enabled:
             self._aoa_reduction_force_effect(telem_data)
-        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+        if self.gforce_effect_enable:
             super()._gforce_effect(telem_data)
 
 class Helicopter(Aircraft):
