@@ -94,6 +94,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name='VPforce-TelemFFB',
+    icon='image/vpforceicon.png',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
