@@ -105,6 +105,9 @@ if args.teleplot:
     utils.teleplot.configure(args.teleplot)
 
 version = utils.get_version()
+min_firmware_version = 'v1.0.15'
+global dev_firmware_version
+dev_firmware_version = None
 
 def format_dict(data, prefix=""):
     output = ""
@@ -519,7 +522,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        row_layout = QHBoxLayout()
+        link_row_layout = QHBoxLayout()
         self.doc_label = QLabel()
         doc_url = 'https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.27yzpife8719'
         label_txt = 'TelemFFB Documentation'
@@ -536,10 +539,12 @@ class MainWindow(QMainWindow):
         self.dl_label.setAlignment(Qt.AlignRight)
         self.dl_label.setToolTip(dl_url)
 
-        row_layout.addWidget(self.doc_label)
-        row_layout.addWidget(self.dl_label)
+        link_row_layout.addWidget(self.doc_label)
+        link_row_layout.addWidget(self.dl_label)
 
+        version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
+
         status_text = "UNKNOWN"
         status = utils.fetch_latest_version()
         if status == False:
@@ -548,15 +553,25 @@ class MainWindow(QMainWindow):
             status_text = "UNKNOWN"
         else:
             status_text = f"New version <a href='{status[1]}'><b>{status[0]}</b></a> is available!"
-            
         if status:
             self.version_label.setToolTip(status[1])
+
         self.version_label.setText(f'Version Status: {status_text}')
         self.version_label.setOpenExternalLinks(True)
 
+        global dev_firmware_version
+        self.firmware_label = QLabel()
+        self.firmware_label.setText(f'Rhino Firmware: {dev_firmware_version}')
+
         self.version_label.setAlignment(Qt.AlignLeft)
-        layout.addLayout(row_layout)
-        layout.addWidget(self.version_label)
+        self.firmware_label.setAlignment(Qt.AlignLeft)
+        version_row_layout.addWidget(self.version_label)
+        version_row_layout.addWidget(self.firmware_label)
+
+        layout.addLayout(link_row_layout)
+
+        layout.addLayout(version_row_layout)
+
         central_widget.setLayout(layout)
 
     def show_sub_menu(self):
@@ -606,6 +621,7 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     global d
+    global dev_firmware_version
     d = LogWindow()
     #d.show()
 
@@ -623,7 +639,12 @@ def main():
         dev = HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
         if args.reset:
             dev.resetEffects()
-        logging.info(f"Rhino Firmware: {dev.get_firmware_version()}")
+        dev_firmware_version = dev.get_firmware_version()
+        logging.info(f"Rhino Firmware: {dev_firmware_version}")
+        minver = re.sub(r'\D', '', min_firmware_version)
+        devver = re.sub(r'\D', '', dev_firmware_version)
+        if devver < minver:
+            QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
     except:
         QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}")
         return
