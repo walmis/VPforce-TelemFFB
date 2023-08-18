@@ -566,12 +566,14 @@ local f_telemFFB = {
               PanelShake,
               actualRPM
               )
-          elseif string.find(obj.Name, "P-47D") then
+          elseif string.find(obj.Name, "P-47") then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- Calculate Engine RPM from redline value and engine.RPM value
             local engine_redline_reference = 2700
             local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            local p47_dive_flap_right = LoGetAircraftDrawArgumentValue(182)
+            mech["speedbrakes"]["value"] = p47_dive_flap_right
             -- P47 sends to TelemFFB
             stringToSend =
               string.format(
