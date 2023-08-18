@@ -144,6 +144,7 @@ class Aircraft(AircraftBase):
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
+        self._update_ffb_forces(telem_data)
         if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
             self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
         if self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0:

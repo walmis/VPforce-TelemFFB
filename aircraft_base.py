@@ -463,6 +463,19 @@ class AircraftBase(object):
         logging.debug(f"Adding wind effect intensity:{v}")
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
+    def _update_ffb_forces(self, telem_data):
+        if self.damper_force:
+            force = utils.clamp(self.damper_force, 0.0, 1.0)
+            effects["damper"].damper(4096*force, 4096*force).start()
+        else:
+            effects["damper"].destroy()
+
+        if self.inertia_force:
+            force = utils.clamp(self.inertia_force, 0.0, 1.0)
+            effects["inertia"].damper(4096*force, 4096*force).start()
+        else:
+            effects["inertia"].destroy()
+
     ########################################
     ######                            ######
     ######    Prop Aircraft Effects   ######
@@ -756,15 +769,4 @@ class AircraftBase(object):
             e.stop()
 
     def on_telemetry(self, data): 
-
-        if self.damper_force:
-            force = utils.clamp(self.damper_force, 0.0, 1.0)
-            effects["damper"].damper(4096*force, 4096*force).start()
-        else:
-            effects["damper"].destroy()
-
-        if self.inertia_force:
-            force = utils.clamp(self.inertia_force, 0.0, 1.0)
-            effects["inertia"].damper(4096*force, 4096*force).start()
-        else:
-            effects["inertia"].destroy()
+        pass
