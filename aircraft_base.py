@@ -159,7 +159,8 @@ class AircraftBase(object):
                     effects.dispose("runway1")
 
     def _gforce_effect(self, telem_data):
-
+        if not self.is_joystick():
+            return
         # gforce_effect_enable = 1
         gneg = -1.0
         gmin = self.gforce_min_gs
@@ -187,6 +188,8 @@ class AircraftBase(object):
         logging.debug(f"G's = {z_gs} | gfactor = {g_factor}")
 
     def _aoa_reduction_force_effect(self, telem_data):
+        if not self.is_joystick():
+            return
         start_aoa = self.critical_aoa_start
         end_aoa = self.critical_aoa_max
         aoa = telem_data.get("AoA", 0)
@@ -203,6 +206,8 @@ class AircraftBase(object):
         return
     
     def _decel_effect(self, telem_data):
+        if not self.is_joystick():
+            return
         if self._sim_is_dcs(telem_data):
             y_gs = telem_data.get("ACCs")[0]
         elif self._sim_is_msfs(telem_data):
