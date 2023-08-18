@@ -147,6 +147,7 @@ class SimConnectManager(threading.Thread):
         SimVar("SimDisabled", "SIM DISABLED", "Bool"),
         SimVar("SimOnGround", "SIM ON GROUND", "Bool"),
         SimVar("Parked", "PLANE IN PARKING STATE", "Bool"),
+        SimVar("Slew", "IS SLEW ACTIVE", "Bool"),
         SimVar("SurfaceType", "SURFACE TYPE", "Enum", mutator=lambda x: surface_types.get(x, "unknown")),
         SimVar("EngineType", "ENGINE TYPE", "Enum"),
         SimVarArray("EngVibration", "ENG VIBRATION", "Number", min=1, max=4),
@@ -265,7 +266,7 @@ class SimConnectManager(threading.Thread):
                         else:
                             data[var.name] = val
                             
-                    if not self._sim_paused and not data["Parked"]:     # fixme: figure out why simstart/stop and sim events dont work right
+                    if not self._sim_paused and not data["Parked"] and not data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
                         self.emit_packet(data)
                         self._final_frame_sent = 0
                     else:
