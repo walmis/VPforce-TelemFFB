@@ -102,6 +102,8 @@ class Aircraft(AircraftBase):
     critical_aoa_max = 25
 
     pedal_spring_mode = 0    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    elevator_droop_force = 0
+
     trim_workaround = False
 
     ####
@@ -156,7 +158,6 @@ class Aircraft(AircraftBase):
             self._update_canopy(telem_data.get("Canopy"))
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
-        
         if self.is_joystick():
             self._update_stick_position(telem_data)
         if self.is_pedals():
@@ -173,6 +174,15 @@ class Aircraft(AircraftBase):
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         
         self._socket.sendto(bytes(cmds, "utf-8"), ("127.0.0.1", 34381))
+
+    def override_elevator_droop(self, telem_data):
+
+        if telem_data['TAS'] < 20*knots:
+            force = utils.scale_clamp(telem_data['TAS'], (20*knots, 0),(0, self.elevator_droop_force))
+            effects['elev_droop'].constant(force, 180).start()
+            logging.debug(f"override elevator:{force}")
+        else:
+            effects.dispose('elev_droop')
 
     def override_pedal_spring(self, telem_data):
 
@@ -251,7 +261,8 @@ class PropellerAircraft(Aircraft):
             telem_data["ActualRPM"] = rpm # inject ActualRPM into telemetry
 
         super().on_telemetry(telem_data)
-
+        if self.is_joystick():
+            self.override_elevator_droop(telem_data)
         if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
             self._update_engine_rumble(telem_data["ActualRPM"])
         if self.wind_effect_enabled:
