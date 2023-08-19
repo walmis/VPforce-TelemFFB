@@ -24,7 +24,7 @@ with additional FFB effects.
 import time
 import ctypes
 import logging
-from utils import DirectionModulator, clamp
+from utils import DirectionModulator, clamp, Destroyable
 import os
 import weakref
 import inspect
@@ -236,7 +236,17 @@ class FFBEffectHandle:
         self.ffb : FFBRhino = device
         self.effect_id = effect_id
         self.type = type
-        self.f = weakref.finalize(self, lambda ref: ref() and ref().destroy(), weakref.ref(self))
+        self._finalizer = weakref.finalize(self, lambda ref: ref() and ref().destroy(), weakref.ref(self))
+        self._cache = {}
+
+    def _data_changed(self, key, data):
+        h = hash(data)
+        if not self._cache.get(key):
+            self._cache[key] = h
+            return True
+        changed = self._cache[key] != h
+        self._cache[key] = h
+        return changed  
 
     def __del__(self):
         self.destroy()
@@ -286,60 +296,44 @@ class FFBEffectHandle:
         assert(magnitude >= -1.0 and magnitude <= 1.0)
 
         direction %= 360
+        direction = round((direction*255/360))
 
-        kw = {
-            "effectBlockIndex": self.effect_id,
-            "effectType": self.type,
-            "axesEnable": AXIS_ENABLE_DIR,
-            "directionX": round((direction*255/360)),
-            "gain" : 4096
-        }
-        kw.update(kwargs)
-        op = FFBReport_SetEffect(**kw)
-        self.ffb.write(bytes(op))
-        op = FFBReport_SetConstantForce(magnitude=round(4096*magnitude), effectBlockIndex=self.effect_id)
-        self.ffb.write(bytes(op))
+        self.setEffect(axesEnable=AXIS_ENABLE_DIR, directionX=direction)
+
+        op = bytes(FFBReport_SetConstantForce(magnitude=round(4096*magnitude), effectBlockIndex=self.effect_id))
+        if self._data_changed("SetConstantForce", op): 
+            self.ffb.write(op)
+
         return self
 
     def setEffect(self, **kwargs):
-        kw = {
+        args = {
             "effectBlockIndex": self.effect_id,
             "effectType": self.type,
             "axesEnable": AXIS_ENABLE_X | AXIS_ENABLE_Y,
             "gain": 4096
         }
-        kwargs.update(kw)
-        op = FFBReport_SetEffect(**kwargs)
-        self.ffb.write(bytes(op))
+        args.update(kwargs)
+
+        op = bytes(FFBReport_SetEffect(**args))
+        if self._data_changed("setEffect", op):  
+            self.ffb.write(op)
     
     def setCondition(self, cond : FFBReport_SetCondition):
         cond.effectBlockIndex = self.effect_id
         cond.positiveCoefficient = clamp(cond.positiveCoefficient, -4096, 4096)
         cond.negativeCoefficient = clamp(cond.negativeCoefficient, -4096, 4096)
-        self.ffb.write(bytes(cond))
+        data = bytes(cond)
+        if self._data_changed(f"setCondition{cond.parameterBlockOffset}", data):
+            self.ffb.write(data)
 
     def setPeriodic(self, freq, magnitude, direction, **kwargs):
-    
         assert(self.type in PERIODIC_EFFECTS)
         assert(magnitude >= 0 and magnitude <= 1.0)
         direction %= 360
+        direction = round(direction*255/360)
 
-
-        kw = {
-            "effectBlockIndex": self.effect_id,
-            "effectType": self.type,
-            "axesEnable": AXIS_ENABLE_DIR,
-            "directionX": round((direction*255/360)),
-            "gain" : 4096
-        }
-        kw.update(kwargs)
-        op = FFBReport_SetEffect(**kw)
-        op = bytes(op)
-
-        # update only when data changes
-        if op != getattr(self, "last_SetEffect", None):
-            self.last_SetEffect = (op)
-            self.ffb.write((op))
+        self.setEffect(axesEnable=AXIS_ENABLE_DIR, directionX=direction)
 
         if freq == 0:
             period = 0
@@ -347,11 +341,9 @@ class FFBEffectHandle:
             period = round(1000.0/freq)
         mag = round(4096*magnitude)
 
-        op = FFBReport_SetPeriodic(magnitude=mag, effectBlockIndex=self.effect_id, period=period, **kwargs)
-        op = bytes(op)
-        # update only when data changes
-        if op != getattr(self, "last_SetPeriodic", None):
-            self.last_SetPeriodic = op
+        op = bytes(FFBReport_SetPeriodic(magnitude=mag, effectBlockIndex=self.effect_id, period=period, **kwargs))
+
+        if self._data_changed("SetPeriodic", op):
             self.ffb.write(op)
 
         return self
@@ -421,7 +413,7 @@ class FFBRhino(hid.Device):
 
 
 # Higher level effect interface
-class HapticEffect:
+class HapticEffect(Destroyable):
     effect : FFBEffectHandle = None
     device : FFBRhino = None
     started : bool = False
@@ -535,7 +527,7 @@ class HapticEffect:
         if self.effect and self.effect.effect_id:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is destryoing effect {self.effect.effect_id}")
+            logging.debug(f"The function {caller_name} is destroying effect {self.effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
             logging.info(f"Destroying effect {self.effect.effect_id} ({self.effect.name}){name}")
             self.effect.destroy()
