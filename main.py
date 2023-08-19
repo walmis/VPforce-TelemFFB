@@ -325,7 +325,8 @@ class TelemManager(QObject, threading.Thread):
                     if vpconf_path and "vpconf" in params:
                         logging.info(f"Found VPforce Configurator at {vpconf_path}")
                         serial = HapticEffect.device.serial
-                        subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial])
+                        workdir = os.path.dirname(vpconf_path)
+                        subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial], cwd=workdir)
 
                     logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
                     # instantiate new aircraft handler
