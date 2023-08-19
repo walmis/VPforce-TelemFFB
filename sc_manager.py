@@ -228,15 +228,19 @@ class SimConnectManager(threading.Thread):
                 if recv.uEventID == EV_PAUSED:
                     logging.debug(f"EVENT PAUSED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_paused = recv.dwData
+                    self.emit_event("Pause")
                 elif recv.uEventID == EV_STARTED:
                     logging.debug(f"EVENT STARTED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_started = 1
+                    self.emit_event("SimStart")
                 elif recv.uEventID == EV_STOPPED:
                     logging.debug(f"EVENT STOPPED, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_started = 0
+                    self.emit_event("SimStop")
                 elif recv.uEventID == EV_SIMSTATE:
                     logging.debug(f"EVENT SIMSTATE, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_state = recv.dwData
+                    self.emit_event("SimState", recv.dwData)
 
             elif isinstance(recv, RECV_SIMOBJECT_DATA):
                 logging.debug(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
@@ -277,6 +281,9 @@ class SimConnectManager(threading.Thread):
                 print("Received", recv)
 
     def emit_packet(self, data):
+        pass
+
+    def emit_event(self, event, **args):
         pass
 
     def quit(self):
