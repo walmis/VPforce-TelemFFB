@@ -23,7 +23,7 @@ from ffb_rhino import HapticEffect, FFBReport_SetCondition
 import utils
 import logging
 import random
-from aircraft_base import AircraftBase
+from aircraft_base import AircraftBase, effects, HPFs, LPFs
 import json
 import socket
 
@@ -32,15 +32,6 @@ knots = 0.514444
 kmh = 1.0/3.6
 deg = math.pi/180
 
-# by accessing effects dict directly new effects will be automatically allocated
-# example: effects["myUniqueName"]
-effects : Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
-
-# Highpass filter dispenser
-HPFs : Dict[str, utils.HighPassFilter]  = utils.Dispenser(utils.HighPassFilter)
-
-# Lowpass filter dispenser
-LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -111,11 +102,6 @@ class Aircraft(AircraftBase):
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
 
-        #clear any existing effects
-        for e in effects.values(): e.destroy()
-        effects.clear()
-
-        self.spring = HapticEffect().spring()
         #self.spring.effect.effect_id = 5
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
@@ -163,10 +149,13 @@ class Aircraft(AircraftBase):
         if self.is_pedals():
             self.override_pedal_spring(telem_data)
 
+    def on_event(self, event, *args):
+        logging.info(f"on_event: {event}")
+        if event == "Stop":
+            effects.clear()
+
     def on_timeout(self):
         super().on_timeout()
-
-        self.spring.stop()
 
     def send_commands(self, cmds):
         cmds = "\n".join(cmds)
@@ -225,11 +214,12 @@ class Aircraft(AircraftBase):
         self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
         self.spring_y.cpOffset = utils.clamp_minmax(round(offs_y * 4096), 4096)
 
+        spring = effects["spring"].spring()
         # upload effect parameters to stick
-        self.spring.effect.setCondition(self.spring_x)
-        self.spring.effect.setCondition(self.spring_y)
+        spring.effect.setCondition(self.spring_x)
+        spring.effect.setCondition(self.spring_y)
         # ensure effect is started
-        self.spring.start(override=True)
+        spring.start(override=True)
 
         # override DCS input and set our own values
         self.send_commands([f"LoSetCommand(2001, {y - offs_y})", 

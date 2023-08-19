@@ -29,19 +29,8 @@ from typing import List, Dict
 from utils import clamp, HighPassFilter, Derivative, Dispenser
 
 from ffb_rhino import HapticEffect, FFBReport_SetCondition
-from aircraft_base import AircraftBase
+from aircraft_base import AircraftBase, effects, HPFs, LPFs
 
-# by accessing effects dict directly new effects will be automatically allocated
-# example: effects["myUniqueName"]
-effects: Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
-
-# Highpass filter dispenser
-HPFs: Dict[str, utils.HighPassFilter] = utils.Dispenser(utils.HighPassFilter)
-
-# Lowpass filter dispenser
-LPFs: Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
-
-hpf = Dispenser(HighPassFilter)
 
 deg = 180 / math.pi
 slugft3 = 0.00194032  # SI to slugft3

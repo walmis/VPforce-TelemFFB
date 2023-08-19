@@ -33,6 +33,12 @@ import zlib
 import subprocess
 import urllib.request
 import json
+import ssl
+import io
+
+class Destroyable:
+    def destroy():
+        raise NotImplementedError
 
 class Vector2D:
     def __init__(self, x, y):
@@ -350,6 +356,7 @@ class LowPassFilter:
         self.alpha = 0.0
         self.x_filt = init_val
         self.last_update = time.perf_counter()
+        
     def __call__(self, x):
         return self.update(x)
     def update(self, x):
@@ -423,8 +430,9 @@ class RandomDirectionModulator(DirectionModulator):
     def update(self):
         now = time.perf_counter()
         #dt = now - self.prev_upd
-        if now - self.prev_upd > self.period/1000:
+        if now - self.prev_upd > self.period:
             self.prev_upd = now
+            random.seed()
             self.value = random.randint(0, 360)
 
         return self.value
@@ -442,8 +450,7 @@ class Dispenser:
         return v
 
     def remove(self, name):
-        if name in self.dict:
-            del self.dict[name]
+        self.dispose(name)
     
     def __contains__(self, name):
         return name in self.dict
@@ -455,9 +462,16 @@ class Dispenser:
         return self.dict.__iter__()
 
     def __delitem__(self, name):
+        v = self.dict[name]
+        if isinstance(v, Destroyable):
+            v.destroy()
         del self.dict[name]
 
     def clear(self):
+        for k in self.dict.keys():
+            v = self.dict[k]
+            if isinstance(v, Destroyable):
+                v.destroy()
         self.dict.clear()
 
     def values(self):
@@ -465,6 +479,9 @@ class Dispenser:
 
     def dispose(self, name):
         if name in self.dict:
+            v = self.dict[name]
+            if isinstance(v, Destroyable):
+                v.destroy()
             del self.dict[name]
 
     def foreach(self, func):
@@ -660,7 +677,7 @@ def get_version():
     return ver
 
 def fetch_latest_version():
-    import ssl
+
     ctx = ssl._create_unverified_context()
 
     current_version = get_version()
@@ -685,9 +702,17 @@ def fetch_latest_version():
         return False
     else:
         return None
+    
+def self_update(zip_uri):
+    r = urllib.request.urlopen(zip_uri, context=ssl._create_unverified_context())
+    r.read()
+
+
 
 if __name__ == "__main__":
     #test install
-    from PyQt5.QtWidgets import QApplication
-    app = QApplication(sys.argv)
-    install_export_lua()
+    #from PyQt5.QtWidgets import QApplication
+    #app = QApplication(sys.argv)
+    #install_export_lua()
+    uri = "https://vpforcecontrols.com/downloads/TelemFFB/VPforce-TelemFFB-wip-2e79e046.zip"
+    self_update(uri)

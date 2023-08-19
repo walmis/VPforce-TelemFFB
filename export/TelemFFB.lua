@@ -104,7 +104,7 @@ local f_telemFFB = {
     socket.try(self.sock_udp:setoption('broadcast', true))
     socket.try(self.sock_udp:setpeername("127.255.255.255", 34380))
 
-    socket.try(self.sock_udp:send("CONNECT"))
+    socket.try(self.sock_udp:send("Ev=Start"))
 
   end,
   BeforeNextFrame = function(self)
@@ -857,7 +857,7 @@ local f_telemFFB = {
       socket.protect(
       function()
         if self.sock_udp then
-          socket.try(self.sock_udp:send("DISCONNECT"))
+          socket.try(self.sock_udp:send("Ev=Stop"))
           self.sock_udp:close()
           self.sock_udp = nil
 

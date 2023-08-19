@@ -47,6 +47,9 @@ class AircraftBase(object):
         self._changes = {}
         self._change_counter = {}
         self._telem_data = None
+        
+        #clear any existing effects
+        effects.clear()
 
     def apply_settings(self, settings_dict):
         for k, v in settings_dict.items():
@@ -762,6 +765,9 @@ class AircraftBase(object):
             # effects.dispose("rpm0-2")
             effects.dispose("rpm1-1")
             # effects.dispose("rpm1-2")
+
+    def on_event(self):
+        pass
 
     def on_timeout(self):  # override me
         logging.info("Telemetry Timeout, stopping effects")

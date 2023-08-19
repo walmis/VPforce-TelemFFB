@@ -137,7 +137,7 @@ def load_config(filename, raise_errors=True) -> ConfigObj:
         err["system"]["dcs_enabled"] = 0
         return err
 
-_config = None
+_config : ConfigObj = None
 _config_mtime = 0
 
 # if update is true, update the current modified time
@@ -223,12 +223,12 @@ class TelemManager(QObject, threading.Thread):
 
     def __init__(self) -> None:
         QObject.__init__(self)
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, daemon=True)
 
-        self.daemon = True
         self._run = True
         self._cond = threading.Condition()
         self._data = None
+        self._events = []
         self._dropped_frames = 0
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
@@ -240,25 +240,31 @@ class TelemManager(QObject, threading.Thread):
         else:
             params = utils.sanitize_dict(config["default"])
 
-        type = "Aircraft"
+        class_name = "Aircraft"
 
         for section,conf in config.items():
             # find matching aircraft in config
             if re.match(section, aircraft_name):
                 conf = utils.sanitize_dict(conf)
                 logging.info(f"Found aircraft '{aircraft_name}' in config")
-                type = conf.get("type", "Aircraft")
+                class_name = conf.get("type", "Aircraft")
                 params.update(conf)
 
-        return (params, type)
+        return (params, class_name)
     
     def quit(self):
         self._run = False
         self.join()
 
-    def submitFrame(self, data):
+    def submitFrame(self, data : bytes):
+        if type(data) == bytes:
+            data = data.decode("utf-8")
+
         with self._cond:
-            if self._data is None:
+            if data.startswith("Ev="):
+                self._events.append(data.lstrip("Ev="))
+                self._cond.notify()
+            elif self._data is None:
                 self._data = data
                 self._cond.notify() # notify waiting thread of new data
             else:
@@ -267,97 +273,111 @@ class TelemManager(QObject, threading.Thread):
                 # USB interrupt transfers (1ms) might take longer than one video frame
                 # we drop frames to keep latency to a minimum
                 logging.debug(f"Droppped frame (total {self._dropped_frames})")
-    
-    @prints_exc
-    def run(self):
 
-        while self._run:
-            with self._cond:
-                if not self._data and not self._cond.wait(0.2):
-                    if self.currentAircraft and not self.timedOut:
-                        self.currentAircraft.on_timeout()
-                    self.timedOut = True
-                    continue
-                else:
-                    self.timedOut = False
-                    assert(self._data is not None)
-                    data = self._data.decode("utf-8").split(";")
-                    self._data = None
-            
-            self.lastFrameTime = time.perf_counter()
-
-            telem_data = {}
-            telem_data["FFBType"] = args.type
-
-            if data[0] == "DISCONNECT":
-                logging.info("Telemetry disconnected")
-                self.currentAircraftName = None
-
-            for i in data:
-                try:
-                    if len(i) and i != "CONNECT" and i != "DISCONNECT":
-                        section, conf = i.split("=")
-                        values = conf.split("~")
-                        telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
-                except Exception as e:
-                    traceback.print_exc()
-                    print("Error Parsing Parameter: ", repr(i))
-
-            # print(items)
-            aircraft_name = telem_data.get("N")
-            data_source = telem_data.get("src", None)
-            if data_source == "MSFS2020":
-                module = aircrafts_msfs
-            else:
-                module = aircrafts_dcs
-
-            if aircraft_name and aircraft_name != self.currentAircraftName:
-                
-                if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
-                    params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-
-                    Class = getattr(module, cls_name, None)
-                    if not Class:
-                        logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
-                        Class = module.Aircraft
-
-                    vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
-                    if vpconf_path and "vpconf" in params:
-                        logging.info(f"Found VPforce Configurator at {vpconf_path}")
-                        serial = HapticEffect.device.serial
-                        workdir = os.path.dirname(vpconf_path)
-                        subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial], cwd=workdir)
-
-                    logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
-                    # instantiate new aircraft handler
-                    self.currentAircraft = Class(aircraft_name)
-                    self.currentAircraft.apply_settings(params)
-
-                self.currentAircraftName = aircraft_name
+    def process_events(self):
+        while len(self._events):
+            ev = self._events.pop(0)
+            ev = ev.split(";")
 
             if self.currentAircraft:
-                if config_has_changed():
-                    logging.info("Configuration has changed, reloading")
-                    params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-                    self.currentAircraft.apply_settings(params)
-                try:
-                    _tm = time.perf_counter()
-                    self.currentAircraft._telem_data = telem_data
-                    self.currentAircraft.on_telemetry(telem_data)
-                    telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
+                self.currentAircraft.on_event(*ev)
+            continue
 
-                except:
-                    print_exc()
+    def process_data(self, data):
+        self.lastFrameTime = time.perf_counter()
+        data = data.split(";")
 
-            if args.plot:
-                for item in args.plot:
-                    if item in telem_data:
-                        utils.teleplot.sendTelemetry(item, telem_data[item])
+        telem_data = {}
+        telem_data["FFBType"] = args.type
 
-            try: # sometime Qt object is destroyed first on exit and this may cause a runtime exception
-                self.telemetryReceived.emit(telem_data)
-            except: pass
+        for i in data:
+            try:
+                if len(i):
+                    section, conf = i.split("=")
+                    values = conf.split("~")
+                    telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
 
+            except Exception as e:
+                traceback.print_exc()
+                print("Error Parsing Parameter: ", repr(i))
+
+        # print(items)
+        aircraft_name = telem_data.get("N")
+        data_source = telem_data.get("src", None)
+        if data_source == "MSFS2020":
+            module = aircrafts_msfs
+        else:
+            module = aircrafts_dcs
+
+        if aircraft_name and aircraft_name != self.currentAircraftName:
+            
+            if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
+                params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
+
+                Class = getattr(module, cls_name, None)
+                if not Class:
+                    logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
+                    Class = module.Aircraft
+
+                vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
+                if vpconf_path and "vpconf" in params:
+                    logging.info(f"Found VPforce Configurator at {vpconf_path}")
+                    serial = HapticEffect.device.serial
+                    workdir = os.path.dirname(vpconf_path)
+                    subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial], cwd=workdir)
+
+                logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
+                # instantiate new aircraft handler
+                self.currentAircraft = Class(aircraft_name)
+                self.currentAircraft.apply_settings(params)
+
+            self.currentAircraftName = aircraft_name
+
+        if self.currentAircraft:
+            if config_has_changed():
+                logging.info("Configuration has changed, reloading")
+                params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
+                self.currentAircraft.apply_settings(params)
+            try:
+                _tm = time.perf_counter()
+                self.currentAircraft._telem_data = telem_data
+                self.currentAircraft.on_telemetry(telem_data)
+                telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
+
+            except:
+                print_exc()
+
+        if args.plot:
+            for item in args.plot:
+                if item in telem_data:
+                    utils.teleplot.sendTelemetry(item, telem_data[item])
+
+        try: # sometime Qt object is destroyed first on exit and this may cause a runtime exception
+            self.telemetryReceived.emit(telem_data)
+        except: pass
+
+    def on_timeout(self):
+        if self.currentAircraft and not self.timedOut:
+            self.currentAircraft.on_timeout()
+        self.timedOut = True
+
+    @prints_exc
+    def run(self):
+        while self._run:
+            with self._cond:
+                if not len(self._events) and not self._data:
+                    if not self._cond.wait(0.2): 
+                        self.on_timeout()
+                        continue
+
+                if len(self._events):
+                    self.process_events()
+
+                if self._data:
+                    self.timedOut = False
+                    data = self._data
+                    self._data = None
+                    self.process_data(data)
 
 class NetworkThread(threading.Thread):
     def __init__(self, telemetry : TelemManager, host = "", port = 34380):
