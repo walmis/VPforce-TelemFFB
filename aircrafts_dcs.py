@@ -187,10 +187,11 @@ class Aircraft(AircraftBase):
         elif self.pedal_spring_mode == 2:
             self.spring_x.positiveCoefficient = 4096
             self.spring_x.negativeCoefficient = 4096
+        spring = effects["spring"].spring()
 
-        self.spring.effect.setCondition(self.spring_x)
+        spring.effect.setCondition(self.spring_x)
         # effects["damper"].damper(512, 512).start()
-        self.spring.start(override=True)
+        spring.start(override=True)
 
     def _update_stick_position(self, telem_data):
         if not self.trim_workaround: return
