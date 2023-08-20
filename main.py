@@ -57,7 +57,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 # Create a formatter for the log messages
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+formatter = logging.Formatter('%(asctime)s.%(msecs)d - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 # Create a StreamHandler to log messages to the console
 console_handler = logging.StreamHandler(sys.stdout)
