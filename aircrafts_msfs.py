@@ -255,7 +255,7 @@ class Aircraft(AircraftBase):
             2 * telem_data["PropThrust1"] / 
                 (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
 
-        if abs(incidence_vec.y) > 0.5 and _prop_air_vel > 1: # avoid edge cases
+        if abs(incidence_vec.y) > 0.5 or _prop_air_vel > 1: # avoid edge cases
             _elevator_aoa = atan2(-incidence_vec.y, _prop_air_vel) * deg
         else:
             _elevator_aoa = 0
@@ -357,7 +357,8 @@ class Aircraft(AircraftBase):
             telem_data["RudForce"] = rud_force
             self.spring.start()
 
-
+    def on_event(self, event, *args):
+        logging.info(f"on_event {event} {args}")
 
     def on_telemetry(self, telem_data):
         if telem_data["Parked"]: # Aircraft is parked, do nothing

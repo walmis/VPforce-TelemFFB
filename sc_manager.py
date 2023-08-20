@@ -223,12 +223,16 @@ class SimConnectManager(threading.Thread):
                 logging.error(f"SimConnect exception {recv.dwException}, sendID {recv.dwSendID}, index {recv.dwIndex}")
             elif isinstance(recv, RECV_QUIT):
                 logging.info("Quit received")
+                self.emit_event("Quit")
                 break
+            elif isinstance(recv, RECV_OPEN):
+                self.emit_event("Open")
+                
             elif isinstance(recv, RECV_EVENT):
                 if recv.uEventID == EV_PAUSED:
                     logging.debug(f"EVENT PAUSED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_paused = recv.dwData
-                    self.emit_event("Pause")
+                    self.emit_event("Paused", recv.dwData)
                 elif recv.uEventID == EV_STARTED:
                     logging.debug(f"EVENT STARTED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_started = 1

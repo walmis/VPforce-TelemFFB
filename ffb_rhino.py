@@ -379,6 +379,7 @@ class FFBRhino(hid.Device):
         return None
 
     def resetEffects(self):
+        logging.info("FFB: Reset device effects")
         super().write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
         time.sleep(0.01)
 

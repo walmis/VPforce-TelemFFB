@@ -70,8 +70,8 @@ class Aircraft(AircraftBase):
     canopy_motion_intensity : float = 0.12      # peak vibration intensity when canopy is moving, 0 to disable
     canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
 
-    afterburner_effect_intensity = 0.2      # peak intensity for afterburner rumble effect
-    jet_engine_rumble_intensity = 0.12      # peak intensity for jet engine rumble effect
+    afterburner_effect_intensity = 0.0      # peak intensity for afterburner rumble effect
+    jet_engine_rumble_intensity = 0      # peak intensity for jet engine rumble effect
     jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
     ####
@@ -102,7 +102,7 @@ class Aircraft(AircraftBase):
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
 
-        #self.spring.effect.effect_id = 5
+        self._jet_rumble_is_playing = 0
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
@@ -125,6 +125,7 @@ class Aircraft(AircraftBase):
 
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"   #inject aircraft class into telemetry
+
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
@@ -144,6 +145,8 @@ class Aircraft(AircraftBase):
             self._update_canopy(telem_data.get("Canopy"))
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
+        if self.jet_engine_rumble_intensity > 0:
+            self._update_jet_engine_rumble(telem_data)
         if self.is_joystick():
             self._update_stick_position(telem_data)
         if self.is_pedals():
@@ -233,8 +236,7 @@ class PropellerAircraft(Aircraft):
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
     rpm_scale : float = 45
     pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
-
-    _engine_rumble_is_playing = 0
+    jet_engine_rumble_intensity = 0
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -268,10 +270,11 @@ class JetAircraft(Aircraft):
     #flaps_motion_intensity = 0.0
 
     _ab_is_playing = 0
-    _jet_rumble_is_playing = 0
     pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
-
+    jet_engine_rumble_intensity = 0.05
+    afterburner_effect_intensity = 0.2
+    
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         ## Jet Aircraft Telemetry Handler
@@ -282,8 +285,6 @@ class JetAircraft(Aircraft):
 
         if self.afterburner_effect_intensity > 0:
             self._update_ab_effect(telem_data)
-        if Aircraft.jet_engine_rumble_intensity > 0:
-            self._update_jet_engine_rumble(telem_data)
         if self.aoa_reduction_effect_enabled:
             self._aoa_reduction_force_effect(telem_data)
         if self.gforce_effect_enable:
@@ -313,38 +314,3 @@ class Helicopter(Aircraft):
 
         self._calc_etl_effect(telem_data)
         self._update_heli_engine_rumble(telem_data)
-
-
-class TF51D(PropellerAircraft):
-    buffeting_intensity = 0 # implement
-    runway_rumble_intensity = 1.0
-    
-
-# Specialized class for Mig-21
-class Mig21(JetAircraft):
-    aoa_shaker_enable = True
-    buffet_aoa = 8
-
-class Ka50(Helicopter):
-    #TODO: KA-50 settings here...
-    pass
-
-
-classes = {
-    "Ka-50" : Ka50,
-    "Mi-8MT": Helicopter,
-    "UH-1H": Helicopter,
-    "SA342M" :Helicopter,
-    "SA342L" :Helicopter,
-    "SA342Mistral":Helicopter,
-    "SA342Minigun":Helicopter,
-    "AH-64D_BLK_II":Helicopter,
-
-    "TF-51D" : TF51D,
-    "MiG-21Bis": Mig21,
-    "F-15C": JetAircraft,
-    "MiG-29A": JetAircraft,
-    "MiG-29S": JetAircraft,
-    "MiG-29G": JetAircraft,
-    "default": Aircraft
-}

@@ -230,6 +230,8 @@ class TelemManager(QObject, threading.Thread):
         self._data = None
         self._events = []
         self._dropped_frames = 0
+        self.lastFrameTime = time.perf_counter()
+        self.frameTimes = []
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
         config = get_config()
@@ -246,8 +248,21 @@ class TelemManager(QObject, threading.Thread):
             # find matching aircraft in config
             if re.match(section, aircraft_name):
                 conf = utils.sanitize_dict(conf)
-                logging.info(f"Found aircraft '{aircraft_name}' in config")
+                logging.info(f"Found section [{section}] for aircraft '{aircraft_name}' in config")
                 class_name = conf.get("type", "Aircraft")
+
+                # load params from that class in config
+                s = ".".join([default_section, class_name] if default_section else [class_name])
+                logging.info(f"Loading parameters from [{s}] section")
+                class_params = config.get(s)
+                if class_params:
+                    class_params = utils.sanitize_dict(class_params)
+                    params.update(class_params)
+                else:
+                    logging.warning(f"Section [{s}] does not exist")
+                    
+
+
                 params.update(conf)
 
         return (params, class_name)
@@ -284,11 +299,18 @@ class TelemManager(QObject, threading.Thread):
             continue
 
     def process_data(self, data):
-        self.lastFrameTime = time.perf_counter()
         data = data.split(";")
 
         telem_data = {}
         telem_data["FFBType"] = args.type
+
+        self.frameTimes.append(int((time.perf_counter() - self.lastFrameTime)*1000))
+        if len(self.frameTimes) > 50: self.frameTimes.pop(0)
+        
+        telem_data["frameTimes"] = [self.frameTimes[-1], max(self.frameTimes)]
+
+
+        self.lastFrameTime = time.perf_counter()
 
         for i in data:
             try:
@@ -423,7 +445,13 @@ class SimConnectSock(SimConnectManager):
         self._telem.submitFrame(packet)
 
     def emit_event(self, event, *args):
-        self._telem.submitFrame(f"Ev={event}" + ";".join(args))
+        # special handling of Open event
+        if event == "Open":
+            # Reset all FFB effects on device, ensure we have a clean start
+            HapticEffect.device.resetEffects()
+
+        args = [str(x) for x in args]
+        self._telem.submitFrame(f"Ev={event};" + ";".join(args))
 
 
 
