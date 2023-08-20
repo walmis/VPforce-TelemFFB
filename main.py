@@ -78,7 +78,7 @@ import re
 import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu
+    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
 # from PyQt5.QtWidgets import *
@@ -97,6 +97,7 @@ from ffb_rhino import HapticEffect
 from configobj import ConfigObj
 
 from sc_manager import SimConnectManager
+from aircraft_base import effects
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -513,7 +514,26 @@ class MainWindow(QMainWindow):
         simlabel.setToolTip("Enable/Disable Sims in config file or use '-s DCS|MSFS' argument to specify")
         layout.addWidget(simlabel)
         # Add a label and telemetry data label
-        layout.addWidget(QLabel("Telemetry"))
+        # layout.addWidget(QLabel("Telemetry"))
+
+
+        self.radio_button_group = QButtonGroup()
+        radio_row_layout = QHBoxLayout()
+        self.telem_monitor_radio = QRadioButton("Telemetry Monitor")
+        self.effect_monitor_radio = QRadioButton("Effects Monitor")
+
+        radio_row_layout.addWidget(self.telem_monitor_radio)
+        radio_row_layout.addWidget(self.effect_monitor_radio)
+
+        self.telem_monitor_radio.setChecked(True)
+
+        self.radio_button_group.addButton(self.telem_monitor_radio)
+        self.radio_button_group.addButton(self.effect_monitor_radio)
+
+        # self.radio_button_group.buttonClicked.connect(self.update_monitor_window)
+
+        layout.addLayout(radio_row_layout)
+
 
         # Create a scrollable area
         scroll_area = QScrollArea()
@@ -663,8 +683,16 @@ class MainWindow(QMainWindow):
                     if isinstance(v, list):
                         v = "[" + ", ".join([f"{x:.3f}" if not isinstance(x, str) else x for x in v]) + "]"
                     items += f"{k}: {v}\n"
+            active_effects = '\n'.join(effects.dict.keys())
+            window_mode = self.radio_button_group.checkedButton()
+            if window_mode == self.telem_monitor_radio:
+                self.lbl_telem_data.setText(items)
+            elif window_mode == self.effect_monitor_radio:
+                self.lbl_telem_data.setText(active_effects)
 
-            self.lbl_telem_data.setText(items)
+
+
+
         except Exception as e:
             traceback.print_exc()
 
