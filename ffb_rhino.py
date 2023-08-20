@@ -360,18 +360,23 @@ class FFBRhino(hid.Device):
         self.nonblocking = True
         
     def get_firmware_version(self):
-        with usb1.USBContext() as context:
-            handle = context.openByVendorIDAndProductID(
-                self.vid,
-                self.pid,
-                skip_on_error=True,
-            )
-            #if handle is None:
-                # Device not present, or user is not allowed to access device.
-            ##request_type, request, value, index, length
+        try:
+            with usb1.USBContext() as context:
+                handle = context.openByVendorIDAndProductID(
+                    self.vid,
+                    self.pid,
+                    skip_on_error=True,
+                )
+                #if handle is None:
+                    # Device not present, or user is not allowed to access device.
+                ##request_type, request, value, index, length
 
-            return handle.controlRead(USB_REQTYPE_DEVICE_TO_HOST|USB_REQTYPE_VENDOR, 
-                                      USB_CTRL_REQ_GET_VERSION, 0, 0, 64).decode("utf-8")
+                return handle.controlRead(USB_REQTYPE_DEVICE_TO_HOST|USB_REQTYPE_VENDOR, 
+                                        USB_CTRL_REQ_GET_VERSION, 0, 0, 64).decode("utf-8")
+        except:
+            logging.exception("Unable to read Firmware Version")
+        
+        return None
 
     def resetEffects(self):
         super().write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))

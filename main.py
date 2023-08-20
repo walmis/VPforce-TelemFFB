@@ -661,13 +661,14 @@ def main():
         if args.reset:
             dev.resetEffects()
         dev_firmware_version = dev.get_firmware_version()
-        logging.info(f"Rhino Firmware: {dev_firmware_version}")
-        minver = re.sub(r'\D', '', min_firmware_version)
-        devver = re.sub(r'\D', '', dev_firmware_version)
-        if devver < minver:
-            QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
-    except:
-        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}")
+        if dev_firmware_version:
+            logging.info(f"Rhino Firmware: {dev_firmware_version}")
+            minver = re.sub(r'\D', '', min_firmware_version)
+            devver = re.sub(r'\D', '', dev_firmware_version)
+            if devver < minver:
+                QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
+    except Exception as e:
+        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}\nError: {e}")
         return
 
 
