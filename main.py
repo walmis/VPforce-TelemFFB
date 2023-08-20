@@ -692,13 +692,8 @@ class MainWindow(QMainWindow):
             elif window_mode == self.effect_monitor_radio:
                 self.lbl_telem_data.setText(active_effects)
 
-
-
-
         except Exception as e:
             traceback.print_exc()
-
-
 
 def main():
     app = QApplication(sys.argv)
@@ -758,9 +753,9 @@ def main():
 
     sim_connect = SimConnectSock(telem_manager)
     try:
-        msfs = config["system"].get("msfs_enabled", None)
+        msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
         logging.debug(f"MSFS={msfs}")
-        if msfs == "1" or args.sim == "MSFS":
+        if msfs or args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")
             sim_connect.start()
     except:
