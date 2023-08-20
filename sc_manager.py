@@ -240,7 +240,7 @@ class SimConnectManager(threading.Thread):
                 elif recv.uEventID == EV_SIMSTATE:
                     logging.debug(f"EVENT SIMSTATE, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_state = recv.dwData
-                    self.emit_event("SimState")
+                    self.emit_event("SimState", recv.dwData)
 
             elif isinstance(recv, RECV_SIMOBJECT_DATA):
                 logging.debug(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
@@ -283,7 +283,7 @@ class SimConnectManager(threading.Thread):
     def emit_packet(self, data):
         pass
 
-    def emit_event(self, event, **args):
+    def emit_event(self, event, *args):
         pass
 
     def quit(self):

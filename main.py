@@ -422,6 +422,9 @@ class SimConnectSock(SimConnectManager):
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
         self._telem.submitFrame(packet)
 
+    def emit_event(self, event, *args):
+        self._telem.submitFrame(f"Ev={event}" + ";".join(args))
+
 
 
 # Subclass QMainWindow to customize your application's main window
