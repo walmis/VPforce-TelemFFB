@@ -673,7 +673,7 @@ class AircraftBase(object):
             elif "Mi-24P" in mod:
                 blade_ct = 5
             elif "AH-64" in mod:
-                blade_ct = 2
+                blade_ct = 4
                 rotor = 245  # Apache does not have exportable data related to Rotor RPM
             elif "UH-60L" in mod:
                 blade_ct = 4
