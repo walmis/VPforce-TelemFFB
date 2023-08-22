@@ -332,6 +332,28 @@ def gaussian_scaling(x, min_val, max_val, peak_percentage=0.5, curve_width=1.0):
     result = scaling_factor
 
     return result
+
+
+def sine_point_in_time(amplitude, period_ms, phase_offset_deg=0):
+    current_time = time.perf_counter()  # Get the current time in seconds with high resolution
+
+    # Convert frequency from milliseconds to Hz
+    frequency_hz = 1 / (period_ms / 1000)
+
+    # Calculate the angular frequency (2 * pi * frequency)
+    angular_frequency = 2 * math.pi * frequency_hz
+
+    phase_offset_rad = math.radians(phase_offset_deg)
+
+    # Calculate the value of the sine wave at the current time with phase offset
+    value = amplitude * math.sin(angular_frequency * current_time + phase_offset_rad)
+
+    # print(f"Amp:{amplitude}     |Freq:{frequency_hz}     |Offset:{phase_offset_deg}        |Val:{value}")
+
+    return value
+
+
+
 def pressure_from_altitude(altitude_m):
     """Calculate pressure at specified altitude
 

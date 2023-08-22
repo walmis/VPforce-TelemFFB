@@ -517,8 +517,18 @@ class AircraftBase(object):
         modulation_neg = 1
         frequency2 = frequency + median_modulation
         precision = 2
-        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
-        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+
+        ##
+        ## Update oscillation modulation with new function that returns the amplitude of a sine wave
+        ## at any point in time based on wave amplitude and period
+        ## Leave legacy code in place in case nobody likes the new effect
+        legacy_mode = 0
+        if legacy_mode:
+            r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+            r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+        else:
+            r1_modulation = utils.sine_point_in_time(3, 10000)
+            r2_modulation = utils.sine_point_in_time(3, 17500, phase_offset_deg=45)
 
         if frequency > 0:
             force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
@@ -578,20 +588,27 @@ class AircraftBase(object):
             logging.error(f"Error getting afterburner position, sim probably disconnected: {e}")
             return
         logging.debug(f"Afterburner = {afterburner_pos}")
-        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=5)
-        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=5)
+        ##
+        ## Update oscillation modulation with new function that returns the amplitude of a sine wave
+        ## at any point in time based on wave amplitude and period
+        ## Leave legacy code in place in case nobody likes the new effect
+        legacy_mode = 0
+        if legacy_mode:
+            r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+            r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+        else:
+            r1_modulation = utils.sine_point_in_time(2, 15000)
+            r2_modulation = utils.sine_point_in_time(1, 15000)
+
         if afterburner_pos and (
-                self.anything_has_changed("Afterburner", afterburner_pos) or self.anything_has_changed("Modulation",
-                                                                                                       r1_modulation)):
+                self.anything_has_changed("Afterburner", afterburner_pos) or self.anything_has_changed("Modulation", r1_modulation)):
             # logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
             intensity = self.afterburner_effect_intensity * afterburner_pos
-            effects["ab_rumble_1_1"].periodic(frequency, intensity, 0, ).start()
-            effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
-            effects["ab_rumble_2_1"].periodic(frequency2, intensity, 45, 4, phase=120, offset=60).start()
-            effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120,
-                                              offset=60).start()
+            effects["ab_rumble_1_1"].periodic(frequency + r1_modulation, intensity, 0,effect_type=5 ).start()
+            # effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
+            effects["ab_rumble_2_1"].periodic(frequency + r1_modulation, intensity, 45,effect_type=5 ).start()
+            # effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120,
+            #                                   offset=60).start()
             # logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
             self._ab_is_playing = 1
         elif afterburner_pos == 0:
@@ -614,27 +631,27 @@ class AircraftBase(object):
         try:
             jet_eng_rpm = max(telem_data.get("EngRPM")[0], telem_data.get("EngRPM")[1])
         except Exception as e:
-            logging.error(f"Error getting Engine RPM, sim probably disconnected, bailing: {e}")
+            logging.error(f"Error getting Engine RPM")
             return
-        r1_modulation = utils.get_random_within_range("jetengine_1", median_modulation,
-                                                      median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=1)
-        r2_modulation = utils.get_random_within_range("jetengine_2", median_modulation,
-                                                      median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=2)
-        if self.engine_rumble and (
-                self.anything_has_changed("EngRPM", jet_eng_rpm) or self.anything_has_changed("JetEngineModul",
-                                                                                              r1_modulation)):
+        ##
+        ## Update oscillation modulation with new function that returns the amplitude of a sine wave
+        ## at any point in time based on wave amplitude and period
+        ## Leave legacy code in place in case nobody likes the new effect
+        legacy_mode = 0
+        if legacy_mode:
+            r1_modulation = utils.get_random_within_range("jetengine_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=1)
+            r2_modulation = utils.get_random_within_range("jetengine_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=2)
+        else:
+            r1_modulation = utils.sine_point_in_time(2, 30000)
+            r2_modulation = utils.sine_point_in_time(2, 22500, phase_offset_deg=0)
+        if self.engine_rumble and (self.anything_has_changed("EngRPM", jet_eng_rpm) or self.anything_has_changed("JetEngineModul", r1_modulation)):
             intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
             rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
             rt_freq2 = round(rt_freq + median_modulation, 4)
             effects["je_rumble_1_1"].periodic(rt_freq, intensity, 0, effect_index).start()
             effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
             effects["je_rumble_2_1"].periodic(rt_freq2, intensity, 90, effect_index, phase=phase_offset).start()
-            effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index,
-                                              phase=phase_offset).start()
-            # logging.debug(f"RPM={jet_eng_rpm}")
-            # logging.debug(f"Intensty={intensity}")
+            effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
             logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
             self._jet_rumble_is_playing = 1
         elif jet_eng_rpm == 0:
@@ -742,16 +759,8 @@ class AircraftBase(object):
         logging.debug(f"Engine Rumble: Blade_Ct={blade_ct}, RPM={rrpm}")
         frequency = float(rrpm) / 45 * blade_ct
 
-        # frequency = 20
         median_modulation = 2
-        modulation_pos = 2
-        modulation_neg = 1
         frequency2 = frequency + median_modulation
-        precision = 2
-        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=3)
-        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=5)
         if frequency > 0:
             logging.debug(f"Current Heli Engine Rumble Intensity = {self.heli_engine_rumble_intensity}")
             effects["rotor_rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
