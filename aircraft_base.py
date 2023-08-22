@@ -39,6 +39,7 @@ class AircraftBase(object):
 
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
     rpm_scale: float = 45
+    canon_rpm = 600
 
     _engine_rumble_is_playing = 0
 
@@ -47,7 +48,8 @@ class AircraftBase(object):
         self._changes = {}
         self._change_counter = {}
         self._telem_data = None
-        
+        self.gun_is_firing = 0
+
         #clear any existing effects
         effects.clear()
 
@@ -312,44 +314,31 @@ class AircraftBase(object):
         gun = telem.get("Gun")
         flares = telem.get("Flares")
         chaff = telem.get("Chaff")
+        # self.canon_rpm = 600
+        canon_hz = self.canon_rpm / 60
         if self.anything_has_changed("PayloadInfo", payload):
-            effects["cm"].stop()
-            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
-            if self.weapon_effect_direction == -1:
-                # Init random number for effect direction
-                random.seed(time.perf_counter())
-                random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction,
-                                       duration=80).start()
-            else:
-                effects["cm"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction,
-                                       duration=80).start()
+            effects["payload_release"].periodic(5, self.weapon_release_intensity, 0, effect_type=3, duration=80).start() #Todo: Ask about duration
+        elif not self.anything_has_changed("PayloadInfo", payload, delta_ms=80): #   ensure the effect plays for at least 80ms
+            effects["payload_release"].stop()
 
-        if self.anything_has_changed("Gun", gun):
-            effects["cm"].stop()
+        if self.anything_has_changed("Gun", gun) and not self.gun_is_firing:
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
-                # Init random number for effect direction
-                random.seed(time.perf_counter())
-                random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction,
-                                       duration=80).start()
+                logging.info(f"Gun Effect Direction is randomized")
+                effects["gunfire"].periodic(canon_hz, .3, utils.RandomDirectionModulator).start()
             else:
-                effects["cm"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction,
-                                       duration=80).start()
+                effects["gunfire"].periodic(canon_hz, self.gun_vibration_intensity, self.weapon_effect_direction, effect_type=6, duration=80).start() #Todo: Ask about duration
+            self.gun_is_firing = 1
+        elif not self.anything_has_changed("Gun", gun, delta_ms=200): # sometimes frames come with data unchanged, causing false stops and starts, diminishing effect
+            effects["gunfire"].stop()
+            self.gun_is_firing = 0
 
         if self.anything_has_changed("Flares", flares) or self.anything_has_changed("Chaff", chaff):
+            effects["cm"].periodic(50, self.cm_vibration_intensity, 0, duration=80).start() #Todo: Ask about duration
+        elif not (self.anything_has_changed("Flares", flares, delta_ms=80) or self.anything_has_changed("Chaff", chaff, delta_ms=80)):
             effects["cm"].stop()
-            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
-            if self.weapon_effect_direction == -1:
-                # Init random number for effect direction
-                random.seed(time.perf_counter())
-                random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction,
-                                       duration=80).start()
-            else:
-                effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction,
-                                       duration=80).start()
+
+
 
     def _update_flaps(self, flapspos):
         # flapspos = data.get("Flaps")
