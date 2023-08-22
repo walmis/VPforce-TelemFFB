@@ -685,7 +685,10 @@ class MainWindow(QMainWindow):
                     if isinstance(v, list):
                         v = "[" + ", ".join([f"{x:.3f}" if not isinstance(x, str) else x for x in v]) + "]"
                     items += f"{k}: {v}\n"
-            active_effects = '\n'.join(effects.dict.keys())
+            active_effects = ""
+            for key in effects.dict.keys():
+                if effects[key].started:
+                    active_effects = '\n'.join([active_effects, key])
             window_mode = self.radio_button_group.checkedButton()
             if window_mode == self.telem_monitor_radio:
                 self.lbl_telem_data.setText(items)
