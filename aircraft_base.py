@@ -525,17 +525,17 @@ class AircraftBase(object):
             dynamic_rumble_intensity = utils.clamp(self._calc_engine_intensity(rpm), 0, force_limit)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
 
-            effects["rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()  # vib on X axis
-            effects["rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X
-            effects["rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()  # vib on Y axis
-            effects["rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()  # vib on Y
+            effects["prop_rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()  # vib on X axis
+            effects["prop_rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X
+            effects["prop_rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()  # vib on Y axis
+            effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()  # vib on Y
             self._engine_rumble_is_playing = 1
         else:
             self._engine_rumble_is_playing = 0
-            effects.dispose("rpm0-1")
-            effects.dispose("rpm0-2")
-            effects.dispose("rpm1-1")
-            effects.dispose("rpm1-2")
+            effects.dispose("prop_rpm0-1")
+            effects.dispose("prop_rpm0-2")
+            effects.dispose("prop_rpm1-1")
+            effects.dispose("prop_rpm1-2")
 
     def _calc_engine_intensity(self, rpm) -> float:
         """
@@ -754,17 +754,13 @@ class AircraftBase(object):
                                                       median_modulation + modulation_pos, precision, time_period=5)
         if frequency > 0:
             logging.debug(f"Current Heli Engine Rumble Intensity = {self.heli_engine_rumble_intensity}")
-            effects["rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
-            # effects["rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X axis
-            effects["rpm1-1"].periodic(frequency2, self.heli_engine_rumble_intensity * .5, 90).start()  # vib on Y axis
-            # effects["rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensit, 90).start()  # vib on Y axis
+            effects["rotor_rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
+            effects["rotor_rpm1-1"].periodic(frequency2, self.heli_engine_rumble_intensity * .5, 90).start()  # vib on Y axis
             self._engine_rumble_is_playing = 1
         else:
             self._engine_rumble_is_playing = 0
-            effects.dispose("rpm0-1")
-            # effects.dispose("rpm0-2")
-            effects.dispose("rpm1-1")
-            # effects.dispose("rpm1-2")
+            effects.dispose("rotor_rpm0-1")
+            effects.dispose("rotor_rpm1-1")
 
     def on_event(self):
         pass
