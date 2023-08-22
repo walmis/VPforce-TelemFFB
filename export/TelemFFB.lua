@@ -40,7 +40,18 @@ function calculateAirDensity(altitude)
 
   return airDensity*100
 end
+function getUH1ShellCount(payloadInfo)
+    local totalShellCount = 0
 
+    for _, station in ipairs(payloadInfo.Stations) do
+        weapon_id = string.format( "%d.%d.%d.%d", station.weapon.level1, station.weapon.level2, station.weapon.level3, station.weapon.level4)
+        if weapon_id == "4.6.10.0" then
+            totalShellCount = totalShellCount + station.count
+        end
+    end
+
+    return totalShellCount
+end
 -- The ExportScript.Tools.dump function show the content of the specified variable.
 -- ExportScript.Tools.dump is similar to PHP function dump and show variables from type
 -- "nil, "number", "string", "boolean, "table", "function", "thread" and "userdata"
@@ -309,6 +320,30 @@ local f_telemFFB = {
             local NoseGear = LoGetAircraftDrawArgumentValue(104)
             local RightGear = LoGetAircraftDrawArgumentValue(104)
             WoW = string.format("%.2f~%.2f~%.2f", LeftGear, NoseGear, RightGear)
+            -- UH1 places canon shell data only in payload block
+            -- pull it out and write to CannonShells for proper effect generation
+            local uh1payload = LoGetPayloadInfo()
+            CannonShells = getUH1ShellCount(uh1payload)
+            stations = LoGetPayloadInfo().Stations
+            PayloadInfo = "empty"
+            temparray = {}
+
+            for i_st, st in pairs(stations) do
+              local name = LoGetNameByType(st.weapon.level1,st.weapon.level2,st.weapon.level3,st.weapon.level4);
+              if not string.find(name, "UNKNOWN") then
+                  temparray[#temparray + 1] =
+                    string.format(
+                    "%s-%d.%d.%d.%d*%d",
+                    name,
+                    st.weapon.level1,
+                    st.weapon.level2,
+                    st.weapon.level3,
+                    st.weapon.level4,
+                    st.count
+                    )
+                  PayloadInfo = table.concat(temparray, "~")
+              end
+            end
             stringToSend =
               string.format(
               "RotorRPM=%.0f;PanShake=%s;LDoor=%.2f;RDoor=%.2f;deadPilot=%.2f",
