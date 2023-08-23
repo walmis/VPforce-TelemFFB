@@ -444,7 +444,7 @@ class DirectionModulator:
     pass
 
 class RandomDirectionModulator(DirectionModulator):
-    def __init__(self, period = 0.1):
+    def __init__(self, period = 0.1, *args, **kwargs):
         self.prev_upd = time.perf_counter()
         self.value = 0
         self.period = period

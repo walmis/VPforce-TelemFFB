@@ -327,13 +327,13 @@ class FFBEffectHandle:
         if self._data_changed(f"setCondition{cond.parameterBlockOffset}", data):
             self.ffb.write(data)
 
-    def setPeriodic(self, freq, magnitude, direction, **kwargs):
+    def setPeriodic(self, freq, magnitude, direction, duration=0, **kwargs):
         assert(self.type in PERIODIC_EFFECTS)
         assert(magnitude >= 0 and magnitude <= 1.0)
         direction %= 360
         direction = round(direction*255/360)
 
-        self.setEffect(axesEnable=AXIS_ENABLE_DIR, directionX=direction)
+        self.setEffect(axesEnable=AXIS_ENABLE_DIR, directionX=direction, duration=duration, **kwargs)
 
         if freq == 0:
             period = 0
@@ -470,7 +470,7 @@ class HapticEffect(Destroyable):
     def spring(self, coef_x = None, coef_y = None):
         return self._conditional_effect(EFFECT_SPRING, coef_x, coef_y) 
 
-    def periodic(self, frequency, magnitude:float, direction:float, effect_type=EFFECT_SINE, *args, **kwargs):
+    def periodic(self, frequency, magnitude:float, direction:float, effect_type=EFFECT_SINE, duration=0, *args, **kwargs):
         if not self.effect:
             self.effect = self.device.createEffect(effect_type)
             if not self.effect: return self
@@ -480,7 +480,7 @@ class HapticEffect(Destroyable):
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
 
-        self.effect.setPeriodic(frequency, magnitude, direction, **kwargs)
+        self.effect.setPeriodic(frequency, magnitude, direction, duration=0, **kwargs)
         return self
 
     def constant(self, magnitude:float, direction:float, *args, **kwargs):
@@ -507,8 +507,9 @@ class HapticEffect(Destroyable):
     def status(self) -> int:
         return self.started
 
-    def start(self, **kw):
-        if self.effect and not self.started:
+    def start(self, force=False, **kw):
+
+        if self.effect and (not self.started or force):
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is starting effect {self.effect.effect_id}")
@@ -544,18 +545,15 @@ class HapticEffect(Destroyable):
 
 # unit test
 if __name__ == "__main__":
+    import utils
+    import random
+
     d = FFBRhino(0xffff, 0x2055)
     d.resetEffects()
     print(d.get_firmware_version())
 
     HapticEffect.open()
-    s1 = HapticEffect().spring(2048,2048)
-    s2 = HapticEffect().spring(1024,1024)
 
-    s1.start()
-    s2.start(override=True)
-    time.sleep(2)
-    s2.stop()
     #c = d.createEffect(EFFECT_CONSTANT)
     #c.setConstantForce(0.05, 90)
 
@@ -564,7 +562,11 @@ if __name__ == "__main__":
     #c = d.createEffect(EFFECT_SINE)
     #c.setPeriodic(10, 0.05, 0)
     #c.start()
+    e = HapticEffect()
     while True:
-        time.sleep(2)
+        d = random.randrange(0, 359)
+        e.periodic(frequency=20, magnitude=0.3, duration=80, phase=45, direction=d)
+        e.start(force=True)
+        time.sleep(0.01)
     
     #c.start()
