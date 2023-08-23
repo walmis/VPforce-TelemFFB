@@ -313,43 +313,43 @@ class AircraftBase(object):
         flares = telem.get("Flares")
         chaff = telem.get("Chaff")
         if self.anything_has_changed("PayloadInfo", payload):
-            effects["cm"].stop()
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction,
-                                       duration=80).start()
+                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction,
+                                       duration=80).start(force=True)
             else:
                 effects["cm"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction,
-                                       duration=80).start()
+                                       duration=80).start(force=True) # force sending the start command to the device
 
         if self.anything_has_changed("Gun", gun):
-            effects["cm"].stop()
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction,
-                                       duration=80).start()
+                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction,
+                                       duration=80).start(force=True)
             else:
                 effects["cm"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction,
-                                       duration=80).start()
+                                       duration=80).start(force=True)
 
         if self.anything_has_changed("Flares", flares) or self.anything_has_changed("Chaff", chaff):
-            effects["cm"].stop()
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction,
-                                       duration=80).start()
+                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction,
+                                       duration=80).start(force=True)
             else:
                 effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction,
-                                       duration=80).start()
+                                       duration=80).start(force=True)
 
     def _update_flaps(self, flapspos):
         # flapspos = data.get("Flaps")
