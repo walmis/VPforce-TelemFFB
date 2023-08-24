@@ -39,6 +39,7 @@ class AircraftBase(object):
 
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
     rpm_scale: float = 45
+    smoother = utils.Smoother()
 
     _engine_rumble_is_playing = 0
 
@@ -164,6 +165,9 @@ class AircraftBase(object):
     def _gforce_effect(self, telem_data):
         if not self.is_joystick():
             return
+        if sum(telem_data.get("WeightOnWheels")):
+            effects.dispose("gforce")
+            return
         # gforce_effect_enable = 1
         gneg = -1.0
         gmin = self.gforce_min_gs
@@ -172,23 +176,25 @@ class AircraftBase(object):
         # if not gforce_effect_enable:
         #     return
         if self._sim_is_dcs(telem_data):
-            z_gs: float = telem_data.get("ACCs")[1]
+            gs: float = telem_data.get("ACCs")[1]
         elif self._sim_is_msfs(telem_data):
-            z_gs: float = telem_data.get("G")
+            gs: float = telem_data.get("G")
 
-        if z_gs < gmin:
+        avg_z_gs = self.smoother.get_average("gs", gs, window_size=10)
+        logging.debug(f"GS={gs}, AVG_Z_GS={avg_z_gs}")
+        if avg_z_gs < gmin:
             effects.dispose("gforce")
             # effects.dispose("gforce_damper")
             return
         # g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 4)
         if self.gforce_effect_invert_force:
             direction = 0
-        g_factor = round(utils.non_linear_scaling(z_gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
+        g_factor = round(utils.non_linear_scaling(avg_z_gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
         g_factor = utils.clamp(g_factor, 0.0, 1.0)
         effects["gforce"].constant(g_factor, direction).start()
         #  effects["gforce_damper"].damper(coef_y=1024).start()
 
-        logging.debug(f"G's = {z_gs} | gfactor = {g_factor}")
+        logging.debug(f"G's = {avg_z_gs} | gfactor = {g_factor}")
 
     def _aoa_reduction_force_effect(self, telem_data):
         if not self.is_joystick():
@@ -197,12 +203,12 @@ class AircraftBase(object):
         end_aoa = self.critical_aoa_max
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
-
-        if aoa >= start_aoa and tas > 10:
-            force_factor = round(utils.non_linear_scaling(aoa, start_aoa, end_aoa, curvature=1.5), 4)
+        avg_aoa = self.smoother.get_average("crit_aoa", aoa, window_size=8)
+        if avg_aoa >= start_aoa and tas > 10:
+            force_factor = round(utils.non_linear_scaling(avg_aoa, start_aoa, end_aoa, curvature=1.5), 4)
             force_factor = self.aoa_reduction_max_force * force_factor
             force_factor = utils.clamp(force_factor, 0.0, 1.0)
-            logging.debug(f"AoA Reduction Effect:  AoA={aoa}, force={force_factor}, max allowed force={self.aoa_reduction_max_force}")
+            logging.debug(f"AoA Reduction Effect:  AoA= {aoa} avg_AoA={avg_aoa}, force={force_factor}, max allowed force={self.aoa_reduction_max_force}")
             effects["crit_aoa"].constant(force_factor, 180).start()
         else:
             effects.dispose("crit_aoa")
@@ -219,12 +225,13 @@ class AircraftBase(object):
             return
         if not sum(telem_data.get("WeightOnWheels")):
             return
+        avg_y_gs = self.smoother.get_average("y_gs", y_gs, window_size=8)
         max_gs = self.deceleration_max_force
-        if y_gs < -0.1:
-            if abs(y_gs) > max_gs:
-                y_gs = -max_gs
-            logging.debug(f"y_gs = {y_gs}")
-            effects["decel"].constant(abs(y_gs), 180).start()
+        if avg_y_gs < -0.1:
+            if abs(avg_y_gs) > max_gs:
+                avg_y_gs = -max_gs
+            logging.debug(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
+            effects["decel"].constant(abs(avg_y_gs), 180).start()
         else:
             effects.dispose("decel")
 

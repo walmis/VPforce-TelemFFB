@@ -37,6 +37,22 @@ import ssl
 import io
 
 
+class Smoother:
+    def __init__(self, window_size=5):
+        self.value_dict = {}
+
+    def get_average (self, key, value, window_size=10):
+        if key not in self.value_dict:
+            self.value_dict[key] = []
+        self.value_dict[key].append(value)
+        if len(self.value_dict[key]) > window_size:
+            self.value_dict[key].pop(0)
+
+        values = self.value_dict.get(key, [])
+        if not values:
+            return 0
+        return sum(values) / len(values)
+
 
 class EffectTranslator:
     def __init__(self):

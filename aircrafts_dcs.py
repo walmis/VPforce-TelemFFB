@@ -187,7 +187,7 @@ class Aircraft(AircraftBase):
         elif self.pedal_spring_mode == 2:
             self.spring_x.positiveCoefficient = 4096
             self.spring_x.negativeCoefficient = 4096
-        spring = effects["spring"].spring()
+        spring = effects["pedal_spring"].spring()
 
         spring.effect.setCondition(self.spring_x)
         # effects["damper"].damper(512, 512).start()
@@ -218,7 +218,7 @@ class Aircraft(AircraftBase):
         self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
         self.spring_y.cpOffset = utils.clamp_minmax(round(offs_y * 4096), 4096)
 
-        spring = effects["spring"].spring()
+        spring = effects["trim_spring"].spring()
         # upload effect parameters to stick
         spring.effect.setCondition(self.spring_x)
         spring.effect.setCondition(self.spring_y)
@@ -314,4 +314,5 @@ class Helicopter(Aircraft):
         super().on_telemetry(telem_data)
 
         self._calc_etl_effect(telem_data)
-        self._update_heli_engine_rumble(telem_data)
+        if self.engine_rumble:
+            self._update_heli_engine_rumble(telem_data)
