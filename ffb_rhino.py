@@ -480,7 +480,7 @@ class HapticEffect(Destroyable):
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
 
-        self.effect.setPeriodic(frequency, magnitude, direction, duration=0, **kwargs)
+        self.effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
         return self
 
     def constant(self, magnitude:float, direction:float, *args, **kwargs):
