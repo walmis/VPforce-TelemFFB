@@ -319,11 +319,11 @@ class AircraftBase(object):
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction,
-                                       duration=80).start(force=True)
+                effects["payload_rel"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
-                effects["cm"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction,
-                                       duration=80).start(force=True) # force sending the start command to the device
+                effects["payload_rel"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction, duration=80).start(force=True) # force sending the start command to the device
+        elif not self.anything_has_changed("PayloadInfo", payload, delta_ms=160):
+            effects["payload_rel"].stop ()
 
         if self.anything_has_changed("Gun", gun):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
@@ -332,11 +332,11 @@ class AircraftBase(object):
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction,
-                                       duration=80).start(force=True)
+                effects["gunfire"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
-                effects["cm"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction,
-                                       duration=80).start(force=True)
+                effects["gunfire"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction, duration=80).start(force=True)
+        elif not self.anything_has_changed("Gun", gun, delta_ms=160):
+            effects["gunfire"].stop()
 
         if self.anything_has_changed("Flares", flares) or self.anything_has_changed("Chaff", chaff):
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
@@ -345,11 +345,11 @@ class AircraftBase(object):
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
                 logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction,
-                                       duration=80).start(force=True)
+                effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
-                effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction,
-                                       duration=80).start(force=True)
+                effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start(force=True)
+        if not self.anything_has_changed("Flares", flares, delta_ms=160) or self.anything_has_changed("Chaff", chaff, delta_ms=160):
+            effects["cm"].stop()
 
     def _update_flaps(self, flapspos):
         # flapspos = data.get("Flaps")
@@ -614,9 +614,9 @@ class AircraftBase(object):
         elif afterburner_pos == 0:
             # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
             effects.dispose("ab_rumble_1_1")
-            effects.dispose("ab_rumble_1_2")
+            # effects.dispose("ab_rumble_1_2")
             effects.dispose("ab_rumble_2_1")
-            effects.dispose("ab_rumble_2_2")
+            # effects.dispose("ab_rumble_2_2")
             self._ab_is_playing = 0
 
     def _update_jet_engine_rumble(self, telem_data):
