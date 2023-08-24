@@ -36,6 +36,59 @@ import json
 import ssl
 import io
 
+
+
+class EffectTranslator:
+    def __init__(self):
+        self.effect_dict = {
+            "ab_rumble_1_1" : "Afterburner Rumble",
+            "ab_rumble_1_2" : "Afterburner Rumble",
+            "ab_rumble_2_1" : "Afterburner Rumble",
+            "ab_rumble_2_2" : "Afterburner Rumble",
+            "aoa" : "AoA Effect",
+            "buffeting" : "AoA\\Stall Buffeting",
+            "canopymovement" : "Canopy Motion",
+            "crit_aoa" : "AoA Reduction Force",
+            "cm" : "Countermeasure Deployment",
+            "decel" : "Decelration Force",
+            "etlY" : "ETL Shaking",
+            "etlX" : "ETL Shaking",
+            "flapsmovement" : "Flap Motion",
+            "gearbuffet" : "Gear Drag Buffeting",
+            "gearbuffet2" : "Gear Drag Buffeting",
+            "gearmovement" : "Gear Motion",
+            "gearmovement2" : "Gear Motion",
+            "gforce" : "G-Force Loading",
+            "gunfire" : "Gunfire Rumble",
+            "je_rumble_1_1" : "Jet Engine Rumble",
+            "je_rumble_1_2" : "Jet Engine Rumble",
+            "je_rumble_2_1" : "Jet Engine Rumble",
+            "je_rumble_2_2" : "Jet Engine Rumble",
+            "nw_shimmy" : "Nosewheel Shimmy",
+            "payload_rel" :"Payload Release",
+            "pedal_spring" : "Pedal Spring",
+            "prop_rpm0-1" : "Propeller Engine Rumble",
+            "prop_rpm0-2" : "Propeller Engine Rumble",
+            "prop_rpm1-1" : "Propeller Engine Rumble",
+            "prop_rpm1-2" : "Propeller Engine Rumble",
+            "rotor_rpm0-1" : "Rotor RPM\\Engine Rumble",
+            "rotor_rpm1-1" : "Rotor RPM\\Engine Rumble",
+            "runway0" : "Runway Rumlble",
+            "runway1" : "Runway Rumlble",
+            "speedbrakebuffet": "Speedbrake Buffeting",
+            "speedbrakebuffet2": "Speedbrake Buffeting",
+            "speedbrakemovement" : "Speedbrake Motion",
+            "spoilerbuffet1-1" : "Spoiler Buffeting",
+            "spoilerbuffet1-2" : "Spoiler Buffeting",
+            "spoilerbuffet2-1" : "Spoiler Buffeting",
+            "spoilerbuffet2-2" : "Spoiler Buffeting",
+            "spoilermovement" : "Spoiler Motion",
+            "trim_spring" : "Trim Override Spring",
+            "wnd" : "Wind Effect"
+        }
+
+    def get_translation(self, key):
+        return self.effect_dict.get(key, "no_lookup")
 class Destroyable:
     def destroy():
         raise NotImplementedError

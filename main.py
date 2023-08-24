@@ -16,6 +16,8 @@
 #
 
 import atexit
+import glob
+
 from traceback_with_variables import print_exc, prints_exc
 
 
@@ -99,6 +101,9 @@ from configobj import ConfigObj
 from sc_manager import SimConnectManager
 from aircraft_base import effects
 
+effects_translator = utils.EffectTranslator()
+
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
 if args.teleplot:
@@ -121,11 +126,23 @@ def format_dict(data, prefix=""):
 
 
 def load_config(filename, raise_errors=True) -> ConfigObj:
-    config_path = os.path.join(os.path.dirname(__file__), filename)
+    if not os.path.sep in filename:
+        #construct absolute path
+        config_path = os.path.join(os.path.dirname(__file__), filename)
+    else:
+        #filename is absolute path
+        config_path = filename
 
     try:
         config = ConfigObj(config_path, raise_errors=raise_errors)
-        logging.info(f"Load Config: {config_path}")
+        logging.info(f"Loading Config: {config_path}")
+        if not os.path.exists(config_path):
+            logging.warning(f"Configuration file {filename} does not exist")
+            path = os.path.dirname(config_path)
+            ini_files = glob.glob(f"{path}/*.ini")
+            logging.warning(f"Possible ini files in that location are:")
+            for file in ini_files:
+                logging.warning(f"{os.path.basename(file)}")
         return config
     except Exception as e:
         logging.error(f"Cannot load config {config_path}:  {e}")
@@ -688,12 +705,16 @@ class MainWindow(QMainWindow):
             active_effects = ""
             for key in effects.dict.keys():
                 if effects[key].started:
-                    active_effects = '\n'.join([active_effects, key])
+                    descr = effects_translator.get_translation(key)
+                    if descr not in active_effects:
+                        active_effects = '\n'.join([active_effects, descr])
             window_mode = self.radio_button_group.checkedButton()
             if window_mode == self.telem_monitor_radio:
                 self.lbl_telem_data.setText(items)
+                self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
             elif window_mode == self.effect_monitor_radio:
                 self.lbl_telem_data.setText(active_effects)
+                self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
 
         except Exception as e:
             traceback.print_exc()
