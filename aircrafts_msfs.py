@@ -29,19 +29,8 @@ from typing import List, Dict
 from utils import clamp, HighPassFilter, Derivative, Dispenser
 
 from ffb_rhino import HapticEffect, FFBReport_SetCondition
-from aircraft_base import AircraftBase
+from aircraft_base import AircraftBase, effects, HPFs, LPFs
 
-# by accessing effects dict directly new effects will be automatically allocated
-# example: effects["myUniqueName"]
-effects: Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
-
-# Highpass filter dispenser
-HPFs: Dict[str, utils.HighPassFilter] = utils.Dispenser(utils.HighPassFilter)
-
-# Lowpass filter dispenser
-LPFs: Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
-
-hpf = Dispenser(HighPassFilter)
 
 deg = 180 / math.pi
 slugft3 = 0.00194032  # SI to slugft3
@@ -266,7 +255,7 @@ class Aircraft(AircraftBase):
             2 * telem_data["PropThrust1"] / 
                 (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
 
-        if abs(incidence_vec.y) > 0.5 and _prop_air_vel > 1: # avoid edge cases
+        if abs(incidence_vec.y) > 0.5 or _prop_air_vel > 1: # avoid edge cases
             _elevator_aoa = atan2(-incidence_vec.y, _prop_air_vel) * deg
         else:
             _elevator_aoa = 0
@@ -368,7 +357,8 @@ class Aircraft(AircraftBase):
             telem_data["RudForce"] = rud_force
             self.spring.start()
 
-
+    def on_event(self, event, *args):
+        logging.info(f"on_event {event} {args}")
 
     def on_telemetry(self, telem_data):
         if telem_data["Parked"]: # Aircraft is parked, do nothing
@@ -400,13 +390,9 @@ class Aircraft(AircraftBase):
 
     def on_timeout(self):
         super().on_timeout()
-        logging.debug("Timeout, preparing to stop effects")
+
         self.const_force.stop()
         self.spring.stop()
-        for e in effects.values():
-            logging.debug(f"Timeout effect: {e}")
-            e.stop()
-
 
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop aircraft"""

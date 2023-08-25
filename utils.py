@@ -33,6 +33,81 @@ import zlib
 import subprocess
 import urllib.request
 import json
+import ssl
+import io
+
+
+class Smoother:
+    def __init__(self, window_size=5):
+        self.value_dict = {}
+
+    def get_average (self, key, value, window_size=10):
+        if key not in self.value_dict:
+            self.value_dict[key] = []
+        self.value_dict[key].append(value)
+        if len(self.value_dict[key]) > window_size:
+            self.value_dict[key].pop(0)
+
+        values = self.value_dict.get(key, [])
+        if not values:
+            return 0
+        return sum(values) / len(values)
+
+
+class EffectTranslator:
+    def __init__(self):
+        self.effect_dict = {
+            "ab_rumble_1_1" : "Afterburner Rumble",
+            "ab_rumble_1_2" : "Afterburner Rumble",
+            "ab_rumble_2_1" : "Afterburner Rumble",
+            "ab_rumble_2_2" : "Afterburner Rumble",
+            "aoa" : "AoA Effect",
+            "buffeting" : "AoA\\Stall Buffeting",
+            "canopymovement" : "Canopy Motion",
+            "crit_aoa" : "AoA Reduction Force",
+            "cm" : "Countermeasure Deployment",
+            "decel" : "Decelration Force",
+            "etlY" : "ETL Shaking",
+            "etlX" : "ETL Shaking",
+            "flapsmovement" : "Flap Motion",
+            "gearbuffet" : "Gear Drag Buffeting",
+            "gearbuffet2" : "Gear Drag Buffeting",
+            "gearmovement" : "Gear Motion",
+            "gearmovement2" : "Gear Motion",
+            "gforce" : "G-Force Loading",
+            "gunfire" : "Gunfire Rumble",
+            "je_rumble_1_1" : "Jet Engine Rumble",
+            "je_rumble_1_2" : "Jet Engine Rumble",
+            "je_rumble_2_1" : "Jet Engine Rumble",
+            "je_rumble_2_2" : "Jet Engine Rumble",
+            "nw_shimmy" : "Nosewheel Shimmy",
+            "payload_rel" :"Payload Release",
+            "pedal_spring" : "Pedal Spring",
+            "prop_rpm0-1" : "Propeller Engine Rumble",
+            "prop_rpm0-2" : "Propeller Engine Rumble",
+            "prop_rpm1-1" : "Propeller Engine Rumble",
+            "prop_rpm1-2" : "Propeller Engine Rumble",
+            "rotor_rpm0-1" : "Rotor RPM\\Engine Rumble",
+            "rotor_rpm1-1" : "Rotor RPM\\Engine Rumble",
+            "runway0" : "Runway Rumlble",
+            "runway1" : "Runway Rumlble",
+            "speedbrakebuffet": "Speedbrake Buffeting",
+            "speedbrakebuffet2": "Speedbrake Buffeting",
+            "speedbrakemovement" : "Speedbrake Motion",
+            "spoilerbuffet1-1" : "Spoiler Buffeting",
+            "spoilerbuffet1-2" : "Spoiler Buffeting",
+            "spoilerbuffet2-1" : "Spoiler Buffeting",
+            "spoilerbuffet2-2" : "Spoiler Buffeting",
+            "spoilermovement" : "Spoiler Motion",
+            "trim_spring" : "Trim Override Spring",
+            "wnd" : "Wind Effect"
+        }
+
+    def get_translation(self, key):
+        return self.effect_dict.get(key, "no_lookup")
+class Destroyable:
+    def destroy():
+        raise NotImplementedError
 
 class Vector2D:
     def __init__(self, x, y):
@@ -326,6 +401,28 @@ def gaussian_scaling(x, min_val, max_val, peak_percentage=0.5, curve_width=1.0):
     result = scaling_factor
 
     return result
+
+
+def sine_point_in_time(amplitude, period_ms, phase_offset_deg=0):
+    current_time = time.perf_counter()  # Get the current time in seconds with high resolution
+
+    # Convert frequency from milliseconds to Hz
+    frequency_hz = 1 / (period_ms / 1000)
+
+    # Calculate the angular frequency (2 * pi * frequency)
+    angular_frequency = 2 * math.pi * frequency_hz
+
+    phase_offset_rad = math.radians(phase_offset_deg)
+
+    # Calculate the value of the sine wave at the current time with phase offset
+    value = amplitude * math.sin(angular_frequency * current_time + phase_offset_rad)
+
+    # print(f"Amp:{amplitude}     |Freq:{frequency_hz}     |Offset:{phase_offset_deg}        |Val:{value}")
+
+    return value
+
+
+
 def pressure_from_altitude(altitude_m):
     """Calculate pressure at specified altitude
 
@@ -350,6 +447,7 @@ class LowPassFilter:
         self.alpha = 0.0
         self.x_filt = init_val
         self.last_update = time.perf_counter()
+        
     def __call__(self, x):
         return self.update(x)
     def update(self, x):
@@ -415,7 +513,7 @@ class DirectionModulator:
     pass
 
 class RandomDirectionModulator(DirectionModulator):
-    def __init__(self, period = 0.1):
+    def __init__(self, period = 0.1, *args, **kwargs):
         self.prev_upd = time.perf_counter()
         self.value = 0
         self.period = period
@@ -423,8 +521,9 @@ class RandomDirectionModulator(DirectionModulator):
     def update(self):
         now = time.perf_counter()
         #dt = now - self.prev_upd
-        if now - self.prev_upd > self.period/1000:
+        if now - self.prev_upd > self.period:
             self.prev_upd = now
+            random.seed()
             self.value = random.randint(0, 360)
 
         return self.value
@@ -442,8 +541,7 @@ class Dispenser:
         return v
 
     def remove(self, name):
-        if name in self.dict:
-            del self.dict[name]
+        self.dispose(name)
     
     def __contains__(self, name):
         return name in self.dict
@@ -455,9 +553,16 @@ class Dispenser:
         return self.dict.__iter__()
 
     def __delitem__(self, name):
+        v = self.dict[name]
+        if isinstance(v, Destroyable):
+            v.destroy()
         del self.dict[name]
 
     def clear(self):
+        for k in self.dict.keys():
+            v = self.dict[k]
+            if isinstance(v, Destroyable):
+                v.destroy()
         self.dict.clear()
 
     def values(self):
@@ -465,7 +570,14 @@ class Dispenser:
 
     def dispose(self, name):
         if name in self.dict:
+            v = self.dict[name]
+            if isinstance(v, Destroyable):
+                v.destroy()
             del self.dict[name]
+
+    def foreach(self, func):
+        for i in self.values():
+            func(i)
 
 
 
@@ -656,7 +768,7 @@ def get_version():
     return ver
 
 def fetch_latest_version():
-    import ssl
+
     ctx = ssl._create_unverified_context()
 
     current_version = get_version()
@@ -681,9 +793,17 @@ def fetch_latest_version():
         return False
     else:
         return None
+    
+def self_update(zip_uri):
+    r = urllib.request.urlopen(zip_uri, context=ssl._create_unverified_context())
+    r.read()
+
+
 
 if __name__ == "__main__":
     #test install
-    from PyQt5.QtWidgets import QApplication
-    app = QApplication(sys.argv)
-    install_export_lua()
+    #from PyQt5.QtWidgets import QApplication
+    #app = QApplication(sys.argv)
+    #install_export_lua()
+    uri = "https://vpforcecontrols.com/downloads/TelemFFB/VPforce-TelemFFB-wip-2e79e046.zip"
+    self_update(uri)

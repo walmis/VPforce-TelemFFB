@@ -40,7 +40,18 @@ function calculateAirDensity(altitude)
 
   return airDensity*100
 end
+function getUH1ShellCount(payloadInfo)
+    local totalShellCount = 0
 
+    for _, station in ipairs(payloadInfo.Stations) do
+        weapon_id = string.format( "%d.%d.%d.%d", station.weapon.level1, station.weapon.level2, station.weapon.level3, station.weapon.level4)
+        if weapon_id == "4.6.10.0" then
+            totalShellCount = totalShellCount + station.count
+        end
+    end
+
+    return totalShellCount
+end
 -- The ExportScript.Tools.dump function show the content of the specified variable.
 -- ExportScript.Tools.dump is similar to PHP function dump and show variables from type
 -- "nil, "number", "string", "boolean, "table", "function", "thread" and "userdata"
@@ -104,7 +115,7 @@ local f_telemFFB = {
     socket.try(self.sock_udp:setoption('broadcast', true))
     socket.try(self.sock_udp:setpeername("127.255.255.255", 34380))
 
-    socket.try(self.sock_udp:send("CONNECT"))
+    socket.try(self.sock_udp:send("Ev=Start"))
 
   end,
   BeforeNextFrame = function(self)
@@ -309,6 +320,30 @@ local f_telemFFB = {
             local NoseGear = LoGetAircraftDrawArgumentValue(104)
             local RightGear = LoGetAircraftDrawArgumentValue(104)
             WoW = string.format("%.2f~%.2f~%.2f", LeftGear, NoseGear, RightGear)
+            -- UH1 places canon shell data only in payload block
+            -- pull it out and write to CannonShells for proper effect generation
+            local uh1payload = LoGetPayloadInfo()
+            CannonShells = getUH1ShellCount(uh1payload)
+            stations = LoGetPayloadInfo().Stations
+            PayloadInfo = "empty"
+            temparray = {}
+
+            for i_st, st in pairs(stations) do
+              local name = LoGetNameByType(st.weapon.level1,st.weapon.level2,st.weapon.level3,st.weapon.level4);
+              if not string.find(name, "UNKNOWN") then
+                  temparray[#temparray + 1] =
+                    string.format(
+                    "%s-%d.%d.%d.%d*%d",
+                    name,
+                    st.weapon.level1,
+                    st.weapon.level2,
+                    st.weapon.level3,
+                    st.weapon.level4,
+                    st.count
+                    )
+                  PayloadInfo = table.concat(temparray, "~")
+              end
+            end
             stringToSend =
               string.format(
               "RotorRPM=%.0f;PanShake=%s;LDoor=%.2f;RDoor=%.2f;deadPilot=%.2f",
@@ -566,12 +601,14 @@ local f_telemFFB = {
               PanelShake,
               actualRPM
               )
-          elseif string.find(obj.Name, "P-47D") then
+          elseif string.find(obj.Name, "P-47") then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- Calculate Engine RPM from redline value and engine.RPM value
             local engine_redline_reference = 2700
             local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            local p47_dive_flap_right = LoGetAircraftDrawArgumentValue(182)
+            mech["speedbrakes"]["value"] = p47_dive_flap_right
             -- P47 sends to TelemFFB
             stringToSend =
               string.format(
@@ -855,7 +892,7 @@ local f_telemFFB = {
       socket.protect(
       function()
         if self.sock_udp then
-          socket.try(self.sock_udp:send("DISCONNECT"))
+          socket.try(self.sock_udp:send("Ev=Stop"))
           self.sock_udp:close()
           self.sock_udp = nil
 

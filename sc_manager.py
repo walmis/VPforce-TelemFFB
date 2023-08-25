@@ -147,6 +147,7 @@ class SimConnectManager(threading.Thread):
         SimVar("SimDisabled", "SIM DISABLED", "Bool"),
         SimVar("SimOnGround", "SIM ON GROUND", "Bool"),
         SimVar("Parked", "PLANE IN PARKING STATE", "Bool"),
+        SimVar("Slew", "IS SLEW ACTIVE", "Bool"),
         SimVar("SurfaceType", "SURFACE TYPE", "Enum", mutator=lambda x: surface_types.get(x, "unknown")),
         SimVar("EngineType", "ENGINE TYPE", "Enum"),
         SimVarArray("EngVibration", "ENG VIBRATION", "Number", min=1, max=4),
@@ -222,20 +223,28 @@ class SimConnectManager(threading.Thread):
                 logging.error(f"SimConnect exception {recv.dwException}, sendID {recv.dwSendID}, index {recv.dwIndex}")
             elif isinstance(recv, RECV_QUIT):
                 logging.info("Quit received")
+                self.emit_event("Quit")
                 break
+            elif isinstance(recv, RECV_OPEN):
+                self.emit_event("Open")
+                
             elif isinstance(recv, RECV_EVENT):
                 if recv.uEventID == EV_PAUSED:
                     logging.debug(f"EVENT PAUSED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_paused = recv.dwData
+                    self.emit_event("Paused", recv.dwData)
                 elif recv.uEventID == EV_STARTED:
                     logging.debug(f"EVENT STARTED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_started = 1
+                    self.emit_event("SimStart")
                 elif recv.uEventID == EV_STOPPED:
                     logging.debug(f"EVENT STOPPED, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_started = 0
+                    self.emit_event("SimStop")
                 elif recv.uEventID == EV_SIMSTATE:
                     logging.debug(f"EVENT SIMSTATE, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_state = recv.dwData
+                    self.emit_event("SimState", recv.dwData)
 
             elif isinstance(recv, RECV_SIMOBJECT_DATA):
                 logging.debug(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
@@ -265,7 +274,7 @@ class SimConnectManager(threading.Thread):
                         else:
                             data[var.name] = val
                             
-                    if not self._sim_paused and not data["Parked"]:     # fixme: figure out why simstart/stop and sim events dont work right
+                    if not self._sim_paused and not data["Parked"] and not data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
                         self.emit_packet(data)
                         self._final_frame_sent = 0
                     else:
@@ -276,6 +285,9 @@ class SimConnectManager(threading.Thread):
                 print("Received", recv)
 
     def emit_packet(self, data):
+        pass
+
+    def emit_event(self, event, *args):
         pass
 
     def quit(self):

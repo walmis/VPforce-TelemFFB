@@ -23,7 +23,7 @@ from ffb_rhino import HapticEffect, FFBReport_SetCondition
 import utils
 import logging
 import random
-from aircraft_base import AircraftBase
+from aircraft_base import AircraftBase, effects, HPFs, LPFs
 import json
 import socket
 
@@ -32,15 +32,6 @@ knots = 0.514444
 kmh = 1.0/3.6
 deg = math.pi/180
 
-# by accessing effects dict directly new effects will be automatically allocated
-# example: effects["myUniqueName"]
-effects : Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
-
-# Highpass filter dispenser
-HPFs : Dict[str, utils.HighPassFilter]  = utils.Dispenser(utils.HighPassFilter)
-
-# Lowpass filter dispenser
-LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -79,8 +70,8 @@ class Aircraft(AircraftBase):
     canopy_motion_intensity : float = 0.12      # peak vibration intensity when canopy is moving, 0 to disable
     canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
 
-    afterburner_effect_intensity = 0.2      # peak intensity for afterburner rumble effect
-    jet_engine_rumble_intensity = 0.12      # peak intensity for jet engine rumble effect
+    afterburner_effect_intensity = 0.0      # peak intensity for afterburner rumble effect
+    jet_engine_rumble_intensity = 0      # peak intensity for jet engine rumble effect
     jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
     ####
@@ -101,6 +92,9 @@ class Aircraft(AircraftBase):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
+    pedal_spring_mode = 0    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    elevator_droop_force = 0
+
     trim_workaround = False
 
     ####
@@ -108,12 +102,7 @@ class Aircraft(AircraftBase):
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
 
-        #clear any existing effects
-        for e in effects.values(): e.destroy()
-        effects.clear()
-
-        self.spring = HapticEffect().spring()
-        #self.spring.effect.effect_id = 5
+        self._jet_rumble_is_playing = 0
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
@@ -136,14 +125,16 @@ class Aircraft(AircraftBase):
 
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"   #inject aircraft class into telemetry
+
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
-        if self.deceleration_effect_enable and self.deceleration_effect_enable_areyoureallysure:
+        if self.deceleration_effect_enable:
             self._decel_effect(telem_data)
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
+        self._update_ffb_forces(telem_data)
         if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
             self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
         if self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0:
@@ -154,18 +145,20 @@ class Aircraft(AircraftBase):
             self._update_canopy(telem_data.get("Canopy"))
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
-        
+        if self.jet_engine_rumble_intensity > 0:
+            self._update_jet_engine_rumble(telem_data)
         if self.is_joystick():
             self._update_stick_position(telem_data)
+        if self.is_pedals():
+            self.override_pedal_spring(telem_data)
 
+    def on_event(self, event, *args):
+        logging.info(f"on_event: {event}")
+        if event == "Stop":
+            effects.clear()
 
     def on_timeout(self):
-        # stop all effects when telemetry stops
         super().on_timeout()
-        logging.debug("Timeout, preparing to stop effects")
-        for e in effects.values():
-            logging.debug(f"Timeout effect: {e}")
-            e.stop()
 
     def send_commands(self, cmds):
         cmds = "\n".join(cmds)
@@ -173,6 +166,32 @@ class Aircraft(AircraftBase):
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         
         self._socket.sendto(bytes(cmds, "utf-8"), ("127.0.0.1", 34381))
+
+    def override_elevator_droop(self, telem_data):
+
+        if telem_data['TAS'] < 20*knots:
+            force = utils.scale_clamp(telem_data['TAS'], (20*knots, 0),(0, self.elevator_droop_force))
+            effects['elev_droop'].constant(force, 180).start()
+            logging.debug(f"override elevator:{force}")
+        else:
+            effects.dispose('elev_droop')
+
+    def override_pedal_spring(self, telem_data):
+
+        ## 0=spring disabled + damper enabled, 1=spring enabled at %100 (overriding DCS) + damper
+        if self.pedal_spring_mode == 0:
+            return
+        elif self.pedal_spring_mode == 1:
+            self.spring_x.positiveCoefficient = 0
+            self.spring_x.negativeCoefficient = 0
+        elif self.pedal_spring_mode == 2:
+            self.spring_x.positiveCoefficient = 4096
+            self.spring_x.negativeCoefficient = 4096
+        spring = effects["pedal_spring"].spring()
+
+        spring.effect.setCondition(self.spring_x)
+        # effects["damper"].damper(512, 512).start()
+        spring.start(override=True)
 
     def _update_stick_position(self, telem_data):
         if not self.trim_workaround: return
@@ -199,11 +218,12 @@ class Aircraft(AircraftBase):
         self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
         self.spring_y.cpOffset = utils.clamp_minmax(round(offs_y * 4096), 4096)
 
+        spring = effects["trim_spring"].spring()
         # upload effect parameters to stick
-        self.spring.effect.setCondition(self.spring_x)
-        self.spring.effect.setCondition(self.spring_y)
+        spring.effect.setCondition(self.spring_x)
+        spring.effect.setCondition(self.spring_y)
         # ensure effect is started
-        self.spring.start(override=True)
+        spring.start(override=True)
 
         # override DCS input and set our own values
         self.send_commands([f"LoSetCommand(2001, {y - offs_y})", 
@@ -216,8 +236,8 @@ class PropellerAircraft(Aircraft):
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
     rpm_scale : float = 45
-
-    _engine_rumble_is_playing = 0
+    pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
+    jet_engine_rumble_intensity = 0
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -234,13 +254,14 @@ class PropellerAircraft(Aircraft):
             telem_data["ActualRPM"] = rpm # inject ActualRPM into telemetry
 
         super().on_telemetry(telem_data)
-
+        if self.is_joystick():
+            self.override_elevator_droop(telem_data)
         if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
             self._update_engine_rumble(telem_data["ActualRPM"])
         if self.wind_effect_enabled:
             self._update_wind_effect(telem_data)
         self._update_aoa_effect(telem_data)
-        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+        if self.gforce_effect_enable:
             super()._gforce_effect(telem_data)
 
 
@@ -250,8 +271,11 @@ class JetAircraft(Aircraft):
     #flaps_motion_intensity = 0.0
 
     _ab_is_playing = 0
-    _jet_rumble_is_playing = 0
+    pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
+    jet_engine_rumble_intensity = 0.05
+    afterburner_effect_intensity = 0.2
+    
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         ## Jet Aircraft Telemetry Handler
@@ -262,11 +286,9 @@ class JetAircraft(Aircraft):
 
         if self.afterburner_effect_intensity > 0:
             self._update_ab_effect(telem_data)
-        if Aircraft.jet_engine_rumble_intensity > 0:
-            self._update_jet_engine_rumble(telem_data)
         if self.aoa_reduction_effect_enabled:
             self._aoa_reduction_force_effect(telem_data)
-        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+        if self.gforce_effect_enable:
             super()._gforce_effect(telem_data)
 
 class Helicopter(Aircraft):
@@ -280,6 +302,7 @@ class Helicopter(Aircraft):
     overspeed_shake_start = 70.0 # m/s
     overspeed_shake_intensity = 0.2
     heli_engine_rumble_intensity = 0.12
+    pedal_spring_mode = 1    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
 
     def on_telemetry(self, telem_data):
@@ -291,39 +314,5 @@ class Helicopter(Aircraft):
         super().on_telemetry(telem_data)
 
         self._calc_etl_effect(telem_data)
-        self._update_heli_engine_rumble(telem_data)
-
-
-class TF51D(PropellerAircraft):
-    buffeting_intensity = 0 # implement
-    runway_rumble_intensity = 1.0
-    
-
-# Specialized class for Mig-21
-class Mig21(JetAircraft):
-    aoa_shaker_enable = True
-    buffet_aoa = 8
-
-class Ka50(Helicopter):
-    #TODO: KA-50 settings here...
-    pass
-
-
-classes = {
-    "Ka-50" : Ka50,
-    "Mi-8MT": Helicopter,
-    "UH-1H": Helicopter,
-    "SA342M" :Helicopter,
-    "SA342L" :Helicopter,
-    "SA342Mistral":Helicopter,
-    "SA342Minigun":Helicopter,
-    "AH-64D_BLK_II":Helicopter,
-
-    "TF-51D" : TF51D,
-    "MiG-21Bis": Mig21,
-    "F-15C": JetAircraft,
-    "MiG-29A": JetAircraft,
-    "MiG-29S": JetAircraft,
-    "MiG-29G": JetAircraft,
-    "default": Aircraft
-}
+        if self.engine_rumble:
+            self._update_heli_engine_rumble(telem_data)

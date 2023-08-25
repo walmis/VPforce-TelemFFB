@@ -16,6 +16,8 @@
 #
 
 import atexit
+import glob
+
 from traceback_with_variables import print_exc, prints_exc
 
 
@@ -57,7 +59,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 # Create a formatter for the log messages
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+formatter = logging.Formatter('%(asctime)s.%(msecs)d - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 # Create a StreamHandler to log messages to the console
 console_handler = logging.StreamHandler(sys.stdout)
@@ -78,7 +80,7 @@ import re
 import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu
+    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
 # from PyQt5.QtWidgets import *
@@ -97,6 +99,10 @@ from ffb_rhino import HapticEffect
 from configobj import ConfigObj
 
 from sc_manager import SimConnectManager
+from aircraft_base import effects
+
+effects_translator = utils.EffectTranslator()
+
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -105,6 +111,9 @@ if args.teleplot:
     utils.teleplot.configure(args.teleplot)
 
 version = utils.get_version()
+min_firmware_version = 'v1.0.15'
+global dev_firmware_version
+dev_firmware_version = None
 
 def format_dict(data, prefix=""):
     output = ""
@@ -117,11 +126,23 @@ def format_dict(data, prefix=""):
 
 
 def load_config(filename, raise_errors=True) -> ConfigObj:
-    config_path = os.path.join(os.path.dirname(__file__), filename)
+    if not os.path.sep in filename:
+        #construct absolute path
+        config_path = os.path.join(os.path.dirname(__file__), filename)
+    else:
+        #filename is absolute path
+        config_path = filename
 
     try:
         config = ConfigObj(config_path, raise_errors=raise_errors)
-        logging.info(f"Load Config: {config_path}")
+        logging.info(f"Loading Config: {config_path}")
+        if not os.path.exists(config_path):
+            logging.warning(f"Configuration file {filename} does not exist")
+            path = os.path.dirname(config_path)
+            ini_files = glob.glob(f"{path}/*.ini")
+            logging.warning(f"Possible ini files in that location are:")
+            for file in ini_files:
+                logging.warning(f"{os.path.basename(file)}")
         return config
     except Exception as e:
         logging.error(f"Cannot load config {config_path}:  {e}")
@@ -134,7 +155,7 @@ def load_config(filename, raise_errors=True) -> ConfigObj:
         err["system"]["dcs_enabled"] = 0
         return err
 
-_config = None
+_config : ConfigObj = None
 _config_mtime = 0
 
 # if update is true, update the current modified time
@@ -220,13 +241,15 @@ class TelemManager(QObject, threading.Thread):
 
     def __init__(self) -> None:
         QObject.__init__(self)
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, daemon=True)
 
-        self.daemon = True
         self._run = True
         self._cond = threading.Condition()
         self._data = None
+        self._events = []
         self._dropped_frames = 0
+        self.lastFrameTime = time.perf_counter()
+        self.frameTimes = []
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
         config = get_config()
@@ -237,25 +260,44 @@ class TelemManager(QObject, threading.Thread):
         else:
             params = utils.sanitize_dict(config["default"])
 
-        type = "Aircraft"
+        class_name = "Aircraft"
 
         for section,conf in config.items():
             # find matching aircraft in config
             if re.match(section, aircraft_name):
                 conf = utils.sanitize_dict(conf)
-                logging.info(f"Found aircraft '{aircraft_name}' in config")
-                type = conf.get("type", "Aircraft")
+                logging.info(f"Found section [{section}] for aircraft '{aircraft_name}' in config")
+                class_name = conf.get("type", "Aircraft")
+
+                # load params from that class in config
+                s = ".".join([default_section, class_name] if default_section else [class_name])
+                logging.info(f"Loading parameters from [{s}] section")
+                class_params = config.get(s)
+                if class_params:
+                    class_params = utils.sanitize_dict(class_params)
+                    params.update(class_params)
+                else:
+                    logging.warning(f"Section [{s}] does not exist")
+                    
+
+
                 params.update(conf)
 
-        return (params, type)
+        return (params, class_name)
     
     def quit(self):
         self._run = False
         self.join()
 
-    def submitFrame(self, data):
+    def submitFrame(self, data : bytes):
+        if type(data) == bytes:
+            data = data.decode("utf-8")
+
         with self._cond:
-            if self._data is None:
+            if data.startswith("Ev="):
+                self._events.append(data.lstrip("Ev="))
+                self._cond.notify()
+            elif self._data is None:
                 self._data = data
                 self._cond.notify() # notify waiting thread of new data
             else:
@@ -264,96 +306,120 @@ class TelemManager(QObject, threading.Thread):
                 # USB interrupt transfers (1ms) might take longer than one video frame
                 # we drop frames to keep latency to a minimum
                 logging.debug(f"Droppped frame (total {self._dropped_frames})")
-    
-    @prints_exc
-    def run(self):
 
-        while self._run:
-            with self._cond:
-                if not self._data and not self._cond.wait(0.1):
-                    if self.currentAircraft and not self.timedOut:
-                        self.currentAircraft.on_timeout()
-                    self.timedOut = True
-                    continue
-                else:
-                    self.timedOut = False
-                    assert(self._data is not None)
-                    data = self._data.decode("utf-8").split(";")
-                    self._data = None
-            
-            self.lastFrameTime = time.perf_counter()
-
-            telem_data = {}
-            telem_data["FFBType"] = args.type
-
-            if data[0] == "DISCONNECT":
-                logging.info("Telemetry disconnected")
-                self.currentAircraftName = None
-
-            for i in data:
-                try:
-                    if len(i) and i != "CONNECT" and i != "DISCONNECT":
-                        section, conf = i.split("=")
-                        values = conf.split("~")
-                        telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
-                except Exception as e:
-                    traceback.print_exc()
-                    print("Error Parsing Parameter: ", repr(i))
-
-            # print(items)
-            aircraft_name = telem_data.get("N")
-            data_source = telem_data.get("src", None)
-            if data_source == "MSFS2020":
-                module = aircrafts_msfs
-            else:
-                module = aircrafts_dcs
-
-            if aircraft_name and aircraft_name != self.currentAircraftName:
-                
-                if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
-                    params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-
-                    Class = getattr(module, cls_name, None)
-                    if not Class:
-                        logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
-                        Class = module.Aircraft
-
-                    vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
-                    if vpconf_path and "vpconf" in params:
-                        logging.info(f"Found VPforce Configurator at {vpconf_path}")
-                        serial = HapticEffect.device.serial
-                        subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial])
-
-                    logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
-                    # instantiate new aircraft handler
-                    self.currentAircraft = Class(aircraft_name)
-                    self.currentAircraft.apply_settings(params)
-
-                self.currentAircraftName = aircraft_name
+    def process_events(self):
+        while len(self._events):
+            ev = self._events.pop(0)
+            ev = ev.split(";")
 
             if self.currentAircraft:
-                if config_has_changed():
-                    logging.info("Configuration has changed, reloading")
-                    params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-                    self.currentAircraft.apply_settings(params)
-                try:
-                    _tm = time.perf_counter()
-                    self.currentAircraft._telem_data = telem_data
-                    self.currentAircraft.on_telemetry(telem_data)
-                    telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
+                self.currentAircraft.on_event(*ev)
+            continue
 
-                except:
-                    print_exc()
+    def process_data(self, data):
+        data = data.split(";")
 
-            if args.plot:
-                for item in args.plot:
-                    if item in telem_data:
-                        utils.teleplot.sendTelemetry(item, telem_data[item])
+        telem_data = {}
+        telem_data["FFBType"] = args.type
 
-            try: # sometime Qt object is destroyed first on exit and this may cause a runtime exception
-                self.telemetryReceived.emit(telem_data)
-            except: pass
+        self.frameTimes.append(int((time.perf_counter() - self.lastFrameTime)*1000))
+        if len(self.frameTimes) > 50: self.frameTimes.pop(0)
+        
+        telem_data["frameTimes"] = [self.frameTimes[-1], max(self.frameTimes)]
 
+
+        self.lastFrameTime = time.perf_counter()
+
+        for i in data:
+            try:
+                if len(i):
+                    section, conf = i.split("=")
+                    values = conf.split("~")
+                    telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
+
+            except Exception as e:
+                traceback.print_exc()
+                print("Error Parsing Parameter: ", repr(i))
+
+        # print(items)
+        aircraft_name = telem_data.get("N")
+        data_source = telem_data.get("src", None)
+        if data_source == "MSFS2020":
+            module = aircrafts_msfs
+        else:
+            module = aircrafts_dcs
+
+        if aircraft_name and aircraft_name != self.currentAircraftName:
+            
+            if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
+                params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
+
+                Class = getattr(module, cls_name, None)
+                if not Class:
+                    logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
+                    Class = module.Aircraft
+
+                vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
+                if vpconf_path and "vpconf" in params:
+                    logging.info(f"Found VPforce Configurator at {vpconf_path}")
+                    serial = HapticEffect.device.serial
+                    workdir = os.path.dirname(vpconf_path)
+                    env = {}
+                    env["PATH"] = os.environ["PATH"]
+                    subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial], cwd=workdir, env=env)
+
+                logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
+                # instantiate new aircraft handler
+                self.currentAircraft = Class(aircraft_name)
+                self.currentAircraft.apply_settings(params)
+
+            self.currentAircraftName = aircraft_name
+
+        if self.currentAircraft:
+            if config_has_changed():
+                logging.info("Configuration has changed, reloading")
+                params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
+                self.currentAircraft.apply_settings(params)
+            try:
+                _tm = time.perf_counter()
+                self.currentAircraft._telem_data = telem_data
+                self.currentAircraft.on_telemetry(telem_data)
+                telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
+
+            except:
+                print_exc()
+
+        if args.plot:
+            for item in args.plot:
+                if item in telem_data:
+                    utils.teleplot.sendTelemetry(item, telem_data[item])
+
+        try: # sometime Qt object is destroyed first on exit and this may cause a runtime exception
+            self.telemetryReceived.emit(telem_data)
+        except: pass
+
+    def on_timeout(self):
+        if self.currentAircraft and not self.timedOut:
+            self.currentAircraft.on_timeout()
+        self.timedOut = True
+
+    @prints_exc
+    def run(self):
+        while self._run:
+            with self._cond:
+                if not len(self._events) and not self._data:
+                    if not self._cond.wait(0.2): 
+                        self.on_timeout()
+                        continue
+
+                if len(self._events):
+                    self.process_events()
+
+                if self._data:
+                    self.timedOut = False
+                    data = self._data
+                    self._data = None
+                    self.process_data(data)
 
 class NetworkThread(threading.Thread):
     def __init__(self, telemetry : TelemManager, host = "", port = 34380):
@@ -397,6 +463,15 @@ class SimConnectSock(SimConnectManager):
         data["src"] = "MSFS2020"
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
         self._telem.submitFrame(packet)
+
+    def emit_event(self, event, *args):
+        # special handling of Open event
+        if event == "Open":
+            # Reset all FFB effects on device, ensure we have a clean start
+            HapticEffect.device.resetEffects()
+
+        args = [str(x) for x in args]
+        self._telem.submitFrame(f"Ev={event};" + ";".join(args))
 
 
 
@@ -458,7 +533,26 @@ class MainWindow(QMainWindow):
         simlabel.setToolTip("Enable/Disable Sims in config file or use '-s DCS|MSFS' argument to specify")
         layout.addWidget(simlabel)
         # Add a label and telemetry data label
-        layout.addWidget(QLabel("Telemetry"))
+        # layout.addWidget(QLabel("Telemetry"))
+
+
+        self.radio_button_group = QButtonGroup()
+        radio_row_layout = QHBoxLayout()
+        self.telem_monitor_radio = QRadioButton("Telemetry Monitor")
+        self.effect_monitor_radio = QRadioButton("Effects Monitor")
+
+        radio_row_layout.addWidget(self.telem_monitor_radio)
+        radio_row_layout.addWidget(self.effect_monitor_radio)
+
+        self.telem_monitor_radio.setChecked(True)
+
+        self.radio_button_group.addButton(self.telem_monitor_radio)
+        self.radio_button_group.addButton(self.effect_monitor_radio)
+
+        # self.radio_button_group.buttonClicked.connect(self.update_monitor_window)
+
+        layout.addLayout(radio_row_layout)
+
 
         # Create a scrollable area
         scroll_area = QScrollArea()
@@ -519,7 +613,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        row_layout = QHBoxLayout()
+        link_row_layout = QHBoxLayout()
         self.doc_label = QLabel()
         doc_url = 'https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.27yzpife8719'
         label_txt = 'TelemFFB Documentation'
@@ -536,10 +630,12 @@ class MainWindow(QMainWindow):
         self.dl_label.setAlignment(Qt.AlignRight)
         self.dl_label.setToolTip(dl_url)
 
-        row_layout.addWidget(self.doc_label)
-        row_layout.addWidget(self.dl_label)
+        link_row_layout.addWidget(self.doc_label)
+        link_row_layout.addWidget(self.dl_label)
 
+        version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
+
         status_text = "UNKNOWN"
         status = utils.fetch_latest_version()
         if status == False:
@@ -548,15 +644,25 @@ class MainWindow(QMainWindow):
             status_text = "UNKNOWN"
         else:
             status_text = f"New version <a href='{status[1]}'><b>{status[0]}</b></a> is available!"
-            
         if status:
             self.version_label.setToolTip(status[1])
+
         self.version_label.setText(f'Version Status: {status_text}')
         self.version_label.setOpenExternalLinks(True)
 
+        global dev_firmware_version
+        self.firmware_label = QLabel()
+        self.firmware_label.setText(f'Rhino Firmware: {dev_firmware_version}')
+
         self.version_label.setAlignment(Qt.AlignLeft)
-        layout.addLayout(row_layout)
-        layout.addWidget(self.version_label)
+        self.firmware_label.setAlignment(Qt.AlignLeft)
+        version_row_layout.addWidget(self.version_label)
+        version_row_layout.addWidget(self.firmware_label)
+
+        layout.addLayout(link_row_layout)
+
+        layout.addLayout(version_row_layout)
+
         central_widget.setLayout(layout)
 
     def show_sub_menu(self):
@@ -596,16 +702,27 @@ class MainWindow(QMainWindow):
                     if isinstance(v, list):
                         v = "[" + ", ".join([f"{x:.3f}" if not isinstance(x, str) else x for x in v]) + "]"
                     items += f"{k}: {v}\n"
+            active_effects = ""
+            for key in effects.dict.keys():
+                if effects[key].started:
+                    descr = effects_translator.get_translation(key)
+                    if descr not in active_effects:
+                        active_effects = '\n'.join([active_effects, descr])
+            window_mode = self.radio_button_group.checkedButton()
+            if window_mode == self.telem_monitor_radio:
+                self.lbl_telem_data.setText(items)
+                self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            elif window_mode == self.effect_monitor_radio:
+                self.lbl_telem_data.setText(active_effects)
+                self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
 
-            self.lbl_telem_data.setText(items)
         except Exception as e:
             traceback.print_exc()
-
-
 
 def main():
     app = QApplication(sys.argv)
     global d
+    global dev_firmware_version
     d = LogWindow()
     #d.show()
 
@@ -623,9 +740,15 @@ def main():
         dev = HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
         if args.reset:
             dev.resetEffects()
-        logging.info(f"Rhino Firmware: {dev.get_firmware_version()}")
-    except:
-        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}")
+        dev_firmware_version = dev.get_firmware_version()
+        if dev_firmware_version:
+            logging.info(f"Rhino Firmware: {dev_firmware_version}")
+            minver = re.sub(r'\D', '', min_firmware_version)
+            devver = re.sub(r'\D', '', dev_firmware_version)
+            if devver < minver:
+                QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
+    except Exception as e:
+        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}\nError: {e}")
         return
 
 
@@ -654,9 +777,9 @@ def main():
 
     sim_connect = SimConnectSock(telem_manager)
     try:
-        msfs = config["system"].get("msfs_enabled", None)
+        msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
         logging.debug(f"MSFS={msfs}")
-        if msfs == "1" or args.sim == "MSFS":
+        if msfs or args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")
             sim_connect.start()
     except:

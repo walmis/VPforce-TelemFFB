@@ -39,6 +39,7 @@ class AircraftBase(object):
 
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
     rpm_scale: float = 45
+    smoother = utils.Smoother()
 
     _engine_rumble_is_playing = 0
 
@@ -47,6 +48,9 @@ class AircraftBase(object):
         self._changes = {}
         self._change_counter = {}
         self._telem_data = None
+        
+        #clear any existing effects
+        effects.clear()
 
     def apply_settings(self, settings_dict):
         for k, v in settings_dict.items():
@@ -159,7 +163,11 @@ class AircraftBase(object):
                     effects.dispose("runway1")
 
     def _gforce_effect(self, telem_data):
-
+        if not self.is_joystick():
+            return
+        if sum(telem_data.get("WeightOnWheels")):
+            effects.dispose("gforce")
+            return
         # gforce_effect_enable = 1
         gneg = -1.0
         gmin = self.gforce_min_gs
@@ -168,41 +176,47 @@ class AircraftBase(object):
         # if not gforce_effect_enable:
         #     return
         if self._sim_is_dcs(telem_data):
-            z_gs: float = telem_data.get("ACCs")[1]
+            gs: float = telem_data.get("ACCs")[1]
         elif self._sim_is_msfs(telem_data):
-            z_gs: float = telem_data.get("G")
+            gs: float = telem_data.get("G")
 
-        if z_gs < gmin:
+        avg_z_gs = self.smoother.get_average("gs", gs, window_size=10)
+        logging.debug(f"GS={gs}, AVG_Z_GS={avg_z_gs}")
+        if avg_z_gs < gmin:
             effects.dispose("gforce")
             # effects.dispose("gforce_damper")
             return
         # g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 4)
         if self.gforce_effect_invert_force:
             direction = 0
-        g_factor = round(utils.non_linear_scaling(z_gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
+        g_factor = round(utils.non_linear_scaling(avg_z_gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
         g_factor = utils.clamp(g_factor, 0.0, 1.0)
         effects["gforce"].constant(g_factor, direction).start()
         #  effects["gforce_damper"].damper(coef_y=1024).start()
 
-        logging.debug(f"G's = {z_gs} | gfactor = {g_factor}")
+        logging.debug(f"G's = {avg_z_gs} | gfactor = {g_factor}")
 
     def _aoa_reduction_force_effect(self, telem_data):
+        if not self.is_joystick():
+            return
         start_aoa = self.critical_aoa_start
         end_aoa = self.critical_aoa_max
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
-
-        if aoa >= start_aoa and tas > 10:
-            force_factor = round(utils.non_linear_scaling(aoa, start_aoa, end_aoa, curvature=1.5), 4)
+        avg_aoa = self.smoother.get_average("crit_aoa", aoa, window_size=8)
+        if avg_aoa >= start_aoa and tas > 10:
+            force_factor = round(utils.non_linear_scaling(avg_aoa, start_aoa, end_aoa, curvature=1.5), 4)
             force_factor = self.aoa_reduction_max_force * force_factor
             force_factor = utils.clamp(force_factor, 0.0, 1.0)
-            logging.debug(f"AoA Reduction Effect:  AoA={aoa}, force={force_factor}, max allowed force={self.aoa_reduction_max_force}")
+            logging.debug(f"AoA Reduction Effect:  AoA= {aoa} avg_AoA={avg_aoa}, force={force_factor}, max allowed force={self.aoa_reduction_max_force}")
             effects["crit_aoa"].constant(force_factor, 180).start()
         else:
             effects.dispose("crit_aoa")
         return
     
     def _decel_effect(self, telem_data):
+        if not self.is_joystick():
+            return
         if self._sim_is_dcs(telem_data):
             y_gs = telem_data.get("ACCs")[0]
         elif self._sim_is_msfs(telem_data):
@@ -211,12 +225,13 @@ class AircraftBase(object):
             return
         if not sum(telem_data.get("WeightOnWheels")):
             return
+        avg_y_gs = self.smoother.get_average("y_gs", y_gs, window_size=8)
         max_gs = self.deceleration_max_force
-        if y_gs < -0.1:
-            if abs(y_gs) > max_gs:
-                y_gs = -max_gs
-            logging.debug(f"y_gs = {y_gs}")
-            effects["decel"].constant(abs(y_gs), 180).start()
+        if avg_y_gs < -0.1:
+            if abs(avg_y_gs) > max_gs:
+                avg_y_gs = -max_gs
+            logging.debug(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
+            effects["decel"].constant(abs(avg_y_gs), 180).start()
         else:
             effects.dispose("decel")
 
@@ -305,43 +320,43 @@ class AircraftBase(object):
         flares = telem.get("Flares")
         chaff = telem.get("Chaff")
         if self.anything_has_changed("PayloadInfo", payload):
-            effects["cm"].stop()
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction,
-                                       duration=80).start()
+                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["payload_rel"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
-                effects["cm"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction,
-                                       duration=80).start()
+                effects["payload_rel"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction, duration=80).start(force=True) # force sending the start command to the device
+        elif not self.anything_has_changed("PayloadInfo", payload, delta_ms=160):
+            effects["payload_rel"].stop ()
 
         if self.anything_has_changed("Gun", gun):
-            effects["cm"].stop()
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction,
-                                       duration=80).start()
+                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["gunfire"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
-                effects["cm"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction,
-                                       duration=80).start()
+                effects["gunfire"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction, duration=80).start(force=True)
+        elif not self.anything_has_changed("Gun", gun, delta_ms=160):
+            effects["gunfire"].stop()
 
         if self.anything_has_changed("Flares", flares) or self.anything_has_changed("Chaff", chaff):
-            effects["cm"].stop()
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
-                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg"); effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction,
-                                       duration=80).start()
+                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
+                effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
-                effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction,
-                                       duration=80).start()
+                effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start(force=True)
+        if not self.anything_has_changed("Flares", flares, delta_ms=160) or self.anything_has_changed("Chaff", chaff, delta_ms=160):
+            effects["cm"].stop()
 
     def _update_flaps(self, flapspos):
         # flapspos = data.get("Flaps")
@@ -458,6 +473,19 @@ class AircraftBase(object):
         logging.debug(f"Adding wind effect intensity:{v}")
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
+    def _update_ffb_forces(self, telem_data):
+        if self.damper_force:
+            force = utils.clamp(self.damper_force, 0.0, 1.0)
+            effects["damper"].damper(4096*force, 4096*force).start()
+        else:
+            effects["damper"].destroy()
+
+        if self.inertia_force:
+            force = utils.clamp(self.inertia_force, 0.0, 1.0)
+            effects["inertia"].damper(4096*force, 4096*force).start()
+        else:
+            effects["inertia"].destroy()
+
     ########################################
     ######                            ######
     ######    Prop Aircraft Effects   ######
@@ -496,25 +524,35 @@ class AircraftBase(object):
         modulation_neg = 1
         frequency2 = frequency + median_modulation
         precision = 2
-        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
-        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+
+        ##
+        ## Update oscillation modulation with new function that returns the amplitude of a sine wave
+        ## at any point in time based on wave amplitude and period
+        ## Leave legacy code in place in case nobody likes the new effect
+        legacy_mode = 0
+        if legacy_mode:
+            r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+            r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+        else:
+            r1_modulation = utils.sine_point_in_time(3, 10000)
+            r2_modulation = utils.sine_point_in_time(3, 17500, phase_offset_deg=45)
 
         if frequency > 0:
             force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
             dynamic_rumble_intensity = utils.clamp(self._calc_engine_intensity(rpm), 0, force_limit)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
 
-            effects["rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()  # vib on X axis
-            effects["rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X
-            effects["rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()  # vib on Y axis
-            effects["rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()  # vib on Y
+            effects["prop_rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()  # vib on X axis
+            effects["prop_rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X
+            effects["prop_rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()  # vib on Y axis
+            effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()  # vib on Y
             self._engine_rumble_is_playing = 1
         else:
             self._engine_rumble_is_playing = 0
-            effects.dispose("rpm0-1")
-            effects.dispose("rpm0-2")
-            effects.dispose("rpm1-1")
-            effects.dispose("rpm1-2")
+            effects.dispose("prop_rpm0-1")
+            effects.dispose("prop_rpm0-2")
+            effects.dispose("prop_rpm1-1")
+            effects.dispose("prop_rpm1-2")
 
     def _calc_engine_intensity(self, rpm) -> float:
         """
@@ -557,28 +595,35 @@ class AircraftBase(object):
             logging.error(f"Error getting afterburner position, sim probably disconnected: {e}")
             return
         logging.debug(f"Afterburner = {afterburner_pos}")
-        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=5)
-        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=5)
+        ##
+        ## Update oscillation modulation with new function that returns the amplitude of a sine wave
+        ## at any point in time based on wave amplitude and period
+        ## Leave legacy code in place in case nobody likes the new effect
+        legacy_mode = 0
+        if legacy_mode:
+            r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+            r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=5)
+        else:
+            r1_modulation = utils.sine_point_in_time(2, 15000)
+            r2_modulation = utils.sine_point_in_time(1, 15000)
+
         if afterburner_pos and (
-                self.anything_has_changed("Afterburner", afterburner_pos) or self.anything_has_changed("Modulation",
-                                                                                                       r1_modulation)):
+                self.anything_has_changed("Afterburner", afterburner_pos) or self.anything_has_changed("Modulation", r1_modulation)):
             # logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
             intensity = self.afterburner_effect_intensity * afterburner_pos
-            effects["ab_rumble_1_1"].periodic(frequency, intensity, 0, ).start()
-            effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
-            effects["ab_rumble_2_1"].periodic(frequency2, intensity, 45, 4, phase=120, offset=60).start()
-            effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120,
-                                              offset=60).start()
+            effects["ab_rumble_1_1"].periodic(frequency + r1_modulation, intensity, 0,effect_type=5 ).start()
+            # effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
+            effects["ab_rumble_2_1"].periodic(frequency + r1_modulation, intensity, 45,effect_type=5 ).start()
+            # effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120,
+            #                                   offset=60).start()
             # logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
             self._ab_is_playing = 1
         elif afterburner_pos == 0:
             # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
             effects.dispose("ab_rumble_1_1")
-            effects.dispose("ab_rumble_1_2")
+            # effects.dispose("ab_rumble_1_2")
             effects.dispose("ab_rumble_2_1")
-            effects.dispose("ab_rumble_2_2")
+            # effects.dispose("ab_rumble_2_2")
             self._ab_is_playing = 0
 
     def _update_jet_engine_rumble(self, telem_data):
@@ -593,27 +638,27 @@ class AircraftBase(object):
         try:
             jet_eng_rpm = max(telem_data.get("EngRPM")[0], telem_data.get("EngRPM")[1])
         except Exception as e:
-            logging.error(f"Error getting Engine RPM, sim probably disconnected, bailing: {e}")
+            logging.error(f"Error getting Engine RPM")
             return
-        r1_modulation = utils.get_random_within_range("jetengine_1", median_modulation,
-                                                      median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=1)
-        r2_modulation = utils.get_random_within_range("jetengine_2", median_modulation,
-                                                      median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=2)
-        if self.engine_rumble and (
-                self.anything_has_changed("EngRPM", jet_eng_rpm) or self.anything_has_changed("JetEngineModul",
-                                                                                              r1_modulation)):
+        ##
+        ## Update oscillation modulation with new function that returns the amplitude of a sine wave
+        ## at any point in time based on wave amplitude and period
+        ## Leave legacy code in place in case nobody likes the new effect
+        legacy_mode = 0
+        if legacy_mode:
+            r1_modulation = utils.get_random_within_range("jetengine_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=1)
+            r2_modulation = utils.get_random_within_range("jetengine_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=2)
+        else:
+            r1_modulation = utils.sine_point_in_time(2, 30000)
+            r2_modulation = utils.sine_point_in_time(2, 22500, phase_offset_deg=0)
+        if self.engine_rumble and (self.anything_has_changed("EngRPM", jet_eng_rpm) or self.anything_has_changed("JetEngineModul", r1_modulation)):
             intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
             rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
             rt_freq2 = round(rt_freq + median_modulation, 4)
             effects["je_rumble_1_1"].periodic(rt_freq, intensity, 0, effect_index).start()
             effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
             effects["je_rumble_2_1"].periodic(rt_freq2, intensity, 90, effect_index, phase=phase_offset).start()
-            effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index,
-                                              phase=phase_offset).start()
-            # logging.debug(f"RPM={jet_eng_rpm}")
-            # logging.debug(f"Intensty={intensity}")
+            effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
             logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
             self._jet_rumble_is_playing = 1
         elif jet_eng_rpm == 0:
@@ -652,7 +697,7 @@ class AircraftBase(object):
             elif "Mi-24P" in mod:
                 blade_ct = 5
             elif "AH-64" in mod:
-                blade_ct = 2
+                blade_ct = 4
                 rotor = 245  # Apache does not have exportable data related to Rotor RPM
             elif "UH-60L" in mod:
                 blade_ct = 4
@@ -721,46 +766,24 @@ class AircraftBase(object):
         logging.debug(f"Engine Rumble: Blade_Ct={blade_ct}, RPM={rrpm}")
         frequency = float(rrpm) / 45 * blade_ct
 
-        # frequency = 20
         median_modulation = 2
-        modulation_pos = 2
-        modulation_neg = 1
         frequency2 = frequency + median_modulation
-        precision = 2
-        r1_modulation = utils.get_random_within_range("rumble_1", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=3)
-        r2_modulation = utils.get_random_within_range("rumble_2", median_modulation, median_modulation - modulation_neg,
-                                                      median_modulation + modulation_pos, precision, time_period=5)
         if frequency > 0:
             logging.debug(f"Current Heli Engine Rumble Intensity = {self.heli_engine_rumble_intensity}")
-            effects["rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
-            # effects["rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X axis
-            effects["rpm1-1"].periodic(frequency2, self.heli_engine_rumble_intensity * .5, 90).start()  # vib on Y axis
-            # effects["rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensit, 90).start()  # vib on Y axis
+            effects["rotor_rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
+            effects["rotor_rpm1-1"].periodic(frequency2, self.heli_engine_rumble_intensity * .5, 90).start()  # vib on Y axis
             self._engine_rumble_is_playing = 1
         else:
             self._engine_rumble_is_playing = 0
-            effects.dispose("rpm0-1")
-            # effects.dispose("rpm0-2")
-            effects.dispose("rpm1-1")
-            # effects.dispose("rpm1-2")
+            effects.dispose("rotor_rpm0-1")
+            effects.dispose("rotor_rpm1-1")
+
+    def on_event(self):
+        pass
 
     def on_timeout(self):  # override me
-        logging.debug("Timeout, preparing to stop effects")
-        for e in effects.values():
-            logging.debug(f"Timeout effect: {e}")
-            e.stop()
+        logging.info("Telemetry Timeout, stopping effects")
+        effects.foreach(lambda e: e.stop())
 
     def on_telemetry(self, data): 
-
-        if self.damper_force:
-            force = utils.clamp(self.damper_force, 0.0, 1.0)
-            effects["damper"].damper(4096*force, 4096*force).start()
-        else:
-            effects["damper"].destroy()
-
-        if self.inertia_force:
-            force = utils.clamp(self.inertia_force, 0.0, 1.0)
-            effects["inertia"].damper(4096*force, 4096*force).start()
-        else:
-            effects["inertia"].destroy()
+        pass
