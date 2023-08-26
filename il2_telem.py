@@ -1,3 +1,12 @@
+###################################################################################
+###################################################################################
+## The IL2 telemetry decoding functions in this module are loosely
+## based on the work done by 'sicsix' and the IL2Shaker github project
+## https://github.com/sicsix/IL2Shaker
+###################################################################################
+###################################################################################
+
+
 import logging
 import math
 import socket
@@ -17,8 +26,11 @@ deg = math.pi / 180
 fpss2gs = 1 / 32.17405
 mpss2gs = 1 / 9.81
 
-def dbg(*args, **kwargs):
-    print(*args, **kwargs)
+dbg_en = 1
+dbg_lvl = 0
+def dbg(level, *args, **kwargs):
+    if dbg_en and level <= dbg_lvl:
+        print(*args, **kwargs)
 
 
 def hexdump(src, length=16, sep='.'):
@@ -136,7 +148,7 @@ class StateDataStructure:
     tick: int = 0
     paused: int = 0
     engine_count: int = 0
-    rpm: list[float] = []
+    rpm: list = [0.0]
     intake_manifold_pressure_pa: list[float] = []
     val2: list[float] = []
     val3: float = 0.0
@@ -145,50 +157,56 @@ class StateDataStructure:
     landing_gear_pressure: list[float] = []
     indicated_air_speed_metres_second: float = 0.0
     val7: float = 0.0
-    acceleration: list[float] = []
-    acceleration_Gs: list[float] = []
+    acceleration: list[float] = [0,0,0]
+    acceleration_Gs: list[float] = [0,0,0]
     stall_buffet_frequency: float = 0.0
     stall_buffet_amplitude: float = 0.0
     above_ground_level_metres: float = 0.0
     flaps_position: float = 0.0
     air_brake_position: float = 0.0
 
+
 class IL2Manager():
     def __init__(self):
         self.ac_name: str = ""
         self.engine_info: list = []
-        self.engine_rpm: list = []
+        self.engine_rpm: list = [0.0]
         self.engine_maxrpm: list = []
+        self.rpm_pcts: list = [0]
         self.gun_data: list = []
-        self.guns_fired: list = []
+        self.guns_fired: list = [0]
         self.wheel_data: list = []
         self.bombs_data: list = []
-        self.bombs_released: int = 0
+        self.bombs_released: list = [0,0]
         self.rockets_data: list = []
-        self.rockets_fired: int = 0
+        self.rockets_fired: list = [0,0]
         self.ev6_data: list = []
         self.ev13_data: list = []
         self.ev14_data: list = []
         self.hit_data: list = []
+        self.hit_events: int = 0
         self.ev_damage_data: list = []
+        self.damage_events: int = 0
         self.seat_data: list = []
 
         self.acceleration_Gs: list = []
         self.acc_vectors: list = []
         self.rot_velocity: list = []
         self.rot_accel: list = []
+        self.guns_dict = {}
         self._changes = {}
         self._change_counter = {}
 
-        self.telem_data = {}
+        self.telem_data = {"src": "IL2", "N": "", "AircraftClass": "unknown"}
 
         self.state = StateDataStructure()
 
-    def process_packet(self, packet: bytes) -> Dict[str, List[float]]:
+    def process_packet(self, packet: bytes) -> bytes:
         data = BinaryDataReader(packet)
         packet_header = data.get_uint32()
-       
-        self.telem_data["src"] = "IL2"
+        lenpack = len(packet)
+        hex_pack = packet.hex().upper()
+        # self.telem_data["src"] = "IL2"
 
         ##
         ## Run Decoders
@@ -205,28 +223,38 @@ class IL2Manager():
         else:
             logging.error(f'Unknown packet type:  Header=0x{packet_header:X}')
 
-        self.telem_data["N"] = self.ac_name
+        self.telem_data["src"] = "IL2"
+        if self.ac_name != "":
+            self.telem_data["N"] = self.ac_name
+        # self.telem_data['AircraftClass'] = []
         self.telem_data['TAS'] = self.state.indicated_air_speed_metres_second
-        self.telem_data['RPM'] = list(self.state.rpm)
-        self.telem_data['Manifold'] = list(self.state.intake_manifold_pressure_pa)
+        self.telem_data['AGL'] = self.state.above_ground_level_metres
+        self.telem_data['RPM'] = self.state.rpm
+        self.telem_data["MaxRPM"] = self.engine_maxrpm
+        try:
+            self.rpm_pcts = [(a / b) * 100 for a, b in zip(self.state.rpm, self.engine_maxrpm)]
+        except: pass
+        self.telem_data["EngRPM"] = self.rpm_pcts
+
+        # self.telem_data['Manifold'] = list(self.state.intake_manifold_pressure_pa)
         self.telem_data['GearPos'] = list(self.state.landing_gear_position)
         self.telem_data['WeightOnWheels'] = list(self.state.landing_gear_pressure)
-        self.telem_data['G'] = self.acceleration_Gs
+        self.telem_data['ACCs'] = self.state.acceleration_Gs
         self.telem_data['StallBuffetFrequency'] = self.state.stall_buffet_frequency
         self.telem_data['StallBuffetAmplitude'] = self.state.stall_buffet_amplitude
-        self.telem_data['Alt'] = self.state.above_ground_level_metres
         self.telem_data['Flaps'] = self.state.flaps_position
         self.telem_data['Speedbrakes'] = self.state.air_brake_position
-        self.telem_data["EngineMaxRPM"] = self.engine_info
         self.telem_data["GunData"] = self.gun_data
-        self.telem_data["GunsFired"] = self.guns_fired
+        self.telem_data["Gun"] = self.guns_fired
         # self.telem_data["wheeldata"] = self.wheel_data
-        self.telem_data["BombData"] = self.bombs_data
-        self.telem_data["BombsReleased"] = self.bombs_released
-        self.telem_data["RocketData"] = self.rockets_data
-        self.telem_data["RocketsFired"] = self.rockets_fired
-        self.telem_data["HitData"] = self.hit_data
-        self.telem_data["DamageData"] = self.ev_damage_data
+        # self.telem_data["BombData"] = self.bombs_data
+        self.telem_data["Bombs"] = self.bombs_released
+        # self.telem_data["RocketData"] = self.rockets_data
+        self.telem_data["Rockets"] = self.rockets_fired
+        # self.telem_data["HitData"] = self.hit_data
+        self.telem_data["Hits"] = self.hit_events
+        # self.telem_data["DamageData"] = self.ev_damage_data
+        self.telem_data["Damage"] = self.damage_events
         self.telem_data["SeatData"] = self.seat_data
         self.telem_data['unknown_data_2'] = list(self.state.val2)
         self.telem_data['unknown_data_3'] = self.state.val3
@@ -234,11 +262,14 @@ class IL2Manager():
         self.telem_data['unknown_data_7'] = self.state.val7
         self.telem_data['unknown_evt_13'] = self.ev13_data
         self.telem_data['unknown_evt_14'] = self.ev14_data
-        self.telem_data['ac_vectors'] = self.acc_vectors
+        self.telem_data['acc_vectors'] = self.acc_vectors
         self.telem_data['rot_velocity'] = self.rot_velocity
         self.telem_data['rot_accel'] = self.rot_accel
 
-        return self.telem_data
+        # return self.telem_data
+
+        packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in self.telem_data.items()]), "utf-8")
+        return packet
 
     def decode_motion(self, data : BinaryDataReader):
         tick = data.get_uint32()
@@ -248,9 +279,9 @@ class IL2Manager():
         self.rot_velocity = data.get_vector3f()
         self.rot_accel = data.get_vector3f()
 
-        dbg ("acc", self.acc_vectors)
+        dbg(1,"acc", self.acc_vectors)
 
-    def decode_telem(self, data: BinaryDataReader) -> int:
+    def decode_telem(self, data: BinaryDataReader):
         packet_size = data.get_uint16()
         tick = data.get_uint32()
 
@@ -259,12 +290,12 @@ class IL2Manager():
         else:
             self.telem_data["SimPaused"] = 0
 
-        dbg(f"telem tick {tick} size {packet_size}")
+        dbg(1,f"telem tick {tick} size {packet_size}")
 
         self.state.tick = tick
 
         length = data.get_uint8()
-        dbg("len", length)
+        dbg(1,"len", length)
 
         ##
         ## Decode fixed structure telemetry data
@@ -274,7 +305,7 @@ class IL2Manager():
             state_type = data.get_uint16()
             state_length = data.get_uint8()
 
-            #dbg(StateType(state_type), "len",  state_length)
+            dbg(1,StateType(state_type), "len",  state_length)
             
             get_state_floats = lambda: [data.get_float() for i in range(0, state_length)]
 
@@ -326,25 +357,31 @@ class IL2Manager():
                 logging.error(f"Unknown state type: {state_type}")
 
         b = data.get_uint8()
-        dbg("last byte", b)
+        dbg(1,"last byte", b)
+
         self.decode_events(data)
 
     def decode_events(self, data : BinaryDataReader) -> int:
-        #dbg("decode_events remaining_data:", data.remaining())
+        dbg(1,"decode_events remaining_data:", data.remaining())
         if data.remaining() < 2: return
-
+        # self.engine_maxrpm = []
+        dbg(1, "event packet")
         while data.remaining():
             eventType = data.get_uint16()
             eventBytes = data.get_uint8()
-            dbg("-- event, type", EventType(eventType), "eventBytes", eventBytes)
-            dbg(hexdump(data.buffer[data.pointer:data.pointer+eventBytes]))
+            dbg(1,"-- event, type", EventType(eventType), "eventBytes", eventBytes)
+            dbg(1,hexdump(data.buffer[data.pointer:data.pointer+eventBytes]))
 
             if eventType == EventType.VehicleName:
                 name_length = data.get_uint8()
                 name_data = data.get_data(name_length)
+                # print(f"NAMEDATA={name_data}")
+                name_hex = name_data.hex().upper()
                 aircraft_name = name_data.decode('ascii').strip()
-
+                # print(f"ACNAME={aircraft_name}")
+                # aircraft_name = ''.join(c for c in aircraft_name if ord(c) <= 127)
                 if aircraft_name != self.ac_name:
+                    logging.info(f"aircraft_name={aircraft_name} | self.ac_name={self.ac_name}")
                     self.__init__()
                     
                 self.ac_name = aircraft_name
@@ -352,9 +389,13 @@ class IL2Manager():
             elif eventType == EventType.EngineData:
                 index = data.get_uint16()
                 index2 = data.get_uint16()
-                engine_data =  data.get_vector3f()
+                engine_data = data.get_vector3f()
                 max_rpm = data.get_float()
-                dbg(f"{index=} {index2=} {engine_data=} {max_rpm=}")
+                if len(self.engine_maxrpm) <= index:
+                    self.engine_maxrpm.append(max_rpm)
+                else:
+                    self.engine_maxrpm[index] = max_rpm
+                dbg(1,"EngineData", f"{index=} {index2=} {engine_data=} {max_rpm=}")
 
 
             elif eventType == EventType.GunData:
@@ -362,38 +403,49 @@ class IL2Manager():
                 offset = data.get_vector3f()
                 mass = data.get_float()
                 velocity = data.get_float()
-                dbg(f"{index=} {offset=} {mass=} {velocity=}")
+                dbg(1,"GunData", f"{index=} {offset=} {mass=} {velocity=}")
+
+                if len(self.gun_data) <= index:
+                    self.gun_data.append([round(mass,4), velocity])
+                else:
+                    self.gun_data[index] = ([round(mass, 4), velocity])
 
 
             elif eventType == EventType.GunFired:
                 gun_index = data.get_uint8()
-                dbg("GunFired", gun_index)
+                dbg(1,"GunFired", gun_index)
+                if len(self.guns_fired) < gun_index + 1:
+                    self.guns_fired.append(0)
+                else:
+                    self.guns_fired[gun_index] += 1
 
             elif eventType == EventType.WheelData:
                 index = data.get_uint16()
                 index2 = data.get_uint16()
                 offset = data.get_vector3f() # wheel positions in 3d space
-                dbg(f"{index=} {index2=} {offset=}")
+                dbg(1,f"{index=} {index2=} {offset=}")
 
 
             elif eventType == EventType.BombRelease:
-                offset = data.get_vector3f()
+                index = data.get_vector3f()
+                print(f"BOMB-{index}")
                 mass = data.get_float()
                 type = data.get_uint16()
 
-                dbg(f"{offset=} {mass=} {type=}")
+                dbg(1,f"{index=} {mass=} {type=}")
 
-                self.bombs_data = [] #TODO
-                self.bombs_released += 1
+                # self.bombs_data = []
+                self.bombs_released[0] = mass
+                self.bombs_released[1] += 1
 
             elif eventType == EventType.RocketLaunch:
                 offset = data.get_vector3f()
                 mass = data.get_float()
                 type = data.get_uint16()
-                dbg(f"{offset=} {mass=} {type=}")
+                dbg(1,f"{offset=} {mass=} {type=}")
 
-                self.rockets_data = []
-                self.rockets_fired += 1
+                self.rockets_fired[0] = mass
+                self.rockets_fired[1] += 1
 
             elif eventType == EventType.Event6:
                 vec0 = data.get_vector3f()
@@ -403,15 +455,18 @@ class IL2Manager():
             elif eventType == EventType.Hit:
                 offset = data.get_vector3f()
                 force = data.get_vector3f()
-                dbg(f"{offset=} {force=}")
+                dbg(1, "HIT EVENT", f"{offset=} {force=}")
 
                 self.hit_data = (offset, force)
+                self.hit_events += 1
 
             elif eventType == EventType.Damage:
                 offset = data.get_vector3f()
                 float0 = data.get_float()
+                dbg(1, "DAMAGE", f"{offset=} {float0=}")
 
                 self.ev_damage_data = (offset, float0)
+                self.damage_events += 1
 
             elif eventType == EventType.CurrentSeat:
                 # Triggers on seat change     
@@ -421,17 +476,28 @@ class IL2Manager():
                 ushort0 = data.get_uint16()
 
                 self.seat_data = [seat, ushort0]
+                dbg(1, "SEAT", f"{seat=} {ushort0=}")
 
             elif eventType == EventType.Event13:
-                self.ev13_data = data.get_vector3f()
-
+                # ev13_length = data.get_uint8()
+                ev13_data = data.get_data(eventBytes)
+                ev13_hex = ev13_data.hex().upper()
+                # ev13_name = ev13_data.decode('ascii').strip()
+                # self.ev13_data = data.get_vector3f()
+                # b = data.get_uint8() #get last byte
             elif eventType == EventType.Event14:
                 data1 = data.get_int32()
                 data2 = data.get_int16()
-                print(f"{data1=} {data2=}") 
+                dbg(1,"EVENT-14", f"{data1=} {data2=}")
                 self.ev14_data = [data1, data2]
             else:
                 logging.error(f"Unknown event type: {eventType}")
+
+
+    def fmt(self, val):
+        if isinstance(val, list):
+            return "~".join([str(x) for x in val])
+        return val
 
 
 def log_il2_trace():

@@ -129,6 +129,11 @@ class AircraftBase(object):
             return 1
         else:
             return 0
+    def _sim_is(self, sim, telem_data):
+        if telem_data.get('src') == sim:
+            return 1
+        else:
+            return 0
 
     ########################################
     ######                            ######
@@ -175,9 +180,9 @@ class AircraftBase(object):
         direction = 180
         # if not gforce_effect_enable:
         #     return
-        if self._sim_is_dcs(telem_data):
+        if self._sim_is("DCS", telem_data) or self._sim_is("IL2", telem_data):
             gs: float = telem_data.get("ACCs")[1]
-        elif self._sim_is_msfs(telem_data):
+        elif self._sim_is("MSFS",telem_data):
             gs: float = telem_data.get("G")
 
         avg_z_gs = self.smoother.get_average("gs", gs, window_size=10)
