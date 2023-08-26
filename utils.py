@@ -633,52 +633,6 @@ class Teleplot:
 
 teleplot = Teleplot()
 
-if __name__ == "__main__":
-    pass
-
-def dot(m1, m2):
-    return [
-        [sum(x * y for x, y in zip(m1_r, m2_c)) for m2_c in zip(*m2)] for m1_r in m1
-    ]
-
-def transpose(m):
-    return [[m[j][i] for j in range(len(m))] for i in range(len(m[0]))]
-
-def to_body_vector(yaw, pitch, roll, world_coordinates):
-    # Pre-compute the sine and cosine of the Euler angles
-    c_roll = math.cos(roll)
-    s_roll = math.sin(roll)
-    c_pitch = math.cos(pitch)
-    s_pitch = math.sin(pitch)
-    c_yaw = math.cos(yaw)
-    s_yaw = math.sin(yaw)
-
-    # Create the rotation matrix using the pre-computed sine and cosine values
-    R_x = [[1, 0, 0],
-        [0, c_roll, -s_roll],
-        [0, s_roll, c_roll]]
-
-    R_y = [[c_pitch, 0, s_pitch],
-        [0, 1, 0],
-        [-s_pitch, 0, c_pitch]]
-
-    R_z = [[c_yaw, -s_yaw, 0],
-        [s_yaw, c_yaw, 0],
-        [0, 0, 1]]
-
-    # DCS Main axes:
-    # x is directed to the north
-    # z is directed to the east
-    # y is directed up
-
-    R = dot(R_z, dot(R_y, R_x))
-
-    # Transform the world coordinates to body coordinates
-    body_coordinates = dot(R, [[x] for x in world_coordinates])
-
-    return [x[0] for x in body_coordinates]
-
-
 from PyQt5.QtWidgets import QMessageBox
 
 
