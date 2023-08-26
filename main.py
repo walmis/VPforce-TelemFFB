@@ -37,7 +37,7 @@ parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store
 # Add config file argument, default config.ini
 parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default='config.ini')
 parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='config.user.ini')
-parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS (default DCS', default="DCS")
+parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="DCS")
 parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default='joystick')
 
 args = parser.parse_args()
@@ -91,6 +91,7 @@ import socket
 import threading
 import aircrafts_dcs
 import aircrafts_msfs
+import aircrafts_il2
 import utils
 import subprocess
 
@@ -99,6 +100,7 @@ from ffb_rhino import HapticEffect
 from configobj import ConfigObj
 
 from sc_manager import SimConnectManager
+from il2_telem import IL2Manager
 from aircraft_base import effects
 
 effects_translator = utils.EffectTranslator()
@@ -346,6 +348,8 @@ class TelemManager(QObject, threading.Thread):
         data_source = telem_data.get("src", None)
         if data_source == "MSFS2020":
             module = aircrafts_msfs
+        elif data_source == "IL2":
+            module = aircrafts_il2
         else:
             module = aircrafts_dcs
 
@@ -422,11 +426,12 @@ class TelemManager(QObject, threading.Thread):
                     self.process_data(data)
 
 class NetworkThread(threading.Thread):
-    def __init__(self, telemetry : TelemManager, host = "", port = 34380):
+    def __init__(self, telemetry : TelemManager, host = "", port = 34380, telem_parser = None):
         super().__init__()
         self._run = True
         self._port = port
         self._telem = telemetry
+        self._telem_parser = telem_parser
 
     def run(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
@@ -440,6 +445,9 @@ class NetworkThread(threading.Thread):
         while self._run:
             try:
                 data, sender = s.recvfrom(4096)
+                if self._telem_parser is not None:
+                    data = self._telem_parser.process_packet(data)
+
                 self._telem.submitFrame(data)
             except ConnectionResetError:
                 continue
@@ -525,11 +533,16 @@ class MainWindow(QMainWindow):
         layout.addLayout(cfg_layout)
 
         cfg = get_config()
-        dcs_enabled = 'Yes'
-        msfs_enabled = 'No'
-        if args.sim == "MSFS" or cfg["system"].get("msfs_enabled") == "1":
-            msfs_enabled = 'Yes'
-        simlabel = QLabel(f"Sims Enabled: DCS: {dcs_enabled} | MSFS: {msfs_enabled}")
+        dcs_enabled = utils.sanitize_dict(cfg["system"]).get("dcs_enabled", False)
+        msfs_enabled = utils.sanitize_dict(cfg["system"]).get("msfs_enabled", False)
+        il2_enabled = utils.sanitize_dict(cfg["system"]).get("il2_enabled", False)
+        if args.sim == "DCS" or dcs_enabled:
+            dcs_enabled = 'True'
+        if args.sim == "MSFS" or msfs_enabled:
+            msfs_enabled = 'True'
+        if args.sim == "IL2" or il2_enabled:
+            il2_enabled = 'True'
+        simlabel = QLabel(f"Sims Enabled: DCS: {dcs_enabled} | MSFS: {msfs_enabled} | IL2: {il2_enabled}")
         simlabel.setToolTip("Enable/Disable Sims in config file or use '-s DCS|MSFS' argument to specify")
         layout.addWidget(simlabel)
         # Add a label and telemetry data label
@@ -773,7 +786,20 @@ def main():
     telem_manager.telemetryReceived.connect(window.update_telemetry)
 
     dcs = NetworkThread(telem_manager, host="", port=34380)
-    dcs.start()
+    dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
+
+    if dcs_enabled or args.sim == "DCS":
+        logging.info("Starting DCS Telemetry Listener")
+        dcs.start()
+
+    il2_mgr = IL2Manager()
+    il2 = NetworkThread(telem_manager, host="", port=34385, telem_parser=il2_mgr)
+
+    il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
+
+    if il2_enabled or args.sim == "IL2":
+        logging.info("Starting IL2 Telemetry Listener")
+        il2.start()
 
     sim_connect = SimConnectSock(telem_manager)
     try:
@@ -788,6 +814,7 @@ def main():
     app.exec_()
 
     dcs.quit()
+    il2.quit()
     sim_connect.quit()
     telem_manager.quit()
 
