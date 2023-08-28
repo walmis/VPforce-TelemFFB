@@ -793,7 +793,8 @@ def main():
         dcs.start()
 
     il2_mgr = IL2Manager()
-    il2 = NetworkThread(telem_manager, host="", port=34385, telem_parser=il2_mgr)
+    il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
+    il2 = NetworkThread(telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
 
     il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
 
