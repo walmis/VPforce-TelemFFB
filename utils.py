@@ -67,7 +67,9 @@ class EffectTranslator:
             "canopymovement" : "Canopy Motion",
             "crit_aoa" : "AoA Reduction Force",
             "cm" : "Countermeasure Deployment",
+            "damage" : "Aircraft Damage Event",
             "decel" : "Decelration Force",
+            "elev_droop": "Elevator Droop",
             "etlY" : "ETL Shaking",
             "etlX" : "ETL Shaking",
             "flapsmovement" : "Flap Motion",
@@ -77,10 +79,12 @@ class EffectTranslator:
             "gearmovement2" : "Gear Motion",
             "gforce" : "G-Force Loading",
             "gunfire" : "Gunfire Rumble",
+            "hit" : "Aircraft Hit Event",
             "je_rumble_1_1" : "Jet Engine Rumble",
             "je_rumble_1_2" : "Jet Engine Rumble",
             "je_rumble_2_1" : "Jet Engine Rumble",
             "je_rumble_2_2" : "Jet Engine Rumble",
+            "il2_buffet": "Buffeting",
             "nw_shimmy" : "Nosewheel Shimmy",
             "payload_rel" :"Payload Release",
             "pedal_spring" : "Pedal Spring",
@@ -277,13 +281,13 @@ def to_number(v : str):
     try:
         # handle boolean strings -> bool return
         lower = v.lower()
-        if lower in ["true", "yes"]:
+        if lower in ["true", "yes", "on", "enable"]:
             return True
-        if lower in ["false", "no"]:
+        if lower in ["false", "no", "off", "disable"]:
             return False 
 
         scale = 1
-        if v.endswith("%"): # handle percent strings
+        if v.endswith("%") or v.startswith("%"): # handle percent strings
             scale = 0.01
             v = v.strip("%")
         if v.endswith("kt"): # handle unit conversion: kt->ms
