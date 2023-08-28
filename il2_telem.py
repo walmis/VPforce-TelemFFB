@@ -67,19 +67,27 @@ class BinaryDataReader:
     def remaining(self):
         return len(self.buffer) - self.pointer
 
-    def _read(self, format_str, size):
+    def _read(self, format_str, size, peek=False):
         if self.pointer + size > len(self.buffer):
             raise ValueError("Not enough data to read")
         endian = "<" if self.endian == "little" else ">"
         value = struct.unpack_from(endian + format_str, self.buffer, self.pointer)[0]
-        self.pointer += size
-        return value
+        if peek:
+            # don't advance pointer, just return data for analysis
+            return value
+        else:
+            self.pointer += size
+            return value
     
     # return slice of remaining data
-    def get_data(self, length):
+    def get_data(self, length, peek=False):
         data = self.buffer[self.pointer:self.pointer+length]
-        self.pointer += length
-        return data
+        if peek:
+            # don't advance pointer, just return data for analysis
+            return data
+        else:
+            self.pointer += length
+            return data
 
 
     def get_uint32(self):
@@ -153,8 +161,8 @@ class StateDataStructure:
     val2: list[float] = []
     val3: float = 0.0
     landing_gear_count: int = 0
-    landing_gear_position: list[float] = []
-    landing_gear_pressure: list[float] = []
+    landing_gear_position: list[float] = [1,1,1]
+    landing_gear_pressure: list[float] = [0,0,0]
     indicated_air_speed_metres_second: float = 0.0
     val7: float = 0.0
     acceleration: list[float] = [0,0,0]
@@ -238,10 +246,18 @@ class IL2Manager():
 
         # self.telem_data['Manifold'] = list(self.state.intake_manifold_pressure_pa)
         self.telem_data['GearPos'] = list(self.state.landing_gear_position)
+
+        try:
+            ## Reorder gear to match DCS for function re-use
+            update_gear_indices = [0, 2, 1]
+            self.state.landing_gear_pressure = [self.state.landing_gear_pressure[i] for i in update_gear_indices]
+        except: pass
+
+        self.telem_data['T'] = self.state.tick
         self.telem_data['WeightOnWheels'] = list(self.state.landing_gear_pressure)
         self.telem_data['ACCs'] = self.state.acceleration_Gs
-        self.telem_data['StallBuffetFrequency'] = self.state.stall_buffet_frequency
-        self.telem_data['StallBuffetAmplitude'] = self.state.stall_buffet_amplitude
+        self.telem_data['BuffetFrequency'] = self.state.stall_buffet_frequency
+        self.telem_data['BuffetAmplitude'] = self.state.stall_buffet_amplitude
         self.telem_data['Flaps'] = self.state.flaps_position
         self.telem_data['Speedbrakes'] = self.state.air_brake_position
         self.telem_data["GunData"] = self.gun_data
