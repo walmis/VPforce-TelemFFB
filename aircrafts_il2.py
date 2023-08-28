@@ -120,6 +120,7 @@ class Aircraft(AircraftBase):
         #clear any existing effects
         for e in effects.values(): e.destroy()
         effects.clear()
+        self._focus_last_value = 1
 
         # self.spring = HapticEffect().spring()
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
@@ -178,6 +179,14 @@ class Aircraft(AircraftBase):
             effects["damage"].periodic(damage_freq, damage_amp, utils.RandomDirectionModulator, effect_type=EFFECT_SQUARE, duration=30).start()
         elif not self.anything_has_changed("damage", damage, delta_ms=120):
             effects.dispose("damage")
+    def _update_focus_loss(self, telem_data):
+        focus = telem_data.get("Focus")
+        if focus != self._focus_last_value:
+            logging.info("IL-2 Window focus changed, resetting effects")
+            effects.clear()
+            self._focus_last_value = focus
+        else:
+            self._focus_last_value = focus
 
     def on_telemetry(self, telem_data : dict):
         ## Generic Aircraft Telemetry Handler
@@ -192,6 +201,7 @@ class Aircraft(AircraftBase):
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
+        self._update_focus_loss(telem_data)
         if self.deceleration_effect_enable:
             self._decel_effect(telem_data)
         if self.damage_event_intensity > 0:
@@ -222,8 +232,6 @@ class Aircraft(AircraftBase):
 
     def on_timeout(self):
         super().on_timeout()
-        self._engine_rumble_is_playing = 0
-        self.gun_is_firing = 0
 
                    
 
@@ -245,7 +253,7 @@ class PropellerAircraft(Aircraft):
 
         super().on_telemetry(telem_data)
 
-        if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
+        if self.engine_rumble: # if _engine_rumble_is_playing is true, check if we need to stop it
             self._update_engine_rumble(telem_data.get("RPM", 0.0))
         if self.is_joystick():
             self.override_elevator_droop(telem_data)

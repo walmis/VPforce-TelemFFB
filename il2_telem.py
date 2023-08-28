@@ -19,6 +19,8 @@ import struct
 from enum import IntEnum
 from dataclasses import dataclass
 import utils
+import pygetwindow as get_focus_window
+
 
 knots = 0.514444
 kmh = 1.0 / 3.6
@@ -300,6 +302,16 @@ class IL2Manager():
     def decode_telem(self, data: BinaryDataReader):
         packet_size = data.get_uint16()
         tick = data.get_uint32()
+
+        # print(f"ACTIVE WINDOW: {get_focus_window.getActiveWindow().title}")
+        try:
+            focus_window = get_focus_window.getActiveWindow().title
+        except:
+            focus_window = "unknown"
+        if "Il-2" in focus_window:
+            self.telem_data["Focus"] = 1
+        else:
+            self.telem_data["Focus"] = 0
 
         if packet_size == 12:
             self.telem_data["SimPaused"] = 1
