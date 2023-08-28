@@ -167,14 +167,7 @@ class Aircraft(AircraftBase):
         
         self._socket.sendto(bytes(cmds, "utf-8"), ("127.0.0.1", 34381))
 
-    def override_elevator_droop(self, telem_data):
 
-        if telem_data['TAS'] < 20*knots:
-            force = utils.scale_clamp(telem_data['TAS'], (20*knots, 0),(0, self.elevator_droop_force))
-            effects['elev_droop'].constant(force, 180).start()
-            logging.debug(f"override elevator:{force}")
-        else:
-            effects.dispose('elev_droop')
 
     def override_pedal_spring(self, telem_data):
 
