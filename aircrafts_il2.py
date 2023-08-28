@@ -23,19 +23,22 @@ from ffb_rhino import HapticEffect, FFBReport_SetCondition
 import utils
 import logging
 import random
-from aircraft_base import AircraftBase
+from aircraft_base import AircraftBase, effects
 import json
 import socket
-#Fixme: Weird things happen when IL2 loses window focus.  It stops all effects (including native effects)
-#       TelemFFB effects do not restart upon IL2 re-gaining focus (TelemFFB doesn't see a timeout event)
+
 #unit conversions (to m/s)
 knots = 0.514444
 kmh = 1.0/3.6
 deg = math.pi/180
-
+EFFECT_SQUARE = 3
+EFFECT_SINE = 4
+EFFECT_TRIANGLE = 5
+EFFECT_SAWTOOTHUP = 6
+EFFECT_SAWTOOTHDOWN = 7
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
-effects : Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
+# effects : Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
 
 # Highpass filter dispenser
 HPFs : Dict[str, utils.HighPassFilter]  = utils.Dispenser(utils.HighPassFilter)
@@ -43,7 +46,7 @@ HPFs : Dict[str, utils.HighPassFilter]  = utils.Dispenser(utils.HighPassFilter)
 # Lowpass filter dispenser
 LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 
-dbg_en = 1
+dbg_en = 0
 dbg_lvl = 2
 def dbg(level, *args, **kwargs):
     if dbg_en and level >= dbg_lvl:
@@ -78,15 +81,14 @@ class Aircraft(AircraftBase):
     spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
     
     gear_motion_intensity : float = 0.12      # peak vibration intensity when gear is moving, 0 to disable
-    gear_buffet_intensity : float = 0.15      # peak buffeting intensity when gear down during flight,  0 to disable
+    # gear_buffet_intensity : float = 0.15      # peak buffeting intensity when gear down during flight,  0 to disable
     
     flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable
-    flaps_buffet_intensity : float = 0.0      # peak buffeting intensity when flaps are deployed,  0 to disable
+    # flaps_buffet_intensity : float = 0.0      # peak buffeting intensity when flaps are deployed,  0 to disable
     
-    canopy_motion_intensity : float = 0.12      # peak vibration intensity when canopy is moving, 0 to disable
-    canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
+    # canopy_motion_intensity : float = 0.12      # peak vibration intensity when canopy is moving, 0 to disable
+    # canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
 
-    afterburner_effect_intensity = 0.2      # peak intensity for afterburner rumble effect
     jet_engine_rumble_intensity = 0.12      # peak intensity for jet engine rumble effect
     jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
@@ -100,26 +102,21 @@ class Aircraft(AircraftBase):
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
 
-    ###
-    ### AoA reduction force effect
-    ###
-    aoa_reduction_effect_enabled = 0
-    aoa_reduction_max_force = 0.0
-    critical_aoa_start = 22
-    critical_aoa_max = 25
-
-    trim_workaround = False
     gun_is_firing = 0
-
+    damage_event_intensity: float = 0
+    il2_shake_master = 0
     il2_enable_weapons = 0
-    il2_enable_runway = 0
-    il2_enable_aoa = 0
+    il2_enable_runway_rumble = 0  # not yet implemented
+    il2_enable_buffet = 0  # not yet impelemnted
+    il2_buffeting_factor: float  = 1.0
+
 
     ####
     ####
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
-
+        self.gun_is_firing = 0
+        self._engine_rumble_is_playing = 0
         #clear any existing effects
         for e in effects.values(): e.destroy()
         effects.clear()
@@ -128,30 +125,59 @@ class Aircraft(AircraftBase):
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         # self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
     def _update_cm_weapons(self, telem):
+        ## IL2 does not deliver telemetry in the same way as DCS.  As a result, modified/different effects logic is required
         canon_rof = 600
         canon_hz = canon_rof/60
-        ## IL2 does not deliver telemetry in the same way as DCS.  As a result, modified/different effects logic is required
         bombs = telem.get("Bombs")
         gun = telem.get("Gun")
         rockets = telem.get("Rockets")
-        #Fixme - Figure out why effects created at the effect module level do not show up in the effect monitor
         if self.anything_has_changed("Bombs", bombs):
-            effects["bombs"].periodic(10, self.weapon_release_intensity, 0,effect_type=6, duration=80).start(force=True)
+            effects["bombs"].periodic(10, self.weapon_release_intensity, 0,effect_type=EFFECT_SAWTOOTHUP, duration=80).start(force=True)
         elif not self.anything_has_changed("Bombs", bombs, delta_ms=160):
             effects["bombs"].stop()
 
         if self.anything_has_changed("Gun", gun) and not self.gun_is_firing:
-            effects["gunfire"].periodic(canon_hz, self.gun_vibration_intensity, 0).start()
+            effects["gunfire"].periodic(canon_hz, self.weapon_release_intensity, 0).start(force=True)
             self.gun_is_firing = 1
             logging.info(f"Gunfire={self.weapon_release_intensity}")
         elif not self.anything_has_changed("Gun", gun, delta_ms=100):
-            effects["gunfire"].stop()
+            # effects["gunfire"].stop()
+            effects.dispose("gunfire")
             self.gun_is_firing = 0
 
         if self.anything_has_changed("Rockets", rockets):
-            effects["rockets"].periodic(50, self.cm_vibration_intensity, 0, effect_type=3, duration=80).start(force=True)
+            effects["rockets"].periodic(50, self.weapon_release_intensity, 0, effect_type=EFFECT_SQUARE, duration=80).start(force=True)
         if not self.anything_has_changed("Rockets", rockets, delta_ms=160):
             effects["rockets"].stop()
+    def _update_runway_rumble(self, telem_data):
+        if telem_data.get("TAS") > 1.0 and telem_data.get("AGL") < 10.0 and utils.average(telem_data.get("GearPos")) == 1:
+            super()._update_runway_rumble(telem_data)
+        else:
+            effects.dispose("runway0")
+            effects.dispose("runway1")
+    def _update_buffeting(self, telem_data: dict):
+        freq = telem_data.get("BuffetFrequency", 0)
+        amp = utils.clamp(telem_data.get("BuffetAmplitude", 0) * self.il2_buffeting_factor, 0.0, 1.0)
+        if amp:
+            effects["il2_buffet"].periodic(freq, amp, 0, effect_type=EFFECT_SINE).start()
+        else:
+            effects.dispose("il2_buffet")
+    def _update_damage(self, telem_data):
+        hit = telem_data.get("Hits")
+        damage = telem_data.get("Damage")
+        hit_freq = 5
+        hit_amp = utils.clamp(self.damage_event_intensity, 0.0, 1.0)
+        damage_freq = 10
+        damage_amp = utils.clamp(self.damage_event_intensity, 0.0, 1.0)
+
+        if self.anything_has_changed("hit", hit):
+            effects["hit"].periodic(hit_freq, hit_amp, utils.RandomDirectionModulator,effect_type=EFFECT_SQUARE, duration=30).start()
+        elif not self.anything_has_changed("hit", hit, delta_ms=120):
+            effects.dispose("hit")
+        if self.anything_has_changed("damage", damage):
+            effects["damage"].periodic(damage_freq, damage_amp, utils.RandomDirectionModulator, effect_type=EFFECT_SQUARE, duration=30).start()
+        elif not self.anything_has_changed("damage", damage, delta_ms=120):
+            effects.dispose("damage")
 
     def on_telemetry(self, telem_data : dict):
         ## Generic Aircraft Telemetry Handler
@@ -166,25 +192,27 @@ class Aircraft(AircraftBase):
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
-        # if self.deceleration_effect_enable and self.deceleration_effect_enable_areyoureallysure:
-        #     self._decel_effect(telem_data)
-        # self._update_buffeting(telem_data)
-        # self._update_runway_rumble(telem_data)
-        if self.il2_enable_weapons:
-            self._update_cm_weapons(telem_data)
-        # if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
-        #     self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
-        # if self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0:
-        #     self._update_landing_gear(telem_data.get("gear_value"), telem_data.get("TAS"))
-        # if self.flaps_motion_intensity > 0:
-        #     self._update_flaps(telem_data.get("Flaps"))
-        # if self.canopy_motion_intensity > 0:
-        #     self._update_canopy(telem_data.get("Canopy"))
+        if self.deceleration_effect_enable:
+            self._decel_effect(telem_data)
+        if self.damage_event_intensity > 0:
+            self._update_damage(telem_data)
+        if self.il2_shake_master:
+            if self.il2_enable_buffet:
+                self._update_buffeting(telem_data)
+            if self.runway_rumble_intensity > 0 and self.il2_enable_runway_rumble:
+                self._update_runway_rumble(telem_data)
+            if self.il2_enable_weapons:
+                self._update_cm_weapons(telem_data)
+        if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
+            self._update_speed_brakes(telem_data.get("Speedbrakes"), telem_data.get("TAS"))
+        if self.gear_motion_intensity > 0:
+            self._update_landing_gear(telem_data.get("GearPos"), 0)
+        if self.flaps_motion_intensity > 0:
+            self._update_flaps(telem_data.get("Flaps"))
+
         # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
         #     self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
-        #
-        # if self.is_joystick():
-        #     self._update_stick_position(telem_data)
+
 
 
     def on_event(self, event, *args):
@@ -194,6 +222,8 @@ class Aircraft(AircraftBase):
 
     def on_timeout(self):
         super().on_timeout()
+        self._engine_rumble_is_playing = 0
+        self.gun_is_firing = 0
 
                    
 
@@ -217,9 +247,8 @@ class PropellerAircraft(Aircraft):
 
         if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
             self._update_engine_rumble(telem_data.get("RPM", 0.0))
-        # if self.wind_effect_enabled:
-        #     self._update_wind_effect(telem_data)
-        # self._update_aoa_effect(telem_data)
+        if self.is_joystick():
+            self.override_elevator_droop(telem_data)
         if self.gforce_effect_enable:
             self._gforce_effect(telem_data)
 
@@ -232,23 +261,7 @@ class JetAircraft(Aircraft):
     _ab_is_playing = 0
     _jet_rumble_is_playing = 0
 
-    # def _update_jet_engine_rumble(self, telem_data):
-    #     rpm = telem_data.get("RPM")
-    #     max_rpm = telem_data.get("MaxRPM")
-    #     if isinstance(rpm, list):
-    #         rpm = max(rpm)
-    #     if isinstance(max_rpm, list):
-    #         max_rpm = max(max_rpm)
-    #     if not rpm > 0.0:
-    #         return
-    #     rpm_pct = (rpm / max_rpm) * 100
-    #     print(f"JET RUMBLE pct={rpm_pct}")
-    #
-    #     eng_rpm = {"EngRPM": [rpm_pct, 0]}
-    #     super()._update_jet_engine_rumble(eng_rpm)
-
-
-    # run on every telemetry frame
+      # run on every telemetry frame
     def on_telemetry(self, telem_data):
         ## Jet Aircraft Telemetry Handler
         if telem_data.get("N")== None:
@@ -256,14 +269,12 @@ class JetAircraft(Aircraft):
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
-        # if self.afterburner_effect_intensity > 0:
-        #     self._update_ab_effect(telem_data)
-        if Aircraft.jet_engine_rumble_intensity > 0:
+
+        if self.jet_engine_rumble_intensity > 0 and self.engine_rumble:
             self._update_jet_engine_rumble(telem_data)
-        # if self.aoa_reduction_effect_enabled:
-        #     self._aoa_reduction_force_effect(telem_data)
-        # if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
-        #     super()._gforce_effect(telem_data)
+
+        if self.gforce_effect_enable:
+            self._gforce_effect(telem_data)
 
 
 
