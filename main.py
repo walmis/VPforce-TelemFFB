@@ -794,11 +794,14 @@ def main():
 
     il2_mgr = IL2Manager()
     il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
+    il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
     il2 = NetworkThread(telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
 
     il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
 
     if il2_enabled or args.sim == "IL2":
+
+        utils.analyze_il2_config(il2_path, port=il2_port)
         logging.info("Starting IL2 Telemetry Listener")
         il2.start()
 
