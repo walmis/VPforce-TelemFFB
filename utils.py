@@ -304,6 +304,8 @@ def to_number(v : str):
             v = v.strip("mph")
         if v.endswith("deg"): # just strip out degrees suffix
             v = v.strip("deg")
+        if v.endswith("ms"): # strip out milliseconds suffix
+            v = v.strip("ms")
 
         if "." in v:
             return float(v) * scale

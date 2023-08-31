@@ -252,6 +252,7 @@ class TelemManager(QObject, threading.Thread):
         self._dropped_frames = 0
         self.lastFrameTime = time.perf_counter()
         self.frameTimes = []
+        self.timeout = 0.2
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
         config = get_config()
@@ -409,10 +410,13 @@ class TelemManager(QObject, threading.Thread):
 
     @prints_exc
     def run(self):
+        global _config
+        self.timeout = utils.sanitize_dict(_config["system"]).get("telemetry_timeout", 200)/1000
+        logging.info(f"Telemetry timeout: {self.timeout}")
         while self._run:
             with self._cond:
                 if not len(self._events) and not self._data:
-                    if not self._cond.wait(0.2): 
+                    if not self._cond.wait(self.timeout):
                         self.on_timeout()
                         continue
 
