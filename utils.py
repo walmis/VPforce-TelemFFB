@@ -67,6 +67,7 @@ class EffectTranslator:
             "crit_aoa" : "AoA Reduction Force",
             "cm" : "Countermeasure Deployment",
             "decel" : "Decelration Force",
+            "elev_droop" : "Elevator Droop",
             "etlY" : "ETL Shaking",
             "etlX" : "ETL Shaking",
             "flapsmovement" : "Flap Motion",
@@ -80,6 +81,7 @@ class EffectTranslator:
             "je_rumble_1_2" : "Jet Engine Rumble",
             "je_rumble_2_1" : "Jet Engine Rumble",
             "je_rumble_2_2" : "Jet Engine Rumble",
+            "inertia" : "Inertia",
             "nw_shimmy" : "Nosewheel Shimmy",
             "payload_rel" :"Payload Release",
             "pedal_spring" : "Pedal Spring",
@@ -104,7 +106,7 @@ class EffectTranslator:
         }
 
     def get_translation(self, key):
-        return self.effect_dict.get(key, "no_lookup")
+        return self.effect_dict.get(key, f"No Lookup: {key}")
 class Destroyable:
     def destroy():
         raise NotImplementedError
