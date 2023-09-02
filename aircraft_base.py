@@ -706,7 +706,7 @@ class AircraftBase(object):
             logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
             return
         if blade_ct is None:
-            if "UH=1H" in mod:
+            if "UH-1H" in mod:
                 blade_ct = 2
             elif "KA-50" in mod:
                 blade_ct = 3
@@ -767,7 +767,7 @@ class AircraftBase(object):
             return
 
         if blade_ct is None:
-            if "UH=1H" in mod:
+            if "UH-1H" in mod:
                 blade_ct = 2
             elif "KA-50" in mod:
                 blade_ct = 2
