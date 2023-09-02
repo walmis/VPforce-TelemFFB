@@ -168,6 +168,10 @@ class AircraftBase(object):
         if sum(telem_data.get("WeightOnWheels")):
             effects.dispose("gforce")
             return
+        if not telem_data.get("TAS", 0):
+            effects.dispose("gforce")
+            return
+
         # gforce_effect_enable = 1
         gneg = -1.0
         gmin = self.gforce_min_gs
@@ -199,6 +203,12 @@ class AircraftBase(object):
     def _aoa_reduction_force_effect(self, telem_data):
         if not self.is_joystick():
             return
+        if sum(telem_data.get("WeightOnWheels")):
+            effects.dispose("crit_aoa")
+            return
+        if not telem_data.get("TAS", 0):
+            effects.dispose("crit_aoa")
+            return
         start_aoa = self.critical_aoa_start
         end_aoa = self.critical_aoa_max
         aoa = telem_data.get("AoA", 0)
@@ -224,6 +234,10 @@ class AircraftBase(object):
         if not self.anything_has_changed("decel", y_gs):
             return
         if not sum(telem_data.get("WeightOnWheels")):
+            effects.dispose("decel")
+            return
+        if not telem_data.get("TAS", 0):
+            effects.dispose("decel")
             return
         avg_y_gs = self.smoother.get_average("y_gs", y_gs, window_size=8)
         max_gs = self.deceleration_max_force
