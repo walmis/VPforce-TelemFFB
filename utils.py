@@ -88,6 +88,7 @@ class EffectTranslator:
             "je_rumble_2_1" : "Jet Engine Rumble",
             "je_rumble_2_2" : "Jet Engine Rumble",
             "il2_buffet": "Buffeting",
+            "inertia" : "Inertia",
             "nw_shimmy" : "Nosewheel Shimmy",
             "payload_rel" :"Payload Release",
             "pedal_spring" : "Pedal Spring",
@@ -113,7 +114,7 @@ class EffectTranslator:
         }
 
     def get_translation(self, key):
-        return self.effect_dict.get(key, "no_lookup")
+        return self.effect_dict.get(key, f"No Lookup: {key}")
 class Destroyable:
     def destroy():
         raise NotImplementedError

@@ -175,6 +175,10 @@ class AircraftBase(object):
         if sum(telem_data.get("WeightOnWheels")):
             effects.dispose("gforce")
             return
+        if not telem_data.get("TAS", 0):
+            effects.dispose("gforce")
+            return
+
         # gforce_effect_enable = 1
         gneg = -1.0
         gmin = self.gforce_min_gs
@@ -206,6 +210,12 @@ class AircraftBase(object):
     def _aoa_reduction_force_effect(self, telem_data):
         if not self.is_joystick():
             return
+        if sum(telem_data.get("WeightOnWheels")):
+            effects.dispose("crit_aoa")
+            return
+        if not telem_data.get("TAS", 0):
+            effects.dispose("crit_aoa")
+            return
         start_aoa = self.critical_aoa_start
         end_aoa = self.critical_aoa_max
         aoa = telem_data.get("AoA", 0)
@@ -231,6 +241,10 @@ class AircraftBase(object):
         if not self.anything_has_changed("decel", y_gs):
             return
         if not sum(telem_data.get("WeightOnWheels")):
+            effects.dispose("decel")
+            return
+        if not telem_data.get("TAS", 0):
+            effects.dispose("decel")
             return
         avg_y_gs = self.smoother.get_average("y_gs", y_gs, window_size=8)
         max_gs = self.deceleration_max_force
@@ -530,7 +544,7 @@ class AircraftBase(object):
 
     def _update_engine_rumble(self, rpm):
         if type(rpm) == list:
-            rpm = rpm[0]
+            rpm = max(rpm)
 
         frequency = float(rpm) / 60
 
@@ -651,23 +665,27 @@ class AircraftBase(object):
         precision = 2
         effect_index = 4
         phase_offset = 120
-        try:
-            jet_eng_rpm = max(telem_data.get("EngRPM")[0], telem_data.get("EngRPM")[1])
-        except Exception as e:
-            logging.error(f"Error getting Engine RPM")
-            return
+        jet_eng_rpm = telem_data.get("EngRPM", 0)
+        if type(jet_eng_rpm) == list:
+            jet_eng_rpm = max(jet_eng_rpm)
+
+        # try:
+        #     jet_eng_rpm = max(telem_data.get("EngRPM")[0], telem_data.get("EngRPM")[1])
+        # except Exception as e:
+        #     logging.error(f"Error getting Engine RPM")
+        #     return
         ##
         ## Update oscillation modulation with new function that returns the amplitude of a sine wave
         ## at any point in time based on wave amplitude and period
         ## Leave legacy code in place in case nobody likes the new effect
-        legacy_mode = 0
-        if legacy_mode:
-            r1_modulation = utils.get_random_within_range("jetengine_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=1)
-            r2_modulation = utils.get_random_within_range("jetengine_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=2)
-        else:
-            r1_modulation = utils.sine_point_in_time(2, 30000)
-            r2_modulation = utils.sine_point_in_time(2, 22500, phase_offset_deg=0)
-        if self.engine_rumble and (self.anything_has_changed("EngRPM", jet_eng_rpm) or self.anything_has_changed("JetEngineModul", r1_modulation)):
+        # legacy_mode = 0
+        # if legacy_mode:
+        #     r1_modulation = utils.get_random_within_range("jetengine_1", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=1)
+        #     r2_modulation = utils.get_random_within_range("jetengine_2", median_modulation, median_modulation - modulation_neg, median_modulation + modulation_pos, precision, time_period=2)
+        # else:
+        r1_modulation = utils.sine_point_in_time(2, 30000)
+        r2_modulation = utils.sine_point_in_time(2, 22500, phase_offset_deg=0)
+        if self.engine_rumble and jet_eng_rpm > 0:
             intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
             rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
             rt_freq2 = round(rt_freq + median_modulation, 4)
@@ -704,7 +722,7 @@ class AircraftBase(object):
             logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
             return
         if blade_ct is None:
-            if "UH=1H" in mod:
+            if "UH-1H" in mod:
                 blade_ct = 2
             elif "KA-50" in mod:
                 blade_ct = 3
@@ -755,13 +773,17 @@ class AircraftBase(object):
         rrpm = telem_data.get("RotorRPM")
         mod = telem_data.get("N")
         tas = telem_data.get("TAS", 0)
+        eng_rpm = telem_data.get("EngRPM", 0)
+        if type(eng_rpm) == list:
+            eng_rpm = max(eng_rpm)
+
         # rotor = telem_data.get("RotorRPM")
         if self._sim_is_msfs(telem_data) and rrpm < 10:
             #MSFS sends telemetry when aircraft is sitting in hangar with the rotor spinning very slowly....
             return
 
         if blade_ct is None:
-            if "UH=1H" in mod:
+            if "UH-1H" in mod:
                 blade_ct = 2
             elif "KA-50" in mod:
                 blade_ct = 2
@@ -784,7 +806,7 @@ class AircraftBase(object):
 
         median_modulation = 2
         frequency2 = frequency + median_modulation
-        if frequency > 0:
+        if frequency > 0 and eng_rpm > 0:
             logging.debug(f"Current Heli Engine Rumble Intensity = {self.heli_engine_rumble_intensity}")
             effects["rotor_rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
             effects["rotor_rpm1-1"].periodic(frequency2, self.heli_engine_rumble_intensity * .5, 90).start()  # vib on Y axis
