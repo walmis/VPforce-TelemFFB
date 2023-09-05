@@ -150,6 +150,7 @@ class EventType(IntEnum):
     Damage = 8
     GunFired = 9
     CurrentSeat = 11
+    MPServerInfo = 10
     Event13 = 13
     Event14 = 14
 
@@ -397,9 +398,16 @@ class IL2Manager():
         while data.remaining():
             eventType = data.get_uint16()
             eventBytes = data.get_uint8()
-            dbg(1,"-- event, type", EventType(eventType), "eventBytes", eventBytes)
-            dbg(1,hexdump(data.buffer[data.pointer:data.pointer+eventBytes]))
-
+            try:
+                event = EventType(eventType)
+            except:
+                logging.warning(f"Unknown Event Type: {eventType}")
+                event = 'Unknown'
+            dbg(0,"-- event, type", event, "eventBytes", eventBytes)
+            dbg(0,hexdump(data.buffer[data.pointer:data.pointer+eventBytes]))
+            if eventType == EventType.MPServerInfo:
+                logging.debug("MP Server info received")
+                return
             if eventType == EventType.VehicleName:
                 name_length = data.get_uint8()
                 name_data = data.get_data(name_length)
