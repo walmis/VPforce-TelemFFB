@@ -277,13 +277,13 @@ def to_number(v : str):
     try:
         # handle boolean strings -> bool return
         lower = v.lower()
-        if lower in ["true", "yes"]:
+        if lower in ["true", "yes", "on", "enable", "enabled"]:
             return True
-        if lower in ["false", "no"]:
-            return False 
+        if lower in ["false", "no", "off", "disable", "disabled"]:
+            return False
 
         scale = 1
-        if v.endswith("%"): # handle percent strings
+        if v.endswith("%") or v.startswith("%"):  # handle percent strings
             scale = 0.01
             v = v.strip("%")
         if v.endswith("kt"): # handle unit conversion: kt->ms
