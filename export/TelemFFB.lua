@@ -686,7 +686,16 @@ local f_telemFFB = {
               CanopyWarnLight,
               SPS
             )
-
+          elseif obj.Name == "MiG-19P" then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            local stickY = -MainPanel:get_argument_value(420)
+            local stickX = MainPanel:get_argument_value(421)
+            stringToSend =
+              string.format(
+              "StickX=%.3f;StickY=%.3f",
+              stickX,
+              stickY
+            )
 
           elseif obj.Name == "L-39C" or obj.Name == "L-39ZA" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
