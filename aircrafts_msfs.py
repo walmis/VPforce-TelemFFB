@@ -28,7 +28,7 @@ import utils
 from typing import List, Dict
 from utils import clamp, HighPassFilter, Derivative, Dispenser
 
-from ffb_rhino import HapticEffect, FFBReport_SetCondition
+from ffb_rhino import HapticEffect, FFBReport_SetCondition, FFBReport_Input
 from aircraft_base import AircraftBase, effects, HPFs, LPFs
 
 
@@ -119,6 +119,11 @@ class Aircraft(AircraftBase):
     nosewheel_shimmy_min_speed = 7
     nosewheel_shimmy_min_brakes = 0.6
 
+    force_trim_enabled = 0
+    cyclic_spring_gain = 1.0
+    force_trim_button = "not_configured"
+    force_trim_reset_button = "not_configured"
+
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
         # clear any existing effects
@@ -159,6 +164,10 @@ class Aircraft(AircraftBase):
         # scale the dynamic pressure to ffb friendly values
         self.dyn_pressure_scale = 0.005
         self.max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
+
+        self.cyclic_trim_release_active = 0
+        self.cyclic_spring_init = 0
+        self.cyclic_center = [0, 0]  # x, y
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
         freq = 8
@@ -390,6 +399,7 @@ class Aircraft(AircraftBase):
 
     def on_timeout(self):
         super().on_timeout()
+        self.cyclic_spring_init = 0
 
         self.const_force.stop()
         self.spring.stop()
@@ -479,11 +489,103 @@ class Helicopter(Aircraft):
     overspeed_shake_intensity = 0.2
     heli_engine_rumble_intensity = 0.12
 
+    def _update_cyclic(self, telem_data):
+        ffb_type = telem_data.get("FFBType", "joystick")
+        if ffb_type != "joystick":
+            return
+        if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
+            logging.warning("Force trim enabled but buttons not configured")
+            return
+        # self.cyclic_spring = effects["cyclic_spring"].spring()
+        input_data = HapticEffect.device.getInput()
+
+        force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
+        trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+        x, y = input_data.axisXY()
+        if force_trim_pressed:
+
+            self.spring_x.positiveCoefficient = 0
+            self.spring_x.negativeCoefficient = 0
+
+            self.spring_y.positiveCoefficient = 0
+            self.spring_y.negativeCoefficient = 0
+
+            offs_x = round(x * 4096)
+            self.spring_x.cpOffset = offs_x
+
+            offs_y = round(y * 4096)
+            self.spring_y.cpOffset = offs_y
+
+            self.spring.effect.setCondition(self.spring_x)
+            self.spring.effect.setCondition(self.spring_y)
+
+
+            self.cyclic_center = [x,y]
+
+            logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
+
+            self.cyclic_trim_release_active = 1
+
+        if not force_trim_pressed and self.cyclic_trim_release_active:
+
+            self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+
+            self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+
+            offs_x = round(x * 4096)
+            self.spring_x.cpOffset = offs_x
+
+            offs_y = round(y * 4096)
+            self.spring_y.cpOffset = offs_y
+
+            self.spring.effect.setCondition(self.spring_x)
+            self.spring.effect.setCondition(self.spring_y)
+
+            self.spring.start()
+            self.cyclic_center = [x,y]
+
+            logging.info(f"Force Trim Engaged :{offs_x}:{offs_y}")
+
+            self.cyclic_trim_release_active = 0
+
+        if trim_reset_pressed or not self.cyclic_spring_init:
+            if trim_reset_pressed:
+                self.cyclic_center = [0, 0]
+
+            self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+
+            self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+
+            cpO_x = round(self.cyclic_center[0]*4096)
+            cpO_y = round(self.cyclic_center[1]*4096)
+
+            self.spring_x.cpOffset = cpO_x
+            self.spring_y.cpOffset = cpO_y
+
+            self.spring.effect.setCondition(self.spring_x)
+            self.spring.effect.setCondition(self.spring_y)
+
+            self.spring.start()
+            self.cyclic_spring_init = 1
+            logging.info("Trim Reset Pressed")
+            return
+
+        telem_data["StickXY"] = [x, y]
+        telem_data["StickXY_offset"] = self.cyclic_center
+
+
+
     def on_telemetry(self, telem_data):
         self.speedbrake_motion_intensity = 0.0
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "Helicopter"  # inject aircraft class into telemetry
         super().on_telemetry(telem_data)
+        if self.force_trim_enabled:
+            self._update_cyclic(telem_data)
         self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
