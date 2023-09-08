@@ -28,7 +28,7 @@ deg = math.pi / 180
 fpss2gs = 1 / 32.17405
 mpss2gs = 1 / 9.81
 
-dbg_en = 1
+dbg_en = 0
 dbg_lvl = 0
 def dbg(level, *args, **kwargs):
     if dbg_en and level <= dbg_lvl:

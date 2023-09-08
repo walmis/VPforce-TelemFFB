@@ -103,7 +103,7 @@ class Aircraft(AircraftBase):
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
 
     gun_is_firing = 0
-    damage_event_intensity: float = 0
+    damage_effect_intensity: float = 0
     il2_shake_master = 0
     il2_enable_weapons = 0
     il2_enable_runway_rumble = 0  # not yet implemented
@@ -167,9 +167,9 @@ class Aircraft(AircraftBase):
         hit = telem_data.get("Hits")
         damage = telem_data.get("Damage")
         hit_freq = 5
-        hit_amp = utils.clamp(self.damage_event_intensity, 0.0, 1.0)
+        hit_amp = utils.clamp(self.damage_effect_intensity, 0.0, 1.0)
         damage_freq = 10
-        damage_amp = utils.clamp(self.damage_event_intensity, 0.0, 1.0)
+        damage_amp = utils.clamp(self.damage_effect_intensity, 0.0, 1.0)
 
         if self.anything_has_changed("hit", hit):
             effects["hit"].periodic(hit_freq, hit_amp, utils.RandomDirectionModulator,effect_type=EFFECT_SQUARE, duration=30).start()
@@ -204,7 +204,7 @@ class Aircraft(AircraftBase):
         self._update_focus_loss(telem_data)
         if self.deceleration_effect_enable:
             self._decel_effect(telem_data)
-        if self.damage_event_intensity > 0:
+        if self.damage_effect_intensity > 0:
             self._update_damage(telem_data)
         if self.il2_shake_master:
             if self.il2_enable_buffet:
