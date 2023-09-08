@@ -42,13 +42,15 @@ class AircraftBase(object):
     smoother = utils.Smoother()
 
     _engine_rumble_is_playing = 0
+    elevator_droop_force = 0
 
     def __init__(self, name: str, **kwargs):
         self._name = name
         self._changes = {}
         self._change_counter = {}
         self._telem_data = None
-        
+        _engine_rumble_is_playing = 0
+        gun_is_firing = 0
         #clear any existing effects
         effects.clear()
 
@@ -129,6 +131,11 @@ class AircraftBase(object):
             return 1
         else:
             return 0
+    def _sim_is(self, sim, telem_data):
+        if telem_data.get('src') == sim:
+            return 1
+        else:
+            return 0
 
     ########################################
     ######                            ######
@@ -156,8 +163,8 @@ class AircraftBase(object):
             if telem_data.get("T", 0) > 2:  # wait a bit for data to settle
                 if tot_weight:
                     logging.debug(f"Runway Rumble : v1 = {v1}. v2 = {v2}")
-                    effects["runway0"].constant(v1, 0).start()
-                    effects["runway1"].constant(v2, 90).start()
+                    effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
+                    effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
                 else:
                     effects.dispose("runway0")
                     effects.dispose("runway1")
@@ -179,9 +186,9 @@ class AircraftBase(object):
         direction = 180
         # if not gforce_effect_enable:
         #     return
-        if self._sim_is_dcs(telem_data):
+        if self._sim_is("DCS", telem_data) or self._sim_is("IL2", telem_data):
             gs: float = telem_data.get("ACCs")[1]
-        elif self._sim_is_msfs(telem_data):
+        elif self._sim_is("MSFS",telem_data):
             gs: float = telem_data.get("G")
 
         avg_z_gs = self.smoother.get_average("gs", gs, window_size=10)
@@ -227,9 +234,9 @@ class AircraftBase(object):
     def _decel_effect(self, telem_data):
         if not self.is_joystick():
             return
-        if self._sim_is_dcs(telem_data):
+        if self._sim_is("DCS", telem_data) or self._sim_is("IL2", telem_data):
             y_gs = telem_data.get("ACCs")[0]
-        elif self._sim_is_msfs(telem_data):
+        elif self._sim_is("MSFS", telem_data):
             y_gs = telem_data.get("G_BODY_Z")
         if not self.anything_has_changed("decel", y_gs):
             return
@@ -427,8 +434,8 @@ class AircraftBase(object):
         if tas > spd_thresh and spdbrk > .1:
             # calculate insensity based on deployment percentage
             realtime_intensity = self.speedbrake_buffet_intensity * spdbrk
-            effects["speedbrakebuffet"].periodic(13, realtime_intensity, 0, 4).start()
-            effects["speedbrakebuffet2"].periodic(13, realtime_intensity, 45, 4).start()
+            effects["speedbrakebuffet"].periodic(13, realtime_intensity, utils.RandomDirectionModulator).start()
+            # effects["speedbrakebuffet2"].periodic(13, realtime_intensity, 45, 4).start()
             logging.debug(f"PLAYING SPEEDBRAKE RUMBLE intensity:{realtime_intensity}")
         else:
             effects.dispose("speedbrakebuffet")
@@ -505,6 +512,15 @@ class AircraftBase(object):
     ######    Prop Aircraft Effects   ######
     ######                            ######
     ########################################
+
+    def override_elevator_droop(self, telem_data):
+
+        if telem_data['TAS'] < 20 * knots:
+            force = utils.scale_clamp(telem_data['TAS'], (20 * knots, 0), (0, self.elevator_droop_force))
+            effects['elev_droop'].constant(force, 180).start()
+            logging.debug(f"override elevator:{force}")
+        else:
+            effects.dispose('elev_droop')
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)

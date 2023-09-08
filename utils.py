@@ -18,6 +18,9 @@
 import math
 import os
 import random
+import re
+from collections import defaultdict
+
 import select
 from time import monotonic
 import logging
@@ -63,11 +66,13 @@ class EffectTranslator:
             "ab_rumble_2_2" : "Afterburner Rumble",
             "aoa" : "AoA Effect",
             "buffeting" : "AoA\\Stall Buffeting",
+            "bombs": "Bomb Release",
             "canopymovement" : "Canopy Motion",
             "crit_aoa" : "AoA Reduction Force",
             "cm" : "Countermeasure Deployment",
+            "damage" : "Aircraft Damage Event",
             "decel" : "Decelration Force",
-            "elev_droop" : "Elevator Droop",
+            "elev_droop": "Elevator Droop",
             "etlY" : "ETL Shaking",
             "etlX" : "ETL Shaking",
             "flapsmovement" : "Flap Motion",
@@ -77,10 +82,12 @@ class EffectTranslator:
             "gearmovement2" : "Gear Motion",
             "gforce" : "G-Force Loading",
             "gunfire" : "Gunfire Rumble",
+            "hit" : "Aircraft Hit Event",
             "je_rumble_1_1" : "Jet Engine Rumble",
             "je_rumble_1_2" : "Jet Engine Rumble",
             "je_rumble_2_1" : "Jet Engine Rumble",
             "je_rumble_2_2" : "Jet Engine Rumble",
+            "il2_buffet": "Buffeting",
             "inertia" : "Inertia",
             "nw_shimmy" : "Nosewheel Shimmy",
             "payload_rel" :"Payload Release",
@@ -89,6 +96,7 @@ class EffectTranslator:
             "prop_rpm0-2" : "Propeller Engine Rumble",
             "prop_rpm1-1" : "Propeller Engine Rumble",
             "prop_rpm1-2" : "Propeller Engine Rumble",
+            "rockets" : "Rocket Fire",
             "rotor_rpm0-1" : "Rotor RPM\\Engine Rumble",
             "rotor_rpm1-1" : "Rotor RPM\\Engine Rumble",
             "runway0" : "Runway Rumlble",
@@ -283,7 +291,7 @@ def to_number(v : str):
             return False
 
         scale = 1
-        if v.endswith("%") or v.startswith("%"):  # handle percent strings
+        if v.endswith("%") or v.startswith("%"): # handle percent strings
             scale = 0.01
             v = v.strip("%")
         if v.endswith("kt"): # handle unit conversion: kt->ms
@@ -654,6 +662,121 @@ def to_body_vector(yaw, pitch, roll, world_coordinates):
 
 
 from PyQt5.QtWidgets import QMessageBox
+
+
+def analyze_il2_config(path, port=34385):
+
+    config_data = defaultdict(dict)
+    file_path = os.path.join(path, "data\\startup.cfg")
+    if not os.path.exists(file_path):
+        QMessageBox.warning(None, "TelemFFB IL-2 Config Check", f"Unable to find Il-2 configuration file at: {path}\n\nPlease verify the installed path and update the TelemFFB configuration file")
+        return
+    current_section = None
+    telemetry_reference = {
+        'addr': '127.255.255.255',
+        'decimation': '1',
+        'enable': 'true',
+        'port': f'{port}'
+    }
+    motion_reference = {
+        'addr': '127.255.255.255',
+        'decimation': '1',
+        'enable': 'true',
+        'port': f'{port}'
+    }
+    telem_config = None
+    motion_config = None
+    with open(file_path, 'r') as config_file:
+        lines = config_file.readlines()
+
+    for line in lines:
+        if '[KEY =' in line:
+            match = re.search(r'\[KEY = (\w+)\]', line)
+            if match:
+                current_section = match.group(1)
+                continue
+        elif '[END]' in line:
+            current_section = None
+            continue
+        elif current_section and '=' in line:
+            key, value = map(str.strip, line.split('=', 1))
+            config_data[current_section][key] = value
+    telem_match = 0
+    telem_exists = 0
+    if "telemetrydevice" in config_data:
+        telem_match = 1
+        telem_exists = 1
+        telem_config = config_data["telemetrydevice"]
+        for k, v in telemetry_reference.items():
+            d_v = telem_config[k]
+            d_v = d_v.strip("\'\"")
+            if d_v != v:
+                telem_match = 0
+    motion_match = 0
+    motion_exists = 0
+    if "motiondevice" in config_data:
+        motion_match = 1
+        motion_exists = 1
+        motion_config = config_data["motiondevice"]
+        for k, v in motion_reference.items():
+            d_v = motion_config[k]
+            d_v = d_v.strip("\'\"")
+            if d_v != v:
+                motion_match = 0
+
+    if telem_match and motion_match:
+        return
+    else:
+        telem_message = QMessageBox()
+        telem_message.setIcon(QMessageBox.Question)
+        telem_message.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        telem_message.setWindowTitle("TelemFFB IL-2 Config")
+        # if not telem_exists or not motion_exists:
+        #     pop = """
+        #     IL-2 requires configuration for TelemFFB to receive telemetry.
+        #
+        #     Would you like to automatically add the required configuration to IL-2?
+        #     """
+        if not telem_match or not motion_match:
+            pop = f"""
+            The telemetry and/or motion device configuration in the IL-2 startup.cfg is missing or incorrect and may prohibit TelemFFB from receiving data
+    
+            Would you like to automatically adjust the configuration per the following?
+            """
+
+            if not telem_match or not telem_exists:
+                pop = pop + f"""
+                Existing \'telemetrydevice\': {telem_config}
+                Proposed \'telemetrydevice\': {telemetry_reference}
+                """
+
+            if not motion_match or not motion_exists:
+                pop = pop + f"""
+                Existing \'motiondevice\': {motion_config}
+                Proposed \'motiondevice\': {motion_reference}
+                """
+            pop = pop + "\n\n***** - Please ensure Il-2 is not running before selecting 'Yes' - *****"
+        telem_message.setText(pop)
+        ans = telem_message.exec()
+        if ans == QMessageBox.Yes:
+            config_data['telemetrydevice'] = telemetry_reference
+            config_data['motiondevice'] = motion_reference
+            try:
+                write_il2_config(file_path, config_data)
+            except Exception as e:
+                QMessageBox.warning(None, "Config Update Error", f"There was an error writing to the Il-2 Config file:\n{e}")
+        elif ans == QMessageBox.No:
+            print(f"Answer: NO")
+
+        # return config_data, telem_match, motion_match
+
+def write_il2_config(file_path, config_data):
+    with open(file_path, 'w') as config_file:
+        for section, options in config_data.items():
+            config_file.write(f"[KEY = {section}]\n")
+            for key, value in options.items():
+                config_file.write(f"\t{key} = {value}\n")
+            config_file.write("[END]\n\n")
 
 def install_export_lua():
     saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
