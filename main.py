@@ -799,13 +799,17 @@ def main():
     il2_mgr = IL2Manager()
     il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
     il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
     il2 = NetworkThread(telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
 
     il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
 
     if il2_enabled or args.sim == "IL2":
 
-        utils.analyze_il2_config(il2_path, port=il2_port)
+        if il2_validate:
+            utils.analyze_il2_config(il2_path, port=il2_port)
+        else:
+            logging.warning("IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
         logging.info("Starting IL2 Telemetry Listener")
         il2.start()
 
