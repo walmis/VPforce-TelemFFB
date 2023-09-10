@@ -508,6 +508,7 @@ class HighPassFilter:
         dt = now - self.last_update
         if dt > 1: 
             self.last_input = x # initialize filter
+            self.value = x
 
         self.last_update = now
         alpha = self.RC / (self.RC + dt)
@@ -515,6 +516,9 @@ class HighPassFilter:
         self.value = alpha * (self.value + x - self.last_input)
         self.last_input = x
         return self.value
+    
+    def reset(self):
+        self.last_update = 0
     
 class Derivative:
     def __init__(self, filter_hz=None) -> None:
@@ -566,7 +570,8 @@ class Dispenser:
     def get(self, name, *args, **kwargs):
         v = self.dict.get(name)
         if not v:
-            v = self.cls(*args, **kwargs, name=name)
+            v = self.cls(*args, **kwargs)
+            v.name = name
             self.dict[name] = v
         return v
 
