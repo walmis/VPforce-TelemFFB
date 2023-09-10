@@ -389,11 +389,10 @@ class Aircraft(AircraftBase):
         if self.gear_motion_intensity > 0:
             gear = max(telem_data.get("Gear", 0))
             self._update_landing_gear(gear, telem_data.get("TAS"), spd_thresh_low=130 * kt2ms, spd_thresh_high=200 * kt2ms)
-        if self.deceleration_effect_enable and self.deceleration_effect_enable_areyoureallysure:
-            if telem_data.get("AircraftClass") != "Helicopter":
-                self._decel_effect(telem_data)
-        if self.aoa_reduction_effect_enabled:
-            self._aoa_reduction_force_effect(telem_data)
+
+        self._decel_effect(telem_data)
+
+        self._aoa_reduction_force_effect(telem_data)
         if self.nosewheel_shimmy and telem_data.get("FFBType") == "pedals" and not telem_data.get("IsTaildragger", 0):
             self._update_nosewheel_shimmy(telem_data)
 
@@ -443,13 +442,13 @@ class JetAircraft(Aircraft):
             return
         telem_data["AircraftClass"] = "JetAircraft"  # inject aircraft class into telemetry
         super().on_telemetry(telem_data)
+
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
-        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
-            super()._gforce_effect(telem_data)
-        if self.afterburner_effect_intensity > 0:
-            self._update_ab_effect(telem_data)
+        
+        self._gforce_effect(telem_data)
+        self._update_ab_effect(telem_data)
 
 class TurbopropAircraft(Aircraft):
 
@@ -490,6 +489,9 @@ class Helicopter(Aircraft):
     heli_engine_rumble_intensity = 0.12
 
     def _update_cyclic(self, telem_data):
+        if not self.force_trim_enabled: 
+            return
+
         ffb_type = telem_data.get("FFBType", "joystick")
         if ffb_type != "joystick":
             return
@@ -585,7 +587,7 @@ class Helicopter(Aircraft):
             return
         telem_data["AircraftClass"] = "Helicopter"  # inject aircraft class into telemetry
         super().on_telemetry(telem_data)
-        if self.force_trim_enabled:
-            self._update_cyclic(telem_data)
+        
+        self._update_cyclic(telem_data)
         self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)

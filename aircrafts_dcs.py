@@ -129,24 +129,18 @@ class Aircraft(AircraftBase):
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
-        if self.deceleration_effect_enable:
-            self._decel_effect(telem_data)
+
+        self._decel_effect(telem_data)
         self._update_buffeting(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
         self._update_ffb_forces(telem_data)
-        if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
-            self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
-        if self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0:
-            self._update_landing_gear(telem_data.get("gear_value"), telem_data.get("TAS"))
-        if self.flaps_motion_intensity > 0:
-            self._update_flaps(telem_data.get("Flaps"))
-        if self.canopy_motion_intensity > 0:
-            self._update_canopy(telem_data.get("Canopy"))
-        if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-            self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
-        if self.jet_engine_rumble_intensity > 0:
-            self._update_jet_engine_rumble(telem_data)
+        self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
+        self._update_landing_gear(telem_data.get("gear_value"), telem_data.get("TAS"))
+        self._update_flaps(telem_data.get("Flaps"))
+        self._update_canopy(telem_data.get("Canopy"))
+        self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
+        self._update_jet_engine_rumble(telem_data)
         if self.is_joystick():
             self._update_stick_position(telem_data)
         if self.is_pedals():
@@ -166,8 +160,6 @@ class Aircraft(AircraftBase):
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         
         self._socket.sendto(bytes(cmds, "utf-8"), ("127.0.0.1", 34381))
-
-
 
     def override_pedal_spring(self, telem_data):
 
@@ -247,15 +239,16 @@ class PropellerAircraft(Aircraft):
             telem_data["ActualRPM"] = rpm # inject ActualRPM into telemetry
 
         super().on_telemetry(telem_data)
+        
         if self.is_joystick():
             self.override_elevator_droop(telem_data)
+
         if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
             self._update_engine_rumble(telem_data["ActualRPM"])
-        if self.wind_effect_enabled:
-            self._update_wind_effect(telem_data)
+        
+        self._update_wind_effect(telem_data)
         self._update_aoa_effect(telem_data)
-        if self.gforce_effect_enable:
-            super()._gforce_effect(telem_data)
+        self._gforce_effect(telem_data)
 
 
 

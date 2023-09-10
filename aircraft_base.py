@@ -6,7 +6,7 @@ import utils
 from typing import List, Dict
 # from utils import clamp, HighPassFilter, Derivative, Dispenser
 
-from ffb_rhino import HapticEffect, FFBReport_SetCondition
+from ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
@@ -37,6 +37,8 @@ class AircraftBase(object):
     engine_rumble_highrpm = 2800
     engine_rumble_highrpm_intensity: float = 0.06
 
+    gforce_effect_enable : bool = False
+
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
     rpm_scale: float = 45
     smoother = utils.Smoother()
@@ -44,13 +46,16 @@ class AircraftBase(object):
     _engine_rumble_is_playing = 0
     elevator_droop_force = 0
 
+    @property
+    def telem_data(self):
+        return self._telem_data
+
     def __init__(self, name: str, **kwargs):
         self._name = name
         self._changes = {}
         self._change_counter = {}
-        self._telem_data = None
-        _engine_rumble_is_playing = 0
-        gun_is_firing = 0
+        self._telem_data = {}
+        self._engine_rumble_is_playing = 0
         #clear any existing effects
         effects.clear()
 
@@ -120,19 +125,20 @@ class AircraftBase(object):
             return True
 
         return False
-    def _sim_is_msfs(self, telem_data):
-        if telem_data.get("src") == "MSFS2020":
+    
+    def _sim_is_msfs(self, *unused):
+        if self._telem_data.get("src") == "MSFS2020":
             return 1
         else:
             return 0
 
-    def _sim_is_dcs(self, telem_data):
-        if telem_data.get("src") == "DCS":
+    def _sim_is_dcs(self, *unused):
+        if self._telem_data.get("src") == "DCS":
             return 1
         else:
             return 0
-    def _sim_is(self, sim, telem_data):
-        if telem_data.get('src') == sim:
+    def _sim_is(self, sim, *unused):
+        if self._telem_data.get('src') == sim:
             return 1
         else:
             return 0
@@ -146,32 +152,38 @@ class AircraftBase(object):
         """Add wheel based rumble effects for immersion
         Generates bumps/etc on touchdown, rolling, field landing etc
         """
-        if self.runway_rumble_intensity:
-            WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # left, nose, right - wheels
-            # get high pass filters for wheel shock displacement data and update with latest data
-            hp_f_cutoff_hz = 3
-            v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[1])) * self.runway_rumble_intensity
-            v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[0] - WoW[2]) * self.runway_rumble_intensity
+        if not self.runway_rumble_intensity:
+            effects.dispose("runway0")
+            effects.dispose("runway1")
+            return
 
-            v1 = utils.clamp_minmax(v1, 0.5)
-            v2 = utils.clamp_minmax(v2, 0.5)
+        WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # left, nose, right - wheels
+        # get high pass filters for wheel shock displacement data and update with latest data
+        hp_f_cutoff_hz = 3
+        v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[1])) * self.runway_rumble_intensity
+        v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[0] - WoW[2]) * self.runway_rumble_intensity
 
-            # modulate constant effects for X and Y axis
-            # connect Y axis to nosewheel, X axis to the side wheels
-            tot_weight = sum(WoW)
+        v1 = utils.clamp_minmax(v1, 0.5)
+        v2 = utils.clamp_minmax(v2, 0.5)
 
-            if telem_data.get("T", 0) > 2:  # wait a bit for data to settle
-                if tot_weight:
-                    logging.debug(f"Runway Rumble : v1 = {v1}. v2 = {v2}")
-                    effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
-                    effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
-                else:
-                    effects.dispose("runway0")
-                    effects.dispose("runway1")
+        # modulate constant effects for X and Y axis
+        # connect Y axis to nosewheel, X axis to the side wheels
+        tot_weight = sum(WoW)
+
+        #if telem_data.get("T", 0) > 2:  # wait a bit for data to settle
+        if tot_weight:
+            logging.debug(f"Runway Rumble : v1 = {v1}. v2 = {v2}")
+            effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
+            effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
+        else:
+            effects.dispose("runway0")
+            effects.dispose("runway1")
 
     def _gforce_effect(self, telem_data):
-        if not self.is_joystick():
+        if not self.is_joystick() or not self.gforce_effect_enable:
+            effects.dispose("gforce")
             return
+        
         if sum(telem_data.get("WeightOnWheels")):
             effects.dispose("gforce")
             return
@@ -186,19 +198,20 @@ class AircraftBase(object):
         direction = 180
         # if not gforce_effect_enable:
         #     return
-        if self._sim_is("DCS", telem_data) or self._sim_is("IL2", telem_data):
+        if self._sim_is("DCS") or self._sim_is("IL2"):
             gs: float = telem_data.get("ACCs")[1]
-        elif self._sim_is("MSFS",telem_data):
+        elif self._sim_is("MSFS"):
             gs: float = telem_data.get("G")
 
-        avg_z_gs = self.smoother.get_average("gs", gs, window_size=10)
-        logging.debug(f"GS={gs}, AVG_Z_GS={avg_z_gs}")
-        if avg_z_gs < gmin:
-            effects.dispose("gforce")
+        #gs = self.smoother.get_average("gs", gs, window_size=10)
+
+        logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
+        if gs < gmin:
+            effects["gforce"].stop()
             # effects.dispose("gforce_damper")
             return
         # g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 4)
-        if self.gforce_effect_invert_force:
+        if self.gforce_effect_invert_force: 
             direction = 0
         g_factor = round(utils.non_linear_scaling(avg_z_gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
         g_factor = utils.clamp(g_factor, 0.0, 1.0)
@@ -208,6 +221,8 @@ class AircraftBase(object):
         logging.debug(f"G's = {avg_z_gs} | gfactor = {g_factor}")
 
     def _aoa_reduction_force_effect(self, telem_data):
+        if not self.aoa_reduction_effect_enabled:
+            return
         if not self.is_joystick():
             return
         if sum(telem_data.get("WeightOnWheels")):
@@ -232,11 +247,13 @@ class AircraftBase(object):
         return
     
     def _decel_effect(self, telem_data):
-        if not self.is_joystick():
+        if not self.deceleration_effect_enable or not self.is_joystick(): 
+            effects.dispose("decel")
             return
-        if self._sim_is("DCS", telem_data) or self._sim_is("IL2", telem_data):
+
+        if self._sim_is("DCS") or self._sim_is("IL2"):
             y_gs = telem_data.get("ACCs")[0]
-        elif self._sim_is("MSFS", telem_data):
+        elif self._sim_is("MSFS"):
             y_gs = telem_data.get("G_BODY_Z")
         if not self.anything_has_changed("decel", y_gs):
             return
@@ -269,7 +286,7 @@ class AircraftBase(object):
         stall_buffet_threshold_percent = 110
 
 
-        if self._sim_is_msfs(telem_data):
+        if self._sim_is_msfs():
             local_stall_aoa = telem_data.get("StallAoA", 0)   # Get stall AoA telemetry from MSFS
             local_buffet_aoa = local_stall_aoa * (stall_buffet_threshold_percent/100)
         else:
@@ -380,14 +397,18 @@ class AircraftBase(object):
             effects["cm"].stop()
 
     def _update_flaps(self, flapspos):
+        if not self.flaps_motion_intensity: return
+
         # flapspos = data.get("Flaps")
-        if self.anything_has_changed("Flaps", flapspos, delta_ms=50):
+        if self.anything_has_changed("Flaps", flapspos, delta_ms=100):
             logging.debug(f"Flaps Pos: {flapspos}")
             effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, 0, 3).start()
         else:
             effects.dispose("flapsmovement")
 
     def _update_canopy(self, canopypos):
+        if not self.canopy_motion_intensity: return
+
         # canopypos = self._telem_data.get("canopy_value", 0)
         if self.anything_has_changed("Canopy", canopypos, delta_ms=300):
             logging.debug(f"Canopy Pos: {canopypos}")
@@ -396,6 +417,8 @@ class AircraftBase(object):
             effects.dispose("canopymovement")
 
     def _update_landing_gear(self, gearpos, tas, spd_thresh_low=100, spd_thresh_high=150):
+        if not(self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0): return
+
         # gearpos = self._telem_data.get("gear_value", 0)
         rumble_freq = 10
         # tas =  self._telem_data.get("TAS", 0)
@@ -422,6 +445,7 @@ class AircraftBase(object):
             effects.dispose("gearbuffet2")
 
     def _update_speed_brakes(self, spdbrk, tas, spd_thresh=70):
+        if not (self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0): return
         # tas = self._telem_data.get("TAS",0)
 
         # spdbrk = self._telem_data.get("speedbrakes_value", 0)
@@ -442,6 +466,8 @@ class AircraftBase(object):
             effects.dispose("speedbrakebuffet2")
 
     def _update_spoiler(self, spoiler, tas, spd_thresh_low=25, spd_thresh_hi=60):
+        if not (self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0): return
+
         # tas = self._telem_data.get("TAS",0)
         tas_intensity = utils.clamp_minmax(utils.scale(tas, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
 
@@ -485,6 +511,9 @@ class AircraftBase(object):
             effects.dispose("spoilerbuffet2-2")
 
     def _update_wind_effect(self, telem_data):
+        if not self.wind_effect_enabled:
+            effects.dispose("wnd")
+            return
 
         wind = telem_data.get("Wind", (0, 0, 0))
         wnd = math.sqrt(wind[0] ** 2 + wind[1] ** 2 + wind[2] ** 2)
@@ -521,10 +550,11 @@ class AircraftBase(object):
             logging.debug(f"override elevator:{force}")
         else:
             effects.dispose('elev_droop')
+
     def _update_aoa_effect(self, telem_data):
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
-        if self._sim_is_msfs(telem_data):
+        if self._sim_is_msfs():
             local_stall_aoa = telem_data.get("StallAoA")
         else:
             local_stall_aoa = self.stall_aoa
@@ -613,6 +643,9 @@ class AircraftBase(object):
     ######                            ######
     ########################################
     def _update_ab_effect(self, telem_data):
+        if not self.afterburner_effect_intensity:
+            return
+
         frequency = 20
         median_modulation = 2
         modulation_pos = 2
@@ -641,9 +674,9 @@ class AircraftBase(object):
                 self.anything_has_changed("Afterburner", afterburner_pos) or self.anything_has_changed("Modulation", r1_modulation)):
             # logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
             intensity = self.afterburner_effect_intensity * afterburner_pos
-            effects["ab_rumble_1_1"].periodic(frequency + r1_modulation, intensity, 0,effect_type=5 ).start()
+            effects["ab_rumble_1_1"].periodic(frequency + r1_modulation, intensity, 0,effect_type=EFFECT_TRIANGLE ).start()
             # effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
-            effects["ab_rumble_2_1"].periodic(frequency + r1_modulation, intensity, 45,effect_type=5 ).start()
+            effects["ab_rumble_2_1"].periodic(frequency + r1_modulation, intensity, 45,effect_type=EFFECT_TRIANGLE ).start()
             # effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120,
             #                                   offset=60).start()
             # logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
@@ -657,6 +690,13 @@ class AircraftBase(object):
             self._ab_is_playing = 0
 
     def _update_jet_engine_rumble(self, telem_data):
+        if not self.jet_engine_rumble_intensity and not self._jet_rumble_is_playing:
+            effects.dispose("je_rumble_1_1")
+            effects.dispose("je_rumble_1_2")
+            effects.dispose("je_rumble_2_1")
+            effects.dispose("je_rumble_2_2")
+            return 
+        
         frequency = self.jet_engine_rumble_freq
         median_modulation = 10
         modulation_pos = 3
@@ -668,12 +708,16 @@ class AircraftBase(object):
         jet_eng_rpm = telem_data.get("EngRPM", 0)
         if type(jet_eng_rpm) == list:
             jet_eng_rpm = max(jet_eng_rpm)
-
-        # try:
-        #     jet_eng_rpm = max(telem_data.get("EngRPM")[0], telem_data.get("EngRPM")[1])
-        # except Exception as e:
-        #     logging.error(f"Error getting Engine RPM")
-        #     return
+       
+        if jet_eng_rpm == 0:
+            # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
+            effects.dispose("je_rumble_1_1")
+            effects.dispose("je_rumble_1_2")
+            effects.dispose("je_rumble_2_1")
+            effects.dispose("je_rumble_2_2")
+            self._jet_rumble_is_playing = 0
+            return
+        
         ##
         ## Update oscillation modulation with new function that returns the amplitude of a sine wave
         ## at any point in time based on wave amplitude and period
@@ -695,13 +739,6 @@ class AircraftBase(object):
             effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
             logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
             self._jet_rumble_is_playing = 1
-        elif jet_eng_rpm == 0:
-            # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
-            effects.dispose("je_rumble_1_1")
-            effects.dispose("je_rumble_1_2")
-            effects.dispose("je_rumble_2_1")
-            effects.dispose("je_rumble_2_2")
-            self._jet_rumble_is_playing = 0
 
     ########################################
     ######                            ######
@@ -770,6 +807,11 @@ class AircraftBase(object):
             # effects["etlY"].stop()
 
     def _update_heli_engine_rumble(self, telem_data, blade_ct=None):
+        if not self.engine_rumble:
+            effects.dispose("rotor_rpm0-1")
+            effects.dispose("rotor_rpm1-1")
+            return
+        
         rrpm = telem_data.get("RotorRPM")
         mod = telem_data.get("N")
         tas = telem_data.get("TAS", 0)
@@ -778,7 +820,7 @@ class AircraftBase(object):
             eng_rpm = max(eng_rpm)
 
         # rotor = telem_data.get("RotorRPM")
-        if self._sim_is_msfs(telem_data) and rrpm < 10:
+        if self._sim_is_msfs() and rrpm < 10:
             #MSFS sends telemetry when aircraft is sitting in hangar with the rotor spinning very slowly....
             return
 
