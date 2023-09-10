@@ -185,7 +185,8 @@ def get_config() -> ConfigObj:
     main = load_config(args.configfile)
     user = load_config(args.overridefile, raise_errors=False)
     if user and main:
-        main.update(user)
+        main.merge(user)   
+    
     config_has_changed(update=True)
     _config = main
     return main
@@ -264,7 +265,6 @@ class TelemManager(QObject, threading.Thread):
             params = utils.sanitize_dict(config["default"])
 
         class_name = "Aircraft"
-
         for section,conf in config.items():
             # find matching aircraft in config
             if re.match(section, aircraft_name):
