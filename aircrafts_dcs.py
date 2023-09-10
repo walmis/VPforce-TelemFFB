@@ -193,8 +193,8 @@ class Aircraft(AircraftBase):
         self.spring_y.negativeCoefficient = 4096
 
         # trim signal needs to be slow to avoid positive feedback
-        lp_y = LPFs.get("y", 10)
-        lp_x = LPFs.get("x", 10)
+        lp_y = LPFs.get("y", 5)
+        lp_x = LPFs.get("x", 5)
 
         # estimate trim from real stick position and virtual stick position
         offs_x = lp_x.update(telem_data['StickX'] - x + lp_x.value)
