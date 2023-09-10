@@ -213,12 +213,27 @@ class AircraftBase(object):
         # g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 4)
         if self.gforce_effect_invert_force: 
             direction = 0
-        g_factor = round(utils.non_linear_scaling(avg_z_gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
+        g_factor = round(utils.non_linear_scaling(gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
+
+        derivative_hz = 5 # derivative lpf filter -3db Hz
+        derivative_k = 0.1 # derivative gain value, or damping ratio
+
+        dGs = getattr(self, "_dGs", None)
+        if not dGs: dGs = self._dGs = utils.Derivative(derivative_hz)
+        dGs.lpf.cutoff_freq_hz = derivative_hz
+
+        g_deriv = - dGs.update(g_factor) * derivative_k
+        
+        #telem_data["g_deriv"] = g_deriv # uncomment to debug derivative
+        #telem_data["g_factor"] = g_factor # uncomment to debug derivative
+        g_factor += g_deriv 
+        #telem_data["g_factor'"] = g_factor # uncomment to debug derivative
+
         g_factor = utils.clamp(g_factor, 0.0, 1.0)
         effects["gforce"].constant(g_factor, direction).start()
         #  effects["gforce_damper"].damper(coef_y=1024).start()
 
-        logging.debug(f"G's = {avg_z_gs} | gfactor = {g_factor}")
+        logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def _aoa_reduction_force_effect(self, telem_data):
         if not self.aoa_reduction_effect_enabled:
