@@ -21,14 +21,17 @@ This bypasses directinput and other layers which allows to augment directInput
 with additional FFB effects.
 """
 
+from enum import IntEnum
 import time
 import ctypes
 import logging
+from typing import List
 from utils import DirectionModulator, clamp, Destroyable
 import os
 import weakref
 import inspect
 import usb1
+from PyQt5.QtCore import QObject, QTimerEvent
 
 try:
     hidapi_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')
@@ -131,7 +134,14 @@ class BaseStructure(ctypes.LittleEndianStructure):
         values = type(self)._defaults_.copy()
         values.update(kwargs)
 
-        super().__init__(**values) 
+        super().__init__(**values)
+    
+    def __repr__(self):
+        out = []
+        for f in self._fields_:
+            if f[0]: out.append(f"{f[0]}={getattr(self, f[0])}")
+        return f"{self.__class__.__name__}(0x{id(self):X}): " + ",".join(out)
+
 
 class FFBReport_SetEffect(BaseStructure):
     _pack_ = 1
@@ -227,8 +237,25 @@ class FFBReport_Input(BaseStructure):
     def axisXY(self):
         return (self.X/4096.0, self.Y/4096.0)
 
+class FFBReport_PIDStatus_Input(BaseStructure):
+    _pack_ = 1
+    _fields_ = [("reportId", ctypes.c_uint8), # = 2
+                ("devicePaused",     ctypes.c_uint8, 1),
+                ("actuatorsEnabled", ctypes.c_uint8, 1),
+                ("safetySwitch",     ctypes.c_uint8, 1),
+                ("actuatorOverride", ctypes.c_uint8, 1),
+                ("actuatorPower",    ctypes.c_uint8, 1),
+                ("deviceResetEvent", ctypes.c_uint8, 1),
+                ("", ctypes.c_uint8, 2),
+                ("effectPlaying", ctypes.c_uint8, 1),
+                ("effectBlockIndex", ctypes.c_uint8, 7),
+                ]
+    _defaults_ = {}
+
+
 input_report_handlers = {
-    1: FFBReport_Input
+    HID_REPORT_ID_INPUT: FFBReport_Input,
+    HID_REPORT_ID_PID_STATE_REPORT: FFBReport_PIDStatus_Input
 }
 
 class FFBEffectHandle:
@@ -238,8 +265,12 @@ class FFBEffectHandle:
         self.type = type
         self._finalizer = weakref.finalize(self, lambda ref: ref() and ref().destroy(), weakref.ref(self))
         self._cache = {}
+        self._started = False
 
-    def _data_changed(self, key, data):
+    def invalidate(self):
+        self.effect_id = 0
+
+    def _data_changed(self, key, data) -> bool:
         h = hash(data)
         if not self._cache.get(key):
             self._cache[key] = h
@@ -250,6 +281,14 @@ class FFBEffectHandle:
 
     def __del__(self):
         self.destroy()
+
+    def __bool__(self) -> bool:
+        # effect is valid if effect id is not None/0 and type is non-zero
+        return bool(self.effect_id and self.type)
+
+    @property
+    def started(self):
+        return self._started
 
     @property
     def name(self):
@@ -264,20 +303,23 @@ class FFBEffectHandle:
             op = OP_START_OVERRIDE
         op = FFBReport_EffectOperation(effectBlockIndex=self.effect_id, operation=op, loopCount=loopCount)
         self.ffb.write(bytes(op))
+        self._started = True
         return self
 
     def stop(self):
         op = FFBReport_EffectOperation(effectBlockIndex=self.effect_id, operation=OP_STOP)
         self.ffb.write(bytes(op))
+        self._started = False
         return self
 
     def destroy(self):
-        if self.effect_id is not None:
+        if self.effect_id:
             logging.debug(f"Destroying effect {self.effect_id} ({effect_names[self.type]})")
             op = FFBReport_BlockFree(effectBlockIndex=self.effect_id)
             self.ffb.write(bytes(op))
             self.type = 0
             self.effect_id = None
+            self._started = False
 
     def setConstantForce(self, magnitude, direction, **kwargs):
         """Set constant for for effect
@@ -350,15 +392,41 @@ class FFBEffectHandle:
 
 
            
-class FFBRhino(hid.Device):
+class FFBRhino(hid.Device, QObject):
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None) -> None:
         self.vid = vid
         self.pid = pid
         self._in_reports = {}
+        self._effectHandles : List[FFBEffectHandle] = []
         
-        super().__init__(vid, pid, serial)
+        hid.Device.__init__(self, vid, pid, serial)
+        QObject.__init__(self)
         self.nonblocking = True
-        
+        self.startTimer(1) # start Qt timer to read HID reports every 1ms
+
+    # runs on mainThread
+    def timerEvent(self, a0: QTimerEvent) -> None:
+        try:
+            self.readReports()
+        except:
+            logging.exception("Exception")
+
+    def on_hid_report_received(self, report_id):
+        if report_id == HID_REPORT_ID_PID_STATE_REPORT:
+            report = self.getReport(HID_REPORT_ID_PID_STATE_REPORT)
+            #print(report)
+            if report.deviceResetEvent:
+                logging.info("Device reset event: Invalidating all effects")
+                for ref in self._effectHandles:
+                    effect : FFBEffectHandle = ref()
+                    effect.invalidate()
+
+            if report.effectPlaying == 0:
+                for ref in self._effectHandles:
+                    effect : FFBEffectHandle = ref()
+                    if effect.effect_id == report.effectBlockIndex:
+                        effect._started = False
+
     def get_firmware_version(self):
         try:
             with usb1.USBContext() as context:
@@ -395,38 +463,50 @@ class FFBRhino(hid.Device):
             logging.warn("Effects pool full, cannot create new effect")
             return None
 
-        return FFBEffectHandle(self, effect_id, type)
+        handle = FFBEffectHandle(self, effect_id, type)
+        self._effectHandles.append(weakref.ref(handle, lambda x: self._effectHandles.remove(x)))
+        return handle
     
     def write(self, data):
         if super().write(data) < 0:
             raise IOError("HID Write")
         
-    def getInput(self, report_id=1):
+    def readReports(self):
         # read all input reports from the operating system buffer
         # we only care about the latest ones, otherwise there will be latency!
         # this function is non-blocking
         while True:
             tmp = super().read(64)
             if tmp:
-                self._in_reports[tmp[0]] = tmp
+                report_id = tmp[0]
+                self._in_reports[report_id] = tmp
+                self.on_hid_report_received(report_id)
             else: break
         
+    def getReport(self, report_id):   
+        #self.readReports()
+
         data = self._in_reports.get(report_id, None)
         if data:
-            return input_report_handlers[report_id].from_buffer_copy(data)
+            try:
+                return input_report_handlers[report_id].from_buffer_copy(data)
+            except KeyError:
+                return data
         
         return data
+        
+    def getInput(self) -> FFBReport_Input:
+        return self.getReport(HID_REPORT_ID_INPUT)
 
 
 # Higher level effect interface
 class HapticEffect(Destroyable):
     effect : FFBEffectHandle = None
     device : FFBRhino = None
-    started : bool = False
     modulator = None
 
-    def __init__(self, name=None):
-        self.name = name
+    def __init__(self):
+       pass
 
     def __repr__(self):
         return f"HapticEffect({self.effect})"
@@ -504,8 +584,8 @@ class HapticEffect(Destroyable):
         return self
 
     @property
-    def status(self) -> int:
-        return self.started
+    def started(self) -> bool:
+        return self.effect and self.effect.started
 
     def start(self, force=False, **kw):
 
@@ -516,22 +596,20 @@ class HapticEffect(Destroyable):
             name = f" (\"{self.name}\")" if self.name else ""
             logging.info(f"Start effect {self.effect.effect_id} ({self.effect.name}){name}")
             self.effect.start(**kw)
-            self.started = True
         return self
     
     def stop(self):
-        if self.effect and self.started:
+        if self.effect and self.effect.started:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is stopping effect {self.effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
             logging.info(f"Stop effect {self.effect.effect_id} ({self.effect.name}){name}")
             self.effect.stop() 
-            self.started = False
         return self
 
     def destroy(self):
-        if self.effect and self.effect.effect_id:
+        if self.effect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is destroying effect {self.effect.effect_id}")
@@ -551,8 +629,8 @@ if __name__ == "__main__":
     d = FFBRhino(0xffff, 0x2055)
     d.resetEffects()
     print(d.get_firmware_version())
-
-    HapticEffect.open()
+    exit()
+    #HapticEffect.open()
 
     #c = d.createEffect(EFFECT_CONSTANT)
     #c.setConstantForce(0.05, 90)
