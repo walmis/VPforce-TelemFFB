@@ -506,7 +506,7 @@ class HapticEffect(Destroyable):
     modulator = None
 
     def __init__(self):
-       pass
+       self.name = None
 
     def __repr__(self):
         return f"HapticEffect({self.effect})"
