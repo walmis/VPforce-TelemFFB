@@ -19,7 +19,7 @@ import math
 from random import randint
 import time
 from typing import List, Dict
-from ffb_rhino import HapticEffect, FFBReport_SetCondition
+from ffb_rhino import HapticEffect, FFBReport_SetCondition,EFFECT_SQUARE,EFFECT_SINE,EFFECT_TRIANGLE,EFFECT_SAWTOOTHUP,EFFECT_SAWTOOTHDOWN
 import utils
 import logging
 import random
@@ -96,6 +96,8 @@ class Aircraft(AircraftBase):
     elevator_droop_force = 0
 
     trim_workaround = False
+    damage_effect_enabled = 0
+    damage_effect_intensity: float = 0.0
 
     ####
     ####
@@ -105,6 +107,7 @@ class Aircraft(AircraftBase):
         self._jet_rumble_is_playing = 0
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
+        self.damage_enable_cmd_sent = 0
 
     def on_telemetry(self, telem_data : dict):
         ## Generic Aircraft Telemetry Handler
@@ -123,6 +126,13 @@ class Aircraft(AircraftBase):
         except:
             pass
 
+        if not self.damage_enable_cmd_sent:
+            self.send_commands([f"enableGetDamage({int(self.damage_effect_enabled)})"])
+            logging.info(f"Sending <enableGetDamage({int(self.damage_effect_enabled)}) to DCS")
+            self.damage_enable_cmd_sent = 1
+
+
+
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"   #inject aircraft class into telemetry
 
@@ -135,6 +145,7 @@ class Aircraft(AircraftBase):
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
         self._update_ffb_forces(telem_data)
+        self._update_damage(telem_data)
         self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
         self._update_landing_gear(telem_data.get("gear_value"), telem_data.get("TAS"))
         self._update_flaps(telem_data.get("Flaps"))
@@ -153,6 +164,8 @@ class Aircraft(AircraftBase):
 
     def on_timeout(self):
         super().on_timeout()
+        self.damage_enable_cmd_sent = 0
+
 
     def send_commands(self, cmds):
         cmds = "\n".join(cmds)
@@ -160,6 +173,22 @@ class Aircraft(AircraftBase):
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         
         self._socket.sendto(bytes(cmds, "utf-8"), ("127.0.0.1", 34381))
+
+    def _update_damage(self, telem_data):
+        if not self.damage_effect_enabled: return
+        damage = telem_data.get("Damage")
+        damage_freq = 10
+        damage_amp = utils.clamp(self.damage_effect_intensity, 0.0, 1.0)
+
+        if self.anything_has_changed("damage", damage):
+            random.seed(time.perf_counter())
+            random_dir = random.randint(0, 359)
+            random_amp = utils.clamp(random.uniform(damage_amp*0.5, damage_amp*1.5), 0.0, 1.0)
+            random_type = random.choice([EFFECT_SQUARE, EFFECT_SINE, EFFECT_TRIANGLE])
+            effects["damage"].periodic(damage_freq, random_amp, random_dir, effect_type=random_type, duration=30).start()
+            logging.info(f"Damage effect: dir={random_dir}, amp={random_amp}")
+        elif not self.anything_has_changed("damage", damage, delta_ms=50):
+            effects.dispose("damage")
 
     def override_pedal_spring(self, telem_data):
 

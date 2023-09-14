@@ -2,7 +2,7 @@ local JSON = loadfile("Scripts\\JSON.lua")()
 package.path = package.path .. ";.\\LuaSocket\\?.lua;Scripts\\?.lua;"
 package.cpath = package.cpath .. ";.\\LuaSocket\\?.dll"
 local socket = require("socket")
-
+local calc_damage = 0
 require("Vector")
 
 local function scale(x, in_min, in_max, out_min, out_max)
@@ -17,6 +17,7 @@ local function sock_readable(s)
   end
   return false
 end
+
 
 
 -- Function to calculate air density based on altitude
@@ -40,6 +41,36 @@ function calculateAirDensity(altitude)
 
   return airDensity*100
 end
+
+function getDamage(draw_vars)
+    local sum = 0
+    for _, var in ipairs(draw_vars) do
+        if type(var) == "number" then
+            -- Handle individual values
+            local value = LoGetAircraftDrawArgumentValue(var)
+            sum = sum + value
+        elseif type(var) == "string" then
+            -- Handle ranges
+            local start, finish = var:match("(%d+)-(%d+)")
+            if start and finish then
+                for i = tonumber(start), tonumber(finish) do
+                    local value = LoGetAircraftDrawArgumentValue(i)
+                    sum = sum + value
+                end
+            end
+        end
+    end
+    return sum
+end
+function enableGetDamage(flag)
+  if flag == 1 then
+    calc_damage = 1
+  elseif flag == 0 then
+    calc_damage = 0
+
+  end
+end
+
 function getUH1ShellCount(payloadInfo)
     local totalShellCount = 0
 
@@ -174,6 +205,8 @@ local f_telemFFB = {
           local drawFlapsPos2 = LoGetAircraftDrawArgumentValue(10)
           local drawSpeedBrake = LoGetAircraftDrawArgumentValue(21)
           local drawRefuelBoom = LoGetAircraftDrawArgumentValue(22)
+          local damage = "not enabled"
+          local damage_vars = "not supported"
 
           local AB = string.format("%.2f~%.2f", LoGetAircraftDrawArgumentValue(28), LoGetAircraftDrawArgumentValue(29))
 
@@ -279,7 +312,11 @@ local f_telemFFB = {
 
             local mainRotorRPM = MainPanel:get_argument_value(42) * 220
             local IAS_L = MainPanel:get_argument_value(24)
-
+            damage_vars = {
+              53,81,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,134,135,136,137,138,146,147,147,148,
+              149,150,151,152,153,154,155,156,157,158,160,161,166,167,188,189,215,225,234,236,243,247,251,252,252,
+              297,452,663,664,665,1100
+            }
             local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
@@ -303,6 +340,11 @@ local f_telemFFB = {
             -- RotorTach.output			= {0.0, 1.0}--{0.0, 0.83, 0.94, 1.0}
             -- UH-1 raw data is in RPM
             -- Multiply received value by 360 to get actual RPM
+            damage_vars = {
+              81,142,146,152,153,154,157,158,159,163,167,169,233,235,244,255,256,257,258,265,297,298,429,430,431,432,
+              433,434,435,436,453,454,455,456,457,458,459,460,461,462,465,466,530,898,899
+            }
+
             local mainRotorRPM = MainPanel:get_argument_value(123) * 360
             local PanelShake =
               string.format(
@@ -360,6 +402,11 @@ local f_telemFFB = {
             local mainRotorPercent = scale(MainPanel:get_argument_value(52), 0.000, 1.000, 0, 1.100)
             -- calculate RotorRPM from gauge percentage (max = 350RPM per internet sources)
             local mainRotorRPM = math.floor(scale(mainRotorPercent, 0, 1.000, 0, 350))
+            damage_vars = {
+              53,65,81,81,81,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,134,
+              135,136,144,146,147,148,149,150,152,153,154,156,157,158,159,161,167,188,189,213,214,223,224,
+              233,235,241,244,247,249,250,265,266,267,296,297,298,299,301,302,302,303,304,305
+            }
 
             local GunTrigger = MainPanel:get_argument_value(615)
             local APUoilP = MainPanel:get_argument_value(168)
@@ -379,7 +426,12 @@ local f_telemFFB = {
             local mainRotorPercent = scale(MainPanel:get_argument_value(42), 0.000, 1.000, 0, 1.100)
             -- calculate RotorRPM from gauge percentage (nominal %95 = 240RPM per internet sources)
             local mainRotorRPM = math.floor(scale(mainRotorPercent, 0, 0.95, 0, 240))
-
+            damage_vars = {
+              53,54,61,62,65,81,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,134,136,137,
+              146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,166,167,183,185,213,215,223,
+              225,233,234,235,236,242,243,245,246,265,266,267,296,297,298,299,300,301,302,303,303,459,460,
+              461,462
+            }
             -- Mi-24  sends to TelemFFB
             stringToSend =
               string.format(
@@ -387,22 +439,13 @@ local f_telemFFB = {
               mainRotorRPM
             )
 
---           elseif obj.Name == "AH-64D_BLK_II" then
---             log.info("This is the Apache")
--- --             -- There is nothing of value to export from AH64 currently, placeholder only
--- --             -- Apache rotor RPM is max 265, send static 245 in telemetry
--- --             local mainRotorRPM = "245.000"
---
---
---             -- AH64  sends to TelemFFB
---             stringToSend =
---               string.format(
---               "RotorRPM=%s",
---               mainRotorRPM
---             )
+           elseif obj.Name == "AH-64D_BLK_II" then
+            damage_vars = {
+              61,62,63,65,81,82,116,117,119,120,122,123,125,126,146,148,149,150,151,152,153,154,155,156,157,158,160,
+              166,214,215,224,225,226,227,238,242,245,255,256,257,259,264,300,610
+            }
 
-          elseif
-            obj.Name == "SA342M" or obj.Name == "SA342L" or obj.Name == "SA342Mistral" or obj.Name == "SA342Minigun"
+          elseif obj.Name == "SA342M" or obj.Name == "SA342L" or obj.Name == "SA342Mistral" or obj.Name == "SA342Minigun"
            then -- Gazelle
             -- SA342 Relevent Info (from mainpanel_init.lua):
             -- Rotor_RPM.input				= {0,		50,		100,	150,	200,	250,	262,	316.29,	361.05,	387,	400,	450}
@@ -415,6 +458,10 @@ local f_telemFFB = {
             local RAltimeterFlagPanne = MainPanel:get_argument_value(98)
             local RAltimeterFlagMA = MainPanel:get_argument_value(999)
             local RAltimeterTest = MainPanel:get_argument_value(100)
+            damage_vars = {
+              145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,
+              175,177,178,179,180,181,204,205
+            }
             local StatusString =
               RAltimeterOnOff .. "~" .. RAltimeterFlagPanne .. "~" .. RAltimeterFlagMA .. "~" .. RAltimeterTest
             -- Gazelle  sends to SimShaker
@@ -425,8 +472,7 @@ local f_telemFFB = {
               RAltimeterMeter,
               StatusString
             )
-          elseif
-            obj.Name == "UH-60L" then
+          elseif obj.Name == "UH-60L" then
             -- directly access rotor rpm percent with get_param_handle call
             -- according to internet sources, nominal RPM of the UH60 is 258 RPM
             local mainRotorPercent = get_param_handle("RRPM"):get()
@@ -459,7 +505,10 @@ local f_telemFFB = {
             local engine_redline_reference = 3000
             local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
-
+            damage_vars = {
+              53,65,81,119,134,135,136,147,148,149,150,152,153,154,157,158,213,214,215,216,217,223,224,225,226,227,
+              233,234,235,236,238,240,242,242,243,247,380,381,382,383,429,430,431
+            }
             --local myselfData = string.format("%.2f~%.2f~%.2f", obj.Heading, obj.Pitch, obj.Bank)
             local PanelShake =
               string.format(
@@ -480,60 +529,49 @@ local f_telemFFB = {
               WEPwire,
               actualRPM
             )
---           elseif obj.Name == "TF-51D" then
---             -------------------------------------------------------------------------------------------------------------------------------------------------------
---             local AirspeedNeedle = MainPanel:get_argument_value(11) * 1000 * 1.852
---             local Altimeter_10000_footPtr = MainPanel:get_argument_value(96) * 100000
---             local Altimeter_1000_footPtr = MainPanel:get_argument_value(24) * 10000
---             local Altimeter_100_footPtr = MainPanel:get_argument_value(25) * 1000
---             local Variometer = MainPanel:get_argument_value(29)
---             local TurnNeedle = MainPanel:get_argument_value(27) * math.rad(3)
---             local Landing_Gear_Handle = MainPanel:get_argument_value(150)
---             local Manifold_Pressure = MainPanel:get_argument_value(10) * 65 + 10
---             local Engine_RPM = MainPanel:get_argument_value(23) * 4500
---             local AHorizon_Pitch = MainPanel:get_argument_value(15) * math.pi / 3.0
---             local AHorizon_Bank = MainPanel:get_argument_value(14) * math.pi
---             local AHorizon_PitchShift = MainPanel:get_argument_value(16) * 10.0 * math.pi / 180.0
---             local GyroHeading = MainPanel:get_argument_value(12) * 2.0 * math.pi
---             local Oil_Temperature = MainPanel:get_argument_value(30) * 100
---             local Oil_Pressure = MainPanel:get_argument_value(31) * 200
---             local Fuel_Pressure = MainPanel:get_argument_value(32) * 25
---             local Coolant_Temperature = MainPanel:get_argument_value(22) * 230 - 80
---             local Carb_Temperature = MainPanel:get_argument_value(21) * 230 - 80
---             local LandingGearGreenLight = MainPanel:get_argument_value(80)
---             local LandingGearRedLight = MainPanel:get_argument_value(82)
---             local Vacuum_Suction = MainPanel:get_argument_value(9) * 10
---             --local myselfData = string.format("%.2f~%.2f~%.2f", obj.Heading, obj.Pitch, obj.Bank)
---             local PanelShake =
---               string.format(
---               "%.2f~%.2f~%.2f",
---               MainPanel:get_argument_value(181),
---               MainPanel:get_argument_value(180),
---               MainPanel:get_argument_value(189)
---             )
---             local LandingGearGreenLight = MainPanel:get_argument_value(80)
---             local WEPwire = MainPanel:get_argument_value(190)
---             local extModelArguments =
---               string.format(
---               "%.2f~%.2f~%.2f~%.2f",
---               LoGetAircraftDrawArgumentValue(0),
---               LoGetAircraftDrawArgumentValue(1),
---               LoGetAircraftDrawArgumentValue(5),
---               LoGetAircraftDrawArgumentValue(6)
---             )
---             -- TF-51 sends to SimShaker
---             stringToSend =
---               string.format(
---               "PanShake=%s",
---               PanelShake
---             )
-          elseif obj.Name == "FW-190D9" or obj.Name == "FW-190A8" then
+
+          elseif obj.Name == "FW-190D9" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local Manifold_Pressure = MainPanel:get_argument_value(46)
             -- Calculate Engine RPM from redline value and engine.RPM value
             local engine_redline_reference = 2700
             local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            damage_vars = {
+              64,65,66,67,81,134,135,136,151,152,153,154,157,158,162,168,213,214,215,216,217,223,224,225,226,227,233,
+              234,235,236,237,239,241,243,247,255,259,273,296,297,298,299,300,301,302,303,304,305,380,381,382,429,
+              430,431
+            }
+
+            local PanelShake =
+              string.format(
+              "%.2f~%.2f~%.2f",
+              MainPanel:get_argument_value(205),
+              MainPanel:get_argument_value(204),
+              MainPanel:get_argument_value(206)
+            )
+            local MW = MainPanel:get_argument_value(106)
+            -- FW-190D9 sends to SimShaker
+            stringToSend =
+              string.format(
+              "PanShake=%s;MP-MW=%.2f~%.2f;ActualRPM=%s",
+              PanelShake,
+              Manifold_Pressure,
+              MW,
+              actualRPM
+            )
+
+          elseif obj.Name == "FW-190A8" then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            local Manifold_Pressure = MainPanel:get_argument_value(46)
+            -- Calculate Engine RPM from redline value and engine.RPM value
+            local engine_redline_reference = 2700
+            local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
+            local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            damage_vars = {
+              81,135,136,146,148,149,150,152,153,154,157,158,213,214,215,216,223,224,225,226,234,236,238,240,242,247,
+              296,380,381,382,429,430,431
+            }
 
             local PanelShake =
               string.format(
@@ -560,6 +598,10 @@ local f_telemFFB = {
             local engine_redline_reference = 2800
             local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            damage_vars = {
+              81,147,148,149,150,151,152,153,154,156,157,158,213,214,215,216,217,218,219,220,223,224,225,226,227,228,
+              229,230,233,234,235,236,237,239,247,243
+            }
             local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
@@ -577,6 +619,7 @@ local f_telemFFB = {
               MW,
               actualRPM
             )
+
           elseif obj.Name == "SpitfireLFMkIX" or obj.Name == "SpitfireLFMkIXCW" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- Calculate Engine RPM from redline value and engine.RPM value
@@ -585,7 +628,10 @@ local f_telemFFB = {
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
             local spit_ldg_right = LoGetAircraftDrawArgumentValue(3)
             mech["gear"]["value"] = spit_ldg_right
-
+            damage_vars = {
+              65,81,119,147,148,149,150,151,152,153,154,156,157,158,213,214,215,216,217,223,224,225,226,227,233,234,
+              235,236,238,240,241,242,247,380,381,382,383,429,430,431
+            }
 
             local PanelShake =
               string.format(
@@ -601,6 +647,7 @@ local f_telemFFB = {
               PanelShake,
               actualRPM
               )
+
           elseif string.find(obj.Name, "P-47") then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- Calculate Engine RPM from redline value and engine.RPM value
@@ -609,12 +656,18 @@ local f_telemFFB = {
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
             local p47_dive_flap_right = LoGetAircraftDrawArgumentValue(182)
             mech["speedbrakes"]["value"] = p47_dive_flap_right
+            damage_vars = {
+              65,81,119,146,147,148,149,150,151,152,153,154,155,156,157,158,159,161,162,163,164,213,214,215,216,217,
+              223,224,225,226,227,233,234,235,236,238,240,242,243,247,265,266,267,270,271,272,273,296,297,298,299,
+              429,430,431,459
+            }
             -- P47 sends to TelemFFB
             stringToSend =
               string.format(
               "ActualRPM=%s",
               actualRPM
               )
+
           elseif string.find(obj.Name, "I-16") then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- Calculate Engine RPM from redline value and engine.RPM value
@@ -622,17 +675,27 @@ local f_telemFFB = {
             local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
             -- I-16 sends to TelemFFB
+            damage_vars = {
+              55,56,65,81,135,136,146,152,156,157,158,159,162,213,214,215,216,223,224,225,226,234,236,238,240,242,247,
+              264,266,267,296,297,298,301,380,381,429,430
+            }
             stringToSend =
               string.format(
               "ActualRPM=%s",
               actualRPM
             )
+
             elseif string.find(obj.Name, "MosquitoFBMkVI") then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- Calculate Engine RPM from redline value and engine.RPM value
             local engine_redline_reference = 3000
             local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
             local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            damage_vars = {
+              53,54,55,56,58,59,60,61,65,147,148,151,159,160,161,162,163,164,165,166,167,168,169,170,171,213,216,217,
+              218,223,226,227,228,233,234,235,236,237,238,239,240,241,242,243,247,248,249,266,267,379,380,381,382,
+              383,384,385
+            }
             -- Mosquito sends to TelemFFB
             stringToSend =
               string.format(
@@ -646,6 +709,10 @@ local f_telemFFB = {
             local Canopy = MainPanel:get_argument_value(7)
             local APU = MainPanel:get_argument_value(13)
             -- A-10C  sends to SimShaker
+            damage_vars = {
+              65,81,134,135,136,144,146,147,148,150,153,154,161,167,213,214,215,216,217,219,223,224,225,226,227,229,
+              233,235,237,239,241,244,247,248,249,266,267
+            }
             stringToSend =
               string.format(
               "Flaps=%.2f;Canopy=%.2f;APU=%.2f",
@@ -659,6 +726,10 @@ local f_telemFFB = {
             local Canopy = MainPanel:get_argument_value(7)
             local APU = MainPanel:get_argument_value(13)
             -- A-10C  sends to SimShaker
+            damage_vars = {
+              65,81,134,135,136,144,146,147,148,150,153,154,161,167,213,214,215,216,217,219,223,224,225,226,227,229,
+              233,235,237,239,241,244,247,248,249,266,267
+            }
             stringToSend =
               string.format(
               "Flaps=%.2f;Canopy=%.2f;APU=%.2f",
@@ -678,6 +749,12 @@ local f_telemFFB = {
             local AB12 = string.format("%.1f~%.1f~%.1f", Afterburner1, Afterburner2, LampCheck)
             local SPS = MainPanel:get_argument_value(624)
             local CanopyWarnLight = MainPanel:get_argument_value(541)
+            damage_vars = {
+              115,116,117,134,135,136,144,145,145,146,147,148,149,150,151,152,153,154,156,157,158,160,162,162,166,167,
+              168,168,169,169,170,170,183,185,187,213,214,215,216,217,218,219,223,224,225,226,227,228,229,233,234,235,
+              236,244,245,246,249,253,254,254,255,256,256,257,257,259,260,260,261,261,264,265,266,267,268,289,290,291,
+              292,296,298,299,300,301,301,302,303,304,305,306
+            }
             -- MiG-21Bis sends to SimShaker
             stringToSend =
               string.format(
@@ -690,6 +767,10 @@ local f_telemFFB = {
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local stickY = -MainPanel:get_argument_value(420)
             local stickX = MainPanel:get_argument_value(421)
+            damage_vars = {
+              65,146,148,151,152,153,154,156,157,158,159,160,161,167,183,185,187,213,214,215,216,217,223,224,225,226,
+              227,238,240,242,242,242,247,253,255,259,265,266,267,270,272,296,297,298,299,300
+            }
             stringToSend =
               string.format(
               "StickX=%.3f;StickY=%.3f",
@@ -720,6 +801,10 @@ local f_telemFFB = {
               MainPanel:get_argument_value(180),
               MainPanel:get_argument_value(189)
             )
+              damage_vars = {
+                65,82,134,135,136,148,149,150,152,153,154,155,156,157,158,159,183,185,213,214,214,215,216,220,222,223,
+                224,224,225,226,230,232,238,240,244,245,246,248,271,296,298,299,300,301,302
+              }
             -- M-2000C sends to SimShaker
             stringToSend =
               string.format(
@@ -728,6 +813,11 @@ local f_telemFFB = {
           elseif obj.Name == "AV8BNA" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- AV8BNA sends to SimShaker
+            damage_vars = {
+              65,82,134,135,136,137,144,147,148,149,150,151,153,154,155,156,157,158,159,160,161,162,166,167,168,171,
+              177,183,213,214,215,216,217,218,220,221,223,224,225,226,227,228,230,231,237,239,244,245,246,248,250,
+              252,253,255,259,263,265,266,267,268,269,270,272,273,303,304,305
+            }
 
             local AileronTrim = MainPanel:get_argument_value(473) * 0.3
             local RudderTrim = MainPanel:get_argument_value(474)
@@ -750,54 +840,120 @@ local f_telemFFB = {
               self.recv_data
             )
 
-              elseif string.find(obj.Name, "F-14") then
+          elseif string.find(obj.Name, "F-14") then
                 -------------------------------------------------------------------------------------------------------------------------------------------------------
-                --local sensor_data = obj.get_base_data()
-                --log.info("TELEMFFB FOUND AIRCRAFT: "..obj.Name)
-                local f14SpeedbrakePos = LoGetAircraftDrawArgumentValue(400)
-                mech["speedbrakes"]["value"] = f14SpeedbrakePos
-                mech["speedbrakes"]["status"] = f14SpeedbrakePos >= 0.9999
-                local f14_Splr_L_Outer = LoGetAircraftDrawArgumentValue(1010)
-                local f14_Splr_L_Inner = LoGetAircraftDrawArgumentValue(1011)
-                local f14_Splr_R_Inner = LoGetAircraftDrawArgumentValue(1012)
-                local f14_Splr_R_Outer = LoGetAircraftDrawArgumentValue(1013)
-                local f14_DLC_Spoiler = string.format("%.2f~%.2f~%.2f~%.2f", f14_Splr_L_Outer, f14_Splr_L_Inner, f14_Splr_R_Inner, f14_Splr_R_Outer)
-                local REngine_RPM = "0"
-                local LEngine_RPM = "0"
-                if getEngineRightRPM then
-                  REngine_RPM = sensor_data.getEngineRightRPM()
-                end
-                if getEngineLeftRPM then
-                  LEngine_RPM = sensor_data.getEngineLeftRPM()
-                end
+              --local sensor_data = obj.get_base_data()
+              --log.info("TELEMFFB FOUND AIRCRAFT: "..obj.Name)
+              local f14SpeedbrakePos = LoGetAircraftDrawArgumentValue(400)
+              mech["speedbrakes"]["value"] = f14SpeedbrakePos
+              mech["speedbrakes"]["status"] = f14SpeedbrakePos >= 0.9999
+              local f14_Splr_L_Outer = LoGetAircraftDrawArgumentValue(1010)
+              local f14_Splr_L_Inner = LoGetAircraftDrawArgumentValue(1011)
+              local f14_Splr_R_Inner = LoGetAircraftDrawArgumentValue(1012)
+              local f14_Splr_R_Outer = LoGetAircraftDrawArgumentValue(1013)
+              local f14_DLC_Spoiler = string.format("%.2f~%.2f~%.2f~%.2f", f14_Splr_L_Outer, f14_Splr_L_Inner, f14_Splr_R_Inner, f14_Splr_R_Outer)
+              local REngine_RPM = "0"
+              local LEngine_RPM = "0"
+              damage_vars = {
+                65,510,513,514,515,516,517,518,519,520,521,522,523,524,525,526,527,530,531,532,533,534,535,536,537,
+                538,539,540,541,542,543,544,545,546,547,548,549,550,551,552,553,554,555,556,557,558,559,560,561,
+                562,563,564,565,566,567,568,569,570,571,574,575,576,577,578,586,587,588,589,590,591,592,593,594,
+                595,596,597,2502
+              }
+              if getEngineRightRPM then
+                REngine_RPM = sensor_data.getEngineRightRPM()
+              end
+              if getEngineLeftRPM then
+                LEngine_RPM = sensor_data.getEngineLeftRPM()
+              end
 
-                local RPM = REngine_RPM .. "~" .. LEngine_RPM
+              local RPM = REngine_RPM .. "~" .. LEngine_RPM
 
-                if f14 == nil or f14 == false then
-                  setupF14Export()
-                end
-                local additionalData = ""
+              if f14 == nil or f14 == false then
+                setupF14Export()
+              end
+              local additionalData = ""
 
-                if f14 == true then
-                  -- usual case after first time
-                  local epoxy = GetDevice(6)
-                  if epoxy ~= nil and type(epoxy) ~= "number" and f14_i2n ~= nil then
-                    local values = epoxy:get_values()
-                    for i, v in ipairs(values) do
-                      f14_variables[f14_i2n[i]] = v
-                      additionalData = additionalData .. "f14_" .. f14_i2n[i] .. "=" .. v .. ";" -- add f14_ prefix to mark these values
-                    end
+              if f14 == true then
+                -- usual case after first time
+                local epoxy = GetDevice(6)
+                if epoxy ~= nil and type(epoxy) ~= "number" and f14_i2n ~= nil then
+                  local values = epoxy:get_values()
+                  for i, v in ipairs(values) do
+                    f14_variables[f14_i2n[i]] = v
+                    additionalData = additionalData .. "f14_" .. f14_i2n[i] .. "=" .. v .. ";" -- add f14_ prefix to mark these values
                   end
-                  -- log.info("additionalData:"..additionalData)
                 end
+                -- log.info("additionalData:"..additionalData)
+              end
 
-                -- F-14 sends to SimShaker
-                stringToSend =
-                  string.format(
-                  "%s;Spoilers=%s",
-                  additionalData,
-                  f14_DLC_Spoiler
-                  )
+              -- F-14 sends to SimShaker
+              stringToSend =
+                string.format(
+                "%s;Spoilers=%s",
+                additionalData,
+                f14_DLC_Spoiler
+                )
+          elseif string.find(obj.Name, "F-18") then
+            damage_vars = {
+              65,135,136,137,146,148,149,150,152,152,153,154,156,157,158,160,166,183,213,214,215,216,217,220,222,223,
+              224,225,226,227,230,232,233,235,241,242,242,244,245,245,247,248,265,266,267,298,299
+            }
+
+          elseif string.find(obj.Name, "F-16") then
+             damage_vars = {
+              65,135,136,137,146,148,152,152,153,154,156,157,158,160,183,185,213,214,215,216,220,223,224,225,226,230,
+              237,238,239,240,241,242,243,247,298,299
+            }
+          elseif string.find(obj.Name, "F-15ESE") then
+            damage_vars = {
+              65,134,136,137,146,148,149,150,152,153,154,157,158,160,161,162,163,166,167,168,169,183,213,214,215,216,
+              217,223,224,225,226,227,238,240,241,243,244,246,247,248,253,255,259,265,266,267,268,298,299,428,428,
+              428,428
+            }
+          elseif string.find(obj.Name, "F-5") then
+            damage_vars = {
+              65,134,135,136,146,148,152,153,154,156,157,158,159,160,161,162,163,166,167,168,169,183,185,213,214,215,
+              216,217,220,223,224,225,226,227,230,238,240,242,247,265,266,267,270,272,296,297,298,299
+            }
+          elseif string.find(obj.Name, "F-86") then
+            damage_vars = {
+              65,147,148,149,150,152,153,154,156,157,158,183,185,213,214,215,216,217,223,224,225,226,227,233,234,235,
+              236,237,238,239,240,241,242,243,247,308,309,310,311,312,313,314,315
+            }
+          elseif string.find(obj.Name, "C-101") then
+            damage_vars = {
+              65,110,134,135,136,146,150,151,167,221,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,
+              239,241,242,243,244,249,250,252,253,254,255,256,257,261,262,263,264,265,267,269,270,271,273,400,401,402
+            }
+          elseif string.find(obj.Name, "MiG-15") then
+            damage_vars = {
+              65,134,135,136,146,148,149,150,152,153,154,156,157,158,167,183,185,213,214,215,216,217,223,224,225,226,
+              227,234,236,238,239,241,242,247,248,265,266,267
+            }
+          elseif string.find(obj.Name, "Mirage-F1") then
+            damage_vars = {
+              65,82,134,135,136,144,145,146,147,148,150,151,152,153,154,155,156,157,158,170,171,180,181,183,185,213,
+              214,214,215,216,217,218,219,220,221,222,223,224,224,225,226,227,230,231,232,237,238,239,240,244,245,
+              246,248,249,250,251,265,266,267,271,296,297,298,299,400,401
+            }
+          elseif string.find(obj.Name, "JF-17") then
+            damage_vars = {
+              65,82,134,135,136,147,148,149,150,151,152,153,154,155,156,157,158,159,160,162,166,168,183,185,187,189,
+              213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,237,238,239,240,241,
+              242,243,246,247,265,266,267,271,296,298,299,300,301,302,303
+            }
+          elseif string.find(obj.Name, "MB-339") then
+            damage_vars = {
+              65,134,135,136,146,148,149,150,152,153,154,156,157,158,159,183,213,214,215,216,217,223,224,225,226,227,
+              233,235,237,238,239,240,242,246,248,265,266,267,297,298,299,663,664
+            }
+          elseif string.find(obj.Name, "AJS37") then
+            damage_vars = {
+              65,134,135,136,148,153,154,159,216,223,225,226,227,242,246,248,271,700,701,800,801,997,998,999
+            }
+
+
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           else -- FC3 Planes
@@ -834,8 +990,10 @@ local f_telemFFB = {
               CanopyPos,
               WingsPos
             )
-          end      
-
+          end
+          if calc_damage == 1 and damage_vars ~= "not supported" then
+            damage = getDamage(damage_vars)
+          end
           local items = {
             {"T", "%.3f", t},
             {"N", "%s", obj.Name},
@@ -864,6 +1022,7 @@ local f_telemFFB = {
             {"CAlpha", "%.3f", calc_alpha},
             {"CBeta", "%.3f", calc_beta}, -- sideslip angle deg
             {"RelWind", "%s", rel_wind}, --wind in body frame
+            {"Damage", "%s", damage},
           }
           
           local formattedValues = {}
