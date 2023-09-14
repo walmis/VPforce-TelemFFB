@@ -225,10 +225,10 @@ class Aircraft(AircraftBase):
             logging.debug("Aircraft is Helicopter, aborting update_flight_controls")
             return
         if self.aircraft_is_spring_centered:
-            elev_base_gain = self.aileron_spring_gain
-            ailer_base_gain = self.elevator_spring_gain
+            elev_base_gain = self.elevator_spring_gain
+            ailer_base_gain = self.aileron_spring_gain
             rudder_base_gain = self.rudder_spring_gain
-            logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{elev_base_gain}:{ailer_base_gain}, rudder base gain to {rudder_base_gain}")
+            logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{ailer_base_gain}:{elev_base_gain}, rudder base gain to {rudder_base_gain}")
         
         incidence_vec = utils.Vector(telem_data["VelWorld"])
         wind_vec = utils.Vector(telem_data["AmbWind"])
