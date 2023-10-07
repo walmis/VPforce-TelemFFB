@@ -8,7 +8,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect') ],
-    datas=[('export/*', 'export'), ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('image/*', 'image'), ('config.user.ini.README', '.'), ('_RELEASE_NOTES.txt', '.')],
+    datas=[('export/*', 'export'), ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('image/*', 'image'), ('config.user.ini.README', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
