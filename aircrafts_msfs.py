@@ -129,7 +129,8 @@ class Aircraft(AircraftBase):
         # clear any existing effects
         for e in effects.values(): e.destroy()
         effects.clear()
-        self.spring = HapticEffect().spring()
+        # self.spring = HapticEffect().spring()
+        self.spring = effects["spring"].spring()
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.const_force = HapticEffect().constant(0, 0)
@@ -187,6 +188,7 @@ class Aircraft(AircraftBase):
 
     def _update_fbw_flight_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
+        self.spring = effects['fbw_spring'].spring()
         if ffb_type == "joystick":
             self.spring_y.positiveCoefficient = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
             # logging.debug(f"Elev Coeef: {elevator_coeff}")
@@ -212,7 +214,7 @@ class Aircraft(AircraftBase):
         # calculations loosely based on FLightGear FFB page:
         # https://wiki.flightgear.org/Force_feedback
         # https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
-
+        self.spring = effects["dynamic_spring"].spring()
         elev_base_gain = 0
         ailer_base_gain = 0
         rudder_base_gain = 0
@@ -498,7 +500,7 @@ class Helicopter(Aircraft):
         if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
             logging.warning("Force trim enabled but buttons not configured")
             return
-        # self.cyclic_spring = effects["cyclic_spring"].spring()
+        self.spring = effects["cyclic_spring"].spring()
         input_data = HapticEffect.device.getInput()
 
         force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
