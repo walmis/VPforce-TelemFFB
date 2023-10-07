@@ -349,6 +349,7 @@ class TelemManager(QObject, threading.Thread):
         data_source = telem_data.get("src", None)
         if data_source == "MSFS2020":
             module = aircrafts_msfs
+            sc_aircraft_type = telem_data.get("SimconnectCategory", None)
         elif data_source == "IL2":
             module = aircrafts_il2
         else:
@@ -360,9 +361,24 @@ class TelemManager(QObject, threading.Thread):
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
 
                 Class = getattr(module, cls_name, None)
-                if not Class:
-                    logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
-                    Class = module.Aircraft
+                print(f"CLASS={Class.__name__}")
+
+                if not Class or Class.__name__ == "Aircraft":
+                    if data_source == "MSFS2020":
+                        if sc_aircraft_type == "Helicopter":
+                            logging.warning(f"Aircraft definition not found, using SimConnect Data (Helicopter Type)")
+                            params, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.Helicopter")
+                            Class = module.Helicopter
+                        elif sc_aircraft_type == "Jet":
+                            logging.warning(f"Aircraft definition not found, using SimConnect Data (Jet Type)")
+                            params, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.JetAircraft")
+                            Class = module.JetAircraft
+                        else:
+                            logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
+                            Class = module.Aircraft
+                    else:
+                        logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
+                        Class = module.Aircraft
 
                 vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
                 if vpconf_path and "vpconf" in params:

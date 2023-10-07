@@ -120,6 +120,9 @@ class SimConnectManager(threading.Thread):
         SimVar("ElevTrim", "ELEVATOR TRIM POSITION", "degrees"),
         SimVar("ElevTrimPct", "ELEVATOR TRIM PCT", "Percent Over 100"),
         SimVar("AileronDefl", "AILERON AVERAGE DEFLECTION", "degrees"),
+        SimVar("AileronDeflPct", "AILERON DEFLECTION PCT", "Percent Over 100"),
+        SimVar("AileronTrim", "AILERON TRIM", "degrees"),
+        SimVar("AileronTrimPct", "AILERON TRIM PCT", "Percent Over 100"),
         SimVar("PropThrust1", "PROP THRUST:1", "kilograms", scale=10), #scaled to newtons
         SimVarArray("PropThrust", "PROP THRUST", "kilograms", min=1, max=4, scale=10),#scaled to newtons
         SimVarArray("PropRPM", "PROP RPM", "RPM", min=1, max=4),
@@ -161,7 +164,8 @@ class SimConnectManager(threading.Thread):
         SimVarArray("Afterburner", "TURB ENG AFTERBURNER", "Number", min=1, max=2),
         SimVar("AfterburnerPct", "TURB ENG AFTERBURNER PCT ACTIVE", "Percent Over 100"),
         SimVar("ACisFBW", "FLY BY WIRE FAC SWITCH", "bool"),
-        SimVar("StallWarning", "STALL WARNING", "bool")
+        SimVar("StallWarning", "STALL WARNING", "bool"),
+        SimVar("SimconnectCategory", "CATEGORY", "", type=DATATYPE_STRING128),
     ]
     
     def __init__(self):
