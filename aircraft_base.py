@@ -346,7 +346,8 @@ class AircraftBase(object):
         if aoa < local_buffet_aoa:
             effects.dispose("buffeting")
             return
-        
+        if local_buffet_aoa == 0 or local_stall_aoa == 0:
+            return
         airflow_factor = utils.scale_clamp(tas, (0, max_airflow_speed), (0, 1.0))
         buffeting_factor = utils.scale_clamp(aoa, (local_buffet_aoa, local_stall_aoa), (0.0, 1.0))
         # todo calc frequency

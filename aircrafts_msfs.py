@@ -123,6 +123,10 @@ class Aircraft(AircraftBase):
     cyclic_spring_gain = 1.0
     force_trim_button = "not_configured"
     force_trim_reset_button = "not_configured"
+    include_dynamic_stick_forces = True
+
+    elevator_force_trim = 0
+    aileron_force_trim = 0
 
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
@@ -169,6 +173,13 @@ class Aircraft(AircraftBase):
         self.cyclic_trim_release_active = 0
         self.cyclic_spring_init = 0
         self.cyclic_center = [0, 0]  # x, y
+
+        self.force_trim_release_active = 0
+        self.force_trim_spring_init = 0
+        self.stick_center = [0, 0]  # x, y
+
+        self.force_trim_x_offset = 0
+        self.force_trim_y_offset = 0
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
         freq = 8
@@ -239,6 +250,8 @@ class Aircraft(AircraftBase):
         incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
         incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
         incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
+        force_trim_x_offset = self.force_trim_x_offset
+        force_trim_y_offset = self.force_trim_y_offset
 
         _airspeed = incidence_vec.z
         telem_data["TAS"] = _airspeed
@@ -320,13 +333,19 @@ class Aircraft(AircraftBase):
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
 
         if ffb_type == 'joystick':
-            if telem_data["ElevDeflPct"] != 0: # avoid div by zero
-                #calculate maximum angle based on current angle and percentage
-                tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"] 
-                offs  =  _aoa / tot
-                offs = clamp(offs, -1, 1)
-                offs = int(offs*4096)
-                self.spring_y.cpOffset = offs
+            elev_trim = telem_data.get("ElevTrimPct", 0)
+            elev_trim_gain = .5
+            elev_trim = elev_trim * elev_trim_gain
+            if self.include_dynamic_stick_forces:
+                if telem_data["ElevDeflPct"] != 0: # avoid div by zero
+                    #calculate maximum angle based on current angle and percentage
+                    tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
+                    offs  =  _aoa / tot
+                    offs = offs + force_trim_y_offset + elev_trim
+                    offs = clamp(offs, -1, 1)
+                    offs = int(offs*4096)
+                    self.spring_y.cpOffset = offs
+                    # logging.debug(f"fto={force_trim_y_offset} | Offset={offs}")
 
             self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
             ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
@@ -466,12 +485,108 @@ class TurbopropAircraft(Aircraft):
             super()._gforce_effect(telem_data)
 
 class GliderAircraft(Aircraft):
+    def _update_force_trim(self, telem_data, x_axis=True, y_axis=True):
+        if not self.force_trim_enabled: 
+            return
+        self.spring = effects["dynamic_spring"].spring()
+        ffb_type = telem_data.get("FFBType", "joystick")
+        offs_x = 0
+        offs_y = 0
+        if ffb_type != "joystick":
+            return
+        if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
+            logging.warning("Force trim enabled but buttons not configured")
+            return
 
+        # logging.debug(f"update_force_trim: x={x_axis}, y={y_axis}")
+        input_data = HapticEffect.device.getInput()
+
+        force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
+        trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+        x, y = input_data.axisXY()
+        if force_trim_pressed:
+            if x_axis:
+                self.spring_x.positiveCoefficient = 2048
+                self.spring_x.negativeCoefficient = 2048
+
+                offs_x = round(x * 4096)
+                self.spring_x.cpOffset = offs_x
+
+                self.spring.effect.setCondition(self.spring_x)
+
+            if y_axis:
+                self.spring_y.positiveCoefficient = 2048
+                self.spring_y.negativeCoefficient = 2048
+
+                offs_y = round(y * 4096)
+                self.spring_y.cpOffset = offs_y
+
+                self.spring.effect.setCondition(self.spring_y)
+
+            self.stick_center = [x,y]
+
+            logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
+
+            self.force_trim_release_active = 1
+
+        if not force_trim_pressed and self.force_trim_release_active:
+
+            self.spring_x.positiveCoefficient = clamp(int(4096 * self.aileron_spring_gain), 0, 4096)
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+
+            self.spring_y.positiveCoefficient = clamp(int(4096 * self.elevator_spring_gain), 0, 4096)
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+            if x_axis:
+                offs_x = round(x * 4096)
+                self.spring_x.cpOffset = offs_x
+                self.spring.effect.setCondition(self.spring_x)
+
+            if y_axis:
+                offs_y = round(y * 4096)
+                self.spring_y.cpOffset = offs_y
+                self.spring.effect.setCondition(self.spring_y)
+
+            # self.spring.start()
+            self.stick_center = [x,y]
+
+            logging.info(f"Force Trim Engaged :{offs_x}:{offs_y}")
+
+            self.force_trim_release_active = 0
+
+        if trim_reset_pressed or not self.force_trim_spring_init:
+            if trim_reset_pressed:
+                self.stick_center = [0, 0]
+
+            if x_axis:
+                self.spring_x.positiveCoefficient = clamp(int(4096 * self.aileron_spring_gain), 0, 4096)
+                self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+                cpO_x = round(self.cyclic_center[0]*4096)
+                self.spring_x.cpOffset = cpO_x
+                self.spring.effect.setCondition(self.spring_x)
+
+            if y_axis:
+                self.spring_y.positiveCoefficient = clamp(int(4096 * self.elevator_spring_gain), 0, 4096)
+                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+                cpO_y = round(self.cyclic_center[1]*4096)
+                self.spring_y.cpOffset = cpO_y
+                self.spring.effect.setCondition(self.spring_y)
+
+            # self.spring.start()
+            self.force_trim_spring_init = 1
+            logging.info("Trim Reset Pressed")
+            return
+
+        telem_data["StickXY"] = [x, y]
+        telem_data["StickXY_offset"] = self.stick_center
+        self.force_trim_x_offset = self.stick_center[0]
+        self.force_trim_y_offset = self.stick_center[1]
     def on_telemetry(self, telem_data):
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "GliderAircraft"  # inject aircraft class into telemetry
         super().on_telemetry(telem_data)
+        if self.force_trim_enabled:
+            self._update_force_trim(telem_data, x_axis=self.aileron_force_trim, y_axis=self.elevator_force_trim)
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
