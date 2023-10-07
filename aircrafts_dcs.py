@@ -45,7 +45,8 @@ class Aircraft(AircraftBase):
     buffet_aoa : float          = 10.0              # AoA when buffeting starts
     stall_aoa : float           = 15.0              # Stall AoA
     wind_effect_enabled : int = 0
-
+    wind_effect_scaling: int = 0
+    wind_effect_max_intensity: int = 0
     engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
     
     runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable

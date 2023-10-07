@@ -535,6 +535,11 @@ class AircraftBase(object):
 
         v = HPFs.get("wnd", 3).update(wnd)
         v = LPFs.get("wnd", 15).update(v)
+        v = utils.clamp(v, 0, self.wind_effect_max_intensity)
+        v = utils.clamp(v*self.wind_effect_scaling, 0.0,1.0)
+        if v == 0:
+            effects.dispose("wind")
+            return
         logging.debug(f"Adding wind effect intensity:{v}")
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
