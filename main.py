@@ -51,7 +51,7 @@ sys.path.insert(0, '')
 log_folder = './log'
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
-logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", args.configfile, ".log"])
+logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", os.path.basename(args.configfile), "_", os.path.basename(args.overridefile), ".log"])
 log_file = os.path.join(log_folder, logname)
 
 # Create a logger instance
@@ -107,6 +107,20 @@ effects_translator = utils.EffectTranslator()
 
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
+if os.path.basename(args.configfile) == args.configfile:
+    # just the filename is present, assume it is in the script directory
+    print("Config File is in the script dir")
+    configfile = os.path.join(script_dir, args.configfile)
+else:
+    # assume is absolute path to file
+    print("Config file is absolute path")
+    configfile = args.configfile
+if os.path.basename(args.overridefile) == args.overridefile:
+    # just the filename is present, assume it is in the script directory
+    overridefile = os.path.join(script_dir, args.overridefile)
+else:
+    # assume is absolute path to file
+    overridefile = args.overridefile
 
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
@@ -166,9 +180,9 @@ def config_has_changed(update=False) -> bool:
     global _config
     
     # "hash" both mtimes together
-    tm = int(os.path.getmtime(args.configfile))
-    if os.path.exists(args.overridefile):
-        tm += int(os.path.getmtime(args.overridefile))
+    tm = int(os.path.getmtime(configfile))
+    if os.path.exists(overridefile):
+        tm += int(os.path.getmtime(overridefile))
     if update:
         _config_mtime = tm
 
@@ -182,8 +196,8 @@ def get_config() -> ConfigObj:
     # TODO: check if config files changed and reload
     if _config: return _config
 
-    main = load_config(args.configfile)
-    user = load_config(args.overridefile, raise_errors=False)
+    main = load_config(configfile)
+    user = load_config(overridefile, raise_errors=False)
     if user and main:
         main.merge(user)   
     
