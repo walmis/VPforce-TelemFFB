@@ -341,7 +341,8 @@ class Aircraft(AircraftBase):
                     #calculate maximum angle based on current angle and percentage
                     tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
                     offs  =  _aoa / tot
-                    offs = offs + force_trim_y_offset + elev_trim
+                    offs = offs + force_trim_y_offset
+                    # offs = offs + force_trim_y_offset + elev_trim
                     offs = clamp(offs, -1, 1)
                     offs = int(offs*4096)
                     self.spring_y.cpOffset = offs
