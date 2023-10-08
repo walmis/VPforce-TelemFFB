@@ -519,6 +519,21 @@ class MainWindow(QMainWindow):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         # Create a layout for the main window
         layout = QVBoxLayout()
+        notes_row_layout = QHBoxLayout()
+        self.notes_label = QLabel()
+        notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
+        label_txt = 'Release Notes'
+        # self.notes_label.setOpenExternalLinks(True)
+
+        # Connect the linkActivated signal to the open_file method and pass the URL
+        self.notes_label.linkActivated.connect(lambda url=notes_url: self.open_file(url))
+
+        self.notes_label.setText(f'<a href="{notes_url}">{label_txt}</a>')
+        self.notes_label.setAlignment(Qt.AlignRight)
+        self.notes_label.setToolTip(notes_url)
+
+        notes_row_layout.addWidget(self.notes_label)
+        layout.addLayout(notes_row_layout)
 
         # Add a label for the image
         # Construct the absolute path of the image file
@@ -701,6 +716,13 @@ class MainWindow(QMainWindow):
     def show_sub_menu(self):
         edit_button = self.sender()
         self.sub_menu.popup(edit_button.mapToGlobal(edit_button.rect().bottomLeft()))
+
+    def open_file(self, url):
+        try:
+            file_url = QUrl.fromLocalFile(url)
+            QDesktopServices.openUrl(file_url)
+        except Exception as e:
+            logging.error(f"There was an error opening the file: {str(e)}")
 
     def edit_config_file(self, config_type):
         script_dir = os.path.dirname(os.path.abspath(__file__))
