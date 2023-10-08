@@ -32,7 +32,7 @@ Many new features have been recently added including:
 - AoA reduction force to simulate such features as in the F/A-18
 ## Improved MSFS Support
 
-MSFS support in TelemFFB has been significantly extended.  A Majority of the ffects listed above are supported (where applicable).
+MSFS support in TelemFFB has been significantly extended.  A Majority of the effects listed above are supported (where applicable).
 
 Primary Flight Controls
 - Dynamic Flight Control Spring Force (existing TelemFFB Feature)
