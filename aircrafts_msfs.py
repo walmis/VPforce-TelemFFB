@@ -189,6 +189,8 @@ class Aircraft(AircraftBase):
         self.telemffb_controls_axes = False
 
         self.joystick_trim_follow = False
+        self.joystick_x_axis_scale = 1.0
+        self.joystick_y_axis_scale = 1.0
         self.joystick_trim_follow_gain_physical_x = 0.0
         self.joystick_trim_follow_gain_physical_y = 0.0
         self.joystick_trim_follow_gain_virtual_x = 0.0
@@ -262,8 +264,10 @@ class Aircraft(AircraftBase):
 
                 # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
                 # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383, 16384)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383, 16384)))
+                x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
+                y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383*x_scale, 16384*x_scale)))
+                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383*y_scale, 16384*y_scale)))
 
                 sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
                 sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
@@ -433,8 +437,11 @@ class Aircraft(AircraftBase):
 
                 # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
                 # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383, 16384)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383, 16384)))
+                x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
+                y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+
                 # print(f"ypos={y_pos}, posypos={pos_y_pos}")
                 # print(f"xpos={x_pos}, posxpos={pos_x_pos}")
                 sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
@@ -814,9 +821,13 @@ class Helicopter(Aircraft):
 
             # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
             # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
-            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383, 16384)))
-            pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16383, 16384)))
-            # print("sending")
+
+            x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
+            y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+
+            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+            pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+
             sim_connect.send_event("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
             sim_connect.send_event("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
 
