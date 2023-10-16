@@ -39,6 +39,11 @@ ft = 3.28084  # m to ft
 kt = 1.94384  # ms to kt
 kt2ms = 0.514444  # knots to m/s
 
+sim_connect = None
+try:
+    sim_connect = SimConnect()
+except: pass
+
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -180,6 +185,21 @@ class Aircraft(AircraftBase):
 
         self.force_trim_x_offset = 0
         self.force_trim_y_offset = 0
+
+        self.telemffb_controls_axes = False
+
+        self.joystick_trim_follow = False
+        self.joystick_trim_follow_gain_physical_x = 0.0
+        self.joystick_trim_follow_gain_physical_y = 0.0
+        self.joystick_trim_follow_gain_virtual_x = 0.0
+        self.joystick_trim_follow_gain_virtual_y = 0.0
+
+        global sim_connect
+        if sim_connect is None:
+            sim_connect = SimConnect()
+
+
+
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
         freq = 8
@@ -201,15 +221,63 @@ class Aircraft(AircraftBase):
         ffb_type = telem_data.get("FFBType", "joystick")
         self.spring = effects['fbw_spring'].spring()
         if ffb_type == "joystick":
+
+            self.joystick_trim_follow = True
+            self.joystick_trim_follow_gain_physical_x = .5
+            self.joystick_trim_follow_gain_physical_y = .5
+            self.joystick_trim_follow_gain_virtual_x = .5
+            self.joystick_trim_follow_gain_virtual_y = .5
+            # virtual_stick_y_gain = .5
+            # aileron_trim_gain = 1
+            # virtual_stick_x_gain = .5
+            if self.joystick_trim_follow:
+                self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
+                elev_trim = telem_data.get("ElevTrimPct", 0)
+                aileron_trim = telem_data.get("AileronTrimPct", 0)
+
+                aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
+                virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
+                phys_stick_x_offs = int(aileron_trim * 4096)
+
+                elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
+                virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+                phys_stick_y_offs = int(elev_trim*4096)
+
+
+
+
+            else:
+                phys_stick_x_offs = 0
+                virtual_stick_x_offs = 0
+                phys_stick_y_offs = 0
+                virtual_stick_y_offs = 0
+
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+                # print(f"{virtual_stick_x_offs}, {virtual_stick_y_offs}")
+                # print(f"phys_x = {phys_x}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
+                x_pos = phys_x - virtual_stick_x_offs
+                y_pos = phys_y - virtual_stick_y_offs
+
+                # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
+                # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383, 16384)))
+                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383, 16384)))
+
+                self.sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
+                self.sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+            # update spring data
+
             self.spring_y.positiveCoefficient = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
             # logging.debug(f"Elev Coeef: {elevator_coeff}")
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
-            self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
+            self.spring_y.cpOffset = phys_stick_y_offs
 
             self.spring_x.positiveCoefficient = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            self.spring_x.cpOffset = phys_stick_x_offs
 
-            # update spring data
             self.spring.effect.setCondition(self.spring_y)
             self.spring.effect.setCondition(self.spring_x)
 
@@ -333,19 +401,60 @@ class Aircraft(AircraftBase):
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
 
         if ffb_type == 'joystick':
-            elev_trim = telem_data.get("ElevTrimPct", 0)
-            elev_trim_gain = .5
-            elev_trim = elev_trim * elev_trim_gain
-            if self.include_dynamic_stick_forces:
-                if telem_data["ElevDeflPct"] != 0: # avoid div by zero
-                    #calculate maximum angle based on current angle and percentage
-                    tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
-                    offs  =  _aoa / tot
-                    offs = offs + force_trim_y_offset
-                    # offs = offs + force_trim_y_offset + elev_trim
-                    offs = clamp(offs, -1, 1)
-                    offs = int(offs*4096)
-                    self.spring_y.cpOffset = offs
+
+            if self.joystick_trim_follow:
+                self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
+                elev_trim = telem_data.get("ElevTrimPct", 0)
+                aileron_trim = telem_data.get("AileronTrimPct", 0)
+
+                aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
+                virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
+                phys_stick_x_offs = int(aileron_trim * 4096)
+
+                elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
+                virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+                phys_stick_y_offs = int(elev_trim * 4096)
+
+            else:
+                phys_stick_x_offs = 0
+                virtual_stick_x_offs = 0
+                phys_stick_y_offs = 0
+                virtual_stick_y_offs = 0
+
+            if self.telemffb_controls_axes:
+                autopilot_active = telem_data.get("APMaster", 0)
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+                # print(f"{virtual_stick_x_offs}, {virtual_stick_y_offs}")
+                # print(f"phys_x = {phys_x}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
+                # print(f"phys_y = {phys_y}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
+                x_pos = phys_x - virtual_stick_x_offs
+                y_pos = phys_y - virtual_stick_y_offs
+
+                # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
+                # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383, 16384)))
+                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383, 16384)))
+                print(f"ypos={y_pos}, posypos={pos_y_pos}")
+                print(f"xpos={x_pos}, posxpos={pos_x_pos}")
+                sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
+                sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+
+
+            if telem_data["ElevDeflPct"] != 0: # avoid div by zero
+                #calculate maximum angle based on current angle and percentage
+                tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
+                y_offs  =  _aoa / tot
+                # offs = offs + force_trim_y_offset
+                y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs/4096)
+                y_offs = clamp(y_offs, -1, 1)
+                y_offs = int(y_offs*4096)
+                self.spring_y.cpOffset = y_offs
+
+            x_offs = phys_stick_x_offs
+            self.spring_x.cpOffset = x_offs
+
+
                     # logging.debug(f"fto={force_trim_y_offset} | Offset={offs}")
 
             self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)

@@ -128,6 +128,7 @@ class SimConnectManager(threading.Thread):
         SimVarArray("PropRPM", "PROP RPM", "RPM", min=1, max=4),
         SimVar("RotorRPM", "ROTOR RPM:1", "RPM"),
         SimVar("DynPressure", "DYNAMIC PRESSURE", "pascal"),
+        SimVar("APMaster", "AUTOPILOT MASTER", "Bool"),
         #SimVar("AileronDeflPct", "AILERON AVERAGE DEFLECTION PCT", "Percent Over 100", scale=100),
         SimVar("RudderDefl", "RUDDER DEFLECTION", "degrees"),
         SimVar("RudderDeflPct", "RUDDER DEFLECTION PCT", "Percent Over 100"),
