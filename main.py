@@ -47,6 +47,8 @@ import sys
 import time
 import os
 sys.path.insert(0, '')
+#sys.path.append('/simconnect')
+
 
 log_folder = './log'
 if not os.path.exists(log_folder):
@@ -132,18 +134,27 @@ global dev_firmware_version
 dev_firmware_version = None
 
 class LoggingFilter(logging.Filter):
-    def __init__(self, keyword):
-        self.keyword = keyword
+    def __init__(self, keywords):
+        self.keywords = keywords
 
     def filter(self, record):
-        # Check if the keyword is present in the log message
-        if self.keyword in record.getMessage():
-            # If the keyword is found, prevent the message from being logged
-            return False
-        # If the keyword is not found, allow the message to be logged
+        # Check if any of the keywords are present in the log message
+        for keyword in self.keywords:
+            if keyword in record.getMessage():
+                # If any keyword is found, prevent the message from being logged
+                return False
+        # If none of the keywords are found, allow the message to be logged
         return True
 
-log_filter = LoggingFilter("unrecognized Miscellaneous Unit in typefor(POSITION)")
+# Create a list of keywords to filter
+log_filter_strings = [
+    "unrecognized Miscellaneous Unit in typefor(POSITION)",
+    "Unrecognized event AXIS_CYCLIC_LATERAL_SET",
+    "Unrecognized event AXIS_CYCLIC_LONGITUDINAL_SET",
+]
+
+log_filter = LoggingFilter(log_filter_strings)
+
 console_handler.addFilter(log_filter)
 file_handler.addFilter(log_filter)
 
