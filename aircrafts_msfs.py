@@ -265,8 +265,8 @@ class Aircraft(AircraftBase):
                 pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383, 16384)))
                 pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383, 16384)))
 
-                self.sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
-                self.sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+                sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
+                sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
             # update spring data
 
             self.spring_y.positiveCoefficient = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
