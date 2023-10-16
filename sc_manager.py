@@ -120,7 +120,7 @@ class SimConnectManager(threading.Thread):
         SimVar("ElevTrim", "ELEVATOR TRIM POSITION", "degrees"),
         SimVar("ElevTrimPct", "ELEVATOR TRIM PCT", "Percent Over 100"),
         SimVar("AileronDefl", "AILERON AVERAGE DEFLECTION", "degrees"),
-        SimVar("AileronDeflPct", "AILERON DEFLECTION PCT", "Percent Over 100"),
+        SimVarArray("AileronDeflPctLR", "AILERON <> DEFLECTION PCT", keywords=("LEFT", "RIGHT"), unit="Percent Over 100"),
         SimVar("AileronTrim", "AILERON TRIM", "degrees"),
         SimVar("AileronTrimPct", "AILERON TRIM PCT", "Percent Over 100"),
         SimVar("PropThrust1", "PROP THRUST:1", "kilograms", scale=10), #scaled to newtons

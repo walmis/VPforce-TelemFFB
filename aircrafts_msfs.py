@@ -195,6 +195,7 @@ class Aircraft(AircraftBase):
         self.joystick_trim_follow_gain_physical_y = 0.0
         self.joystick_trim_follow_gain_virtual_x = 0.0
         self.joystick_trim_follow_gain_virtual_y = 0.0
+        self.joystick_ap_following = False
 
         global sim_connect
         if sim_connect is None:
@@ -221,14 +222,10 @@ class Aircraft(AircraftBase):
 
     def _update_fbw_flight_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
+        ap_active = telem_data.get("APMaster", 0)
         self.spring = effects['fbw_spring'].spring()
         if ffb_type == "joystick":
 
-            self.joystick_trim_follow = True
-            self.joystick_trim_follow_gain_physical_x = .5
-            self.joystick_trim_follow_gain_physical_y = .5
-            self.joystick_trim_follow_gain_virtual_x = .5
-            self.joystick_trim_follow_gain_virtual_y = .5
             # virtual_stick_y_gain = .5
             # aileron_trim_gain = 1
             # virtual_stick_x_gain = .5
@@ -239,14 +236,27 @@ class Aircraft(AircraftBase):
 
                 aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
                 virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
-                phys_stick_x_offs = int(aileron_trim * 4096)
+
 
                 elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
                 virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
                 phys_stick_y_offs = int(elev_trim*4096)
 
-
-
+                if self.joystick_ap_following and ap_active:
+                    input_data = HapticEffect.device.getInput()
+                    phys_x, phys_y = input_data.axisXY()
+                    aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+                    elevator_pos = telem_data.get("ElevDeflPct", 0)
+                    aileron_pos = aileron_pos[0]
+                    if phys_x != 0:
+                        delta = round((aileron_pos - phys_x) / phys_x, 3)
+                    else:
+                        delta = 0.0
+                    # if abs(delta) > 0.1:
+                    #     print(f"{round(aileron_pos, 3)}, {round(phys_x, 3)}, delta={delta}")
+                    phys_stick_x_offs = int(aileron_pos * 4096)
+                else:
+                    phys_stick_x_offs = int(aileron_trim * 4096)
 
             else:
                 phys_stick_x_offs = 0
@@ -410,15 +420,30 @@ class Aircraft(AircraftBase):
                 self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
                 elev_trim = telem_data.get("ElevTrimPct", 0)
                 aileron_trim = telem_data.get("AileronTrimPct", 0)
+                ap_active = telem_data.get("APMaster", 0)
 
                 aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
                 virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
-                phys_stick_x_offs = int(aileron_trim * 4096)
 
                 elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
                 virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
                 phys_stick_y_offs = int(elev_trim * 4096)
 
+                if self.joystick_ap_following and ap_active:
+                    input_data = HapticEffect.device.getInput()
+                    phys_x, phys_y = input_data.axisXY()
+                    aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+                    elevator_pos = telem_data.get("ElevDeflPct", 0)
+                    aileron_pos = aileron_pos[0]
+                    if phys_x != 0:
+                        delta = round((aileron_pos - phys_x) / phys_x, 3)
+                    else:
+                        delta = 0.0
+                    # if abs(delta) > 0.1:
+                    #     print(f"{round(aileron_pos, 3)}, {round(phys_x, 3)}, delta={delta}")
+                    phys_stick_x_offs = int(aileron_pos * 4096)
+                else:
+                    phys_stick_x_offs = int(aileron_trim * 4096)
             else:
                 phys_stick_x_offs = 0
                 virtual_stick_x_offs = 0
