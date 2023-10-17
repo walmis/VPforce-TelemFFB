@@ -766,11 +766,11 @@ class Helicopter(Aircraft):
 
     def _update_cyclic(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
-
+        if ffb_type != "joystick":
+            return
         if self.force_trim_enabled:
 
-            if ffb_type != "joystick":
-                return
+
             if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
                 logging.warning("Force trim enabled but buttons not configured")
                 return
@@ -870,7 +870,7 @@ class Helicopter(Aircraft):
             pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
             pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-            logging.info(f"AXIS_CYCLIC_LATERAL_SET: {pos_x_pos}, AXIS_CYCLIC_LONGITUDINAL_SET: {pos_y_pos}")
+            # logging.debug(f"AXIS_CYCLIC_LATERAL_SET: {pos_x_pos}, AXIS_CYCLIC_LONGITUDINAL_SET: {pos_y_pos}")
             sim_connect.send_event("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
             sim_connect.send_event("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
 
