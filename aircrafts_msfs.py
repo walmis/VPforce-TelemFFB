@@ -197,6 +197,8 @@ class Aircraft(AircraftBase):
         self.joystick_trim_follow_gain_virtual_y = 0.0
         self.joystick_ap_following = False
 
+        self.use_fbw_for_ap_follow = False
+
         global sim_connect
         if sim_connect is None:
             sim_connect = SimConnect()
@@ -282,14 +284,18 @@ class Aircraft(AircraftBase):
                 sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
                 sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
             # update spring data
+            if self.joystick_ap_following and ap_active:
+                y_coeff = 4096
+                x_coeff = 4096
+            else:
+                y_coeff = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
+                x_coeff = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
 
-            self.spring_y.positiveCoefficient = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = y_coeff
             # logging.debug(f"Elev Coeef: {elevator_coeff}")
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
             self.spring_y.cpOffset = phys_stick_y_offs
 
-            self.spring_x.positiveCoefficient = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
             self.spring_x.cpOffset = phys_stick_x_offs
 
             self.spring.effect.setCondition(self.spring_y)
@@ -308,6 +314,8 @@ class Aircraft(AircraftBase):
         # https://wiki.flightgear.org/Force_feedback
         # https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
         self.spring = effects["dynamic_spring"].spring()
+        ap_active = telem_data.get("APMaster", 0)
+
         elev_base_gain = 0
         ailer_base_gain = 0
         rudder_base_gain = 0
@@ -316,9 +324,19 @@ class Aircraft(AircraftBase):
             logging.debug ("FBW Setting enabled, running fbw_flight_controls")
             self._update_fbw_flight_controls(telem_data)
             return
-        elif telem_data.get("AircraftClass") == "Helicopter":
+
+        if telem_data.get("AircraftClass") == "Helicopter":
             logging.debug("Aircraft is Helicopter, aborting update_flight_controls")
             return
+
+        if self.joystick_ap_following and ap_active and self.use_fbw_for_ap_follow:
+            logging.debug("FBW Setting enabled, running fbw_flight_controls")
+            self._update_fbw_flight_controls(telem_data)
+            effects["dynamic_spring"].stop()
+            return
+        else:
+            effects["fbw_spring"].stop()
+
         if self.aircraft_is_spring_centered:
             elev_base_gain = self.elevator_spring_gain
             ailer_base_gain = self.aileron_spring_gain
@@ -420,7 +438,6 @@ class Aircraft(AircraftBase):
                 self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
                 elev_trim = telem_data.get("ElevTrimPct", 0)
                 aileron_trim = telem_data.get("AileronTrimPct", 0)
-                ap_active = telem_data.get("APMaster", 0)
 
                 aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
                 virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
@@ -853,6 +870,7 @@ class Helicopter(Aircraft):
             pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
             pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
+            logging.info(f"AXIS_CYCLIC_LATERAL_SET: {pos_x_pos}, AXIS_CYCLIC_LONGITUDINAL_SET: {pos_y_pos}")
             sim_connect.send_event("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
             sim_connect.send_event("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
 
