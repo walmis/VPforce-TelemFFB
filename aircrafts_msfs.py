@@ -188,16 +188,21 @@ class Aircraft(AircraftBase):
 
         self.telemffb_controls_axes = False
 
-        self.joystick_trim_follow = False
+        self.trim_following = False
         self.joystick_x_axis_scale = 1.0
         self.joystick_y_axis_scale = 1.0
-        self.joystick_trim_follow_gain_physical_x = 0.0
-        self.joystick_trim_follow_gain_physical_y = 0.0
-        self.joystick_trim_follow_gain_virtual_x = 0.0
-        self.joystick_trim_follow_gain_virtual_y = 0.0
-        self.joystick_ap_following = False
+        self.rudder_x_axis_scale = 1.0
 
-        self.use_fbw_for_ap_follow = False
+        self.joystick_trim_follow_gain_physical_x = 1.0
+        self.joystick_trim_follow_gain_physical_y = 0.2
+        self.joystick_trim_follow_gain_virtual_x = 1.0
+        self.joystick_trim_follow_gain_virtual_y = 0.2
+        self.rudder_trim_follow_gain_physical_x = 1.0
+        self.rudder_trim_follow_gain_virtual_x = 0.2
+
+        self.joystick_ap_following = True
+
+        self.use_fbw_for_ap_follow = True
 
         global sim_connect
         if sim_connect is None:
@@ -228,20 +233,19 @@ class Aircraft(AircraftBase):
         self.spring = effects['fbw_spring'].spring()
         if ffb_type == "joystick":
 
-            # virtual_stick_y_gain = .5
-            # aileron_trim_gain = 1
-            # virtual_stick_x_gain = .5
-            if self.joystick_trim_follow:
-                self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
+            if self.trim_following:
+                if not self.telemffb_controls_axes:
+                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION TO MSFS! Forcing to enable!")
+                    self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
                 elev_trim = telem_data.get("ElevTrimPct", 0)
                 aileron_trim = telem_data.get("AileronTrimPct", 0)
 
                 aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
                 virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
 
-
                 elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
                 virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+
                 phys_stick_y_offs = int(elev_trim*4096)
 
                 if self.joystick_ap_following and ap_active:
@@ -302,10 +306,45 @@ class Aircraft(AircraftBase):
             self.spring.effect.setCondition(self.spring_x)
 
         elif ffb_type == "pedals":
-            self.spring_x.positiveCoefficient = clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)
-            logging.debug(f"Elev Coeef: {clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)}")
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
-            self.spring_x.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
+            if self.trim_following:
+                if not self.telemffb_controls_axes:
+                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION TO MSFS! Forcing to enable!")
+                    self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
+                rudder_trim = telem_data.get("RudderTrimPct", 0)
+
+                rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
+                virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
+
+                phys_rudder_x_offs = int(rudder_trim * 4096)
+            else:
+                phys_rudder_x_offs = 0
+                virtual_rudder_x_offs = 0
+
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+                x_pos = phys_x - virtual_rudder_x_offs
+                x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+                # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+
+                sim_connect.send_event("AXIS_RUDDER_SET", pos_x_pos)
+                # sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+                # update spring data
+
+            # if self.joystick_ap_following and ap_active:
+            #     y_coeff = 4096
+            #     x_coeff = 4096
+            # else:
+            #     y_coeff = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
+            #     x_coeff = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
+
+            x_coeff = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
+
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
+            self.spring_x.cpOffset = phys_rudder_x_offs
+            logging.debug(f"Elev Coeef: {x_coeff}")
+
             self.spring.effect.setCondition(self.spring_x)
         self.spring.start()
 
@@ -434,7 +473,7 @@ class Aircraft(AircraftBase):
 
         if ffb_type == 'joystick':
 
-            if self.joystick_trim_follow:
+            if self.trim_following:
                 self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
                 elev_trim = telem_data.get("ElevTrimPct", 0)
                 aileron_trim = telem_data.get("AileronTrimPct", 0)
@@ -539,8 +578,45 @@ class Aircraft(AircraftBase):
             self.spring.start() # ensure spring is started
 
         elif ffb_type == 'pedals':
-            self.spring_x.positiveCoefficient = clamp(int(4096 * rudder_coeff), base_rudder_coeff, 4096)
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            if self.trim_following:
+                if not self.telemffb_controls_axes:
+                    logging.warning(
+                        "TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION TO MSFS! Forcing to enable!")
+                    self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
+                rudder_trim = telem_data.get("RudderTrimPct", 0)
+
+                rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
+                virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
+
+                phys_rudder_x_offs = int(rudder_trim * 4096)
+            else:
+                phys_rudder_x_offs = 0
+                virtual_rudder_x_offs = 0
+
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+                x_pos = phys_x - virtual_rudder_x_offs
+                x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+                # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+
+                sim_connect.send_event("AXIS_RUDDER_SET", pos_x_pos)
+                # sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+                # update spring data
+
+            # if self.joystick_ap_following and ap_active:
+            #     y_coeff = 4096
+            #     x_coeff = 4096
+            # else:
+            #     y_coeff = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
+            #     x_coeff = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
+
+            x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, 4096)
+
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
+            self.spring_x.cpOffset = phys_rudder_x_offs
+
             self.spring.effect.setCondition(self.spring_x)
             self.const_force.constant(rud_force, 270).start()
             telem_data["RudForce"] = rud_force
