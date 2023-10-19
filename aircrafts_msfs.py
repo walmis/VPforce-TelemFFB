@@ -1004,7 +1004,6 @@ class Helicopter(Aircraft):
                 # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
                 sim_connect.send_event("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
-            pass
 
 
 
