@@ -1,4 +1,28 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+#############################################
+##  <DATE>
+#############################################
+
+# MSFS
+** Please read the full documentation in the VPForce Manual **
+** https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y **
+
+- New option to send joystick/pedal axis position to MSFS via simconnect.  Requires un-binding axes from MSFS
+ - telemffb_controls_axes           - Master control for simconnect axis sending (true/false)
+   - joystick_x_axis_scale          - Scale joystick x axis output (0-%100)
+   - joystick_y_axis_scale          - Scale joystick y axis output (0-%100)
+   - rudder_x_axis_scale            - Scale pedal axis output (0-%100)
+
+- New trim and AP following functionality for fixed wing aircraft.  REQUIRES `telemffb_controls_axes = True`
+ - trim_following = True                            - Master control for trim/ap following (true/false)
+   - ap_following                                   - Enable/disable ap following (only disables aileron/rudder) (true/false)
+   - invert_ap_x_axis                               - Invert the x axis AP follow behavior (req'd for some AC like the default C172)
+   - joystick_trim_follow_gain_physical_x           - Physical stick x axis movement as a percentage of the trim value (0-100%)
+   - joystick_trim_follow_gain_physical_y           - Physical stick y axis movement as a percentage of the trim value (0-100%)
+   - joystick_trim_follow_gain_virtual_x            - Virtual stick x axis movement as a percentage of the physical stick movement (0-100%)
+   - joystick_trim_follow_gain_virtual_y            - Virtual stick y axis movement as a percentage of the physical stick movement (0-100%)
+   - rudder_trim_follow_gain_physical_x             - Physical pedal x axis movement as a percentage of the trim value (0-100%)
+   - rudder_trim_follow_gain_virtual_x              - Virtual pedal x axis movement as a percentage of the physical pedal movement (0-100%)
 
 #############################################
 ##  October 6th, 2023 Commits by @Number481
