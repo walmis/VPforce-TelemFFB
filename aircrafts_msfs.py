@@ -39,6 +39,11 @@ ft = 3.28084  # m to ft
 kt = 1.94384  # ms to kt
 kt2ms = 0.514444  # knots to m/s
 
+sim_connect = None
+try:
+    sim_connect = SimConnect()
+except: pass
+
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -128,6 +133,10 @@ class Aircraft(AircraftBase):
     elevator_force_trim = 0
     aileron_force_trim = 0
 
+    smoother = utils.Smoother()
+    dampener = utils.Derivative()
+
+
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
         # clear any existing effects
@@ -180,6 +189,33 @@ class Aircraft(AircraftBase):
 
         self.force_trim_x_offset = 0
         self.force_trim_y_offset = 0
+
+        self.telemffb_controls_axes = False
+
+        self.trim_following = False
+        self.joystick_x_axis_scale = 1.0
+        self.joystick_y_axis_scale = 1.0
+        self.rudder_x_axis_scale = 1.0
+
+        self.joystick_trim_follow_gain_physical_x = 1.0
+        self.joystick_trim_follow_gain_physical_y = 0.2
+        self.joystick_trim_follow_gain_virtual_x = 1.0
+        self.joystick_trim_follow_gain_virtual_y = 0.2
+        self.rudder_trim_follow_gain_physical_x = 1.0
+        self.rudder_trim_follow_gain_virtual_x = 0.2
+
+        self.ap_following = True
+
+        self.use_fbw_for_ap_follow = True
+
+        self.invert_ap_x_axis = False
+
+        global sim_connect
+        if sim_connect is None:
+            sim_connect = SimConnect()
+
+
+
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
         freq = 8
@@ -199,25 +235,167 @@ class Aircraft(AircraftBase):
 
     def _update_fbw_flight_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
+        ap_active = telem_data.get("APMaster", 0)
         self.spring = effects['fbw_spring'].spring()
         if ffb_type == "joystick":
-            self.spring_y.positiveCoefficient = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
-            # logging.debug(f"Elev Coeef: {elevator_coeff}")
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
-            self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
 
-            self.spring_x.positiveCoefficient = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            if self.trim_following:
+                if not self.telemffb_controls_axes:
+                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION TO MSFS! Forcing to enable!")
+                    self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
+                elev_trim = telem_data.get("ElevTrimPct", 0)
 
+                # derivative_hz = 5  # derivative lpf filter -3db Hz
+                # derivative_k = 0.1  # derivative gain value, or damping ratio
+                #
+                # d_elev_trim = getattr(self, "_d_elev_trim", None)
+                # if not d_elev_trim: d_elev_trim = self._d_elev_trim = utils.Derivative(derivative_hz)
+                # d_elev_trim.lpf.cutoff_freq_hz = derivative_hz
+                #
+                # elev_trim_deriv = - d_elev_trim.update(elev_trim) * derivative_k
+                #
+                # elev_trim += elev_trim_deriv
+                elev_trim = self.dampener.dampen_value(elev_trim, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+
+                # print(f"raw:{raw_elev_trim}, smooth:{elev_trim}")
+                aileron_trim = telem_data.get("AileronTrimPct", 0)
+
+                aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
+                virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
+
+                elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
+                virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+
+                phys_stick_y_offs = int(elev_trim*4096)
+
+                if self.ap_following and ap_active:
+                    input_data = HapticEffect.device.getInput()
+                    phys_x, phys_y = input_data.axisXY()
+                    aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+                    elevator_pos = telem_data.get("ElevDeflPct", 0)
+                    aileron_pos = aileron_pos[0]
+
+                    aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+                    # derivative_hz = 5  # derivative lpf filter -3db Hz
+                    # derivative_k = 0.1  # derivative gain value, or damping ratio
+                    #
+                    # d_aileron_pos = getattr(self, "_d_aileron_pos", None)
+                    # if not d_aileron_pos: d_aileron_pos = self._d_aileron_pos = utils.Derivative(derivative_hz)
+                    # d_aileron_pos.lpf.cutoff_freq_hz = derivative_hz
+                    #
+                    # aileron_pos_deriv = - d_aileron_pos.update(aileron_pos) * derivative_k
+                    #
+                    # aileron_pos += aileron_pos_deriv
+
+
+                    phys_stick_x_offs = int(aileron_pos * 4096)
+                    if self.invert_ap_x_axis:
+                        phys_stick_x_offs = -phys_stick_x_offs
+                else:
+                    phys_stick_x_offs = int(aileron_trim * 4096)
+
+            else:
+                phys_stick_x_offs = 0
+                virtual_stick_x_offs = 0
+                phys_stick_y_offs = 0
+                virtual_stick_y_offs = 0
+
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+                # print(f"{virtual_stick_x_offs}, {virtual_stick_y_offs}")
+                # print(f"phys_x = {phys_x}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
+                x_pos = phys_x - virtual_stick_x_offs
+                y_pos = phys_y - virtual_stick_y_offs
+
+                # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
+                # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
+                x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
+                y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383*x_scale, 16384*x_scale)))
+                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383*y_scale, 16384*y_scale)))
+
+                sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
+                sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
             # update spring data
+            if self.ap_following and ap_active:
+                y_coeff = 4096
+                x_coeff = 4096
+            else:
+                y_coeff = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
+                x_coeff = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
+
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = y_coeff
+            # logging.debug(f"Elev Coeef: {elevator_coeff}")
+            self.spring_y.cpOffset = phys_stick_y_offs
+
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
+            self.spring_x.cpOffset = phys_stick_x_offs
+
             self.spring.effect.setCondition(self.spring_y)
             self.spring.effect.setCondition(self.spring_x)
 
         elif ffb_type == "pedals":
-            self.spring_x.positiveCoefficient = clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)
-            logging.debug(f"Elev Coeef: {clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)}")
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
-            self.spring_x.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
+            if self.trim_following:
+                if not self.telemffb_controls_axes:
+                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION TO MSFS! Forcing to enable!")
+                    self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
+                rudder_trim = telem_data.get("RudderTrimPct", 0)
+
+                rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
+                virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
+
+                phys_rudder_x_offs = int(rudder_trim * 4096)
+
+                if self.ap_following and ap_active:
+                    input_data = HapticEffect.device.getInput()
+                    # print("I am here")
+                    phys_x, phys_y = input_data.axisXY()
+                    rudder_pos = telem_data.get("RudderDeflPct", 0)
+                    rudder_pos = self.dampener.dampen_value(rudder_pos, '_rudder_pos', derivative_hz=5, derivative_k=0.15)
+                    # derivative_hz = 5  # derivative lpf filter -3db Hz
+                    # derivative_k = 0.1  # derivative gain value, or damping ratio
+                    #
+                    # d_rudder_pos = getattr(self, "_d_rudder_pos", None)
+                    # if not d_rudder_pos: d_rudder_pos = self._d_rudder_pos = utils.Derivative(derivative_hz)
+                    # d_rudder_pos.lpf.cutoff_freq_hz = derivative_hz
+                    #
+                    # rudder_pos_deriv = - d_rudder_pos.update(rudder_pos) * derivative_k
+                    #
+                    # rudder_pos += rudder_pos_deriv
+
+
+                    phys_rudder_x_offs = int(rudder_pos * 4096)
+
+                else:
+                    phys_rudder_x_offs = int(rudder_trim * 4096)
+
+            else:
+                phys_rudder_x_offs = 0
+                virtual_rudder_x_offs = 0
+
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+                x_pos = phys_x - virtual_rudder_x_offs
+                x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+                # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+
+                sim_connect.send_event("AXIS_RUDDER_SET", pos_x_pos)
+                # sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+                # update spring data
+
+            if self.ap_following and ap_active:
+                x_coeff = 4096
+            else:
+                x_coeff = clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)
+
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
+            # print(f"{phys_rudder_x_offs}")
+            self.spring_x.cpOffset = phys_rudder_x_offs
+            logging.debug(f"Elev Coeef: {x_coeff}")
+
             self.spring.effect.setCondition(self.spring_x)
         self.spring.start()
 
@@ -226,6 +404,8 @@ class Aircraft(AircraftBase):
         # https://wiki.flightgear.org/Force_feedback
         # https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
         self.spring = effects["dynamic_spring"].spring()
+        ap_active = telem_data.get("APMaster", 0)
+
         elev_base_gain = 0
         ailer_base_gain = 0
         rudder_base_gain = 0
@@ -234,9 +414,19 @@ class Aircraft(AircraftBase):
             logging.debug ("FBW Setting enabled, running fbw_flight_controls")
             self._update_fbw_flight_controls(telem_data)
             return
-        elif telem_data.get("AircraftClass") == "Helicopter":
+
+        if telem_data.get("AircraftClass") == "Helicopter":
             logging.debug("Aircraft is Helicopter, aborting update_flight_controls")
             return
+
+        if self.ap_following and ap_active and self.use_fbw_for_ap_follow:
+            logging.debug("FBW Setting enabled, running fbw_flight_controls")
+            self._update_fbw_flight_controls(telem_data)
+            effects["dynamic_spring"].stop()
+            return
+        else:
+            effects["fbw_spring"].stop()
+
         if self.aircraft_is_spring_centered:
             elev_base_gain = self.elevator_spring_gain
             ailer_base_gain = self.aileron_spring_gain
@@ -333,19 +523,68 @@ class Aircraft(AircraftBase):
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
 
         if ffb_type == 'joystick':
-            elev_trim = telem_data.get("ElevTrimPct", 0)
-            elev_trim_gain = .5
-            elev_trim = elev_trim * elev_trim_gain
-            if self.include_dynamic_stick_forces:
-                if telem_data["ElevDeflPct"] != 0: # avoid div by zero
-                    #calculate maximum angle based on current angle and percentage
-                    tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
-                    offs  =  _aoa / tot
-                    offs = offs + force_trim_y_offset
-                    # offs = offs + force_trim_y_offset + elev_trim
-                    offs = clamp(offs, -1, 1)
-                    offs = int(offs*4096)
-                    self.spring_y.cpOffset = offs
+
+            if self.trim_following:
+                self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
+                elev_trim = telem_data.get("ElevTrimPct", 0)
+                aileron_trim = telem_data.get("AileronTrimPct", 0)
+
+                aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
+                virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
+
+                elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
+
+                elev_trim = self.dampener.dampen_value(elev_trim, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+
+                virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+                phys_stick_y_offs = int(elev_trim * 4096)
+
+
+                if self.ap_following and ap_active:
+                    aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+
+                    aileron_pos = aileron_pos[0]
+                    aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+
+                    phys_stick_x_offs = int(aileron_pos * 4096)
+                else:
+                    phys_stick_x_offs = int(aileron_trim * 4096)
+            else:
+                phys_stick_x_offs = 0
+                virtual_stick_x_offs = 0
+                phys_stick_y_offs = 0
+                virtual_stick_y_offs = 0
+
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+
+                x_pos = phys_x - virtual_stick_x_offs
+                y_pos = phys_y - virtual_stick_y_offs
+
+                x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
+                y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+
+                sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
+                sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+
+
+            if telem_data["ElevDeflPct"] != 0: # avoid div by zero
+                #calculate maximum angle based on current angle and percentage
+                tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
+                y_offs  =  _aoa / tot
+                y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs/4096)
+                y_offs = clamp(y_offs, -1, 1)
+                y_offs = int(y_offs*4096)
+                self.spring_y.cpOffset = y_offs
+
+            x_offs = phys_stick_x_offs
+            self.spring_x.cpOffset = x_offs
+
+
                     # logging.debug(f"fto={force_trim_y_offset} | Offset={offs}")
 
             self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
@@ -381,11 +620,46 @@ class Aircraft(AircraftBase):
             self.spring.start() # ensure spring is started
 
         elif ffb_type == 'pedals':
-            self.spring_x.positiveCoefficient = clamp(int(4096 * rudder_coeff), base_rudder_coeff, 4096)
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            if self.trim_following:
+                if not self.telemffb_controls_axes:
+                    logging.warning(
+                        "TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION TO MSFS! Forcing to enable!")
+                    self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
+                rudder_trim = telem_data.get("RudderTrimPct", 0)
+
+                rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
+                virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
+
+                phys_rudder_x_offs = int(rudder_trim * 4096)
+            else:
+                phys_rudder_x_offs = 0
+                virtual_rudder_x_offs = 0
+            x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, 4096)
+
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
+            self.spring_x.cpOffset = phys_rudder_x_offs
+
             self.spring.effect.setCondition(self.spring_x)
-            self.const_force.constant(rud_force, 270).start()
             telem_data["RudForce"] = rud_force
+
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+
+                x_pos = phys_x - virtual_rudder_x_offs
+                x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+
+                sim_connect.send_event("AXIS_RUDDER_SET", pos_x_pos)
+
+
+            # if self.ap_following and ap_active:
+            #     y_coeff = 4096
+            #     x_coeff = 4096
+            # else:
+            #     y_coeff = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
+            #     x_coeff = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
+            self.const_force.constant(rud_force, 270).start()
             self.spring.start()
 
     def on_event(self, event, *args):
@@ -606,96 +880,127 @@ class Helicopter(Aircraft):
     overspeed_shake_intensity = 0.2
     heli_engine_rumble_intensity = 0.12
 
-    def _update_cyclic(self, telem_data):
-        if not self.force_trim_enabled: 
-            return
-
+    def _update_heli_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
-        if ffb_type != "joystick":
-            return
-        if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
-            logging.warning("Force trim enabled but buttons not configured")
-            return
-        self.spring = effects["cyclic_spring"].spring()
-        input_data = HapticEffect.device.getInput()
-
-        force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
-        trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
-        x, y = input_data.axisXY()
-        if force_trim_pressed:
-
-            self.spring_x.positiveCoefficient = 0
-            self.spring_x.negativeCoefficient = 0
-
-            self.spring_y.positiveCoefficient = 0
-            self.spring_y.negativeCoefficient = 0
-
-            offs_x = round(x * 4096)
-            self.spring_x.cpOffset = offs_x
-
-            offs_y = round(y * 4096)
-            self.spring_y.cpOffset = offs_y
-
-            self.spring.effect.setCondition(self.spring_x)
-            self.spring.effect.setCondition(self.spring_y)
+        if ffb_type == "joystick":
+            if self.force_trim_enabled:
 
 
-            self.cyclic_center = [x,y]
+                if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
+                    logging.warning("Force trim enabled but buttons not configured")
+                    return
+                self.spring = effects["cyclic_spring"].spring()
+                input_data = HapticEffect.device.getInput()
 
-            logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
+                force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
+                trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+                x, y = input_data.axisXY()
+                if force_trim_pressed:
 
-            self.cyclic_trim_release_active = 1
+                    self.spring_x.positiveCoefficient = 0
+                    self.spring_x.negativeCoefficient = 0
 
-        if not force_trim_pressed and self.cyclic_trim_release_active:
+                    self.spring_y.positiveCoefficient = 0
+                    self.spring_y.negativeCoefficient = 0
 
-            self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+                    offs_x = round(x * 4096)
+                    self.spring_x.cpOffset = offs_x
 
-            self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+                    offs_y = round(y * 4096)
+                    self.spring_y.cpOffset = offs_y
 
-            offs_x = round(x * 4096)
-            self.spring_x.cpOffset = offs_x
+                    self.spring.effect.setCondition(self.spring_x)
+                    self.spring.effect.setCondition(self.spring_y)
 
-            offs_y = round(y * 4096)
-            self.spring_y.cpOffset = offs_y
+                    self.cyclic_center = [x,y]
 
-            self.spring.effect.setCondition(self.spring_x)
-            self.spring.effect.setCondition(self.spring_y)
+                    logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
 
-            self.spring.start()
-            self.cyclic_center = [x,y]
+                    self.cyclic_trim_release_active = 1
 
-            logging.info(f"Force Trim Engaged :{offs_x}:{offs_y}")
+                if not force_trim_pressed and self.cyclic_trim_release_active:
 
-            self.cyclic_trim_release_active = 0
+                    self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                    self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
 
-        if trim_reset_pressed or not self.cyclic_spring_init:
-            if trim_reset_pressed:
-                self.cyclic_center = [0, 0]
+                    self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                    self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
 
-            self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+                    offs_x = round(x * 4096)
+                    self.spring_x.cpOffset = offs_x
 
-            self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+                    offs_y = round(y * 4096)
+                    self.spring_y.cpOffset = offs_y
 
-            cpO_x = round(self.cyclic_center[0]*4096)
-            cpO_y = round(self.cyclic_center[1]*4096)
+                    self.spring.effect.setCondition(self.spring_x)
+                    self.spring.effect.setCondition(self.spring_y)
 
-            self.spring_x.cpOffset = cpO_x
-            self.spring_y.cpOffset = cpO_y
+                    self.spring.start()
+                    self.cyclic_center = [x,y]
 
-            self.spring.effect.setCondition(self.spring_x)
-            self.spring.effect.setCondition(self.spring_y)
+                    logging.info(f"Force Trim Engaged :{offs_x}:{offs_y}")
 
-            self.spring.start()
-            self.cyclic_spring_init = 1
-            logging.info("Trim Reset Pressed")
-            return
+                    self.cyclic_trim_release_active = 0
 
-        telem_data["StickXY"] = [x, y]
-        telem_data["StickXY_offset"] = self.cyclic_center
+                if trim_reset_pressed or not self.cyclic_spring_init:
+                    if trim_reset_pressed:
+                        self.cyclic_center = [0, 0]
+
+                    self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                    self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+
+                    self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                    self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+
+                    cpO_x = round(self.cyclic_center[0]*4096)
+                    cpO_y = round(self.cyclic_center[1]*4096)
+
+                    self.spring_x.cpOffset = cpO_x
+                    self.spring_y.cpOffset = cpO_y
+
+                    self.spring.effect.setCondition(self.spring_x)
+                    self.spring.effect.setCondition(self.spring_y)
+
+                    self.spring.start()
+                    self.cyclic_spring_init = 1
+                    logging.info("Trim Reset Pressed")
+                    return
+                telem_data["StickXY"] = [x, y]
+                telem_data["StickXY_offset"] = self.cyclic_center
+
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+                # print(f"{virtual_stick_x_offs}, {virtual_stick_y_offs}")
+                # print(f"phys_x = {phys_x}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
+                # x_pos = phys_x - virtual_stick_x_offs
+                # y_pos = phys_y - virtual_stick_y_offs
+
+                # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
+                # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
+
+                x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
+                y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+
+                pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+
+                # logging.debug(f"AXIS_CYCLIC_LATERAL_SET: {pos_x_pos}, AXIS_CYCLIC_LONGITUDINAL_SET: {pos_y_pos}")
+                sim_connect.send_event("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
+                sim_connect.send_event("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
+        elif ffb_type == "pedals":
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+                # x_pos = phys_x - virtual_rudder_x_offs
+                x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+                pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+                # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+
+                sim_connect.send_event("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
+
+
+
 
 
 
@@ -706,6 +1011,6 @@ class Helicopter(Aircraft):
         telem_data["AircraftClass"] = "Helicopter"  # inject aircraft class into telemetry
         super().on_telemetry(telem_data)
         
-        self._update_cyclic(telem_data)
+        self._update_heli_controls(telem_data)
         self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)

@@ -777,7 +777,7 @@ class AircraftBase(object):
             WoW = telem_data.get("WeightOnWheels")[0] + telem_data.get("WeightOnWheels")[2]
         rotor = telem_data.get("RotorRPM")
         if WoW > 0:
-            logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
+            # logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
             return
         if blade_ct is None:
             if "UH-1H" in mod:

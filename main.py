@@ -37,7 +37,7 @@ parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store
 # Add config file argument, default config.ini
 parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default='config.ini')
 parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='config.user.ini')
-parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="DCS")
+parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
 parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default='joystick')
 
 args = parser.parse_args()
@@ -47,6 +47,8 @@ import sys
 import time
 import os
 sys.path.insert(0, '')
+#sys.path.append('/simconnect')
+
 
 log_folder = './log'
 if not os.path.exists(log_folder):
@@ -130,6 +132,32 @@ version = utils.get_version()
 min_firmware_version = 'v1.0.15'
 global dev_firmware_version
 dev_firmware_version = None
+
+class LoggingFilter(logging.Filter):
+    def __init__(self, keywords):
+        self.keywords = keywords
+
+    def filter(self, record):
+        # Check if any of the keywords are present in the log message
+        for keyword in self.keywords:
+            if keyword in record.getMessage():
+                # If any keyword is found, prevent the message from being logged
+                return False
+        # If none of the keywords are found, allow the message to be logged
+        return True
+
+# Create a list of keywords to filter
+log_filter_strings = [
+    "unrecognized Miscellaneous Unit in typefor(POSITION)",
+    "Unrecognized event AXIS_CYCLIC_LATERAL_SET",
+    "Unrecognized event AXIS_CYCLIC_LONGITUDINAL_SET",
+    "Unrecognized event ROTOR_AXIS_TAIL_ROTOR_SET",
+]
+
+log_filter = LoggingFilter(log_filter_strings)
+
+console_handler.addFilter(log_filter)
+file_handler.addFilter(log_filter)
 
 def format_dict(data, prefix=""):
     output = ""
@@ -587,10 +615,16 @@ class MainWindow(QMainWindow):
         il2_enabled = utils.sanitize_dict(cfg["system"]).get("il2_enabled", False)
         if args.sim == "DCS" or dcs_enabled:
             dcs_enabled = 'True'
+        else:
+            dcs_enabled = 'False'
         if args.sim == "MSFS" or msfs_enabled:
             msfs_enabled = 'True'
+        else:
+            msfs_enabled = 'False'
         if args.sim == "IL2" or il2_enabled:
             il2_enabled = 'True'
+        else:
+            il2_enabled = 'False'
         simlabel = QLabel(f"Sims Enabled: DCS: {dcs_enabled} | MSFS: {msfs_enabled} | IL2: {il2_enabled}")
         simlabel.setToolTip("Enable/Disable Sims in config file or use '-s DCS|MSFS' argument to specify")
         layout.addWidget(simlabel)
@@ -801,8 +835,7 @@ def main():
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info(f"TelemFFB (version {version}) Starting")
 
-    # check and install/update export lua script
-    utils.install_export_lua()
+
 	
     vid_pid = [int(x, 16) for x in args.device.split(":")]
     try:
@@ -845,6 +878,8 @@ def main():
     dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
 
     if dcs_enabled or args.sim == "DCS":
+        # check and install/update export lua script
+        utils.install_export_lua()
         logging.info("Starting DCS Telemetry Listener")
         dcs.start()
 
