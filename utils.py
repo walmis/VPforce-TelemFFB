@@ -526,6 +526,7 @@ class Derivative:
         self.prev_value = 0
         self.value = 0
         self.lpf = None
+        self.derivative_dict = {}
         if filter_hz:
             self.lpf = LowPassFilter(filter_hz)
 
@@ -541,6 +542,27 @@ class Derivative:
         self.value = val   
             
         return self.value
+    def dampen_value(self, var, name, derivative_hz=5, derivative_k=0.1):
+        # Check if derivative information is already stored, and initialize if not
+        derivative_data = self.derivative_dict.get(name, None)
+        if derivative_data is None:
+            derivative_data = self.derivative_dict[name] = {
+                'derivative': Derivative(derivative_hz),
+                'cutoff_freq_hz': derivative_hz,
+            }
+
+        # Update the cutoff frequency if needed
+        if derivative_data['cutoff_freq_hz'] != derivative_hz:
+            derivative_data['derivative'].lpf.cutoff_freq_hz = derivative_hz
+            derivative_data['cutoff_freq_hz'] = derivative_hz
+
+        # Compute the derivative
+        derivative = -derivative_data['derivative'].update(var) * derivative_k
+
+        # Update the variable
+        var += derivative
+
+        return var
 
 
 class DirectionModulator:

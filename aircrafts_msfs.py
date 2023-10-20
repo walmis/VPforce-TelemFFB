@@ -134,6 +134,7 @@ class Aircraft(AircraftBase):
     aileron_force_trim = 0
 
     smoother = utils.Smoother()
+    dampener = utils.Derivative()
 
 
     def __init__(self, name, **kwargs) -> None:
@@ -203,7 +204,7 @@ class Aircraft(AircraftBase):
         self.rudder_trim_follow_gain_physical_x = 1.0
         self.rudder_trim_follow_gain_virtual_x = 0.2
 
-        self.joystick_ap_following = True
+        self.ap_following = True
 
         self.use_fbw_for_ap_follow = True
 
@@ -244,16 +245,17 @@ class Aircraft(AircraftBase):
                     self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
                 elev_trim = telem_data.get("ElevTrimPct", 0)
 
-                derivative_hz = 5  # derivative lpf filter -3db Hz
-                derivative_k = 0.1  # derivative gain value, or damping ratio
-
-                d_elev_trim = getattr(self, "_d_elev_trim", None)
-                if not d_elev_trim: d_elev_trim = self._d_elev_trim = utils.Derivative(derivative_hz)
-                d_elev_trim.lpf.cutoff_freq_hz = derivative_hz
-
-                elev_trim_deriv = - d_elev_trim.update(elev_trim) * derivative_k
-
-                elev_trim += elev_trim_deriv
+                # derivative_hz = 5  # derivative lpf filter -3db Hz
+                # derivative_k = 0.1  # derivative gain value, or damping ratio
+                #
+                # d_elev_trim = getattr(self, "_d_elev_trim", None)
+                # if not d_elev_trim: d_elev_trim = self._d_elev_trim = utils.Derivative(derivative_hz)
+                # d_elev_trim.lpf.cutoff_freq_hz = derivative_hz
+                #
+                # elev_trim_deriv = - d_elev_trim.update(elev_trim) * derivative_k
+                #
+                # elev_trim += elev_trim_deriv
+                elev_trim = self.dampener.dampen_value(elev_trim, '_elev_trim', derivative_hz=5, derivative_k=0.15)
 
                 # print(f"raw:{raw_elev_trim}, smooth:{elev_trim}")
                 aileron_trim = telem_data.get("AileronTrimPct", 0)
@@ -266,23 +268,24 @@ class Aircraft(AircraftBase):
 
                 phys_stick_y_offs = int(elev_trim*4096)
 
-                if self.joystick_ap_following and ap_active:
+                if self.ap_following and ap_active:
                     input_data = HapticEffect.device.getInput()
                     phys_x, phys_y = input_data.axisXY()
                     aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
                     elevator_pos = telem_data.get("ElevDeflPct", 0)
                     aileron_pos = aileron_pos[0]
 
-                    derivative_hz = 5  # derivative lpf filter -3db Hz
-                    derivative_k = 0.1  # derivative gain value, or damping ratio
-
-                    d_aileron_pos = getattr(self, "_d_aileron_pos", None)
-                    if not d_aileron_pos: d_aileron_pos = self._d_aileron_pos = utils.Derivative(derivative_hz)
-                    d_aileron_pos.lpf.cutoff_freq_hz = derivative_hz
-
-                    aileron_pos_deriv = - d_aileron_pos.update(aileron_pos) * derivative_k
-
-                    aileron_pos += aileron_pos_deriv
+                    aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+                    # derivative_hz = 5  # derivative lpf filter -3db Hz
+                    # derivative_k = 0.1  # derivative gain value, or damping ratio
+                    #
+                    # d_aileron_pos = getattr(self, "_d_aileron_pos", None)
+                    # if not d_aileron_pos: d_aileron_pos = self._d_aileron_pos = utils.Derivative(derivative_hz)
+                    # d_aileron_pos.lpf.cutoff_freq_hz = derivative_hz
+                    #
+                    # aileron_pos_deriv = - d_aileron_pos.update(aileron_pos) * derivative_k
+                    #
+                    # aileron_pos += aileron_pos_deriv
 
 
                     phys_stick_x_offs = int(aileron_pos * 4096)
@@ -315,7 +318,7 @@ class Aircraft(AircraftBase):
                 sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
                 sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
             # update spring data
-            if self.joystick_ap_following and ap_active:
+            if self.ap_following and ap_active:
                 y_coeff = 4096
                 x_coeff = 4096
             else:
@@ -344,22 +347,22 @@ class Aircraft(AircraftBase):
 
                 phys_rudder_x_offs = int(rudder_trim * 4096)
 
-                if self.joystick_ap_following and ap_active:
+                if self.ap_following and ap_active:
                     input_data = HapticEffect.device.getInput()
                     # print("I am here")
                     phys_x, phys_y = input_data.axisXY()
                     rudder_pos = telem_data.get("RudderDeflPct", 0)
-                    raw_rudder_pos = rudder_pos
-                    derivative_hz = 5  # derivative lpf filter -3db Hz
-                    derivative_k = 0.1  # derivative gain value, or damping ratio
-
-                    d_rudder_pos = getattr(self, "_d_rudder_pos", None)
-                    if not d_rudder_pos: d_rudder_pos = self._d_rudder_pos = utils.Derivative(derivative_hz)
-                    d_rudder_pos.lpf.cutoff_freq_hz = derivative_hz
-
-                    rudder_pos_deriv = - d_rudder_pos.update(rudder_pos) * derivative_k
-
-                    rudder_pos += rudder_pos_deriv
+                    rudder_pos = self.dampener.dampen_value(rudder_pos, '_rudder_pos', derivative_hz=5, derivative_k=0.15)
+                    # derivative_hz = 5  # derivative lpf filter -3db Hz
+                    # derivative_k = 0.1  # derivative gain value, or damping ratio
+                    #
+                    # d_rudder_pos = getattr(self, "_d_rudder_pos", None)
+                    # if not d_rudder_pos: d_rudder_pos = self._d_rudder_pos = utils.Derivative(derivative_hz)
+                    # d_rudder_pos.lpf.cutoff_freq_hz = derivative_hz
+                    #
+                    # rudder_pos_deriv = - d_rudder_pos.update(rudder_pos) * derivative_k
+                    #
+                    # rudder_pos += rudder_pos_deriv
 
 
                     phys_rudder_x_offs = int(rudder_pos * 4096)
@@ -383,7 +386,7 @@ class Aircraft(AircraftBase):
                 # sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
                 # update spring data
 
-            if self.joystick_ap_following and ap_active:
+            if self.ap_following and ap_active:
                 x_coeff = 4096
             else:
                 x_coeff = clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)
@@ -416,7 +419,7 @@ class Aircraft(AircraftBase):
             logging.debug("Aircraft is Helicopter, aborting update_flight_controls")
             return
 
-        if self.joystick_ap_following and ap_active and self.use_fbw_for_ap_follow:
+        if self.ap_following and ap_active and self.use_fbw_for_ap_follow:
             logging.debug("FBW Setting enabled, running fbw_flight_controls")
             self._update_fbw_flight_controls(telem_data)
             effects["dynamic_spring"].stop()
@@ -530,21 +533,19 @@ class Aircraft(AircraftBase):
                 virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
 
                 elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
+
+                elev_trim = self.dampener.dampen_value(elev_trim, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+
                 virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
                 phys_stick_y_offs = int(elev_trim * 4096)
 
-                if self.joystick_ap_following and ap_active:
-                    input_data = HapticEffect.device.getInput()
-                    phys_x, phys_y = input_data.axisXY()
+
+                if self.ap_following and ap_active:
                     aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
-                    elevator_pos = telem_data.get("ElevDeflPct", 0)
+
                     aileron_pos = aileron_pos[0]
-                    if phys_x != 0:
-                        delta = round((aileron_pos - phys_x) / phys_x, 3)
-                    else:
-                        delta = 0.0
-                    # if abs(delta) > 0.1:
-                    #     print(f"{round(aileron_pos, 3)}, {round(phys_x, 3)}, delta={delta}")
+                    aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+
                     phys_stick_x_offs = int(aileron_pos * 4096)
                 else:
                     phys_stick_x_offs = int(aileron_trim * 4096)
@@ -555,24 +556,18 @@ class Aircraft(AircraftBase):
                 virtual_stick_y_offs = 0
 
             if self.telemffb_controls_axes:
-                autopilot_active = telem_data.get("APMaster", 0)
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
-                # print(f"{virtual_stick_x_offs}, {virtual_stick_y_offs}")
-                # print(f"phys_x = {phys_x}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
-                # print(f"phys_y = {phys_y}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
+
                 x_pos = phys_x - virtual_stick_x_offs
                 y_pos = phys_y - virtual_stick_y_offs
 
-                # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
-                # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+
                 pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
                 pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-                # print(f"ypos={y_pos}, posypos={pos_y_pos}")
-                # print(f"xpos={x_pos}, posxpos={pos_x_pos}")
                 sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
                 sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
 
@@ -581,7 +576,6 @@ class Aircraft(AircraftBase):
                 #calculate maximum angle based on current angle and percentage
                 tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
                 y_offs  =  _aoa / tot
-                # offs = offs + force_trim_y_offset
                 y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs/4096)
                 y_offs = clamp(y_offs, -1, 1)
                 y_offs = int(y_offs*4096)
@@ -659,7 +653,7 @@ class Aircraft(AircraftBase):
                 sim_connect.send_event("AXIS_RUDDER_SET", pos_x_pos)
 
 
-            # if self.joystick_ap_following and ap_active:
+            # if self.ap_following and ap_active:
             #     y_coeff = 4096
             #     x_coeff = 4096
             # else:
