@@ -392,7 +392,7 @@ class Aircraft(AircraftBase):
                 x_coeff = clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)
 
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
-            print(f"{phys_rudder_x_offs}")
+            # print(f"{phys_rudder_x_offs}")
             self.spring_x.cpOffset = phys_rudder_x_offs
             logging.debug(f"Elev Coeef: {x_coeff}")
 
