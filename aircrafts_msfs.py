@@ -30,6 +30,9 @@ from utils import clamp, HighPassFilter, Derivative, Dispenser
 
 from ffb_rhino import HapticEffect, FFBReport_SetCondition, FFBReport_Input
 from aircraft_base import AircraftBase, effects, HPFs, LPFs
+# # from WASimCommander import pyWASimCommander
+# from pyWASimCommander import *
+# wasim = pyWASimCommander()
 
 
 deg = 180 / math.pi
@@ -203,6 +206,10 @@ class Aircraft(AircraftBase):
         self.joystick_trim_follow_gain_virtual_y = 0.2
         self.rudder_trim_follow_gain_physical_x = 1.0
         self.rudder_trim_follow_gain_virtual_x = 0.2
+        self.cyclic_trim_follow_gain_physical_x = 1.0
+        self.cyclic_trim_follow_gain_physical_y = 1.0
+        self.cyclic_trim_follow_gain_virtual_x = 0.2
+        self.cyclic_trim_follow_gain_virtual_y = 0.2
 
         self.ap_following = True
 
@@ -879,12 +886,24 @@ class Helicopter(Aircraft):
     overspeed_shake_start = 70.0  # m/s
     overspeed_shake_intensity = 0.2
     heli_engine_rumble_intensity = 0.12
+    cpO_x = 0
+    cpO_y = 0
+    virtual_cyclic_x_offs = 0
+    virtual_cyclic_y_offs = 0
+    phys_cyclic_x_offs = 0
+    phys_cyclic_y_offs = 0
+
 
     def _update_heli_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
-        if ffb_type == "joystick":
-            if self.force_trim_enabled:
+        ap_active = telem_data.get("APMaster", 0)
+        trim_reset = telem_data.get("h145TrimRelease", 0)
 
+        if ffb_type == "joystick":
+            # x = wasim.get_var('L:DEBUG_SEMA_PCT_X', 'enum')
+            # y = wasim.get_var('L:DEBUG_SEMA_PCT_Y', 'enum')
+            # print(f"x:{x}, y:{y}")
+            if self.force_trim_enabled:
 
                 if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
                     logging.warning("Force trim enabled but buttons not configured")
@@ -896,53 +915,47 @@ class Helicopter(Aircraft):
                 trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
                 x, y = input_data.axisXY()
                 if force_trim_pressed:
-
                     self.spring_x.positiveCoefficient = 0
                     self.spring_x.negativeCoefficient = 0
 
                     self.spring_y.positiveCoefficient = 0
                     self.spring_y.negativeCoefficient = 0
 
-                    offs_x = round(x * 4096)
-                    self.spring_x.cpOffset = offs_x
+                    self.cpO_x = round(x * 4096)
+                    self.spring_x.cpOffset = self.cpO_x
 
-                    offs_y = round(y * 4096)
-                    self.spring_y.cpOffset = offs_y
+                    self.cpO_y = round(y * 4096)
+                    self.spring_y.cpOffset = self.cpO_y
 
-                    self.spring.effect.setCondition(self.spring_x)
-                    self.spring.effect.setCondition(self.spring_y)
 
-                    self.cyclic_center = [x,y]
+
+                    self.cyclic_center = [x, y]
 
                     logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
 
                     self.cyclic_trim_release_active = 1
 
-                if not force_trim_pressed and self.cyclic_trim_release_active:
-
+                elif not force_trim_pressed and self.cyclic_trim_release_active:
                     self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
                     self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
 
                     self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
                     self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
 
-                    offs_x = round(x * 4096)
-                    self.spring_x.cpOffset = offs_x
+                    self.cpO_x = round(x * 4096)
+                    self.spring_x.cpOffset = self.cpO_x
 
-                    offs_y = round(y * 4096)
-                    self.spring_y.cpOffset = offs_y
+                    self.cpO_y = round(y * 4096)
+                    self.spring_y.cpOffset = self.cpO_y
 
-                    self.spring.effect.setCondition(self.spring_x)
-                    self.spring.effect.setCondition(self.spring_y)
 
-                    self.spring.start()
-                    self.cyclic_center = [x,y]
+                    self.cyclic_center = [x, y]
 
-                    logging.info(f"Force Trim Engaged :{offs_x}:{offs_y}")
+                    logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
 
                     self.cyclic_trim_release_active = 0
 
-                if trim_reset_pressed or not self.cyclic_spring_init:
+                elif trim_reset_pressed or not self.cyclic_spring_init:
                     if trim_reset_pressed:
                         self.cyclic_center = [0, 0]
 
@@ -952,19 +965,16 @@ class Helicopter(Aircraft):
                     self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
                     self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
 
-                    cpO_x = round(self.cyclic_center[0]*4096)
-                    cpO_y = round(self.cyclic_center[1]*4096)
+                    self.cpO_x = round(self.cyclic_center[0] * 4096)
+                    self.cpO_y = round(self.cyclic_center[1] * 4096)
 
-                    self.spring_x.cpOffset = cpO_x
-                    self.spring_y.cpOffset = cpO_y
+                    self.spring_x.cpOffset = self.cpO_x
+                    self.spring_y.cpOffset = self.cpO_y
 
-                    self.spring.effect.setCondition(self.spring_x)
-                    self.spring.effect.setCondition(self.spring_y)
 
-                    self.spring.start()
                     self.cyclic_spring_init = 1
                     logging.info("Trim Reset Pressed")
-                    return
+
                 telem_data["StickXY"] = [x, y]
                 telem_data["StickXY_offset"] = self.cyclic_center
 
@@ -973,8 +983,8 @@ class Helicopter(Aircraft):
                 phys_x, phys_y = input_data.axisXY()
                 # print(f"{virtual_stick_x_offs}, {virtual_stick_y_offs}")
                 # print(f"phys_x = {phys_x}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
-                # x_pos = phys_x - virtual_stick_x_offs
-                # y_pos = phys_y - virtual_stick_y_offs
+                x_pos = phys_x - self.virtual_cyclic_x_offs
+                y_pos = phys_y - self.virtual_cyclic_y_offs
 
                 # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
                 # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
@@ -982,12 +992,20 @@ class Helicopter(Aircraft):
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
 
-                pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
-                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
                 # logging.debug(f"AXIS_CYCLIC_LATERAL_SET: {pos_x_pos}, AXIS_CYCLIC_LONGITUDINAL_SET: {pos_y_pos}")
                 sim_connect.send_event("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
                 sim_connect.send_event("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
+
+            self.spring_x.cpOffset = int(self.cpO_x)
+            self.spring_y.cpOffset = int(self.cpO_y)
+            self.spring.effect.setCondition(self.spring_x)
+            self.spring.effect.setCondition(self.spring_y)
+
+            self.spring.start()
+
         elif ffb_type == "pedals":
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
@@ -1003,7 +1021,6 @@ class Helicopter(Aircraft):
 
 
 
-
     def on_telemetry(self, telem_data):
         self.speedbrake_motion_intensity = 0.0
         if telem_data.get("N") == None:
@@ -1014,3 +1031,66 @@ class Helicopter(Aircraft):
         self._update_heli_controls(telem_data)
         self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
+
+class HPGHelicopter(Helicopter):
+    sema_x_max = 15
+    sema_y_max = 15
+    afcs_step_size = 2
+
+    def on_telemetry(self, telem_data):
+        super().on_telemetry(telem_data)
+
+    def _update_heli_controls(self, telem_data):
+        super()._update_heli_controls(telem_data)
+        ffb_type = telem_data.get("FFBType", "joystick")
+        ap_active = telem_data.get("APMaster", 0)
+        trim_reset = telem_data.get("h145TrimRelease", 0)
+
+        if ffb_type == "joystick":
+
+            sema_x = telem_data.get("h145SEMAx")
+            sema_y = telem_data.get("h145SEMAy")
+
+            sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
+            sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
+            # sema_x_max = 15
+            # sema_y_max = 15
+            if not trim_reset:
+                if abs(sema_x_avg) > self.sema_x_max:
+                    # print(f"sema_x:{sema_x}")
+                    if sema_x_avg > self.sema_x_max:
+                        self.cpO_x -= self.afcs_step_size
+                    elif sema_x_avg < -self.sema_x_max:
+                        self.cpO_x += self.afcs_step_size
+                if abs(sema_y_avg) > self.sema_y_max:
+                    # print(f"sema_y:{sema_y}")
+                    if sema_y_avg > self.sema_y_max:
+                        self.cpO_y -= self.afcs_step_size
+                    elif sema_y_avg < -self.sema_y_max:
+                        self.cpO_y += self.afcs_step_size
+                # print("here here here")
+            self.spring_x.cpOffset = int(self.cpO_x)
+            self.spring_y.cpOffset = int(self.cpO_y)
+            self.spring.effect.setCondition(self.spring_x)
+            self.spring.effect.setCondition(self.spring_y)
+
+            self.spring.start()
+        elif ffb_type == "pedals":
+            if self.telemffb_controls_axes:
+                input_data = HapticEffect.device.getInput()
+                phys_x, phys_y = input_data.axisXY()
+                # x_pos = phys_x - virtual_rudder_x_offs
+                x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+                pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
+                # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+
+                sim_connect.send_event("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
+                afcs_x = telem_data.get("h145AfcsSemaPedalX")
+                # spr_offs_x = utils.scale(afcs_x, (-16000, 16000), (-4096, 4096))
+                # spr_offs_x = self.smoother.get_average('pedals_x', spr_offs_x, 20)
+                #
+                # self.spring_x.cpOffset = -int(spr_offs_x)
+                # self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = 2048
+                self.spring.effect.setCondition(self.spring_x)
+
+                self.spring.start()

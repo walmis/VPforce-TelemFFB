@@ -19,7 +19,7 @@ import math
 import os
 import random
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 
 import select
 from time import monotonic
@@ -44,17 +44,37 @@ class Smoother:
     def __init__(self, window_size=5):
         self.value_dict = {}
 
-    def get_average (self, key, value, window_size=10):
+    def get_average(self, key, value, sample_size=10):
+        # Get average of 'sample_size' instances of 'value', tracked by string 'key'
         if key not in self.value_dict:
             self.value_dict[key] = []
         self.value_dict[key].append(value)
-        if len(self.value_dict[key]) > window_size:
+        if len(self.value_dict[key]) > sample_size:
             self.value_dict[key].pop(0)
 
         values = self.value_dict.get(key, [])
         if not values:
             return 0
         return sum(values) / len(values)
+
+    def get_rolling_average(self, key, value, window_ms=1000):
+        # get average value of a rolling window of tracker string 'key', updated by 'value' over a period of 'window_ms'
+        current_time_ms = time.time() * 1000  # Convert current time to milliseconds
+
+        if key not in self.value_dict:
+            self.value_dict[key] = deque()
+
+        # Remove values older than the specified window
+        while self.value_dict[key] and (current_time_ms - self.value_dict[key][0][1]) > window_ms:
+            self.value_dict[key].popleft()
+
+        self.value_dict[key].append((value, current_time_ms))
+
+        if not self.value_dict[key]:
+            return 0
+
+        total = sum(val[0] for val in self.value_dict[key])
+        return total / len(self.value_dict[key])
 
 
 class EffectTranslator:

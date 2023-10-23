@@ -250,7 +250,7 @@ class AircraftBase(object):
         end_aoa = self.critical_aoa_max
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
-        avg_aoa = self.smoother.get_average("crit_aoa", aoa, window_size=8)
+        avg_aoa = self.smoother.get_average("crit_aoa", aoa, sample_size=8)
         if avg_aoa >= start_aoa and tas > 10:
             force_factor = round(utils.non_linear_scaling(avg_aoa, start_aoa, end_aoa, curvature=1.5), 4)
             force_factor = self.aoa_reduction_max_force * force_factor
@@ -278,7 +278,7 @@ class AircraftBase(object):
         if not telem_data.get("TAS", 0):
             effects.dispose("decel")
             return
-        avg_y_gs = self.smoother.get_average("y_gs", y_gs, window_size=8)
+        avg_y_gs = self.smoother.get_average("y_gs", y_gs, sample_size=8)
         max_gs = self.deceleration_max_force
         if avg_y_gs < -0.1:
             if abs(avg_y_gs) > max_gs:

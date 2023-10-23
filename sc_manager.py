@@ -134,6 +134,8 @@ class SimConnectManager(threading.Thread):
         SimVar("RudderTrimPct", "RUDDER TRIM PCT", "Percent Over 100"),
         SimVar("Pitch", "PLANE PITCH DEGREES", "degrees"),
         SimVar("Roll", "PLANE BANK DEGREES", "degrees"),
+        SimVar("CyclicTrimX", "ROTOR LATERAL TRIM PCT", "Percent Over 100"),
+        SimVar("CyclicTrimY", "ROTOR LONGITUDINAL TRIM PCT", "Percent Over 100"),
         SimVar("Heading", "PLANE HEADING DEGREES TRUE", "degrees"),
         SimVar("PitchRate", "ROTATION VELOCITY BODY X", "degrees per second"), # todo replace usage with VelRotBody array
         SimVar("RollRate", "ROTATION VELOCITY BODY Z", "degrees per second"), # todo replace usage with VelRotBody array
@@ -164,6 +166,19 @@ class SimConnectManager(threading.Thread):
         SimVar("ACisFBW", "FLY BY WIRE FAC SWITCH", "bool"),
         SimVar("StallWarning", "STALL WARNING", "bool"),
         SimVar("SimconnectCategory", "CATEGORY", "", type=DATATYPE_STRING128),
+        SimVar("h145SEMAx", "L:DEBUG_SEMA_PCT_X", sc_unit="percent over 100"),
+        SimVar("h145SEMAy", "L:DEBUG_SEMA_PCT_Y", sc_unit="percent over 100"),
+        SimVar("h145AfcsSemaCyclicX", "L:DEBUG_AFCS_SYS_SEMA_CYCLICX", sc_unit="position"),
+        SimVar("h145AfcsSemaCyclicY", "L:DEBUG_AFCS_SYS_SEMA_CYCLICY", sc_unit="position"),
+        SimVar("h145AfcsSemaPedalX", "L:DEBUG_AFCS_SYS_SEMA_YAW", sc_unit="position"),
+        SimVar("h145AfcsEngagedRoll", "L:DEBUG_AFCS_AXIS_ENAGED_ROLL", "number"),
+        SimVar("h145AfcsEngagedPitch", "L:DEBUG_AFCS_AXIS_ENAGED_PICH", "number"),
+        SimVar("h145AfcsEngagedYaw", "L:DEBUG_AFCS_AXIS_ENAGED_YAW", "number"),
+        SimVar("h145AfcsModeRoll", "L:H145_SDK_AFCS_MODE_ROLL", "number"),
+        SimVar("h145AfcModePitch", "L:H145_SDK_AFCS_MODE_PITCH", "number"),
+        SimVar("h145AfcsModeCollective", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "number"),
+        SimVar("h145AfcsMaster", "L:H145_SDK_AFCS_MASTER", "number"),
+        SimVar("h145TrimRelease", "L:H145_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool"),
     ]
     
     def __init__(self):
