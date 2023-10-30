@@ -1180,8 +1180,8 @@ class Helicopter(Aircraft):
 
 
 class HPGHelicopter(Helicopter):
-    sema_x_max = 15
-    sema_y_max = 15
+    sema_x_max = 5
+    sema_y_max = 5
     afcs_step_size = 2
     collective_init = 0
     collective_ap_spring_gain = 1
@@ -1264,24 +1264,24 @@ class HPGHelicopter(Helicopter):
                 sx = round(abs(sema_x_avg), 3)
                 sy = round(abs(sema_y_avg), 3)
                 if 100 > sx > 50:
-                    self.afcsx_step_size = 6
-                elif 49.999 > sx > 20:
                     self.afcsx_step_size = 5
-                elif 19.999 > sx > 10:
+                elif 49.999 > sx > 20:
                     self.afcsx_step_size = 3
-                elif 9.999 > sx > 5:
+                elif 19.999 > sx > 10:
                     self.afcsx_step_size = 2
+                elif 9.999 > sx > 5:
+                    self.afcsx_step_size = 1
                 elif 4.999 > sx > 0:
                     self.afcsx_step_size = 1
 
                 if 100 > sy > 50:
-                    self.afcsy_step_size = 6
-                elif 49.999 > sy > 20:
                     self.afcsy_step_size = 5
-                elif 19.999 > sy > 10:
+                elif 49.999 > sy > 20:
                     self.afcsy_step_size = 3
-                elif 9.999 > sx > 5:
+                elif 19.999 > sy > 10:
                     self.afcsy_step_size = 2
+                elif 9.999 > sx > 5:
+                    self.afcsy_step_size = 1
                 elif 4.999 > sy > 0:
                     self.afcsy_step_size = 1
 
