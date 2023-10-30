@@ -48,6 +48,17 @@ try:
 except: pass
 
 
+def set_simdatum_to_msfs(simvar, value, units=None):
+    try:
+        sim_connect.set_simdatum(simvar, value, units=units)
+    except Exception as e:
+        logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
+def send_event_to_msfs(event, data: int = 0 ):
+    try:
+        sim_connect.send_event(event, data)
+    except Exception as e:
+        logging.error(f"Error setting event {event} to MSFS: {e}")
+
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
 
@@ -311,20 +322,16 @@ class Aircraft(AircraftBase):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
-                # print(f"{virtual_stick_x_offs}, {virtual_stick_y_offs}")
-                # print(f"phys_x = {phys_x}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
                 x_pos = phys_x - virtual_stick_x_offs
                 y_pos = phys_y - virtual_stick_y_offs
 
-                # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
-                # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
                 pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383*x_scale, 16384*x_scale)))
                 pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383*y_scale, 16384*y_scale)))
 
-                sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
-                sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+                send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
+                send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
             # update spring data
             if self.ap_following and ap_active:
                 y_coeff = 4096
@@ -390,8 +397,7 @@ class Aircraft(AircraftBase):
                 pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
                 # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-                sim_connect.send_event("AXIS_RUDDER_SET", pos_x_pos)
-                # sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
                 # update spring data
 
             if self.ap_following and ap_active:
@@ -576,8 +582,8 @@ class Aircraft(AircraftBase):
                 pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
                 pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-                sim_connect.send_event("AXIS_AILERONS_SET", pos_x_pos)
-                sim_connect.send_event("AXIS_ELEVATOR_SET", pos_y_pos)
+                send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
+                send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
 
 
             if telem_data["ElevDeflPct"] != 0: # avoid div by zero
@@ -658,7 +664,7 @@ class Aircraft(AircraftBase):
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
                 pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
 
-                sim_connect.send_event("AXIS_RUDDER_SET", pos_x_pos)
+                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
 
 
             # if self.ap_following and ap_active:
@@ -1075,13 +1081,9 @@ class Helicopter(Aircraft):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
-                # print(f"{virtual_stick_x_offs}, {virtual_stick_y_offs}")
-                # print(f"phys_x = {phys_x}, ailer_trim_offs= {virtual_stick_x_offs}, physx-virtualx={phys_x - virtual_stick_x_offs}")
                 x_pos = phys_x - self.virtual_cyclic_x_offs
                 y_pos = phys_y - self.virtual_cyclic_y_offs
 
-                # self.sim_connect.set_simdatum("AILERON POSITION", x_pos, units=None)
-                # self.sim_connect.set_simdatum("ELEVATOR POSITION", y_pos, units=None)
 
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
@@ -1089,10 +1091,9 @@ class Helicopter(Aircraft):
                 pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
                 pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-                # logging.debug(f"AXIS_CYCLIC_LATERAL_SET: {pos_x_pos}, AXIS_CYCLIC_LONGITUDINAL_SET: {pos_y_pos}")
                 if self.cyclic_spring_init:
-                    sim_connect.send_event("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
-                    sim_connect.send_event("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
+                    send_event_to_msfs("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
+                    send_event_to_msfs("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
 
             self.spring_x.cpOffset = int(self.cpO_x)
             self.spring_y.cpOffset = int(self.cpO_y)
@@ -1110,7 +1111,7 @@ class Helicopter(Aircraft):
                 pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-12000 * x_scale, 12000 * x_scale)))
                 # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-                sim_connect.send_event("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
+                send_event_to_msfs("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
@@ -1173,7 +1174,7 @@ class Helicopter(Aircraft):
         pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
         if self.collective_init:
             print("sending")
-            sim_connect.send_event("AXIS_COLLECTIVE_SET", pos_y_pos)
+            send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
 
 
 
@@ -1313,25 +1314,25 @@ class HPGHelicopter(Helicopter):
             dev_y = hands_on_dict["y_deviation"]
             if self.send_individual_hands_on:
                 if hands_on_x:
-                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLICX", 1, units="number")
+                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 1, units="number")
                     self.hands_on_x_active = True
 
                 else:
-                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLICX", 0, units="number")
+                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 0, units="number")
                     self.hands_on_x_active = False
 
                 if hands_on_y:
-                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLICY", 1, units="number")
+                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 1, units="number")
                     self.hands_on_y_active = True
                 else:
-                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLICY", 0, units="number")
+                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 0, units="number")
                     self.hands_on_y_active = False
             else:
                 if hands_on_either:
-                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLIC", 1, units="number")
+                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 1, units="number")
                     self.hands_on_active = True
                 else:
-                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
+                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
                     self.hands_on_active = False
 
             telem_data["hands_on"] = int(hands_on_either)
@@ -1357,8 +1358,7 @@ class HPGHelicopter(Helicopter):
                 pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
                 # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-
-                sim_connect.send_event("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
+                send_event_to_msfs("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
                 afcs_x = telem_data.get("h145AfcsSemaPedalX")
                 # self.cpO_x = int(utils.scale(pedal_pos, (-1, 1), (-4096, 4096)))
                 # #
@@ -1424,7 +1424,7 @@ class HPGHelicopter(Helicopter):
 
                 pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
                 if self.collective_init:
-                    sim_connect.send_event("AXIS_COLLECTIVE_SET", pos_y_pos)
+                    send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
 
 
             else:
@@ -1452,7 +1452,7 @@ class HPGHelicopter(Helicopter):
 
                 pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
                 if self.collective_init:
-                    sim_connect.send_event("AXIS_COLLECTIVE_SET", pos_y_pos)
+                    send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
             else:
                 collective_pos = telem_data.get("CollectivePos", 0)
                 self.cpO_y = round(utils.scale(collective_pos,(0, 1), (4096, -4096)))
