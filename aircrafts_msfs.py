@@ -1186,6 +1186,11 @@ class HPGHelicopter(Helicopter):
     collective_ap_spring_gain = 1
     collective_dampening_gain = 1
     collective_spring_coeff_y = 0
+    hands_on_deadzone = 0.2
+    hands_on_active = 0
+    hands_on_x_active = 0
+    hands_on_y_active = 0
+    send_individual_hands_on = 0
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -1193,6 +1198,9 @@ class HPGHelicopter(Helicopter):
         self.phys_x, self.phys_y = input_data.axisXY()
         self.cpO_y = round(self.phys_y * 4096)
         self.collective_spring_coeff_y = round(4096 * utils.clamp(self.collective_ap_spring_gain, 0, 1))
+        self.hands_on_active = 0
+        self.hands_on_x_active = 0
+        self.hands_on_y_active = 0
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
@@ -1201,7 +1209,38 @@ class HPGHelicopter(Helicopter):
         super().on_timeout()
         self.collective_init = 0
 
+    def check_hands_on(self, percent):
+        input_data = HapticEffect.device.getInput()
+        phys_x, phys_y = input_data.axisXY()
 
+        # Convert phys input to +/-4096
+        phys_x = round(phys_x * 4096)
+        phys_y = round(phys_y * 4096)
+
+        ref_x = self.cpO_x
+        ref_y = self.cpO_y
+
+        # Calculate the threshold values based on the input percentage
+        threshold = 4096 * percent
+
+        # Calculate the deviation percentages in decimal form
+        deviation_x = abs(phys_x - ref_x) / 4096
+        deviation_y = abs(phys_y - ref_y) / 4096
+
+        # Check if either phys_x or phys_y exceeds the threshold
+        x_exceeds_threshold = abs(phys_x - ref_x) > threshold
+        y_exceeds_threshold = abs(phys_y - ref_y) > threshold
+        master_exceeds_threshold = x_exceeds_threshold or y_exceeds_threshold
+
+        result = {
+            "master_result": master_exceeds_threshold,
+            "x_result": x_exceeds_threshold,
+            "x_deviation": deviation_x,
+            "y_result": y_exceeds_threshold,
+            "y_deviation": deviation_y,
+        }
+
+        return result
     def _update_heli_controls(self, telem_data):
 
         super()._update_heli_controls(telem_data)
@@ -1221,23 +1260,86 @@ class HPGHelicopter(Helicopter):
             sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
 
             if not trim_reset:
-                if abs(sema_x_avg) > self.sema_x_max:
-                    # print(f"sema_x:{sema_x}")
-                    if sema_x_avg > self.sema_x_max:
-                        self.cpO_x -= self.afcs_step_size
-                    elif sema_x_avg < -self.sema_x_max:
-                        self.cpO_x += self.afcs_step_size
-                if abs(sema_y_avg) > self.sema_y_max:
-                    # print(f"sema_y:{sema_y}")
-                    if sema_y_avg > self.sema_y_max:
-                        self.cpO_y -= self.afcs_step_size
-                    elif sema_y_avg < -self.sema_y_max:
-                        self.cpO_y += self.afcs_step_size
+                sx = round(abs(sema_x_avg), 3)
+                sy = round(abs(sema_y_avg), 3)
+                if 100 > sx > 50:
+                    self.afcsx_step_size = 6
+                elif 49.999 > sx > 20:
+                    self.afcsx_step_size = 5
+                elif 19.999 > sx > 10:
+                    self.afcsx_step_size = 3
+                elif 9.999 > sx > 5:
+                    self.afcsx_step_size = 2
+                elif 4.999 > sx > 0:
+                    self.afcsx_step_size = 1
+
+                if 100 > sy > 50:
+                    self.afcsy_step_size = 6
+                elif 49.999 > sy > 20:
+                    self.afcsy_step_size = 5
+                elif 19.999 > sy > 10:
+                    self.afcsy_step_size = 3
+                elif 9.999 > sx > 5:
+                    self.afcsy_step_size = 2
+                elif 4.999 > sy > 0:
+                    self.afcsy_step_size = 1
+
+                if not (self.hands_on_x_active or self.hands_on_active):
+                    if abs(sema_x_avg) > self.sema_x_max:
+                        # print(f"sema_x:{sema_x}")
+                        if sema_x_avg > self.sema_x_max:
+                            self.cpO_x -= self.afcsx_step_size
+                        elif sema_x_avg < -self.sema_x_max:
+                            self.cpO_x += self.afcsx_step_size
+
+                if not (self.hands_on_y_active or self.hands_on_active):
+                    if abs(sema_y_avg) > self.sema_y_max:
+                        # print(f"sema_y:{sema_y}")
+                        if sema_y_avg > self.sema_y_max:
+                            self.cpO_y -= self.afcsy_step_size
+                        elif sema_y_avg < -self.sema_y_max:
+                            self.cpO_y += self.afcsy_step_size
                 # print("here here here")
             self.spring_x.cpOffset = int(self.cpO_x)
             self.spring_y.cpOffset = int(self.cpO_y)
             self.spring.effect.setCondition(self.spring_x)
             self.spring.effect.setCondition(self.spring_y)
+
+            hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
+            hands_on_either = hands_on_dict["master_result"]
+            hands_on_x = hands_on_dict["x_result"]
+            dev_x = hands_on_dict["x_deviation"]
+            hands_on_y = hands_on_dict["y_result"]
+            dev_y = hands_on_dict["y_deviation"]
+            if self.send_individual_hands_on:
+                if hands_on_x:
+                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLICX", 1, units="number")
+                    self.hands_on_x_active = True
+
+                else:
+                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLICX", 0, units="number")
+                    self.hands_on_x_active = False
+
+                if hands_on_y:
+                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLICY", 1, units="number")
+                    self.hands_on_y_active = True
+                else:
+                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLICY", 0, units="number")
+                    self.hands_on_y_active = False
+            else:
+                if hands_on_either:
+                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLIC", 1, units="number")
+                    self.hands_on_active = True
+                else:
+                    sim_connect.set_simdatum("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
+                    self.hands_on_active = False
+
+            telem_data["hands_on"] = int(hands_on_either)
+            telem_data["hands_on_x"] = int(hands_on_x)
+            telem_data["hands_on_y"] = int(hands_on_y)
+            telem_data["deviation_x"] = dev_x
+            telem_data["deviation_y"] = dev_y
+
 
             self.spring.start()
         elif ffb_type == "pedals":
