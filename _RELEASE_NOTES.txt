@@ -1,6 +1,17 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+############################################
+##  October 30th, 2023
 #############################################
-##  <DATE>
+
+#MSFS
+- New special integration with the Hype Performance Group Airbus H145 and H160 Helicopters
+ - Full FFB integration with the AFCS for both the Cyclic and Collective axes (Tailrotor axis is planned)
+ - Tight integration with the AFCS data provides a true-to-life experience with the Rhino
+ - This was a 2-sided project with support from HPG to add necessary capabilites for TelemFFB to communicate the state of the axes for proper implementation!
+- For a full breakdown of the capabilites and tips on setup, check out the VPforce user guide: https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.f30c77lc61iq
+
+############################################
+##  October 19th, 2023
 #############################################
 
 # MSFS
@@ -25,7 +36,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
    - rudder_trim_follow_gain_virtual_x              - Virtual pedal x axis movement as a percentage of the physical pedal movement (0-100%)
 
 #############################################
-##  October 6th, 2023 Commits by @Number481
+##  October 6th, 2023 Commits
 #############################################
 
 #General
