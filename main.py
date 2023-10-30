@@ -148,11 +148,11 @@ class LoggingFilter(logging.Filter):
 
 # Create a list of keywords to filter
 log_filter_strings = [
-    "unrecognized Miscellaneous Unit in typefor(POSITION)",
-    "Unrecognized event AXIS_CYCLIC_LATERAL_SET",
-    "Unrecognized event AXIS_CYCLIC_LONGITUDINAL_SET",
-    "Unrecognized event ROTOR_AXIS_TAIL_ROTOR_SET",
-    "Unrecognized event AXIS_COLLECTIVE_SET",
+    # "unrecognized Miscellaneous Unit in typefor(POSITION)",
+    # "Unrecognized event AXIS_CYCLIC_LATERAL_SET",
+    # "Unrecognized event AXIS_CYCLIC_LONGITUDINAL_SET",
+    # "Unrecognized event ROTOR_AXIS_TAIL_ROTOR_SET",
+    # "Unrecognized event AXIS_COLLECTIVE_SET",
 ]
 
 log_filter = LoggingFilter(log_filter_strings)
