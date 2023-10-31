@@ -1187,7 +1187,8 @@ class HPGHelicopter(Helicopter):
     collective_ap_spring_gain = 1
     collective_dampening_gain = 1
     collective_spring_coeff_y = 0
-    hands_on_deadzone = 0.2
+    hands_on_deadzone = 0.1
+    hands_off_deadzone = 0.02
     hands_on_active = 0
     hands_on_x_active = 0
     hands_on_y_active = 0
@@ -1308,9 +1309,9 @@ class HPGHelicopter(Helicopter):
             self.spring.effect.setCondition(self.spring_x)
             self.spring.effect.setCondition(self.spring_y)
 
-            hands_off_deadzone = 0.02
+            # hands_off_deadzone = 0.02
             if (telem_data.get("h145HandsOnCyclic", 0) or telem_data.get("h160HandsOnCyclic", 0)):
-                hands_on_dict = self.check_hands_on(hands_off_deadzone)
+                hands_on_dict = self.check_hands_on(self.hands_off_deadzone)
             else:
                 hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
             hands_on_either = hands_on_dict["master_result"]
