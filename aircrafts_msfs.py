@@ -1257,8 +1257,10 @@ class HPGHelicopter(Helicopter):
             sema_x = telem_data.get("h145SEMAx")
             sema_y = telem_data.get("h145SEMAy")
 
-            sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
-            sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
+            # sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
+            # sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
+            sema_x_avg = sema_x
+            sema_y_avg = sema_y
 
             if not trim_reset:
                 sx = round(abs(sema_x_avg), 3)
@@ -1306,7 +1308,11 @@ class HPGHelicopter(Helicopter):
             self.spring.effect.setCondition(self.spring_x)
             self.spring.effect.setCondition(self.spring_y)
 
-            hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
+            hands_off_deadzone = 0.02
+            if (telem_data.get("h145HandsOnCyclic", 0) or telem_data.get("h160HandsOnCyclic", 0)):
+                hands_on_dict = self.check_hands_on(hands_off_deadzone)
+            else:
+                hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
             hands_on_either = hands_on_dict["master_result"]
             hands_on_x = hands_on_dict["x_result"]
             dev_x = hands_on_dict["x_deviation"]

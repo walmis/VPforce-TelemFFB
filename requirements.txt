@@ -1,6 +1,6 @@
 pyqt5
 configobj
-git+https://github.com/walmis/pysimconnect
+pysimconnect @ https://github.com/walmis/pysimconnect/archive/refs/heads/master.zip
 traceback_with_variables
 libusb1
 pygetwindow
