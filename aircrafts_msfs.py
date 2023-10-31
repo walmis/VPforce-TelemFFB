@@ -1191,7 +1191,7 @@ class HPGHelicopter(Helicopter):
     hands_on_active = 0
     hands_on_x_active = 0
     hands_on_y_active = 0
-    send_individual_hands_on = 0
+    send_individual_hands_on = 1
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
