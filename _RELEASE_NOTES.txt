@@ -1,14 +1,16 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
-##  October 30th, 2023
+##  October 31st, 2023
 #############################################
 
 #MSFS
 - New special integration with the Hype Performance Group Airbus H145 and H160 Helicopters
- - Full FFB integration with the AFCS for both the Cyclic and Collective axes (Tailrotor axis is planned)
+ - Full FFB integration with the AFCS for both the Cyclic and Collective axes (Tail rotor axis is planned)
  - Tight integration with the AFCS data provides a true-to-life experience with the Rhino
- - This was a 2-sided project with support from HPG to add necessary capabilites for TelemFFB to communicate the state of the axes for proper implementation!
-- For a full breakdown of the capabilites and tips on setup, check out the VPforce user guide: https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.f30c77lc61iq
+ - This was a 2-sided project with support from HPG to add necessary capabilities for TelemFFB to communicate the state of the axes for proper implementation!
+ - Requires a minimum of Build 43 Patch 2 for the H160 and Build420 Patch 3 for the H145.  These patches are available in the HPG Discord.
+- For a full breakdown of the capabilities and tips on setup, check out the VPforce user guide: https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.f30c77lc61iq
+- NOTE:  If you are running from python source instead of the exe release file, we have switched to a forked version of pysimconenct to support reading/writing of L:VARS in MSFS.  As such, you will need to `pip uninstall pysimconnect` and then re-run `pip install -r requirements.txt`
 
 ############################################
 ##  October 19th, 2023
