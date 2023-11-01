@@ -1117,8 +1117,8 @@ class Helicopter(Aircraft):
         if telem_data.get("FFBType") != 'collective':
             return
         if not self.telemffb_controls_axes:
-            logging.error(
-                "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
+            # logging.error(
+            #     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
             return
         self.spring = effects["collective_ap_spring"].spring()
         self.damper = effects["collective_damper"].damper()
@@ -1139,7 +1139,7 @@ class Helicopter(Aircraft):
             if telem_data.get("SimOnGround", 1):
                 self.cpO_y = 4096
             else:
-                print(f"last_colelctive_y={self.last_collective_y}")
+                # print(f"last_colelctive_y={self.last_collective_y}")
                 self.cpO_y = round(4096 * self.last_collective_y)
 
             self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = round(
@@ -1187,11 +1187,12 @@ class HPGHelicopter(Helicopter):
     collective_ap_spring_gain = 1
     collective_dampening_gain = 1
     collective_spring_coeff_y = 0
-    hands_on_deadzone = 0.2
+    hands_on_deadzone = 0.1
+    hands_off_deadzone = 0.02
     hands_on_active = 0
     hands_on_x_active = 0
     hands_on_y_active = 0
-    send_individual_hands_on = 1
+    send_individual_hands_on = 0
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -1257,8 +1258,10 @@ class HPGHelicopter(Helicopter):
             sema_x = telem_data.get("h145SEMAx")
             sema_y = telem_data.get("h145SEMAy")
 
-            sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
-            sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
+            # sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
+            # sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
+            sema_x_avg = sema_x
+            sema_y_avg = sema_y
 
             if not trim_reset:
                 sx = round(abs(sema_x_avg), 3)
@@ -1306,7 +1309,11 @@ class HPGHelicopter(Helicopter):
             self.spring.effect.setCondition(self.spring_x)
             self.spring.effect.setCondition(self.spring_y)
 
-            hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
+            # hands_off_deadzone = 0.02
+            if (telem_data.get("h145HandsOnCyclic", 0) or telem_data.get("h160HandsOnCyclic", 0)):
+                hands_on_dict = self.check_hands_on(self.hands_off_deadzone)
+            else:
+                hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
             hands_on_either = hands_on_dict["master_result"]
             hands_on_x = hands_on_dict["x_result"]
             dev_x = hands_on_dict["x_deviation"]

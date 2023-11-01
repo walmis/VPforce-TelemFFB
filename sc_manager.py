@@ -176,7 +176,9 @@ class SimConnectManager(threading.Thread):
         SimVar("h145CollectiveRelease", "L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool"),
         SimVar("h160CollectiveRelease", "L:H160_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool"),
         SimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "enum"),
-        SimVar("h1160CollectiveAfcsMode", "L:H160_SDK_AFCS_MODE_COLLECTIVE", "enum"),
+        SimVar("h160CollectiveAfcsMode", "L:H160_SDK_AFCS_MODE_COLLECTIVE", "enum"),
+        SimVar("h145HandsOnCyclic", "L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum"),
+        SimVar("h160HandsOnCyclic", "L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum"),
         SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
         SimVar("TailRotorPedalPos", "TAIL ROTOR BLADE PITCH PCT", "percent over 100"),
     ]
