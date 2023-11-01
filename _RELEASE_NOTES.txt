@@ -1,5 +1,15 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
+##  November 1st, 2023
+#############################################
+
+#MSFS
+- Hot patch for HPG H145/H160 implementation which greatly improves the hands on detection
+ - There is a new `hands_off_deadzone` setting that will dictate when TelemFFB will notify the helicopter that spring override is no longer active
+ - previously the hands on/hands off point was a single deadzone around the center of the stick
+ - now a smaller "hands off deadzone" will prevent flapping of hands on detection as the stick will need to be much closer to center to trigger "hands off" than it did to trigger "hands on"
+
+############################################
 ##  October 31st, 2023
 #############################################
 
