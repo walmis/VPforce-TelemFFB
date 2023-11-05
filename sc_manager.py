@@ -182,6 +182,8 @@ class SimConnectManager(threading.Thread):
         SimVar("h160HandsOnCyclic", "L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum"),
         SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
         SimVar("TailRotorPedalPos", "TAIL ROTOR BLADE PITCH PCT", "percent over 100"),
+        SimVar("HPGVRSDatum", "L:DEBUG_VRS2_DATUM", "enum"),
+        SimVar("HPGVRSIsInVRS", "L:DEBUG_VRS2_IS_IN_VRS", "enum"),
     ]
     
     def __init__(self):

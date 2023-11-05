@@ -1196,6 +1196,7 @@ class HPGHelicopter(Helicopter):
     hands_on_x_active = 0
     hands_on_y_active = 0
     send_individual_hands_on = 1
+    vrs_effect_intensity = 0
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -1209,6 +1210,7 @@ class HPGHelicopter(Helicopter):
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
+        self._update_vrs_effect(telem_data)
 
     def on_timeout(self):
         super().on_timeout()
@@ -1471,6 +1473,26 @@ class HPGHelicopter(Helicopter):
 
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
+    def _update_vrs_effect(self, telem_data):
+        vrs_onset = telem_data.get("HPGVRSDatum", 0)
+        vrs_certain = telem_data.get("HPGVRSIsInVRS", 0)
+
+
+        if vrs_certain:
+            vrs_intensity = 1.0
+        elif vrs_onset == 1:
+            vrs_intensity = .33
+        elif vrs_onset == 2:
+            vrs_intensity = .66
+        else:
+            vrs_intensity = 0
+
+
+        if vrs_intensity:
+            effects["vrs_buffet"].periodic(10, self.vrs_effect_intensity * vrs_intensity, utils.RandomDirectionModulator).start()
+        else:
+            effects.dispose("vrs_buffet")
+
 
 
 
