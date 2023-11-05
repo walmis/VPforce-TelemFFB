@@ -1154,7 +1154,7 @@ class Helicopter(Aircraft):
             self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
             self.spring.start()
             print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
-            if self.cpO_y/4096 - 0.2 < phys_y < self.cpO_y/4096 + 0.2:
+            if self.cpO_y/4096 - 0.1 < phys_y < self.cpO_y/4096 + 0.1:
                 # dont start sending position until physical stick has centered
                 self.collective_init = 1
                 logging.info("Collective Initialized")
