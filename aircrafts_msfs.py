@@ -696,7 +696,10 @@ class Aircraft(AircraftBase):
         if self.flaps_motion_intensity > 0:
             flps = max(telem_data.get("Flaps", 0))
             self._update_flaps(flps)
-        if self.gear_motion_intensity > 0:
+        retracts = telem_data.get("RetractableGear", 0)
+        if isinstance(retracts, list):
+            retracts = max(retracts)
+        if (self.gear_motion_intensity > 0) and (retracts):
             gear = max(telem_data.get("Gear", 0))
             self._update_landing_gear(gear, telem_data.get("TAS"), spd_thresh_low=130 * kt2ms, spd_thresh_high=200 * kt2ms)
 

@@ -161,6 +161,7 @@ class SimConnectManager(threading.Thread):
         SimVarArray("WeightOnWheels", "CONTACT POINT COMPRESSION", "Number", min=0, max=2),
         SimVarArray("Flaps", "TRAILING EDGE FLAPS <> PERCENT", "Percent Over 100", keywords=("LEFT", "RIGHT")),
         SimVarArray("Gear", "GEAR <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
+        SimVarArray("RetractableGear", "IS GEAR RETRACTABLE", "bool"),
         SimVarArray("Spoilers", "SPOILERS <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
         SimVarArray("Afterburner", "TURB ENG AFTERBURNER", "Number", min=1, max=2),
         SimVar("AfterburnerPct", "TURB ENG AFTERBURNER PCT ACTIVE", "Percent Over 100"),
