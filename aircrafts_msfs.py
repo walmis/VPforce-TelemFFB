@@ -696,7 +696,10 @@ class Aircraft(AircraftBase):
         if self.flaps_motion_intensity > 0:
             flps = max(telem_data.get("Flaps", 0))
             self._update_flaps(flps)
-        if self.gear_motion_intensity > 0:
+        retracts = telem_data.get("RetractableGear", 0)
+        if isinstance(retracts, list):
+            retracts = max(retracts)
+        if (self.gear_motion_intensity > 0) and (retracts):
             gear = max(telem_data.get("Gear", 0))
             self._update_landing_gear(gear, telem_data.get("TAS"), spd_thresh_low=130 * kt2ms, spd_thresh_high=200 * kt2ms)
 
@@ -1151,7 +1154,7 @@ class Helicopter(Aircraft):
             self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
             self.spring.start()
             print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
-            if self.cpO_y/4096 - 0.2 < phys_y < self.cpO_y/4096 + 0.2:
+            if self.cpO_y/4096 - 0.1 < phys_y < self.cpO_y/4096 + 0.1:
                 # dont start sending position until physical stick has centered
                 self.collective_init = 1
                 logging.info("Collective Initialized")
@@ -1193,6 +1196,7 @@ class HPGHelicopter(Helicopter):
     hands_on_x_active = 0
     hands_on_y_active = 0
     send_individual_hands_on = 0
+    vrs_effect_intensity = 0
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -1206,6 +1210,7 @@ class HPGHelicopter(Helicopter):
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
+        self._update_vrs_effect(telem_data)
 
     def on_timeout(self):
         super().on_timeout()
@@ -1468,6 +1473,26 @@ class HPGHelicopter(Helicopter):
 
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
+    def _update_vrs_effect(self, telem_data):
+        vrs_onset = telem_data.get("HPGVRSDatum", 0)
+        vrs_certain = telem_data.get("HPGVRSIsInVRS", 0)
+
+
+        if vrs_certain:
+            vrs_intensity = 1.0
+        elif vrs_onset == 1:
+            vrs_intensity = .33
+        elif vrs_onset == 2:
+            vrs_intensity = .66
+        else:
+            vrs_intensity = 0
+
+
+        if vrs_intensity:
+            effects["vrs_buffet"].periodic(10, self.vrs_effect_intensity * vrs_intensity, utils.RandomDirectionModulator).start()
+        else:
+            effects.dispose("vrs_buffet")
+
 
 
 

@@ -161,6 +161,7 @@ class SimConnectManager(threading.Thread):
         SimVarArray("WeightOnWheels", "CONTACT POINT COMPRESSION", "Number", min=0, max=2),
         SimVarArray("Flaps", "TRAILING EDGE FLAPS <> PERCENT", "Percent Over 100", keywords=("LEFT", "RIGHT")),
         SimVarArray("Gear", "GEAR <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
+        SimVarArray("RetractableGear", "IS GEAR RETRACTABLE", "bool"),
         SimVarArray("Spoilers", "SPOILERS <> POSITION", "Percent Over 100", keywords=("LEFT", "RIGHT")),
         SimVarArray("Afterburner", "TURB ENG AFTERBURNER", "Number", min=1, max=2),
         SimVar("AfterburnerPct", "TURB ENG AFTERBURNER PCT ACTIVE", "Percent Over 100"),
@@ -181,6 +182,8 @@ class SimConnectManager(threading.Thread):
         SimVar("h160HandsOnCyclic", "L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum"),
         SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
         SimVar("TailRotorPedalPos", "TAIL ROTOR BLADE PITCH PCT", "percent over 100"),
+        SimVar("HPGVRSDatum", "L:DEBUG_VRS2_DATUM", "enum"),
+        SimVar("HPGVRSIsInVRS", "L:DEBUG_VRS2_IS_IN_VRS", "enum"),
     ]
     
     def __init__(self):
