@@ -187,7 +187,7 @@ class Aircraft(AircraftBase):
             random_amp = utils.clamp(random.uniform(damage_amp*0.5, damage_amp*1.5), 0.0, 1.0)
             random_type = random.choice([EFFECT_SQUARE, EFFECT_SINE, EFFECT_TRIANGLE])
             effects["damage"].periodic(damage_freq, random_amp, random_dir, effect_type=random_type, duration=30).start()
-            logging.info(f"Damage effect: dir={random_dir}, amp={random_amp}")
+            logging.debug(f"Damage effect: dir={random_dir}, amp={random_amp}")
         elif not self.anything_has_changed("damage", damage, delta_ms=50):
             effects.dispose("damage")
 
