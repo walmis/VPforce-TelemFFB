@@ -100,6 +100,8 @@ class Aircraft(AircraftBase):
     damage_effect_enabled = 0
     damage_effect_intensity: float = 0.0
 
+    aoa_effect_enabled = 1
+
     ####
     ####
     def __init__(self, name : str, **kwargs):
@@ -277,7 +279,8 @@ class PropellerAircraft(Aircraft):
             self._update_engine_rumble(telem_data["ActualRPM"])
         
         self._update_wind_effect(telem_data)
-        self._update_aoa_effect(telem_data)
+        if self.aoa_effect_enabled:
+            self._update_aoa_effect(telem_data)
         self._gforce_effect(telem_data)
 
 
