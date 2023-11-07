@@ -1,4 +1,20 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+
+############################################
+##  November 6th, 2023
+#############################################
+#DCS
+- Extended the damage effect to support all FC3 aircraft
+- Add setting to enable disable basic AoA forces effect `aoa_effect_enabled` (default=yes)
+
+#MSFS
+- Added VRS effect to HPG Helicopter class
+    - new setting `vrs_effect_intensity` (%0-100, default %20)
+    - will lightly shudder when on verge of VRS conditions, medium shudder when slightly into VRS, maximum shudder when VRS fully developed
+- Fixed config.ini so gear/flaps/spoiler(speedbrake) effects are in the default configuration for MSFS aircraft
+- Toned down the dynamic force effect on rudder pedals in non-FBW fixed wing aircraft.
+
+
 ############################################
 ##  November 1st, 2023
 #############################################
