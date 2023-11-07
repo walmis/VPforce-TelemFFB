@@ -535,6 +535,7 @@ class Aircraft(AircraftBase):
         telem_data["_rud_coeff"] = rudder_coeff
         rud = (slip_angle - rudder_angle) * _dyn_pressure * _slip_gain
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
+        rud_force = self.dampener.dampen_value(rud_force, '_rud_force', derivative_hz=5, derivative_k=.015)
 
         if ffb_type == 'joystick':
 
