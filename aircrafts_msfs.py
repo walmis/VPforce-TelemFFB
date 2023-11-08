@@ -773,7 +773,9 @@ class JetAircraft(Aircraft):
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
-        
+        if self.engine_rumble:
+            self._update_jet_engine_rumble(telem_data)
+
         self._gforce_effect(telem_data)
         self._update_ab_effect(telem_data)
 
