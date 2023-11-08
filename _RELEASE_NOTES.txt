@@ -1,6 +1,17 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  November 8th, 2023
+############################################
+#MSFS
+- Add setting `center_spring_on_pause` to center with springs during pause/slew conditions
+ - If true the stick will center with spring force when the simulator enters pause or slew
+- TelemFFB will now auto-detect the aircraft category and engine type for all aircraft and load the appropriate default settings if no aircraft specific entry is found
+ - Still possible for data from simconnect to be inaccurate
+- Added engine/prop and jet (turbine) rumble effects to 'TurbopropAircraft' type
+- Fixed jet engine rumble not playing for JetAircraft type
+
+############################################
 ##  November 6th, 2023
 #############################################
 #DCS
