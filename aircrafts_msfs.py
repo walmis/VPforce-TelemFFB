@@ -149,6 +149,7 @@ class Aircraft(AircraftBase):
 
     smoother = utils.Smoother()
     dampener = utils.Derivative()
+    center_spring_on_pause = False
 
 
     def __init__(self, name, **kwargs) -> None:
@@ -158,6 +159,7 @@ class Aircraft(AircraftBase):
         effects.clear()
         # self.spring = HapticEffect().spring()
         self.spring = effects["spring"].spring()
+        self.pause_spring = effects["pause_spring"].spring()
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.const_force = HapticEffect().constant(0, 0)
@@ -681,6 +683,7 @@ class Aircraft(AircraftBase):
         logging.info(f"on_event {event} {args}")
 
     def on_telemetry(self, telem_data):
+        effects["pause_spring"].spring().stop()
         if telem_data["Parked"]: # Aircraft is parked, do nothing
             return
         
@@ -716,6 +719,16 @@ class Aircraft(AircraftBase):
 
         self.const_force.stop()
         self.spring.stop()
+        if self.center_spring_on_pause:
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = 4096
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
+            self.spring_x.cpOffset = self.spring_y.cpOffset = 0
+            self.pause_spring.effect.setCondition(self.spring_x)
+            self.pause_spring.effect.setCondition(self.spring_y)
+            self.pause_spring.start()
+
+
+
 
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop aircraft"""
