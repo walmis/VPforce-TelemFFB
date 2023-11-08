@@ -88,13 +88,18 @@ class EffectTranslator:
             "buffeting" : "AoA\\Stall Buffeting",
             "bombs": "Bomb Release",
             "canopymovement" : "Canopy Motion",
+            "collective_ap_spring" : "Collective AP/Lock Spring Force",
+            "collective_damper" : "Collective Dampening Force",
             "crit_aoa" : "AoA Reduction Force",
             "cm" : "Countermeasure Deployment",
+            "cyclic_spring" : "Cyclic Spring Force",
             "damage" : "Aircraft Damage Event",
             "decel" : "Decelration Force",
+            "dynamic_spring" : "Dynamic Spring Force",
             "elev_droop": "Elevator Droop",
             "etlY" : "ETL Shaking",
             "etlX" : "ETL Shaking",
+            "fbw_spring" : "Fly-by-wire Spring Force",
             "flapsmovement" : "Flap Motion",
             "gearbuffet" : "Gear Drag Buffeting",
             "gearbuffet2" : "Gear Drag Buffeting",
@@ -111,6 +116,7 @@ class EffectTranslator:
             "inertia" : "Inertia",
             "nw_shimmy" : "Nosewheel Shimmy",
             "payload_rel" :"Payload Release",
+            "pause_spring" :"Pause/Slew Spring Force",
             "pedal_spring" : "Pedal Spring",
             "prop_rpm0-1" : "Propeller Engine Rumble",
             "prop_rpm0-2" : "Propeller Engine Rumble",
@@ -130,6 +136,7 @@ class EffectTranslator:
             "spoilerbuffet2-2" : "Spoiler Buffeting",
             "spoilermovement" : "Spoiler Motion",
             "trim_spring" : "Trim Override Spring",
+            "vrs_buffet" : "Vortex Ring State Buffeting",
             "wnd" : "Wind Effect"
         }
 
@@ -311,22 +318,24 @@ def to_number(v : str):
             return False
 
         scale = 1
-        if v.endswith("%") or v.startswith("%"): # handle percent strings
+        if v.lower().endswith("%") or v.startswith("%"): # handle percent strings
             scale = 0.01
             v = v.strip("%")
-        if v.endswith("kt"): # handle unit conversion: kt->ms
+        if v.lower().endswith("kt"): # handle unit conversion: kt->ms
             scale = 0.51444
             v = v.strip("kt")
-        if v.endswith("kph"): # handle unit conversion: kph->ms
+        if v.lower().endswith("kph"): # handle unit conversion: kph->ms
             scale = 1/3.6
             v = v.strip("kph")
-        if v.endswith("mph"): # handle unit conversion: mph->ms
+        if v.lower().endswith("mph"): # handle unit conversion: mph->ms
             scale = 0.44704
             v = v.strip("mph")
-        if v.endswith("deg"): # just strip out degrees suffix
+        if v.lower().endswith("deg"): # just strip out degrees suffix
             v = v.strip("deg")
-        if v.endswith("ms"): # strip out milliseconds suffix
+        if v.lower().endswith("ms"): # strip out milliseconds suffix
             v = v.strip("ms")
+        if v.lower().endswith("hz"): # strip out hertz suffix
+            v = v.strip("hz")
 
         if "." in v:
             return float(v) * scale
