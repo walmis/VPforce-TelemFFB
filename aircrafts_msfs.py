@@ -777,18 +777,20 @@ class JetAircraft(Aircraft):
         self._gforce_effect(telem_data)
         self._update_ab_effect(telem_data)
 
-class TurbopropAircraft(Aircraft):
+class TurbopropAircraft(PropellerAircraft):
 
     def on_telemetry(self, telem_data):
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
         super().on_telemetry(telem_data)
-        if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-            sp = max(telem_data.get("Spoilers", 0))
-            self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
-        if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
-            super()._gforce_effect(telem_data)
+        # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
+        #     sp = max(telem_data.get("Spoilers", 0))
+        #     self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
+        # if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
+        #     super()._gforce_effect(telem_data)
+        if self.engine_rumble:
+            self._update_jet_engine_rumble(telem_data)
 
 class GliderAircraft(Aircraft):
     def _update_force_trim(self, telem_data, x_axis=True, y_axis=True):
