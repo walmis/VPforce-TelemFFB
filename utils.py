@@ -415,19 +415,26 @@ def clamp_minmax(n, max):
     return clamp(n, -max, max)
 
 
-def scale(val, src : tuple, dst : tuple):
+def scale(val, src : tuple, dst : tuple, return_round=False, return_int=False):
     """
     Scale the given value from the scale of src to the scale of dst.
     """   
-    return (val - src[0]) * (dst[1] - dst[0]) / (src[1] - src[0]) + dst[0]
+    result =  (val - src[0]) * (dst[1] - dst[0]) / (src[1] - src[0]) + dst[0]
+    if return_round:
+        return round(result)
+    elif return_int:
+        return int(result)
+    else:
+        return result
 
 
-def scale_clamp(val, src : tuple, dst : tuple):
+
+def scale_clamp(val, src : tuple, dst : tuple,return_round=False, return_int=False ):
     """
     Scale the given value from the scale of src to the scale of dst. 
     and clamp the result to dst
     """   
-    v = scale(val, src, dst)
+    v = scale(val, src, dst,return_round=return_round, return_int=return_int)
     return clamp(v, dst[0], dst[1])
 def non_linear_scaling(x, min_val, max_val, curvature=1):
     # Scale the input value to a value between 0 and 1 within the given range
