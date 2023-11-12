@@ -5,7 +5,7 @@
 		<name>afterburner_effect_intensity</name>
 		<displayname>Afterburner</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -17,7 +17,7 @@
 		<value Craft="Aircraft">0.2</value>
 		<value Craft="TurbopropAircraft">0.2</value>
 		<value Craft="GliderAircraft">0.1</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -27,7 +27,7 @@
 		<displayname>Aileron Spring Gain</displayname>
 		<value Craft="GliderAircraft">0.25</value>
 		<value Craft="TurbopropAircraft">0.5</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -36,7 +36,7 @@
 		<name>aircraft_is_fbw</name>
 		<displayname>Enable FlyByWire (FBW)</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -47,7 +47,7 @@
 		<displayname>Enable Spring Centering</displayname>
 		<value Craft="GliderAircraft">false</value>
 		<value Craft="TurbopropAircraft">true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -57,7 +57,7 @@
 		<name>aoa_effect_enabled</name>
 		<displayname>Enable Buffeting</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -68,7 +68,7 @@
 		<name>aoa_reduction_effect_enabled</name>
 		<displayname>Enable AoA Reduction</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -78,7 +78,7 @@
 		<name>aoa_reduction_max_force</name>
 		<displayname>AoA Reduction Max Force</displayname>
 		<value>1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -89,7 +89,7 @@
 		<name>ap_following</name>
 		<displayname>Enable Autopilot Following</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -98,7 +98,7 @@
 		<name>buffet_aoa</name>
 		<displayname>Buffet Onset Aoa</displayname>
 		<value>10</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>AoA when buffeting starts</info>
@@ -108,7 +108,7 @@
 		<name>buffeting_intensity</name>
 		<displayname>Buffeting Intensity</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>peak AoA buffeting intensity  0 to disable</info>
@@ -118,7 +118,7 @@
 		<name>canopy_motion_intensity</name>
 		<displayname>Canopy Motion</displayname>
 		<value>0.12</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>peak vibration intensity when canopy is moving, 0 to disable</info>
@@ -128,7 +128,7 @@
 		<name>center_spring_on_pause</name>
 		<displayname>Center on Pause/Slew</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -138,7 +138,7 @@
 		<name>cm_vibration_intensity</name>
 		<displayname>Countermeasure Release</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>peak intensity for countermeasure release effect, 0 to disable</info>
@@ -149,7 +149,7 @@
 		<displayname>Collective AP Spring Gain</displayname>
 		<value Craft="Helicopter">1.0</value>
 		<value Craft="HPGHelicopter">1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<collective>true</collective>
 	</defaults>
@@ -159,7 +159,7 @@
 		<displayname>Collective Dampening Gain</displayname>
 		<value Craft="Helicopter">0.4</value>
 		<value Craft="HPGHelicopter">0.4</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<collective>true</collective>
 	</defaults>
@@ -169,7 +169,7 @@
 		<displayname>Critical AoA Max Speed</displayname>
 		<value>25</value>
 		<unit>m/s</unit>
-		<type>int</type>
+		<datatype>int</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -181,7 +181,7 @@
 		<displayname>Critical AoA Start Speed</displayname>
 		<value>22</value>
 		<unit>m/s</unit>
-		<type>int</type>
+		<datatype>int</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -193,7 +193,7 @@
 		<displayname>Cyclic Spring Gain</displayname>
 		<value Craft="Helicopter">1.0</value>
 		<value Craft="HPGHelicopter">0.75</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -202,7 +202,7 @@
 		<name>damage_effect_enabled</name>
 		<displayname>Enable Damage Effect</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -212,7 +212,7 @@
 		<name>damage_effect_intensity</name>
 		<displayname>Damage Effect</displayname>
 		<value>0.4</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
@@ -224,7 +224,7 @@
 		<name>dcs_enabled</name>
 		<displayname>Enable DCS</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<global>true</global>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -235,7 +235,7 @@
 		<name>deceleration_effect_enable</name>
 		<displayname>Enable Decelleration Effect</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
@@ -246,7 +246,7 @@
 		<name>deceleration_max_force</name>
 		<displayname>Decelleration Max Force</displayname>
 		<value>0.6</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
@@ -257,7 +257,7 @@
 		<name>elevator_droop_moment</name>
 		<displayname>Elevator Droop Moment</displayname>
 		<value>0.1</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -268,7 +268,7 @@
 		<value Craft="Aircraft">0.2</value>
 		<value Craft="TurbopropAircraft">0.2</value>
 		<value Craft="GliderAircraft">0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -278,7 +278,7 @@
 		<displayname>Elevator Prop Flow</displayname>
 		<value Craft="PropellerAircraft">0.2</value>
 		<value Craft="TurbopropAircraft">0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -288,7 +288,7 @@
 		<displayname>Elevator Spring Gain</displayname>
 		<value Craft="GliderAircraft">0.25</value>
 		<value Craft="TurbopropAircraft">0.5</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -297,7 +297,7 @@
 		<name>engine_rumble</name>
 		<displayname>Engine Rumble</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<IL2>true</IL2>
@@ -310,7 +310,7 @@
 		<displayname>Engine Rumble High RPM</displayname>
 		<value Craft="PropellerAircraft">2800</value>
 		<value Craft="TurbopropAircraft">2800</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<IL2>true</IL2>
@@ -324,7 +324,7 @@
 		<displayname>Engine Rumble High Intensity</displayname>
 		<value Craft="PropellerAircraft">0.03</value>
 		<value Craft="TurbopropAircraft">0.03</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<IL2>true</IL2>
@@ -338,7 +338,7 @@
 		<displayname>Engine Rumble Low RPM</displayname>
 		<value Craft="PropellerAircraft">650</value>
 		<value Craft="TurbopropAircraft">650</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<IL2>true</IL2>
@@ -352,7 +352,7 @@
 		<displayname>Engine Rumble Low Intensity</displayname>
 		<value Craft="PropellerAircraft">0.06</value>
 		<value Craft="TurbopropAircraft">0.06</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<IL2>true</IL2>
@@ -366,7 +366,7 @@
 		<displayname>ETL Effect</displayname>
 		<value Craft="Helicopter">0.25</value>
 		<value Craft="HPGHelicopter">0.25</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 	</defaults>
@@ -376,7 +376,7 @@
 		<displayname>ETL Start Speed</displayname>
 		<value Craft="Helicopter">8</value>
 		<value Craft="HPGHelicopter">8</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<unit>m/s</unit>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -388,7 +388,7 @@
 		<displayname>ETL Stop Speed</displayname>
 		<value Craft="Helicopter">16</value>
 		<value Craft="HPGHelicopter">16</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<unit>m/s</unit>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -399,7 +399,7 @@
 		<name>fbw_aileron_gain</name>
 		<displayname>FBW Aileron Gain</displayname>
 		<value>0.6</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<info>Fixed spring gain for FBW aircraft</info>
@@ -409,7 +409,7 @@
 		<name>fbw_elevator_gain</name>
 		<displayname>FBW Elevator Gain</displayname>
 		<value>0.6</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<info>Fixed spring gain for FBW aircraft</info>
@@ -419,7 +419,7 @@
 		<name>fbw_rudder_gain</name>
 		<displayname>FBW Rudder Gain</displayname>
 		<value>0.5</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 		<info>Fixed spring gain for FBW aircraft</info>
@@ -429,7 +429,7 @@
 		<name>flaps_motion_intensity</name>
 		<displayname>Flaps Motion</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<IL2>true</IL2>
@@ -442,7 +442,7 @@
 		<name>force_trim_button</name>
 		<displayname>Force Trim Button</displayname>
 		<value>99</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<MSFS>true</MSFS>
 	</defaults>
 	<defaults>
@@ -450,7 +450,7 @@
 		<name>force_trim_reset_button</name>
 		<displayname>Force Trim Reset Button</displayname>
 		<value>99</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<MSFS>true</MSFS>
 	</defaults>
 	<defaults>
@@ -458,7 +458,7 @@
 		<name>gear_buffet_intensity</name>
 		<displayname>Gear Buffet</displayname>
 		<value>0.15</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -469,7 +469,7 @@
 		<name>gear_motion_intensity</name>
 		<displayname>Gear Motion</displayname>
 		<value>0.15</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<IL2>true</IL2>
@@ -482,18 +482,18 @@
 		<name>gforce_effect_curvature</name>
 		<displayname>G Force Curvature</displayname>
 		<value>2.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 	</defaults>
-	<defaults><Grouping>G Force</Grouping><name>gforce_effect_enable</name><displayname>G Force Effect Enable</displayname><value>true</value><type>bool</type><IL2>true</IL2><joystick>true</joystick></defaults>
+	<defaults><Grouping>G Force</Grouping><name>gforce_effect_enable</name><displayname>G Force Effect Enable</displayname><value>true</value><datatype>bool</datatype><IL2>true</IL2><joystick>true</joystick></defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
 		<name>gforce_effect_max_intensity</name>
 		<displayname>G Force Max Intensity</displayname>
 		<value>1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
@@ -503,7 +503,7 @@
 		<name>gforce_max_gs</name>
 		<displayname>Maximum Gs</displayname>
 		<value>7.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
@@ -513,7 +513,7 @@
 		<name>gforce_min_gs</name>
 		<displayname>Minimum Gs</displayname>
 		<value>1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
@@ -523,7 +523,7 @@
 		<name>gun_vibration_intensity</name>
 		<displayname>Gun Vibration</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>peak intenstiy for gunfire effect, 0 to disable</info>
@@ -533,7 +533,7 @@
 		<name>hands_off_deadzone</name>
 		<displayname>Hands Off Deadzone</displayname>
 		<value>0.02</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 	</defaults>
 	<defaults>
@@ -541,7 +541,7 @@
 		<name>hands_on_deadzone</name>
 		<displayname>Hands On Deadzone</displayname>
 		<value>0.1</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 	</defaults>
 	<defaults>
@@ -550,7 +550,7 @@
 		<displayname>Heli Engine Rumble Intensity</displayname>
 		<value Craft="Helicopter">0.12</value>
 		<value Craft="HPGHelicopter">0.12</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<info>peak rumble intensity for helicopter engine/rotor effect</info>
@@ -560,7 +560,7 @@
 		<name>il2_buffeting_factor</name><IL2>true</IL2><joystick>true</joystick>
 		<displayname>Buffeting Factor	</displayname>
 		<value>1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<info></info>
 		</defaults>
 	<defaults>
@@ -568,7 +568,7 @@
 		<name>il2_cfg_validation</name>
 		<displayname>IL2 Config Validation</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -579,7 +579,7 @@
 		<name>il2_enable_buffet</name>
 		<displayname>Enable Buffeting</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 	</defaults>
@@ -588,7 +588,7 @@
 		<name>il2_enable_runway_rumble</name>
 		<displayname>Enable Runway Rumble</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -598,7 +598,7 @@
 		<name>il2_enable_weapons</name>
 		<displayname>Enable Weapon Effects</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -608,7 +608,7 @@
 		<name>il2_enabled</name>
 		<displayname>Enable IL2</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<global>true</global>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -619,7 +619,7 @@
 		<name>il2_path</name>
 		<displayname>IL2 Path</displayname>
 		<value>'C:\Program Files\IL-2 Sturmovik Great Battles'</value>
-		<type>text</type>
+		<datatype>text</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -630,7 +630,7 @@
 		<name>il2_shake_master</name>
 		<displayname>Effects Master Control</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -641,7 +641,7 @@
 		<name>il2_telem_port</name>
 		<displayname>IL2 Telemetry Port</displayname>
 		<value>34385</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -652,7 +652,7 @@
 		<name>invert_ap_x_axis</name>
 		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -664,7 +664,7 @@
 		<value Craft="HPGHelicopter">45</value>
 		<value Craft="JetAircraft">45</value>
 		<value Craft="TurbopropAircraft">45</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<unit>hz</unit>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -680,7 +680,7 @@
 		<value Craft="HPGHelicopter">0.01</value>
 		<value Craft="JetAircraft">0.05</value>
 		<value Craft="TurbopropAircraft">0.03</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<IL2>true</IL2>
@@ -692,7 +692,7 @@
 		<displayname>Aileron Trim Gain (physical)</displayname>
 		<value Craft="Aircraft">1.0</value>
 		<value Craft="Helicopter">0.4</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -702,7 +702,7 @@
 		<displayname>Elevator Trim Gain (physical)</displayname>
 		<value Craft="Aircraft">1.0</value>
 		<value Craft="Helicopter">0.4</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -712,7 +712,7 @@
 		<displayname>Aileron Trim Gain (virtual)</displayname>
 		<value Craft="Aircraft">0.2</value>
 		<value Craft="Helicopter">0.3</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -722,7 +722,7 @@
 		<displayname>Elevator Trim Gain (virtual)</displayname>
 		<value Craft="Aircraft">0.2</value>
 		<value Craft="Helicopter">0.3</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -731,7 +731,7 @@
 		<name>joystick_x_axis_scale</name>
 		<displayname>Aileron (X) Axis Scale</displayname>
 		<value>1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -740,7 +740,7 @@
 		<name>joystick_y_axis_scale</name>
 		<displayname>Elevator (Y) Axis Scale</displayname>
 		<value>1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -749,7 +749,7 @@
 		<name>logging_level</name>
 		<displayname>Logging Level</displayname>
 		<value>INFO</value>
-		<type>text</type>
+		<datatype>text</datatype>
 		<global>true</global>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -761,7 +761,7 @@
 		<name>msfs_enabled</name>
 		<displayname>Enable MSFS</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<global>true</global>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -772,7 +772,7 @@
 		<name>nosewheel_shimmy</name>
 		<displayname>Enable Nosewheel Shimmy</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 	</defaults>
@@ -781,7 +781,7 @@
 		<name>nosewheel_shimmy_intensity</name>
 		<displayname>Nosewheel Shimmy</displayname>
 		<value>0.15</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 	</defaults>
@@ -790,7 +790,7 @@
 		<name>nosewheel_shimmy_min_brakes</name>
 		<displayname>Nosewheel Shimmy min brakes</displayname>
 		<value>0.65</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 		</defaults>
@@ -800,7 +800,7 @@
 		<displayname>Nosewheel Shimmy min speed</displayname>
 		<value>7</value>
 		<unit>m/s</unit>
-		<type>int</type>
+		<datatype>int</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 	</defaults>
@@ -810,7 +810,7 @@
 		<displayname>Overpeed Shake Intensity</displayname>
 		<value Craft="Helicopter">0.2</value>
 		<value Craft="HPGHelicopter">0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -823,7 +823,7 @@
 		<displayname>Overpeed Shake Start Speed</displayname>
 		<value Craft="Helicopter">80</value>
 		<value Craft="HPGHelicopter">80</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<unit>m/s</unit>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -836,7 +836,7 @@
 		<name>pedal_dampening_gain</name>
 		<displayname>Pedal Dampening Gain</displayname>
 		<value>0.5</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
 		<info>Percent of damper setting in VPConf</info>
@@ -846,7 +846,7 @@
 		<name>pedal_spring_gain</name>
 		<displayname>Pedal Spring Gain</displayname>
 		<value>0.6</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
 		<info>Percent of spring setting in VPConf</info>
@@ -856,9 +856,10 @@
 		<name>pedal_spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
 		<value>2</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
+		<validvalues>0,1,2</validvalues>
 		<info>2=static. Spring enabled using "pedal_spring_gain" spring setting</info>
 	</defaults>
 	<defaults>
@@ -866,7 +867,7 @@
 		<name>pedal_trimming_enabled</name>
 		<displayname>Enable Pedal Trimming</displayname>
 		<value>true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
 	</defaults>
@@ -876,7 +877,7 @@
 		<displayname>Prop Diameter</displayname>
 		<value Craft="PropellerAircraft">1.7</value>
 		<value Craft="TurbopropAircraft">2.7</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<unit>m</unit>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -888,7 +889,7 @@
 		<displayname>Rotor Blade Count</displayname>
 		<value Craft="Helicopter">2</value>
 		<value Craft="HPGHelicopter">4</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 	</defaults>
@@ -898,7 +899,7 @@
 		<displayname>Rudder Gain</displayname>
 		<value Craft="Aircraft">0.3</value>
 		<value Craft="TurbopropAircraft">0.3</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 	</defaults>
@@ -908,7 +909,7 @@
 		<displayname>Rudder Prop Flow</displayname>
 		<value Craft="PropellerAircraft">0.2</value>
 		<value Craft="TurbopropAircraft">0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 	</defaults>
@@ -918,7 +919,7 @@
 		<displayname>Rudder Spring Gain</displayname>
 		<value Craft="GliderAircraft">0.25</value>
 		<value Craft="TurbopropAircraft">0.4</value><pedals>true</pedals>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 	</defaults>
 	<defaults>
@@ -926,7 +927,7 @@
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<displayname>Rudder Trim Gain (physical)</displayname>
 		<value>1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 	</defaults>
@@ -935,7 +936,7 @@
 		<name>rudder_trim_follow_gain_virtual_x</name>
 		<displayname>Rudder Trim Gain (virtual)</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 	</defaults>
@@ -944,7 +945,7 @@
 		<name>rudder_x_axis_scale</name>
 		<displayname>Rudder (X) Axis Scale</displayname>
 		<value>1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 		</defaults>
@@ -953,7 +954,7 @@
 		<name>runway_rumble_intensity</name>
 		<displayname>Runway Rumble</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>peak runway intensity, 0 to disable</info>
@@ -963,7 +964,7 @@
 		<name>speedbrake_buffet_intensity</name>
 		<displayname>Speedbrake Buffet</displayname>
 		<value>0.15</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>Peak intensity for speed brake buffeting effect</info>
@@ -973,7 +974,7 @@
 		<name>speedbrake_motion_intensity</name>
 		<displayname>Speedbrake Motion</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>peak vibration intensity when speed brake is moving</info>
@@ -983,7 +984,7 @@
 		<name>spoiler_buffet_intensity</name>
 		<displayname>Speedbrake Buffet</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<info>peak buffeting intensity when spoilers deployed,  0 to disable</info>
@@ -993,7 +994,7 @@
 		<name>spoiler_buffet_intensity</name>
 		<displayname>Spoiler Buffet</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -1004,7 +1005,7 @@
 		<name>spoiler_motion_intensity</name>
 		<displayname>Speedbrake Motion</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<info>F14 Only, peak vibration intensity when spoilers is moving, 0 to disable</info>
@@ -1014,7 +1015,7 @@
 		<name>spoiler_motion_intensity</name>
 		<displayname>Spoiler Motion</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -1026,7 +1027,7 @@
 		<name>stall_aoa</name>
 		<displayname>Stall AoA</displayname>
 		<value>15</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>Stall AoA</info>
@@ -1036,7 +1037,7 @@
 		<name>telemetry_timeout</name>
 		<displayname>Telemetry Timeout</displayname>
 		<value>200</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<unit>ms</unit>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -1050,7 +1051,7 @@
 		<displayname>Enable Axis Control</displayname>
 		<value Craft="Aircraft">false</value>
 		<value Craft="HPGHelicopter">true</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -1062,7 +1063,7 @@
 		<name>type</name>
 		<displayname>Type</displayname>
 		<value>Aircraft</value>
-		<type>text</type>
+		<datatype>text</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -1074,7 +1075,7 @@
 		<name>type</name>
 		<displayname>Type</displayname>
 		<value>Aircraft</value>
-		<type>text</type>
+		<datatype>text</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -1087,7 +1088,7 @@
 		<name>type</name>
 		<displayname>Type</displayname>
 		<value>Aircraft</value>
-		<type>text</type>
+		<datatype>text</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -1100,7 +1101,7 @@
 		<name>weapon_effect_direction</name>
 		<displayname>Weapon Effect Direction</displayname>
 		<value>-1</value>
-		<type>int</type>
+		<datatype>int</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>Direction of applied force for weapons effects | range 0-359 or set to -1 for random</info>
@@ -1110,7 +1111,7 @@
 		<name>weapon_release_intensity</name>
 		<displayname>Weapon Release</displayname>
 		<value>0.2</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
@@ -1122,7 +1123,7 @@
 		<name>wind_effect_enabled</name>
 		<displayname>Enable Wind Effect</displayname>
 		<value>false</value>
-		<type>bool</type>
+		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 	</defaults>
@@ -1131,7 +1132,7 @@
 		<name>wind_effect_max_intensity</name>
 		<displayname>Wind Effect Max Inensity</displayname>
 		<value>0.4</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -1142,7 +1143,7 @@
 		<name>wind_effect_scaling</name>
 		<displayname>Wind Effect Scaling</displayname>
 		<value>1.0</value>
-		<type>float</type>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>Adjust the overall intensity of the wind effect</info>
