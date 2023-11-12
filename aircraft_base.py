@@ -96,6 +96,10 @@ class AircraftBase(object):
     def is_pedals(self):
         return self._telem_data.get("FFBType") == "pedals"
 
+    def is_collective(self):
+        return self._telem_data.get("FFBType") == "collective"
+
+
     def anything_has_changed(self, item: str, value, delta_ms=0):
         """track if any parameter, given as key "item" has changed between two consecutive calls of the function
         delta_ms can be used to smooth the effects of telemetry which does not update regularly but is still "moving"
@@ -527,6 +531,7 @@ class AircraftBase(object):
             effects.dispose("spoilerbuffet2-2")
 
     def _update_wind_effect(self, telem_data):
+        if not self.is_joystick(): return
         if not self.wind_effect_enabled:
             effects.dispose("wnd")
             return
@@ -573,6 +578,7 @@ class AircraftBase(object):
             effects.dispose('elev_droop')
 
     def _update_aoa_effect(self, telem_data):
+        if not self.is_joystick(): return
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
         if self._sim_is_msfs():

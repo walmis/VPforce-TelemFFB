@@ -101,16 +101,35 @@ class Aircraft(AircraftBase):
     damage_effect_intensity: float = 0.0
 
     aoa_effect_enabled = 1
-
+    pedals_init = 0
+    pedal_spring_coeff_x = 0
+    last_pedal_x = 0
+    pedal_trimming_enabled = False
+    pedal_spring_gain = 1.0
+    pedal_dampening_gain = 0.5
+    collective_dampening_gain = 0.5
+    collective_init = 0
+    collective_spring_coeff_y = 0
+    last_collective_y = 0
+    collective_ap_spring_gain = 4096
+    cpO_x = 0
+    cpO_y = 0
     ####
     ####
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
-
+        self.spring = effects["spring"].spring()
+        self.damper = effects["damper"].damper()
         self._jet_rumble_is_playing = 0
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.damage_enable_cmd_sent = 0
+        self.pedals_init = 0
+        input_data = HapticEffect.device.getInput()
+        self.last_device_x, self.last_device_y = input_data.axisXY()
+        self.last_pedal_x = self.last_device_x
+        self.last_collective_y = self.last_device_y
+
 
     def on_telemetry(self, telem_data : dict):
         ## Generic Aircraft Telemetry Handler
@@ -159,6 +178,9 @@ class Aircraft(AircraftBase):
             self._update_stick_position(telem_data)
         if self.is_pedals():
             self.override_pedal_spring(telem_data)
+        if self.is_collective():
+            self.override_collective_spring(telem_data)
+
 
     def on_event(self, event, *args):
         logging.info(f"on_event: {event}")
@@ -167,7 +189,15 @@ class Aircraft(AircraftBase):
 
     def on_timeout(self):
         super().on_timeout()
+        input_data = HapticEffect.device.getInput()
+        self.last_device_x, self.last_device_y = input_data.axisXY()
+        self.last_pedal_x = self.last_device_x
+        self.last_collective_y = self.last_device_y
         self.damage_enable_cmd_sent = 0
+        self.collective_init = 0
+        self.pedals_init = 0
+        self.spring.stop()
+        self.damper.stop()
 
 
     def send_commands(self, cmds):
@@ -192,26 +222,176 @@ class Aircraft(AircraftBase):
             logging.debug(f"Damage effect: dir={random_dir}, amp={random_amp}")
         elif not self.anything_has_changed("damage", damage, delta_ms=50):
             effects.dispose("damage")
+    def get_aircraft_perf(self, telem_data):
+        perf_dict = {
+            'default': {
+                'Vs': 87 * knots,
+                'Vne': 438 * knots,
+            },
+            'TF-51D': {
+                'Vs': 87*knots,
+                'Vne': 438*knots,
+            },
+            'P-51D': {
+                'Vs': 87 * knots,
+                'Vne': 438 * knots,
+            },
+            'P-47D': {
+                'Vs': 94 * knots,
+                'Vne': 425 * knots,
+            },
+            'Spitfire': {
+                'Vs': 70 * knots,
+                'Vne': 390 * knots,
+            },
+            'FW-190A8': {
+                'Vs': 118 * knots,
+                'Vne': 370 * knots,
+            },
+            'FW-190D9': {
+                'Vs': 103 * knots,
+                'Vne': 370 * knots,
+            },
+            'Bf-109K-4': {
+                'Vs': 65 * knots,
+                'Vne': 470 * knots,
+            },
+            'I-16': {
+                'Vs': 45 * knots,
+                'Vne': 340 * knots,
+            },
+            'Mosquito': {
+                'Vs': 90 * knots,
+                'Vne': 415 * knots,
+            },
+        }
+
+        ac = telem_data.get("N")
+        for aircraft, values in perf_dict.items():
+            # print(f"Checking >{aircraft}< against >{ac}<")
+            if aircraft in ac:
+                # logging.info(f"Found aircraft performance data for {ac} in entry {aircraft}")
+                return values
+
+        # logging.info(f"No aircraft performance data found for {ac} - using default")
+        return perf_dict.get('default')
+
+    def override_collective_spring(self, telem_data):
+        if not self.is_collective(): return
+
+        self.spring = effects["collective_ap_spring"].spring()
+        self.damper = effects["collective_damper"].damper()
+        if not self.collective_init:
+            input_data = HapticEffect.device.getInput()
+            phys_x, phys_y = input_data.axisXY()
+
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = self.collective_spring_coeff_y
+            if max(telem_data.get("WeightOnWheels")):
+                self.cpO_y = 4096
+            else:
+                self.cpO_y = round(4096 * self.last_collective_y)
+
+
+            self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = round(
+                4096 * utils.clamp(self.collective_ap_spring_gain, 0, 1))
+
+            self.spring_y.cpOffset = self.cpO_y
+
+            self.spring.effect.setCondition(self.spring_y)
+            self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
+            self.spring.start(override=True)
+            print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
+            if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
+                # dont start sending position until physical stick has centered
+                self.collective_init = 1
+                logging.info("Collective Initialized")
+            else:
+                return
+
+        input_data = HapticEffect.device.getInput()
+        phys_x, phys_y = input_data.axisXY()
+        self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
+        self.spring_y.cpOffset = self.cpO_y
+
+        self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
+        self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
+
+        self.spring.effect.setCondition(self.spring_y)
+        self.spring.start(override=True)
 
     def override_pedal_spring(self, telem_data):
+        if not self.is_pedals(): return
 
-        ## 0=spring disabled + damper enabled, 1=spring enabled at %100 (overriding DCS) + damper
+        input_data = HapticEffect.device.getInput()
+        phys_x, phys_y = input_data.axisXY()
+        ## 0=DCS Default
+        ## 1=spring disabled
+        ## 2=static spring enabled using "pedal_spring_gain" spring setting
+        ## 3=dynamic spring enabled.  Based on "pedal_spring_gain"
         if self.pedal_spring_mode == 0:
             return
         elif self.pedal_spring_mode == 1:
             self.spring_x.positiveCoefficient = 0
             self.spring_x.negativeCoefficient = 0
-        elif self.pedal_spring_mode == 2:
-            self.spring_x.positiveCoefficient = 4096
-            self.spring_x.negativeCoefficient = 4096
-        spring = effects["pedal_spring"].spring()
 
-        spring.effect.setCondition(self.spring_x)
-        # effects["damper"].damper(512, 512).start()
-        spring.start(override=True)
+        elif self.pedal_spring_mode == 2:
+            spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
+            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
+
+            if self.pedal_trimming_enabled:
+                self._update_pedal_trim(telem_data)
+
+        elif self.pedal_spring_mode == 3:
+            tas = telem_data.get("TAS", 0)
+            ac_perf = self.get_aircraft_perf(telem_data)
+            spr_coeff = utils.scale(tas, (ac_perf['Vs'], ac_perf['Vne']), (1024, 4096))
+            spr_coeff = round(spr_coeff * self.pedal_spring_gain)
+            spr_coeff = utils.clamp(spr_coeff, 0, 4096)
+            print(f"coeff={spr_coeff}")
+            self.spring_x.positiveCoefficient = spr_coeff
+            self.spring_x.negativeCoefficient = spr_coeff
+            if self.pedal_trimming_enabled:
+                self._update_pedal_trim(telem_data)
+            # return
+        self.spring = effects["pedal_spring"].spring()
+        damper_coeff = round(utils.clamp((self.pedal_dampening_gain * 4096), 0, 4096))
+        self.damper = effects["pedal_damper"].damper(coef_x=damper_coeff).start()
+
+        self.spring.effect.setCondition(self.spring_x)
+        self.spring.start(override=True)
+
+    def _update_pedal_trim(self, telem_data):
+        if not self.is_pedals(): return
+
+        input_data = HapticEffect.device.getInput()
+        x, y = input_data.axisXY()
+        telem_data["X"] = x
+
+        # self.spring_x.positiveCoefficient = 4096
+        # self.spring_x.negativeCoefficient = 4096
+        pedal_pos = -telem_data.get('controlsurfaces_rudder_right')
+        # trim signal needs to be slow to avoid positive feedback
+        lp_x = LPFs.get("x", 5)
+        # print(f"lp_x: {lp_x.value} phys: {x}, pedal={pedal_pos}")
+        # estimate trim from real stick position and virtual stick position
+        offs = pedal_pos - x
+        offs_x = lp_x.update(pedal_pos - x - lp_x.value)
+        # print(f"offs={offs} offset_lpf={offs_x}")
+        self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
+        self.spring = effects["pedal_spring"].spring()
+        # upload effect parameters to stick
+        self.spring.effect.setCondition(self.spring_x)
+        # ensure effect is started
+        self.spring.start(override=True)
+
+        # override DCS input and set our own values
+        self.send_commands([f"LoSetCommand(2003, {x - offs_x})"])
 
     def _update_stick_position(self, telem_data):
+        if not self.is_joystick(): return
+
         if not self.trim_workaround: return
+
         if not ("StickX" in telem_data and "StickY" in telem_data): return
 
         input_data = HapticEffect.device.getInput()
