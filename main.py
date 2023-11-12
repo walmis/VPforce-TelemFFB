@@ -111,11 +111,11 @@ effects_translator = utils.EffectTranslator()
 script_dir = os.path.dirname(os.path.abspath(__file__))
 if os.path.basename(args.configfile) == args.configfile:
     # just the filename is present, assume it is in the script directory
-    print("Config File is in the script dir")
+    # print("Config File is in the script dir")
     configfile = os.path.join(script_dir, args.configfile)
 else:
     # assume is absolute path to file
-    print("Config file is absolute path")
+    # print("Config file is absolute path")
     configfile = args.configfile
 if os.path.basename(args.overridefile) == args.overridefile:
     # just the filename is present, assume it is in the script directory
@@ -385,7 +385,7 @@ class TelemManager(QObject, threading.Thread):
 
             except Exception as e:
                 traceback.print_exc()
-                print("Error Parsing Parameter: ", repr(i))
+                logging.error("Error Parsing Parameter: ", repr(i))
 
         # print(items)
         aircraft_name = telem_data.get("N")
@@ -411,7 +411,7 @@ class TelemManager(QObject, threading.Thread):
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
 
                 Class = getattr(module, cls_name, None)
-                print(f"CLASS={Class.__name__}")
+                logging.debug(f"CLASS={Class.__name__}")
 
                 if not Class or Class.__name__ == "Aircraft":
                     if data_source == "MSFS2020":

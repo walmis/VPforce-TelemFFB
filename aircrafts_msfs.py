@@ -1242,7 +1242,7 @@ class Helicopter(Aircraft):
             self.spring.effect.setCondition(self.spring_y)
             self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
             self.spring.start()
-            print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
+            # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
             if self.cpO_y/4096 - 0.1 < phys_y < self.cpO_y/4096 + 0.1:
                 # dont start sending position until physical stick has centered
                 self.collective_init = 1
@@ -1253,7 +1253,7 @@ class Helicopter(Aircraft):
         input_data = HapticEffect.device.getInput()
         phys_x, phys_y = input_data.axisXY()
         self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
-        print(self.cpO_y)
+        # print(self.cpO_y)
         self.spring_y.cpOffset = self.cpO_y
 
         self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
@@ -1265,7 +1265,6 @@ class Helicopter(Aircraft):
 
         pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
         if self.collective_init:
-            print("sending")
             send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
 
 
@@ -1398,7 +1397,6 @@ class HPGHelicopter(Helicopter):
                             self.cpO_y -= self.afcsy_step_size
                         elif sema_y_avg < -self.sema_y_max:
                             self.cpO_y += self.afcsy_step_size
-                # print("here here here")
             self.spring_x.cpOffset = int(self.cpO_x)
             self.spring_y.cpOffset = int(self.cpO_y)
             self.spring.effect.setCondition(self.spring_x)
@@ -1540,7 +1538,7 @@ class HPGHelicopter(Helicopter):
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
                 self.cpO_y = round(4096*utils.clamp(phys_y, -1, 1))
-                print(self.cpO_y)
+                # print(self.cpO_y)
                 self.spring_y.cpOffset = self.cpO_y
 
                 self.damper.damper(coef_y=0).start()
@@ -1568,7 +1566,7 @@ class HPGHelicopter(Helicopter):
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
                 self.cpO_y = round(4096*utils.clamp(phys_y, -1, 1))
-                print(self.cpO_y)
+                # print(self.cpO_y)
                 self.spring_y.cpOffset = self.cpO_y
 
                 self.damper.damper(coef_y=0).start()
