@@ -725,6 +725,7 @@ class MainWindow(QMainWindow):
             error = cfg["EXCEPTION"]["ERROR"]
             logging.error(f"CONFIG ERROR: {error}")
             self.lbl_telem_data = QLabel(f"CONFIG ERROR: {error}")
+            QMessageBox.critical(None, "CONFIG ERROR", f"Error: {error}")
         else:
             self.lbl_telem_data = QLabel("Waiting for data...")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
