@@ -95,7 +95,10 @@ class Aircraft(AircraftBase):
 
     pedal_spring_mode = 0    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
     elevator_droop_force = 0
-
+    aircraft_vs_speed = 0
+    aircraft_vs_gain = 0.25
+    aircraft_vne_speed = 0
+    aircraft_vne_gain = 1.0
     trim_workaround = False
     damage_effect_enabled = 0
     damage_effect_intensity: float = 0.0
@@ -300,7 +303,7 @@ class Aircraft(AircraftBase):
             self.spring.effect.setCondition(self.spring_y)
             self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
             self.spring.start(override=True)
-            print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
+            # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
             if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
                 # dont start sending position until physical stick has centered
                 self.collective_init = 1
@@ -344,10 +347,28 @@ class Aircraft(AircraftBase):
         elif self.pedal_spring_mode == 3:
             tas = telem_data.get("TAS", 0)
             ac_perf = self.get_aircraft_perf(telem_data)
-            spr_coeff = utils.scale(tas, (ac_perf['Vs'], ac_perf['Vne']), (1024, 4096))
+            if self.aircraft_vs_speed:
+                #If user has added the speeds to their config, use that value
+                vs = self.aircraft_vs_speed
+            else:
+                #Otherwise, use the value from the internal table
+                vs = ac_perf['Vs']
+
+            if self.aircraft_vne_speed:
+                vne = self.aircraft_vne_speed
+            else:
+                vne = ac_perf['Vne']
+
+            if vs > vne:
+                #log error if vs speed is configured greater than vne speed and exit
+                logging.error(f"Dynamic pedal forces error: Vs speed ({vs}) is configured with a larger value than Vne ({vne}) - Invalid configuration")
+
+            vs_coeff = utils.clamp(round(self.aircraft_vs_gain*4096), 0, 4096)
+            vne_coeff = utils.clamp(round(self.aircraft_vne_gain*4096), 0, 4096)
+            spr_coeff = utils.scale(tas, (vs, vne), (vs_coeff, vne_coeff))
             spr_coeff = round(spr_coeff * self.pedal_spring_gain)
             spr_coeff = utils.clamp(spr_coeff, 0, 4096)
-            print(f"coeff={spr_coeff}")
+            # print(f"coeff={spr_coeff}")
             self.spring_x.positiveCoefficient = spr_coeff
             self.spring_x.negativeCoefficient = spr_coeff
             if self.pedal_trimming_enabled:
@@ -367,24 +388,16 @@ class Aircraft(AircraftBase):
         x, y = input_data.axisXY()
         telem_data["X"] = x
 
-        # self.spring_x.positiveCoefficient = 4096
-        # self.spring_x.negativeCoefficient = 4096
         pedal_pos = -telem_data.get('controlsurfaces_rudder_right')
         # trim signal needs to be slow to avoid positive feedback
         lp_x = LPFs.get("x", 5)
-        # print(f"lp_x: {lp_x.value} phys: {x}, pedal={pedal_pos}")
         # estimate trim from real stick position and virtual stick position
-        offs = pedal_pos - x
         offs_x = lp_x.update(pedal_pos - x - lp_x.value)
-        # print(f"offs={offs} offset_lpf={offs_x}")
         self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
         self.spring = effects["pedal_spring"].spring()
-        # upload effect parameters to stick
         self.spring.effect.setCondition(self.spring_x)
-        # ensure effect is started
         self.spring.start(override=True)
 
-        # override DCS input and set our own values
         self.send_commands([f"LoSetCommand(2003, {x - offs_x})"])
 
     def _update_stick_position(self, telem_data):
