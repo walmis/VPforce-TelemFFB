@@ -156,6 +156,7 @@ class AircraftBase(object):
         """Add wheel based rumble effects for immersion
         Generates bumps/etc on touchdown, rolling, field landing etc
         """
+        if self.is_collective(): return
         if not self.runway_rumble_intensity:
             effects.dispose("runway0")
             effects.dispose("runway1")
@@ -569,6 +570,7 @@ class AircraftBase(object):
     ########################################
 
     def override_elevator_droop(self, telem_data):
+        if not self.is_joystick(): return
 
         if telem_data['TAS'] < 20 * knots:
             force = utils.scale_clamp(telem_data['TAS'], (20 * knots, 0), (0, self.elevator_droop_force))
