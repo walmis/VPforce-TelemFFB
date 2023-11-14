@@ -296,13 +296,14 @@ class SimConnectManager(threading.Thread):
                         else:
                             data[var.name] = val
                             
-                    if not self._sim_paused and not data["Parked"] and not data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
-                        self.emit_packet(data)
-                        self._final_frame_sent = 0
-                    else:
-                        if not self._final_frame_sent:
-                            self._final_frame_sent = 1
-                            self.emit_packet(data)
+                    # if not self._sim_paused and not data["Parked"] and not data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
+                    #     self.emit_packet(data)
+                    #     self._final_frame_sent = 0
+                    if self._sim_paused or data["Parked"] or data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
+                        data["STOP"] = 1
+
+                    self.emit_packet(data)
+
             else:
                 print("Received", recv)
 
