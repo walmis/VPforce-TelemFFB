@@ -181,31 +181,31 @@ def print_all_defaults():
             #print("main: "+ mydata)
             printconfig(sim, craft, mydata)
 
-def read_single_model(xml_file_path,sim,modelname,device):
+def read_single_model(xml_file_path,sim,modelname,device,suggested_class=""):
      # Read models data first
     model_data = read_models_data(xml_file_path, sim, modelname, device)
     user_model_data = read_models_data(userconfg_path, sim, modelname, device)
 
     # Extract the type from models data
-    model_type = None
+    model_class = suggested_class
     for model in model_data:
         if model['setting'] == 'type':
-            model_type = model['value']
+            model_class = model['value']
             break
     #check if theres an override
     if user_model_data is not None:
         for model in user_model_data:
             if model['setting'] == 'type':
-                model_type = model['value']
+                model_class = model['value']
                 break
 
-    # get default aircraft settings for this sim and device
+    # get default Aircraft settings for this sim and device
     defaultdata = read_xml_file(xml_file_path, sim, 'Aircraft', device)
     
-    # get additional aircrafttype default data
-    if model_type is not None:
+    # get additional class default data
+    if model_class is not "":
         # Use the extracted type in read_xml_file
-        craftresult = read_xml_file(xml_file_path, sim, model_type, device)
+        craftresult = read_xml_file(xml_file_path, sim, model_class, device)
 
         
 
@@ -219,7 +219,7 @@ def read_single_model(xml_file_path,sim,modelname,device):
         else: default_craft_result = defaultdata
     
         #get userconfg aircraft type overrides
-        usercraftdata = read_user_craft_data(userconfg_path,sim,model_type,device)
+        usercraftdata = read_user_craft_data(userconfg_path,sim,model_class,device)
         if usercraftdata is not None:
             # merge if there is any
             def_craft_usercraft_result= update_data_with_models(default_craft_result, usercraftdata, 'usrCraft')
@@ -235,7 +235,7 @@ def read_single_model(xml_file_path,sim,modelname,device):
         final_result = update_data_with_models(def_craft_models_result, user_model_data, 'usrModel')
     else: final_result = def_craft_models_result
 
-    return model_type, final_result
+    return model_class, final_result
 
 def update_default_data_with_craft_result(defaultdata, craftresult):
     #updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
@@ -342,20 +342,17 @@ if __name__ == "__main__":
     xml_file_path = "defaults.xml"  # defaults
     userconfg_path = "userconfig.xml" # user config overrides stored here
 
-    app = QApplication(sys.argv)
-
     defaultdata= []
     mydata = []
 
     sim="MSFS"
-    model = "Airbus H160 Luxury"
+    model = "Unknown aircraft name"
     device="pedals"   # joystick, pedals, collective
+    crafttype = "Helicopter"    # suggested, send whatever simconnect finds
 
     """
     # output a single aircraft class config
     
-    crafttype = "HPGHelicopter"
-
     defaultdata = read_xml_file(xml_file_path,sim,"Aircraft",device)
     printconfig(sim, "Aircraft", defaultdata)
     
@@ -364,16 +361,17 @@ if __name__ == "__main__":
     """
 
     # output a single model
-    model_type, mydata = read_single_model(xml_file_path,sim,model,device)
+    model_type, mydata = read_single_model(xml_file_path,sim,model,device,crafttype)
     
-    print (f"\nData for: {sim} model: {model} type: {model_type}  device:{device}\n")
+    print (f"\nData for: {sim} model: {model} class: {model_type}  device:{device}\n")
     
     printconfig(sim,model_type,mydata)
     
     #output all default configs for device
  #   print_all_defaults()
 
-
+    #  GUI stuff below
+    #app = QApplication(sys.argv)
            # table_widget = MyTableWidget(mydata)
            # table_widget.show()
 
