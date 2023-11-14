@@ -661,7 +661,11 @@ class Aircraft(AircraftBase):
             self.spring_x.cpOffset = phys_rudder_x_offs
 
             self.spring.effect.setCondition(self.spring_x)
-            telem_data["RudForce"] = rud_force
+            tas = telem_data.get("TAS")
+            vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
+            speed_factor = utils.scale_clamp(tas, (0, vc * 1.4), (0.0, 1.0))  # rough estimate that Vne is 1.4x Vc
+            rud_force = rud_force * speed_factor
+            # telem_data["RudForce"] = rud_force * speed_factor
 
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
