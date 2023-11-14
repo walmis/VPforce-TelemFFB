@@ -65,6 +65,7 @@ class Aircraft(AircraftBase):
     buffeting_intensity: float = 0.2  # peak AoA buffeting intensity  0 to disable
     buffet_aoa: float = 10.0  # AoA when buffeting starts
     stall_aoa: float = 15.0  # Stall AoA
+    aoa_effect_enabled: int = 1
 
     engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
 
@@ -586,14 +587,19 @@ class Aircraft(AircraftBase):
                 send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
                 send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
 
-
-            if telem_data["ElevDeflPct"] != 0: # avoid div by zero
-                #calculate maximum angle based on current angle and percentage
+            if telem_data["ElevDeflPct"] != 0 and not max(telem_data.get("WeightOnWheels")):  # avoid div by zero or calculating while on the ground
+                #give option to disable if desired by user
+                if not self.aoa_effect_enabled: return
+                # calculate maximum angle based on current angle and percentage
                 tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
-                y_offs  =  _aoa / tot
-                y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs/4096)
+                tas = telem_data.get("TAS")  # m/s
+                vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
+                speed_factor = utils.scale_clamp(tas, (0, vc * 1.4), (0.0, 1.0))  # rough estimate that Vne is 1.4x Vc
+                y_offs = _aoa / tot
+                y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
                 y_offs = clamp(y_offs, -1, 1)
-                y_offs = int(y_offs*4096)
+                # Take speed in relation to aircraft v speeds into account when moving offset based on aoa
+                y_offs = int(y_offs * 4096 * speed_factor)
                 self.spring_y.cpOffset = y_offs
 
             x_offs = phys_stick_x_offs
