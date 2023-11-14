@@ -1,5 +1,12 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
+##  November 13th, 2023
+############################################
+#MSFS
+- Patch issue with auto-classification when loading into an aircraft which is not in the config file
+- Change pause behavior to allow aircraft change to update TelemFFB while in the hangar
+
+############################################
 ##  November 12th, 2023
 ############################################
 #MSFS
