@@ -417,32 +417,39 @@ class TelemManager(QObject, threading.Thread):
                     if data_source == "MSFS2020":
                         if sc_aircraft_type == "Helicopter":
                             logging.warning(f"Aircraft definition not found, using SimConnect Data (Helicopter Type)")
-                            params, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.Helicopter")
+                            type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.Helicopter")
+                            params.update(type_cfg)
                             Class = module.Helicopter
                         elif sc_aircraft_type == "Jet":
                             logging.warning(f"Aircraft definition not found, using SimConnect Data (Jet Type)")
-                            params, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.JetAircraft")
+                            type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.JetAircraft")
+                            params.update(type_cfg)
                             Class = module.JetAircraft
                         elif sc_aircraft_type == "Airplane":
                             if sc_engine_type == 0:     # Piston
                                 logging.warning(f"Aircraft definition not found, using SimConnect Data (Propeller Type)")
-                                params, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.PropellerAircraft")
+                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.PropellerAircraft")
+                                params.update(type_cfg)
                                 Class = module.PropellerAircraft
                             if sc_engine_type == 1:     # Jet
                                 logging.warning(f"Aircraft definition not found, using SimConnect Data (Jet Type)")
-                                params, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.JetAircraft")
+                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.JetAircraft")
+                                params.update(type_cfg)
                                 Class = module.JetAircraft
                             elif sc_engine_type == 2:   # None
                                 logging.warning(f"Aircraft definition not found, using SimConnect Data (Glider Type)")
-                                params, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.GliderAircraft")
+                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.GliderAircraft")
+                                params.update(type_cfg)
                                 Class = module.GliderAircraft
                             elif sc_engine_type == 3:   # Heli
                                 logging.warning(f"Aircraft definition not found, using SimConnect Data (Helo Type)")
-                                params, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.HelicopterAircraft")
+                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.HelicopterAircraft")
+                                params.update(type_cfg)
                                 Class = module.Helicopter
                             elif sc_engine_type == 5:   # Turboprop
                                 logging.warning(f"Aircraft definition not found, using SimConnect Data (Turboprop Type)")
-                                params, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.TurbopropAircraft")
+                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.TurbopropAircraft")
+                                params.update(type_cfg)
                                 Class = module.TurbopropAircraft
                         else:
                             logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
