@@ -1,4 +1,9 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+############################################
+##  November 12th, 2023
+############################################
+#MSFS
+- Patch for aoa effect playing while aircraft is on the ground with no airspeed resulting in bad behavior of spring offset for aircraft with "aircraft_is_spring_centered" enabled
 
 ############################################
 ##  November 12th, 2023
