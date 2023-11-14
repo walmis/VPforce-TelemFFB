@@ -2,7 +2,7 @@ import xml.etree.ElementTree as ET
 import sys
 from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QSlider, QCheckBox, QLineEdit, QVBoxLayout, QWidget
 from PyQt5.QtCore import Qt
-
+import re
 
 def get_craft_attributes(file_path,sim,device):
     craft_attributes = set()
@@ -56,15 +56,16 @@ def read_xml_file(file_path,sim,craft,device):
             space = " " * spacing
             info_elem = defaults_elem.find('info')
             info = (f"{space} # {info_elem.text}")  if info_elem is not None else ""
-
+            
             data_dict = {
                 'grouping': grouping,
                 'name': name,
-       #         'displayname': displayname,
+                'displayname': displayname,
                 'value': value_craft,
                 'unit': unit,
-       #         'datatype': datatype,
-        #        'validvalues': validvalues,
+                'datatype': datatype,
+                'validvalues': validvalues,
+                'replaced': "",
                 'info': info
             }
             #print(data_dict)
@@ -91,20 +92,11 @@ def skip_bad_combos(sim,craft):
 
     return False
 
-
-
 def printconfig(sim, craft, sorted_data):
     #print("printconfig: " +sorted_data)
-    print("\n")  # Separate sections with a blank line
-    print("\n#######################################################################################################################")
-    # Print the appropriate header based on tags
-    if craft == 'Aircraft':
-        current_header = '['+ sim + ']'
-        print(current_header)
-    else:
-        current_header = '['+ sim + "." + craft + ']'
-        print(current_header)
-
+    
+    print("#############################################")
+  
     # Print the sorted data with group names and headers
     current_group = None
     current_header = None
@@ -114,8 +106,115 @@ def printconfig(sim, craft, sorted_data):
             if current_header is not None:
                 print("\n\n")  # Separate sections with a blank line
             print(f"\n# {current_group}")           
+        tabstring = "\t"
+        if item['replaced'] == "byCraft": tabstring = "    C   "
+        if item['replaced'] == "byModel": tabstring = "    M   "
+        print(f"{tabstring}{item['name']} = {item['value']} {item['unit']}")
 
-        print(f"{item['name']} = {item['value']} {item['unit']}{item['info']}")
+def update_data_with_models(defaults_data, model_data):
+    updated_result = []
+
+    # Create a dictionary mapping settings to their corresponding values and units
+    model_dict = {model['setting']: {'value': model['value'], 'unit': model['unit']} for model in model_data}
+
+    for item in defaults_data:
+        setting = item['name']
+
+        # Check if the setting exists in the model_data
+        if setting in model_dict:
+            # Update the value and unit in defaults_data with the values from model_data
+            item['value'] = model_dict[setting]['value']
+            item['unit'] = model_dict[setting]['unit']
+            item['replaced'] = "byModel"  # Set the 'replaced' flag
+        # else:
+            # If setting doesn't exist in model_data, set 'replaced' flag to False
+            # item['replaced'] = ""
+
+        updated_result.append(item)
+
+    return updated_result
+
+def read_models_data(file_path, sim, full_model_name, device):
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+
+    model_data = []
+
+    # Iterate through models elements
+    for model_elem in root.findall(f'.//models[sim="{sim}"][device="{device}"]'):
+        pattern = model_elem.find('model').text  # Assuming 'model' is the element containing the wildcard pattern
+
+        # Check if the full_model_name matches the pattern using fnmatch
+        if re.match(pattern, full_model_name):
+            setting = model_elem.find('setting').text
+            value = model_elem.find('value').text
+            unit_elem = model_elem.find('unit')
+            unit = unit_elem.text  if unit_elem is not None else ""
+            model_dict = {
+                'setting': setting,
+                'value': value,
+                'unit': unit
+            }
+
+            model_data.append(model_dict)
+
+    return model_data
+
+
+def print_all_defaults():
+    device = "joystick"
+    for sim in "global","DCS","MSFS","IL2":
+        crafts = get_craft_attributes(xml_file_path,sim,device)
+        for craft in crafts:
+            skip = skip_bad_combos(sim,craft)
+            if skip == True: continue
+            mydata = read_xml_file(xml_file_path,sim,craft,device)
+            #print("main: "+ mydata)
+            printconfig(sim, craft, mydata)
+
+def read_single_model(xml_file_path,sim,model,device):
+     # Read models data first
+    model_data = read_models_data(xml_file_path, sim, model, device)
+
+    # Extract the type from models data
+    model_type = None
+    for model in model_data:
+        if model['setting'] == 'type':
+            model_type = model['value']
+            break
+    
+    defaultdata = read_xml_file(xml_file_path, sim, 'Aircraft', device)
+    
+    if model_type is not None:
+        # Use the extracted type in read_xml_file
+        craftresult = read_xml_file(xml_file_path, sim, model_type, device)
+        if craftresult is not None:
+            combinedresult = update_default_data_with_craft_result(defaultdata,craftresult)     
+        else: combinedresult = defaultdata
+
+        # Update result with models data
+        updated_result = update_data_with_models(combinedresult, model_data)
+    else: updated_result = defaultdata
+
+    return model_type, updated_result
+
+def update_default_data_with_craft_result(defaultdata, craftresult):
+    updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
+
+    # Create a dictionary mapping names to their corresponding values and units
+    craftresult_dict = {item['name']: {'value': item['value'], 'unit': item['unit']} for item in craftresult}
+
+    for item in updated_defaultdata:
+        name = item['name']
+
+        # Check if the name exists in the craftresult
+        if name in craftresult_dict:
+            # Update the value and unit in defaultdata with the values from craftresult
+            item['value'] = craftresult_dict[name]['value']
+            item['unit'] = craftresult_dict[name]['unit']
+            item['replaced'] = "byCraft"  # Set the 'replaced' flag
+
+    return updated_defaultdata
 
 class MyTableWidget(QWidget):
     def __init__(self, data_list):
@@ -171,27 +270,42 @@ class MyTableWidget(QWidget):
         return None
     
 
+
+
 if __name__ == "__main__":
-    xml_file_path = "defaults.xml"  # Replace with the path to your XML file
+    xml_file_path = "defaults.xml"  # defaults
+    userconfg_path = "userconfig.xml" # user config overrides stored here
+
     app = QApplication(sys.argv)
 
-    mydata= []
-    # output a single config
-   # read_xml_file(xml_file_path,"DCS","Aircraft","joystick")
+    defaultdata= []
+    mydata = []
 
+    sim="MSFS"
+    model = "Airbus H160 Luxury"
+    device="joystick"   # joystick, pedals, collective
+
+    # output a single aircraft class config
+    """
+    crafttype = "HPGHelicopter"
+
+    defaultdata = read_xml_file(xml_file_path,"DCS","Aircraft","joystick")
+    printconfig("DCS", "Aircraft", defaultdata)
+    
+    #defaultdata = read_xml_file(xml_file_path,sim,crafttype,device)
+    #printconfig(sim, crafttype, defaultdata)
+   """
+    # output a single model
+    model_type, mydata = read_single_model(xml_file_path,sim,model,device)
+    
+    print (f"\nData for: {sim} model: {model} type: {model_type}  device:{device}\n")
+    
+    printconfig(sim,model_type,mydata)
+    
     #output all default configs for device
-    device = "joystick"
-    for sim in "global","DCS","MSFS","IL2":
-        crafts = get_craft_attributes(xml_file_path,sim,device)
-        for craft in crafts:
-            skip = skip_bad_combos(sim,craft)
-            if skip == True: continue
-            mydata = read_xml_file(xml_file_path,sim,craft,device)
-            #print("main: "+ mydata)
-    
-            printconfig(sim, craft, mydata)
+ #   print_all_defaults()
 
-    
+
            # table_widget = MyTableWidget(mydata)
            # table_widget.show()
 

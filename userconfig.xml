@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TelemFFB>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>dcs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>DCS</sim>
+
+		<device>joystick</device>
+
+	</models>
+
+	<models>
+
+		<type>PropellerAircraft</type>
+
+		<setting>dcs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>DCS</sim>
+
+		<device>joystick</device>
+
+	</models>
+
+	<models>
+
+		<type>JetAircraft</type>
+
+		<setting>dcs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>DCS</sim>
+
+		<device>joystick</device>
+
+	</models>
+
+	<models>
+
+		<type>Helicopter</type>
+
+		<setting>dcs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>DCS</sim>
+
+		<device>joystick</device>
+
+	</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>msfs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>MSFS</sim>
+
+		<device>joystick</device>
+
+	</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>msfs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>MSFS</sim>
+
+		<device>pedals</device>
+
+	</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>msfs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>telemffb_controls_axes</setting>
+
+		<value>false</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>trim_following</setting>
+
+		<value>false</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>joystick_ap_following</setting>
+
+		<value>false</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>vpconf</setting>
+
+		<value>configs\collective.vpconf</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>Helicopter</type>
+
+		<setting>telemffb_controls_axes</setting>
+
+		<value>true</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>Helicopter</type>
+
+		<setting>collective_dampening_gain</setting>
+
+		<value>0.6</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>HPGHelicopter</type>
+
+		<setting>telemffb_controls_axes</setting>
+
+		<value>true</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>HPGHelicopter</type>
+
+		<setting>trim_following</setting>
+
+		<value>true</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>HPGHelicopter</type>
+
+		<setting>joystick_ap_following</setting>
+
+		<value>true</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>HPGHelicopter</type>
+
+		<setting>collective_dampening_gain</setting>
+
+		<value>0.6</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>PropellerAircraft</type>
+
+		<setting>type</setting>
+
+		<value>PropellerAircraft</value>
+
+		<sim>MSFS</sim>
+
+		<device>joystick</device>
+
+	</models>
+
+	<models>
+	<type>PropellerAircraft</type>
+	<setting>type</setting>
+	<model></model>
+	<value>PropellerAircraft</value>
+	<sim>MSFS</sim>
+	<device>joystick</device>
+	</models>
+	<models>
+		<type>JetAircraft</type>
+		<setting>buffeting_intensity</setting>
+		<model></model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<type>Helicopter</type>
+		<setting>runway_rumble_intensity</setting>
+		<model></model>
+		<value>1.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<type>HPGHelicopter</type>
+		<setting>gear_buffet_intensity</setting>
+		<model>TF-51D</model>
+		<value>0.15</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+</TelemFFB>
