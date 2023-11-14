@@ -270,19 +270,11 @@
 		<device>joystick</device>
 		</models>
 	<models>
-		<type>Helicopter</type>
-		<setting>runway_rumble_intensity</setting>
-		<model></model>
-		<value>1.0</value>
+		<type></type>
+		<setting>type</setting>
+		<model>Airbus H160.*</model>
+		<value>Helicopter</value>
 		<sim>MSFS</sim>
-		<device>joystick</device>
+		<device>pedals</device>
 		</models>
-	<models>
-		<type>HPGHelicopter</type>
-		<setting>gear_buffet_intensity</setting>
-		<model>TF-51D</model>
-		<value>0.15</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
 </TelemFFB>
