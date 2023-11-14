@@ -109,6 +109,7 @@ def printconfig(sim, craft, sorted_data):
         tabstring = "\t"
         if item['replaced'] == "byCraft": tabstring = "    C   "
         if item['replaced'] == "byModel": tabstring = "    M   "
+        if item['replaced'] == "usrAircf": tabstring = "   UA   "
         if item['replaced'] == "usrCraft": tabstring = "   UC   "
         if item['replaced'] == "usrModel": tabstring = "   UM   "
         print(f"{tabstring}{item['name']} = {item['value']} {item['unit']}")
@@ -151,22 +152,23 @@ def read_user_craft_data(file_path, sim, crafttype, device):
 
     # Iterate through models elements
     for model_elem in root.findall(f'.//models[sim="{sim}"][device="{device}"]'):
-        pattern = model_elem.find('type').text  # Assuming 'model' is the element containing the wildcard pattern
+        if model_elem.find('type') is not None:
+            pattern = model_elem.find('type').text  # Assuming 'model' is the element containing the wildcard pattern
 
-        # Check if the full_model_name matches the pattern using re metch
-        if pattern is not None:
-            if re.match(pattern, crafttype):
-                setting = model_elem.find('setting').text
-                value = model_elem.find('value').text
-                unit_elem = model_elem.find('unit')
-                unit = unit_elem.text  if unit_elem is not None else ""
-                model_dict = {
-                    'setting': setting,
-                    'value': value,
-                    'unit': unit
-                }
+            # Check if the full_model_name matches the pattern using re metch
+            if pattern is not None:
+                if re.match(pattern, crafttype):
+                    setting = model_elem.find('setting').text
+                    value = model_elem.find('value').text
+                    unit_elem = model_elem.find('unit')
+                    unit = unit_elem.text  if unit_elem is not None else ""
+                    model_dict = {
+                        'setting': setting,
+                        'value': value,
+                        'unit': unit
+                    }
 
-                model_data.append(model_dict)
+                    model_data.append(model_dict)
 
     return model_data
 
@@ -198,31 +200,61 @@ def read_single_model(xml_file_path,sim,modelname,device,suggested_class=""):
             if model['setting'] == 'type':
                 model_class = model['value']
                 break
+    # get default Aircraft settings for all sims and device
+    globaldata = read_xml_file(xml_file_path, 'global', 'Aircraft', device)
+
+    #see what we got
+    if print_each_step:
+        print (f"\nGlobalresult: Global  type: Aircraft  device:{device}\n")
+        printconfig('global','Aircraft',globaldata)
 
     # get default Aircraft settings for this sim and device
-    defaultdata = read_xml_file(xml_file_path, sim, 'Aircraft', device)
-    
-    # get additional class default data
-    if model_class is not "":
-        # Use the extracted type in read_xml_file
-        craftresult = read_xml_file(xml_file_path, sim, model_class, device)
+    simdata = read_xml_file(xml_file_path, sim, 'Aircraft', device)
 
-        
+    #see what we got
+    if print_each_step:
+        print (f"\nSimresult: {sim} type: Aircraft  device:{device}\n")
+        printconfig(sim,'Aircraft',simdata)
+
+    #combine base stuff
+    defaultdata = globaldata
+    for item in simdata:
+        defaultdata.append(item)
+
+    # get additional class default data
+    if model_class != "":
+        # Use the extracted type in read_xml_file
+        craftresult = read_xml_file(xml_file_path, sim, model_class, device)     
 
         if craftresult is not None:
             #see what we got
-            #print (f"\nCraftresult: {sim} type: {model_type}  device:{device}\n")
-            #printconfig(sim,model_type,craftresult)
+            if print_each_step:
+                print (f"\nCraftresult: {sim} type: {model_class}  device:{device}\n")
+                printconfig(sim,model_class,craftresult)
 
             # merge if there is any
             default_craft_result = update_default_data_with_craft_result(defaultdata,craftresult)     
         else: default_craft_result = defaultdata
     
-        #get userconfg aircraft type overrides
+        #see what we got
+        if print_each_step:
+            print (f"\nDefaultsresult: {sim} type: Aircraft  device:{device}\n")
+            printconfig(sim,model_class,default_craft_result)
+    else: default_craft_result = defaultdata
+
+    #get userconfg aircraft type overrides
+    userairplanedata = read_user_craft_data(userconfg_path,sim,'Aircraft',device)
+    if userairplanedata is not None:
+        # merge if there is any
+        def_craft_useraircft_result= update_data_with_models(default_craft_result, userairplanedata, 'usrAircf')
+    else: def_craft_useraircft_result = defaultdata
+
+    if model_class != "":
+        #get userconfg craft specific type overrides
         usercraftdata = read_user_craft_data(userconfg_path,sim,model_class,device)
         if usercraftdata is not None:
             # merge if there is any
-            def_craft_usercraft_result= update_data_with_models(default_craft_result, usercraftdata, 'usrCraft')
+            def_craft_usercraft_result= update_data_with_models(def_craft_useraircft_result, usercraftdata, 'usrCraft')
 
     else: def_craft_usercraft_result = defaultdata
 
@@ -234,8 +266,8 @@ def read_single_model(xml_file_path,sim,modelname,device,suggested_class=""):
     if user_model_data is not None:
         final_result = update_data_with_models(def_craft_models_result, user_model_data, 'usrModel')
     else: final_result = def_craft_models_result
-
-    return model_class, final_result
+    sorted_data = sorted(final_result, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
+    return model_class, sorted_data
 
 def update_default_data_with_craft_result(defaultdata, craftresult):
     #updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
@@ -255,9 +287,17 @@ def update_default_data_with_craft_result(defaultdata, craftresult):
        
         updated_defaultdata.append(item)
 
+    # Create a dictionary mapping names to their corresponding values and units
+    updatedresult_dict = {item['name']: {'value': item['value'], 'unit': item['unit']} for item in updated_defaultdata}
+
     for item in craftresult:
         name = item['name']
-        if name not in defaultdata: updated_defaultdata.append(item)
+
+       # print (item['name'])
+    #    print(f'name: {name}')
+      
+        if name not in updatedresult_dict: 
+            updated_defaultdata.append(item)
 
     return updated_defaultdata
 
@@ -346,9 +386,11 @@ if __name__ == "__main__":
     mydata = []
 
     sim="MSFS"
-    model = "Unknown aircraft name"
-    device="pedals"   # joystick, pedals, collective
+    model = "Airbus H145 Luxury"
+    device="joystick"   # joystick, pedals, collective
     crafttype = "Helicopter"    # suggested, send whatever simconnect finds
+
+    print_each_step = False
 
     """
     # output a single aircraft class config

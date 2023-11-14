@@ -1,5 +1,48 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <TelemFFB>
+	<models>
+		<setting>aircraft_is_fbw</setting>
+		<model>Airbus H145.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+		</models>
+	<models>
+		<type>JetAircraft</type>
+		<setting>buffeting_intensity</setting>
+		<model></model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+		</models>
+
+	<models>
+
+		<type>Helicopter</type>
+
+		<setting>collective_dampening_gain</setting>
+
+		<value>0.6</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+
+	<models>
+
+		<type>HPGHelicopter</type>
+
+		<setting>collective_dampening_gain</setting>
+
+		<value>0.6</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
 
 	<models>
 
@@ -56,31 +99,46 @@
 		<device>joystick</device>
 
 	</models>
+	<models>
+		<setting>fbw_rudder_gain</setting>
+		<model>Airbus H145.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+		</models>
 
 	<models>
 
 		<type>Aircraft</type>
 
-		<setting>msfs_enabled</setting>
+		<setting>joystick_ap_following</setting>
 
-		<value>true</value>
+		<value>false</value>
 
 		<sim>MSFS</sim>
 
-		<device>joystick</device>
+		<device>collective</device>
 
 	</models>
 
 	<models>
 
-		<type>Aircraft</type>
+		<type>HPGHelicopter</type>
 
-		<setting>msfs_enabled</setting>
+		<setting>joystick_ap_following</setting>
 
 		<value>true</value>
 
 		<sim>MSFS</sim>
 
+		<device>collective</device>
+
+	</models>
+	<models>
+		<type>Aircraft</type>
+		<setting>joystick_ap_following</setting>
+		<value>true</value>
+		<sim>MSFS</sim>
 		<device>pedals</device>
 
 	</models>
@@ -103,51 +161,89 @@
 
 		<type>Aircraft</type>
 
+		<setting>msfs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>MSFS</sim>
+
+		<device>joystick</device>
+
+	</models>
+	<models>
+		<type>Aircraft</type>
+		<setting>msfs_enabled</setting>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+
+	</models>
+	<models>
+		<setting>pedal_dampening_gain</setting>
+		<model>Airbus H160.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+		</models>
+	<models>
+		<setting>pedal_spring_gain</setting>
+		<model>Airbus H160.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+		</models>
+	<models>
+		<type>Aircraft</type>
+		<setting>rudder_gain</setting>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+
+	</models>
+	<models>
+		<type>Aircraft</type>
+		<setting>rudder_trim_follow_gain_physical_x</setting>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+
+	</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>rudder_trim_follow_gain_virtual_x</setting>
+
+		<value>0.2</value>
+
+		<sim>MSFS</sim>
+
+		<device>pedals</device>
+
+	</models>
+	<models>
+		<type>Aircraft</type>
+		<setting>rudder_x_axis_scale</setting>
+		<value>1.0</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<type>Aircraft</type>
+		<setting>telemetry_timeout</setting>
+		<value>400</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
 		<setting>telemffb_controls_axes</setting>
 
 		<value>false</value>
-
-		<sim>MSFS</sim>
-
-		<device>collective</device>
-
-	</models>
-
-	<models>
-
-		<type>Aircraft</type>
-
-		<setting>trim_following</setting>
-
-		<value>false</value>
-
-		<sim>MSFS</sim>
-
-		<device>collective</device>
-
-	</models>
-
-	<models>
-
-		<type>Aircraft</type>
-
-		<setting>joystick_ap_following</setting>
-
-		<value>false</value>
-
-		<sim>MSFS</sim>
-
-		<device>collective</device>
-
-	</models>
-
-	<models>
-
-		<type>Aircraft</type>
-
-		<setting>vpconf</setting>
-
-		<value>configs\collective.vpconf</value>
 
 		<sim>MSFS</sim>
 
@@ -171,25 +267,33 @@
 
 	<models>
 
-		<type>Helicopter</type>
+		<type>HPGHelicopter</type>
 
-		<setting>collective_dampening_gain</setting>
+		<setting>telemffb_controls_axes</setting>
 
-		<value>0.6</value>
+		<value>true</value>
 
 		<sim>MSFS</sim>
 
 		<device>collective</device>
 
 	</models>
+	<models>
+		<type>Aircraft</type>
+		<setting>telemffb_controls_axes</setting>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+
+	</models>
 
 	<models>
 
-		<type>HPGHelicopter</type>
+		<type>Aircraft</type>
 
-		<setting>telemffb_controls_axes</setting>
+		<setting>trim_following</setting>
 
-		<value>true</value>
+		<value>false</value>
 
 		<sim>MSFS</sim>
 
@@ -210,34 +314,28 @@
 		<device>collective</device>
 
 	</models>
-
 	<models>
-
-		<type>HPGHelicopter</type>
-
-		<setting>joystick_ap_following</setting>
-
+		<type>Aircraft</type>
+		<setting>trim_following</setting>
 		<value>true</value>
-
 		<sim>MSFS</sim>
-
-		<device>collective</device>
+		<device>pedals</device>
 
 	</models>
-
 	<models>
-
-		<type>HPGHelicopter</type>
-
-		<setting>collective_dampening_gain</setting>
-
-		<value>0.6</value>
-
+		<setting>type</setting>
+		<model>Airbus H145.*</model>
+		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
-
 		<device>collective</device>
-
-	</models>
+		</models>
+	<models>
+		<setting>type</setting>
+		<model>Airbus H160.*</model>
+		<value>HPGHelicopter</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+		</models>
 
 	<models>
 
@@ -262,19 +360,45 @@
 	<device>joystick</device>
 	</models>
 	<models>
-		<type>JetAircraft</type>
-		<setting>buffeting_intensity</setting>
-		<model></model>
-		<value>0.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<type></type>
 		<setting>type</setting>
 		<model>Airbus H160.*</model>
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 		</models>
+	<models>
+		<setting>type</setting>
+		<model>Airbus H160.*</model>
+		<value>HPGHelicopter</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+		</models>
+	<models>
+		<setting>type</setting>
+		<model>Airbus H145.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+		</models>
+
+	<models>
+
+		<type>Aircraft</type>
+
+		<setting>vpconf</setting>
+
+		<value>configs\collective.vpconf</value>
+
+		<sim>MSFS</sim>
+
+		<device>collective</device>
+
+	</models>
+	<models>
+		<setting>vpconf</setting>
+		<model>Bell 429.*</model>
+		<value>configs\collective-HWTrim.vpconf</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
 </TelemFFB>
