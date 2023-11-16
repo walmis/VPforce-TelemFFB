@@ -104,7 +104,8 @@ from configobj import ConfigObj
 from sc_manager import SimConnectManager
 from il2_telem import IL2Manager
 from aircraft_base import effects
-
+import settingsmanager
+import pprint
 effects_translator = utils.EffectTranslator()
 
 
@@ -409,6 +410,19 @@ class TelemManager(QObject, threading.Thread):
             
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
+                try:
+                    userconfg_path = "userconfig.xml"
+                    model_type, result = settingsmanager.read_single_model("defaults.xml", data_source, aircraft_name, args.type)
+                    # print(f"TYPE: {type(result)}")
+                    formatted_result = pprint.pformat(result)
+
+                    for setting in result:
+                        logging.warning(f"Got from SMITTY: {setting['name']} : {setting['value']}")
+                        # print(f"SETTING:\n{setting}")
+
+                    # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
+                except Exception as e:
+                    logging.warning(f"Error getting settings from XML:{e}")
 
                 Class = getattr(module, cls_name, None)
                 logging.debug(f"CLASS={Class.__name__}")

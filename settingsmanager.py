@@ -183,11 +183,12 @@ def print_all_defaults():
             #print("main: "+ mydata)
             printconfig(sim, craft, mydata)
 
-def read_single_model(xml_file_path,sim,modelname,device,suggested_class=""):
+def read_single_model(xml_file_path,sim,modelname,device,suggested_class="", userconfg_path='userconfig.xml'):
      # Read models data first
     model_data = read_models_data(xml_file_path, sim, modelname, device)
     user_model_data = read_models_data(userconfg_path, sim, modelname, device)
-
+    if 'print_each_step' not in locals():
+        print_each_step = False
     # Extract the type from models data
     model_class = suggested_class
     for model in model_data:
