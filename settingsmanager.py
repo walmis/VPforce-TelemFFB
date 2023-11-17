@@ -55,10 +55,9 @@ def read_xml_file(file_path, sim, craft, device):
 
         # Store data in a dictionary
         if value_craft is not None:
-            spacing = 50 - (len(name) + len(value_craft) + len(unit))
-            space = " " * spacing
+
             info_elem = defaults_elem.find('info')
-            info = (f"{space} # {info_elem.text}") if info_elem is not None else ""
+            info = (f"{info_elem.text}") if info_elem is not None else ""
 
             data_dict = {
                 'grouping': grouping,
@@ -116,7 +115,10 @@ def printconfig(sim, craft, sorted_data):
         if item['replaced'] == "usrAircf": tabstring = "   UA   "
         if item['replaced'] == "usrCraft": tabstring = "   UC   "
         if item['replaced'] == "usrModel": tabstring = "   UM   "
-        print(f"{tabstring}{item['name']} = {item['value']} {item['unit']}")
+        spacing = 50 - (len(item['name']) + len(item['value']) + len(item['unit']))
+        space = " " * spacing + " # "
+
+        print(f"{tabstring}{item['name']} = {item['value']} {item['unit']} {space} {item['info']}")
 
 
 def read_models_data(file_path, sim, full_model_name, device):
@@ -348,46 +350,91 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def init_ui(self):
         # Your custom logic for table setup goes here
-        self.table_widget.setColumnCount(4)
-        headers = ['Grouping', 'Display Name', 'Value', 'Info']
+        self.table_widget.setColumnCount(5)
+        headers = ['Override', 'Grouping', 'Display Name', 'Value', 'Info']
         self.table_widget.setHorizontalHeaderLabels(headers)
+        self.table_widget.setColumnWidth( 0, 60)
+
+        self.table_widget.setColumnWidth( 1, 120)
+        self.table_widget.setColumnWidth( 2, 200)
+        self.table_widget.setColumnWidth( 3, 100)
+        self.table_widget.setColumnWidth( 4, 400)
+
+        # Connect the stateChanged signal of the checkbox to the toggle_rows function
+        self.cb_show_inherited.stateChanged.connect(self.toggle_rows)
+
+        # Initial visibility of rows based on checkbox state
+        self.toggle_rows()
+
         self.populate_table()
 
     def populate_table(self):
         for row, data_dict in enumerate(self.data_list):
+            override_item = self.create_override_item(data_dict['replaced'])
             grouping_item = QTableWidgetItem(data_dict['grouping'])
             displayname_item = QTableWidgetItem(data_dict['displayname'])
-            value_item = self.create_datatype_item(data_dict['datatype'], data_dict['value'])
+            value_item = self.create_datatype_item(data_dict['datatype'], data_dict['value'], data_dict['unit'])
             info_item = QTableWidgetItem(data_dict['info'])
+            unit_item = QTableWidgetItem(data_dict['unit'])
 
           #  print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Info: {data_dict['info']}")
 
+            # Check if replaced is an empty string and set text color accordingly
+            if data_dict['replaced'] == '':
+                for item in [grouping_item, displayname_item, value_item, info_item]:
+                    item.setForeground(QtGui.QColor('gray'))
+
             self.table_widget.insertRow(row)
-            self.table_widget.setItem(row, 0, grouping_item)
-            self.table_widget.setItem(row, 1, displayname_item)
-            self.table_widget.setItem(row, 2, value_item)
-            self.table_widget.setItem(row, 3, info_item)
+            self.table_widget.setItem(row, 0, override_item)
+            self.table_widget.setItem(row, 1, grouping_item)
+            self.table_widget.setItem(row, 2, displayname_item)
+            self.table_widget.setItem(row, 3, value_item)
+            self.table_widget.setItem(row, 4, info_item)
          #   print(f"Row {row} added to the table.")
 
-    def create_datatype_item(self, datatype, value):
-        print(f"{datatype} {value}")
+    def toggle_rows(self):
+        show_inherited = self.cb_show_inherited.isChecked()
+
+        for row in range(self.table_widget.rowCount()):
+            grouping_item = self.table_widget.item(row, 1)  # Assuming grouping is in the second column
+            if grouping_item is not None:
+                is_replaced = grouping_item.foreground().color() == QtGui.QColor('gray')
+                self.table_widget.setRowHidden(row, not show_inherited and is_replaced)
+
+
+    def create_datatype_item(self, datatype, value, unit):
+        #print(f"{datatype} {value}")
         if datatype == 'bool':
             checkbox = QCheckBox()
             checkbox.setChecked(value.lower() == 'true')
+            #checkbox.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
             item = QTableWidgetItem()
+            #item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             item.setData(Qt.CheckStateRole, Qt.Checked if value.lower() == 'true' else Qt.Unchecked)
             return item
-        elif datatype == 'int' or datatype == 'text':
-            line_edit = QLineEdit(str(value))
+        elif datatype == 'int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat':
+            line_edit = QLineEdit(str(value) + str(unit))
             return QTableWidgetItem(line_edit.text())  # Set the widget
-        elif datatype == 'float':
-            slider = QSlider(Qt.Horizontal)
-            slider.setValue(int(float(value) * 100))  # Assuming float values between 0 and 1
-            item = QTableWidgetItem()
-            item.setData(Qt.DisplayRole, slider)
-            return item
+        # making float numeric for now...
+        # elif datatype == 'float':
+        #     slider = QSlider(Qt.Horizontal)
+        #     slider.setValue(int(float(value) * 100))  # Assuming float values between 0 and 1
+        #     item = QTableWidgetItem()
+        #     item.setData(Qt.DisplayRole, slider)
+        #     return item
         else:
             return QTableWidgetItem(value)
+
+    def create_override_item(self, override):
+        #print(f"{override}")
+
+        checkbox = QCheckBox()
+        checkbox.setChecked(override != '')
+        checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
+        item = QTableWidgetItem()
+        item.setData(Qt.CheckStateRole, Qt.Checked if override != '' else Qt.Unchecked)
+        return item
 
 
 if __name__ == "__main__":
@@ -420,7 +467,7 @@ if __name__ == "__main__":
     #printconfig(sim, model_type, mydata)
 
     # output all default configs for device
-    #   print_all_defaults()
+    print_all_defaults()
 
     #  GUI stuff below
     data_list = mydata

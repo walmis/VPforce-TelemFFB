@@ -17,8 +17,8 @@
    <widget class="QRadioButton" name="rb_Global">
     <property name="geometry">
      <rect>
-      <x>60</x>
-      <y>50</y>
+      <x>50</x>
+      <y>30</y>
       <width>61</width>
       <height>17</height>
      </rect>
@@ -30,7 +30,7 @@
    <widget class="QRadioButton" name="rb_DCS">
     <property name="geometry">
      <rect>
-      <x>160</x>
+      <x>50</x>
       <y>50</y>
       <width>51</width>
       <height>17</height>
@@ -43,7 +43,7 @@
    <widget class="QRadioButton" name="rb_MSFS">
     <property name="geometry">
      <rect>
-      <x>230</x>
+      <x>120</x>
       <y>50</y>
       <width>51</width>
       <height>17</height>
@@ -56,7 +56,7 @@
    <widget class="QRadioButton" name="rb_IL2">
     <property name="geometry">
      <rect>
-      <x>300</x>
+      <x>190</x>
       <y>50</y>
       <width>51</width>
       <height>17</height>
@@ -132,9 +132,9 @@
    <widget class="QTableWidget" name="table_widget">
     <property name="geometry">
      <rect>
-      <x>10</x>
+      <x>30</x>
       <y>120</y>
-      <width>971</width>
+      <width>861</width>
       <height>331</height>
      </rect>
     </property>
@@ -156,6 +156,11 @@
     <property name="cornerButtonEnabled">
      <bool>false</bool>
     </property>
+    <column>
+     <property name="text">
+      <string>New Column</string>
+     </property>
+    </column>
     <column>
      <property name="text">
       <string>New Column</string>
@@ -252,6 +257,53 @@
      </rect>
     </property>
    </widget>
+   <widget class="QFrame" name="frame">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>110</y>
+      <width>911</width>
+      <height>341</height>
+     </rect>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="cb_show_inherited">
+    <property name="geometry">
+     <rect>
+      <x>740</x>
+      <y>90</y>
+      <width>151</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Show Inherited</string>
+    </property>
+    <property name="checked">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <zorder>frame</zorder>
+   <zorder>rb_Global</zorder>
+   <zorder>rb_DCS</zorder>
+   <zorder>rb_MSFS</zorder>
+   <zorder>rb_IL2</zorder>
+   <zorder>buttonBox</zorder>
+   <zorder>drp_class</zorder>
+   <zorder>table_widget</zorder>
+   <zorder>label</zorder>
+   <zorder>lineEdit</zorder>
+   <zorder>b_createaircraft</zorder>
+   <zorder>label_2</zorder>
+   <zorder>label_3</zorder>
+   <zorder>drp_craft</zorder>
+   <zorder>cb_show_inherited</zorder>
   </widget>
  </widget>
  <resources/>
