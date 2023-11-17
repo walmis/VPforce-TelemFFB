@@ -465,6 +465,7 @@ class TelemManager(QObject, threading.Thread):
                     workdir = os.path.dirname(vpconf_path)
                     env = {}
                     env["PATH"] = os.environ["PATH"]
+                    logging.info(f"Loading vpconf for aircraft with: {vpconf_path} -config {params['vpconf']} -serial {serial}")
                     subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial], cwd=workdir, env=env)
 
                 logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
