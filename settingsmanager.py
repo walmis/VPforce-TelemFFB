@@ -126,10 +126,12 @@ def read_models_data(file_path, sim, full_model_name, device):
     root = tree.getroot()
 
     model_data = []
+    found_pattern = ''
 
     # Iterate through models elements
     for model_elem in root.findall(f'.//models[sim="{sim}"][device="{device}"]'):
         # Assuming 'model' is the element containing the wildcard pattern
+
         unit_pattern = model_elem.find('model')
         if unit_pattern is not None:
             pattern = unit_pattern.text
@@ -145,10 +147,10 @@ def read_models_data(file_path, sim, full_model_name, device):
                         'value': value,
                         'unit': unit
                     }
-
+                    found_pattern = pattern
                     model_data.append(model_dict)
 
-    return model_data
+    return model_data, found_pattern
 
 
 def read_user_craft_data(file_path, sim, crafttype, device):
@@ -194,8 +196,13 @@ def print_all_defaults():
 
 def read_single_model(xml_file_path, sim, modelname, device, suggested_class="", userconfig_path='userconfig.xml'):
     # Read models data first
-    model_data = read_models_data(xml_file_path, sim, modelname, device)
-    user_model_data = read_models_data(userconfig_path, sim, modelname, device)
+    model_data, def_model_pattern = read_models_data(xml_file_path, sim, modelname, device)
+    user_model_data, usr_model_pattern = read_models_data(userconfig_path, sim, modelname, device)
+
+    model_pattern = def_model_pattern
+    if usr_model_pattern != '':
+        model_pattern = usr_model_pattern
+
     if 'print_each_step' not in locals():
         print_each_step = False
     # Extract the type from models data
@@ -254,7 +261,7 @@ def read_single_model(xml_file_path, sim, modelname, device, suggested_class="",
     else:
         default_craft_result = defaultdata
 
-    # get userconfg aircraft type overrides
+    # get userconfig aircraft type overrides
     userairplanedata = read_user_craft_data(userconfig_path, sim, 'Aircraft', device)
     if userairplanedata is not None:
         # merge if there is any
@@ -277,12 +284,12 @@ def read_single_model(xml_file_path, sim, modelname, device, suggested_class="",
 
     # finally get userconfig model specific overrides
 
-    if user_model_data is not None:
+    if user_model_data:
         final_result = update_data_with_models(def_craft_models_result, user_model_data, 'usrModel')
     else:
         final_result = def_craft_models_result
     sorted_data = sorted(final_result, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
-    return model_class, sorted_data
+    return model_class, model_pattern, sorted_data
 
 
 def update_default_data_with_craft_result(defaultdata, craftresult):
@@ -338,6 +345,44 @@ def update_data_with_models(defaults_data, model_data, replacetext):
 
     return updated_result
 
+
+def read_models(sim, device, defaults_path, userconfig_path):
+    all_models = []
+
+    # Read default models
+    default_tree = ET.parse(defaults_path)
+    default_root = default_tree.getroot()
+    default_models = extract_models(sim, device, default_root)
+    all_models.extend(default_models)
+
+    # Read userconfig models
+    userconfig_tree = ET.parse(userconfig_path)
+    userconfig_root = userconfig_tree.getroot()
+    userconfig_models = extract_models(sim, device, userconfig_root)
+    all_models.extend(userconfig_models)
+
+    return all_models
+
+def extract_models(sim, device, xml_root):
+    models = []
+
+    # Assuming models are under a specific tag, adjust as needed
+    model_elements = xml_root.findall('.//models')
+
+    for model_element in model_elements:
+        # Extract model information based on sim and device
+        model_sim = model_element.find('sim').text
+        model_device = model_element.find('device').text
+
+        if model_sim == sim and model_device == device:
+            model_text = model_element.find('model').text if model_element.find('model') is not None else None
+            if model_text is not None:
+                if model_text not in models:
+                    models.append(model_text)
+
+    return models
+
+
 #######   GUI STUFF BELOW
 
 
@@ -366,6 +411,22 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Initial visibility of rows based on checkbox state
         self.toggle_rows()
 
+        self.l_device.setText(device)
+
+        # read models from xml files to populate dropdown
+        models = read_models(sim, device, xml_file_path, userconfig_path)
+        self.drp_models.clear()
+        self.drp_models.addItems(models)
+        self.drp_models.setCurrentText(model_pattern)
+
+        # put model name and class into UI
+        self.tb_currentmodel.setText(model_name)
+        self.drp_class.setCurrentText(model_type)
+
+        #allow changing model
+        self.drp_models.currentIndexChanged.connect(self.update_table_on_model_change)
+
+
         self.populate_table()
 
     def populate_table(self):
@@ -374,15 +435,45 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             grouping_item = QTableWidgetItem(data_dict['grouping'])
             displayname_item = QTableWidgetItem(data_dict['displayname'])
             value_item = self.create_datatype_item(data_dict['datatype'], data_dict['value'], data_dict['unit'])
-            info_item = QTableWidgetItem(data_dict['info'])
+            info_item = QTableWidgetItem(data_dict['replaced'])
             unit_item = QTableWidgetItem(data_dict['unit'])
 
-          #  print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Info: {data_dict['info']}")
+            #print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
+
+
+
+
+          #   if item['replaced'] == "byCraft": tabstring = "    C   "
+          #   if item['replaced'] == "byModel": tabstring = "    M   "
+          #   if item['replaced'] == "usrAircf": tabstring = "   UA   "
+          #   if item['replaced'] == "usrCraft": tabstring = "   UC   "
+          #   if item['replaced'] == "usrModel": tabstring = "   UM   "
+
 
             # Check if replaced is an empty string and set text color accordingly
             if data_dict['replaced'] == '':
                 for item in [grouping_item, displayname_item, value_item, info_item]:
                     item.setForeground(QtGui.QColor('gray'))
+            if data_dict['replaced'] == 'byModel':
+                for item in [grouping_item, displayname_item, value_item, info_item]:
+                    item.setForeground(QtGui.QColor('blue'))
+            if data_dict['replaced'] == 'byCraft':
+                for item in [grouping_item, displayname_item, value_item, info_item]:
+                    item.setForeground(QtGui.QColor('darkblue'))
+            if data_dict['replaced'] == 'usrModel':
+                for item in [grouping_item, displayname_item, value_item, info_item]:
+                    item.setForeground(QtGui.QColor('green'))
+            if data_dict['replaced'] == 'usrCraft':
+                for item in [grouping_item, displayname_item, value_item, info_item]:
+                    item.setForeground(QtGui.QColor('darkgreen'))
+            if data_dict['replaced'] == 'usrAircf':
+                for item in [grouping_item, displayname_item, value_item, info_item]:
+                    item.setForeground(QtGui.QColor('purple'))
+
+            # Make specific columns read-only
+            grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemIsEditable)
+            displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemIsEditable)
+            info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
 
             self.table_widget.insertRow(row)
             self.table_widget.setItem(row, 0, override_item)
@@ -401,6 +492,18 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 is_replaced = grouping_item.foreground().color() == QtGui.QColor('gray')
                 self.table_widget.setRowHidden(row, not show_inherited and is_replaced)
 
+    def update_table_on_model_change(self, index):
+        # Get the selected model from the combo box
+        selected_model = self.drp_models.currentText()
+
+        # Replace the following line with your actual XML reading logic
+        model_type, model_pattern, mydata = read_single_model(xml_file_path, sim, selected_model, device, crafttype)
+
+        # Update the table with the new data
+        self.data_list = mydata
+        self.table_widget.clear()
+        self.populate_table()
+        self.toggle_rows()
 
     def create_datatype_item(self, datatype, value, unit):
         #print(f"{datatype} {value}")
@@ -431,7 +534,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         checkbox = QCheckBox()
         checkbox.setChecked(override != '')
-        checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
+        checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")    #why no worky
         item = QTableWidgetItem()
         item.setData(Qt.CheckStateRole, Qt.Checked if override != '' else Qt.Unchecked)
         return item
@@ -445,7 +548,7 @@ if __name__ == "__main__":
     mydata = []
 
     sim = "MSFS"
-    model = "Airbus H145 Luxury"
+    model_name = "XCub"
     device = "joystick"  # joystick, pedals, collective
     crafttype = "Helicopter"  # suggested, send whatever simconnect finds
 
@@ -460,14 +563,14 @@ if __name__ == "__main__":
     # #printconfig(sim, crafttype, defaultdata)
 
     # output a single model
-    model_type, mydata = read_single_model(xml_file_path, sim, model, device, crafttype)
+    model_type, model_pattern, mydata = read_single_model(xml_file_path, sim, model_name, device, crafttype)
 
-    #print(f"\nData for: {sim} model: {model} class: {model_type}  device:{device}\n")
+    print(f"\nData for: {sim}  model: {model_name}  pattern: {model_pattern}  class: {model_type}  device:{device}\n")
 
-    #printconfig(sim, model_type, mydata)
+    printconfig(sim, model_type, mydata)
 
     # output all default configs for device
-    print_all_defaults()
+    # print_all_defaults()
 
     #  GUI stuff below
     data_list = mydata
