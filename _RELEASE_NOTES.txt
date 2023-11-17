@@ -1,5 +1,15 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
+##  November 17th, 2023
+############################################
+#General
+- Bug fixes and cleanup
+ - Remove erroneous FC3 'F-15E' default aircraft config
+ - Don't print warning when vpconf setting is in config
+ - Log additional info when loading vpconf dynamically
+
+
+############################################
 ##  November 13th, 2023
 ############################################
 #MSFS
