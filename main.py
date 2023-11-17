@@ -39,8 +39,10 @@ parser.add_argument('-c', '--configfile', type=str, help='Config ini file (defau
 parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='config.user.ini')
 parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
 parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default='joystick')
+parser.add_argument('-X', '--xml', help='use XML config', nargs='?', const='default')
 
 args = parser.parse_args()
+
 import json
 import logging
 import sys
@@ -107,7 +109,6 @@ from aircraft_base import effects
 import settingsmanager
 import pprint
 effects_translator = utils.EffectTranslator()
-
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 if os.path.basename(args.configfile) == args.configfile:
@@ -220,11 +221,36 @@ def config_has_changed(update=False) -> bool:
         _config = None # force reloading config on next get_config call
         return True
     return False
+def get_config_xml():
+    global _config
+    if _config: return _config
+
+    main = settingsmanager.read_xml_file(configfile, 'global', 'Aircraft', args.type)
+    user = settingsmanager.read_xml_file(overridefile, 'global', 'Aircraft', args.type)
+    params = ConfigObj()
+    params['system'] = {}
+    for setting in main:
+        k = setting['name']
+        v = setting['value']
+        if setting["grouping"] == "System":
+            params['system'][k] = v
+            logging.warning(f"Got from SMITTY: {k} : {v}")
+    for setting in user:
+        k = setting['name']
+        v = setting['value']
+        if setting["grouping"] == "System":
+            params['system'][k] = v
+            logging.warning(f"Got USER config from SMITTY: {k} : {v}")
+    return params
 
 def get_config() -> ConfigObj:
     global _config
-    # TODO: check if config files changed and reload
     if _config: return _config
+    if args.xml is not None:
+        params = get_config_xml()
+        config_has_changed(update=True)
+        _config = params
+        return params
 
     main = load_config(configfile)
     user = load_config(overridefile, raise_errors=False)
@@ -300,6 +326,10 @@ class TelemManager(QObject, threading.Thread):
         self.timeout = 0.2
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
+        if args.xml is not None:
+            config = get_config()
+            params, class_name = self.sm_get_aircraft_config(aircraft_name, default_section)
+            return params, class_name
         config = get_config()
 
         if default_section:
@@ -331,7 +361,32 @@ class TelemManager(QObject, threading.Thread):
                 params.update(conf)
 
         return (params, class_name)
-    
+
+    def sm_get_aircraft_config(self, aircraft_name, data_source):
+        params = {}
+        cls_name = "UNKNOWN"
+        try:
+            if data_source == "MSFS2020":
+                send_source = "MSFS"
+            else:
+                send_source = data_source
+            cls_name, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfg_path=overridefile)
+            for setting in result:
+                k = setting['name']
+                v = setting['value']
+                if setting["grouping"] != "System":
+                    params[k] = v
+                    logging.warning(f"Got from SMITTY: {k} : {v}")
+                else:
+                    logging.warning(f"Ignoring system setting for aircraft load from SMITTY: {k} : {v}")
+                # print(f"SETTING:\n{setting}")
+            params = utils.sanitize_dict(params)
+            return params, cls_name
+
+            # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
+        except Exception as e:
+            logging.warning(f"Error getting settings from SMITTY:{e}")
+
     def quit(self):
         self._run = False
         self.join()
@@ -410,19 +465,6 @@ class TelemManager(QObject, threading.Thread):
             
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-                try:
-                    userconfg_path = "userconfig.xml"
-                    model_type, result = settingsmanager.read_single_model("defaults.xml", data_source, aircraft_name, args.type)
-                    # print(f"TYPE: {type(result)}")
-                    formatted_result = pprint.pformat(result)
-
-                    for setting in result:
-                        logging.warning(f"Got from SMITTY: {setting['name']} : {setting['value']}")
-                        # print(f"SETTING:\n{setting}")
-
-                    # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
-                except Exception as e:
-                    logging.warning(f"Error getting settings from XML:{e}")
 
                 Class = getattr(module, cls_name, None)
                 logging.debug(f"CLASS={Class.__name__}")
@@ -484,6 +526,7 @@ class TelemManager(QObject, threading.Thread):
                 logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
                 # instantiate new aircraft handler
                 self.currentAircraft = Class(aircraft_name)
+                # self.currentAircraft.apply_settings(params)
                 self.currentAircraft.apply_settings(params)
 
             self.currentAircraftName = aircraft_name
