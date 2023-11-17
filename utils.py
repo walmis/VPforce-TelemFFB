@@ -327,6 +327,9 @@ def to_number(v : str):
         if v.lower().endswith("kph"): # handle unit conversion: kph->ms
             scale = 1/3.6
             v = v.strip("kph")
+        if v.lower().endswith("m/s"): # handle unit conversion: kph->ms
+            scale = 1
+            v = v.strip("m/s")
         if v.lower().endswith("mph"): # handle unit conversion: mph->ms
             scale = 0.44704
             v = v.strip("mph")
