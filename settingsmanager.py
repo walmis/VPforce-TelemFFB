@@ -1,8 +1,8 @@
 import xml.etree.ElementTree as ET
 import sys
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication, QTableWidget, QTableWidgetItem, QSlider, QCheckBox, QLineEdit, QVBoxLayout, \
-    QWidget
+from PyQt5.QtWidgets import (QApplication, QRadioButton, QButtonGroup, QTableWidget, QTableWidgetItem,
+                             QSlider, QCheckBox, QLineEdit, QVBoxLayout, QWidget)
 from PyQt5.QtCore import Qt
 from settingswindow import Ui_SettingsWindow
 import re
@@ -347,7 +347,7 @@ def update_data_with_models(defaults_data, model_data, replacetext):
 
 
 def read_models(sim, device, defaults_path, userconfig_path):
-    all_models = []
+    all_models = ['']
 
     # Read default models
     default_tree = ET.parse(defaults_path)
@@ -394,16 +394,18 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.init_ui()
 
     def init_ui(self):
-        # Your custom logic for table setup goes here
-        self.table_widget.setColumnCount(5)
-        headers = ['Override', 'Grouping', 'Display Name', 'Value', 'Info']
-        self.table_widget.setHorizontalHeaderLabels(headers)
-        self.table_widget.setColumnWidth( 0, 60)
 
-        self.table_widget.setColumnWidth( 1, 120)
-        self.table_widget.setColumnWidth( 2, 200)
-        self.table_widget.setColumnWidth( 3, 100)
-        self.table_widget.setColumnWidth( 4, 400)
+        match sim:
+            case 'DCS':
+                self.rb_DCS.setChecked(True)
+            case 'MSFS':
+                self.rb_MSFS.setChecked(True)
+            case 'IL2':
+                self.rb_IL2.setChecked(True)
+
+
+        # Your custom logic for table setup goes here
+        self.setup_table()
 
         # Connect the stateChanged signal of the checkbox to the toggle_rows function
         self.cb_show_inherited.stateChanged.connect(self.toggle_rows)
@@ -414,20 +416,38 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.l_device.setText(device)
 
         # read models from xml files to populate dropdown
-        models = read_models(sim, device, xml_file_path, userconfig_path)
-        self.drp_models.clear()
-        self.drp_models.addItems(models)
-        self.drp_models.setCurrentText(model_pattern)
+        self.setup_model_list(sim)
 
         # put model name and class into UI
         self.tb_currentmodel.setText(model_name)
         self.drp_class.setCurrentText(model_type)
 
-        #allow changing model
+        #allow changing model dropdown
         self.drp_models.currentIndexChanged.connect(self.update_table_on_model_change)
 
+        #change class dropdown
+        self.drp_class.currentIndexChanged.connect(self.update_table_on_class_change)
+
+        #change on sim changle
+        #self.rb_DCS.
 
         self.populate_table()
+
+    def setup_model_list(self,chosensim):
+        models = read_models(chosensim, device, xml_file_path, userconfig_path)
+        self.drp_models.clear()
+        self.drp_models.addItems(models)
+        self.drp_models.setCurrentText(model_pattern)
+
+    def setup_table(self):
+        self.table_widget.setColumnCount(5)
+        headers = ['Override', 'Grouping', 'Display Name', 'Value', 'Info']
+        self.table_widget.setHorizontalHeaderLabels(headers)
+        self.table_widget.setColumnWidth(0, 60)
+        self.table_widget.setColumnWidth(1, 120)
+        self.table_widget.setColumnWidth(2, 200)
+        self.table_widget.setColumnWidth(3, 100)
+        self.table_widget.setColumnWidth(4, 380)
 
     def populate_table(self):
         for row, data_dict in enumerate(self.data_list):
@@ -440,8 +460,14 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             #print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
 
-
-
+            #group radiobuttons
+            # Create a button group
+            button_group = QButtonGroup(self)
+            button_group.addButton(self.rb_Global)
+            button_group.addButton(self.rb_DCS)
+            button_group.addButton(self.rb_MSFS)
+            button_group.addButton(self.rb_IL2)
+            button_group.buttonClicked.connect(self.on_sim_radio_button_clicked)
 
           #   if item['replaced'] == "byCraft": tabstring = "    C   "
           #   if item['replaced'] == "byModel": tabstring = "    M   "
@@ -451,24 +477,20 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
             # Check if replaced is an empty string and set text color accordingly
-            if data_dict['replaced'] == '':
-                for item in [grouping_item, displayname_item, value_item, info_item]:
-                    item.setForeground(QtGui.QColor('gray'))
-            if data_dict['replaced'] == 'byModel':
-                for item in [grouping_item, displayname_item, value_item, info_item]:
-                    item.setForeground(QtGui.QColor('blue'))
-            if data_dict['replaced'] == 'byCraft':
-                for item in [grouping_item, displayname_item, value_item, info_item]:
-                    item.setForeground(QtGui.QColor('darkblue'))
-            if data_dict['replaced'] == 'usrModel':
-                for item in [grouping_item, displayname_item, value_item, info_item]:
-                    item.setForeground(QtGui.QColor('green'))
-            if data_dict['replaced'] == 'usrCraft':
-                for item in [grouping_item, displayname_item, value_item, info_item]:
-                    item.setForeground(QtGui.QColor('darkgreen'))
-            if data_dict['replaced'] == 'usrAircf':
-                for item in [grouping_item, displayname_item, value_item, info_item]:
-                    item.setForeground(QtGui.QColor('purple'))
+            for item in [grouping_item, displayname_item, value_item, info_item]:
+                match data_dict['replaced']:
+                    case '':
+                        item.setForeground(QtGui.QColor('gray'))
+                    case 'byModel':
+                        item.setForeground(QtGui.QColor('blue'))
+                    case 'byCraft':
+                        item.setForeground(QtGui.QColor('darkblue'))
+                    case 'usrModel':
+                        item.setForeground(QtGui.QColor('green'))
+                    case 'usrCraft':
+                        item.setForeground(QtGui.QColor('darkgreen'))
+                    case 'usrAircf':
+                        item.setForeground(QtGui.QColor('purple'))
 
             # Make specific columns read-only
             grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemIsEditable)
@@ -502,6 +524,42 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Update the table with the new data
         self.data_list = mydata
         self.table_widget.clear()
+        self.setup_table()
+        self.populate_table()
+        self.toggle_rows()
+
+    def update_table_on_class_change(self, index):
+        # Get the selected model from the combo box
+        selected_class = self.drp_class.currentText()
+
+        # Replace the following line with your actual XML reading logic
+        model_type, model_pattern, mydata = read_single_model(xml_file_path, sim, '', device, selected_class)
+
+        # Update the table with the new data
+        self.data_list = mydata
+        self.table_widget.clear()
+        self.setup_table()
+        self.populate_table()
+        self.toggle_rows()
+
+    def on_sim_radio_button_clicked(self, button):
+        selected_radio_button_objname = button.objectName()
+        selected_radio_button = selected_radio_button_objname.replace('rb_','')
+        print(selected_radio_button)
+        self.update_table_on_sim_change(selected_radio_button)
+
+    def update_table_on_sim_change(self, button_text):
+        # Get the selected sim from the radio buttons
+
+        selected_sim = button_text
+        self.setup_model_list(button_text)
+        # Replace the following line with your actual XML reading logic
+        model_type, model_pattern, mydata = read_single_model(xml_file_path, selected_sim, '', device, '')
+
+        # Update the table with the new data
+        self.data_list = mydata
+        self.table_widget.clear()
+        self.setup_table()
         self.populate_table()
         self.toggle_rows()
 
@@ -547,8 +605,8 @@ if __name__ == "__main__":
     defaultdata = []
     mydata = []
 
-    sim = "MSFS"
-    model_name = "XCub"
+    sim = "DCS"
+    model_name = "F-15ESE"
     device = "joystick"  # joystick, pedals, collective
     crafttype = "Helicopter"  # suggested, send whatever simconnect finds
 
