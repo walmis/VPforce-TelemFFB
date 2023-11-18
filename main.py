@@ -370,7 +370,7 @@ class TelemManager(QObject, threading.Thread):
                 send_source = "MSFS"
             else:
                 send_source = data_source
-            cls_name, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
+            cls_name,pattern, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
             for setting in result:
                 k = setting['name']
                 v = setting['value']
