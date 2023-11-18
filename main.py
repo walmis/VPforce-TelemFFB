@@ -370,15 +370,17 @@ class TelemManager(QObject, threading.Thread):
                 send_source = "MSFS"
             else:
                 send_source = data_source
-            cls_name, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
+            cls_name,pattern, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
             for setting in result:
                 k = setting['name']
                 v = setting['value']
+                u = setting['unit']
+                vu= v+u
                 if setting["grouping"] != "System":
-                    params[k] = v
-                    logging.warning(f"Got from SMITTY: {k} : {v}")
+                    params[k] = vu
+                    logging.warning(f"Got from SMITTY: {k} : {vu}")
                 else:
-                    logging.warning(f"Ignoring system setting for aircraft load from SMITTY: {k} : {v}")
+                    logging.warning(f"Ignoring system setting for aircraft load from SMITTY: {k} : {vu}")
                 # print(f"SETTING:\n{setting}")
             params = utils.sanitize_dict(params)
             return params, cls_name
