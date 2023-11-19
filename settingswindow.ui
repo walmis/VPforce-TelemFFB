@@ -26,15 +26,82 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0,0,0,0,0,0,0" columnminimumwidth="0,0,0,0,0,0,0,0,0,0">
-    <item row="27" column="8">
-     <widget class="QDialogButtonBox" name="buttonBox">
-      <property name="standardButtons">
-       <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+   <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0,0,0,0,0,0,0,0,0">
+    <item row="18" column="3">
+     <widget class="QPushButton" name="b_createaircraft">
+      <property name="text">
+       <string>Create Individual Setting</string>
       </property>
      </widget>
     </item>
-    <item row="10" column="7">
+    <item row="12" column="0">
+     <widget class="QRadioButton" name="rb_default">
+      <property name="text">
+       <string>Default</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="3">
+     <widget class="QRadioButton" name="rb_MSFS">
+      <property name="text">
+       <string>MSFS</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="4">
+     <widget class="QRadioButton" name="rb_IL2">
+      <property name="text">
+       <string>IL2</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QRadioButton" name="rb_DCS">
+      <property name="text">
+       <string>DCS</string>
+      </property>
+     </widget>
+    </item>
+    <item row="12" column="3">
+     <widget class="QComboBox" name="drp_class">
+      <item>
+       <property name="text">
+        <string/>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>PropellerAircraft</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>TurbojetAircraft</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>JetAircraft</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>GliderAircraft</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>Helicopter</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>HPGHelicopter</string>
+       </property>
+      </item>
+     </widget>
+    </item>
+    <item row="12" column="9">
      <widget class="QLabel" name="label_3">
       <property name="text">
        <string>Edit Mode:</string>
@@ -44,14 +111,17 @@
       </property>
      </widget>
     </item>
-    <item row="10" column="8">
-     <widget class="QLabel" name="l_mode">
+    <item row="18" column="4">
+     <widget class="QLabel" name="label">
       <property name="text">
-       <string>Model</string>
+       <string>Current Aircraft:</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
       </property>
      </widget>
     </item>
-    <item row="0" column="7">
+    <item row="0" column="9">
      <widget class="QLabel" name="label_2">
       <property name="text">
        <string>Device:</string>
@@ -61,7 +131,62 @@
       </property>
      </widget>
     </item>
-    <item row="1" column="0">
+    <item row="0" column="5">
+     <spacer name="horizontalSpacer">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>40</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+    <item row="18" column="5">
+     <widget class="QLineEdit" name="tb_currentmodel">
+      <property name="text">
+       <string>Wilga 80X</string>
+      </property>
+     </widget>
+    </item>
+    <item row="12" column="1">
+     <widget class="QRadioButton" name="rb_class">
+      <property name="text">
+       <string>Class</string>
+      </property>
+     </widget>
+    </item>
+    <item row="28" column="10">
+     <widget class="QDialogButtonBox" name="buttonBox">
+      <property name="standardButtons">
+       <set>QDialogButtonBox::Close|QDialogButtonBox::Save</set>
+      </property>
+     </widget>
+    </item>
+    <item row="18" column="10">
+     <widget class="QPushButton" name="b_getcurrentmodel">
+      <property name="text">
+       <string>Get Current Model</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="10">
+     <widget class="QLabel" name="l_device">
+      <property name="text">
+       <string>unknown</string>
+      </property>
+     </widget>
+    </item>
+    <item row="12" column="10">
+     <widget class="QLabel" name="l_mode">
+      <property name="text">
+       <string>Model</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="0">
      <widget class="Line" name="line">
       <property name="orientation">
        <enum>Qt::Vertical</enum>
@@ -75,7 +200,7 @@
       </property>
      </widget>
     </item>
-    <item row="15" column="0" colspan="10">
+    <item row="16" column="0" colspan="12">
      <widget class="QTableWidget" name="table_widget">
       <property name="verticalScrollBarPolicy">
        <enum>Qt::ScrollBarAlwaysOn</enum>
@@ -125,124 +250,27 @@
       </column>
      </widget>
     </item>
-    <item row="0" column="1">
-     <widget class="QRadioButton" name="rb_DCS">
+    <item row="18" column="0">
+     <widget class="QCheckBox" name="cb_show_inherited">
       <property name="text">
-       <string>DCS</string>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="2">
-     <widget class="QRadioButton" name="rb_MSFS">
-      <property name="text">
-       <string>MSFS</string>
-      </property>
-     </widget>
-    </item>
-    <item row="10" column="0">
-     <widget class="QRadioButton" name="rb_class">
-      <property name="text">
-       <string>Class</string>
-      </property>
-     </widget>
-    </item>
-    <item row="10" column="1">
-     <widget class="QComboBox" name="drp_class">
-      <item>
-       <property name="text">
-        <string>Aircraft</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>PropellerAircraft</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>TurbojetAircraft</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>Jet</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>Helicopter</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>HPGHelicopter</string>
-       </property>
-      </item>
-     </widget>
-    </item>
-    <item row="10" column="3">
-     <widget class="QComboBox" name="drp_models">
-      <property name="editable">
-       <bool>false</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="3">
-     <widget class="QRadioButton" name="rb_IL2">
-      <property name="text">
-       <string>IL2</string>
-      </property>
-     </widget>
-    </item>
-    <item row="10" column="2">
-     <widget class="QRadioButton" name="rb_model">
-      <property name="text">
-       <string>Model</string>
+       <string>Show Inherited</string>
       </property>
       <property name="checked">
        <bool>true</bool>
       </property>
      </widget>
     </item>
-    <item row="0" column="8">
-     <widget class="QLabel" name="l_device">
-      <property name="text">
-       <string>unknown</string>
+    <item row="12" column="5">
+     <widget class="QComboBox" name="drp_models">
+      <property name="editable">
+       <bool>false</bool>
       </property>
      </widget>
     </item>
-    <item row="17" column="7">
-     <widget class="QLineEdit" name="tb_currentmodel">
+    <item row="12" column="4">
+     <widget class="QRadioButton" name="rb_model">
       <property name="text">
-       <string>Wilga 80X</string>
-      </property>
-     </widget>
-    </item>
-    <item row="17" column="8">
-     <widget class="QPushButton" name="b_getcurrentmodel">
-      <property name="text">
-       <string>Get Current Model</string>
-      </property>
-     </widget>
-    </item>
-    <item row="17" column="5">
-     <widget class="QLabel" name="label">
-      <property name="text">
-       <string>Current Aircraft:</string>
-      </property>
-     </widget>
-    </item>
-    <item row="17" column="3">
-     <widget class="QPushButton" name="b_createaircraft">
-      <property name="text">
-       <string>Create Individual Setting</string>
-      </property>
-     </widget>
-    </item>
-    <item row="17" column="0">
-     <widget class="QCheckBox" name="cb_show_inherited">
-      <property name="text">
-       <string>Show Inherited</string>
+       <string>Model</string>
       </property>
       <property name="checked">
        <bool>true</bool>

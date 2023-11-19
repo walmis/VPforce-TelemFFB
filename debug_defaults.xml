@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TelemFFB>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<name>mj1</name>
+		<displayname>MSFS joystick def</displayname>
+		<value>mj1</value>
+		<datatype>text</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<name>mp1</name>
+		<displayname>MSFS pedal def</displayname>
+		<value>mp1</value>
+		<datatype>text</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<name>mc1</name>
+		<displayname>MSFS coll def</displayname>
+		<value>mc1</value>
+		<datatype>text</datatype>
+		<MSFS>true</MSFS>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<name>dj1</name>
+		<displayname>DCS joystick def</displayname>
+		<value>dj1</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<name>dp1</name>
+		<displayname>DCS pedal def</displayname>
+		<value>dp1</value>
+		<datatype>text</datatype>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<name>dc1</name>
+		<displayname>DCS coll def</displayname>
+		<value>dc1</value>
+		<datatype>text</datatype>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<name>ij1</name>
+		<displayname>IL2 joystick def</displayname>
+		<value>ij1</value>
+		<datatype>text</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<name>ip1</name>
+		<displayname>IL2 pedal def</displayname>
+		<value>ip1</value>
+		<datatype>text</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<name>ic1</name>
+		<displayname>IL2 coll def</displayname>
+		<value>ic1</value>
+		<datatype>text</datatype>
+		<MSFS>true</MSFS>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<name>a1</name>
+		<displayname>All sim setting</displayname>
+		<value>a1</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<name>g1</name>
+		<displayname>global setting</displayname>
+		<value>g1</value>
+		<datatype>text</datatype>
+		<Global>true</Global>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<name>u1</name>
+		<displayname>Unit setting</displayname>
+		<value>u1</value>
+		<unit>m/s</unit>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<name>logging_level</name>
+		<displayname>Log glob valid values</displayname>
+		<value>INFO</value>
+		<datatype>text</datatype>
+		<Global>true</Global>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>DEBUG,INFO,WARNING,ERROR,CRITICAL</validvalues>
+		<info></info>
+	</defaults>
+	<defaults>
+		<Grouping>Prop</Grouping>
+		<name>prop_diameter</name>
+		<displayname>MSFS jp Prop Turbo Only</displayname>
+		<value Craft="PropellerAircraft">prop</value>
+		<value Craft="TurbopropAircraft">turbo</value>
+		<datatype>text</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<name>cv</name>
+		<displayname>Craft Values all sim</displayname>
+		<value Craft="Default">def</value>
+		<value Craft="PropellerAircraft">prop</value>
+		<value Craft="TurbopropAircraft">turbo</value>
+		<value Craft="JetAircraft">jet</value>
+		<value Craft="GliderAircraft">glider</value>
+		<value Craft="Helicopter">heli</value>
+		<value Craft="HPGHelicopter">hpg</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<name>cv1</name>
+		<displayname>Craft Values all sim no def</displayname>
+		<value Craft="PropellerAircraft">prop</value>
+		<value Craft="TurbopropAircraft">turbo</value>
+		<value Craft="JetAircraft">jet</value>
+		<value Craft="GliderAircraft">glider</value>
+		<value Craft="Helicopter">heli</value>
+		<value Craft="HPGHelicopter">hpg</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<name>cv2</name>
+		<displayname>heli hpg Values all sim</displayname>
+		<value Craft="Helicopter">heli</value>
+		<value Craft="HPGHelicopter">hpg</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<name>cv3</name>
+		<displayname>def jet Values all sim</displayname>
+		<value Craft="Default">def</value>
+		<value Craft="JetAircraft">jet</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<name>rudder_area</name>
+		<displayname>Rudder Area</displayname>
+		<value Craft="PropellerAircraft">0.8</value>
+		<value Craft="TurbopropAircraft">1.2</value>
+		<datatype>float</datatype>
+		<pedals>true</pedals>
+		<info>square meters</info>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<name>type</name>
+		<displayname>Class MSFS</displayname>
+		<value>Default</value>
+		<datatype>text</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,HPGHelicopter,GliderAircraft</validvalues>
+		<info>HPGHelicopter is MSFS Hype Performace Group heli's only</info>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<name>type</name>
+		<displayname>Class IL2</displayname>
+		<value>Default</value>
+		<datatype>text</datatype>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<validvalues>PropellerAircraft,JetAircraft</validvalues>
+		<info>Aircraft Type</info>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<name>vpconf</name>
+		<displayname>Configurator File glob,sims</displayname>
+		<value> </value>
+		<datatype>text</datatype>
+		<Global>true</Global>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<name>afterburner_effect_intensity</name>
+		<displayname>Afterburner jet dcs ms</displayname>
+		<value Craft="JetAircraft">0.2</value>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<models>
+		<setting>type</setting>
+		<model>222B.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>type</setting>
+		<model>A-10A.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<setting>type</setting>
+		<model>Airbus H145.*</model>
+		<value>HPGHelicopter</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+		</models>
+	<models>
+		<setting>cyclic_spring_gain</setting>
+		<model>Airbus H160.*</model>
+		<value>0.65</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>etl_effect_intensity</setting>
+		<model>Airbus H160.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>etl_start_speed</setting>
+		<model>Airbus H160.*</model>
+		<value>6</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>etl_stop_speed</setting>
+		<model>Airbus H160.*</model>
+		<value>30</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>rotor_blade_count</setting>
+		<model>Airbus H160.*</model>
+		<value>5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>runway_rumble_intensity</setting>
+		<model>Airbus H160.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>type</setting>
+		<model>Airbus H160.*</model>
+		<value>HPGHelicopter</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>etl_start_speed</setting>
+		<model>Bell 407.*</model>
+		<value>8</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>etl_stop_speed</setting>
+		<model>Bell 407.*</model>
+		<value>13</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>overspeed_shake_start</setting>
+		<model>Bell 407.*</model>
+		<value>60</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>inertia_force</setting>
+		<model>TF-51D</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<setting>rpm_scale</setting>
+		<model>TF-51D</model>
+		<value>31.5</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<setting>runway_rumble_intensity</setting>
+		<model>TF-51D</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+</TelemFFB>
