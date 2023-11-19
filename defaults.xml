@@ -17,6 +17,7 @@
 		<value Craft="PropellerAircraft">0.7</value>
 		<value Craft="TurbopropAircraft">1.0</value>
 		<datatype>float</datatype>
+		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<info>square meters</info>
 	</defaults>
@@ -270,6 +271,7 @@
 		<value Craft="PropellerAircraft">1.2</value>
 		<value Craft="TurbopropAircraft">2.2</value>
 		<datatype>float</datatype>
+		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<info>square meters</info>
 	</defaults>
@@ -957,6 +959,7 @@
 		<value Craft="PropellerAircraft">0.8</value>
 		<value Craft="TurbopropAircraft">1.2</value>
 		<datatype>float</datatype>
+		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 		<info>square meters</info>
 	</defaults>

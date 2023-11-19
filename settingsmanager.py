@@ -654,7 +654,6 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         globaldata = self.read_xml_file('Global', '')
         for g in globaldata: g['replaced'] = 'Global'
 
-
         if print_counts: print(f"globaldata count {len(globaldata)}")
 
         # see what we got
@@ -662,8 +661,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             print(f"\nGlobal result: Global  type: ''  device:{device}\n")
             self.printconfig(globaldata)
 
-        # get default Aircraft settings for this sim and device
 
+        # get default Aircraft settings for this sim and device
         simdata = self.read_xml_file(self.sim, '')
         for s in simdata:  s['replaced'] = 'Sim Default'
         if print_counts:  print(f"simdata count {len(simdata)}")
@@ -679,6 +678,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             for item in simdata: defaultdata.append(item)
 
         if print_counts:  print(f"defaultdata count {len(defaultdata)}")
+
 
         # get additional class default data
         if model_class != "":
@@ -706,15 +706,17 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             default_craft_result = defaultdata
 
+
         # get userconfig global overrides
         userglobaldata = self.read_user_default_data( 'Global')
         if userglobaldata is not None:
             # merge if there is any
             def_craft_userglobal_result = self.update_data_with_models(default_craft_result, userglobaldata,'Global (user)')
         else:
-            def_craft_userglobal_result = defaultdata
+            def_craft_userglobal_result = default_craft_result
 
         if print_counts:  print(f"def_craft_userglobal_result count {len(def_craft_userglobal_result)}")
+
 
         # get userconfig sim overrides
         if self.sim != 'Global':
@@ -723,11 +725,11 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 # merge if there is any
                 def_craft_user_default_result = self.update_data_with_models(def_craft_userglobal_result, user_default_data, 'Sim (user)')
             else:
-                def_craft_user_default_result = defaultdata
+                def_craft_user_default_result = def_craft_userglobal_result
 
             if print_counts:  print(f"def_craft_user_default_result count {len(def_craft_user_default_result)}")
         else:
-            def_craft_user_default_result = defaultdata
+            def_craft_user_default_result = def_craft_userglobal_result
 
         if model_class != "":
             # get userconfg craft specific type overrides
@@ -736,14 +738,16 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 # merge if there is any
                 def_craft_usercraft_result = self.update_data_with_models(def_craft_user_default_result, usercraftdata, 'Class (user)')
             else:
-                def_craft_usercraft_result = defaultdata
+                def_craft_usercraft_result = def_craft_user_default_result
         else:
-            def_craft_usercraft_result = defaultdata
+            def_craft_usercraft_result = def_craft_user_default_result
+
 
         # Update result with default models data
         def_craft_models_result = self.update_data_with_models(def_craft_usercraft_result, model_data, 'Model Default')
 
         if print_counts:  print(f"def_craft_models count {len(def_craft_models_result)}")
+
 
         # finally get userconfig model specific overrides
         if user_model_data:
