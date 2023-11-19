@@ -79,12 +79,7 @@
      <widget class="QComboBox" name="drp_class">
       <item>
        <property name="text">
-        <string>(None - Global)</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>(None - Sim Default)</string>
+        <string/>
        </property>
       </item>
       <item>
@@ -238,7 +233,7 @@
       </property>
       <item>
        <property name="text">
-        <string>(None - Class Default)</string>
+        <string/>
        </property>
       </item>
      </widget>

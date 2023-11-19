@@ -45,14 +45,14 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_sim.blockSignals(False)
         self.drp_class.blockSignals(True)
         self.drp_class.setCurrentText(self.model_type)
-        self.drp_class.blockSignals(True)
+        self.drp_class.blockSignals(False)
 
         if self.model_pattern != '':
             #self.rb_model.setChecked(True)
             self.set_edit_mode('Model')
             self.drp_models.blockSignals(True)
             self.drp_models.setCurrentText(self.model_pattern)
-            self.drp_models.blockSignals(True)
+            self.drp_models.blockSignals(False)
         else:
             self.set_edit_mode('Class')
 
@@ -106,10 +106,9 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 for disable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
                     if print_debug: print (f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
-                self.drp_class.model().item(self.drp_class.findText('(None - Global)')).setEnabled(True)
 
             case 'DCS':
-                for disable in {'(None - Global)', 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter'}:
+                for disable in { 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter'}:
                     if print_debug: print(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
                 for enable in {'PropellerAircraft', 'JetAircraft', 'Helicopter'}:
@@ -117,7 +116,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'IL2':
-                for disable in {'(None - Global)', 'TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                for disable in {'TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
                     if print_debug: print(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
                 for enable in {'PropellerAircraft', 'JetAircraft'}:
@@ -125,9 +124,6 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'MSFS':
-                for disable in {'(None - Global)'}:
-                    if print_debug: print(f"disable {disable}")
-                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
                 for enable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
                     if print_debug: print(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
@@ -243,10 +239,11 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.drp_class.blockSignals(False)
 
         else:
+            print("model cleared")
             self.set_edit_mode('Class')
             old_model_type = self.model_type
             print(self.model_type)
-            self.drp_class.setCurrentText('(None - Sim Default)')
+            self.drp_class.setCurrentText('')
             self.drp_class.setCurrentText(old_model_type)
 
         self.table_widget.clear()
@@ -266,8 +263,6 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             # Replace the following line with your actual XML reading logic
             self.model_type, self.model_pattern, self.data_list = self.read_single_model()
-
-
             print(
                 f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
 
@@ -278,9 +273,18 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.populate_table()
             self.toggle_rows()
         else:
-            self.drp_class.setCurrentText('(None - Sim Default)')
+            print("class cleared")
+            self.drp_class.setCurrentText('')
             self.set_edit_mode('Sim')
+            old_sim = self.sim
+            print(self.model_type)
+            self.drp_sim.setCurrentText('Global')
+            self.drp_sim.setCurrentText(old_sim)
 
+        self.table_widget.clear()
+        self.setup_table()
+        self.populate_table()
+        self.toggle_rows()
 
     def update_table_on_sim_change(self):
         # Get the selected sim from the radio buttons
@@ -370,7 +374,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
                     self.drp_class.blockSignals(True)
                     self.drp_models.blockSignals(True)
-                    self.drp_class.setCurrentText('(None - Global)')
+                    self.drp_class.setCurrentText('')
                     self.drp_models.setCurrentText('')
                     self.model_name = ''
                     self.model_type = ''
@@ -383,7 +387,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_models.setEnabled(True)
                     self.drp_class.blockSignals(True)
                     self.drp_models.blockSignals(True)
-                    self.drp_class.setCurrentText('(None - Sim Default)')
+                    self.drp_class.setCurrentText('')
                     self.drp_models.setCurrentText('')
                     self.model_name = ''
                     self.model_type = ''
@@ -394,7 +398,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
                     self.drp_models.blockSignals(True)
-                    self.drp_models.setCurrentText('(None - Class Default)')
+                    self.drp_models.setCurrentText('')
                     self.model_name = ''
                     self.drp_models.blockSignals(False)
 
@@ -607,7 +611,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if self.model_name == '':
             model_class = self.model_type
         else:
-            model_class = '(None - Sim Default)'   #self.model_type
+            model_class = ''   #self.model_type
 
         for model in model_data:
             if model['setting'] == 'type':
@@ -818,10 +822,10 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
 if __name__ == "__main__":
-    # defaults_path = "defaults.xml"  # defaults file
-    # userconfig_path = "userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
-    defaults_path = "debug_defaults.xml"  # defaults file
-    userconfig_path = "debug_userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
+    defaults_path = "defaults.xml"  # defaults file
+    userconfig_path = "userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
+    # defaults_path = "debug_defaults.xml"  # defaults file
+    # userconfig_path = "debug_userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
     device = "joystick"  # joystick, pedals, collective.  essentially permanent per session
 
 
