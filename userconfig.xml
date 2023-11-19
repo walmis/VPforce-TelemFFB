@@ -54,7 +54,7 @@
 
 		<type>Default</type>
 
-		<setting>joystick_ap_following</setting>
+		<setting>ap_following</setting>
 
 		<value>false</value>
 
@@ -65,7 +65,7 @@
 	</models>
 	<models>
 		<type>Default</type>
-		<setting>joystick_ap_following</setting>
+		<setting>ap_following</setting>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
@@ -76,7 +76,7 @@
 
 		<type>HPGHelicopter</type>
 
-		<setting>joystick_ap_following</setting>
+		<setting>ap_following</setting>
 
 		<value>true</value>
 
@@ -100,7 +100,6 @@
 		<device>pedals</device>
 		</models>
 	<models>
-		<type>Default</type>
 		<setting>rudder_gain</setting>
 		<value>true</value>
 		<sim>MSFS</sim>
@@ -108,7 +107,6 @@
 
 	</models>
 	<models>
-		<type>Default</type>
 		<setting>rudder_trim_follow_gain_physical_x</setting>
 		<value>0.5</value>
 		<sim>MSFS</sim>
@@ -117,8 +115,6 @@
 	</models>
 
 	<models>
-
-		<type>Default</type>
 
 		<setting>rudder_trim_follow_gain_virtual_x</setting>
 
@@ -130,23 +126,31 @@
 
 	</models>
 	<models>
-		<type>Default</type>
 		<setting>rudder_x_axis_scale</setting>
 		<value>1.0</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</models>
 	<models>
-		<type>Default</type>
 		<setting>telemetry_timeout</setting>
 		<value>400</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</models>
+	<models>
+		<setting>telemetry_timeout</setting>
+		<value>400</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<setting>telemetry_timeout</setting>
+		<value>400</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
 
 	<models>
-
-		<type>Default</type>
 
 		<setting>telemffb_controls_axes</setting>
 
@@ -157,12 +161,22 @@
 		<device>collective</device>
 
 	</models>
+
 	<models>
-		<type>Default</type>
+
+		<setting>telemffb_controls_axes</setting>
+
+		<value>true</value>
+
+		<sim>MSFS</sim>
+
+		<device>pedals</device>
+	</models>
+	<models>
 		<setting>telemffb_controls_axes</setting>
 		<value>true</value>
 		<sim>MSFS</sim>
-		<device>pedals</device>
+		<device>joystick</device>
 
 	</models>
 
@@ -257,28 +271,6 @@
 		<sim>MSFS</sim>
 		<device>pedals</device>
 		</models>
-
-	<models>
-
-		<type>PropellerAircraft</type>
-
-		<setting>type</setting>
-
-		<value>PropellerAircraft</value>
-
-		<sim>MSFS</sim>
-
-		<device>joystick</device>
-
-	</models>
-
-	<models>
-	<type>PropellerAircraft</type>
-	<setting>type</setting>
-	<value>PropellerAircraft</value>
-	<sim>MSFS</sim>
-	<device>joystick</device>
-	</models>
 	<models>
 		<setting>vpconf</setting>
 		<model>Bell 429.*</model>
@@ -289,8 +281,6 @@
 
 	<models>
 
-		<type>Default</type>
-
 		<setting>vpconf</setting>
 
 		<value>configs\collective.vpconf</value>
@@ -300,4 +290,40 @@
 		<device>collective</device>
 
 	</models>
+
+	<models>
+
+		<setting>msfs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>Global</sim>
+
+		<device>joystick</device>
+
+		</models>
+
+	<models>
+
+		<setting>msfs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>Global</sim>
+
+		<device>pedals</device>
+
+		</models>
+
+	<models>
+
+		<setting>msfs_enabled</setting>
+
+		<value>true</value>
+
+		<sim>Global</sim>
+
+		<device>collective</device>
+
+		</models>
 </TelemFFB>

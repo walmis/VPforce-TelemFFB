@@ -20,8 +20,6 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
     model_pattern = ""  # holder for current matching pattern found in config xmls
     edit_mode = '' # holder for current editing mode.
 
-    print_each_step = False  #for debugging
-
 
     def __init__(self):
         super(settings_window, self).__init__()
@@ -171,17 +169,17 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     case 'Global (user)':
                         item.setForeground(QtGui.QColor('black'))
                     case 'Sim Default':
-                        item.setForeground(QtGui.QColor('blue'))
+                        item.setForeground(QtGui.QColor('darkblue'))
                     case 'Sim (user)':
-                        item.setForeground(QtGui.QColor('green'))
+                        item.setForeground(QtGui.QColor('blue'))
                     case 'Class Default':
-                        item.setForeground(QtGui.QColor('darkBlue'))
-                    case 'Class (user)':
                         item.setForeground(QtGui.QColor('darkGreen'))
+                    case 'Class (user)':
+                        item.setForeground(QtGui.QColor('green'))
                     case 'Model Default':
-                        item.setForeground(QtGui.QColor('magenta'))
-                    case 'Model (user)':
                         item.setForeground(QtGui.QColor('darkMagenta'))
+                    case 'Model (user)':
+                        item.setForeground(QtGui.QColor('magenta'))
 
             # Make specific columns read-only
             grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemIsEditable)
@@ -450,12 +448,15 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             validvalues = valid_elem.text if valid_elem is not None else ""
 
             # Check if the 'value' element has the 'Craft' attribute
-            value_elem_craft = defaults_elem.find(f".//value[@Craft='{craft}']")
+            searchcraft = craft
+            if craft == '':
+                searchcraft = 'Default'
+            value_elem_craft = defaults_elem.find(f".//value[@Craft='{searchcraft}']")
             value_craft = value_elem_craft.text if value_elem_craft is not None and value_elem_craft.get(
-                'Craft') == craft else None
+                'Craft') == searchcraft else None
 
-            # If 'value' element without 'Craft' attribute exists, use that in 'Aircraft' section
-            if value_craft is None and craft == 'Default' and 'Craft' not in defaults_elem.attrib:
+            # If 'value' element without 'Craft' attribute exists, use that in 'Default' section
+            if value_craft is None and craft == '' and 'Craft' not in defaults_elem.attrib:
                 value_elem_craft = defaults_elem.find('value')
                 value_craft = value_elem_craft.text if value_elem_craft is not None and 'Craft' not in value_elem_craft.attrib else None
 
@@ -564,6 +565,30 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         return model_data, found_pattern
 
+    def read_user_default_data(self, the_sim):
+        tree = ET.parse(userconfig_path)
+        root = tree.getroot()
+
+        model_data = []
+
+        # Iterate through models elements
+        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]'):
+            if model_elem.find('type') is None:
+                if model_elem.find('setting') is not None:
+
+                    setting = model_elem.find('setting').text
+                    value = model_elem.find('value').text
+                    unit_elem = model_elem.find('unit')
+                    unit = unit_elem.text if unit_elem is not None else ""
+                    model_dict = {
+                        'setting': setting,
+                        'value': value,
+                        'unit': unit
+                    }
+
+                    model_data.append(model_dict)
+
+        return model_data
 
     def read_user_craft_data(self, the_sim, crafttype):
         tree = ET.parse(userconfig_path)
@@ -595,7 +620,9 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         return model_data
 
     def read_single_model(self):
-        print_counts = False
+        print_counts = True
+        print_each_step = True  # for debugging
+
         # Read models data first
         model_data, def_model_pattern = self.read_models_data(defaults_path, self.model_name)
         user_model_data, usr_model_pattern = self.read_models_data(userconfig_path, self.model_name)
@@ -603,9 +630,6 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         model_pattern = def_model_pattern
         if usr_model_pattern != '':
             model_pattern = usr_model_pattern
-
-        if 'print_each_step' not in locals():
-            print_each_step = False
 
         # Extract the type from models data, if name is blank then use the class.  otherwise assume no type is set.
         if self.model_name == '':
@@ -627,26 +651,26 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         # get default settings for all sims and device
-        globaldata = self.read_xml_file('Global', 'Default')
+        globaldata = self.read_xml_file('Global', '')
         for g in globaldata: g['replaced'] = 'Global'
 
 
         if print_counts: print(f"globaldata count {len(globaldata)}")
 
         # see what we got
-        if self.print_each_step:
+        if print_each_step:
             print(f"\nGlobal result: Global  type: ''  device:{device}\n")
             self.printconfig(globaldata)
 
         # get default Aircraft settings for this sim and device
 
-        simdata = self.read_xml_file(self.sim, 'Default')
+        simdata = self.read_xml_file(self.sim, '')
         for s in simdata:  s['replaced'] = 'Sim Default'
         if print_counts:  print(f"simdata count {len(simdata)}")
 
         # see what we got
-        if self.print_each_step:
-            print(f"\nSimresult: {self.sim} type: Default  device:{device}\n")
+        if print_each_step:
+            print(f"\nSimresult: {self.sim} type: ''  device:{device}\n")
             self.printconfig(simdata)
 
         # combine base stuff
@@ -682,8 +706,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             default_craft_result = defaultdata
 
-        # get userconfig aircraft type overrides
-        userglobaldata = self.read_user_craft_data( 'Global', 'Default')
+        # get userconfig global overrides
+        userglobaldata = self.read_user_default_data( 'Global')
         if userglobaldata is not None:
             # merge if there is any
             def_craft_userglobal_result = self.update_data_with_models(default_craft_result, userglobaldata,'Global (user)')
@@ -692,9 +716,9 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         if print_counts:  print(f"def_craft_userglobal_result count {len(def_craft_userglobal_result)}")
 
-        # get userconfig default type overrides
+        # get userconfig sim overrides
         if self.sim != 'Global':
-            user_default_data = self.read_user_craft_data(self.sim, 'Default')
+            user_default_data = self.read_user_default_data(self.sim)
             if user_default_data is not None:
                 # merge if there is any
                 def_craft_user_default_result = self.update_data_with_models(def_craft_userglobal_result, user_default_data, 'Sim (user)')
@@ -732,36 +756,28 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
     def update_default_data_with_craft_result(self,defaultdata, craftresult):
-        # updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
-        updated_defaultdata = []
-        # Create a dictionary mapping names to their corresponding values and units
-        craftresult_dict = {item['name']: {'value': item['value'], 'unit': item['unit']} for item in craftresult}
+        #updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
 
-        for item in defaultdata:
-            name = item['name']
 
-            # Check if the name exists in the craftresult
-            if name in craftresult_dict:
-                # Update the value and unit in defaultdata with the values from craftresult
-                item['value'] = craftresult_dict[name]['value']
-                item['unit'] = craftresult_dict[name]['unit']
-                item['replaced'] = "Class Default"  # Set the 'replaced' flag
+        #default_names = set(item['name'] for item in defaultdata)
 
-            updated_defaultdata.append(item)
+        # Iterate through craftresult
+        for craft_item in craftresult:
+            name = craft_item['name']
 
-        # Create a dictionary mapping names to their corresponding values and units
-        # updatedresult_dict = {item['name']: {'value': item['value'], 'unit': item['unit']} for item in updated_defaultdata}
-        #
-        # for item in craftresult:
-        #     name = item['name']
-        #
-        #     # print (item['name'])
-        #     #    print(f'name: {name}')
-        #
-        #     if name not in updatedresult_dict:
-        #         updated_defaultdata.append(item)
+            # Check if the item with the same name exists in defaultdata
+            matching_item = next((item for item in defaultdata if item['name'] == name), None)
 
-        return updated_defaultdata
+            if matching_item:
+                # If the item exists, update 'value' and 'unit'
+                matching_item['value'] = craft_item['value']
+                matching_item['unit'] = craft_item['unit']
+                matching_item['replaced'] = "Class Default"  # Set the 'replaced' flag
+            else:
+                # If the item doesn't exist, append it to defaultdata
+                defaultdata.append(craft_item)
+
+        return defaultdata
 
 
     def update_data_with_models(self,defaults_data, model_data, replacetext):

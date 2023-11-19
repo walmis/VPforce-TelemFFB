@@ -1138,7 +1138,12 @@
 		<Grouping>Basic</Grouping>
 		<name>type</name>
 		<displayname>Class</displayname>
-		<value>Default</value>
+		<value Craft="PropellerAircraft">PropellerAircraft</value>
+		<value Craft="TurbopropAircraft">TurbopropAircraft</value>
+		<value Craft="JetAircraft">JetAircraft</value>
+		<value Craft="GliderAircraft">GliderAircraft</value>
+		<value Craft="Helicopter">Helicopter</value>
+		<value Craft="HPGHelicopter">HPGHelicopter</value>
 		<datatype>text</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -1151,7 +1156,8 @@
 		<Grouping>Basic</Grouping>
 		<name>type</name>
 		<displayname>Class</displayname>
-		<value>Default</value>
+		<value Craft="PropellerAircraft">PropellerAircraft</value>
+		<value Craft="JetAircraft">JetAircraft</value>
 		<datatype>text</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
@@ -1163,7 +1169,9 @@
 		<Grouping>Basic</Grouping>
 		<name>type</name>
 		<displayname>Class</displayname>
-		<value>Default</value>
+		<value Craft="PropellerAircraft">PropellerAircraft</value>
+		<value Craft="JetAircraft">JetAircraft</value>
+		<value Craft="Helicopter">Helicopter</value>
 		<datatype>text</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
