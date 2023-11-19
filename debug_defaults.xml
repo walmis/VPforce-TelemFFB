@@ -91,12 +91,63 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<info>should see in all sims</info>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<name>a2</name>
+		<displayname>class override All sim setting</displayname>
+		<value>a1</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<name>a3</name>
+		<displayname>model override All sim setting</displayname>
+		<value>a1</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<name>a4</name>
+		<displayname>model default All sim setting</displayname>
+		<value>a1</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>System</Grouping>
 		<name>g1</name>
 		<displayname>global setting</displayname>
 		<value>g1</value>
+		<datatype>text</datatype>
+		<Global>true</Global>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<name>g2</name>
+		<displayname>override global setting</displayname>
+		<value>g2</value>
 		<datatype>text</datatype>
 		<Global>true</Global>
 		<joystick>true</joystick>
@@ -116,6 +167,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<info>appends unit in all sims</info>
 	</defaults>
 	<defaults>
 		<Grouping>System</Grouping>
@@ -142,9 +194,58 @@
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
+		<Grouping>Prop</Grouping>
+		<name>p1</name>
+		<displayname>MSFS jp Prop override Only</displayname>
+		<value Craft="PropellerAircraft">prop</value>
+		<value Craft="TurbopropAircraft">turbo</value>
+		<datatype>text</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<name>cva</name>
+		<displayname>Craft Values all override</displayname>
+		<value Craft="Default">def</value>
+		<value Craft="PropellerAircraft">prop</value>
+		<value Craft="TurbopropAircraft">turbo</value>
+		<value Craft="JetAircraft">jet</value>
+		<value Craft="GliderAircraft">glider</value>
+		<value Craft="Helicopter">heli</value>
+		<value Craft="HPGHelicopter">hpg</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<name>cvm</name>
+		<displayname>model Values all override</displayname>
+		<value Craft="Default">def</value>
+		<value Craft="PropellerAircraft">prop</value>
+		<value Craft="TurbopropAircraft">turbo</value>
+		<value Craft="JetAircraft">jet</value>
+		<value Craft="GliderAircraft">glider</value>
+		<value Craft="Helicopter">heli</value>
+		<value Craft="HPGHelicopter">hpg</value>
+		<datatype>text</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
 		<Grouping>Engine</Grouping>
 		<name>cv</name>
-		<displayname>Craft Values all sim</displayname>
+		<displayname>class Values all sim</displayname>
 		<value Craft="Default">def</value>
 		<value Craft="PropellerAircraft">prop</value>
 		<value Craft="TurbopropAircraft">turbo</value>
@@ -208,16 +309,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<name>rudder_area</name>
-		<displayname>Rudder Area</displayname>
-		<value Craft="PropellerAircraft">0.8</value>
-		<value Craft="TurbopropAircraft">1.2</value>
-		<datatype>float</datatype>
-		<pedals>true</pedals>
-		<info>square meters</info>
-	</defaults>
-	<defaults>
-		<Grouping>Basic</Grouping>
 		<name>type</name>
 		<displayname>Class MSFS</displayname>
 		<value>Default</value>
@@ -265,6 +356,16 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<name>ab</name>
+		<displayname>Afterburner jet dcs ms override</displayname>
+		<value Craft="JetAircraft">0.2</value>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
 	<models>
 		<setting>type</setting>
 		<model>222B.*</model>
@@ -287,46 +388,16 @@
 		<device>collective</device>
 		</models>
 	<models>
-		<setting>cyclic_spring_gain</setting>
+		<setting>a4</setting>
 		<model>Airbus H160.*</model>
 		<value>0.65</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
-		<setting>etl_effect_intensity</setting>
+		<setting>cvm</setting>
 		<model>Airbus H160.*</model>
 		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<setting>etl_start_speed</setting>
-		<model>Airbus H160.*</model>
-		<value>6</value>
-		<unit>kt</unit>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<setting>etl_stop_speed</setting>
-		<model>Airbus H160.*</model>
-		<value>30</value>
-		<unit>kt</unit>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<setting>rotor_blade_count</setting>
-		<model>Airbus H160.*</model>
-		<value>5</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<setting>runway_rumble_intensity</setting>
-		<model>Airbus H160.*</model>
-		<value>0.5</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -338,7 +409,7 @@
 		<device>joystick</device>
 	</models>
 	<models>
-		<setting>etl_start_speed</setting>
+		<setting>cvm</setting>
 		<model>Bell 407.*</model>
 		<value>8</value>
 		<unit>m/s</unit>
@@ -346,7 +417,7 @@
 		<device>joystick</device>
 	</models>
 	<models>
-		<setting>etl_stop_speed</setting>
+		<setting>a4</setting>
 		<model>Bell 407.*</model>
 		<value>13</value>
 		<unit>m/s</unit>
@@ -354,29 +425,21 @@
 		<device>joystick</device>
 	</models>
 	<models>
-		<setting>overspeed_shake_start</setting>
-		<model>Bell 407.*</model>
-		<value>60</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<setting>inertia_force</setting>
+		<setting>cvm</setting>
 		<model>TF-51D</model>
 		<value>0.2</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
 		</models>
 	<models>
-		<setting>rpm_scale</setting>
+		<setting>a4</setting>
 		<model>TF-51D</model>
 		<value>31.5</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
 		</models>
 	<models>
-		<setting>runway_rumble_intensity</setting>
+		<setting>ab</setting>
 		<model>TF-51D</model>
 		<value>1.0</value>
 		<sim>DCS</sim>

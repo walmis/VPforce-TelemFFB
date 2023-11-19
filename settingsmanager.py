@@ -10,7 +10,7 @@ import re
 
 class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
-    sim = ""                             # DCS, MSFS, IL2
+    sim = ""                             # DCS, MSFS, IL2       -- set in get_current_model below
     model_name = "Airbus H160 Luxury"    # full model name with livery etc
     crafttype = ""                       # suggested, send whatever simconnect finds
 
@@ -18,7 +18,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     model_type = ""     # holder for current type/class
     model_pattern = ""  # holder for current matching pattern found in config xmls
-    edit_mode = 'Model' # holder for current editing mode.
+    edit_mode = '' # holder for current editing mode.
 
     print_each_step = False  #for debugging
 
@@ -29,20 +29,32 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.init_ui()
 
     def get_current_model(self):
+        # in the future, get from simconnect.
         self.sim = "MSFS"
-
-        self.model_name = self.tb_currentmodel.text()
+        self.model_name = self.tb_currentmodel.text()     #type value in box for testing. will set textbox in future
         self.crafttype = "Helicopter"  # suggested, send whatever simconnect finds
-
+        self.table_widget.clear()
+        self.setup_table()
+        self.setup_class_list()
+        self.setup_model_list()
 
         # output a single model
         self.model_type, self.model_pattern, self.data_list = self.read_single_model()
-        self.populate_sim_radiobuttons()
+        self.drp_sim.blockSignals(True)
+        self.drp_sim.setCurrentText(self.sim)
+        self.drp_sim.blockSignals(False)
+        self.drp_class.blockSignals(True)
+        self.drp_class.setCurrentText(self.model_type)
+        self.drp_class.blockSignals(True)
 
         if self.model_pattern != '':
             #self.rb_model.setChecked(True)
             self.set_edit_mode('Model')
+            self.drp_models.blockSignals(True)
             self.drp_models.setCurrentText(self.model_pattern)
+            self.drp_models.blockSignals(True)
+        else:
+            self.set_edit_mode('Class')
 
         print(f"\nCurrent: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
 
@@ -67,55 +79,69 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Connect the stateChanged signal of the checkbox to the toggle_rows function
         self.cb_show_inherited.stateChanged.connect(self.toggle_rows)
 
-        # Initial visibility of rows based on checkbox state
-        self.toggle_rows()
 
         self.l_device.setText(device)
 
         # read models from xml files to populate dropdown
         self.setup_model_list()
+        self.setup_class_list()
 
-        # group sim radiobuttons
-        # Create a button group
-        button_group = QButtonGroup(self)
-        button_group.addButton(self.rb_Global)
-        button_group.addButton(self.rb_DCS)
-        button_group.addButton(self.rb_MSFS)
-        button_group.addButton(self.rb_IL2)
-
-        button_group.buttonClicked.connect(self.on_sim_radio_button_clicked)
-
-        setting_group = QButtonGroup(self)
-        setting_group.addButton(self.rb_default)
-        setting_group.addButton(self.rb_class)
-        setting_group.addButton(self.rb_model)
-
-        setting_group.buttonClicked.connect(self.on_setting_radio_button_clicked)
-
+        # allow changing sim dropdown
+        self.drp_sim.currentIndexChanged.connect(lambda index: self.update_table_on_sim_change())
+        # change class dropdown
+        self.drp_class.currentIndexChanged.connect(lambda index: self.update_table_on_class_change())
         #allow changing model dropdown
         self.drp_models.currentIndexChanged.connect(lambda index: self.update_table_on_model_change())
 
-        #change class dropdown
-        self.drp_class.currentIndexChanged.connect(lambda index: self.update_table_on_class_change())
+        # Initial visibility of rows based on checkbox state
+        self.toggle_rows()
 
+    def setup_class_list(self):
+        self.drp_class.blockSignals(True)
+        print_debug = False
 
-
-    def populate_sim_radiobuttons(self):
         match self.sim:
+            case 'Global':
+                # Assuming drp_class is your QComboBox
+                for disable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                    if print_debug: print (f"disable {disable}")
+                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
+                self.drp_class.model().item(self.drp_class.findText('(None - Global)')).setEnabled(True)
+
             case 'DCS':
-                self.rb_DCS.setChecked(True)
-            case 'MSFS':
-                self.rb_MSFS.setChecked(True)
+                for disable in {'(None - Global)', 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter'}:
+                    if print_debug: print(f"disable {disable}")
+                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
+                for enable in {'PropellerAircraft', 'JetAircraft', 'Helicopter'}:
+                    if print_debug: print(f"enable {enable}")
+                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
+
             case 'IL2':
-                self.rb_IL2.setChecked(True)
+                for disable in {'(None - Global)', 'TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                    if print_debug: print(f"disable {disable}")
+                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
+                for enable in {'PropellerAircraft', 'JetAircraft'}:
+                    if print_debug: print(f"enable {enable}")
+                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
+            case 'MSFS':
+                for disable in {'(None - Global)'}:
+                    if print_debug: print(f"disable {disable}")
+                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
+                for enable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                    if print_debug: print(f"enable {enable}")
+                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
+        #self.drp_class.addItems(classes)
+        self.drp_class.blockSignals(False)
 
     def setup_model_list(self):
         models = self.read_models(self.sim)
+        self.drp_models.blockSignals(True)
         self.drp_models.clear()
         self.drp_models.addItems(models)
         self.drp_models.setCurrentText(self.model_pattern)
+        self.drp_models.blockSignals(False)
 
     def setup_table(self):
         self.table_widget.setColumnCount(6)
@@ -146,20 +172,20 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 match data_dict['replaced']:
                     case 'Global':
                         item.setForeground(QtGui.QColor('gray'))
+                    case 'Global (user)':
+                        item.setForeground(QtGui.QColor('black'))
                     case 'Sim Default':
                         item.setForeground(QtGui.QColor('blue'))
-                    case 'Sim Class':
-                        item.setForeground(QtGui.QColor('darkblue'))
-                    case 'Global (user)':
-                        item.setForeground(QtGui.QColor('darkgray'))
-                    case 'Sim Default (user)':
+                    case 'Sim (user)':
                         item.setForeground(QtGui.QColor('green'))
-                    case 'Sim Class (user)':
-                        item.setForeground(QtGui.QColor('darkgreen'))
+                    case 'Class Default':
+                        item.setForeground(QtGui.QColor('darkBlue'))
+                    case 'Class (user)':
+                        item.setForeground(QtGui.QColor('darkGreen'))
                     case 'Model Default':
-                        item.setForeground(QtGui.QColor('purple'))
+                        item.setForeground(QtGui.QColor('magenta'))
                     case 'Model (user)':
-                        item.setForeground(QtGui.QColor('darkpurple'))
+                        item.setForeground(QtGui.QColor('darkMagenta'))
 
             # Make specific columns read-only
             grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemIsEditable)
@@ -177,6 +203,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setItem(row, 3, value_item)
             self.table_widget.setItem(row, 4, info_item)
             self.table_widget.setItem(row, 5, replaced_item)
+            #print(f"{override_item.text()}\t{grouping_item.text()}\t{displayname_item.text()}\t{value_item.text()}\t{replaced_item.text()}")
          #   print(f"Row {row} added to the table.")
 
     def toggle_rows_old(self):
@@ -197,9 +224,13 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if checkbox_item is not None and checkbox_item.checkState() != Qt.Checked:
                 self.table_widget.setRowHidden(row, not show_inherited)
 
+
     def update_table_on_model_change(self):
         # Get the selected model from the combo box
+        self.set_edit_mode('Model')
+
         self.model_name = self.drp_models.currentText()
+
         if self.model_name != '':
 
             # Replace the following line with your actual XML reading logic
@@ -207,20 +238,36 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             print(f"\nmodel change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
 
             # Update the table with the new data
-
-            self.table_widget.clear()
+            self.drp_class.blockSignals(True)
             self.drp_class.setCurrentText(self.model_type)
-            self.setup_table()
-            self.populate_table()
-            self.toggle_rows()
+            self.drp_class.blockSignals(False)
+
+        else:
+            self.set_edit_mode('Class')
+            old_model_type = self.model_type
+            print(self.model_type)
+            self.drp_class.setCurrentText('(None - Sim Default)')
+            self.drp_class.setCurrentText(old_model_type)
+
+        self.table_widget.clear()
+        self.setup_table()
+        self.populate_table()
+        self.toggle_rows()
 
     def update_table_on_class_change(self):
         # Get the selected model from the combo box
+        self.drp_models.blockSignals(True)
+        self.drp_models.setCurrentText('')
+        self.model_name = ''
+        self.drp_models.blockSignals(False)
+        self.set_edit_mode('Class')
         self.model_type = self.drp_class.currentText()
         if self.model_type != '':
 
             # Replace the following line with your actual XML reading logic
             self.model_type, self.model_pattern, self.data_list = self.read_single_model()
+
+
             print(
                 f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
 
@@ -230,49 +277,29 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.setup_table()
             self.populate_table()
             self.toggle_rows()
-
-    def on_sim_radio_button_clicked(self, button):
-        selected_radio_button_objname = button.objectName()
-        selected_radio_button = selected_radio_button_objname.replace('rb_','')
-        print(f"sim radio: {selected_radio_button}")
-        if selected_radio_button == 'Global':
-
-            self.set_edit_mode('Global')
-
         else:
+            self.drp_class.setCurrentText('(None - Sim Default)')
+            self.set_edit_mode('Sim')
 
-            self.set_edit_mode('Sim Default')
 
-        self.update_table_on_sim_change(selected_radio_button)
-
-    def on_setting_radio_button_clicked(self, setting):
-
-        selected_radio_button_objname = setting.objectName()
-        print(f"setting rb {selected_radio_button_objname}")
-        match selected_radio_button_objname:
-            case 'rb_default':
-                print('class')  # more to do here
-                self.set_edit_mode('Sim Default')
-                self.drp_models.setCurrentText('')
-            case 'rb_class':
-                print('class')  # more to do here
-                self.set_edit_mode('Class')
-                self.drp_models.setCurrentText('')
-            case 'rb_model':
-                print ('model')
-                self.set_edit_mode('Model')
-
-    def update_table_on_sim_change(self, button_text):
+    def update_table_on_sim_change(self):
         # Get the selected sim from the radio buttons
 
-        self.sim = button_text
-        self.set_edit_mode('Sim Default')
+        self.sim = self.drp_sim.currentText()
 
+        if self.sim == 'Global':
+            self.set_edit_mode('Global')
+        else:
+            self.set_edit_mode('Sim')
+
+        self.setup_class_list()
         self.setup_model_list()
+
+
         # Replace the following line with your actual XML reading logic
         self.model_type, self.model_pattern, self.data_list = self.read_single_model()
         print(
-            f"\nsim change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
+            f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
 
         # Update the table with the new data
 
@@ -322,7 +349,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             match self.edit_mode:
                 case 'Global': checkbox.setChecked(override == 'Global (user)')
-                case 'Class': checkbox.setChecked(override == 'Sim Class (user)')
+                case 'Sim': checkbox.setChecked(override == 'Sim (user)')
+                case 'Class': checkbox.setChecked(override == 'Class (user)')
                 case 'Model': checkbox.setChecked(override == 'Model (user)')
 
         checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")    #why no worky
@@ -336,43 +364,50 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if mode != oldmode:
             self.l_mode.setText(mode)
             self.edit_mode = mode
-
+            self.setup_class_list()
             match mode:
                 case 'Global':
-                    self.drp_class.setCurrentText('')
+
+                    self.drp_class.blockSignals(True)
+                    self.drp_models.blockSignals(True)
+                    self.drp_class.setCurrentText('(None - Global)')
                     self.drp_models.setCurrentText('')
                     self.model_name = ''
                     self.model_type = ''
-                    self.sim = 'Global'
-
-                    self.rb_class.setEnabled(False)
-                    self.rb_model.setEnabled(False)
+                    self.drp_class.blockSignals(False)
+                    self.drp_models.blockSignals(False)
                     self.drp_class.setEnabled(False)
                     self.drp_models.setEnabled(False)
-                    self.rb_default.setChecked(True)
-
-                case 'Sim Default':
-
-                    self.rb_class.setEnabled(True)
-                    self.rb_model.setEnabled(True)
+                case 'Sim':
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
-                    self.rb_default.setChecked(True)
+                    self.drp_class.blockSignals(True)
+                    self.drp_models.blockSignals(True)
+                    self.drp_class.setCurrentText('(None - Sim Default)')
+                    self.drp_models.setCurrentText('')
+                    self.model_name = ''
+                    self.model_type = ''
+                    self.drp_class.blockSignals(False)
+                    self.drp_models.blockSignals(False)
 
                 case 'Class':
-                    self.rb_class.setEnabled(True)
-                    self.rb_model.setEnabled(True)
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
-                    self.rb_class.setChecked(True)
+                    self.drp_models.blockSignals(True)
+                    self.drp_models.setCurrentText('(None - Class Default)')
+                    self.model_name = ''
+                    self.drp_models.blockSignals(False)
 
                 case 'Model':
-
-                    self.rb_class.setEnabled(True)
-                    self.rb_model.setEnabled(True)
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
-                    self.rb_model.setChecked(True)
+
+                case _:
+                    self.drp_class.setEnabled(True)
+                    self.drp_models.setEnabled(True)
+
+        print(f"{mode} Mode")
+
 
     def get_craft_attributes(file_path, sim, device):
         craft_attributes = set()
@@ -481,11 +516,11 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             replacestring = ''
             if show_source:
                 if item['replaced'] == "Global": replacestring = " G"
-                if item['replaced'] == "Sim Default": replacestring =  "SD"
-                if item['replaced'] == "Sim Class": replacestring = "SC"
                 if item['replaced'] == "Global (user)": replacestring = "UG"
-                if item['replaced'] == "Sim Default (user)": replacestring = "UD"
-                if item['replaced'] == "Sim Class (user)": replacestring = "UC"
+                if item['replaced'] == "Sim Default": replacestring =  "SD"
+                if item['replaced'] == "Sim (user)": replacestring = "UD"
+                if item['replaced'] == "Class Default": replacestring = "SC"
+                if item['replaced'] == "Class (user)": replacestring = "UC"
                 if item['replaced'] == "Model Default": replacestring = "DM"
                 if item['replaced'] == "Model (user)": replacestring = "UM"
             spacing = 50 - (len(item['name']) + len(item['value']) + len(item['unit']))
@@ -556,6 +591,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         return model_data
 
     def read_single_model(self):
+        print_counts = False
         # Read models data first
         model_data, def_model_pattern = self.read_models_data(defaults_path, self.model_name)
         user_model_data, usr_model_pattern = self.read_models_data(userconfig_path, self.model_name)
@@ -566,8 +602,13 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         if 'print_each_step' not in locals():
             print_each_step = False
-        # Extract the type from models data
-        model_class = self.model_type
+
+        # Extract the type from models data, if name is blank then use the class.  otherwise assume no type is set.
+        if self.model_name == '':
+            model_class = self.model_type
+        else:
+            model_class = '(None - Sim Default)'   #self.model_type
+
         for model in model_data:
             if model['setting'] == 'type':
                 model_class = model['value']
@@ -583,11 +624,10 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         # get default settings for all sims and device
         globaldata = self.read_xml_file('Global', 'Default')
-        for g in globaldata:
-            g['replaced'] = 'Global'
+        for g in globaldata: g['replaced'] = 'Global'
 
 
-        # print(f"globaldata count {len(globaldata)}")
+        if print_counts: print(f"globaldata count {len(globaldata)}")
 
         # see what we got
         if self.print_each_step:
@@ -597,9 +637,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # get default Aircraft settings for this sim and device
 
         simdata = self.read_xml_file(self.sim, 'Default')
-        for s in simdata:
-            s['replaced'] = 'Sim Default'
-        # print(f"simdata count {len(simdata)}")
+        for s in simdata:  s['replaced'] = 'Sim Default'
+        if print_counts:  print(f"simdata count {len(simdata)}")
 
         # see what we got
         if self.print_each_step:
@@ -609,10 +648,9 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # combine base stuff
         defaultdata = globaldata
         if self.sim != 'Global':
-            for item in simdata:
-                defaultdata.append(item)
+            for item in simdata: defaultdata.append(item)
 
-        # print(f"defaultdata count {len(defaultdata)}")
+        if print_counts:  print(f"defaultdata count {len(defaultdata)}")
 
         # get additional class default data
         if model_class != "":
@@ -620,8 +658,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             craftresult = self.read_xml_file(self.sim,model_class)
 
             if craftresult is not None:
-                for c in craftresult:
-                    c['replaced'] = 'Sim Class'
+                for c in craftresult:  c['replaced'] = 'Class Default'
                 # see what we got
                 if print_each_step:
                     print(f"\nCraftresult: {self.sim} type: {model_class}  device:{device}\n")
@@ -632,7 +669,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             else:
                 default_craft_result = defaultdata
 
-            # print(f"default_craft_result count {len(default_craft_result)}")
+            if print_counts:  print(f"default_craft_result count {len(default_craft_result)}")
 
             # see what we got
             if print_each_step:
@@ -649,24 +686,27 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             def_craft_userglobal_result = defaultdata
 
-        # print(f"def_craft_userglobal_result count {len(def_craft_userglobal_result)}")
+        if print_counts:  print(f"def_craft_userglobal_result count {len(def_craft_userglobal_result)}")
 
-        # get userconfig aircraft type overrides
-        userairplanedata = self.read_user_craft_data(self.sim, 'Default')
-        if userairplanedata is not None:
-            # merge if there is any
-            def_craft_useraircft_result = self.update_data_with_models(def_craft_userglobal_result, userairplanedata, 'Sim Default (user)')
+        # get userconfig default type overrides
+        if self.sim != 'Global':
+            user_default_data = self.read_user_craft_data(self.sim, 'Default')
+            if user_default_data is not None:
+                # merge if there is any
+                def_craft_user_default_result = self.update_data_with_models(def_craft_userglobal_result, user_default_data, 'Sim (user)')
+            else:
+                def_craft_user_default_result = defaultdata
+
+            if print_counts:  print(f"def_craft_user_default_result count {len(def_craft_user_default_result)}")
         else:
-            def_craft_useraircft_result = defaultdata
-
-        # print(f"def_craft_useraircft_result count {len(def_craft_useraircft_result)}")
+            def_craft_user_default_result = defaultdata
 
         if model_class != "":
             # get userconfg craft specific type overrides
             usercraftdata = self.read_user_craft_data(self.sim, model_class)
             if usercraftdata is not None:
                 # merge if there is any
-                def_craft_usercraft_result = self.update_data_with_models(def_craft_useraircft_result, usercraftdata, 'Sim Class (user)')
+                def_craft_usercraft_result = self.update_data_with_models(def_craft_user_default_result, usercraftdata, 'Class (user)')
             else:
                 def_craft_usercraft_result = defaultdata
         else:
@@ -675,7 +715,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Update result with default models data
         def_craft_models_result = self.update_data_with_models(def_craft_usercraft_result, model_data, 'Model Default')
 
-        # print(f"def_craft_models count {len(def_craft_models_result)}")
+        if print_counts:  print(f"def_craft_models count {len(def_craft_models_result)}")
 
         # finally get userconfig model specific overrides
         if user_model_data:
@@ -701,7 +741,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 # Update the value and unit in defaultdata with the values from craftresult
                 item['value'] = craftresult_dict[name]['value']
                 item['unit'] = craftresult_dict[name]['unit']
-                item['replaced'] = "Sim Class"  # Set the 'replaced' flag
+                item['replaced'] = "Class Default"  # Set the 'replaced' flag
 
             updated_defaultdata.append(item)
 
@@ -778,6 +818,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
 if __name__ == "__main__":
+    # defaults_path = "defaults.xml"  # defaults file
+    # userconfig_path = "userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
     defaults_path = "debug_defaults.xml"  # defaults file
     userconfig_path = "debug_userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
     device = "joystick"  # joystick, pedals, collective.  essentially permanent per session
