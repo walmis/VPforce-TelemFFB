@@ -429,7 +429,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 #  END GUI STUFF
 
-    def read_xml_file(self, the_sim, craft):
+    def read_xml_file(self, the_sim):
         tree = ET.parse(defaults_path)
         root = tree.getroot()
 
@@ -444,44 +444,36 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             datatype = defaults_elem.find('datatype').text
             unit_elem = defaults_elem.find('unit')
             unit = unit_elem.text if unit_elem is not None else ""
+            value_elem = defaults_elem.find('value')
+            value = value_elem.text if value_elem is not None else ""
+            if value is None: value = ""
             valid_elem = defaults_elem.find('validvalues')
             validvalues = valid_elem.text if valid_elem is not None else ""
+            info_elem = defaults_elem.find('info')
+            info = (f"{info_elem.text}") if info_elem is not None else ""
 
-            # Check if the 'value' element has the 'Craft' attribute
-            searchcraft = craft
-            if craft == '':
-                searchcraft = 'Default'
-            value_elem_craft = defaults_elem.find(f".//value[@Craft='{searchcraft}']")
-            value_craft = value_elem_craft.text if value_elem_craft is not None and value_elem_craft.get(
-                'Craft') == searchcraft else None
-
-            # If 'value' element without 'Craft' attribute exists, use that in 'Default' section
-            if value_craft is None and craft == '' and 'Craft' not in defaults_elem.attrib:
-                value_elem_craft = defaults_elem.find('value')
-                value_craft = value_elem_craft.text if value_elem_craft is not None and 'Craft' not in value_elem_craft.attrib else None
+            if the_sim == 'Global':
+                replaced = 'Global'
+            else:
+                replaced = 'Sim Default'
 
             # Store data in a dictionary
-            if value_craft is not None:
+            data_dict = {
+                'grouping': grouping,
+                'name': name,
+                'displayname': displayname,
+                'value': value,
+                'unit': unit,
+                'datatype': datatype,
+                'validvalues': validvalues,
+                'replaced': replaced,
+                'info': info
+            }
+            # print(data_dict)
 
-                info_elem = defaults_elem.find('info')
-                info = (f"{info_elem.text}") if info_elem is not None else ""
-
-                data_dict = {
-                    'grouping': grouping,
-                    'name': name,
-                    'displayname': displayname,
-                    'value': value_craft,
-                    'unit': unit,
-                    'datatype': datatype,
-                    'validvalues': validvalues,
-                    'replaced': "",
-                    'info': info
-                }
-                # print(data_dict)
-
-                # Append to the list
-                data_list.append(data_dict)
-                # print(data_list)
+            # Append to the list
+            data_list.append(data_dict)
+            # print(data_list)
         # Sort the data by grouping and then by name
 
         sorted_data = sorted(data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
@@ -535,6 +527,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
     def read_models_data(self,file_path, full_model_name):
+        # runs on both defaults and userconfig xml files
         tree = ET.parse(file_path)
         root = tree.getroot()
 
@@ -551,12 +544,12 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if pattern is not None:
                     # Check if the full_model_name matches the pattern using re.match
                     if re.match(pattern, full_model_name):
-                        setting = model_elem.find('setting').text
+                        name = model_elem.find('name').text
                         value = model_elem.find('value').text
                         unit_elem = model_elem.find('unit')
                         unit = unit_elem.text if unit_elem is not None else ""
                         model_dict = {
-                            'setting': setting,
+                            'name': name,
                             'value': value,
                             'unit': unit
                         }
@@ -565,6 +558,31 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         return model_data, found_pattern
 
+    def read_default_data(self, the_sim, the_class):
+        tree = ET.parse(defaults_path)
+        root = tree.getroot()
+
+        class_data = []
+
+        # Iterate through models elements
+        for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]'):
+
+            if model_elem.find('name') is not None:
+
+                name = model_elem.find('name').text
+                value = model_elem.find('value').text
+                unit_elem = model_elem.find('unit')
+                unit = unit_elem.text if unit_elem is not None else ""
+                model_dict = {
+                    'name': name,
+                    'value': value,
+                    'unit': unit,
+                    'replaced': 'Class Default'
+                }
+
+                class_data.append(model_dict)
+
+        return class_data
     def read_user_default_data(self, the_sim):
         tree = ET.parse(userconfig_path)
         root = tree.getroot()
@@ -574,14 +592,14 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Iterate through models elements
         for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]'):
             if model_elem.find('type') is None:
-                if model_elem.find('setting') is not None:
+                if model_elem.find('name') is not None:
 
-                    setting = model_elem.find('setting').text
+                    setting = model_elem.find('name').text
                     value = model_elem.find('value').text
                     unit_elem = model_elem.find('unit')
                     unit = unit_elem.text if unit_elem is not None else ""
                     model_dict = {
-                        'setting': setting,
+                        'name': setting,
                         'value': value,
                         'unit': unit
                     }
@@ -605,12 +623,12 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if pattern is not None:
                     # Check if the craft type matches the pattern using re match
                     if re.match(pattern, crafttype):
-                        setting = model_elem.find('setting').text
+                        name = model_elem.find('name').text
                         value = model_elem.find('value').text
                         unit_elem = model_elem.find('unit')
                         unit = unit_elem.text if unit_elem is not None else ""
                         model_dict = {
-                            'setting': setting,
+                            'name': name,
                             'value': value,
                             'unit': unit
                         }
@@ -638,21 +656,20 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             model_class = ''   #self.model_type
 
         for model in model_data:
-            if model['setting'] == 'type':
+            if model['name'] == 'type':
                 model_class = model['value']
                 break
         # check if theres an override
         if user_model_data is not None:
             for model in user_model_data:
-                if model['setting'] == 'type':
+                if model['name'] == 'type':
                     model_class = model['value']
                     break
         print(f"class: {model_class}")
 
 
         # get default settings for all sims and device
-        globaldata = self.read_xml_file('Global', '')
-        for g in globaldata: g['replaced'] = 'Global'
+        globaldata = self.read_xml_file('Global')
 
         if print_counts: print(f"globaldata count {len(globaldata)}")
 
@@ -663,8 +680,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         # get default Aircraft settings for this sim and device
-        simdata = self.read_xml_file(self.sim, '')
-        for s in simdata:  s['replaced'] = 'Sim Default'
+        simdata = self.read_xml_file(self.sim)
+
         if print_counts:  print(f"simdata count {len(simdata)}")
 
         # see what we got
@@ -683,14 +700,9 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # get additional class default data
         if model_class != "":
             # Use the extracted type in read_xml_file
-            craftresult = self.read_xml_file(self.sim,model_class)
+            craftresult = self.read_default_data(self.sim,model_class)
 
             if craftresult is not None:
-                for c in craftresult:  c['replaced'] = 'Class Default'
-                # see what we got
-                if print_each_step:
-                    print(f"\nCraftresult: {self.sim} type: {model_class}  device:{device}\n")
-                    self.printconfig(craftresult)
 
                 # merge if there is any
                 default_craft_result = self.update_default_data_with_craft_result(defaultdata, craftresult)
@@ -754,6 +766,9 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             final_result = self.update_data_with_models(def_craft_models_result, user_model_data, 'Model (user)')
         else:
             final_result = def_craft_models_result
+
+        final_result = [item for item in final_result if item['value'] != '' or item['name'] == 'vpconf']
+
         sorted_data = sorted(final_result, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
         print(f"final count {len(final_result)}")
         return model_class, model_pattern, sorted_data
@@ -788,16 +803,16 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         updated_result = []
 
         # Create a dictionary mapping settings to their corresponding values and units
-        model_dict = {model['setting']: {'value': model['value'], 'unit': model['unit']} for model in model_data}
+        model_dict = {model['name']: {'value': model['value'], 'unit': model['unit']} for model in model_data}
 
         for item in defaults_data:
-            setting = item['name']
+            name = item['name']
 
             # Check if the setting exists in the model_data
-            if setting in model_dict:
+            if name in model_dict:
                 # Update the value and unit in defaults_data with the values from model_data
-                item['value'] = model_dict[setting]['value']
-                item['unit'] = model_dict[setting]['unit']
+                item['value'] = model_dict[name]['value']
+                item['unit'] = model_dict[name]['unit']
                 item['replaced'] = replacetext  # Set the 'replaced' text
 
             updated_result.append(item)
