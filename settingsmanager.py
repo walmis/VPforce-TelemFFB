@@ -21,9 +21,12 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
     edit_mode = '' # holder for current editing mode.
 
 
-    def __init__(self):
+    def __init__(self, defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick'):
         super(settings_window, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
+        self.defaults_path = defaults_path
+        self.userconfig_path = userconfig_path
+        self.device = device
         self.init_ui()
 
     def get_current_model(self):
@@ -54,7 +57,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             self.set_edit_mode('Class')
 
-        print(f"\nCurrent: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
+        print(f"\nCurrent: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
         # put model name and class into UI
 
@@ -77,7 +80,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.cb_show_inherited.stateChanged.connect(self.toggle_rows)
 
 
-        self.l_device.setText(device)
+        self.l_device.setText(self.device)
 
         # read models from xml files to populate dropdown
         self.setup_model_list()
@@ -229,7 +232,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             # Replace the following line with your actual XML reading logic
             self.model_type, self.model_pattern, self.data_list = self.read_single_model()
-            print(f"\nmodel change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
+            print(f"\nmodel change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
             # Update the table with the new data
             self.drp_class.blockSignals(True)
@@ -262,7 +265,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Replace the following line with your actual XML reading logic
             self.model_type, self.model_pattern, self.data_list = self.read_single_model()
             print(
-                f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
+                f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
             # Update the table with the new data
 
@@ -301,7 +304,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Replace the following line with your actual XML reading logic
         self.model_type, self.model_pattern, self.data_list = self.read_single_model()
         print(
-            f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{device}\n")
+            f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
         # Update the table with the new data
 
@@ -430,12 +433,12 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 #  END GUI STUFF
 
     def read_xml_file(self, the_sim):
-        tree = ET.parse(defaults_path)
+        tree = ET.parse(self.defaults_path)
         root = tree.getroot()
 
         # Collect data in a list of dictionaries
         data_list = []
-        for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{device}="true"]'):
+        for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{self.device}="true"]'):
 
             grouping = defaults_elem.find('Grouping').text
             name = defaults_elem.find('name').text
@@ -535,7 +538,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         found_pattern = ''
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{self.device}"]'):
             # Assuming 'model' is the element containing the wildcard pattern
 
             unit_pattern = model_elem.find('model')
@@ -559,13 +562,13 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         return model_data, found_pattern
 
     def read_default_class_data(self, the_sim, the_class):
-        tree = ET.parse(defaults_path)
+        tree = ET.parse(self.defaults_path)
         root = tree.getroot()
 
         class_data = []
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]'):
+        for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]'):
 
             if model_elem.find('name') is not None:
 
@@ -586,13 +589,13 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         return class_data
 
     def read_user_model_data(self, the_sim):
-        tree = ET.parse(userconfig_path)
+        tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
 
         model_data = []
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
             if model_elem.find('type') is None:
                 if model_elem.find('name') is not None:
 
@@ -612,13 +615,13 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         return model_data
 
     def read_user_sim_data(self, the_sim):
-        tree = ET.parse(userconfig_path)
+        tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
 
         sim_data = []
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{device}"]'):
+        for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{self.device}"]'):
 
             if model_elem.find('name') is not None:
 
@@ -640,13 +643,13 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         return sim_data
 
     def read_user_class_data(self, the_sim, crafttype):
-        tree = ET.parse(userconfig_path)
+        tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
 
         model_data = []
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
             if model_elem.find('type') is not None:
                 # Assuming 'model' is the element containing the wildcard pattern
                 pattern = model_elem.find('type').text
@@ -669,20 +672,24 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         return model_data
 
-    def read_single_model(self):
+    def read_single_model(self, sim=None, model_name=None):
+        if sim is None:
+            sim = self.sim
+        if model_name is None:
+            model_name = self.model_name
         print_counts = True
         print_each_step = True  # for debugging
 
         # Read models data first
-        model_data, def_model_pattern = self.read_models_data(defaults_path, self.model_name)
-        user_model_data, usr_model_pattern = self.read_models_data(userconfig_path, self.model_name)
+        model_data, def_model_pattern = self.read_models_data(self.defaults_path, model_name)
+        user_model_data, usr_model_pattern = self.read_models_data(self.userconfig_path, model_name)
 
         model_pattern = def_model_pattern
         if usr_model_pattern != '':
             model_pattern = usr_model_pattern
 
         # Extract the type from models data, if name is blank then use the class.  otherwise assume no type is set.
-        if self.model_name == '':
+        if model_name == '':
             model_class = self.model_type
         else:
             model_class = ''   #self.model_type
@@ -707,23 +714,23 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         # see what we got
         if print_each_step:
-            print(f"\nGlobal result: Global  type: ''  device:{device}\n")
+            print(f"\nGlobal result: Global  type: ''  device:{self.device}\n")
             self.printconfig(globaldata)
 
 
         # get default Aircraft settings for this sim and device
-        simdata = self.read_xml_file(self.sim)
+        simdata = self.read_xml_file(sim)
 
         if print_counts:  print(f"simdata count {len(simdata)}")
 
         # see what we got
         if print_each_step:
-            print(f"\nSimresult: {self.sim} type: ''  device:{device}\n")
+            print(f"\nSimresult: {sim} type: ''  device:{self.device}\n")
             self.printconfig(simdata)
 
         # combine base stuff
         defaultdata = globaldata
-        if self.sim != 'Global':
+        if sim != 'Global':
             for item in simdata: defaultdata.append(item)
 
         if print_counts:  print(f"defaultdata count {len(defaultdata)}")
@@ -732,7 +739,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # get additional class default data
         if model_class != "":
             # Use the extracted type in read_xml_file
-            craftresult = self.read_default_class_data(self.sim,model_class)
+            craftresult = self.read_default_class_data(sim,model_class)
 
             if craftresult is not None:
 
@@ -745,7 +752,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             # see what we got
             if print_each_step:
-                print(f"\nDefaultsresult: {self.sim} type: {model_class}  device:{device}\n")
+                print(f"\nDefaultsresult: {sim} type: {model_class}  device:{self.device}\n")
                 self.printconfig(default_craft_result)
         else:
             default_craft_result = defaultdata
@@ -763,8 +770,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         # get userconfig sim overrides
-        if self.sim != 'Global':
-            user_default_data = self.read_user_sim_data(self.sim)
+        if sim != 'Global':
+            user_default_data = self.read_user_sim_data(sim)
             if user_default_data is not None:
                 # merge if there is any
                 def_craft_user_default_result = self.update_data_with_models(def_craft_userglobal_result, user_default_data, 'Sim (user)')
@@ -777,7 +784,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         if model_class != "":
             # get userconfg craft specific type overrides
-            usercraftdata = self.read_user_class_data(self.sim, model_class)
+            usercraftdata = self.read_user_class_data(sim, model_class)
             if usercraftdata is not None:
                 # merge if there is any
                 def_craft_usercraft_result = self.update_data_with_models(def_craft_user_default_result, usercraftdata, 'Class (user)')
@@ -854,9 +861,9 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def read_models(self,mysim):
         all_models = ['']
-        tree = ET.parse(defaults_path)
+        tree = ET.parse(self.defaults_path)
         root = tree.getroot()
-        for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{self.device}"]'):
 
             pattern = model_elem.find('model')
             #print (pattern.text)
@@ -864,9 +871,9 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if pattern.text not in all_models:
                     all_models.append(pattern.text)
 
-        tree = ET.parse(userconfig_path)
+        tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
-        for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{self.device}"]'):
             pattern = model_elem.find('model')
             #print (pattern.text)
             if pattern is not None:
@@ -889,11 +896,11 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
 if __name__ == "__main__":
-    defaults_path = "defaults.xml"  # defaults file
-    userconfig_path = "userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
-    # defaults_path = "debug_defaults.xml"  # defaults file
-    # userconfig_path = "debug_userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
-    device = "joystick"  # joystick, pedals, collective.  essentially permanent per session
+    # defaults_path = "defaults.xml"  # defaults file
+    # userconfig_path = "userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
+    # # defaults_path = "debug_defaults.xml"  # defaults file
+    # # userconfig_path = "debug_userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
+    # device = "joystick"  # joystick, pedals, collective.  essentially permanent per session
 
     # stuff below is fo printing config.ini, no longer used.
 
@@ -921,7 +928,7 @@ if __name__ == "__main__":
     #  GUI stuff below
 
     app = QApplication(sys.argv)
-    SettingsWindow = settings_window()
+    SettingsWindow = settings_window(defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick')
     # ui = Ui_SettingsWindow()         # ui setup in class
     # ui.setupUi(SettingsWindow)
     SettingsWindow.show()

@@ -106,7 +106,7 @@ from configobj import ConfigObj
 from sc_manager import SimConnectManager
 from il2_telem import IL2Manager
 from aircraft_base import effects
-import settingsmanager
+from settingsmanager import *
 import pprint
 effects_translator = utils.EffectTranslator()
 
@@ -223,10 +223,10 @@ def config_has_changed(update=False) -> bool:
     return False
 def get_config_xml():
     global _config
+    global settings_mgr
     if _config: return _config
-
-    main = settingsmanager.read_xml_file(configfile, 'global', 'Aircraft', args.type)
-    user = settingsmanager.read_xml_file(overridefile, 'global', 'Aircraft', args.type)
+    a, b, main = settings_mgr.read_single_model('Global', 'Any')
+    # user = settingsmanager.read_xml_file(overridefile, 'global', 'Aircraft', args.type)
     params = ConfigObj()
     params['system'] = {}
     for setting in main:
@@ -235,12 +235,12 @@ def get_config_xml():
         if setting["grouping"] == "System":
             params['system'][k] = v
             logging.warning(f"Got from SMITTY: {k} : {v}")
-    for setting in user:
-        k = setting['name']
-        v = setting['value']
-        if setting["grouping"] == "System":
-            params['system'][k] = v
-            logging.warning(f"Got USER config from SMITTY: {k} : {v}")
+    # for setting in user:
+    #     k = setting['name']
+    #     v = setting['value']
+    #     if setting["grouping"] == "System":
+    #         params['system'][k] = v
+    #         logging.warning(f"Got USER config from SMITTY: {k} : {v}")
     return params
 
 def get_config() -> ConfigObj:
@@ -312,7 +312,7 @@ class TelemManager(QObject, threading.Thread):
     lastFrameTime: float
     numFrames: int = 0
 
-    def __init__(self) -> None:
+    def __init__(self, settings_manager) -> None:
         QObject.__init__(self)
         threading.Thread.__init__(self, daemon=True)
 
@@ -324,6 +324,8 @@ class TelemManager(QObject, threading.Thread):
         self.lastFrameTime = time.perf_counter()
         self.frameTimes = []
         self.timeout = 0.2
+        self.settings_manager = settings_manager
+        # settings_manager.show()
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
         if args.xml is not None:
@@ -370,7 +372,8 @@ class TelemManager(QObject, threading.Thread):
                 send_source = "MSFS"
             else:
                 send_source = data_source
-            cls_name,pattern, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
+            # cls_name,pattern, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
+            cls_name,pattern, result = self.settings_manager.read_single_model(data_source, aircraft_name)
             for setting in result:
                 k = setting['name']
                 v = setting['value']
@@ -642,7 +645,7 @@ class SimConnectSock(SimConnectManager):
 
 # Subclass QMainWindow to customize your application's main window
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, settings_manager):
         super().__init__()
 
         self.setGeometry(100, 100, 400, 700)
@@ -811,12 +814,15 @@ class MainWindow(QMainWindow):
 
         # Create a sub-menu for the button
         self.sub_menu = QMenu(edit_button)
+        smgr_config_action = QAction("Settings Manager", self)
+        smgr_config_action.triggered.connect(lambda: settings_manager.show())
         primary_config_action = QAction("Primary Config", self)
         primary_config_action.triggered.connect(lambda: self.edit_config_file("Primary"))
         if os.path.exists(args.overridefile):
             user_config_action = QAction("User Config", self)
             user_config_action.triggered.connect(lambda: self.edit_config_file("User"))
 
+        self.sub_menu.addAction(smgr_config_action)
         self.sub_menu.addAction(primary_config_action)
         if os.path.exists(args.overridefile):
             self.sub_menu.addAction(user_config_action)
@@ -971,6 +977,8 @@ def main():
     global dev_firmware_version
     d = LogWindow()
     #d.show()
+    global settings_mgr
+    settings_mgr = settings_window()
 
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
@@ -979,7 +987,7 @@ def main():
     logging.info(f"TelemFFB (version {version}) Starting")
 
 
-	
+
     vid_pid = [int(x, 16) for x in args.device.split(":")]
     try:
         dev = HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
@@ -1009,10 +1017,10 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
-    window = MainWindow()
+    window = MainWindow(settings_manager=settings_mgr)
     window.show()
 
-    telem_manager = TelemManager()
+    telem_manager = TelemManager(settings_manager=settings_mgr)
     telem_manager.start()
 
     telem_manager.telemetryReceived.connect(window.update_telemetry)
