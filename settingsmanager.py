@@ -8,7 +8,7 @@ from settingswindow import Ui_SettingsWindow
 import re
 
 
-class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
+class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     sim = ""                             # DCS, MSFS, IL2       -- set in get_current_model below
     model_name = "Airbus H160 Luxury"    # full model name with livery etc
@@ -22,7 +22,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
     def __init__(self, defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick'):
-        super(settings_window, self).__init__()
+        super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
         self.defaults_path = defaults_path
         self.userconfig_path = userconfig_path
@@ -886,13 +886,13 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 # def print_all_defaults():    # none of this may work outside teh class
 #     device = "joystick"
 #     for the_sim in "Global", "DCS", "MSFS", "IL2":
-#         crafts = settings_window.get_craft_attributes(defaults_path, the_sim, device)
+#         crafts = SettingsWindow.get_craft_attributes(defaults_path, the_sim, device)
 #         for craft in crafts:
-#             skip = settings_window.skip_bad_combos(the_sim, craft)
+#             skip = SettingsWindow.skip_bad_combos(the_sim, craft)
 #             if skip == True: continue
-#             mydata = settings_window.read_xml_file(the_sim, craft)
+#             mydata = SettingsWindow.read_xml_file(the_sim, craft)
 #             # print("main: "+ mydata)
-#             settings_window.printconfig( mydata)
+#             SettingsWindow.printconfig( mydata)
 
 
 if __name__ == "__main__":
@@ -928,10 +928,9 @@ if __name__ == "__main__":
     #  GUI stuff below
 
     app = QApplication(sys.argv)
-    SettingsWindow = settings_window(defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick')
-    # ui = Ui_SettingsWindow()         # ui setup in class
-    # ui.setupUi(SettingsWindow)
-    SettingsWindow.show()
+    sw = SettingsWindow(defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick')
+
+    sw.show()
 
     sys.exit(app.exec_())
 

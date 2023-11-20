@@ -978,7 +978,7 @@ def main():
     d = LogWindow()
     #d.show()
     global settings_mgr
-    settings_mgr = settings_window()
+    settings_mgr = SettingsWindow()
 
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)

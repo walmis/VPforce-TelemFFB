@@ -146,7 +146,19 @@
 	<simSettings><name>telemetry_timeout</name><value>400</value><sim>MSFS</sim><device>collective</device></simSettings>
 	<simSettings><name>telemffb_controls_axes</name><value>false</value><sim>MSFS</sim><device>collective</device></simSettings>
 	<simSettings><name>vpconf</name><value>configs\collective.vpconf</value><sim>MSFS</sim><device>collective</device></simSettings>
-	<simSettings><name>msfs_enabled</name><value>true</value><sim>Global</sim><device>collective</device></simSettings>
+	<simSettings>
+		<name>msfs_enabled</name>
+		<value>true</value>
+		<sim>Global</sim>
+		<device>collective</device>
+	</simSettings>
+	<simSettings>
+		<name>rhino_usb</name>
+		<value>2053</value>
+		<sim>Global</sim>
+		<device>collective</device>
+	</simSettings>
+	<simSettings><name>rhino_usb</name><value>2054</value><sim>Global</sim><device>pedals</device></simSettings>
 	<simSettings><name>telemetry_timeout</name><value>400</value><sim>MSFS</sim><device>joystick</device></simSettings>
 	<simSettings><name>telemffb_controls_axes</name><value>true</value><sim>MSFS</sim><device>joystick</device></simSettings>
 	<simSettings><name>msfs_enabled</name><value>true</value><sim>Global</sim><device>joystick</device></simSettings>

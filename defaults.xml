@@ -1069,12 +1069,23 @@
 		<Grouping>System</Grouping>
 		<displayname>Configurator File</displayname>
 		<name>vpconf</name>
-		<value></value>
 		<datatype>text</datatype>
 		<Global>true</Global>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<displayname>Rhino Address</displayname>
+		<name>rhino_usb</name>
+		<value>2055</value>
+		<datatype>text</datatype>
+		<Global>true</Global>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>Rhino USB address. Must relaunch if changed.</info>
 	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
