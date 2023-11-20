@@ -672,24 +672,24 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         return model_data
 
-    def read_single_model(self, sim=None, model_name=None):
-        if sim is None:
-            sim = self.sim
-        if model_name is None:
-            model_name = self.model_name
+    def read_single_model(self, sim=None, aircraft_name=None):
+        if sim is not None:
+            self.sim = sim
+        if aircraft_name is not None:
+            self.model_name = aircraft_name
         print_counts = True
         print_each_step = True  # for debugging
 
         # Read models data first
-        model_data, def_model_pattern = self.read_models_data(self.defaults_path, model_name)
-        user_model_data, usr_model_pattern = self.read_models_data(self.userconfig_path, model_name)
+        model_data, def_model_pattern = self.read_models_data(self.defaults_path, self.model_name)
+        user_model_data, usr_model_pattern = self.read_models_data(self.userconfig_path, self.model_name)
 
         model_pattern = def_model_pattern
         if usr_model_pattern != '':
             model_pattern = usr_model_pattern
 
         # Extract the type from models data, if name is blank then use the class.  otherwise assume no type is set.
-        if model_name == '':
+        if self.model_name == '':
             model_class = self.model_type
         else:
             model_class = ''   #self.model_type
@@ -719,18 +719,18 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         # get default Aircraft settings for this sim and device
-        simdata = self.read_xml_file(sim)
+        simdata = self.read_xml_file(self.sim)
 
         if print_counts:  print(f"simdata count {len(simdata)}")
 
         # see what we got
         if print_each_step:
-            print(f"\nSimresult: {sim} type: ''  device:{self.device}\n")
+            print(f"\nSimresult: {self.sim} type: ''  device:{self.device}\n")
             self.printconfig(simdata)
 
         # combine base stuff
         defaultdata = globaldata
-        if sim != 'Global':
+        if self.sim != 'Global':
             for item in simdata: defaultdata.append(item)
 
         if print_counts:  print(f"defaultdata count {len(defaultdata)}")
@@ -739,7 +739,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # get additional class default data
         if model_class != "":
             # Use the extracted type in read_xml_file
-            craftresult = self.read_default_class_data(sim,model_class)
+            craftresult = self.read_default_class_data(self.sim,model_class)
 
             if craftresult is not None:
 
@@ -752,7 +752,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             # see what we got
             if print_each_step:
-                print(f"\nDefaultsresult: {sim} type: {model_class}  device:{self.device}\n")
+                print(f"\nDefaultsresult: {self.sim} type: {model_class}  device:{self.device}\n")
                 self.printconfig(default_craft_result)
         else:
             default_craft_result = defaultdata
@@ -770,8 +770,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         # get userconfig sim overrides
-        if sim != 'Global':
-            user_default_data = self.read_user_sim_data(sim)
+        if self.sim != 'Global':
+            user_default_data = self.read_user_sim_data(self.sim)
             if user_default_data is not None:
                 # merge if there is any
                 def_craft_user_default_result = self.update_data_with_models(def_craft_userglobal_result, user_default_data, 'Sim (user)')
@@ -784,7 +784,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         if model_class != "":
             # get userconfg craft specific type overrides
-            usercraftdata = self.read_user_class_data(sim, model_class)
+            usercraftdata = self.read_user_class_data(self.sim, model_class)
             if usercraftdata is not None:
                 # merge if there is any
                 def_craft_usercraft_result = self.update_data_with_models(def_craft_user_default_result, usercraftdata, 'Class (user)')
