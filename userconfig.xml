@@ -70,165 +70,101 @@
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</models>
-<classSettings>
-		<name>collective_dampening_gain</name>
-		<type>Helicopter</type>
-		<value>0.6</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
 	<classSettings>
-		<name>collective_dampening_gain</name>
-		<type>HPGHelicopter</type>
-		<value>0.6</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>ap_following</name>
-		<type>Default</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>ap_following</name>
-		<type>HPGHelicopter</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>telemetry_timeout</name>
-		<value>400</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>telemffb_controls_axes</name>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>telemffb_controls_axes</name>
-		<type>Helicopter</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>telemffb_controls_axes</name>
-		<type>HPGHelicopter</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>trim_following</name>
-		<type>Default</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>trim_following</name>
-		<type>HPGHelicopter</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>vpconf</name>
-		<value>configs\collective.vpconf</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classSettings>
-	<classSettings>
-		<name>msfs_enabled</name>
-		<value>true</value>
-		<sim>Global</sim>
-		<device>collective</device>
-		</classSettings>
-	<classSettings>
-		<name>buffeting_intensity</name>
 		<type>JetAircraft</type>
+		<name>buffeting_intensity</name>
 		<value>0.0</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 		</classSettings>
 	<classSettings>
-		<name>telemetry_timeout</name>
-		<value>400</value>
+		<type>HPGHelicopter</type>
+		<name>collective_dampening_gain</name>
+		<value>0.6</value>
 		<sim>MSFS</sim>
-		<device>joystick</device>
+		<device>collective</device>
 	</classSettings>
 	<classSettings>
-		<name>telemffb_controls_axes</name>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classSettings>
-	<classSettings>
-		<name>msfs_enabled</name>
-		<value>true</value>
-		<sim>Global</sim>
-		<device>joystick</device>
-		</classSettings>
-	<classSettings>
+		<type>HPGHelicopter</type>
 		<name>ap_following</name>
-		<type>Default</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classSettings>
+	<classSettings>
+		<type>HPGHelicopter</type>
+		<name>telemffb_controls_axes</name>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classSettings>
+	<classSettings>
+		<type>HPGHelicopter</type>
+		<name>trim_following</name>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classSettings>
+<classSettings>
+		<type>Helicopter</type>
+		<name>collective_dampening_gain</name>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classSettings>
+	<classSettings>
+		<type>Helicopter</type>
+		<name>telemffb_controls_axes</name>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classSettings>
+	<simSettings>
+		<name>ap_following</name>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</simSettings>
+	<simSettings>
+		<name>trim_following</name>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</simSettings>
+	<simSettings>
+		<name>ap_following</name>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
-	</classSettings>
-	<classSettings>
-		<name>rudder_gain</name>
+	</simSettings>
+	<simSettings>
+		<name>trim_following</name>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
-	</classSettings>
-	<classSettings>
-		<name>rudder_trim_follow_gain_physical_x</name>
-		<value>0.5</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classSettings>
-	<classSettings>
-		<name>rudder_trim_follow_gain_virtual_x</name>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classSettings>
-	<classSettings>
-		<name>rudder_x_axis_scale</name>
-		<value>1.0</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classSettings>
-	<classSettings>
-		<name>telemetry_timeout</name>
-		<value>400</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classSettings>
-	<classSettings>
+	</simSettings>
+	<simSettings><name>telemetry_timeout</name><value>400</value><sim>MSFS</sim><device>collective</device></simSettings>
+	<simSettings><name>telemffb_controls_axes</name><value>false</value><sim>MSFS</sim><device>collective</device></simSettings>
+	<simSettings><name>vpconf</name><value>configs\collective.vpconf</value><sim>MSFS</sim><device>collective</device></simSettings>
+	<simSettings><name>msfs_enabled</name><value>true</value><sim>Global</sim><device>collective</device></simSettings>
+	<simSettings><name>telemetry_timeout</name><value>400</value><sim>MSFS</sim><device>joystick</device></simSettings>
+	<simSettings><name>telemffb_controls_axes</name><value>true</value><sim>MSFS</sim><device>joystick</device></simSettings>
+	<simSettings><name>msfs_enabled</name><value>true</value><sim>Global</sim><device>joystick</device></simSettings>
+	<simSettings><name>rudder_gain</name><value>true</value><sim>MSFS</sim><device>pedals</device></simSettings>
+	<simSettings><name>rudder_trim_follow_gain_physical_x</name><value>0.5</value><sim>MSFS</sim><device>pedals</device></simSettings>
+	<simSettings><name>rudder_trim_follow_gain_virtual_x</name><value>0.2</value><sim>MSFS</sim><device>pedals</device></simSettings>
+	<simSettings><name>rudder_x_axis_scale</name><value>1.0</value><sim>MSFS</sim><device>pedals</device></simSettings>
+	<simSettings><name>telemetry_timeout</name><value>400</value><sim>MSFS</sim><device>pedals</device></simSettings>
+	<simSettings>
 		<name>telemffb_controls_axes</name>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
-	</classSettings>
-	<classSettings>
-		<name>trim_following</name>
-		<type>Default</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classSettings>
-	<classSettings>
+	</simSettings>
+	<simSettings>
 		<name>msfs_enabled</name>
 		<value>true</value>
 		<sim>Global</sim>
 		<device>pedals</device>
-		</classSettings>
+		</simSettings>
 </TelemFFB>

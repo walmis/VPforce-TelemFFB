@@ -116,6 +116,12 @@ class Ui_SettingsWindow(object):
         self.drp_sim.addItem("")
         self.drp_sim.addItem("")
         self.gridLayout.addWidget(self.drp_sim, 14, 0, 1, 3)
+        self.l_manual = QtWidgets.QLabel(self.centralwidget)
+        self.l_manual.setTextFormat(QtCore.Qt.RichText)
+        self.l_manual.setAlignment(QtCore.Qt.AlignCenter)
+        self.l_manual.setOpenExternalLinks(True)
+        self.l_manual.setObjectName("l_manual")
+        self.gridLayout.addWidget(self.l_manual, 30, 6, 1, 1)
         SettingsWindow.setCentralWidget(self.centralwidget)
 
         self.retranslateUi(SettingsWindow)
@@ -157,3 +163,4 @@ class Ui_SettingsWindow(object):
         self.drp_sim.setItemText(1, _translate("SettingsWindow", "DCS"))
         self.drp_sim.setItemText(2, _translate("SettingsWindow", "IL2"))
         self.drp_sim.setItemText(3, _translate("SettingsWindow", "MSFS"))
+        self.l_manual.setText(_translate("SettingsWindow", "<a href=\"https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y\">Read TelemFFB manual for settings details</a>"))

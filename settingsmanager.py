@@ -69,7 +69,6 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.get_current_model()
         self.b_getcurrentmodel.clicked.connect(self.get_current_model)
 
-
         print (f"init {self.sim}")
         # Your custom logic for table setup goes here
         self.setup_table()
@@ -149,7 +148,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.table_widget.setColumnWidth(5, 100)
 
     def populate_table(self):
-        for row, data_dict in enumerate(self.data_list):
+        sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
+        for row, data_dict in enumerate(sorted_data):
             override_item = self.create_override_item(data_dict['replaced'])
             grouping_item = QTableWidgetItem(data_dict['grouping'])
             displayname_item = QTableWidgetItem(data_dict['displayname'])
@@ -476,7 +476,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # print(data_list)
         # Sort the data by grouping and then by name
 
-        sorted_data = sorted(data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
+        sorted_data = sorted(data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
         # print(sorted_data)
         # printconfig(sim, craft, sorted_data)
         return sorted_data
@@ -558,7 +558,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         return model_data, found_pattern
 
-    def read_default_data(self, the_sim, the_class):
+    def read_default_class_data(self, the_sim, the_class):
         tree = ET.parse(defaults_path)
         root = tree.getroot()
 
@@ -573,6 +573,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 value = model_elem.find('value').text
                 unit_elem = model_elem.find('unit')
                 unit = unit_elem.text if unit_elem is not None else ""
+
                 model_dict = {
                     'name': name,
                     'value': value,
@@ -583,7 +584,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 class_data.append(model_dict)
 
         return class_data
-    def read_user_default_data(self, the_sim):
+
+    def read_user_model_data(self, the_sim):
         tree = ET.parse(userconfig_path)
         root = tree.getroot()
 
@@ -596,19 +598,48 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
                     setting = model_elem.find('name').text
                     value = model_elem.find('value').text
-                    unit_elem = model_elem.find('unit')
-                    unit = unit_elem.text if unit_elem is not None else ""
+
+
                     model_dict = {
                         'name': setting,
                         'value': value,
-                        'unit': unit
+                        'unit': '',
+                        'replaced': 'Model (user)'
                     }
 
                     model_data.append(model_dict)
 
         return model_data
 
-    def read_user_craft_data(self, the_sim, crafttype):
+    def read_user_sim_data(self, the_sim):
+        tree = ET.parse(userconfig_path)
+        root = tree.getroot()
+
+        sim_data = []
+
+        # Iterate through models elements
+        for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{device}"]'):
+
+            if model_elem.find('name') is not None:
+
+                name = model_elem.find('name').text
+                value = model_elem.find('value').text
+                if the_sim == 'Global':
+                    replaced = 'Global'
+                else:
+                    replaced = 'Sim (user)'
+                model_dict = {
+                    'name': name,
+                    'value': value,
+                    'unit': '',
+                    'replaced': replaced
+                }
+
+                sim_data.append(model_dict)
+
+        return sim_data
+
+    def read_user_class_data(self, the_sim, crafttype):
         tree = ET.parse(userconfig_path)
         root = tree.getroot()
 
@@ -630,7 +661,8 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
                         model_dict = {
                             'name': name,
                             'value': value,
-                            'unit': unit
+                            'unit': unit,
+                            'replaced': 'Class (user)'
                         }
 
                         model_data.append(model_dict)
@@ -700,7 +732,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # get additional class default data
         if model_class != "":
             # Use the extracted type in read_xml_file
-            craftresult = self.read_default_data(self.sim,model_class)
+            craftresult = self.read_default_class_data(self.sim,model_class)
 
             if craftresult is not None:
 
@@ -720,7 +752,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         # get userconfig global overrides
-        userglobaldata = self.read_user_default_data( 'Global')
+        userglobaldata = self.read_user_sim_data( 'Global')
         if userglobaldata is not None:
             # merge if there is any
             def_craft_userglobal_result = self.update_data_with_models(default_craft_result, userglobaldata,'Global (user)')
@@ -732,7 +764,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         # get userconfig sim overrides
         if self.sim != 'Global':
-            user_default_data = self.read_user_default_data(self.sim)
+            user_default_data = self.read_user_sim_data(self.sim)
             if user_default_data is not None:
                 # merge if there is any
                 def_craft_user_default_result = self.update_data_with_models(def_craft_userglobal_result, user_default_data, 'Sim (user)')
@@ -745,7 +777,7 @@ class settings_window(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         if model_class != "":
             # get userconfg craft specific type overrides
-            usercraftdata = self.read_user_craft_data(self.sim, model_class)
+            usercraftdata = self.read_user_class_data(self.sim, model_class)
             if usercraftdata is not None:
                 # merge if there is any
                 def_craft_usercraft_result = self.update_data_with_models(def_craft_user_default_result, usercraftdata, 'Class (user)')
@@ -862,7 +894,6 @@ if __name__ == "__main__":
     # defaults_path = "debug_defaults.xml"  # defaults file
     # userconfig_path = "debug_userconfig.xml"  # user config overrides stored here, will move to %localappdata% at some point
     device = "joystick"  # joystick, pedals, collective.  essentially permanent per session
-
 
     # stuff below is fo printing config.ini, no longer used.
 

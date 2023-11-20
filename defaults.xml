@@ -58,7 +58,6 @@
 		<Grouping>Autopilot</Grouping>
 		<displayname>Hands Off Deadzone</displayname>
 		<name>hands_off_deadzone</name>
-		<value>0.02</value>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -69,7 +68,6 @@
 		<Grouping>Autopilot</Grouping>
 		<displayname>Hands On Deadzone</displayname>
 		<name>hands_on_deadzone</name>
-		<value>0.1</value>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3531,6 +3529,48 @@
 		<device>joystick</device>
 		</models>
 	<classdefaults>
+		<name>hands_on_deadzone</name>
+		<type>HPGHelicopter</type>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>hands_on_deadzone</name>
+		<type>HPGHelicopter</type>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>hands_on_deadzone</name>
+		<type>HPGHelicopter</type>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>hands_off_deadzone</name>
+		<type>HPGHelicopter</type>
+		<value>0.02</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>hands_off_deadzone</name>
+		<type>HPGHelicopter</type>
+		<value>0.02</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>hands_off_deadzone</name>
+		<type>HPGHelicopter</type>
+		<value>0.02</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
 		<name>afterburner_effect_intensity</name>
 		<type>JetAircraft</type>
 		<value>2800</value>
@@ -4017,7 +4057,7 @@
 		<name>etl_start_speed</name>
 		<type>Helicopter</type>
 		<value>8</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>DCS</sim>
 		<device>collective</device>
 	</classdefaults>
@@ -4025,7 +4065,7 @@
 		<name>etl_start_speed</name>
 		<type>Helicopter</type>
 		<value>8</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4033,7 +4073,7 @@
 		<name>etl_start_speed</name>
 		<type>Helicopter</type>
 		<value>8</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4041,7 +4081,7 @@
 		<name>etl_start_speed</name>
 		<type>Helicopter</type>
 		<value>8</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
@@ -4049,7 +4089,7 @@
 		<name>etl_start_speed</name>
 		<type>HPGHelicopter</type>
 		<value>8</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
@@ -4057,7 +4097,7 @@
 		<name>etl_start_speed</name>
 		<type>Helicopter</type>
 		<value>8</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4065,7 +4105,7 @@
 		<name>etl_start_speed</name>
 		<type>HPGHelicopter</type>
 		<value>8</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4073,7 +4113,7 @@
 		<name>etl_start_speed</name>
 		<type>Helicopter</type>
 		<value>8</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4081,39 +4121,39 @@
 		<name>etl_start_speed</name>
 		<type>HPGHelicopter</type>
 		<value>8</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>etl_stop_speed</name>
-		<type>Helicopter</type>
-		<value>16</value>
-		<Element1>m/s</Element1>
-		<sim>DCS</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
-		<name>etl_stop_speed</name>
-		<type>Helicopter</type>
-		<value>16</value>
-		<Element1>m/s</Element1>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>etl_stop_speed</name>
-		<type>Helicopter</type>
-		<value>16</value>
-		<Element1>m/s</Element1>
-		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>etl_stop_speed</name>
 		<type>Helicopter</type>
 		<value>16</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>etl_stop_speed</name>
+		<type>Helicopter</type>
+		<value>16</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>etl_stop_speed</name>
+		<type>Helicopter</type>
+		<value>16</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>etl_stop_speed</name>
+		<type>Helicopter</type>
+		<value>16</value>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
@@ -4121,7 +4161,7 @@
 		<name>etl_stop_speed</name>
 		<type>HPGHelicopter</type>
 		<value>16</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
@@ -4129,7 +4169,7 @@
 		<name>etl_stop_speed</name>
 		<type>Helicopter</type>
 		<value>16</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4137,7 +4177,7 @@
 		<name>etl_stop_speed</name>
 		<type>HPGHelicopter</type>
 		<value>16</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4145,7 +4185,7 @@
 		<name>etl_stop_speed</name>
 		<type>Helicopter</type>
 		<value>16</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4153,7 +4193,7 @@
 		<name>etl_stop_speed</name>
 		<type>HPGHelicopter</type>
 		<value>16</value>
-		<Element1>m/s</Element1>
+		<unit>m/s</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4224,39 +4264,39 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>Helicopter</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>DCS</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>JetAircraft</type>
-		<value>45</value>
-		<Element1>hz</Element1>
-		<sim>DCS</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>Helicopter</type>
-		<value>45</value>
-		<Element1>hz</Element1>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>HPGHelicopter</type>
-		<value>45</value>
-		<Element1>hz</Element1>
-		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
 	<classdefaults>
 		<name>jet_engine_rumble_freq</name>
 		<type>JetAircraft</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
+		<sim>DCS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>jet_engine_rumble_freq</name>
+		<type>Helicopter</type>
+		<value>45</value>
+		<unit>hz</unit>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>jet_engine_rumble_freq</name>
+		<type>HPGHelicopter</type>
+		<value>45</value>
+		<unit>hz</unit>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>jet_engine_rumble_freq</name>
+		<type>JetAircraft</type>
+		<value>45</value>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
@@ -4264,7 +4304,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>TurbopropAircraft</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
@@ -4272,7 +4312,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>Helicopter</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4280,7 +4320,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>JetAircraft</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4288,7 +4328,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>Helicopter</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4296,7 +4336,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>HPGHelicopter</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4304,7 +4344,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>JetAircraft</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4312,7 +4352,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>TurbopropAircraft</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4320,7 +4360,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>Helicopter</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4328,7 +4368,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>JetAircraft</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4336,7 +4376,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>Helicopter</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4344,7 +4384,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>HPGHelicopter</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4352,7 +4392,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>JetAircraft</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4360,7 +4400,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<type>TurbopropAircraft</type>
 		<value>45</value>
-		<Element1>hz</Element1>
+		<unit>hz</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4718,7 +4758,7 @@
 		<name>prop_diameter</name>
 		<type>PropellerAircraft</type>
 		<value>1.7</value>
-		<Element1>m</Element1>
+		<unit>m</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4726,7 +4766,7 @@
 		<name>prop_diameter</name>
 		<type>TurbopropAircraft</type>
 		<value>2.7</value>
-		<Element1>m</Element1>
+		<unit>m</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -4734,7 +4774,7 @@
 		<name>prop_diameter</name>
 		<type>PropellerAircraft</type>
 		<value>1.7</value>
-		<Element1>m</Element1>
+		<unit>m</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -4742,7 +4782,7 @@
 		<name>prop_diameter</name>
 		<type>TurbopropAircraft</type>
 		<value>2.7</value>
-		<Element1>m</Element1>
+		<unit>m</unit>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
