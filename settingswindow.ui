@@ -138,13 +138,6 @@
       </property>
      </widget>
     </item>
-    <item row="30" column="11">
-     <widget class="QDialogButtonBox" name="buttonBox">
-      <property name="standardButtons">
-       <set>QDialogButtonBox::Close|QDialogButtonBox::Save</set>
-      </property>
-     </widget>
-    </item>
     <item row="20" column="11">
      <widget class="QPushButton" name="b_getcurrentmodel">
       <property name="text">
@@ -278,6 +271,20 @@
       </property>
       <property name="openExternalLinks">
        <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="30" column="0">
+     <widget class="QPushButton" name="b_revert">
+      <property name="text">
+       <string>Revert Changes</string>
+      </property>
+     </widget>
+    </item>
+    <item row="30" column="11">
+     <widget class="QDialogButtonBox" name="buttonBox">
+      <property name="standardButtons">
+       <set>QDialogButtonBox::Close</set>
       </property>
      </widget>
     </item>

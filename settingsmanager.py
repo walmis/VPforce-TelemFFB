@@ -1,11 +1,12 @@
 import xml.etree.ElementTree as ET
 import sys
 import os
+import shutil
 from PyQt5 import QtGui, QtWidgets, QtCore
-from PyQt5.QtWidgets import (QApplication, QRadioButton, QButtonGroup, QTableWidget, QTableWidgetItem,
-                             QSlider, QCheckBox, QLineEdit, QVBoxLayout, QWidget)
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QComboBox, QTextEdit, QPushButton
-
+from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
+                             QVBoxLayout, QPushButton)
+from PyQt5.QtWidgets import QTableWidget, QTextEdit, QWidget, QSlider
+from datetime import datetime
 from PyQt5.QtCore import Qt
 from settingswindow import Ui_SettingsWindow
 import re
@@ -24,13 +25,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     edit_mode = '' # holder for current editing mode.
 
 
-    def __init__(self, datasource='Global', defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick'):
+    def __init__(self, datasource='Global', defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='collective'):
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
         self.defaults_path = defaults_path
         self.userconfig_path = userconfig_path
         self.device = device
         self.sim = datasource
+        self.backup_userconfig()
         self.init_ui()
 
     def get_current_model(self,the_sim='Global'):
@@ -85,6 +87,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Connect the stateChanged signal of the checkbox to the toggle_rows function
         self.cb_show_inherited.stateChanged.connect(self.toggle_rows)
 
+        self.b_revert.clicked.connect(self.restore_userconfig_backup)
 
         self.l_device.setText(self.device)
         self.set_edit_mode(self.sim)
@@ -107,6 +110,36 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def currentmodel_click(self):
         self.get_current_model(self.sim)
+
+    def backup_userconfig(self):
+        # Ensure the userconfig.xml file exists
+        self.create_empty_userxml_file()
+        backup_path = self.userconfig_path + ".backup"
+        # Create a timestamp
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        backup_path_time = f"{self.userconfig_path}_{timestamp}.backup"
+        try:
+            # Copy the userconfig.xml file to the backup location
+            shutil.copy2(self.userconfig_path, backup_path)
+            shutil.copy2(self.userconfig_path, backup_path_time)
+            print(f"Backup created: {backup_path}")
+        except Exception as e:
+            print(f"Error creating backup: {e}")
+
+    def restore_userconfig_backup(self):
+        # Ensure the backup file exists
+        backup_path = self.userconfig_path + ".backup"
+
+        if not os.path.isfile(backup_path):
+            print(f"Backup file '{backup_path}' not found.")
+            return
+
+        try:
+            # Copy the backup file to userconfig.xml
+            shutil.copy2(backup_path, self.userconfig_path)
+            print(f"Backup '{backup_path}' restored to userconfig.xml")
+        except Exception as e:
+            print(f"Error restoring backup: {e}")
 
     def show_user_model_dialog(self):
         current_aircraft = self.tb_currentmodel.text()
@@ -598,7 +631,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         found_pattern = ''
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{self.device}"]'):
+        #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="{self.sim}"][device="any"]') + \
+                          root.findall(f'.//models[sim="any"][device="any"]'):
+
             # Assuming 'model' is the element containing the wildcard pattern
 
             unit_pattern = model_elem.find('model')
@@ -628,7 +666,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         class_data = []
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]'):
+        #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]'):
+        #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]') + \
+                          root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="{self.device}"]') + \
+                          root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
+                          root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="any"]'):
 
             if model_elem.find('name') is not None:
 
@@ -655,7 +698,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         model_data = []
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
+        #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+                          root.findall(f'.//models[sim="any"][device="any"]'):
             if model_elem.find('type') is None:
                 if model_elem.find('name') is not None:
 
@@ -681,7 +728,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         sim_data = []
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{self.device}"]'):
+        #for model_elem in root.findall(f'.//simSettings[sim="{the_sim}" or sim="any"][device="{self.device}" or device="any"]'):
+        for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{self.device}"]') + \
+                          root.findall(f'.//simSettings[sim="any"][device="{self.device}"]') + \
+                          root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]') + \
+                          root.findall(f'.//simSettings[sim="any"][device="any"]'):
 
             if model_elem.find('name') is not None:
 
@@ -709,7 +760,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         model_data = []
 
         # Iterate through models elements
-        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
+        #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+                          root.findall(f'.//models[sim="any"][device="any"]'):
             if model_elem.find('type') is not None:
                 # Assuming 'model' is the element containing the wildcard pattern
                 pattern = model_elem.find('type').text
@@ -738,7 +793,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if aircraft_name is not None:
             self.model_name = aircraft_name
         print_counts = False
-        print_each_step = False  # for debugging
+        print_each_step = True  # for debugging
 
         # Read models data first
         model_data, def_model_pattern = self.read_models_data(self.defaults_path, self.model_name)
@@ -789,7 +844,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.printconfig(simdata)
 
         # combine base stuff
-        defaultdata = globaldata
+        defaultdata = globaldata.copy()
         if self.sim != 'Global':
             for item in simdata: defaultdata.append(item)
 
@@ -874,7 +929,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
     def update_default_data_with_craft_result(self,defaultdata, craftresult):
-        #updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
+        updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
 
 
         #default_names = set(item['name'] for item in defaultdata)
@@ -884,21 +939,40 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             name = craft_item['name']
 
             # Check if the item with the same name exists in defaultdata
-            matching_item = next((item for item in defaultdata if item['name'] == name), None)
+            matching_item = next((item for item in updated_defaultdata if item['name'] == name), None)
 
             if matching_item:
                 # If the item exists, update 'value' and 'unit'
                 matching_item['value'] = craft_item['value']
                 matching_item['unit'] = craft_item['unit']
                 matching_item['replaced'] = "Class Default"  # Set the 'replaced' flag
-            else:
-                # If the item doesn't exist, append it to defaultdata
-                defaultdata.append(craft_item)
+            #else:
+            # If the item doesn't exist, append it to defaultdata
+                # no appending
+                # defaultdata.append(craft_item)
 
-        return defaultdata
-
+        return updated_defaultdata
 
     def update_data_with_models(self,defaults_data, model_data, replacetext):
+        updated_result = defaults_data.copy()
+
+        # Create a dictionary mapping settings to their corresponding values and units
+        model_dict = {model['name']: {'value': model['value'], 'unit': model['unit']} for model in model_data}
+
+        for item in updated_result:
+            name = item['name']
+
+            # Check if the setting exists in the model_data
+            if name in model_dict:
+                # Update the value and unit in defaults_data with the values from model_data
+                item['value'] = model_dict[name]['value']
+                item['unit'] = model_dict[name]['unit']
+                item['replaced'] = replacetext  # Set the 'replaced' text
+
+
+
+        return updated_result
+    def update_data_with_models_old(self,defaults_data, model_data, replacetext):
         updated_result = []
 
         # Create a dictionary mapping settings to their corresponding values and units
@@ -919,6 +993,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         return updated_result
 
     def create_empty_userxml_file(self):
+        # Create a backup directory if it doesn't exist
+        # uncomment later when we use %localappdata%
+        # os.makedirs(os.path.dirname(self.userconfig_path), exist_ok=True)
+
         if not os.path.isfile(self.userconfig_path):
             # Create an empty XML file with the specified root element
             root = ET.Element("TelemFFB")
@@ -928,11 +1006,15 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             print(f"XML file exists at {self.userconfig_path}")
 
-    def read_models(self,mysim):
+    def read_models(self,the_sim):
         all_models = ['']
         tree = ET.parse(self.defaults_path)
         root = tree.getroot()
-        for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{self.device}"]'):
+        #for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]') +\
+            root.findall(f'.//models[sim="any"][device="{self.device}"]') +\
+            root.findall(f'.//models[sim="{the_sim}"][device="any"]') +\
+            root.findall(f'.//models[sim="any"][device="any"]'):
 
             pattern = model_elem.find('model')
             #print (pattern.text)
@@ -942,7 +1024,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
-        for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{self.device}"]'):
+        #for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+                          root.findall(f'.//models[sim="any"][device="any"]'):
+
             pattern = model_elem.find('model')
             #print (pattern.text)
             if pattern is not None:
