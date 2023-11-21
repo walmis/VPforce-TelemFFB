@@ -1,8 +1,11 @@
 import xml.etree.ElementTree as ET
 import sys
+import os
 from PyQt5 import QtGui, QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication, QRadioButton, QButtonGroup, QTableWidget, QTableWidgetItem,
                              QSlider, QCheckBox, QLineEdit, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QComboBox, QTextEdit, QPushButton
+
 from PyQt5.QtCore import Qt
 from settingswindow import Ui_SettingsWindow
 import re
@@ -11,7 +14,7 @@ import re
 class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     sim = ""                             # DCS, MSFS, IL2       -- set in get_current_model below
-    model_name = "Airbus H160 Luxury"    # full model name with livery etc
+    model_name = "unknown airplane"    # full model name with livery etc
     crafttype = ""                       # suggested, send whatever simconnect finds
 
     data_list = []
@@ -21,19 +24,20 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     edit_mode = '' # holder for current editing mode.
 
 
-    def __init__(self, defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick'):
+    def __init__(self, datasource='Global', defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick'):
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
         self.defaults_path = defaults_path
         self.userconfig_path = userconfig_path
         self.device = device
+        self.sim = datasource
         self.init_ui()
 
-    def get_current_model(self):
+    def get_current_model(self,the_sim='Global'):
         # in the future, get from simconnect.
-        self.sim = "MSFS"
+        self.sim = the_sim
         self.model_name = self.tb_currentmodel.text()     #type value in box for testing. will set textbox in future
-        self.crafttype = "Helicopter"  # suggested, send whatever simconnect finds
+        self.crafttype = ""  # suggested, send whatever simconnect finds
         self.table_widget.clear()
         self.setup_table()
         self.setup_class_list()
@@ -67,10 +71,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def init_ui(self):
 
+        self.create_empty_userxml_file()
+
         self.tb_currentmodel.setText(self.model_name)
 
         self.get_current_model()
-        self.b_getcurrentmodel.clicked.connect(self.get_current_model)
+        self.b_getcurrentmodel.clicked.connect(self.currentmodel_click)
 
         print (f"init {self.sim}")
         # Your custom logic for table setup goes here
@@ -81,7 +87,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         self.l_device.setText(self.device)
-
+        self.set_edit_mode(self.sim)
         # read models from xml files to populate dropdown
         self.setup_model_list()
         self.setup_class_list()
@@ -93,8 +99,58 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         #allow changing model dropdown
         self.drp_models.currentIndexChanged.connect(lambda index: self.update_table_on_model_change())
 
+        # create model setting button
+        self.b_createusermodel.clicked.connect(self.show_user_model_dialog)
+
         # Initial visibility of rows based on checkbox state
         self.toggle_rows()
+
+    def currentmodel_click(self):
+        self.get_current_model(self.sim)
+
+    def show_user_model_dialog(self):
+        current_aircraft = self.tb_currentmodel.text()
+        dialog = UserModelDialog(self.sim,current_aircraft, self)
+        result = dialog.exec_()
+        if result == QtWidgets.QDialog.Accepted:
+            # Handle accepted
+            new_aircraft = dialog.tb_current_aircraft.text()
+            new_combo_box_value = dialog.combo_box.currentText()
+            print (f"New: {new_aircraft} {new_combo_box_value}")
+            self.write_models_to_xml(new_aircraft,new_combo_box_value, 'type')
+            self.model_name = new_aircraft
+            self.tb_currentmodel.setText(new_aircraft)
+            self.get_current_model(self.sim)
+        else:
+            # Handle canceled
+            pass
+
+    def write_models_to_xml(self, the_model, the_value, setting_name):
+        # Load the existing XML file or create a new one if it doesn't exist
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+        for model_elem in root.findall(f'.//models[sim="{self.sim}"]'
+                                       f'[device="{self.device}"]'
+                                       f'[value="{the_value}"]'
+                                       f'[model="{the_model}"]'
+                                       f'[name="{setting_name}"]'):
+
+            if model_elem is not None:
+                print("<models> element with the same values already exists. Skipping.")
+                return
+
+        # Create child elements with the specified content
+        models = ET.SubElement(root, "models")
+        for tag, value in [("name", setting_name),
+                           ("model", the_model),
+                           ("value", the_value),
+                           ("sim", self.sim),
+                           ("device", self.device)]:
+            ET.SubElement(models, tag).text = value
+
+        # Write the modified XML back to the file
+        tree = ET.ElementTree(root)
+        tree.write(self.userconfig_path)
 
     def setup_class_list(self):
         self.drp_class.blockSignals(True)
@@ -383,6 +439,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_models.blockSignals(False)
                     self.drp_class.setEnabled(False)
                     self.drp_models.setEnabled(False)
+                    self.b_createusermodel.setEnabled(False)
                 case 'Sim':
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
@@ -394,6 +451,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.model_type = ''
                     self.drp_class.blockSignals(False)
                     self.drp_models.blockSignals(False)
+                    self.b_createusermodel.setEnabled(True)
 
                 case 'Class':
                     self.drp_class.setEnabled(True)
@@ -402,10 +460,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_models.setCurrentText('')
                     self.model_name = ''
                     self.drp_models.blockSignals(False)
+                    self.b_createusermodel.setEnabled(True)
 
                 case 'Model':
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
+                    self.b_createusermodel.setEnabled(True)
 
                 case _:
                     self.drp_class.setEnabled(True)
@@ -677,8 +737,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.sim = sim
         if aircraft_name is not None:
             self.model_name = aircraft_name
-        print_counts = True
-        print_each_step = True  # for debugging
+        print_counts = False
+        print_each_step = False  # for debugging
 
         # Read models data first
         model_data, def_model_pattern = self.read_models_data(self.defaults_path, self.model_name)
@@ -858,6 +918,15 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         return updated_result
 
+    def create_empty_userxml_file(self):
+        if not os.path.isfile(self.userconfig_path):
+            # Create an empty XML file with the specified root element
+            root = ET.Element("TelemFFB")
+            tree = ET.ElementTree(root)
+            tree.write(self.userconfig_path)
+            print(f"Empty XML file created at {self.userconfig_path}")
+        else:
+            print(f"XML file exists at {self.userconfig_path}")
 
     def read_models(self,mysim):
         all_models = ['']
@@ -881,6 +950,71 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     all_models.append(pattern.text)
 
         return all_models
+
+
+class UserModelDialog(QDialog):
+    def __init__(self, sim, current_aircraft, parent=None):
+        super(UserModelDialog, self).__init__(parent)
+        self.combo_box = None
+        self.tb_current_aircraft = None
+        self.setWindowTitle("Create Model Setting")
+        self.init_ui(sim, current_aircraft)
+
+    def init_ui(self,sim,current_aircraft):
+
+
+        layout = QVBoxLayout()
+
+        label1 = QLabel("TelemFFB uses regex to match aircraft names")
+        label2 = QLabel("Name.* will match anything starting with 'Name'")
+        label3 = QLabel("^Name$ will match only the exact 'Name'")
+        label4 = QLabel("(The )?Name.* matches starting with 'Name' or 'The Name'" )
+        label5 = QLabel("Edit the match pattern below.")
+
+        label6 = QLabel("And choose the aircraft class:")
+
+        classes = []
+        match sim:
+            case 'DCS':
+                classes = ["PropellerAircraft", "JetAircraft", "Helicopter"]
+            case 'IL2':
+                classes = ["PropellerAircraft", "JetAircraft"]
+            case 'MSFS':
+                classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter']
+
+        label_aircraft = QtWidgets.QLabel("Current Aircraft:")
+        self.tb_current_aircraft = QtWidgets.QLineEdit()
+        self.tb_current_aircraft.setText(current_aircraft)
+        self.tb_current_aircraft.setAlignment(Qt.AlignHCenter)
+
+        self.combo_box = QComboBox()
+        self.combo_box.addItems(classes)
+        self.combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
+
+        ok_button = QPushButton("OK")
+        ok_button.setStyleSheet("text-align:center;")
+        cancel_button = QPushButton("Cancel")
+        cancel_button.setStyleSheet("text-align:center;")
+
+        layout.addWidget(label1)
+        layout.addWidget(label2)
+        layout.addWidget(label3)
+        layout.addWidget(label4)
+        layout.addWidget(label5)
+
+        layout.addWidget(self.tb_current_aircraft)
+
+        layout.addWidget(label6)
+        layout.addWidget(self.combo_box)
+
+        layout.addWidget(ok_button)
+        layout.addWidget(cancel_button)
+
+        self.setLayout(layout)
+
+        ok_button.clicked.connect(self.accept)
+        cancel_button.clicked.connect(self.reject)
+
 
 # #  for printing config.ini text file
 # def print_all_defaults():    # none of this may work outside teh class
