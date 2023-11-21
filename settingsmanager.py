@@ -229,8 +229,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_models.blockSignals(False)
 
     def setup_table(self):
-        self.table_widget.setColumnCount(6)
-        headers = ['Override', 'Grouping', 'Display Name', 'Value', 'Info', "Source"]
+        self.table_widget.setColumnCount(7)
+        headers = ['Override', 'Grouping', 'Display Name', 'Value', 'Info', "Source", "name"]
         self.table_widget.setHorizontalHeaderLabels(headers)
         self.table_widget.setColumnWidth(0, 60)
         self.table_widget.setColumnWidth(1, 120)
@@ -249,9 +249,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             info_item = QTableWidgetItem(data_dict['info'])
             replaced_item = QTableWidgetItem(data_dict['replaced'])
             unit_item = QTableWidgetItem(data_dict['unit'])
+            # store name for use later, not shown
+            name_item = QTableWidgetItem(data_dict['name'])
+            name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
 
             #print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
-
 
             # Check if replaced is an empty string and set text color accordingly
             for item in [grouping_item, displayname_item, value_item, info_item, replaced_item]:
@@ -289,18 +291,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setItem(row, 3, value_item)
             self.table_widget.setItem(row, 4, info_item)
             self.table_widget.setItem(row, 5, replaced_item)
-            #print(f"{override_item.text()}\t{grouping_item.text()}\t{displayname_item.text()}\t{value_item.text()}\t{replaced_item.text()}")
-         #   print(f"Row {row} added to the table.")
+            self.table_widget.setItem(row, 6, name_item)
+            self.table_widget.setColumnHidden(6,True)
 
-    def toggle_rows_old(self):
-        show_inherited = self.cb_show_inherited.isChecked()
 
-        for row in range(self.table_widget.rowCount()):
-            replaced_item = self.table_widget.item(row, 5)  # Assuming source is in the second column
-            if replaced_item is not None:
 
-                is_editable = replaced_item.foreground().color() == QtGui.QColor('gray')
-                self.table_widget.setRowHidden(row, not show_inherited and is_editable)
+
 
     def toggle_rows(self):
         show_inherited = self.cb_show_inherited.isChecked()
