@@ -10,6 +10,7 @@ from datetime import datetime
 from PyQt5.QtCore import Qt
 from settingswindow import Ui_SettingsWindow
 import re
+import xml.dom.minidom
 
 
 class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
@@ -121,7 +122,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         try:
             # Copy the userconfig.xml file to the backup location
             shutil.copy2(self.userconfig_path, backup_path)
-            shutil.copy2(self.userconfig_path, backup_path_time)
+            #shutil.copy2(self.userconfig_path, backup_path_time)        #  do we want lots of backups?
             print(f"Backup created: {backup_path}")
         except Exception as e:
             print(f"Error creating backup: {e}")
@@ -184,6 +185,131 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Write the modified XML back to the file
         tree = ET.ElementTree(root)
         tree.write(self.userconfig_path)
+
+    def write_class_to_xml(self, the_class, the_value, setting_name):
+        # Load the existing XML file or create a new one if it doesn't exist
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+        for model_elem in root.findall(f'.//classSettings[sim="{self.sim}"]'
+                                       f'[device="{self.device}"]'
+                                       f'[value="{the_value}"]'
+                                       f'[type="{the_class}"]'
+                                       f'[name="{setting_name}"]'):
+
+            if model_elem is not None:
+                print("<classSettings> element with the same values already exists. Skipping.")
+                return
+
+        # Create child elements with the specified content
+        models = ET.SubElement(root, "classSettings")
+        for tag, value in [("name", setting_name),
+                           ("type", the_class),
+                           ("value", the_value),
+                           ("sim", self.sim),
+                           ("device", self.device)]:
+            ET.SubElement(models, tag).text = value
+
+        # Write the modified XML back to the file
+        tree = ET.ElementTree(root)
+        tree.write(self.userconfig_path)
+
+    def write_sim_to_xml(self, the_value, setting_name):
+        # Load the existing XML file or create a new one if it doesn't exist
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+        for model_elem in root.findall(f'.//simSettings[sim="{self.sim}"]'
+                                       f'[device="{self.device}"]'
+                                       f'[value="{the_value}"]'
+                                       f'[name="{setting_name}"]'):
+
+            if model_elem is not None:
+                print("<simSettings> element with the same values already exists. Skipping.")
+                return
+
+        # Create child elements with the specified content
+        models = ET.SubElement(root, "simSettings")
+        for tag, value in [("name", setting_name),
+                           ("value", the_value),
+                           ("sim", self.sim),
+                           ("device", self.device)]:
+            ET.SubElement(models, tag).text = value
+
+        # Write the modified XML back to the file
+        tree = ET.ElementTree(root)
+        tree.write(self.userconfig_path)
+
+    def erase_models_from_xml(self, the_model, the_value, setting_name):
+        # Load the existing XML file or create a new one if it doesn't exist
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+        elements_to_remove = []
+        for model_elem in root.findall(f'models[sim="{self.sim}"]'
+                                       f'[device="{self.device}"]'
+                                       f'[value="{the_value}"]'
+                                       f'[model="{the_model}"]'
+                                       f'[name="{setting_name}"]'):
+
+            if elem is not None:
+                elements_to_remove.append(model_elem)
+            else:
+                print ("not found")
+
+        # Remove the elements outside the loop
+        for elem in elements_to_remove:
+            root.remove(elem)
+            # Write the modified XML back to the file
+            tree.write(self.userconfig_path)
+            print(f"Removed <models> element with values: sim={self.sim}, device={self.device}, "
+                      f"value={the_value}, model={the_model}, name={setting_name}")
+
+
+    def erase_class_from_xml(self, the_class, the_value, setting_name):
+        # Load the existing XML file or create a new one if it doesn't exist
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+        elements_to_remove = []
+        for class_elem in root.findall(f'.//classSettings[sim="{self.sim}"]'
+                                       f'[device="{self.device}"]'
+                                       f'[value="{the_value}"]'
+                                       f'[type="{the_class}"]'
+                                       f'[name="{setting_name}"]'):
+
+            if class_elem is not None:
+                elements_to_remove.append(class_elem)
+            else:
+                print ("not found")
+
+        # Remove the elements outside the loop
+        for elem in elements_to_remove:
+            root.remove(elem)
+            # Write the modified XML back to the file
+            tree.write(self.userconfig_path)
+            print(f"Removed <classSettings> element with values: sim={self.sim}, device={self.device}, "
+                      f"value={the_value}, type={the_class}, name={setting_name}")
+
+
+    def erase_sim_from_xml(self, the_value, setting_name):
+        # Load the existing XML file or create a new one if it doesn't exist
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+
+        elements_to_remove = []
+        for sim_elem in root.findall(f'.//simSettings[sim="{self.sim}"]'
+                                       f'[device="{self.device}"]'
+                                       f'[value="{the_value}"]'
+                                       f'[name="{setting_name}"]'):
+
+            if sim_elem is not None:
+                elements_to_remove.append(sim_elem)
+            else:
+                print ("not found")
+
+        # Remove the elements outside the loop
+        for elem in elements_to_remove:
+            root.remove(elem)
+            # Write the modified XML back to the file
+            tree.write(self.userconfig_path)
+            print(f"Removed <simSettings> element with values: sim={self.sim}, device={self.device}, value={the_value}, name={setting_name}")
 
     def setup_class_list(self):
         self.drp_class.blockSignals(True)
@@ -311,23 +437,109 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         for row in range(self.table_widget.rowCount()):
             item = self.table_widget.item(row, 0)  # Assuming the column with 'user' is the sixth column
-            if item is not None: print (item.text().lower())
+
             if item is not None and 'user' in item.text().lower():
                 self.table_widget.setRowHidden(row, False)
-                print ("found")
+
             else:
                 self.table_widget.setRowHidden(row, not show_inherited)
 
 
     # Slot function to handle checkbox state changes
     def override_state_changed(self, row, data_dict, state):
-        print(f"Override state changed - Row: {row}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}")
-        # Do something with the changed state and data_dict
-    def do_something(self):
-        box = self.sender()
-        name = box.objectName()
-        row, col = name.split('_')[1], name.split('_')[3]
-        print(f'A checkbox was pressed: row {row}, column {col}')
+        print(f"Override - Row: {row}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+        mysim = self.drp_sim.currentText()
+        myclass = self.drp_class.currentText()
+        mymodel = self.drp_models.currentText()
+
+        if state:
+
+            # add row to userconfig
+            match self.edit_mode:
+                case 'Global':
+                    print(f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.write_sim_to_xml(data_dict['value'],data_dict['name'])
+                    self.sort_elements()
+                    self.drp_sim.setCurrentText('')
+                    self.drp_sim.setCurrentText(mysim)
+                case 'Sim':
+                    print(f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.write_sim_to_xml(data_dict['value'],data_dict['name'])
+                    self.sort_elements()
+                    self.drp_sim.setCurrentText('')
+                    self.drp_sim.setCurrentText(mysim)
+                case 'Class':
+                    print(f"Override - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.write_class_to_xml(myclass,data_dict['value'],data_dict['name'])
+                    self.sort_elements()
+                    self.drp_class.setCurrentText('')
+                    self.drp_class.setCurrentText(myclass)
+                case 'Model':
+                    print(f"Override - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.write_models_to_xml(self.drp_models.currentText(),data_dict['value'],data_dict['name'])
+                    self.sort_elements()
+                    self.drp_models.setCurrentText('')
+                    self.drp_models.setCurrentText(mymodel)
+        # make value editable & reset view
+            self.reload_table()
+
+        else:
+            match self.edit_mode:
+                case 'Global':
+                    print(
+                        f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.erase_sim_from_xml(data_dict['value'], data_dict['name'])
+                    self.drp_sim.setCurrentText('')
+                    self.drp_sim.setCurrentText(mysim)
+                case 'Sim':
+                    print(
+                        f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.erase_sim_from_xml(data_dict['value'], data_dict['name'])
+                    self.drp_sim.setCurrentText('')
+                    self.drp_sim.setCurrentText(mysim)
+                case 'Class':
+                    print(
+                        f"Remove - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.erase_class_from_xml(self.drp_class.currentText(), data_dict['value'], data_dict['name'])
+                    self.drp_class.setCurrentText('')
+                    self.drp_class.setCurrentText(myclass)
+                case 'Model':
+                    print(
+                        f"Remove - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.erase_models_from_xml(self.drp_models.currentText(), data_dict['value'], data_dict['name'])
+                    self.drp_models.setCurrentText('')
+                    self.drp_models.setCurrentText(mymodel)
+                # make value editable & reset view
+            self.reload_table()
+
+    def sort_elements(self):
+        # Parse the XML file
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+
+        # Extract all elements
+        all_elements = root.findall('')
+
+        # Sort the elements based on their tag names
+        sorted_elements = sorted(all_elements, key=lambda x: x.tag)
+
+# warning!  deletes everything
+
+         # Replace existing elements with sorted elements
+        # for elem in root:
+        #     root.remove(elem)
+        #
+        #     # Add sorted elements back to the parent
+        # for elem in sorted_elements:
+        #     root.append(elem)
+###
+
+        # Prettify the XML
+        xml_str = xml.dom.minidom.parseString(ET.tostring(root)).toprettyxml()
+        with open(self.userconfig_path, 'w') as xml_file:
+            xml_file.write(xml_str)
+
+
 
     def update_table_on_model_change(self):
         # Get the selected model from the combo box
@@ -354,10 +566,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.drp_class.setCurrentText('')
             self.drp_class.setCurrentText(old_model_type)
 
-        self.table_widget.clear()
-        self.setup_table()
-        self.populate_table()
-        self.toggle_rows()
+        self.reload_table()
 
     def update_table_on_class_change(self):
         # Get the selected model from the combo box
@@ -369,17 +578,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.model_type = self.drp_class.currentText()
         if self.model_type != '':
 
-            # Replace the following line with your actual XML reading logic
-            self.model_type, self.model_pattern, self.data_list = self.read_single_model()
+            self.reload_table()
+
             print(
                 f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
-            # Update the table with the new data
-
-            self.table_widget.clear()
-            self.setup_table()
-            self.populate_table()
-            self.toggle_rows()
         else:
             print("class cleared")
             self.drp_class.setCurrentText('')
@@ -407,14 +610,15 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.setup_class_list()
         self.setup_model_list()
 
+        self.reload_table()
 
-        # Replace the following line with your actual XML reading logic
+        print(f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
+
+    def reload_table(self):
+
+        # Read all the data
         self.model_type, self.model_pattern, self.data_list = self.read_single_model()
-        print(
-            f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
-
         # Update the table with the new data
-
         self.table_widget.clear()
         self.setup_table()
         self.populate_table()
