@@ -249,7 +249,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                                        f'[model="{the_model}"]'
                                        f'[name="{setting_name}"]'):
 
-            if elem is not None:
+            if model_elem is not None:
                 elements_to_remove.append(model_elem)
             else:
                 print ("not found")
@@ -355,7 +355,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_models.blockSignals(False)
 
     def setup_table(self):
-        self.table_widget.setColumnCount(6)
+        self.table_widget.setColumnCount(7)
         headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name"]
         self.table_widget.setHorizontalHeaderLabels(headers)
         self.table_widget.setColumnWidth(0, 120)
@@ -364,6 +364,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.table_widget.setColumnWidth(3, 100)
         self.table_widget.setColumnWidth(4, 320)  #make 380 later
         self.table_widget.setColumnHidden(5, True)
+        self.table_widget.setColumnHidden(6, True)
 
     def populate_table(self):
         sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
@@ -377,7 +378,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             item = QTableWidgetItem()
             item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
-
+            #item.setStyleSheet("margin-left:50%; margin-right:50%;")
             item.setData(QtCore.Qt.UserRole, row)  # Attach row to the item
             item.setData(QtCore.Qt.CheckStateRole, QtCore.Qt.Unchecked)  # Set initial state
 
@@ -388,9 +389,20 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             info_item = QTableWidgetItem(data_dict['info'])
             replaced_item = QTableWidgetItem("      " + data_dict['replaced'])
             unit_item = QTableWidgetItem(data_dict['unit'])
+            valid_item = QTableWidgetItem(data_dict['validvalues'])
             # store name for use later, not shown
             name_item = QTableWidgetItem(data_dict['name'])
             name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+
+            # Connect the itemChanged signal to your custom function
+            value_item.setData(Qt.UserRole, row)  # Attach row to the item
+            value_item.setData(Qt.UserRole + 1, data_dict['name'])  # Attach name to the item
+            value_item.setData(Qt.UserRole + 2, data_dict['value'])  # Attach original value to the item
+            value_item.setData(Qt.UserRole + 3, data_dict['unit'])  # Attach unit to the item
+            value_item.setData(Qt.UserRole + 4, data_dict['datatype'])  # Attach datatype to the item
+            value_item.setData(Qt.UserRole + 5, data_dict['validvalues'])  # Attach datatype to the item
+
+            self.table_widget.itemChanged.connect(self.handle_item_change)  # Connect to the custom function
 
             #print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
 
@@ -431,6 +443,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setItem(row, 3, value_item)
             self.table_widget.setItem(row, 4, info_item)
             self.table_widget.setItem(row, 5, name_item)
+            self.table_widget.setItem(row, 6, valid_item)
 
     def toggle_rows(self):
         show_inherited = self.cb_show_inherited.isChecked()
@@ -443,6 +456,45 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             else:
                 self.table_widget.setRowHidden(row, not show_inherited)
+
+    def handle_item_change(self, item):
+        name = ''
+        original_value = ''
+        unit = ''
+        datatype = ''
+        new_value = ''
+        row = ''
+        valid = ''
+        if item.column() == 3:  # Assuming column 3 contains the 'value' items
+            row = item.data(Qt.UserRole)
+            name = item.data(Qt.UserRole + 1)
+            original_value = item.data(Qt.UserRole + 2)
+            unit = item.data(Qt.UserRole + 3)
+            datatype = item.data(Qt.UserRole + 4)
+            valid = item.data(Qt.UserRole + 5)
+            new_value = item.text()
+
+            # Perform any other actions you need with the updated value
+        if datatype == 'bool':
+            newbool = not self.strtobool(original_value)
+            new_value = 'true' if newbool else 'false'
+        if new_value != '':
+            print(
+                f"Row {row} - Name: {name}, Original: {original_value}, New: {new_value}, Unit: {unit}, Datatype: {datatype}, valid values: {valid}")
+
+    def strtobool(self,val):
+        """Convert a string representation of truth to true (1) or false (0).
+        True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+        are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+        'val' is anything else.
+        """
+        val = val.lower()
+        if val in ('y', 'yes', 't', 'true', 'on', '1'):
+            return 1
+        elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+            return 0
+        else:
+            raise ValueError("invalid truth value %r" % (val,))
 
 
     # Slot function to handle checkbox state changes
