@@ -25,7 +25,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     edit_mode = '' # holder for current editing mode.
 
 
-    def __init__(self, datasource='Global', defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='collective'):
+    def __init__(self, datasource='Global', defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick'):
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
         self.defaults_path = defaults_path
@@ -229,25 +229,38 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_models.blockSignals(False)
 
     def setup_table(self):
-        self.table_widget.setColumnCount(7)
-        headers = ['Override', 'Grouping', 'Display Name', 'Value', 'Info', "Source", "name"]
+        self.table_widget.setColumnCount(6)
+        headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name"]
         self.table_widget.setHorizontalHeaderLabels(headers)
-        self.table_widget.setColumnWidth(0, 60)
+        self.table_widget.setColumnWidth(0, 120)
         self.table_widget.setColumnWidth(1, 120)
         self.table_widget.setColumnWidth(2, 200)
         self.table_widget.setColumnWidth(3, 100)
-        self.table_widget.setColumnWidth(4, 280)  #make 380 later
-        self.table_widget.setColumnWidth(5, 100)
+        self.table_widget.setColumnWidth(4, 320)  #make 380 later
+        self.table_widget.setColumnHidden(5, True)
 
     def populate_table(self):
         sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
         for row, data_dict in enumerate(sorted_data):
-            override_item = self.create_override_item(data_dict['replaced'])
+            state = self.set_override_state(data_dict['replaced'])
+            checkbox = QCheckBox()
+            # Manually set the initial state
+            checkbox.setChecked(state)
+            checkbox.clicked.connect(
+                lambda state, trow=row, tdata_dict=data_dict: self.override_state_changed(trow, tdata_dict, state))
+
+            item = QTableWidgetItem()
+            item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+
+            item.setData(QtCore.Qt.UserRole, row)  # Attach row to the item
+            item.setData(QtCore.Qt.CheckStateRole, QtCore.Qt.Unchecked)  # Set initial state
+
+
             grouping_item = QTableWidgetItem(data_dict['grouping'])
             displayname_item = QTableWidgetItem(data_dict['displayname'])
-            value_item = self.create_datatype_item(data_dict['datatype'], data_dict['value'], data_dict['unit'], override_item.checkState())
+            value_item = self.create_datatype_item(data_dict['datatype'], data_dict['value'], data_dict['unit'], checkbox.checkState())
             info_item = QTableWidgetItem(data_dict['info'])
-            replaced_item = QTableWidgetItem(data_dict['replaced'])
+            replaced_item = QTableWidgetItem("      " + data_dict['replaced'])
             unit_item = QTableWidgetItem(data_dict['unit'])
             # store name for use later, not shown
             name_item = QTableWidgetItem(data_dict['name'])
@@ -285,27 +298,36 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setRowCount(len(self.data_list))
 
             self.table_widget.insertRow(row)
-            self.table_widget.setItem(row, 0, override_item)
+            self.table_widget.setItem(row, 0, item)
+            self.table_widget.setCellWidget(row, 0, checkbox)
             self.table_widget.setItem(row, 1, grouping_item)
             self.table_widget.setItem(row, 2, displayname_item)
             self.table_widget.setItem(row, 3, value_item)
             self.table_widget.setItem(row, 4, info_item)
-            self.table_widget.setItem(row, 5, replaced_item)
-            self.table_widget.setItem(row, 6, name_item)
-            self.table_widget.setColumnHidden(6,True)
-
-
-
-
+            self.table_widget.setItem(row, 5, name_item)
 
     def toggle_rows(self):
         show_inherited = self.cb_show_inherited.isChecked()
 
         for row in range(self.table_widget.rowCount()):
-            checkbox_item = self.table_widget.item(row, 0)  # Assuming the checkbox is in the first column
-            if checkbox_item is not None and checkbox_item.checkState() != Qt.Checked:
+            item = self.table_widget.item(row, 0)  # Assuming the column with 'user' is the sixth column
+            if item is not None: print (item.text().lower())
+            if item is not None and 'user' in item.text().lower():
+                self.table_widget.setRowHidden(row, False)
+                print ("found")
+            else:
                 self.table_widget.setRowHidden(row, not show_inherited)
 
+
+    # Slot function to handle checkbox state changes
+    def override_state_changed(self, row, data_dict, state):
+        print(f"Override state changed - Row: {row}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}")
+        # Do something with the changed state and data_dict
+    def do_something(self):
+        box = self.sender()
+        name = box.objectName()
+        row, col = name.split('_')[1], name.split('_')[3]
+        print(f'A checkbox was pressed: row {row}, column {col}')
 
     def update_table_on_model_change(self):
         # Get the selected model from the combo box
@@ -401,10 +423,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def create_datatype_item(self, datatype, value, unit, checkstate):
         #print(f"{datatype} {value}")
         if datatype == 'bool':
-            checkbox = QCheckBox()
-            checkbox.setChecked(value.lower() == 'true')
+            toggle = QCheckBox()
+            toggle.setChecked(value.lower() == 'true')
             #checkbox.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")
+            toggle.setStyleSheet("margin-left:50%; margin-right:50%;")
             item = QTableWidgetItem()
             #item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             item.setData(Qt.CheckStateRole, Qt.Checked if value.lower() == 'true' else Qt.Unchecked)
@@ -430,23 +452,18 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)   # no editing if not allowed in this mode
             return item
 
-    def create_override_item(self, override):
-        #print(f"{override}")
-
-        checkbox = QCheckBox()
-        if '(user)' not in override:
-            checkbox.setChecked(False)
+    def set_override_state(self, override_text):
+        state = False
+        if '(user)' not in override_text:
+            state = False
         else:
             match self.edit_mode:
-                case 'Global': checkbox.setChecked(override == 'Global (user)')
-                case 'Sim': checkbox.setChecked(override == 'Sim (user)')
-                case 'Class': checkbox.setChecked(override == 'Class (user)')
-                case 'Model': checkbox.setChecked(override == 'Model (user)')
-
-        checkbox.setStyleSheet("margin-left:50%; margin-right:50%;")    #why no worky
-        item = QTableWidgetItem()
-        item.setData(Qt.CheckStateRole, Qt.Checked if checkbox.checkState() else Qt.Unchecked)
-        return item
+                case 'Global': state = (override_text == 'Global (user)')
+                case 'Sim': state = (override_text == 'Sim (user)')
+                case 'Class': state = (override_text == 'Class (user)')
+                case 'Model': state =(override_text == 'Model (user)')
+            state = True
+        return state
 
     def set_edit_mode(self,mode):
         oldmode = self.edit_mode
@@ -789,7 +806,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if aircraft_name is not None:
             self.model_name = aircraft_name
         print_counts = False
-        print_each_step = True  # for debugging
+        print_each_step = False  # for debugging
 
         # Read models data first
         model_data, def_model_pattern = self.read_models_data(self.defaults_path, self.model_name)
