@@ -947,6 +947,7 @@
 		<Grouping>SpringCenter</Grouping>
 		<displayname>Collective Dampening Gain</displayname>
 		<name>collective_dampening_gain</name>
+		<value></value>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -956,6 +957,7 @@
 		<Grouping>System</Grouping>
 		<displayname>Configurator File</displayname>
 		<name>vpconf</name>
+		<value>-</value>
 		<datatype>text</datatype>
 		<Global>true</Global>
 		<joystick>true</joystick>
