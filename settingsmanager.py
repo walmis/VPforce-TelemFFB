@@ -4,7 +4,7 @@ import os
 import shutil
 from PyQt5 import QtGui, QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
-                             QVBoxLayout, QPushButton)
+                             QVBoxLayout, QPushButton, QFileDialog)
 from PyQt5.QtWidgets import QTableWidget, QTextEdit, QWidget, QSlider
 from datetime import datetime
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -25,8 +25,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     model_pattern = ""  # holder for current matching pattern found in config xmls
     edit_mode = '' # holder for current editing mode.
 
-    value_previous = []
-
     def __init__(self, datasource='Global', defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick'):
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
@@ -34,7 +32,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.userconfig_path = userconfig_path
         self.device = device
         self.sim = datasource
-
+        self.b_browse.clicked.connect(self.choose_directory)
+        self.b_update.clicked.connect(self.update_button)
+        self.slider_float.valueChanged.connect(self.update_textbox)
+        self.cb_enable.stateChanged.connect(self.cb_enable_setvalue)
+        self.drp_valuebox.currentIndexChanged.connect(self.update_dropbox)
+        self.clear_propmgr()
         self.backup_userconfig()
         self.init_ui()
 
@@ -234,8 +237,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
         for sim_elem in root.findall(f'.//simSettings[sim="{self.sim}"]'
-                                       f'[device="{self.device}"]'
-                                       f'[value="{the_value}"]'
+                                       f'[device="{self.device}"]'                                      
                                        f'[name="{setting_name}"]'):
 
             if sim_elem is not None:
@@ -493,21 +495,29 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_models.blockSignals(False)
 
     def setup_table(self):
-        self.table_widget.setColumnCount(7)
+        self.table_widget.setColumnCount(10)
         headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name"]
         self.table_widget.setHorizontalHeaderLabels(headers)
         self.table_widget.setColumnWidth(0, 120)
         self.table_widget.setColumnWidth(1, 120)
-        self.table_widget.setColumnWidth(2, 200)
-        self.table_widget.setColumnWidth(3, 100)
-        self.table_widget.setColumnWidth(4, 320)  #make 380 later
+        self.table_widget.setColumnWidth(2, 215)
+        self.table_widget.setColumnWidth(3, 120)
+        self.table_widget.setColumnHidden(4, True)
         self.table_widget.setColumnHidden(5, True)
         self.table_widget.setColumnHidden(6, True)
+        self.table_widget.setColumnHidden(7, True)
+        self.table_widget.setColumnHidden(8, True)
+        self.table_widget.setColumnHidden(9, True)
 
     def populate_table(self):
         self.table_widget.blockSignals(True)
         sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
+        list_length = len(self.data_list)
         for row, data_dict in enumerate(sorted_data):
+            if self.edit_mode == 'Class' and data_dict['name'] == 'type':
+                self.table_widget.setRowHeight(row, 0)
+                continue
+
             state = self.set_override_state(data_dict['replaced'])
             checkbox = QCheckBox()
             # Manually set the initial state
@@ -529,9 +539,13 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             replaced_item = QTableWidgetItem("      " + data_dict['replaced'])
             unit_item = QTableWidgetItem(data_dict['unit'])
             valid_item = QTableWidgetItem(data_dict['validvalues'])
+            datatype_item = QTableWidgetItem(data_dict['datatype'])
+
             # store name for use later, not shown
             name_item = QTableWidgetItem(data_dict['name'])
             name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            state_item = QTableWidgetItem(str(state))
+
 
             # Connect the itemChanged signal to your custom function
             value_item.setData(Qt.UserRole, row)  # Attach row to the item
@@ -540,9 +554,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             value_item.setData(Qt.UserRole + 3, data_dict['unit'])  # Attach unit to the item
             value_item.setData(Qt.UserRole + 4, data_dict['datatype'])  # Attach datatype to the item
             value_item.setData(Qt.UserRole + 5, data_dict['validvalues'])  # Attach datatype to the item
+            value_item.setData(Qt.UserRole + 6, str(state))  # Attach datatype to the item
 
-
-            self.table_widget.itemChanged.connect(self.handle_item_change)  # Connect to the custom function
 
             #print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
 
@@ -571,9 +584,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemIsEditable)
             info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
             replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemIsEditable)
+            #value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
 
             # Set the row count based on the actual data
-            self.table_widget.setRowCount(len(self.data_list))
+            self.table_widget.setRowCount(list_length)
 
             self.table_widget.insertRow(row)
             self.table_widget.setItem(row, 0, item)
@@ -584,12 +598,29 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setItem(row, 4, info_item)
             self.table_widget.setItem(row, 5, name_item)
             self.table_widget.setItem(row, 6, valid_item)
+            self.table_widget.setItem(row, 7, datatype_item)
+            self.table_widget.setItem(row, 8, unit_item)
+            self.table_widget.setItem(row, 9, state_item)
             #self.connected_rows.add(row)
+
+
+            # row click for property manager
+            #self.table_widget.itemSelectionChanged.connect(self.handle_item_click)
+            self.table_widget.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
+
+            # make unselectable in not checked
+            if not state:
+                for col in range(self.table_widget.columnCount()):
+                    unselitem = self.table_widget.item(row, col)
+                    unselitem.setFlags(unselitem.flags() & ~Qt.ItemIsSelectable)
 
             # if row not in self.connected_rows:
             #     value_item.dataChanged.connect(self.handle_item_change)
             #     self.connected_rows.add(row)
-            self.table_widget.blockSignals(False)
+        # this is for handling clicking the actual value cell... doesnt work so great
+        self.table_widget.itemSelectionChanged.connect(self.handle_item_click)
+        self.table_widget.itemChanged.connect(self.handle_item_change)  # Connect to the custom function
+        self.table_widget.blockSignals(False)
     def toggle_rows(self):
         show_inherited = self.cb_show_inherited.isChecked()
 
@@ -602,8 +633,148 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             else:
                 self.table_widget.setRowHidden(row, not show_inherited)
 
+
+
+    def clear_propmgr(self):
+        self.l_displayname.setText("Select a Row to Edit")
+        self.cb_enable.hide()
+        self.t_info.hide()
+        self.l_validvalues.hide()
+        self.l_value.hide()
+        self.slider_float.hide()
+        self.b_update.hide()
+        self.drp_valuebox.hide()
+        self.tb_value.hide()
+        self.b_browse.hide()
+
+
+
+
+    def handle_item_click(self):
+        selected_items = self.table_widget.selectedItems()
+
+        if selected_items:
+            # Get the row number of the first selected item
+            row = selected_items[0].row()
+            if row is not None:
+
+                print(f"Clicked on Row {row + 1}")
+
+                for col in range(self.table_widget.columnCount()):
+
+                    source_item = self.table_widget.item(row, 0)
+                    source = source_item.text()
+                    displayname_item = self.table_widget.item(row, 2, )
+                    displayname = displayname_item.text()
+                    value_item = self.table_widget.item(row, 3 )
+                    value = value_item.text()
+                    info_item = self.table_widget.item(row, 4 )
+                    info = info_item.text()
+                    name_item = self.table_widget.item(row, 5 )
+                    name = name_item.text()
+                    valid_item = self.table_widget.item(row, 6 )
+                    validvalues = valid_item.text()
+                    datatype_item = self.table_widget.item(row, 7 )
+                    datatype = datatype_item.text()
+                    unit_item = self.table_widget.item(row, 8 )
+                    unit = unit_item.text()
+                    state_item = self.table_widget.item(row, 9 )
+                    state = state_item.text()
+
+                    self.populate_propmgr(name, displayname, value, unit, validvalues, datatype, info, state)
+            else:
+                self.clear_propmgr()
+
+    def populate_propmgr(self, name, displayname, value, unit, validvalues, datatype, info, state):
+        self.clear_propmgr()
+        if state.lower() == 'false':
+            return
+        self.l_displayname.setText(displayname)
+        if info != 'None' and info != '':
+            self.t_info.setText(info)
+            self.t_info.show()
+        self.l_name.setText(name)
+        self.tb_value.setText(value)
+        self.l_name.show()
+        self.b_update.show()
+        match datatype:
+            case 'bool':
+                self.cb_enable.show()
+                if value == '': value = 'false'
+                self.cb_enable.setCheckState(self.strtobool(value))
+                #self.tb_value.show()
+                self.tb_value.setText(value)
+            case 'float':
+                self.slider_float.setMinimum(0)
+                self.slider_float.setMaximum(100)
+                self.l_value.show()
+                self.slider_float.show()
+                self.tb_value.show()
+                if '%' in value:
+                    pctval = int(value.replace('%', ''))
+                else:
+                    pctval = int(float(value) * 100)
+                self.slider_float.setValue(pctval)
+                self.tb_value.setText(str(pctval) + '%')
+
+            case 'negfloat':
+                self.slider_float.setMinimum(-100)
+                self.slider_float.setMaximum(100)
+                self.l_value.show()
+                self.slider_float.show()
+                self.tb_value.show()
+                if '%' in value:
+                    pctval = int(value.replace('%', ''))
+                else:
+                    pctval = int(float(value) * 100)
+                self.slider_float.setValue(pctval)
+                self.tb_value.setText(str(pctval) + '%')
+
+            case 'int' | 'text' | 'anyfloat':
+                self.l_value.show()
+                self.tb_value.show()
+
+            case 'list':
+                self.l_value.show()
+                self.tb_value.show()
+                self.drp_valuebox.show()
+                self.drp_valuebox.blockSignals(True)
+                self.drp_valuebox.clear()
+                valids = validvalues.split(',')
+                self.drp_valuebox.addItems(valids)
+                self.drp_valuebox.blockSignals(False)
+            case 'path':
+                self.b_browse.show()
+                self.l_value.show()
+
+    def cb_enable_setvalue(self):
+        state = self.cb_enable.checkState()
+        strstate = 'false' if state == 0 else 'true'
+        self.tb_value.setText(strstate)
+
+    def update_button(self,):
+        self.write_values(self.l_name.text(),self.tb_value.text())
+
+    def update_textbox(self, value):
+        pct_value = int(value)  # Convert slider value to a float (adjust the division factor as needed)
+        self.tb_value.setText(str(pct_value)+'%')
+
+    def update_dropbox(self):
+        self.tb_value.setText(self.drp_valuebox.currentText())
+
+    def choose_directory(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.ShowDirsOnly | QFileDialog.DontUseNativeDialog
+
+        # Open the directory browser dialog
+        directory = QFileDialog.getExistingDirectory(self, "Choose Directory", options=options)
+
+        if directory:
+            print(f"Selected Directory: {directory}")
+            self.tb_value.setText(directory)
+
     def handle_item_change(self,  item):
-        return
+
         #print (f"{item.column()} : {self.value_previous} ")
         if item.column() == 3:  # Assuming column 3 contains the 'value' items
 
@@ -613,6 +784,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             unit = item.data(Qt.UserRole + 3)
             datatype = item.data(Qt.UserRole + 4)
             valid = item.data(Qt.UserRole + 5)
+            state = item.data(Qt.UserRole + 6)
             new_value = item.text()
 
             if datatype == 'bool':
@@ -620,40 +792,34 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 new_value = 'true' if newbool else 'false'
 
             if original_value == '': original_value = "(blank)"
-            value_new = [row, name, new_value]
 
-            print(f"{item.column()} : prev: {self.value_previous}  new:{value_new} ")
-            if value_new != self.value_previous:
+
+            if new_value != original_value:
                 print(f"{item.column()} : CHANGED ")
-                if new_value != original_value:
-                    mysim = self.drp_sim.currentText()
-                    myclass = self.drp_class.currentText()
-                    mymodel = self.drp_models.currentText()
 
-                    self.value_previous = [row, name, new_value]
+                self.write_values(name, new_value)
 
-                    if datatype == 'bool':
-                        newbool = not self.strtobool(original_value)
-                        new_value = 'true' if newbool else 'false'
-
-                    match self.edit_mode:
-                        case 'Global' | 'Sim':
-                            self.write_sim_value_to_xml(new_value,name)
-                            self.drp_sim.setCurrentText('')
-                            self.drp_sim.setCurrentText(mysim)
-                        case 'Class':
-                            self.write_class_value_to_xml(self.model_type, new_value, name)
-                            self.drp_class.setCurrentText('')
-                            self.drp_class.setCurrentText(myclass)
-                        case 'Model':
-                            self.write_models_value_to_xml(self.model_pattern, new_value, name)
-                            self.drp_models.setCurrentText('')
-                            self.drp_models.setCurrentText(mymodel)
-
-                    self.reload_table()
-
-                    print(
+                print(
                             f"Row {row} - Name: {name}, Original: {original_value}, New: {new_value}, Unit: {unit}, Datatype: {datatype}, valid values: {valid}")
+
+    def write_values(self, name, new_value):
+        mysim = self.drp_sim.currentText()
+        myclass = self.drp_class.currentText()
+        mymodel = self.drp_models.currentText()
+        match self.edit_mode:
+            case 'Global' | 'Sim':
+                self.write_sim_value_to_xml(new_value, name)
+                self.drp_sim.setCurrentText('')
+                self.drp_sim.setCurrentText(mysim)
+            case 'Class':
+                self.write_class_value_to_xml(self.model_type, new_value, name)
+                self.drp_class.setCurrentText('')
+                self.drp_class.setCurrentText(myclass)
+            case 'Model':
+                self.write_models_value_to_xml(self.model_pattern, new_value, name)
+                self.drp_models.setCurrentText('')
+                self.drp_models.setCurrentText(mymodel)
+        self.reload_table()
 
     def strtobool(self,val):
         """Convert a string representation of truth to true (1) or false (0).
@@ -677,7 +843,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         myclass = self.drp_class.currentText()
         mymodel = self.drp_models.currentText()
 
-        self.table_widget.blockSignals(True)
+        #self.table_widget.blockSignals(True)
         if state:
 
             # add row to userconfig
@@ -731,6 +897,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_models.setCurrentText(mymodel)
                 # make value editable & reset view
             self.reload_table()
+            self.clear_propmgr()
             self.table_widget.blockSignals(False)
     def sort_elements(self):
         # Parse the XML file
@@ -844,6 +1011,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.populate_table()
         self.toggle_rows()
         self.table_widget.blockSignals(False)
+
     def create_datatype_item(self, datatype, value, unit, checkstate):
         #print(f"{datatype} {value}")
         if datatype == 'bool':

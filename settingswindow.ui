@@ -6,19 +6,19 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>900</width>
+    <width>800</width>
     <height>641</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>900</width>
+    <width>800</width>
     <height>600</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
-    <width>900</width>
+    <width>800</width>
     <height>3000</height>
    </size>
   </property>
@@ -34,17 +34,17 @@
       </property>
      </widget>
     </item>
-    <item row="20" column="4">
+    <item row="35" column="4">
      <widget class="QPushButton" name="b_createusermodel">
       <property name="text">
        <string>Create Model Setting</string>
       </property>
      </widget>
     </item>
-    <item row="8" column="11">
-     <widget class="QLabel" name="l_device">
+    <item row="8" column="4">
+     <widget class="QLabel" name="label_5">
       <property name="text">
-       <string>unknown</string>
+       <string>Class</string>
       </property>
      </widget>
     </item>
@@ -58,10 +58,16 @@
       </property>
      </widget>
     </item>
-    <item row="8" column="4">
-     <widget class="QLabel" name="label_5">
+    <item row="8" column="11">
+     <widget class="QLabel" name="l_device">
+      <property name="maximumSize">
+       <size>
+        <width>150</width>
+        <height>16777215</height>
+       </size>
+      </property>
       <property name="text">
-       <string>Class</string>
+       <string>unknown</string>
       </property>
      </widget>
     </item>
@@ -114,14 +120,7 @@
       </item>
      </widget>
     </item>
-    <item row="8" column="0">
-     <widget class="QLabel" name="label_4">
-      <property name="text">
-       <string>Simulator</string>
-      </property>
-     </widget>
-    </item>
-    <item row="20" column="5">
+    <item row="35" column="5">
      <widget class="QLabel" name="label">
       <property name="text">
        <string>Current Aircraft:</string>
@@ -131,15 +130,28 @@
       </property>
      </widget>
     </item>
-    <item row="20" column="6">
+    <item row="8" column="0">
+     <widget class="QLabel" name="label_4">
+      <property name="text">
+       <string>Simulator</string>
+      </property>
+     </widget>
+    </item>
+    <item row="35" column="6">
      <widget class="QLineEdit" name="tb_currentmodel">
       <property name="text">
        <string>Wilga 80X</string>
       </property>
      </widget>
     </item>
-    <item row="20" column="11">
+    <item row="35" column="11">
      <widget class="QPushButton" name="b_getcurrentmodel">
+      <property name="maximumSize">
+       <size>
+        <width>200</width>
+        <height>16777215</height>
+       </size>
+      </property>
       <property name="text">
        <string>Get Current Model</string>
       </property>
@@ -147,6 +159,12 @@
     </item>
     <item row="14" column="11">
      <widget class="QLabel" name="l_mode">
+      <property name="maximumSize">
+       <size>
+        <width>150</width>
+        <height>16777215</height>
+       </size>
+      </property>
       <property name="text">
        <string>Model</string>
       </property>
@@ -159,7 +177,174 @@
       </property>
      </widget>
     </item>
-    <item row="18" column="0" colspan="13">
+    <item row="14" column="6">
+     <widget class="QComboBox" name="drp_models">
+      <property name="editable">
+       <bool>false</bool>
+      </property>
+      <item>
+       <property name="text">
+        <string/>
+       </property>
+      </item>
+     </widget>
+    </item>
+    <item row="35" column="0">
+     <widget class="QCheckBox" name="cb_show_inherited">
+      <property name="text">
+       <string>Show Defaults</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="45" column="11">
+     <widget class="QDialogButtonBox" name="buttonBox">
+      <property name="maximumSize">
+       <size>
+        <width>200</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="standardButtons">
+       <set>QDialogButtonBox::Close</set>
+      </property>
+     </widget>
+    </item>
+    <item row="45" column="6">
+     <widget class="QLabel" name="l_manual">
+      <property name="text">
+       <string>&lt;a href=&quot;https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y&quot;&gt;Read TelemFFB manual for settings details&lt;/a&gt;</string>
+      </property>
+      <property name="textFormat">
+       <enum>Qt::RichText</enum>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="openExternalLinks">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="45" column="0">
+     <widget class="QPushButton" name="b_revert">
+      <property name="text">
+       <string>Revert Changes</string>
+      </property>
+     </widget>
+    </item>
+    <item row="14" column="0" colspan="3">
+     <widget class="QComboBox" name="drp_sim">
+      <property name="editable">
+       <bool>false</bool>
+      </property>
+      <item>
+       <property name="text">
+        <string>Global</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>DCS</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>IL2</string>
+       </property>
+      </item>
+      <item>
+       <property name="text">
+        <string>MSFS</string>
+       </property>
+      </item>
+     </widget>
+    </item>
+    <item row="32" column="11">
+     <widget class="QLabel" name="label_7">
+      <property name="text">
+       <string>Source checkbox must be checked</string>
+      </property>
+     </widget>
+    </item>
+    <item row="19" column="11">
+     <widget class="QLabel" name="l_name">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string>TextLabel</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="21" column="11">
+     <widget class="QTextEdit" name="t_info">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="MinimumExpanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>100</height>
+       </size>
+      </property>
+      <property name="acceptDrops">
+       <bool>false</bool>
+      </property>
+      <property name="horizontalScrollBarPolicy">
+       <enum>Qt::ScrollBarAlwaysOff</enum>
+      </property>
+      <property name="sizeAdjustPolicy">
+       <enum>QAbstractScrollArea::AdjustToContents</enum>
+      </property>
+      <property name="undoRedoEnabled">
+       <bool>false</bool>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="17" column="11">
+     <widget class="Line" name="line_3">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+    <item row="20" column="11">
+     <widget class="Line" name="line_2">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+    <item row="34" column="11">
+     <widget class="Line" name="line_4">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+    <item row="27" column="11">
+     <widget class="QPushButton" name="b_browse">
+      <property name="text">
+       <string>Browse...</string>
+      </property>
+     </widget>
+    </item>
+    <item row="28" column="11">
+     <widget class="QComboBox" name="drp_valuebox"/>
+    </item>
+    <item row="16" column="0" rowspan="19" colspan="11">
      <widget class="QTableWidget" name="table_widget">
       <property name="verticalScrollBarPolicy">
        <enum>Qt::ScrollBarAlwaysOn</enum>
@@ -209,82 +394,102 @@
       </column>
      </widget>
     </item>
-    <item row="20" column="0">
-     <widget class="QCheckBox" name="cb_show_inherited">
+    <item row="25" column="11">
+     <widget class="QLabel" name="l_validvalues">
       <property name="text">
-       <string>Show Inherited</string>
-      </property>
-      <property name="checked">
-       <bool>true</bool>
+       <string>TextLabel</string>
       </property>
      </widget>
     </item>
-    <item row="14" column="6">
-     <widget class="QComboBox" name="drp_models">
-      <property name="editable">
-       <bool>false</bool>
+    <item row="18" column="11">
+     <widget class="QLabel" name="l_displayname">
+      <property name="maximumSize">
+       <size>
+        <width>200</width>
+        <height>16777215</height>
+       </size>
       </property>
-      <item>
-       <property name="text">
-        <string/>
-       </property>
-      </item>
-     </widget>
-    </item>
-    <item row="14" column="0" colspan="3">
-     <widget class="QComboBox" name="drp_sim">
-      <property name="editable">
-       <bool>false</bool>
+      <property name="font">
+       <font>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
       </property>
-      <item>
-       <property name="text">
-        <string>Global</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>DCS</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>IL2</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
-        <string>MSFS</string>
-       </property>
-      </item>
-     </widget>
-    </item>
-    <item row="30" column="6">
-     <widget class="QLabel" name="l_manual">
       <property name="text">
-       <string>&lt;a href=&quot;https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y&quot;&gt;Read TelemFFB manual for settings details&lt;/a&gt;</string>
-      </property>
-      <property name="textFormat">
-       <enum>Qt::RichText</enum>
+       <string>Select a Row to Edit</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
       </property>
-      <property name="openExternalLinks">
-       <bool>true</bool>
-      </property>
      </widget>
     </item>
-    <item row="30" column="0">
-     <widget class="QPushButton" name="b_revert">
+    <item row="22" column="11">
+     <widget class="QCheckBox" name="cb_enable">
       <property name="text">
-       <string>Revert Changes</string>
+       <string>Enable</string>
       </property>
      </widget>
     </item>
-    <item row="30" column="11">
-     <widget class="QDialogButtonBox" name="buttonBox">
-      <property name="standardButtons">
-       <set>QDialogButtonBox::Close</set>
+    <item row="31" column="11">
+     <spacer name="verticalSpacer">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>150</width>
+        <height>40</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+    <item row="24" column="11">
+     <widget class="QLineEdit" name="tb_value">
+      <property name="maximumSize">
+       <size>
+        <width>9999</width>
+        <height>16777215</height>
+       </size>
+      </property>
+     </widget>
+    </item>
+    <item row="23" column="11">
+     <widget class="QLabel" name="l_value">
+      <property name="text">
+       <string>Value:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="26" column="11">
+     <widget class="QSlider" name="slider_float">
+      <property name="maximumSize">
+       <size>
+        <width>200</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+    <item row="29" column="11">
+     <widget class="QPushButton" name="b_update">
+      <property name="maximumSize">
+       <size>
+        <width>200</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>Update Value</string>
+      </property>
+     </widget>
+    </item>
+    <item row="33" column="11">
+     <widget class="QLabel" name="label_8">
+      <property name="text">
+       <string>to allow selection and editing</string>
       </property>
      </widget>
     </item>
