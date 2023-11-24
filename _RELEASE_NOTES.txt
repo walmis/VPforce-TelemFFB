@@ -1,4 +1,19 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+
+############################################
+##  November 23th, 2023
+############################################
+# General
+- New integrated updater app!
+ - Upon startup, TelemFFB will check for available updates and, if available, prompt you to download and install.  If you proceed, TelemFFB will quit and the updater app will launch and allow you to install the update with the push of a button
+    - You may optionally restart TelemFFB automatically when the update is complete
+ - If you canceled the update, you can also update from the Utilities menu, or you will be prompted again the next time TelemFFB starts
+ - If you find the popup annoying and *dont* want to update, you may disable the auto update prompt in your user config file by setting `ignore_auto_updates=True`
+    - If you have disabled the update notifications, you may still update via the Utilities Menu
+ - **Caution** - The update process will ***overwrite*** config.ini!  If you are not yet making use of a user config file, now would be a good time to start.
+
+
+
 ############################################
 ##  November 17th, 2023
 ############################################
