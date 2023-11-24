@@ -17,6 +17,7 @@
 
 import atexit
 import glob
+import shutil
 
 from traceback_with_variables import print_exc, prints_exc
 
@@ -132,7 +133,10 @@ version = utils.get_version()
 min_firmware_version = 'v1.0.15'
 global dev_firmware_version
 dev_firmware_version = None
-
+_update_available = False
+_latest_version = None
+_latest_url = None
+_current_version = version
 class LoggingFilter(logging.Filter):
     def __init__(self, keywords):
         self.keywords = keywords
@@ -592,7 +596,8 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(f"TelemFFB ({args.type}) ({version})")
         else:
             self.setWindowTitle(f"TelemFFB")
-
+        global _update_available
+        global _latest_version, _latest_url
         self.resize(400, 700)
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -620,6 +625,14 @@ class MainWindow(QMainWindow):
         reset_action = QAction('Reset All Effects', self)
         reset_action.triggered.connect(self.reset_all_effects)
         utilities_menu.addAction(reset_action)
+
+        update_action = QAction('Update TelemFFB', self)
+        update_action.triggered.connect(self.update_from_menu)
+        utilities_menu.addAction(update_action)
+        if utils.fetch_latest_version():
+            update_action.setDisabled(False)
+        else:
+            update_action.setDisabled(True)
 
         # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
 
@@ -814,6 +827,11 @@ class MainWindow(QMainWindow):
         elif status == None:
             status_text = "UNKNOWN"
         else:
+            # print(_update_available)
+            _update_available = True
+            _latest_version, _latest_url = status
+            logging.info(f"<<<<Update available - new version={_latest_version}>>>>")
+
             status_text = f"New version <a href='{status[1]}'><b>{status[0]}</b></a> is available!"
         if status:
             self.version_label.setToolTip(status[1])
@@ -880,6 +898,10 @@ class MainWindow(QMainWindow):
         # Perform any cleanup or save operations here
         QCoreApplication.instance().quit()
 
+    def update_from_menu(self):
+        if perform_update(auto=False):
+            QCoreApplication.instance().quit()
+
     def update_telemetry(self, data: dict):
         try:
             items = ""
@@ -906,7 +928,49 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             traceback.print_exc()
+def perform_update(auto=True):
+    config = get_config()
+    ignore_auto_updates = utils.sanitize_dict(config["system"]).get("ignore_auto_updates", 0)
+    if not auto:
+        ignore_auto_updates = False
+    update_ans = QMessageBox.No
+    proceed_ans = QMessageBox.Cancel
+    is_exe = getattr(sys, 'frozen', False) #TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
+    # is_exe = True
+    if is_exe and _update_available and not ignore_auto_updates:
+        # vers, url = utils.fetch_latest_version()
+        update_ans = QMessageBox.Yes
+        if auto:
+            update_ans = QMessageBox.information(None, "Update Available!!",
+                                                 f"A new version of TelemFFB is available ({_latest_version}).\n\nWould you like to automatically download and install it now?\n\nYou may also update later from the Utilities menu, or the\nnext time TelemFFB starts.\n\n~~ Note ~~ If you no longer wish to see this message on startup,\nyou may enable `ignore_auto_updates` in your user config.\n\nYou will still be able to update via the Utilities menu",
+                                                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
+        if update_ans == QMessageBox.Yes:
+            proceed_ans = QMessageBox.information(None, "TelemFFB Updater",
+                                                  f"TelemFFB will now exit and launch the updater.\n\nOnce the update is complete, TelemFFB will restart.\n\n~~ Please Note~~~  The primary `config.ini` file will be overwritten.  If you\nhave made changes to `config.ini`, please back up the file or move the modifications to a user config file before upgrading.\n\nPress OK to continue",
+                                                  QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
+
+        if proceed_ans == QMessageBox.Ok:
+
+            global _current_version
+            updater_source_path = os.path.join(os.path.dirname(__file__), 'updater', 'updater.exe')
+            updater_execution_path = os.path.join(os.path.dirname(__file__), 'updater.exe')
+
+            # Copy the updater executable with forced overwrite
+            shutil.copy2(updater_source_path, updater_execution_path)
+            active_args, unknown_args = parser.parse_known_args()
+            args_list = [f'--{k}={v}' for k, v in vars(active_args).items() if v is not None and v != parser.get_default(k)]
+            call = [updater_execution_path, "--current_version", _current_version] + args_list
+            subprocess.Popen(call, cwd=os.path.dirname(__file__))
+            return True
+    else:
+        try:
+            updater_execution_path = os.path.join(os.path.dirname(__file__), 'updater.exe')
+            if os.path.exists(updater_execution_path):
+                os.remove(updater_execution_path)
+        except Exception as e:
+            print(e)
+    return False
 def main():
     app = QApplication(sys.argv)
     global d
@@ -995,8 +1059,8 @@ def main():
     except:
         logging.exception("Error loading MSFS enable flag from config file")
 
-    app.exec_()
-
+    if not perform_update():
+        app.exec_()
     dcs.quit()
     il2.quit()
     sim_connect.quit()
