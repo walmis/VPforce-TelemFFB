@@ -20,10 +20,13 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     crafttype = ""                       # suggested, send whatever simconnect finds
 
     data_list = []
+    prereq_list = []
 
     model_type = ""     # holder for current type/class
     model_pattern = ""  # holder for current matching pattern found in config xmls
     edit_mode = '' # holder for current editing mode.
+
+    allow_in_table_editing = False
 
     def __init__(self, datasource='Global', defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick'):
         super(SettingsWindow, self).__init__()
@@ -37,6 +40,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.slider_float.valueChanged.connect(self.update_textbox)
         self.cb_enable.stateChanged.connect(self.cb_enable_setvalue)
         self.drp_valuebox.currentIndexChanged.connect(self.update_dropbox)
+        self.buttonBox.rejected.connect(self.hide)
         self.clear_propmgr()
         self.backup_userconfig()
         self.init_ui()
@@ -163,6 +167,1183 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             # Handle canceled
             pass
+
+
+    def setup_class_list(self):
+        self.drp_class.blockSignals(True)
+        print_debug = False
+
+        match self.sim:
+            case 'Global':
+                # Assuming drp_class is your QComboBox
+                for disable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                    if print_debug: print (f"disable {disable}")
+                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
+
+            case 'DCS':
+                for disable in { 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter'}:
+                    if print_debug: print(f"disable {disable}")
+                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
+                for enable in {'PropellerAircraft', 'JetAircraft', 'Helicopter'}:
+                    if print_debug: print(f"enable {enable}")
+                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
+
+            case 'IL2':
+                for disable in {'TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                    if print_debug: print(f"disable {disable}")
+                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
+                for enable in {'PropellerAircraft', 'JetAircraft'}:
+                    if print_debug: print(f"enable {enable}")
+                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
+
+            case 'MSFS':
+                for enable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                    if print_debug: print(f"enable {enable}")
+                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
+
+        #self.drp_class.addItems(classes)
+        self.drp_class.blockSignals(False)
+
+    def setup_model_list(self):
+        models = self.read_models(self.sim)
+        self.drp_models.blockSignals(True)
+        self.drp_models.clear()
+        self.drp_models.addItems(models)
+        self.drp_models.setCurrentText(self.model_pattern)
+        self.drp_models.blockSignals(False)
+
+    def setup_table(self):
+        self.table_widget.setColumnCount(10)
+        headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name"]
+        self.table_widget.setHorizontalHeaderLabels(headers)
+        self.table_widget.setColumnWidth(0, 120)
+        self.table_widget.setColumnWidth(1, 120)
+        self.table_widget.setColumnWidth(2, 215)
+        self.table_widget.setColumnWidth(3, 120)
+        self.table_widget.setColumnHidden(4, True)
+        self.table_widget.setColumnHidden(5, True)
+        self.table_widget.setColumnHidden(6, True)
+        self.table_widget.setColumnHidden(7, True)
+        self.table_widget.setColumnHidden(8, True)
+        self.table_widget.setColumnHidden(9, True)
+
+    def populate_table(self):
+        self.table_widget.blockSignals(True)
+        sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
+        list_length = len(self.data_list)
+
+        for row, data_dict in enumerate(sorted_data):
+            #
+            # hide 'type' setting in class mode
+            #
+            if self.edit_mode == 'Class' and data_dict['name'] == 'type':
+                self.table_widget.setRowHeight(row, 0)
+                continue
+
+
+            # hide prereqs not satisfied
+            #
+            found_prereq = False
+            if data_dict['prereq'] != '':
+                for pr in self.prereq_list:
+                    if pr['prereq']==data_dict['prereq']:
+                        if pr['value'].lower() == 'false':
+                            print(f"name: {data_dict['displayname']} data: {data_dict['prereq']}  pr:{pr['prereq']}  value:{pr['value']}")
+                            self.table_widget.setRowHeight(row, 0)
+                            found_prereq = True
+                            break
+                if found_prereq: continue
+
+
+            state = self.set_override_state(data_dict['replaced'])
+            checkbox = QCheckBox()
+            # Manually set the initial state
+            checkbox.setChecked(state)
+
+
+            checkbox.clicked.connect(
+                lambda state, trow=row, tdata_dict=data_dict: self.override_state_changed(trow, tdata_dict, state))
+
+            item = QTableWidgetItem()
+            item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+            #item.setStyleSheet("margin-left:50%; margin-right:50%;")
+            item.setData(QtCore.Qt.UserRole, row)  # Attach row to the item
+            item.setData(QtCore.Qt.CheckStateRole, QtCore.Qt.Unchecked)  # Set initial state
+
+
+            grouping_item = QTableWidgetItem(data_dict['grouping'])
+            displayname_item = QTableWidgetItem(data_dict['displayname'])
+            value_item = self.create_datatype_item(data_dict['datatype'], data_dict['value'], data_dict['unit'], checkbox.checkState())
+            info_item = QTableWidgetItem(data_dict['info'])
+            replaced_item = QTableWidgetItem("      " + data_dict['replaced'])
+            unit_item = QTableWidgetItem(data_dict['unit'])
+            valid_item = QTableWidgetItem(data_dict['validvalues'])
+            datatype_item = QTableWidgetItem(data_dict['datatype'])
+
+            # store name for use later, not shown
+            name_item = QTableWidgetItem(data_dict['name'])
+            name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            state_item = QTableWidgetItem(str(state))
+
+
+            # Connect the itemChanged signal to your custom function
+            value_item.setData(Qt.UserRole, row)  # Attach row to the item
+            value_item.setData(Qt.UserRole + 1, data_dict['name'])  # Attach name to the item
+            value_item.setData(Qt.UserRole + 2, data_dict['value'])  # Attach original value to the item
+            value_item.setData(Qt.UserRole + 3, data_dict['unit'])  # Attach unit to the item
+            value_item.setData(Qt.UserRole + 4, data_dict['datatype'])  # Attach datatype to the item
+            value_item.setData(Qt.UserRole + 5, data_dict['validvalues'])  # Attach datatype to the item
+            value_item.setData(Qt.UserRole + 6, str(state))  # Attach datatype to the item
+
+
+            #print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
+
+            # Check if replaced is an empty string and set text color accordingly
+            for item in [grouping_item, displayname_item, value_item, info_item, replaced_item]:
+                match data_dict['replaced']:
+                    case 'Global':
+                        item.setForeground(QtGui.QColor('gray'))
+                    case 'Global (user)':
+                        item.setForeground(QtGui.QColor('black'))
+                    case 'Sim Default':
+                        item.setForeground(QtGui.QColor('darkblue'))
+                    case 'Sim (user)':
+                        item.setForeground(QtGui.QColor('blue'))
+                    case 'Class Default':
+                        item.setForeground(QtGui.QColor('darkGreen'))
+                    case 'Class (user)':
+                        item.setForeground(QtGui.QColor('green'))
+                    case 'Model Default':
+                        item.setForeground(QtGui.QColor('darkMagenta'))
+                    case 'Model (user)':
+                        item.setForeground(QtGui.QColor('magenta'))
+
+            # Make specific columns read-only
+            grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemIsEditable)
+            displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemIsEditable)
+            info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
+            replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemIsEditable)
+
+            #
+            # disable in-table value editing here
+            # if not self.allow_in_table_editing:
+            #     value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
+
+            # Set the row count based on the actual data
+            self.table_widget.setRowCount(list_length)
+
+            self.table_widget.insertRow(row)
+            self.table_widget.setItem(row, 0, item)
+            self.table_widget.setCellWidget(row, 0, checkbox)
+            self.table_widget.setItem(row, 1, grouping_item)
+            self.table_widget.setItem(row, 2, displayname_item)
+            self.table_widget.setItem(row, 3, value_item)
+            self.table_widget.setItem(row, 4, info_item)
+            self.table_widget.setItem(row, 5, name_item)
+            self.table_widget.setItem(row, 6, valid_item)
+            self.table_widget.setItem(row, 7, datatype_item)
+            self.table_widget.setItem(row, 8, unit_item)
+            self.table_widget.setItem(row, 9, state_item)
+            #self.connected_rows.add(row)
+
+
+            # row click for property manager
+            #self.table_widget.itemSelectionChanged.connect(self.handle_item_click)
+            self.table_widget.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
+
+            # make unselectable in not checked
+            if not state:
+                for col in range(self.table_widget.columnCount()):
+                    unselitem = self.table_widget.item(row, col)
+                    unselitem.setFlags(unselitem.flags() & ~Qt.ItemIsSelectable)
+
+            # if row not in self.connected_rows:
+            #     value_item.dataChanged.connect(self.handle_item_change)
+            #     self.connected_rows.add(row)
+
+        # this is for handling clicking the actual value cell..
+        self.table_widget.itemSelectionChanged.connect(self.handle_item_click)
+
+        # disable in-table value editing here
+        if not self.allow_in_table_editing:
+            self.table_widget.itemChanged.connect(self.handle_item_change)  # Connect to the custom function
+
+        self.table_widget.blockSignals(False)
+    def toggle_rows(self):
+        show_inherited = self.cb_show_inherited.isChecked()
+
+        for row in range(self.table_widget.rowCount()):
+            item = self.table_widget.item(row, 0)  # Assuming the column with 'user' is the sixth column
+
+            if item is not None and 'user' in item.text() and self.edit_mode in item.text():
+                self.table_widget.setRowHidden(row, False)
+
+            else:
+                self.table_widget.setRowHidden(row, not show_inherited)
+
+
+
+    def clear_propmgr(self):
+        self.l_displayname.setText("Select a Row to Edit")
+        self.cb_enable.hide()
+        self.t_info.hide()
+        self.l_validvalues.hide()
+        self.l_value.hide()
+        self.slider_float.hide()
+        self.b_update.hide()
+        self.drp_valuebox.hide()
+        self.tb_value.hide()
+        self.b_browse.hide()
+
+
+
+
+    def handle_item_click(self):
+        selected_items = self.table_widget.selectedItems()
+
+        if selected_items:
+            # Get the row number of the first selected item
+            row = selected_items[0].row()
+            if row is not None:
+
+                print(f"Clicked on Row {row + 1}")
+
+                for col in range(self.table_widget.columnCount()):
+
+                    source_item = self.table_widget.item(row, 0)
+                    source = source_item.text()
+                    displayname_item = self.table_widget.item(row, 2, )
+                    displayname = displayname_item.text()
+                    value_item = self.table_widget.item(row, 3 )
+                    value = value_item.text()
+                    info_item = self.table_widget.item(row, 4 )
+                    info = info_item.text()
+                    name_item = self.table_widget.item(row, 5 )
+                    name = name_item.text()
+                    valid_item = self.table_widget.item(row, 6 )
+                    validvalues = valid_item.text()
+                    datatype_item = self.table_widget.item(row, 7 )
+                    datatype = datatype_item.text()
+                    unit_item = self.table_widget.item(row, 8 )
+                    unit = unit_item.text()
+                    state_item = self.table_widget.item(row, 9 )
+                    state = state_item.text()
+
+                    self.populate_propmgr(name, displayname, value, unit, validvalues, datatype, info, state)
+            else:
+                self.clear_propmgr()
+
+    def populate_propmgr(self, name, displayname, value, unit, validvalues, datatype, info, state):
+        self.clear_propmgr()
+        if state.lower() == 'false':
+            return
+        self.l_displayname.setText(displayname)
+        if info != 'None' and info != '':
+            self.t_info.setText(info)
+            self.t_info.show()
+        self.l_name.setText(name)
+        self.tb_value.setText(value)
+        self.l_name.show()
+        self.b_update.show()
+        match datatype:
+            case 'bool':
+                self.cb_enable.show()
+                if value == '': value = 'false'
+                self.cb_enable.setCheckState(self.strtobool(value))
+                #self.tb_value.show()
+                self.tb_value.setText(value)
+            case 'float':
+                self.slider_float.setMinimum(0)
+                self.slider_float.setMaximum(100)
+                self.l_value.show()
+                self.slider_float.show()
+                self.tb_value.show()
+                if '%' in value:
+                    pctval = int(value.replace('%', ''))
+                else:
+                    pctval = int(float(value) * 100)
+                self.slider_float.setValue(pctval)
+                self.tb_value.setText(str(pctval) + '%')
+
+            case 'negfloat':
+                self.slider_float.setMinimum(-100)
+                self.slider_float.setMaximum(100)
+                self.l_value.show()
+                self.slider_float.show()
+                self.tb_value.show()
+                if '%' in value:
+                    pctval = int(value.replace('%', ''))
+                else:
+                    pctval = int(float(value) * 100)
+                self.slider_float.setValue(pctval)
+                self.tb_value.setText(str(pctval) + '%')
+
+            case 'int' | 'text' | 'anyfloat':
+                self.l_value.show()
+                self.tb_value.show()
+
+            case 'list':
+                self.l_value.show()
+                self.tb_value.show()
+                self.drp_valuebox.show()
+                self.drp_valuebox.blockSignals(True)
+                self.drp_valuebox.clear()
+                valids = validvalues.split(',')
+                self.drp_valuebox.addItems(valids)
+                self.drp_valuebox.blockSignals(False)
+            case 'path':
+                self.b_browse.show()
+                self.l_value.show()
+
+    def cb_enable_setvalue(self):
+        state = self.cb_enable.checkState()
+        strstate = 'false' if state == 0 else 'true'
+        self.tb_value.setText(strstate)
+
+    def update_button(self,):
+        self.write_values(self.l_name.text(),self.tb_value.text())
+
+    def update_textbox(self, value):
+        pct_value = int(value)  # Convert slider value to a float (adjust the division factor as needed)
+        self.tb_value.setText(str(pct_value)+'%')
+
+    def update_dropbox(self):
+        self.tb_value.setText(self.drp_valuebox.currentText())
+
+    def choose_directory(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.ShowDirsOnly | QFileDialog.DontUseNativeDialog
+
+        # Open the directory browser dialog
+        directory = QFileDialog.getExistingDirectory(self, "Choose Directory", options=options)
+
+        if directory:
+            print(f"Selected Directory: {directory}")
+            self.tb_value.setText(directory)
+
+    def handle_item_change(self,  item):
+
+        #print (f"{item.column()} : {self.value_previous} ")
+        if item.column() == 3:  # Assuming column 3 contains the 'value' items
+
+            row = item.data(Qt.UserRole)
+            name = item.data(Qt.UserRole + 1)
+            original_value = item.data(Qt.UserRole + 2)
+            unit = item.data(Qt.UserRole + 3)
+            datatype = item.data(Qt.UserRole + 4)
+            valid = item.data(Qt.UserRole + 5)
+            state = item.data(Qt.UserRole + 6)
+            new_value = item.text()
+
+            if datatype == 'bool':
+                newbool = not self.strtobool(original_value)
+                new_value = 'true' if newbool else 'false'
+
+            if original_value == '': original_value = "(blank)"
+
+
+            if new_value != original_value:
+                print(f"{item.column()} : CHANGED ")
+
+                self.write_values(name, new_value)
+
+                print(
+                            f"Row {row} - Name: {name}, Original: {original_value}, New: {new_value}, Unit: {unit}, Datatype: {datatype}, valid values: {valid}")
+
+    def write_values(self, name, new_value):
+        mysim = self.drp_sim.currentText()
+        myclass = self.drp_class.currentText()
+        mymodel = self.drp_models.currentText()
+        match self.edit_mode:
+            case 'Global' | 'Sim':
+                self.write_sim_value_to_xml(new_value, name)
+                self.drp_sim.setCurrentText('')
+                self.drp_sim.setCurrentText(mysim)
+            case 'Class':
+                self.write_class_value_to_xml(self.model_type, new_value, name)
+                self.drp_class.setCurrentText('')
+                self.drp_class.setCurrentText(myclass)
+            case 'Model':
+                self.write_models_value_to_xml(self.model_pattern, new_value, name)
+                self.drp_models.setCurrentText('')
+                self.drp_models.setCurrentText(mymodel)
+        self.reload_table()
+
+    def strtobool(self,val):
+        """Convert a string representation of truth to true (1) or false (0).
+        True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+        are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+        'val' is anything else.
+        """
+        val = val.lower()
+        if val in ('y', 'yes', 't', 'true', 'on', '1'):
+            return 1
+        elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+            return 0
+        else:
+            raise ValueError("invalid truth value %r" % (val,))
+
+
+    # Slot function to handle checkbox state changes
+    # blows up 0x0000005 after 3 clicks
+
+    def override_state_changed(self, row, data_dict, state):
+        print(f"Override - Row: {row}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+        mysim = self.drp_sim.currentText()
+        myclass = self.drp_class.currentText()
+        mymodel = self.drp_models.currentText()
+
+        self.table_widget.blockSignals(True)
+        if state:
+
+            # add row to userconfig
+            match self.edit_mode:
+                case 'Global' | 'Sim':
+                    print(f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.write_sim_to_xml(data_dict['value'],data_dict['name'])
+                    self.sort_elements()
+                    self.drp_sim.setCurrentText('')
+                    self.drp_sim.setCurrentText(mysim)
+                case 'Class':
+                    print(f"Override - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.write_class_to_xml(myclass,data_dict['value'],data_dict['name'])
+                    self.sort_elements()
+                    self.drp_class.setCurrentText('')
+                    self.drp_class.setCurrentText(myclass)
+                case 'Model':
+                    print(f"Override - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.write_models_to_xml(self.drp_models.currentText(),data_dict['value'],data_dict['name'])
+                    self.sort_elements()
+                    self.drp_models.setCurrentText('')
+                    self.drp_models.setCurrentText(mymodel)
+        # make value editable & reset view
+            self.reload_table()
+
+        else:
+            match self.edit_mode:
+                case 'Global':
+                    print(
+                        f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.erase_sim_from_xml(data_dict['value'], data_dict['name'])
+                    self.drp_sim.setCurrentText('')
+                    self.drp_sim.setCurrentText(mysim)
+                case 'Sim':
+                    print(
+                        f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.erase_sim_from_xml(data_dict['value'], data_dict['name'])
+                    self.drp_sim.setCurrentText('')
+                    self.drp_sim.setCurrentText(mysim)
+                case 'Class':
+                    print(
+                        f"Remove - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.erase_class_from_xml(self.drp_class.currentText(), data_dict['value'], data_dict['name'])
+                    self.drp_class.setCurrentText('')
+                    self.drp_class.setCurrentText(myclass)
+                case 'Model':
+                    print(
+                        f"Remove - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    self.erase_models_from_xml(self.drp_models.currentText(), data_dict['value'], data_dict['name'])
+                    self.drp_models.setCurrentText('')
+                    self.drp_models.setCurrentText(mymodel)
+                # make value editable & reset view
+            self.reload_table()
+            self.clear_propmgr()
+            self.table_widget.blockSignals(False)
+
+    def sort_elements(self):
+        # Parse the XML file
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+
+        # Extract all elements
+        all_elements = root.findall('')
+
+        # Sort the elements based on their tag names
+        sorted_elements = sorted(all_elements, key=lambda x: x.tag)
+
+# warning!  deletes everything
+
+         # Replace existing elements with sorted elements
+        # for elem in root:
+        #     root.remove(elem)
+        #
+        #     # Add sorted elements back to the parent
+        # for elem in sorted_elements:
+        #     root.append(elem)
+###
+
+        # Prettify the XML
+        xml_str = xml.dom.minidom.parseString(ET.tostring(root)).toprettyxml()
+        with open(self.userconfig_path, 'w') as xml_file:
+            xml_file.write(xml_str)
+
+
+
+    def update_table_on_model_change(self):
+        # Get the selected model from the combo box
+        self.set_edit_mode('Model')
+
+        self.model_name = self.drp_models.currentText()
+
+        if self.model_name != '':
+
+            # Replace the following line with your actual XML reading logic
+            self.model_type, self.model_pattern, self.data_list = self.read_single_model()
+            print(f"\nmodel change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
+
+            # Update the table with the new data
+            self.drp_class.blockSignals(True)
+            self.drp_class.setCurrentText(self.model_type)
+            self.drp_class.blockSignals(False)
+
+        else:
+            print("model cleared")
+            self.set_edit_mode('Class')
+            old_model_type = self.model_type
+            print(self.model_type)
+            self.drp_class.setCurrentText('')
+            self.drp_class.setCurrentText(old_model_type)
+
+        self.reload_table()
+
+    def update_table_on_class_change(self):
+        # Get the selected model from the combo box
+        self.drp_models.blockSignals(True)
+        self.drp_models.setCurrentText('')
+        self.model_name = ''
+        self.drp_models.blockSignals(False)
+        self.set_edit_mode('Class')
+        self.model_type = self.drp_class.currentText()
+        if self.model_type != '':
+
+            self.reload_table()
+
+            print(
+                f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
+
+        else:
+            print("class cleared")
+            self.drp_class.setCurrentText('')
+            self.set_edit_mode('Sim')
+            old_sim = self.sim
+            print(self.model_type)
+            self.drp_sim.setCurrentText('Global')
+            self.drp_sim.setCurrentText(old_sim)
+
+        self.table_widget.clear()
+        self.setup_table()
+        self.populate_table()
+        self.toggle_rows()
+
+    def update_table_on_sim_change(self):
+        # Get the selected sim from the radio buttons
+
+        self.sim = self.drp_sim.currentText()
+
+        if self.sim == 'Global':
+            self.set_edit_mode('Global')
+        else:
+            self.set_edit_mode('Sim')
+
+        self.setup_class_list()
+        self.setup_model_list()
+
+        self.reload_table()
+
+        print(f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
+
+    def reload_table(self):
+        self.table_widget.blockSignals(True)
+        # Read all the data
+        self.model_type, self.model_pattern, self.data_list = self.read_single_model()
+        # Update the table with the new data
+        self.table_widget.clear()
+        self.setup_table()
+        self.populate_table()
+        self.toggle_rows()
+        self.table_widget.blockSignals(False)
+
+    def create_datatype_item(self, datatype, value, unit, checkstate):
+        #print(f"{datatype} {value}")
+        if datatype == 'bool':
+            toggle = QCheckBox()
+            toggle.setChecked(value.lower() == 'true')
+            #checkbox.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            toggle.setStyleSheet("margin-left:50%; margin-right:50%;")
+            item = QTableWidgetItem()
+            #item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            item.setData(Qt.CheckStateRole, Qt.Checked if value.lower() == 'true' else Qt.Unchecked)
+            if not checkstate:
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)   # no editing if not allowed in this mode
+            # disable in-table value editing here
+            if not self.allow_in_table_editing:
+                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)  #
+            return item
+        elif datatype == 'int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat':
+            line_edit = QLineEdit(str(value) + str(unit))
+            item = QTableWidgetItem(line_edit.text())  # Set the widget
+            if not checkstate:
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)   # no editing if not allowed in this mode
+            return item
+        # making float numeric for now...
+        # elif datatype == 'float':
+        #     slider = QSlider(Qt.Horizontal)
+        #     slider.setValue(int(float(value) * 100))  # Assuming float values between 0 and 1
+        #     item = QTableWidgetItem()
+        #     item.setData(Qt.DisplayRole, slider)
+        #     return item
+        else:
+            item = QTableWidgetItem(value)
+            if not checkstate:
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)   # no editing if not allowed in this mode
+            return item
+
+    def set_override_state(self, override_text):
+        state = False
+        if '(user)' not in override_text:
+            state = False
+        else:
+            match self.edit_mode:
+                case 'Global':
+                    state = (override_text == 'Global (user)')
+                case 'Sim':
+                    state = (override_text == 'Sim (user)')
+                case 'Class':
+                    state = (override_text == 'Class (user)')
+                case 'Model':
+                    state =(override_text == 'Model (user)')
+        return state
+
+    def set_edit_mode(self,mode):
+        oldmode = self.edit_mode
+
+        if mode != oldmode:
+            self.l_mode.setText(mode)
+            self.edit_mode = mode
+            self.setup_class_list()
+            match mode:
+                case 'Global':
+
+                    self.drp_class.blockSignals(True)
+                    self.drp_models.blockSignals(True)
+                    self.drp_class.setCurrentText('')
+                    self.drp_models.setCurrentText('')
+                    self.model_name = ''
+                    self.model_type = ''
+                    self.drp_class.blockSignals(False)
+                    self.drp_models.blockSignals(False)
+                    self.drp_class.setEnabled(False)
+                    self.drp_models.setEnabled(False)
+                    self.b_createusermodel.setEnabled(False)
+                case 'Sim':
+                    self.drp_class.setEnabled(True)
+                    self.drp_models.setEnabled(True)
+                    self.drp_class.blockSignals(True)
+                    self.drp_models.blockSignals(True)
+                    self.drp_class.setCurrentText('')
+                    self.drp_models.setCurrentText('')
+                    self.model_name = ''
+                    self.model_type = ''
+                    self.drp_class.blockSignals(False)
+                    self.drp_models.blockSignals(False)
+                    self.b_createusermodel.setEnabled(True)
+
+                case 'Class':
+                    self.drp_class.setEnabled(True)
+                    self.drp_models.setEnabled(True)
+                    self.drp_models.blockSignals(True)
+                    self.drp_models.setCurrentText('')
+                    self.model_name = ''
+                    self.drp_models.blockSignals(False)
+                    self.b_createusermodel.setEnabled(True)
+
+                case 'Model':
+                    self.drp_class.setEnabled(True)
+                    self.drp_models.setEnabled(True)
+                    self.b_createusermodel.setEnabled(True)
+
+                case _:
+                    self.drp_class.setEnabled(True)
+                    self.drp_models.setEnabled(True)
+
+        print(f"{mode} Mode")
+
+
+    def get_craft_attributes(file_path, sim, device):
+        craft_attributes = set()
+        craft_attributes.add('Aircraft')
+
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+
+        for defaults_elem in root.findall(f'.//defaults[{sim}="true"][{device}="true"]'):
+            # for defaults_elem in root.findall(f'.//defaults[{sim}="true" and {device}="true"]'):
+            for value_elem in defaults_elem.findall('.//value'):
+                craft_attr = value_elem.get('Craft')
+                if craft_attr is not None:
+                    craft_attributes.add(craft_attr)
+
+        return sorted(list(craft_attributes))
+
+#  END GUI STUFF
+
+    def read_xml_file(self, the_sim):
+        tree = ET.parse(self.defaults_path)
+        root = tree.getroot()
+
+        # Collect data in a list of dictionaries
+        data_list = []
+        for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{self.device}="true"]'):
+
+            grouping = defaults_elem.find('Grouping').text
+            name = defaults_elem.find('name').text
+            # print(name)
+            displayname = defaults_elem.find('displayname').text
+            datatype = defaults_elem.find('datatype').text
+            unit_elem = defaults_elem.find('unit')
+            unit = unit_elem.text if unit_elem is not None else ""
+            value_elem = defaults_elem.find('value')
+            value = value_elem.text if value_elem is not None else ""
+            if value is None: value = ""
+            valid_elem = defaults_elem.find('validvalues')
+            validvalues = valid_elem.text if valid_elem is not None else ""
+            info_elem = defaults_elem.find('info')
+            info = (f"{info_elem.text}") if info_elem is not None else ""
+            prereq_elem = defaults_elem.find('prereq')
+            prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
+
+            if the_sim == 'Global':
+                replaced = 'Global'
+            else:
+                replaced = 'Sim Default'
+
+            # Store data in a dictionary
+            data_dict = {
+                'grouping': grouping,
+                'name': name,
+                'displayname': displayname,
+                'value': value,
+                'unit': unit,
+                'datatype': datatype,
+                'validvalues': validvalues,
+                'replaced': replaced,
+                'prereq': prereq,
+                'info': info
+            }
+
+            data_list.append(data_dict)
+
+            # print(data_list)
+        # Sort the data by grouping and then by name
+
+        sorted_data = sorted(data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
+        # print(sorted_data)
+        # printconfig(sim, craft, sorted_data)
+        return sorted_data
+
+    def read_prereqs(self):
+        tree = ET.parse(self.defaults_path)
+        root = tree.getroot()
+
+        # Collect data in a list of dictionaries
+        data_list = []
+        for defaults_elem in root.findall(f'.//defaults'):
+
+            name = defaults_elem.find('name').text
+            prereq_elem = defaults_elem.find('prereq')
+            prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
+
+            # Store data in a dictionary
+            data_dict = {
+                'prereq': prereq,
+                'value': 'False'
+            }
+
+            if data_dict is not None and data_dict['prereq'] != '' and data_dict not in data_list:
+                data_list.append(data_dict)
+
+            # print(data_list)
+
+        # print(sorted_data)
+        # printconfig(sim, craft, sorted_data)
+        return data_list
+
+    def check_prereq_value(self,datalist):
+        for item in datalist:
+            for prereq in self.prereq_list:
+                if prereq['prereq'] == item['name']:
+                    prereq['value'] = item['value']
+
+    def is_prereq_satisfied(self,setting_name):
+        tree = ET.parse(self.defaults_path)
+        root = tree.getroot()
+        result = True
+        # Collect data in a list of dictionaries
+        prereq_list = []
+        for defaults_elem in root.findall(f'.//defaults[sim="{self.sim}"][device="{self.device}"]'):
+
+            prereq_elem = defaults_elem.find('prereq')
+            prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
+            prereq_dict = {'prereq': prereq}
+            # Append to the list
+            prereq_list.append(prereq_dict)
+
+        if prereq_list != []:
+            if setting_name in prereq_dict:
+                print (prereq_dict['name'])
+
+        return result
+
+    def skip_bad_combos(self, craft):
+        if self.sim == 'DCS' and craft == 'HPGHelicopter': return True
+        if self.sim == 'DCS' and craft == 'TurbopropAircraft': return True
+        if self.sim == 'DCS' and craft == 'GliderAircraft': return True
+        if self.sim == 'IL2' and craft == 'GliderAircraft': return True
+        if self.sim == 'IL2' and craft == 'HPGHelicopter': return True
+        if self.sim == 'IL2' and craft == 'Helicopter': return True
+        if self.sim == 'IL2' and craft == 'TurbopropAircraft': return True
+
+        if self.sim == 'Global' and craft != 'Aircraft': return True
+        return False
+
+
+    def printconfig(self, sorted_data):
+        # print("printconfig: " +sorted_data)
+        show_source = False
+        print("#############################################")
+
+        # Print the sorted data with group names and headers
+        current_group = None
+        current_header = None
+        for item in sorted_data:
+            if item['grouping'] != current_group:
+                current_group = item['grouping']
+                if current_header is not None:
+                    print("\n\n")  # Separate sections with a blank line
+                print(f"\n# {current_group}")
+            tabstring = "\t\t"
+            replacestring = ''
+            if show_source:
+                if item['replaced'] == "Global": replacestring = " G"
+                if item['replaced'] == "Global (user)": replacestring = "UG"
+                if item['replaced'] == "Sim Default": replacestring =  "SD"
+                if item['replaced'] == "Sim (user)": replacestring = "UD"
+                if item['replaced'] == "Class Default": replacestring = "SC"
+                if item['replaced'] == "Class (user)": replacestring = "UC"
+                if item['replaced'] == "Model Default": replacestring = "DM"
+                if item['replaced'] == "Model (user)": replacestring = "UM"
+            spacing = 50 - (len(item['name']) + len(item['value']) + len(item['unit']))
+            space = " " * spacing + " # " + replacestring + " # "
+
+            print(f"{tabstring}{item['name']} = {item['value']} {item['unit']} {space} {item['info']}")
+
+
+    def read_models_data(self,file_path, full_model_name):
+        # runs on both defaults and userconfig xml files
+        tree = ET.parse(file_path)
+        root = tree.getroot()
+
+        model_data = []
+        found_pattern = ''
+
+        # Iterate through models elements
+        #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
+                          root.findall(f'.//models[sim="{self.sim}"][device="any"]') + \
+                          root.findall(f'.//models[sim="any"][device="any"]'):
+
+            # Assuming 'model' is the element containing the wildcard pattern
+
+            unit_pattern = model_elem.find('model')
+            if unit_pattern is not None:
+                pattern = unit_pattern.text
+                if pattern is not None:
+                    # Check if the full_model_name matches the pattern using re.match
+                    if re.match(pattern, full_model_name):
+                        name = model_elem.find('name').text
+                        value = model_elem.find('value').text
+                        unit_elem = model_elem.find('unit')
+                        unit = unit_elem.text if unit_elem is not None else ""
+                        model_dict = {
+                            'name': name,
+                            'value': value,
+                            'unit': unit
+                        }
+                        found_pattern = pattern
+                        model_data.append(model_dict)
+
+        return model_data, found_pattern
+
+    def read_default_class_data(self, the_sim, the_class):
+        tree = ET.parse(self.defaults_path)
+        root = tree.getroot()
+
+        class_data = []
+
+        # Iterate through models elements
+        #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]'):
+        #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]') + \
+                          root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="{self.device}"]') + \
+                          root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
+                          root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="any"]'):
+
+            if model_elem.find('name') is not None:
+
+                name = model_elem.find('name').text
+                value = model_elem.find('value').text
+                unit_elem = model_elem.find('unit')
+                unit = unit_elem.text if unit_elem is not None else ""
+
+                model_dict = {
+                    'name': name,
+                    'value': value,
+                    'unit': unit,
+                    'replaced': 'Class Default'
+                }
+
+                class_data.append(model_dict)
+
+        return class_data
+
+    def read_user_model_data(self, the_sim):
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+
+        model_data = []
+
+        # Iterate through models elements
+        #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):     #  + \
+                          # root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
+                          # root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+                          # root.findall(f'.//models[sim="any"][device="any"]'):
+            if model_elem.find('type') is None:
+                if model_elem.find('name') is not None:
+
+                    setting = model_elem.find('name').text
+                    value = model_elem.find('value').text
+
+
+                    model_dict = {
+                        'name': setting,
+                        'value': value,
+                        'unit': '',
+                        'replaced': 'Model (user)'
+                    }
+
+                    model_data.append(model_dict)
+
+        return model_data
+
+    def read_user_sim_data(self, the_sim):
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+
+        sim_data = []
+
+        # Iterate through models elements
+        #for model_elem in root.findall(f'.//simSettings[sim="{the_sim}" or sim="any"][device="{self.device}" or device="any"]'):
+        for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{self.device}"]'):   # + \
+                          # root.findall(f'.//simSettings[sim="any"][device="{self.device}"]') + \
+                          # root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]') + \
+                          # root.findall(f'.//simSettings[sim="any"][device="any"]'):
+
+            if model_elem.find('name') is not None:
+
+                name = model_elem.find('name').text
+                value = model_elem.find('value').text
+                if the_sim == 'Global':
+                    replaced = 'Global'
+                else:
+                    replaced = 'Sim (user)'
+                model_dict = {
+                    'name': name,
+                    'value': value,
+                    'unit': '',
+                    'replaced': replaced
+                }
+
+                sim_data.append(model_dict)
+
+        return sim_data
+
+    def read_user_class_data(self, the_sim, crafttype):
+        tree = ET.parse(self.userconfig_path)
+        root = tree.getroot()
+
+        model_data = []
+
+        # Iterate through models elements
+        #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
+        for model_elem in root.findall(f'.//classSettings[sim="{the_sim}"][device="{self.device}"]'):     # + \
+                          # root.findall(f'.//classSettings[sim="any"][device="{self.device}"]') + \
+                          # root.findall(f'.//classSettings[sim="{the_sim}"][device="any"]') + \
+                          # root.findall(f'.//classSettings[sim="any"][device="any"]'):
+            if model_elem.find('type') is not None:
+                # Assuming 'model' is the element containing the wildcard pattern
+                pattern = model_elem.find('type').text
+
+                if pattern is not None:
+                    # Check if the craft type matches the pattern using re match
+                    if re.match(pattern, crafttype):
+                        name = model_elem.find('name').text
+                        value = model_elem.find('value').text
+                        unit_elem = model_elem.find('unit')
+                        unit = unit_elem.text if unit_elem is not None else ""
+                        model_dict = {
+                            'name': name,
+                            'value': value,
+                            'unit': unit,
+                            'replaced': 'Class (user)'
+                        }
+
+                        model_data.append(model_dict)
+
+        return model_data
+
+    def read_single_model(self, sim=None, aircraft_name=None):
+        if sim is not None:
+            self.sim = sim
+        if aircraft_name is not None:
+            self.model_name = aircraft_name
+        print_counts = False
+        print_each_step = False  # for debugging
+
+        # Read models data first
+        model_data, def_model_pattern = self.read_models_data(self.defaults_path, self.model_name)
+        user_model_data, usr_model_pattern = self.read_models_data(self.userconfig_path, self.model_name)
+
+        model_pattern = def_model_pattern
+        if usr_model_pattern != '':
+            model_pattern = usr_model_pattern
+
+        # Extract the type from models data, if name is blank then use the class.  otherwise assume no type is set.
+        if self.model_name == '':
+            model_class = self.model_type
+        else:
+            model_class = ''   #self.model_type
+
+        for model in model_data:
+            if model['name'] == 'type':
+                model_class = model['value']
+                break
+        # check if theres an override
+        if user_model_data is not None:
+            for model in user_model_data:
+                if model['name'] == 'type':
+                    model_class = model['value']
+                    break
+        print(f"class: {model_class}")
+
+        # get default settings for all sims and device
+        globaldata = self.read_xml_file('Global')
+
+        if print_counts: print(f"globaldata count {len(globaldata)}")
+
+        # see what we got
+        if print_each_step:
+            print(f"\nGlobal result: Global  type: ''  device:{self.device}\n")
+            self.printconfig(globaldata)
+
+
+        # get default Aircraft settings for this sim and device
+        simdata = self.read_xml_file(self.sim)
+
+        if print_counts:  print(f"simdata count {len(simdata)}")
+
+        # see what we got
+        if print_each_step:
+            print(f"\nSimresult: {self.sim} type: ''  device:{self.device}\n")
+            self.printconfig(simdata)
+
+        # combine base stuff
+        defaultdata = globaldata.copy()
+        if self.sim != 'Global':
+            for item in simdata: defaultdata.append(item)
+
+        if print_counts:  print(f"defaultdata count {len(defaultdata)}")
+
+
+        # get additional class default data
+        if model_class != "":
+            # Use the extracted type in read_xml_file
+            craftresult = self.read_default_class_data(self.sim,model_class)
+
+            if craftresult is not None:
+
+                # merge if there is any
+                default_craft_result = self.update_default_data_with_craft_result(defaultdata, craftresult)
+            else:
+                default_craft_result = defaultdata
+
+            if print_counts:  print(f"default_craft_result count {len(default_craft_result)}")
+
+            # see what we got
+            if print_each_step:
+                print(f"\nDefaultsresult: {self.sim} type: {model_class}  device:{self.device}\n")
+                self.printconfig(default_craft_result)
+        else:
+            default_craft_result = defaultdata
+
+
+        # get userconfig global overrides
+        userglobaldata = self.read_user_sim_data( 'Global')
+        if userglobaldata is not None:
+            # merge if there is any
+            def_craft_userglobal_result = self.update_data_with_models(default_craft_result, userglobaldata,'Global (user)')
+        else:
+            def_craft_userglobal_result = default_craft_result
+
+        if print_counts:  print(f"def_craft_userglobal_result count {len(def_craft_userglobal_result)}")
+
+
+        # get userconfig sim overrides
+        if self.sim != 'Global':
+            user_default_data = self.read_user_sim_data(self.sim)
+            if user_default_data is not None:
+                # merge if there is any
+                def_craft_user_default_result = self.update_data_with_models(def_craft_userglobal_result, user_default_data, 'Sim (user)')
+            else:
+                def_craft_user_default_result = def_craft_userglobal_result
+
+            if print_counts:  print(f"def_craft_user_default_result count {len(def_craft_user_default_result)}")
+        else:
+            def_craft_user_default_result = def_craft_userglobal_result
+
+        if model_class != "":
+            # get userconfg craft specific type overrides
+            usercraftdata = self.read_user_class_data(self.sim, model_class)
+            if usercraftdata is not None:
+                # merge if there is any
+                def_craft_usercraft_result = self.update_data_with_models(def_craft_user_default_result, usercraftdata, 'Class (user)')
+            else:
+                def_craft_usercraft_result = def_craft_user_default_result
+        else:
+            def_craft_usercraft_result = def_craft_user_default_result
+
+
+        # Update result with default models data
+        def_craft_models_result = self.update_data_with_models(def_craft_usercraft_result, model_data, 'Model Default')
+
+        if print_counts:  print(f"def_craft_models count {len(def_craft_models_result)}")
+
+
+        # finally get userconfig model specific overrides
+        if user_model_data:
+            final_result = self.update_data_with_models(def_craft_models_result, user_model_data, 'Model (user)')
+        else:
+            final_result = def_craft_models_result
+
+        final_result = [item for item in final_result if item['value'] != '' or item['name'] == 'vpconf']
+
+        self.prereq_list = self.read_prereqs()
+        self.check_prereq_value(final_result)
+
+        sorted_data = sorted(final_result, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
+        print(f"final count {len(final_result)}")
+        return model_class, model_pattern, sorted_data
 
     def write_models_value_to_xml(self, the_model, the_value, setting_name):
         # Load the existing XML file or create a new one if it doesn't exist
@@ -450,1091 +1631,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Write the modified XML back to the file
             tree.write(self.userconfig_path)
             print(f"Removed <simSettings> element with values: sim={self.sim}, device={self.device}, value={the_value}, name={setting_name}")
-
-    def setup_class_list(self):
-        self.drp_class.blockSignals(True)
-        print_debug = False
-
-        match self.sim:
-            case 'Global':
-                # Assuming drp_class is your QComboBox
-                for disable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
-                    if print_debug: print (f"disable {disable}")
-                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
-
-            case 'DCS':
-                for disable in { 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter'}:
-                    if print_debug: print(f"disable {disable}")
-                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
-                for enable in {'PropellerAircraft', 'JetAircraft', 'Helicopter'}:
-                    if print_debug: print(f"enable {enable}")
-                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
-
-            case 'IL2':
-                for disable in {'TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
-                    if print_debug: print(f"disable {disable}")
-                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
-                for enable in {'PropellerAircraft', 'JetAircraft'}:
-                    if print_debug: print(f"enable {enable}")
-                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
-
-            case 'MSFS':
-                for enable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
-                    if print_debug: print(f"enable {enable}")
-                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
-
-        #self.drp_class.addItems(classes)
-        self.drp_class.blockSignals(False)
-
-    def setup_model_list(self):
-        models = self.read_models(self.sim)
-        self.drp_models.blockSignals(True)
-        self.drp_models.clear()
-        self.drp_models.addItems(models)
-        self.drp_models.setCurrentText(self.model_pattern)
-        self.drp_models.blockSignals(False)
-
-    def setup_table(self):
-        self.table_widget.setColumnCount(10)
-        headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name"]
-        self.table_widget.setHorizontalHeaderLabels(headers)
-        self.table_widget.setColumnWidth(0, 120)
-        self.table_widget.setColumnWidth(1, 120)
-        self.table_widget.setColumnWidth(2, 215)
-        self.table_widget.setColumnWidth(3, 120)
-        self.table_widget.setColumnHidden(4, True)
-        self.table_widget.setColumnHidden(5, True)
-        self.table_widget.setColumnHidden(6, True)
-        self.table_widget.setColumnHidden(7, True)
-        self.table_widget.setColumnHidden(8, True)
-        self.table_widget.setColumnHidden(9, True)
-
-    def populate_table(self):
-        self.table_widget.blockSignals(True)
-        sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
-        list_length = len(self.data_list)
-        for row, data_dict in enumerate(sorted_data):
-            if self.edit_mode == 'Class' and data_dict['name'] == 'type':
-                self.table_widget.setRowHeight(row, 0)
-                continue
-
-            state = self.set_override_state(data_dict['replaced'])
-            checkbox = QCheckBox()
-            # Manually set the initial state
-            checkbox.setChecked(state)
-            checkbox.clicked.connect(
-                lambda state, trow=row, tdata_dict=data_dict: self.override_state_changed(trow, tdata_dict, state))
-
-            item = QTableWidgetItem()
-            item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
-            #item.setStyleSheet("margin-left:50%; margin-right:50%;")
-            item.setData(QtCore.Qt.UserRole, row)  # Attach row to the item
-            item.setData(QtCore.Qt.CheckStateRole, QtCore.Qt.Unchecked)  # Set initial state
-
-
-            grouping_item = QTableWidgetItem(data_dict['grouping'])
-            displayname_item = QTableWidgetItem(data_dict['displayname'])
-            value_item = self.create_datatype_item(data_dict['datatype'], data_dict['value'], data_dict['unit'], checkbox.checkState())
-            info_item = QTableWidgetItem(data_dict['info'])
-            replaced_item = QTableWidgetItem("      " + data_dict['replaced'])
-            unit_item = QTableWidgetItem(data_dict['unit'])
-            valid_item = QTableWidgetItem(data_dict['validvalues'])
-            datatype_item = QTableWidgetItem(data_dict['datatype'])
-
-            # store name for use later, not shown
-            name_item = QTableWidgetItem(data_dict['name'])
-            name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
-            state_item = QTableWidgetItem(str(state))
-
-
-            # Connect the itemChanged signal to your custom function
-            value_item.setData(Qt.UserRole, row)  # Attach row to the item
-            value_item.setData(Qt.UserRole + 1, data_dict['name'])  # Attach name to the item
-            value_item.setData(Qt.UserRole + 2, data_dict['value'])  # Attach original value to the item
-            value_item.setData(Qt.UserRole + 3, data_dict['unit'])  # Attach unit to the item
-            value_item.setData(Qt.UserRole + 4, data_dict['datatype'])  # Attach datatype to the item
-            value_item.setData(Qt.UserRole + 5, data_dict['validvalues'])  # Attach datatype to the item
-            value_item.setData(Qt.UserRole + 6, str(state))  # Attach datatype to the item
-
-
-            #print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
-
-            # Check if replaced is an empty string and set text color accordingly
-            for item in [grouping_item, displayname_item, value_item, info_item, replaced_item]:
-                match data_dict['replaced']:
-                    case 'Global':
-                        item.setForeground(QtGui.QColor('gray'))
-                    case 'Global (user)':
-                        item.setForeground(QtGui.QColor('black'))
-                    case 'Sim Default':
-                        item.setForeground(QtGui.QColor('darkblue'))
-                    case 'Sim (user)':
-                        item.setForeground(QtGui.QColor('blue'))
-                    case 'Class Default':
-                        item.setForeground(QtGui.QColor('darkGreen'))
-                    case 'Class (user)':
-                        item.setForeground(QtGui.QColor('green'))
-                    case 'Model Default':
-                        item.setForeground(QtGui.QColor('darkMagenta'))
-                    case 'Model (user)':
-                        item.setForeground(QtGui.QColor('magenta'))
-
-            # Make specific columns read-only
-            grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemIsEditable)
-            displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemIsEditable)
-            info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
-            replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemIsEditable)
-            #value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
-
-            # Set the row count based on the actual data
-            self.table_widget.setRowCount(list_length)
-
-            self.table_widget.insertRow(row)
-            self.table_widget.setItem(row, 0, item)
-            self.table_widget.setCellWidget(row, 0, checkbox)
-            self.table_widget.setItem(row, 1, grouping_item)
-            self.table_widget.setItem(row, 2, displayname_item)
-            self.table_widget.setItem(row, 3, value_item)
-            self.table_widget.setItem(row, 4, info_item)
-            self.table_widget.setItem(row, 5, name_item)
-            self.table_widget.setItem(row, 6, valid_item)
-            self.table_widget.setItem(row, 7, datatype_item)
-            self.table_widget.setItem(row, 8, unit_item)
-            self.table_widget.setItem(row, 9, state_item)
-            #self.connected_rows.add(row)
-
-
-            # row click for property manager
-            #self.table_widget.itemSelectionChanged.connect(self.handle_item_click)
-            self.table_widget.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
-
-            # make unselectable in not checked
-            if not state:
-                for col in range(self.table_widget.columnCount()):
-                    unselitem = self.table_widget.item(row, col)
-                    unselitem.setFlags(unselitem.flags() & ~Qt.ItemIsSelectable)
-
-            # if row not in self.connected_rows:
-            #     value_item.dataChanged.connect(self.handle_item_change)
-            #     self.connected_rows.add(row)
-        # this is for handling clicking the actual value cell... doesnt work so great
-        self.table_widget.itemSelectionChanged.connect(self.handle_item_click)
-        self.table_widget.itemChanged.connect(self.handle_item_change)  # Connect to the custom function
-        self.table_widget.blockSignals(False)
-    def toggle_rows(self):
-        show_inherited = self.cb_show_inherited.isChecked()
-
-        for row in range(self.table_widget.rowCount()):
-            item = self.table_widget.item(row, 0)  # Assuming the column with 'user' is the sixth column
-
-            if item is not None and 'user' in item.text() and self.edit_mode in item.text():
-                self.table_widget.setRowHidden(row, False)
-
-            else:
-                self.table_widget.setRowHidden(row, not show_inherited)
-
-
-
-    def clear_propmgr(self):
-        self.l_displayname.setText("Select a Row to Edit")
-        self.cb_enable.hide()
-        self.t_info.hide()
-        self.l_validvalues.hide()
-        self.l_value.hide()
-        self.slider_float.hide()
-        self.b_update.hide()
-        self.drp_valuebox.hide()
-        self.tb_value.hide()
-        self.b_browse.hide()
-
-
-
-
-    def handle_item_click(self):
-        selected_items = self.table_widget.selectedItems()
-
-        if selected_items:
-            # Get the row number of the first selected item
-            row = selected_items[0].row()
-            if row is not None:
-
-                print(f"Clicked on Row {row + 1}")
-
-                for col in range(self.table_widget.columnCount()):
-
-                    source_item = self.table_widget.item(row, 0)
-                    source = source_item.text()
-                    displayname_item = self.table_widget.item(row, 2, )
-                    displayname = displayname_item.text()
-                    value_item = self.table_widget.item(row, 3 )
-                    value = value_item.text()
-                    info_item = self.table_widget.item(row, 4 )
-                    info = info_item.text()
-                    name_item = self.table_widget.item(row, 5 )
-                    name = name_item.text()
-                    valid_item = self.table_widget.item(row, 6 )
-                    validvalues = valid_item.text()
-                    datatype_item = self.table_widget.item(row, 7 )
-                    datatype = datatype_item.text()
-                    unit_item = self.table_widget.item(row, 8 )
-                    unit = unit_item.text()
-                    state_item = self.table_widget.item(row, 9 )
-                    state = state_item.text()
-
-                    self.populate_propmgr(name, displayname, value, unit, validvalues, datatype, info, state)
-            else:
-                self.clear_propmgr()
-
-    def populate_propmgr(self, name, displayname, value, unit, validvalues, datatype, info, state):
-        self.clear_propmgr()
-        if state.lower() == 'false':
-            return
-        self.l_displayname.setText(displayname)
-        if info != 'None' and info != '':
-            self.t_info.setText(info)
-            self.t_info.show()
-        self.l_name.setText(name)
-        self.tb_value.setText(value)
-        self.l_name.show()
-        self.b_update.show()
-        match datatype:
-            case 'bool':
-                self.cb_enable.show()
-                if value == '': value = 'false'
-                self.cb_enable.setCheckState(self.strtobool(value))
-                #self.tb_value.show()
-                self.tb_value.setText(value)
-            case 'float':
-                self.slider_float.setMinimum(0)
-                self.slider_float.setMaximum(100)
-                self.l_value.show()
-                self.slider_float.show()
-                self.tb_value.show()
-                if '%' in value:
-                    pctval = int(value.replace('%', ''))
-                else:
-                    pctval = int(float(value) * 100)
-                self.slider_float.setValue(pctval)
-                self.tb_value.setText(str(pctval) + '%')
-
-            case 'negfloat':
-                self.slider_float.setMinimum(-100)
-                self.slider_float.setMaximum(100)
-                self.l_value.show()
-                self.slider_float.show()
-                self.tb_value.show()
-                if '%' in value:
-                    pctval = int(value.replace('%', ''))
-                else:
-                    pctval = int(float(value) * 100)
-                self.slider_float.setValue(pctval)
-                self.tb_value.setText(str(pctval) + '%')
-
-            case 'int' | 'text' | 'anyfloat':
-                self.l_value.show()
-                self.tb_value.show()
-
-            case 'list':
-                self.l_value.show()
-                self.tb_value.show()
-                self.drp_valuebox.show()
-                self.drp_valuebox.blockSignals(True)
-                self.drp_valuebox.clear()
-                valids = validvalues.split(',')
-                self.drp_valuebox.addItems(valids)
-                self.drp_valuebox.blockSignals(False)
-            case 'path':
-                self.b_browse.show()
-                self.l_value.show()
-
-    def cb_enable_setvalue(self):
-        state = self.cb_enable.checkState()
-        strstate = 'false' if state == 0 else 'true'
-        self.tb_value.setText(strstate)
-
-    def update_button(self,):
-        self.write_values(self.l_name.text(),self.tb_value.text())
-
-    def update_textbox(self, value):
-        pct_value = int(value)  # Convert slider value to a float (adjust the division factor as needed)
-        self.tb_value.setText(str(pct_value)+'%')
-
-    def update_dropbox(self):
-        self.tb_value.setText(self.drp_valuebox.currentText())
-
-    def choose_directory(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.ShowDirsOnly | QFileDialog.DontUseNativeDialog
-
-        # Open the directory browser dialog
-        directory = QFileDialog.getExistingDirectory(self, "Choose Directory", options=options)
-
-        if directory:
-            print(f"Selected Directory: {directory}")
-            self.tb_value.setText(directory)
-
-    def handle_item_change(self,  item):
-
-        #print (f"{item.column()} : {self.value_previous} ")
-        if item.column() == 3:  # Assuming column 3 contains the 'value' items
-
-            row = item.data(Qt.UserRole)
-            name = item.data(Qt.UserRole + 1)
-            original_value = item.data(Qt.UserRole + 2)
-            unit = item.data(Qt.UserRole + 3)
-            datatype = item.data(Qt.UserRole + 4)
-            valid = item.data(Qt.UserRole + 5)
-            state = item.data(Qt.UserRole + 6)
-            new_value = item.text()
-
-            if datatype == 'bool':
-                newbool = not self.strtobool(original_value)
-                new_value = 'true' if newbool else 'false'
-
-            if original_value == '': original_value = "(blank)"
-
-
-            if new_value != original_value:
-                print(f"{item.column()} : CHANGED ")
-
-                self.write_values(name, new_value)
-
-                print(
-                            f"Row {row} - Name: {name}, Original: {original_value}, New: {new_value}, Unit: {unit}, Datatype: {datatype}, valid values: {valid}")
-
-    def write_values(self, name, new_value):
-        mysim = self.drp_sim.currentText()
-        myclass = self.drp_class.currentText()
-        mymodel = self.drp_models.currentText()
-        match self.edit_mode:
-            case 'Global' | 'Sim':
-                self.write_sim_value_to_xml(new_value, name)
-                self.drp_sim.setCurrentText('')
-                self.drp_sim.setCurrentText(mysim)
-            case 'Class':
-                self.write_class_value_to_xml(self.model_type, new_value, name)
-                self.drp_class.setCurrentText('')
-                self.drp_class.setCurrentText(myclass)
-            case 'Model':
-                self.write_models_value_to_xml(self.model_pattern, new_value, name)
-                self.drp_models.setCurrentText('')
-                self.drp_models.setCurrentText(mymodel)
-        self.reload_table()
-
-    def strtobool(self,val):
-        """Convert a string representation of truth to true (1) or false (0).
-        True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
-        are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
-        'val' is anything else.
-        """
-        val = val.lower()
-        if val in ('y', 'yes', 't', 'true', 'on', '1'):
-            return 1
-        elif val in ('n', 'no', 'f', 'false', 'off', '0'):
-            return 0
-        else:
-            raise ValueError("invalid truth value %r" % (val,))
-
-
-    # Slot function to handle checkbox state changes
-    def override_state_changed(self, row, data_dict, state):
-        print(f"Override - Row: {row}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-        mysim = self.drp_sim.currentText()
-        myclass = self.drp_class.currentText()
-        mymodel = self.drp_models.currentText()
-
-        #self.table_widget.blockSignals(True)
-        if state:
-
-            # add row to userconfig
-            match self.edit_mode:
-                case 'Global' | 'Sim':
-                    print(f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.write_sim_to_xml(data_dict['value'],data_dict['name'])
-                    self.sort_elements()
-                    self.drp_sim.setCurrentText('')
-                    self.drp_sim.setCurrentText(mysim)
-                case 'Class':
-                    print(f"Override - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.write_class_to_xml(myclass,data_dict['value'],data_dict['name'])
-                    self.sort_elements()
-                    self.drp_class.setCurrentText('')
-                    self.drp_class.setCurrentText(myclass)
-                case 'Model':
-                    print(f"Override - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.write_models_to_xml(self.drp_models.currentText(),data_dict['value'],data_dict['name'])
-                    self.sort_elements()
-                    self.drp_models.setCurrentText('')
-                    self.drp_models.setCurrentText(mymodel)
-        # make value editable & reset view
-            self.reload_table()
-
-        else:
-            match self.edit_mode:
-                case 'Global':
-                    print(
-                        f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.erase_sim_from_xml(data_dict['value'], data_dict['name'])
-                    self.drp_sim.setCurrentText('')
-                    self.drp_sim.setCurrentText(mysim)
-                case 'Sim':
-                    print(
-                        f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.erase_sim_from_xml(data_dict['value'], data_dict['name'])
-                    self.drp_sim.setCurrentText('')
-                    self.drp_sim.setCurrentText(mysim)
-                case 'Class':
-                    print(
-                        f"Remove - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.erase_class_from_xml(self.drp_class.currentText(), data_dict['value'], data_dict['name'])
-                    self.drp_class.setCurrentText('')
-                    self.drp_class.setCurrentText(myclass)
-                case 'Model':
-                    print(
-                        f"Remove - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.erase_models_from_xml(self.drp_models.currentText(), data_dict['value'], data_dict['name'])
-                    self.drp_models.setCurrentText('')
-                    self.drp_models.setCurrentText(mymodel)
-                # make value editable & reset view
-            self.reload_table()
-            self.clear_propmgr()
-            self.table_widget.blockSignals(False)
-    def sort_elements(self):
-        # Parse the XML file
-        tree = ET.parse(self.userconfig_path)
-        root = tree.getroot()
-
-        # Extract all elements
-        all_elements = root.findall('')
-
-        # Sort the elements based on their tag names
-        sorted_elements = sorted(all_elements, key=lambda x: x.tag)
-
-# warning!  deletes everything
-
-         # Replace existing elements with sorted elements
-        # for elem in root:
-        #     root.remove(elem)
-        #
-        #     # Add sorted elements back to the parent
-        # for elem in sorted_elements:
-        #     root.append(elem)
-###
-
-        # Prettify the XML
-        xml_str = xml.dom.minidom.parseString(ET.tostring(root)).toprettyxml()
-        with open(self.userconfig_path, 'w') as xml_file:
-            xml_file.write(xml_str)
-
-
-
-    def update_table_on_model_change(self):
-        # Get the selected model from the combo box
-        self.set_edit_mode('Model')
-
-        self.model_name = self.drp_models.currentText()
-
-        if self.model_name != '':
-
-            # Replace the following line with your actual XML reading logic
-            self.model_type, self.model_pattern, self.data_list = self.read_single_model()
-            print(f"\nmodel change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
-
-            # Update the table with the new data
-            self.drp_class.blockSignals(True)
-            self.drp_class.setCurrentText(self.model_type)
-            self.drp_class.blockSignals(False)
-
-        else:
-            print("model cleared")
-            self.set_edit_mode('Class')
-            old_model_type = self.model_type
-            print(self.model_type)
-            self.drp_class.setCurrentText('')
-            self.drp_class.setCurrentText(old_model_type)
-
-        self.reload_table()
-
-    def update_table_on_class_change(self):
-        # Get the selected model from the combo box
-        self.drp_models.blockSignals(True)
-        self.drp_models.setCurrentText('')
-        self.model_name = ''
-        self.drp_models.blockSignals(False)
-        self.set_edit_mode('Class')
-        self.model_type = self.drp_class.currentText()
-        if self.model_type != '':
-
-            self.reload_table()
-
-            print(
-                f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
-
-        else:
-            print("class cleared")
-            self.drp_class.setCurrentText('')
-            self.set_edit_mode('Sim')
-            old_sim = self.sim
-            print(self.model_type)
-            self.drp_sim.setCurrentText('Global')
-            self.drp_sim.setCurrentText(old_sim)
-
-        self.table_widget.clear()
-        self.setup_table()
-        self.populate_table()
-        self.toggle_rows()
-
-    def update_table_on_sim_change(self):
-        # Get the selected sim from the radio buttons
-
-        self.sim = self.drp_sim.currentText()
-
-        if self.sim == 'Global':
-            self.set_edit_mode('Global')
-        else:
-            self.set_edit_mode('Sim')
-
-        self.setup_class_list()
-        self.setup_model_list()
-
-        self.reload_table()
-
-        print(f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
-
-    def reload_table(self):
-        self.table_widget.blockSignals(True)
-        # Read all the data
-        self.model_type, self.model_pattern, self.data_list = self.read_single_model()
-        # Update the table with the new data
-        self.table_widget.clear()
-        self.setup_table()
-        self.populate_table()
-        self.toggle_rows()
-        self.table_widget.blockSignals(False)
-
-    def create_datatype_item(self, datatype, value, unit, checkstate):
-        #print(f"{datatype} {value}")
-        if datatype == 'bool':
-            toggle = QCheckBox()
-            toggle.setChecked(value.lower() == 'true')
-            #checkbox.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            toggle.setStyleSheet("margin-left:50%; margin-right:50%;")
-            item = QTableWidgetItem()
-            #item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            item.setData(Qt.CheckStateRole, Qt.Checked if value.lower() == 'true' else Qt.Unchecked)
-            if not checkstate:
-                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)   # no editing if not allowed in this mode
-            return item
-        elif datatype == 'int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat':
-            line_edit = QLineEdit(str(value) + str(unit))
-            item = QTableWidgetItem(line_edit.text())  # Set the widget
-            if not checkstate:
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)   # no editing if not allowed in this mode
-            return item
-        # making float numeric for now...
-        # elif datatype == 'float':
-        #     slider = QSlider(Qt.Horizontal)
-        #     slider.setValue(int(float(value) * 100))  # Assuming float values between 0 and 1
-        #     item = QTableWidgetItem()
-        #     item.setData(Qt.DisplayRole, slider)
-        #     return item
-        else:
-            item = QTableWidgetItem(value)
-            if not checkstate:
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)   # no editing if not allowed in this mode
-            return item
-
-    def set_override_state(self, override_text):
-        state = False
-        if '(user)' not in override_text:
-            state = False
-        else:
-            match self.edit_mode:
-                case 'Global':
-                    state = (override_text == 'Global (user)')
-                case 'Sim':
-                    state = (override_text == 'Sim (user)')
-                case 'Class':
-                    state = (override_text == 'Class (user)')
-                case 'Model':
-                    state =(override_text == 'Model (user)')
-        return state
-
-    def set_edit_mode(self,mode):
-        oldmode = self.edit_mode
-
-        if mode != oldmode:
-            self.l_mode.setText(mode)
-            self.edit_mode = mode
-            self.setup_class_list()
-            match mode:
-                case 'Global':
-
-                    self.drp_class.blockSignals(True)
-                    self.drp_models.blockSignals(True)
-                    self.drp_class.setCurrentText('')
-                    self.drp_models.setCurrentText('')
-                    self.model_name = ''
-                    self.model_type = ''
-                    self.drp_class.blockSignals(False)
-                    self.drp_models.blockSignals(False)
-                    self.drp_class.setEnabled(False)
-                    self.drp_models.setEnabled(False)
-                    self.b_createusermodel.setEnabled(False)
-                case 'Sim':
-                    self.drp_class.setEnabled(True)
-                    self.drp_models.setEnabled(True)
-                    self.drp_class.blockSignals(True)
-                    self.drp_models.blockSignals(True)
-                    self.drp_class.setCurrentText('')
-                    self.drp_models.setCurrentText('')
-                    self.model_name = ''
-                    self.model_type = ''
-                    self.drp_class.blockSignals(False)
-                    self.drp_models.blockSignals(False)
-                    self.b_createusermodel.setEnabled(True)
-
-                case 'Class':
-                    self.drp_class.setEnabled(True)
-                    self.drp_models.setEnabled(True)
-                    self.drp_models.blockSignals(True)
-                    self.drp_models.setCurrentText('')
-                    self.model_name = ''
-                    self.drp_models.blockSignals(False)
-                    self.b_createusermodel.setEnabled(True)
-
-                case 'Model':
-                    self.drp_class.setEnabled(True)
-                    self.drp_models.setEnabled(True)
-                    self.b_createusermodel.setEnabled(True)
-
-                case _:
-                    self.drp_class.setEnabled(True)
-                    self.drp_models.setEnabled(True)
-
-        print(f"{mode} Mode")
-
-
-    def get_craft_attributes(file_path, sim, device):
-        craft_attributes = set()
-        craft_attributes.add('Aircraft')
-
-        tree = ET.parse(file_path)
-        root = tree.getroot()
-
-        for defaults_elem in root.findall(f'.//defaults[{sim}="true"][{device}="true"]'):
-            # for defaults_elem in root.findall(f'.//defaults[{sim}="true" and {device}="true"]'):
-            for value_elem in defaults_elem.findall('.//value'):
-                craft_attr = value_elem.get('Craft')
-                if craft_attr is not None:
-                    craft_attributes.add(craft_attr)
-
-        return sorted(list(craft_attributes))
-
-#  END GUI STUFF
-
-    def read_xml_file(self, the_sim):
-        tree = ET.parse(self.defaults_path)
-        root = tree.getroot()
-
-        # Collect data in a list of dictionaries
-        data_list = []
-        for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{self.device}="true"]'):
-
-            grouping = defaults_elem.find('Grouping').text
-            name = defaults_elem.find('name').text
-            # print(name)
-            displayname = defaults_elem.find('displayname').text
-            datatype = defaults_elem.find('datatype').text
-            unit_elem = defaults_elem.find('unit')
-            unit = unit_elem.text if unit_elem is not None else ""
-            value_elem = defaults_elem.find('value')
-            value = value_elem.text if value_elem is not None else ""
-            if value is None: value = ""
-            valid_elem = defaults_elem.find('validvalues')
-            validvalues = valid_elem.text if valid_elem is not None else ""
-            info_elem = defaults_elem.find('info')
-            info = (f"{info_elem.text}") if info_elem is not None else ""
-
-            if the_sim == 'Global':
-                replaced = 'Global'
-            else:
-                replaced = 'Sim Default'
-
-            # Store data in a dictionary
-            data_dict = {
-                'grouping': grouping,
-                'name': name,
-                'displayname': displayname,
-                'value': value,
-                'unit': unit,
-                'datatype': datatype,
-                'validvalues': validvalues,
-                'replaced': replaced,
-                'info': info
-            }
-            # print(data_dict)
-
-            # Append to the list
-            data_list.append(data_dict)
-            # print(data_list)
-        # Sort the data by grouping and then by name
-
-        sorted_data = sorted(data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
-        # print(sorted_data)
-        # printconfig(sim, craft, sorted_data)
-        return sorted_data
-
-
-    def skip_bad_combos(self, craft):
-        if self.sim == 'DCS' and craft == 'HPGHelicopter': return True
-        if self.sim == 'DCS' and craft == 'TurbopropAircraft': return True
-        if self.sim == 'DCS' and craft == 'GliderAircraft': return True
-        if self.sim == 'IL2' and craft == 'GliderAircraft': return True
-        if self.sim == 'IL2' and craft == 'HPGHelicopter': return True
-        if self.sim == 'IL2' and craft == 'Helicopter': return True
-        if self.sim == 'IL2' and craft == 'TurbopropAircraft': return True
-
-        if self.sim == 'Global' and craft != 'Aircraft': return True
-        return False
-
-
-    def printconfig(self, sorted_data):
-        # print("printconfig: " +sorted_data)
-        show_source = False
-        print("#############################################")
-
-        # Print the sorted data with group names and headers
-        current_group = None
-        current_header = None
-        for item in sorted_data:
-            if item['grouping'] != current_group:
-                current_group = item['grouping']
-                if current_header is not None:
-                    print("\n\n")  # Separate sections with a blank line
-                print(f"\n# {current_group}")
-            tabstring = "\t\t"
-            replacestring = ''
-            if show_source:
-                if item['replaced'] == "Global": replacestring = " G"
-                if item['replaced'] == "Global (user)": replacestring = "UG"
-                if item['replaced'] == "Sim Default": replacestring =  "SD"
-                if item['replaced'] == "Sim (user)": replacestring = "UD"
-                if item['replaced'] == "Class Default": replacestring = "SC"
-                if item['replaced'] == "Class (user)": replacestring = "UC"
-                if item['replaced'] == "Model Default": replacestring = "DM"
-                if item['replaced'] == "Model (user)": replacestring = "UM"
-            spacing = 50 - (len(item['name']) + len(item['value']) + len(item['unit']))
-            space = " " * spacing + " # " + replacestring + " # "
-
-            print(f"{tabstring}{item['name']} = {item['value']} {item['unit']} {space} {item['info']}")
-
-
-    def read_models_data(self,file_path, full_model_name):
-        # runs on both defaults and userconfig xml files
-        tree = ET.parse(file_path)
-        root = tree.getroot()
-
-        model_data = []
-        found_pattern = ''
-
-        # Iterate through models elements
-        #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{self.device}"]'):
-        for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{self.device}"]') + \
-                          root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
-                          root.findall(f'.//models[sim="{self.sim}"][device="any"]') + \
-                          root.findall(f'.//models[sim="any"][device="any"]'):
-
-            # Assuming 'model' is the element containing the wildcard pattern
-
-            unit_pattern = model_elem.find('model')
-            if unit_pattern is not None:
-                pattern = unit_pattern.text
-                if pattern is not None:
-                    # Check if the full_model_name matches the pattern using re.match
-                    if re.match(pattern, full_model_name):
-                        name = model_elem.find('name').text
-                        value = model_elem.find('value').text
-                        unit_elem = model_elem.find('unit')
-                        unit = unit_elem.text if unit_elem is not None else ""
-                        model_dict = {
-                            'name': name,
-                            'value': value,
-                            'unit': unit
-                        }
-                        found_pattern = pattern
-                        model_data.append(model_dict)
-
-        return model_data, found_pattern
-
-    def read_default_class_data(self, the_sim, the_class):
-        tree = ET.parse(self.defaults_path)
-        root = tree.getroot()
-
-        class_data = []
-
-        # Iterate through models elements
-        #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]'):
-        #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]'):
-        for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{self.device}"]') + \
-                          root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="{self.device}"]') + \
-                          root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
-                          root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="any"]'):
-
-            if model_elem.find('name') is not None:
-
-                name = model_elem.find('name').text
-                value = model_elem.find('value').text
-                unit_elem = model_elem.find('unit')
-                unit = unit_elem.text if unit_elem is not None else ""
-
-                model_dict = {
-                    'name': name,
-                    'value': value,
-                    'unit': unit,
-                    'replaced': 'Class Default'
-                }
-
-                class_data.append(model_dict)
-
-        return class_data
-
-    def read_user_model_data(self, the_sim):
-        tree = ET.parse(self.userconfig_path)
-        root = tree.getroot()
-
-        model_data = []
-
-        # Iterate through models elements
-        #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
-        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):     #  + \
-                          # root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
-                          # root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
-                          # root.findall(f'.//models[sim="any"][device="any"]'):
-            if model_elem.find('type') is None:
-                if model_elem.find('name') is not None:
-
-                    setting = model_elem.find('name').text
-                    value = model_elem.find('value').text
-
-
-                    model_dict = {
-                        'name': setting,
-                        'value': value,
-                        'unit': '',
-                        'replaced': 'Model (user)'
-                    }
-
-                    model_data.append(model_dict)
-
-        return model_data
-
-    def read_user_sim_data(self, the_sim):
-        tree = ET.parse(self.userconfig_path)
-        root = tree.getroot()
-
-        sim_data = []
-
-        # Iterate through models elements
-        #for model_elem in root.findall(f'.//simSettings[sim="{the_sim}" or sim="any"][device="{self.device}" or device="any"]'):
-        for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{self.device}"]'):   # + \
-                          # root.findall(f'.//simSettings[sim="any"][device="{self.device}"]') + \
-                          # root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]') + \
-                          # root.findall(f'.//simSettings[sim="any"][device="any"]'):
-
-            if model_elem.find('name') is not None:
-
-                name = model_elem.find('name').text
-                value = model_elem.find('value').text
-                if the_sim == 'Global':
-                    replaced = 'Global'
-                else:
-                    replaced = 'Sim (user)'
-                model_dict = {
-                    'name': name,
-                    'value': value,
-                    'unit': '',
-                    'replaced': replaced
-                }
-
-                sim_data.append(model_dict)
-
-        return sim_data
-
-    def read_user_class_data(self, the_sim, crafttype):
-        tree = ET.parse(self.userconfig_path)
-        root = tree.getroot()
-
-        model_data = []
-
-        # Iterate through models elements
-        #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
-        for model_elem in root.findall(f'.//classSettings[sim="{the_sim}"][device="{self.device}"]'):     # + \
-                          # root.findall(f'.//classSettings[sim="any"][device="{self.device}"]') + \
-                          # root.findall(f'.//classSettings[sim="{the_sim}"][device="any"]') + \
-                          # root.findall(f'.//classSettings[sim="any"][device="any"]'):
-            if model_elem.find('type') is not None:
-                # Assuming 'model' is the element containing the wildcard pattern
-                pattern = model_elem.find('type').text
-
-                if pattern is not None:
-                    # Check if the craft type matches the pattern using re match
-                    if re.match(pattern, crafttype):
-                        name = model_elem.find('name').text
-                        value = model_elem.find('value').text
-                        unit_elem = model_elem.find('unit')
-                        unit = unit_elem.text if unit_elem is not None else ""
-                        model_dict = {
-                            'name': name,
-                            'value': value,
-                            'unit': unit,
-                            'replaced': 'Class (user)'
-                        }
-
-                        model_data.append(model_dict)
-
-        return model_data
-
-    def read_single_model(self, sim=None, aircraft_name=None):
-        if sim is not None:
-            self.sim = sim
-        if aircraft_name is not None:
-            self.model_name = aircraft_name
-        print_counts = False
-        print_each_step = False  # for debugging
-
-        # Read models data first
-        model_data, def_model_pattern = self.read_models_data(self.defaults_path, self.model_name)
-        user_model_data, usr_model_pattern = self.read_models_data(self.userconfig_path, self.model_name)
-
-        model_pattern = def_model_pattern
-        if usr_model_pattern != '':
-            model_pattern = usr_model_pattern
-
-        # Extract the type from models data, if name is blank then use the class.  otherwise assume no type is set.
-        if self.model_name == '':
-            model_class = self.model_type
-        else:
-            model_class = ''   #self.model_type
-
-        for model in model_data:
-            if model['name'] == 'type':
-                model_class = model['value']
-                break
-        # check if theres an override
-        if user_model_data is not None:
-            for model in user_model_data:
-                if model['name'] == 'type':
-                    model_class = model['value']
-                    break
-        print(f"class: {model_class}")
-
-
-        # get default settings for all sims and device
-        globaldata = self.read_xml_file('Global')
-
-        if print_counts: print(f"globaldata count {len(globaldata)}")
-
-        # see what we got
-        if print_each_step:
-            print(f"\nGlobal result: Global  type: ''  device:{self.device}\n")
-            self.printconfig(globaldata)
-
-
-        # get default Aircraft settings for this sim and device
-        simdata = self.read_xml_file(self.sim)
-
-        if print_counts:  print(f"simdata count {len(simdata)}")
-
-        # see what we got
-        if print_each_step:
-            print(f"\nSimresult: {self.sim} type: ''  device:{self.device}\n")
-            self.printconfig(simdata)
-
-        # combine base stuff
-        defaultdata = globaldata.copy()
-        if self.sim != 'Global':
-            for item in simdata: defaultdata.append(item)
-
-        if print_counts:  print(f"defaultdata count {len(defaultdata)}")
-
-
-        # get additional class default data
-        if model_class != "":
-            # Use the extracted type in read_xml_file
-            craftresult = self.read_default_class_data(self.sim,model_class)
-
-            if craftresult is not None:
-
-                # merge if there is any
-                default_craft_result = self.update_default_data_with_craft_result(defaultdata, craftresult)
-            else:
-                default_craft_result = defaultdata
-
-            if print_counts:  print(f"default_craft_result count {len(default_craft_result)}")
-
-            # see what we got
-            if print_each_step:
-                print(f"\nDefaultsresult: {self.sim} type: {model_class}  device:{self.device}\n")
-                self.printconfig(default_craft_result)
-        else:
-            default_craft_result = defaultdata
-
-
-        # get userconfig global overrides
-        userglobaldata = self.read_user_sim_data( 'Global')
-        if userglobaldata is not None:
-            # merge if there is any
-            def_craft_userglobal_result = self.update_data_with_models(default_craft_result, userglobaldata,'Global (user)')
-        else:
-            def_craft_userglobal_result = default_craft_result
-
-        if print_counts:  print(f"def_craft_userglobal_result count {len(def_craft_userglobal_result)}")
-
-
-        # get userconfig sim overrides
-        if self.sim != 'Global':
-            user_default_data = self.read_user_sim_data(self.sim)
-            if user_default_data is not None:
-                # merge if there is any
-                def_craft_user_default_result = self.update_data_with_models(def_craft_userglobal_result, user_default_data, 'Sim (user)')
-            else:
-                def_craft_user_default_result = def_craft_userglobal_result
-
-            if print_counts:  print(f"def_craft_user_default_result count {len(def_craft_user_default_result)}")
-        else:
-            def_craft_user_default_result = def_craft_userglobal_result
-
-        if model_class != "":
-            # get userconfg craft specific type overrides
-            usercraftdata = self.read_user_class_data(self.sim, model_class)
-            if usercraftdata is not None:
-                # merge if there is any
-                def_craft_usercraft_result = self.update_data_with_models(def_craft_user_default_result, usercraftdata, 'Class (user)')
-            else:
-                def_craft_usercraft_result = def_craft_user_default_result
-        else:
-            def_craft_usercraft_result = def_craft_user_default_result
-
-
-        # Update result with default models data
-        def_craft_models_result = self.update_data_with_models(def_craft_usercraft_result, model_data, 'Model Default')
-
-        if print_counts:  print(f"def_craft_models count {len(def_craft_models_result)}")
-
-
-        # finally get userconfig model specific overrides
-        if user_model_data:
-            final_result = self.update_data_with_models(def_craft_models_result, user_model_data, 'Model (user)')
-        else:
-            final_result = def_craft_models_result
-
-        final_result = [item for item in final_result if item['value'] != '' or item['name'] == 'vpconf']
-
-        sorted_data = sorted(final_result, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
-        print(f"final count {len(final_result)}")
-        return model_class, model_pattern, sorted_data
-
 
     def update_default_data_with_craft_result(self,defaultdata, craftresult):
         updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
