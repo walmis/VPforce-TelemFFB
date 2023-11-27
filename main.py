@@ -51,11 +51,15 @@ import os
 sys.path.insert(0, '')
 #sys.path.append('/simconnect')
 
-
-log_folder = './log'
+log_folder = os.path.join(os.environ['LOCALAPPDATA'],"VPForce-TelemFFB", 'log')
+#log_folder = './log'
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
-logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", os.path.basename(args.configfile), "_", os.path.basename(args.overridefile), ".log"])
+if args.xml is None:
+    logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", os.path.basename(args.configfile), "_",
+                       os.path.basename(args.overridefile), ".log"])
+else:
+    logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_xmlconfig.log"])
 log_file = os.path.join(log_folder, logname)
 
 # Create a logger instance
@@ -361,8 +365,6 @@ class TelemManager(QObject, threading.Thread):
                     params.update(class_params)
                 else:
                     logging.warning(f"Section [{s}] does not exist")
-                    
-
 
                 params.update(conf)
 
@@ -690,6 +692,12 @@ class MainWindow(QMainWindow):
         reset_action.triggered.connect(self.reset_all_effects)
         utilities_menu.addAction(reset_action)
 
+        # Add settings converter
+        if args.xml is None:
+            convert_settings_action = QAction('Convert user config.ini to XML',self)
+            convert_settings_action.triggered.connect(self.convert_settings)
+            utilities_menu.addAction(convert_settings_action)
+
         # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
 
         # Create a line beneath the menu bar
@@ -950,6 +958,81 @@ class MainWindow(QMainWindow):
                 HapticEffect.device.resetEffects()
             except Exception as error:
                 pass
+
+    def convert_settings(self):
+        differences = []
+        defaultconfig = load_config(configfile)
+        userconfig = load_config(overridefile, raise_errors=False)
+        def_sections = defaultconfig.sections
+        usr_sections = userconfig.sections
+
+        for section,dconf in defaultconfig.items():
+            #print (f"reading {section}")
+
+
+            def_params = utils.sanitize_dict(defaultconfig[section])
+            if section in usr_sections:
+
+                usr_params = utils.sanitize_dict(userconfig[section])
+                for ditem in def_params:
+                    #print (f"{section} - {ditem} = {def_params[ditem]}" )
+                    for uitem in usr_params:
+                        if ditem == uitem:
+                            if def_params[ditem] != usr_params[uitem]:
+                                #print(f"{section} - {uitem} = {usr_params[uitem]}")
+                                valuestring = str(usr_params[uitem])
+                                dif_item = self.config_to_dict(section,uitem,valuestring)
+                                differences.append(dif_item)
+
+        SettingsWindow.write_converted_to_xml(settings_mgr, differences)
+
+        message = f'\n\nConverted {overridefile} for {args.type} to XML.\nYou can now use the -X argument to use the new Settings Manager\n'
+        print(message)
+
+
+
+    def config_to_dict(self,section,name,value):
+        sim=''
+        cls = ''
+        model = ''
+        match section:
+            case 'system':
+                sim = 'Global'
+            case 'DCS':
+                sim = 'DCS'
+            case 'IL2':
+                sim = 'IL2'
+            case 'MSFS2020':
+                sim = 'MSFS'
+
+        if '.' in section:
+            subsection = section.split('.')
+            ssim = subsection[0]
+            cls = subsection[1]
+            match ssim:
+                case 'DCS':
+                    sim = 'DCS'
+                case 'IL2':
+                    sim = 'IL2'
+                case 'MSFS2020':
+                    sim = 'MSFS'
+
+        # if sim is still blank here, must be a model
+        if sim == '':
+            model = section
+            sim = 'any'
+            cls = ''
+
+        data_dict = {
+            'name': name,
+            'value': value,
+            'sim' : sim,
+            'class': cls,
+            'model': model,
+            'device': args.type
+        }
+        print (data_dict)
+        return data_dict
 
     def edit_config_file(self, config_type):
         script_dir = os.path.dirname(os.path.abspath(__file__))

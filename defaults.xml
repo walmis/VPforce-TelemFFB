@@ -1145,7 +1145,7 @@
 		<value>200</value>
 		<datatype>int</datatype>
 		<unit>ms</unit>
-		<MSFS>true</MSFS>
+		<Global>true</Global>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>

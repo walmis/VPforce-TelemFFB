@@ -609,15 +609,15 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         mymodel = self.drp_models.currentText()
         match self.edit_mode:
             case 'Global' | 'Sim':
-                self.write_sim_value_to_xml(new_value, name)
+                self.write_sim_to_xml(self.device, self.sim, new_value, name)
                 self.drp_sim.setCurrentText('')
                 self.drp_sim.setCurrentText(mysim)
             case 'Class':
-                self.write_class_value_to_xml(self.model_type, new_value, name)
+                self.write_class_to_xml(self.device, self.sim, self.model_type, new_value, name)
                 self.drp_class.setCurrentText('')
                 self.drp_class.setCurrentText(myclass)
             case 'Model':
-                self.write_models_value_to_xml(self.model_pattern, new_value, name)
+                self.write_models_value_to_xml(self.device, self.sim, self.model_pattern, new_value, name)
                 self.drp_models.setCurrentText('')
                 self.drp_models.setCurrentText(mymodel)
         self.reload_table()
@@ -653,19 +653,19 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             match self.edit_mode:
                 case 'Global' | 'Sim':
                     print(f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.write_sim_to_xml(data_dict['value'],data_dict['name'])
+                    self.write_sim_to_xml(self.device, self.sim,data_dict['value'],data_dict['name'])
                     self.sort_elements()
                     self.drp_sim.setCurrentText('')
                     self.drp_sim.setCurrentText(mysim)
                 case 'Class':
                     print(f"Override - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.write_class_to_xml(myclass,data_dict['value'],data_dict['name'])
+                    self.write_class_to_xml(self.device, self.sim, myclass, data_dict['value'],data_dict['name'])
                     self.sort_elements()
                     self.drp_class.setCurrentText('')
                     self.drp_class.setCurrentText(myclass)
                 case 'Model':
                     print(f"Override - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    self.write_models_to_xml(self.drp_models.currentText(),data_dict['value'],data_dict['name'])
+                    self.write_models_to_xml(self.device, self.sim, self.drp_models.currentText(),data_dict['value'],data_dict['name'])
                     self.sort_elements()
                     self.drp_models.setCurrentText('')
                     self.drp_models.setCurrentText(mymodel)
@@ -829,7 +829,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             toggle.setStyleSheet("margin-left:50%; margin-right:50%;")
             item = QTableWidgetItem()
             #item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-            item.setData(Qt.CheckStateRole, Qt.Checked if value.lower() == 'true' else Qt.Unchecked)
+            boolvalue = self.strtobool(value)
+            item.setData(Qt.CheckStateRole, Qt.Checked if boolvalue else Qt.Unchecked)
             if not checkstate:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)   # no editing if not allowed in this mode
             # disable in-table value editing here
@@ -1176,10 +1177,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         # Iterate through models elements
         #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):
-        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]'):     #  + \
-                          # root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
-                          # root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
-                          # root.findall(f'.//models[sim="any"][device="any"]'):
+        for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{self.device}"]') + \
+                           root.findall(f'.//models[sim="any"][device="{self.device}"]') + \
+                           root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+                           root.findall(f'.//models[sim="any"][device="any"]'):
             if model_elem.find('type') is None:
                 if model_elem.find('name') is not None:
 
@@ -1416,219 +1417,153 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         return model_class, model_pattern, sorted_data
 
-    def write_models_value_to_xml(self, the_model, the_value, setting_name):
+
+    def write_models_to_xml(self, the_device, the_sim, the_model, the_value, setting_name):
         # Load the existing XML file or create a new one if it doesn't exist
         tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
-        for model_elem in root.findall(f'.//models[sim="{self.sim}"]'
-                                       f'[device="{self.device}"]'
-                                       f'[model="{the_model}"]'
-                                       f'[name="{setting_name}"]'):
 
-            if model_elem is not None:
-                # Update the value of the element
-                for child_elem in model_elem:
-                    if child_elem.tag == 'value':
-                        child_elem.text = str(the_value)
-                tree.write(self.userconfig_path)
-                print(f"updated <models> element with values: sim={self.sim}, device={self.device}, "
-                      f"value={the_value}, model={the_model}, name={setting_name}")
+        # Check if an identical <models> element already exists
+        model_elem = root.find(f'.//models[sim="{the_sim}"]'
+                               f'[device="{the_device}"]'
+                               f'[model="{the_model}"]'
+                               f'[name="{setting_name}"]')
+
+        if model_elem is not None:
+            # Update the value of the existing element
+            for child_elem in model_elem:
+                if child_elem.tag == 'value':
+                    child_elem.text = str(the_value)
+            tree.write(self.userconfig_path)
+            print(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
+                  f"value={the_value}, model={the_model}, name={setting_name}")
+
+        else:
+            # Check if an identical <models> element already exists; if so, skip
+            model_elem_exists = any(
+                all(
+                    element.tag == tag and element.text == value
+                    for tag, value in [
+                        ("name", setting_name),
+                        ("model", the_model),
+                        ("value", the_value),
+                        ("sim", the_sim),
+                        ("device", the_device)
+                    ]
+                )
+                for element in root.iter("models")
+            )
+
+            if model_elem_exists:
+                print("<models> element with the same values already exists. Skipping.")
             else:
-
                 # Create child elements with the specified content
                 models = ET.SubElement(root, "models")
                 for tag, value in [("name", setting_name),
                                    ("model", the_model),
                                    ("value", the_value),
-                                   ("sim", self.sim),
-                                   ("device", self.device)]:
+                                   ("sim", the_sim),
+                                   ("device", the_device)]:
                     ET.SubElement(models, tag).text = value
 
                 # Write the modified XML back to the file
                 tree = ET.ElementTree(root)
                 tree.write(self.userconfig_path)
-                print(f"Added <models> element with values: sim={self.sim}, device={self.device}, "
+                print(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
                       f"value={the_value}, model={the_model}, name={setting_name}")
 
-    def write_class_value_to_xml(self, the_class, the_value, setting_name):
+
+    def write_class_to_xml(self, the_device, the_sim, the_class, the_value, setting_name):
         # Load the existing XML file or create a new one if it doesn't exist
         tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
-        for class_elem in root.findall(f'.//classSettings[sim="{self.sim}"]'
-                                       f'[device="{self.device}"]'
-                                       f'[type="{the_class}"]'
-                                       f'[name="{setting_name}"]'):
 
-            if class_elem is not None:
-                # Update the value of the element
-                for child_elem in class_elem:
-                    if child_elem.tag == 'value':
-                        child_elem.text = str(the_value)
-                tree.write(self.userconfig_path)
-                print(f"Updated <classSettings> element with values: sim={self.sim}, device={self.device}, "
-                      f"value={the_value}, model={the_class}, name={setting_name}")
-            else:
+        # Check if an identical <classSettings> element already exists
+        class_elem = root.find(f'.//classSettings[sim="{the_sim}"]'
+                               f'[device="{the_device}"]'
+                               f'[type="{the_class}"]'
+                               f'[name="{setting_name}"]')
 
-                # Create child elements with the specified content
-                classes = ET.SubElement(root, "classSettings")
-                for tag, value in [("name", setting_name),
-                                   ("type", the_class),
-                                   ("value", the_value),
-                                   ("sim", self.sim),
-                                   ("device", self.device)]:
-                    ET.SubElement(classes, tag).text = value
-
-                # Write the modified XML back to the file
-                tree = ET.ElementTree(root)
-                tree.write(self.userconfig_path)
-                print(f"Added <classSettings> element with values: sim={self.sim}, device={self.device}, "
-                      f"value={the_value}, type={the_class}, name={setting_name}")
-
-    def write_sim_value_to_xml(self, the_value, setting_name):
-        # Load the existing XML file or create a new one if it doesn't exist
-        tree = ET.parse(self.userconfig_path)
-        root = tree.getroot()
-        for sim_elem in root.findall(f'.//simSettings[sim="{self.sim}"]'
-                                       f'[device="{self.device}"]'                                      
-                                       f'[name="{setting_name}"]'):
-
-            if sim_elem is not None:
-                # Update the value of the element
-                for child_elem in sim_elem:
-                    if child_elem.tag == 'value':
-                        child_elem.text = str(the_value)
-                tree.write(self.userconfig_path)
-                print(f"updated <simSettings> element with values: sim={self.sim}, device={self.device}, "
-                      f"value={the_value}, name={setting_name}")
-
-            else:
-                # Create child elements with the specified content
-                sims = ET.SubElement(root, "simSettings")
-                for tag, value in [("name", setting_name),
-                                   ("value", the_value),
-                                   ("sim", self.sim),
-                                   ("device", self.device)]:
-                    ET.SubElement(sims, tag).text = value
-
-                # Write the modified XML back to the file
-                tree = ET.ElementTree(root)
-                tree.write(self.userconfig_path)
-                print(
-                    f"Added <simSettings> element with values: sim={self.sim}, device={self.device}, value={the_value}, name={setting_name}")
-
-    def write_models_to_xml(self, the_model, the_value, setting_name):
-        # Load the existing XML file or create a new one if it doesn't exist
-        tree = ET.parse(self.userconfig_path)
-        root = tree.getroot()
-        # Check if an identical <simSettings> element already exists; if so, skip
-        model_elem_exists = any(
-            all(
-                element.tag == tag and element.text == value
-                for tag, value in [
-                    ("name", setting_name),
-                    ("model", the_model),
-                    ("value", the_value),
-                    ("sim", self.sim),
-                    ("device", self.device)
-                ]
-            )
-            for element in root.iter("classSettings")
-        )
-
-        if model_elem_exists:
-                print("<models> element with the same values already exists. Skipping.")
-        else:
-
-            # Create child elements with the specified content
-            models = ET.SubElement(root, "models")
-            for tag, value in [("name", setting_name),
-                               ("model", the_model),
-                               ("value", the_value),
-                               ("sim", self.sim),
-                               ("device", self.device)]:
-                ET.SubElement(models, tag).text = value
-
-            # Write the modified XML back to the file
-            tree = ET.ElementTree(root)
+        if class_elem is not None:
+            # Update the value of the existing element
+            for child_elem in class_elem:
+                if child_elem.tag == 'value':
+                    child_elem.text = str(the_value)
             tree.write(self.userconfig_path)
-            print(f"Added <models> element with values: sim={self.sim}, device={self.device}, "
-                  f"value={the_value}, model={the_model}, name={setting_name}")
+            print(f"Updated <classSettings> element with values: sim={the_sim}, device={the_device}, "
+                  f"value={the_value}, model={the_class}, name={setting_name}")
 
-    def write_class_to_xml(self, the_class, the_value, setting_name):
-        # Load the existing XML file or create a new one if it doesn't exist
-        tree = ET.parse(self.userconfig_path)
-        root = tree.getroot()
-        # Check if an identical <simSettings> element already exists; if so, skip
-        class_elem_exists = any(
-            all(
-                element.tag == tag and element.text == value
-                for tag, value in [
-                    ("name", setting_name),
-                    ("type", the_class),
-                    ("value", the_value),
-                    ("sim", self.sim),
-                    ("device", self.device)
-                ]
-            )
-            for element in root.iter("classSettings")
-        )
-
-        if class_elem_exists:
-                print("<classSettings> element with the same values already exists. Skipping.")
         else:
-
-            # Create child elements with the specified content
+            # Create a new <classSettings> element
             classes = ET.SubElement(root, "classSettings")
             for tag, value in [("name", setting_name),
                                ("type", the_class),
                                ("value", the_value),
-                               ("sim", self.sim),
-                               ("device", self.device)]:
+                               ("sim", the_sim),
+                               ("device", the_device)]:
                 ET.SubElement(classes, tag).text = value
 
             # Write the modified XML back to the file
             tree = ET.ElementTree(root)
             tree.write(self.userconfig_path)
-            print(f"Added <classSettings> element with values: sim={self.sim}, device={self.device}, "
+            print(f"Added <classSettings> element with values: sim={the_sim}, device={the_device}, "
                   f"value={the_value}, type={the_class}, name={setting_name}")
 
-    def write_sim_to_xml(self, the_value, setting_name):
+
+    def write_sim_to_xml(self, the_device, the_sim, the_value, setting_name):
         # Load the existing XML file or create a new one if it doesn't exist
         tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
 
-        # Check if an identical <simSettings> element already exists; if so, skip
-        sim_elem_exists = any(
-            all(
-                element.tag == tag and element.text == value
-                for tag, value in [
-                    ("name", setting_name),
-                    ("value", the_value),
-                    ("sim", self.sim),
-                    ("device", self.device)
-                ]
-            )
-            for element in root.iter("simSettings")
-        )
+        # Check if an identical <simSettings> element already exists
+        sim_elem = root.find(f'.//simSettings[sim="{the_sim}"]'
+                             f'[device="{the_device}"]'
+                             f'[name="{setting_name}"]')
 
-        if sim_elem_exists:
-                print("<simSettings> element with the same values already exists. Skipping.")
+        if sim_elem is not None:
+            # Update the value of the existing element
+            for child_elem in sim_elem:
+                if child_elem.tag == 'value':
+                    child_elem.text = str(the_value)
+            tree.write(self.userconfig_path)
+            print(f"Updated <simSettings> element with values: sim={the_sim}, device={the_device}, "
+                  f"value={the_value}, name={setting_name}")
 
         else:
-            # Create child elements with the specified content
+            # Create a new <simSettings> element
             sims = ET.SubElement(root, "simSettings")
             for tag, value in [("name", setting_name),
                                ("value", the_value),
-                               ("sim", self.sim),
-                               ("device", self.device)]:
+                               ("sim", the_sim),
+                               ("device", the_device)]:
                 ET.SubElement(sims, tag).text = value
 
             # Write the modified XML back to the file
             tree = ET.ElementTree(root)
             tree.write(self.userconfig_path)
             print(
-                f"Added <simSettings> element with values: sim={self.sim}, device={self.device}, value={the_value}, name={setting_name}")
+                f"Added <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}, name={setting_name}")
 
+
+    def write_converted_to_xml(self, differences):
+        sim_set = []
+        class_set = []
+        model_set = []
+
+        for dif in differences:
+            if dif['sim'] == 'any':
+                model_set.append(dif)
+            else:
+                if dif['class'] != '':
+                    class_set.append(dif)
+                else:
+                    sim_set.append(dif)
+        for s in sim_set:
+            self.write_sim_to_xml(s['device'], s['sim'], s['value'], s['name'])
+        for c in class_set:
+            self.write_class_to_xml(c['device'], c['sim'], c['class'], c['value'], c['name'])
+        for m in model_set:
+            self.write_models_to_xml(m['device'], m['sim'], m['model'], m['value'], m['name'])
 
     def erase_models_from_xml(self, the_model, the_value, setting_name):
         # Load the existing XML file or create a new one if it doesn't exist
@@ -1800,7 +1735,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if pattern.text not in all_models:
                     all_models.append(pattern.text)
 
-
+        self.create_empty_userxml_file()
         tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
         #for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{self.device}"]'):
