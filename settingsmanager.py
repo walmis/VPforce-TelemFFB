@@ -45,11 +45,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.backup_userconfig()
         self.init_ui()
 
-    def get_current_model(self,the_sim='Global'):
+    def get_current_model(self,the_sim=None, dbg_model_name=None, dbg_crafttype=None, ):
         # in the future, get from simconnect.
-        self.sim = the_sim
-        self.model_name = self.tb_currentmodel.text()     #type value in box for testing. will set textbox in future
-        self.crafttype = ""  # suggested, send whatever simconnect finds
+        if the_sim is not None:
+            self.sim = the_sim
+        if dbg_model_name is not None:
+            self.model_name = self.tb_currentmodel.text()     #type value in box for testing. will set textbox in future
+        if dbg_crafttype is not None:
+            self.crafttype = ""  # suggested, send whatever simconnect finds
         self.table_widget.clear()
         self.setup_table()
         self.setup_class_list()
@@ -120,7 +123,18 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def currentmodel_click(self):
         self.get_current_model(self.sim)
-
+    def update_current_aircraft(self, data_source, aircraft_name, ac_class=None):
+        send_source = data_source
+        if data_source == "MSFS2020":
+            send_source = "MSFS"
+        self.sim = send_source
+        self.model_name = aircraft_name
+        if ac_class is not None:
+            self.model_type = ac_class
+        if self.isVisible():
+            self.b_getcurrentmodel.click()
+            # self.currentmodel_click()
+            # self.get_current_model(data_source)
     def backup_userconfig(self):
         # Ensure the userconfig.xml file exists
         self.create_empty_userxml_file()
@@ -231,7 +245,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.table_widget.blockSignals(True)
         sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
         list_length = len(self.data_list)
-
+        pcount = 1
         for row, data_dict in enumerate(sorted_data):
             #
             # hide 'type' setting in class mode
@@ -254,7 +268,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                             break
                 if found_prereq: continue
 
-
             state = self.set_override_state(data_dict['replaced'])
             checkbox = QCheckBox()
             # Manually set the initial state
@@ -269,7 +282,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             #item.setStyleSheet("margin-left:50%; margin-right:50%;")
             item.setData(QtCore.Qt.UserRole, row)  # Attach row to the item
             item.setData(QtCore.Qt.CheckStateRole, QtCore.Qt.Unchecked)  # Set initial state
-
 
             grouping_item = QTableWidgetItem(data_dict['grouping'])
             displayname_item = QTableWidgetItem(data_dict['displayname'])
@@ -334,7 +346,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             self.table_widget.insertRow(row)
             self.table_widget.setItem(row, 0, item)
-            self.table_widget.setCellWidget(row, 0, checkbox)
+            try:
+                self.table_widget.setCellWidget(row, 0, checkbox)
+            except Exception as e:
+                print(f"EXCEPTION: {e}")
             self.table_widget.setItem(row, 1, grouping_item)
             self.table_widget.setItem(row, 2, displayname_item)
             self.table_widget.setItem(row, 3, value_item)

@@ -373,7 +373,7 @@ class TelemManager(QObject, threading.Thread):
             else:
                 send_source = data_source
             # cls_name,pattern, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
-            cls_name,pattern, result = self.settings_manager.read_single_model(data_source, aircraft_name)
+            cls_name,pattern, result = self.settings_manager.read_single_model(send_source, aircraft_name)
             for setting in result:
                 k = setting['name']
                 v = setting['value']
@@ -386,6 +386,7 @@ class TelemManager(QObject, threading.Thread):
                     logging.warning(f"Ignoring system setting for aircraft load from SMITTY: {k} : {vu}")
                 # print(f"SETTING:\n{setting}")
             params = utils.sanitize_dict(params)
+            self.settings_manager.update_current_aircraft(send_source, aircraft_name)
             return params, cls_name
 
             # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
@@ -805,30 +806,36 @@ class MainWindow(QMainWindow):
 
         # Add the scroll area to the layout
         layout.addWidget(scroll_area)
+        if args.xml is None:
+            edit_button = QPushButton("Edit Config File")
+            edit_button.setMinimumWidth(200)
+            edit_button.setMaximumWidth(200)
 
-        edit_button = QPushButton("Edit Config File")
-        edit_button.setMinimumWidth(200)
-        edit_button.setMaximumWidth(200)
+            layout.addWidget(edit_button, alignment=Qt.AlignCenter)
 
-        layout.addWidget(edit_button, alignment=Qt.AlignCenter)
+            # Create a sub-menu for the button
+            self.sub_menu = QMenu(edit_button)
+            # smgr_config_action = QAction("Settings Manager", self)
+            # smgr_config_action.triggered.connect(lambda: (settings_manager.show(), settings_manager.get_current_model()))
+            primary_config_action = QAction("Primary Config", self)
+            primary_config_action.triggered.connect(lambda: self.edit_config_file("Primary"))
+            if os.path.exists(args.overridefile):
+                user_config_action = QAction("User Config", self)
+                user_config_action.triggered.connect(lambda: self.edit_config_file("User"))
 
-        # Create a sub-menu for the button
-        self.sub_menu = QMenu(edit_button)
-        smgr_config_action = QAction("Settings Manager", self)
-        smgr_config_action.triggered.connect(lambda: settings_manager.show())
-        primary_config_action = QAction("Primary Config", self)
-        primary_config_action.triggered.connect(lambda: self.edit_config_file("Primary"))
-        if os.path.exists(args.overridefile):
-            user_config_action = QAction("User Config", self)
-            user_config_action.triggered.connect(lambda: self.edit_config_file("User"))
+            # self.sub_menu.addAction(smgr_config_action)
+            self.sub_menu.addAction(primary_config_action)
+            if os.path.exists(args.overridefile):
+                self.sub_menu.addAction(user_config_action)
 
-        self.sub_menu.addAction(smgr_config_action)
-        self.sub_menu.addAction(primary_config_action)
-        if os.path.exists(args.overridefile):
-            self.sub_menu.addAction(user_config_action)
-
-        # Connect the button's click event to show the sub-menu
-        edit_button.clicked.connect(self.show_sub_menu)
+            # Connect the button's click event to show the sub-menu
+            edit_button.clicked.connect(self.show_sub_menu)
+        else:
+            edit_button = QPushButton("Settings Manager")
+            edit_button.setMinimumWidth(200)
+            edit_button.setMaximumWidth(200)
+            edit_button.clicked.connect(lambda: (settings_manager.show(), settings_manager.get_current_model()))
+            layout.addWidget(edit_button, alignment=Qt.AlignCenter)
 
         self.log_button = QPushButton("Open/Hide Log")
         self.log_button.setMinimumWidth(200)
@@ -978,7 +985,7 @@ def main():
     d = LogWindow()
     #d.show()
     global settings_mgr
-    settings_mgr = SettingsWindow()
+    settings_mgr = SettingsWindow(device=args.type)
 
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
