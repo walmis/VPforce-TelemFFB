@@ -211,9 +211,13 @@ def config_has_changed(update=False) -> bool:
     global _config
     
     # "hash" both mtimes together
-    tm = int(os.path.getmtime(configfile))
-    if os.path.exists(overridefile):
-        tm += int(os.path.getmtime(overridefile))
+    if args.xml is not None:
+        userfile=os.path.join(os.environ['LOCALAPPDATA'], "VPforce-TelemFFB", "userconfig.xml")
+        tm = int(os.path.getmtime(userfile))
+    else:
+        tm = int(os.path.getmtime(configfile))
+        if os.path.exists(overridefile):
+            tm += int(os.path.getmtime(overridefile))
     if update:
         _config_mtime = tm
 
