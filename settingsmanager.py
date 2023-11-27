@@ -14,6 +14,12 @@ import xml.dom.minidom
 
 
 class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
+    defaults_path = 'defaults.xml'
+    userconfig_path = 'userconfig.xml'
+
+    input_sim = ""
+    input_model_name = ""
+    input_model_type = ""
 
     sim = ""                             # DCS, MSFS, IL2       -- set in get_current_model below
     model_name = "unknown airplane"    # full model name with livery etc
@@ -28,13 +34,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     allow_in_table_editing = False
 
-    def __init__(self, datasource='Global', defaults_path='defaults.xml', userconfig_path='userconfig.xml', device='joystick'):
+    def __init__(self, datasource='Global', device = 'joystick'):
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
-        self.defaults_path = defaults_path
-        self.userconfig_path = userconfig_path
+        # self.defaults_path = defaults_path
+        # self.userconfig_path = userconfig_path
         self.device = device
-        self.sim = datasource
+        self.input_sim = datasource
+        self.sim = self.input_sim
         self.b_browse.clicked.connect(self.choose_directory)
         self.b_update.clicked.connect(self.update_button)
         self.slider_float.valueChanged.connect(self.update_textbox)
@@ -46,13 +53,25 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.init_ui()
 
     def get_current_model(self,the_sim=None, dbg_model_name=None, dbg_crafttype=None, ):
+
         # in the future, get from simconnect.
         if the_sim is not None:
+
             self.sim = the_sim
+        else:
+            self.sim = self.input_sim
         if dbg_model_name is not None:
-            self.model_name = self.tb_currentmodel.text()     #type value in box for testing. will set textbox in future
+            self.model_name = dbg_model_name     #type value in box for testing. will set textbox in future
+        else:
+            self.model_name = self.input_model_name
         if dbg_crafttype is not None:
-            self.crafttype = ""  # suggested, send whatever simconnect finds
+            self.crafttype = dbg_crafttype  # suggested, send whatever simconnect finds
+        else:
+            self.crafttype = self.input_model_type
+
+        print(f'get current model {self.sim}  {self.model_name} {self.crafttype}')
+
+        self.tb_currentmodel.setText(self.model_name)
         self.table_widget.clear()
         self.setup_table()
         self.setup_class_list()
@@ -74,7 +93,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.drp_models.setCurrentText(self.model_pattern)
             self.drp_models.blockSignals(False)
         else:
-            self.set_edit_mode(self.sim)
+            if self.model_type == '':
+                self.set_edit_mode(self.sim)
+            else:
+                self.set_edit_mode('Class')
+
 
         print(f"\nCurrent: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
@@ -122,19 +145,32 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.toggle_rows()
 
     def currentmodel_click(self):
-        self.get_current_model(self.sim)
+        self.get_current_model(self.input_sim)
+
     def update_current_aircraft(self, data_source, aircraft_name, ac_class=None):
         send_source = data_source
         if data_source == "MSFS2020":
             send_source = "MSFS"
-        self.sim = send_source
-        self.model_name = aircraft_name
-        if ac_class is not None:
-            self.model_type = ac_class
+        if send_source is not None:
+            if '.' in send_source:        #  source came is as SIM.Aircrafttype, must split.
+                input = send_source.split('.')
+                self.sim = input[0]
+                self.input_model_type = input[1]
+            else:
+                self.input_sim = send_source
+                if ac_class is not None:
+                    self.input_model_type = ac_class
+                else:
+                    self.input_model_type = ''
+
+        self.input_model_name = aircraft_name
+
+
         if self.isVisible():
-            self.b_getcurrentmodel.click()
-            # self.currentmodel_click()
-            # self.get_current_model(data_source)
+             self.b_getcurrentmodel.click()
+        #     self.currentmodel_click()
+        #    self.get_current_model()
+
     def backup_userconfig(self):
         # Ensure the userconfig.xml file exists
         self.create_empty_userxml_file()
@@ -167,7 +203,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def show_user_model_dialog(self):
         current_aircraft = self.tb_currentmodel.text()
-        dialog = UserModelDialog(self.sim,current_aircraft, self)
+        dialog = UserModelDialog(self.sim,current_aircraft, self.model_type, self)
         result = dialog.exec_()
         if result == QtWidgets.QDialog.Accepted:
             # Handle accepted
@@ -833,6 +869,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         oldmode = self.edit_mode
 
         if mode != oldmode:
+            match mode:
+                case 'MSFS' | 'IL2' | 'DCS':
+                    mode = 'Sim'
+
             self.l_mode.setText(mode)
             self.edit_mode = mode
             self.setup_class_list()
@@ -1220,7 +1260,13 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def read_single_model(self, sim=None, aircraft_name=None):
         if sim is not None:
-            self.sim = sim
+            if '.' in sim:
+                input = sim.split('.')
+                sim_temp = input[0]
+                self.sim = sim_temp.replace('2020','')
+                self.model_type = input[1]
+            else:
+                self.sim = sim
         if aircraft_name is not None:
             self.model_name = aircraft_name
         print_counts = False
@@ -1250,17 +1296,19 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if model['name'] == 'type':
                     model_class = model['value']
                     break
+        if model_class == '':
+            model_class = self.input_model_type
         print(f"class: {model_class}")
 
-        # get default settings for all sims and device
-        globaldata = self.read_xml_file('Global')
-
-        if print_counts: print(f"globaldata count {len(globaldata)}")
-
-        # see what we got
-        if print_each_step:
-            print(f"\nGlobal result: Global  type: ''  device:{self.device}\n")
-            self.printconfig(globaldata)
+        # # get default settings for all sims and device
+        # globaldata = self.read_xml_file('Global')
+        #
+        # if print_counts: print(f"globaldata count {len(globaldata)}")
+        #
+        # # see what we got
+        # if print_each_step:
+        #     print(f"\nGlobal result: Global  type: ''  device:{self.device}\n")
+        #     self.printconfig(globaldata)
 
 
         # get default Aircraft settings for this sim and device
@@ -1274,9 +1322,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.printconfig(simdata)
 
         # combine base stuff
-        defaultdata = globaldata.copy()
-        if self.sim != 'Global':
-            for item in simdata: defaultdata.append(item)
+        defaultdata = simdata
+        # if self.sim != 'Global':
+        #     for item in simdata: defaultdata.append(item)
 
         if print_counts:  print(f"defaultdata count {len(defaultdata)}")
 
@@ -1358,6 +1406,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         sorted_data = sorted(final_result, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
         print(f"final count {len(final_result)}")
+
+
         return model_class, model_pattern, sorted_data
 
     def write_models_value_to_xml(self, the_model, the_value, setting_name):
@@ -1741,6 +1791,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if pattern.text not in all_models:
                     all_models.append(pattern.text)
 
+
         tree = ET.parse(self.userconfig_path)
         root = tree.getroot()
         #for model_elem in root.findall(f'.//models[sim="{mysim}"][device="{self.device}"]'):
@@ -1755,18 +1806,18 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if pattern.text not in all_models:
                     all_models.append(pattern.text)
 
-        return all_models
+        return sorted(all_models)
 
 
 class UserModelDialog(QDialog):
-    def __init__(self, sim, current_aircraft, parent=None):
+    def __init__(self, sim, current_aircraft, current_type, parent=None):
         super(UserModelDialog, self).__init__(parent)
         self.combo_box = None
         self.tb_current_aircraft = None
         self.setWindowTitle("Create Model Setting")
-        self.init_ui(sim, current_aircraft)
+        self.init_ui(sim, current_aircraft,current_type)
 
-    def init_ui(self,sim,current_aircraft):
+    def init_ui(self,sim,current_aircraft,current_type):
 
 
         layout = QVBoxLayout()
@@ -1796,6 +1847,7 @@ class UserModelDialog(QDialog):
         self.combo_box = QComboBox()
         self.combo_box.addItems(classes)
         self.combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
+        self.combo_box.setCurrentText(current_type)
 
         ok_button = QPushButton("OK")
         ok_button.setStyleSheet("text-align:center;")

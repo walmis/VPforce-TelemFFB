@@ -373,25 +373,27 @@ class TelemManager(QObject, threading.Thread):
             else:
                 send_source = data_source
             # cls_name,pattern, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
+            self.settings_manager.update_current_aircraft(send_source, aircraft_name)
             cls_name,pattern, result = self.settings_manager.read_single_model(send_source, aircraft_name)
+            if cls_name == '': cls_name = 'Aircraft'
             for setting in result:
                 k = setting['name']
                 v = setting['value']
                 u = setting['unit']
                 vu= v+u
-                if setting["grouping"] != "System":
+                if setting['value'] != '-':
                     params[k] = vu
-                    logging.warning(f"Got from SMITTY: {k} : {vu}")
+                    logging.warning(f"Got from Settings Manager: {k} : {vu}")
                 else:
-                    logging.warning(f"Ignoring system setting for aircraft load from SMITTY: {k} : {vu}")
+                    logging.warning(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
                 # print(f"SETTING:\n{setting}")
             params = utils.sanitize_dict(params)
-            self.settings_manager.update_current_aircraft(send_source, aircraft_name)
+
             return params, cls_name
 
             # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
         except Exception as e:
-            logging.warning(f"Error getting settings from SMITTY:{e}")
+            logging.warning(f"Error getting settings from Settings Manager:{e}")
 
     def quit(self):
         self._run = False
@@ -470,6 +472,7 @@ class TelemManager(QObject, threading.Thread):
         if aircraft_name and aircraft_name != self.currentAircraftName:
             
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
+
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
 
                 Class = getattr(module, cls_name, None)
@@ -727,16 +730,28 @@ class MainWindow(QMainWindow):
         # layout.addWidget(QLabel(f"Config File: {args.configfile}"))
         cfg_layout = QHBoxLayout()
         self.cfg_label = QLabel()
-        self.cfg_label.setText(f"Config File: {args.configfile}")
-        self.cfg_label.setToolTip("You can use a custom configuration file by passing the -c argument to TelemFFB\n\nExample: \"VPForce-TelemFFB.exe -c customconfig.ini\"")
-
         self.ovrd_label = QLabel()
-        if os.path.exists(args.overridefile):
-            self.ovrd_label.setText(f"User Override File: {args.overridefile}")
-        else:
-            self.ovrd_label.setText(f"User Override File: None")
 
-        self.ovrd_label.setToolTip("Rename \'config.user.ini.README\' to \'config.user.ini\' or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o argument\n\nExample \"VPForce-TelemFFB.exe -o myconfig.user.ini\" (starting TelemFFB without the override flag will look for the default config.user.ini)")
+        # show xml file info
+        if args.xml is None:
+
+            self.cfg_label.setText(f"Config File: {args.configfile}")
+            self.cfg_label.setToolTip("You can use a custom configuration file by passing the -c argument to TelemFFB\n\nExample: \"VPForce-TelemFFB.exe -c customconfig.ini\"")
+
+            if os.path.exists(args.overridefile):
+                self.ovrd_label.setText(f"User Override File: {args.overridefile}")
+            else:
+                self.ovrd_label.setText(f"User Override File: None")
+
+            self.ovrd_label.setToolTip("Rename \'config.user.ini.README\' to \'config.user.ini\' or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o argument\n\nExample \"VPForce-TelemFFB.exe -o myconfig.user.ini\" (starting TelemFFB without the override flag will look for the default config.user.ini)")
+
+        else:
+            self.cfg_label.setText(f"XML Defaults File: {SettingsWindow.defaults_path}")
+            self.cfg_label.setToolTip("Use the Settings Manager to customize aircraft settings")
+
+            if os.path.exists(SettingsWindow.userconfig_path):
+                self.ovrd_label.setText(f"User Override File: {SettingsWindow.userconfig_path}")
+
         self.ovrd_label.setAlignment(Qt.AlignLeft)
         self.cfg_label.setAlignment(Qt.AlignLeft)
 

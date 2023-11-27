@@ -34,13 +34,6 @@
       </property>
      </widget>
     </item>
-    <item row="35" column="4">
-     <widget class="QPushButton" name="b_createusermodel">
-      <property name="text">
-       <string>Create Model Setting</string>
-      </property>
-     </widget>
-    </item>
     <item row="8" column="4">
      <widget class="QLabel" name="label_5">
       <property name="text">
@@ -134,13 +127,6 @@
      <widget class="QLabel" name="label_4">
       <property name="text">
        <string>Simulator</string>
-      </property>
-     </widget>
-    </item>
-    <item row="35" column="6">
-     <widget class="QLineEdit" name="tb_currentmodel">
-      <property name="text">
-       <string>Wilga 80X</string>
       </property>
      </widget>
     </item>
@@ -279,6 +265,13 @@
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+    <item row="33" column="11">
+     <widget class="QLabel" name="label_8">
+      <property name="text">
+       <string>to allow selection and editing</string>
       </property>
      </widget>
     </item>
@@ -486,10 +479,20 @@
       </property>
      </widget>
     </item>
-    <item row="33" column="11">
-     <widget class="QLabel" name="label_8">
+    <item row="35" column="4">
+     <widget class="QPushButton" name="b_createusermodel">
       <property name="text">
-       <string>to allow selection and editing</string>
+       <string>Create Model Setting</string>
+      </property>
+     </widget>
+    </item>
+    <item row="35" column="6" colspan="5">
+     <widget class="QLineEdit" name="tb_currentmodel">
+      <property name="text">
+       <string>Wilga 80X</string>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
       </property>
      </widget>
     </item>

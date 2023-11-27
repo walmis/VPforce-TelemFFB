@@ -337,8 +337,13 @@ def to_number(v : str):
             v = v.strip("deg")
         if v.lower().endswith("ms"): # strip out milliseconds suffix
             v = v.strip("ms")
-        if v.lower().endswith("hz"): # strip out hertz suffix
+        if v.lower().endswith("hz"):  # strip out hertz suffix
             v = v.strip("hz")
+        if v.lower().endswith("m"):  # strip out m meters suffix
+                v = v.strip("m")
+        if v.lower().endswith("ft"): # handle ft->m conversion
+            scale = 0.3048
+            v = v.strip("ft")
 
         if "." in v:
             return float(v) * scale
