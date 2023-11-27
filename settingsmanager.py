@@ -15,7 +15,9 @@ import xml.dom.minidom
 
 class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     defaults_path = 'defaults.xml'
-    userconfig_path = 'userconfig.xml'
+
+    userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'],"VPForce-TelemFFB")
+    userconfig_path = os.path.join(userconfig_rootpath , 'userconfig.xml')
 
     input_sim = ""
     input_model_name = ""
@@ -167,8 +169,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         if self.isVisible():
-             self.b_getcurrentmodel.click()
-        #     self.currentmodel_click()
+            self.b_getcurrentmodel.click()
+        #    self.currentmodel_click()
         #    self.get_current_model()
 
     def backup_userconfig(self):
@@ -457,7 +459,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             row = selected_items[0].row()
             if row is not None:
 
-                print(f"Clicked on Row {row + 1}")
+                #print(f"Clicked on Row {row + 1}")
 
                 for col in range(self.table_widget.columnCount()):
 
@@ -668,7 +670,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_models.setCurrentText('')
                     self.drp_models.setCurrentText(mymodel)
         # make value editable & reset view
+
             self.reload_table()
+            self.table_widget.selectRow(row)
+            self.handle_item_click()
 
         else:
             match self.edit_mode:
@@ -700,6 +705,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.reload_table()
             self.clear_propmgr()
             self.table_widget.blockSignals(False)
+
 
     def sort_elements(self):
         # Parse the XML file
@@ -1298,7 +1304,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     break
         if model_class == '':
             model_class = self.input_model_type
-        print(f"class: {model_class}")
+        #print(f"class: {model_class}")
 
         # # get default settings for all sims and device
         # globaldata = self.read_xml_file('Global')
@@ -1405,7 +1411,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.check_prereq_value(final_result)
 
         sorted_data = sorted(final_result, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
-        print(f"final count {len(final_result)}")
+        #print(f"final count {len(final_result)}")
 
 
         return model_class, model_pattern, sorted_data
@@ -1770,6 +1776,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Create an empty XML file with the specified root element
             root = ET.Element("TelemFFB")
             tree = ET.ElementTree(root)
+
+            if not os.path.exists(self.userconfig_rootpath):
+                os.makedirs(self.userconfig_rootpath)
             tree.write(self.userconfig_path)
             print(f"Empty XML file created at {self.userconfig_path}")
         else:

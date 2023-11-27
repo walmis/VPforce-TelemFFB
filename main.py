@@ -730,11 +730,11 @@ class MainWindow(QMainWindow):
         # layout.addWidget(QLabel(f"Config File: {args.configfile}"))
         cfg_layout = QHBoxLayout()
         self.cfg_label = QLabel()
-        self.ovrd_label = QLabel()
+
 
         # show xml file info
         if args.xml is None:
-
+            self.ovrd_label = QLabel()
             self.cfg_label.setText(f"Config File: {args.configfile}")
             self.cfg_label.setToolTip("You can use a custom configuration file by passing the -c argument to TelemFFB\n\nExample: \"VPForce-TelemFFB.exe -c customconfig.ini\"")
 
@@ -744,18 +744,22 @@ class MainWindow(QMainWindow):
                 self.ovrd_label.setText(f"User Override File: None")
 
             self.ovrd_label.setToolTip("Rename \'config.user.ini.README\' to \'config.user.ini\' or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o argument\n\nExample \"VPForce-TelemFFB.exe -o myconfig.user.ini\" (starting TelemFFB without the override flag will look for the default config.user.ini)")
+            cfg_layout.addWidget(self.cfg_label)
 
         else:
-            self.cfg_label.setText(f"XML Defaults File: {SettingsWindow.defaults_path}")
-            self.cfg_label.setToolTip("Use the Settings Manager to customize aircraft settings")
-
+            # self.cfg_label.setText(f"XML Defaults File: {SettingsWindow.defaults_path}")
+            # self.cfg_label.setToolTip("Use the Settings Manager to customize aircraft settings")
+            self.ovrd_label = ClickableLabel()
             if os.path.exists(SettingsWindow.userconfig_path):
-                self.ovrd_label.setText(f"User Override File: {SettingsWindow.userconfig_path}")
+                self.ovrd_label.setText(f"User File: {SettingsWindow.userconfig_path}")
+
+            self.ovrd_label.setToolTip("Use the Settings Manager to customize aircraft settings.\nClick to open the userconfig directory if you need to send the file for support.")
+
 
         self.ovrd_label.setAlignment(Qt.AlignLeft)
         self.cfg_label.setAlignment(Qt.AlignLeft)
 
-        cfg_layout.addWidget(self.cfg_label)
+
         cfg_layout.addWidget(self.ovrd_label)
 
         layout.addLayout(cfg_layout)
@@ -955,7 +959,8 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(file_url)
         except:
             logging.error(f"There was an error opening the config file")
-            
+
+
     def toggle_log_window(self):
         if d.isVisible():
             d.hide()
@@ -992,6 +997,14 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             traceback.print_exc()
+class ClickableLabel(QLabel):
+    def __init__(self, parent=None):
+        super(ClickableLabel, self).__init__(parent)
+
+    def mousePressEvent(self, event):
+        os.startfile(SettingsWindow.userconfig_rootpath,'open')
+        print("userpath opened")
+        # Example: SettingsWindow.some_function()
 
 def main():
     app = QApplication(sys.argv)
