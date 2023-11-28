@@ -200,6 +200,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Copy the backup file to userconfig.xml
             shutil.copy2(backup_path, self.userconfig_path)
             print(f"Backup '{backup_path}' restored to userconfig.xml")
+            self.get_current_model()
+
         except Exception as e:
             print(f"Error restoring backup: {e}")
 
@@ -422,6 +424,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.itemChanged.connect(self.handle_item_change)  # Connect to the custom function
 
         self.table_widget.blockSignals(False)
+
     def toggle_rows(self):
         show_inherited = self.cb_show_inherited.isChecked()
 
@@ -434,8 +437,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             else:
                 self.table_widget.setRowHidden(row, not show_inherited)
 
-
-
     def clear_propmgr(self):
         self.l_displayname.setText("Select a Row to Edit")
         self.cb_enable.hide()
@@ -447,9 +448,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_valuebox.hide()
         self.tb_value.hide()
         self.b_browse.hide()
-
-
-
 
     def handle_item_click(self):
         selected_items = self.table_widget.selectedItems()
@@ -617,7 +615,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 self.drp_class.setCurrentText('')
                 self.drp_class.setCurrentText(myclass)
             case 'Model':
-                self.write_models_value_to_xml(self.device, self.sim, self.model_pattern, new_value, name)
+                self.write_models_to_xml(self.device, self.sim, self.model_pattern, new_value, name)
                 self.drp_models.setCurrentText('')
                 self.drp_models.setCurrentText(mymodel)
         self.reload_table()
@@ -1424,7 +1422,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         root = tree.getroot()
 
         # Check if an identical <models> element already exists
-        model_elem = root.find(f'.//models[sim="{the_sim}"]'
+        model_elem = root.find(f'.//models' #[sim="{the_sim}"]'
                                f'[device="{the_device}"]'
                                f'[model="{the_model}"]'
                                f'[name="{setting_name}"]')
@@ -1434,6 +1432,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             for child_elem in model_elem:
                 if child_elem.tag == 'value':
                     child_elem.text = str(the_value)
+                if child_elem.tag == 'sim':
+                    if child_elem.text == 'any':
+                        child_elem.text = the_sim
             tree.write(self.userconfig_path)
             print(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
                   f"value={the_value}, model={the_model}, name={setting_name}")
