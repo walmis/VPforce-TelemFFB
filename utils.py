@@ -309,6 +309,7 @@ def to_number(v : str):
     """Try to convert string to number
     If unable, return the original string
     """
+    orig_v = v
     try:
         # handle boolean strings -> bool return
         lower = v.lower()
@@ -346,12 +347,13 @@ def to_number(v : str):
             v = v.strip("ft")
 
         if "." in v:
-            return float(v) * scale
+            return round(float(v) * scale, 4)
         else:
             return int(v) * scale
         
     except ValueError:
-        return v
+        #return v
+        return orig_v
     
 def sanitize_dict(d):
     out = {}
