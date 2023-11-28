@@ -341,10 +341,15 @@ def to_number(v : str):
         if v.lower().endswith("hz"):  # strip out hertz suffix
             v = v.strip("hz")
         if v.lower().endswith("m"):  # strip out m meters suffix
-                v = v.strip("m")
-        if v.lower().endswith("ft"): # handle ft->m conversion
+            v = v.strip("m")
+        if v.lower().endswith("ft"):  # handle ft->m conversion
             scale = 0.3048
             v = v.strip("ft")
+        if v.lower().endswith("m^2"):  # strip out m meters suffix
+            v = v.strip("m^2")
+        if v.lower().endswith("ft^2"):  # handle ft^2->m^2 conversion
+            scale = 0.092903
+            v = v.strip("ft^2")
 
         if "." in v:
             return round(float(v) * scale, 4)

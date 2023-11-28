@@ -13,15 +13,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<displayname>Aileron Area</displayname>
-		<name>aileron_area</name>
-		<datatype>anyfloat</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<info>square meters of ailerons</info>
-	</defaults>
-	<defaults>
-		<Grouping>Basic</Grouping>
 		<displayname>Aileron Gain</displayname>
 		<name>aileron_gain</name>
 		<value>0.2</value>
@@ -267,15 +258,6 @@
 		<validvalues>0-100%</validvalues>
 		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		</defaults>
-	<defaults>
-		<Grouping>Basic</Grouping>
-		<displayname>Elevator Area</displayname>
-		<name>elevator_area</name>
-		<datatype>anyfloat</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<info>square meters</info>
-	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
 		<displayname>Elevator Droop Moment</displayname>
@@ -985,16 +967,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>Basic</Grouping>
-		<displayname>Rudder Area</displayname>
-		<name>rudder_area</name>
-		<value>0.8</value>
-		<datatype>anyfloat</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-		<info>square meters of rudder control surface</info>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
