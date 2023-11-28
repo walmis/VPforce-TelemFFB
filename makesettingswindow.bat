@@ -1,1 +1,0 @@
-pyuic5 settingswindow.ui -o settingswindow.py

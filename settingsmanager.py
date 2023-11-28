@@ -1,3 +1,4 @@
+import logging
 import xml.etree.ElementTree as ET
 import sys
 import os
@@ -12,6 +13,12 @@ from settingswindow import Ui_SettingsWindow
 import re
 import xml.dom.minidom
 
+print_debugs = True
+
+
+def lprint(msg):
+    if print_debugs:
+        print(msg)
 
 class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     defaults_path = 'defaults.xml'
@@ -71,7 +78,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             self.crafttype = self.input_model_type
 
-        print(f'get current model {self.sim}  {self.model_name} {self.crafttype}')
+        lprint(f'get current model {self.sim}  {self.model_name} {self.crafttype}')
 
         self.tb_currentmodel.setText(self.model_name)
         self.table_widget.clear()
@@ -101,7 +108,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 self.set_edit_mode('Class')
 
 
-        print(f"\nCurrent: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
+        lprint(f"\nCurrent: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
         # put model name and class into UI
 
@@ -184,26 +191,26 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Copy the userconfig.xml file to the backup location
             shutil.copy2(self.userconfig_path, backup_path)
             #shutil.copy2(self.userconfig_path, backup_path_time)        #  do we want lots of backups?
-            print(f"Backup created: {backup_path}")
+            lprint(f"Backup created: {backup_path}")
         except Exception as e:
-            print(f"Error creating backup: {e}")
+            lprint(f"Error creating backup: {e}")
 
     def restore_userconfig_backup(self):
         # Ensure the backup file exists
         backup_path = self.userconfig_path + ".backup"
 
         if not os.path.isfile(backup_path):
-            print(f"Backup file '{backup_path}' not found.")
+            lprint(f"Backup file '{backup_path}' not found.")
             return
 
         try:
             # Copy the backup file to userconfig.xml
             shutil.copy2(backup_path, self.userconfig_path)
-            print(f"Backup '{backup_path}' restored to userconfig.xml")
+            lprint(f"Backup '{backup_path}' restored to userconfig.xml")
             self.get_current_model()
 
         except Exception as e:
-            print(f"Error restoring backup: {e}")
+            lprint(f"Error restoring backup: {e}")
 
     def show_user_model_dialog(self):
         current_aircraft = self.tb_currentmodel.text()
@@ -236,23 +243,23 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             case 'DCS':
                 for disable in { 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter'}:
-                    if print_debug: print(f"disable {disable}")
+                    if print_debug: lprint(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
                 for enable in {'PropellerAircraft', 'JetAircraft', 'Helicopter'}:
-                    if print_debug: print(f"enable {enable}")
+                    if print_debug: lprint(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'IL2':
                 for disable in {'TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
-                    if print_debug: print(f"disable {disable}")
+                    if print_debug: lprint(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
                 for enable in {'PropellerAircraft', 'JetAircraft'}:
-                    if print_debug: print(f"enable {enable}")
+                    if print_debug: lprint(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'MSFS':
                 for enable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
-                    if print_debug: print(f"enable {enable}")
+                    if print_debug: lprint(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
         #self.drp_class.addItems(classes)
@@ -302,7 +309,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 for pr in self.prereq_list:
                     if pr['prereq']==data_dict['prereq']:
                         if pr['value'].lower() == 'false':
-                            print(f"name: {data_dict['displayname']} data: {data_dict['prereq']}  pr:{pr['prereq']}  value:{pr['value']}")
+                            lprint(f"name: {data_dict['displayname']} data: {data_dict['prereq']}  pr:{pr['prereq']}  value:{pr['value']}")
                             self.table_widget.setRowHeight(row, 0)
                             found_prereq = True
                             break
@@ -348,7 +355,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             value_item.setData(Qt.UserRole + 6, str(state))  # Attach datatype to the item
 
 
-            #print(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
+            #lprint(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
 
             # Check if replaced is an empty string and set text color accordingly
             for item in [grouping_item, displayname_item, value_item, info_item, replaced_item]:
@@ -389,7 +396,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             try:
                 self.table_widget.setCellWidget(row, 0, checkbox)
             except Exception as e:
-                print(f"EXCEPTION: {e}")
+                logging.error(f"EXCEPTION: {e}")
             self.table_widget.setItem(row, 1, grouping_item)
             self.table_widget.setItem(row, 2, displayname_item)
             self.table_widget.setItem(row, 3, value_item)
@@ -457,7 +464,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             row = selected_items[0].row()
             if row is not None:
 
-                #print(f"Clicked on Row {row + 1}")
+                #lprint(f"Clicked on Row {row + 1}")
 
                 for col in range(self.table_widget.columnCount()):
 
@@ -569,7 +576,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         directory = QFileDialog.getExistingDirectory(self, "Choose Directory", options=options)
 
         if directory:
-            print(f"Selected Directory: {directory}")
+            lprint(f"Selected Directory: {directory}")
             self.tb_value.setText(directory)
 
     def handle_item_change(self,  item):
@@ -594,11 +601,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
             if new_value != original_value:
-                print(f"{item.column()} : CHANGED ")
+                lprint(f"{item.column()} : CHANGED ")
 
                 self.write_values(name, new_value)
 
-                print(
+                lprint(
                             f"Row {row} - Name: {name}, Original: {original_value}, New: {new_value}, Unit: {unit}, Datatype: {datatype}, valid values: {valid}")
 
     def write_values(self, name, new_value):
@@ -639,7 +646,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     # blows up 0x0000005 after 3 clicks
 
     def override_state_changed(self, row, data_dict, state):
-        print(f"Override - Row: {row}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+        lprint(f"Override - Row: {row}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
         mysim = self.drp_sim.currentText()
         myclass = self.drp_class.currentText()
         mymodel = self.drp_models.currentText()
@@ -650,19 +657,19 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # add row to userconfig
             match self.edit_mode:
                 case 'Global' | 'Sim':
-                    print(f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    lprint(f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
                     self.write_sim_to_xml(self.device, self.sim,data_dict['value'],data_dict['name'])
                     self.sort_elements()
                     self.drp_sim.setCurrentText('')
                     self.drp_sim.setCurrentText(mysim)
                 case 'Class':
-                    print(f"Override - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    lprint(f"Override - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
                     self.write_class_to_xml(self.device, self.sim, myclass, data_dict['value'],data_dict['name'])
                     self.sort_elements()
                     self.drp_class.setCurrentText('')
                     self.drp_class.setCurrentText(myclass)
                 case 'Model':
-                    print(f"Override - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    lprint(f"Override - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
                     self.write_models_to_xml(self.device, self.sim, self.drp_models.currentText(),data_dict['value'],data_dict['name'])
                     self.sort_elements()
                     self.drp_models.setCurrentText('')
@@ -676,25 +683,25 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             match self.edit_mode:
                 case 'Global':
-                    print(
+                    lprint(
                         f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
                     self.erase_sim_from_xml(data_dict['value'], data_dict['name'])
                     self.drp_sim.setCurrentText('')
                     self.drp_sim.setCurrentText(mysim)
                 case 'Sim':
-                    print(
+                    lprint(
                         f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
                     self.erase_sim_from_xml(data_dict['value'], data_dict['name'])
                     self.drp_sim.setCurrentText('')
                     self.drp_sim.setCurrentText(mysim)
                 case 'Class':
-                    print(
+                    lprint(
                         f"Remove - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
                     self.erase_class_from_xml(self.drp_class.currentText(), data_dict['value'], data_dict['name'])
                     self.drp_class.setCurrentText('')
                     self.drp_class.setCurrentText(myclass)
                 case 'Model':
-                    print(
+                    lprint(
                         f"Remove - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
                     self.erase_models_from_xml(self.drp_models.currentText(), data_dict['value'], data_dict['name'])
                     self.drp_models.setCurrentText('')
@@ -744,7 +751,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             # Replace the following line with your actual XML reading logic
             self.model_type, self.model_pattern, self.data_list = self.read_single_model()
-            print(f"\nmodel change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
+            lprint(f"\nmodel change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
             # Update the table with the new data
             self.drp_class.blockSignals(True)
@@ -752,10 +759,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.drp_class.blockSignals(False)
 
         else:
-            print("model cleared")
+            lprint("model cleared")
             self.set_edit_mode('Class')
             old_model_type = self.model_type
-            print(self.model_type)
+            lprint(self.model_type)
             self.drp_class.setCurrentText('')
             self.drp_class.setCurrentText(old_model_type)
 
@@ -773,15 +780,15 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             self.reload_table()
 
-            print(
+            lprint(
                 f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
         else:
-            print("class cleared")
+            lprint("class cleared")
             self.drp_class.setCurrentText('')
             self.set_edit_mode('Sim')
             old_sim = self.sim
-            print(self.model_type)
+            lprint(self.model_type)
             self.drp_sim.setCurrentText('Global')
             self.drp_sim.setCurrentText(old_sim)
 
@@ -805,7 +812,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         self.reload_table()
 
-        print(f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
+        lprint(f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
     def reload_table(self):
         self.table_widget.blockSignals(True)
@@ -819,7 +826,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.table_widget.blockSignals(False)
 
     def create_datatype_item(self, datatype, value, unit, checkstate):
-        #print(f"{datatype} {value}")
+        #lprint(f"{datatype} {value}")
         if datatype == 'bool':
             toggle = QCheckBox()
             toggle.setChecked(value.lower() == 'true')
@@ -926,7 +933,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
 
-        print(f"{mode} Mode")
+        lprint(f"{mode} Mode")
 
 
     def get_craft_attributes(file_path, sim, device):
@@ -957,7 +964,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             grouping = defaults_elem.find('Grouping').text
             name = defaults_elem.find('name').text
-            # print(name)
+            # lprint(name)
             displayname = defaults_elem.find('displayname').text
             datatype = defaults_elem.find('datatype').text
             unit_elem = defaults_elem.find('unit')
@@ -993,11 +1000,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             data_list.append(data_dict)
 
-            # print(data_list)
+            # lprint(data_list)
         # Sort the data by grouping and then by name
 
         sorted_data = sorted(data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
-        # print(sorted_data)
+        # lprint(sorted_data)
         # printconfig(sim, craft, sorted_data)
         return sorted_data
 
@@ -1022,9 +1029,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if data_dict is not None and data_dict['prereq'] != '' and data_dict not in data_list:
                 data_list.append(data_dict)
 
-            # print(data_list)
+            # lprint(data_list)
 
-        # print(sorted_data)
+        # lprint(sorted_data)
         # printconfig(sim, craft, sorted_data)
         return data_list
 
@@ -1068,9 +1075,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
     def printconfig(self, sorted_data):
-        # print("printconfig: " +sorted_data)
+        # lprint("printconfig: " +sorted_data)
         show_source = False
-        print("#############################################")
+        lprint("#############################################")
 
         # Print the sorted data with group names and headers
         current_group = None
@@ -1079,8 +1086,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if item['grouping'] != current_group:
                 current_group = item['grouping']
                 if current_header is not None:
-                    print("\n\n")  # Separate sections with a blank line
-                print(f"\n# {current_group}")
+                    lprint("\n\n")  # Separate sections with a blank line
+                lprint(f"\n# {current_group}")
             tabstring = "\t\t"
             replacestring = ''
             if show_source:
@@ -1095,7 +1102,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             spacing = 50 - (len(item['name']) + len(item['value']) + len(item['unit']))
             space = " " * spacing + " # " + replacestring + " # "
 
-            print(f"{tabstring}{item['name']} = {item['value']} {item['unit']} {space} {item['info']}")
+            lprint(f"{tabstring}{item['name']} = {item['value']} {item['unit']} {space} {item['info']}")
 
 
     def read_models_data(self,file_path, full_model_name):
@@ -1303,27 +1310,27 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     break
         if model_class == '':
             model_class = self.input_model_type
-        #print(f"class: {model_class}")
+        #lprint(f"class: {model_class}")
 
         # # get default settings for all sims and device
         # globaldata = self.read_xml_file('Global')
         #
-        # if print_counts: print(f"globaldata count {len(globaldata)}")
+        # if print_counts: lprint(f"globaldata count {len(globaldata)}")
         #
         # # see what we got
         # if print_each_step:
-        #     print(f"\nGlobal result: Global  type: ''  device:{self.device}\n")
+        #     lprint(f"\nGlobal result: Global  type: ''  device:{self.device}\n")
         #     self.printconfig(globaldata)
 
 
         # get default Aircraft settings for this sim and device
         simdata = self.read_xml_file(self.sim)
 
-        if print_counts:  print(f"simdata count {len(simdata)}")
+        if print_counts:  lprint(f"simdata count {len(simdata)}")
 
         # see what we got
         if print_each_step:
-            print(f"\nSimresult: {self.sim} type: ''  device:{self.device}\n")
+            lprint(f"\nSimresult: {self.sim} type: ''  device:{self.device}\n")
             self.printconfig(simdata)
 
         # combine base stuff
@@ -1331,7 +1338,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # if self.sim != 'Global':
         #     for item in simdata: defaultdata.append(item)
 
-        if print_counts:  print(f"defaultdata count {len(defaultdata)}")
+        if print_counts:  lprint(f"defaultdata count {len(defaultdata)}")
 
 
         # get additional class default data
@@ -1346,11 +1353,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             else:
                 default_craft_result = defaultdata
 
-            if print_counts:  print(f"default_craft_result count {len(default_craft_result)}")
+            if print_counts:  lprint(f"default_craft_result count {len(default_craft_result)}")
 
             # see what we got
             if print_each_step:
-                print(f"\nDefaultsresult: {self.sim} type: {model_class}  device:{self.device}\n")
+                lprint(f"\nDefaultsresult: {self.sim} type: {model_class}  device:{self.device}\n")
                 self.printconfig(default_craft_result)
         else:
             default_craft_result = defaultdata
@@ -1364,7 +1371,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         else:
             def_craft_userglobal_result = default_craft_result
 
-        if print_counts:  print(f"def_craft_userglobal_result count {len(def_craft_userglobal_result)}")
+        if print_counts:  lprint(f"def_craft_userglobal_result count {len(def_craft_userglobal_result)}")
 
 
         # get userconfig sim overrides
@@ -1376,7 +1383,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             else:
                 def_craft_user_default_result = def_craft_userglobal_result
 
-            if print_counts:  print(f"def_craft_user_default_result count {len(def_craft_user_default_result)}")
+            if print_counts:  lprint(f"def_craft_user_default_result count {len(def_craft_user_default_result)}")
         else:
             def_craft_user_default_result = def_craft_userglobal_result
 
@@ -1395,7 +1402,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Update result with default models data
         def_craft_models_result = self.update_data_with_models(def_craft_usercraft_result, model_data, 'Model Default')
 
-        if print_counts:  print(f"def_craft_models count {len(def_craft_models_result)}")
+        if print_counts:  lprint(f"def_craft_models count {len(def_craft_models_result)}")
 
 
         # finally get userconfig model specific overrides
@@ -1410,7 +1417,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.check_prereq_value(final_result)
 
         sorted_data = sorted(final_result, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
-        #print(f"final count {len(final_result)}")
+        #lprint(f"final count {len(final_result)}")
 
 
         return model_class, model_pattern, sorted_data
@@ -1436,7 +1443,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     if child_elem.text == 'any':
                         child_elem.text = the_sim
             tree.write(self.userconfig_path)
-            print(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
+            lprint(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
                   f"value={the_value}, model={the_model}, name={setting_name}")
 
         else:
@@ -1456,7 +1463,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             )
 
             if model_elem_exists:
-                print("<models> element with the same values already exists. Skipping.")
+                lprint("<models> element with the same values already exists. Skipping.")
             else:
                 # Create child elements with the specified content
                 models = ET.SubElement(root, "models")
@@ -1470,7 +1477,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 # Write the modified XML back to the file
                 tree = ET.ElementTree(root)
                 tree.write(self.userconfig_path)
-                print(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
+                lprint(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
                       f"value={the_value}, model={the_model}, name={setting_name}")
 
 
@@ -1491,7 +1498,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if child_elem.tag == 'value':
                     child_elem.text = str(the_value)
             tree.write(self.userconfig_path)
-            print(f"Updated <classSettings> element with values: sim={the_sim}, device={the_device}, "
+            lprint(f"Updated <classSettings> element with values: sim={the_sim}, device={the_device}, "
                   f"value={the_value}, model={the_class}, name={setting_name}")
 
         else:
@@ -1507,7 +1514,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Write the modified XML back to the file
             tree = ET.ElementTree(root)
             tree.write(self.userconfig_path)
-            print(f"Added <classSettings> element with values: sim={the_sim}, device={the_device}, "
+            lprint(f"Added <classSettings> element with values: sim={the_sim}, device={the_device}, "
                   f"value={the_value}, type={the_class}, name={setting_name}")
 
 
@@ -1527,7 +1534,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if child_elem.tag == 'value':
                     child_elem.text = str(the_value)
             tree.write(self.userconfig_path)
-            print(f"Updated <simSettings> element with values: sim={the_sim}, device={the_device}, "
+            lprint(f"Updated <simSettings> element with values: sim={the_sim}, device={the_device}, "
                   f"value={the_value}, name={setting_name}")
 
         else:
@@ -1542,7 +1549,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Write the modified XML back to the file
             tree = ET.ElementTree(root)
             tree.write(self.userconfig_path)
-            print(
+            lprint(
                 f"Added <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}, name={setting_name}")
 
 
@@ -1587,7 +1594,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             root.remove(elem)
             # Write the modified XML back to the file
             tree.write(self.userconfig_path)
-            print(f"Removed <models> element with values: sim={self.sim}, device={self.device}, "
+            lprint(f"Removed <models> element with values: sim={self.sim}, device={self.device}, "
                       f"value={the_value}, model={the_model}, name={setting_name}")
 
 
@@ -1612,7 +1619,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             root.remove(elem)
             # Write the modified XML back to the file
             tree.write(self.userconfig_path)
-            print(f"Removed <classSettings> element with values: sim={self.sim}, device={self.device}, "
+            lprint(f"Removed <classSettings> element with values: sim={self.sim}, device={self.device}, "
                       f"value={the_value}, type={the_class}, name={setting_name}")
 
 
@@ -1637,7 +1644,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             root.remove(elem)
             # Write the modified XML back to the file
             tree.write(self.userconfig_path)
-            print(f"Removed <simSettings> element with values: sim={self.sim}, device={self.device}, value={the_value}, name={setting_name}")
+            lprint(f"Removed <simSettings> element with values: sim={self.sim}, device={self.device}, value={the_value}, name={setting_name}")
 
     def update_default_data_with_craft_result(self,defaultdata, craftresult):
         updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
@@ -1716,9 +1723,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if not os.path.exists(self.userconfig_rootpath):
                 os.makedirs(self.userconfig_rootpath)
             tree.write(self.userconfig_path)
-            print(f"Empty XML file created at {self.userconfig_path}")
+            lprint(f"Empty XML file created at {self.userconfig_path}")
         else:
-            print(f"XML file exists at {self.userconfig_path}")
+            lprint(f"XML file exists at {self.userconfig_path}")
 
     def read_models(self,the_sim):
         all_models = ['']
@@ -1828,7 +1835,7 @@ class UserModelDialog(QDialog):
 #             skip = SettingsWindow.skip_bad_combos(the_sim, craft)
 #             if skip == True: continue
 #             mydata = SettingsWindow.read_xml_file(the_sim, craft)
-#             # print("main: "+ mydata)
+#             # lprint("main: "+ mydata)
 #             SettingsWindow.printconfig( mydata)
 
 
@@ -1855,7 +1862,7 @@ if __name__ == "__main__":
     # output a single model
     # model_type, model_pattern, mydata = read_single_model(defaults_path, sim, model_name, device, crafttype)
 
-    # print(f"\nData for: {sim}  model: {model_name}  pattern: {model_pattern}  class: {model_type}  device:{device}\n")
+    # lprint(f"\nData for: {sim}  model: {model_name}  pattern: {model_pattern}  class: {model_type}  device:{device}\n")
 
     # printconfig(sim, model_type, mydata)
 
