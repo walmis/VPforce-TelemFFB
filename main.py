@@ -22,6 +22,9 @@ from traceback_with_variables import print_exc, prints_exc
 
 
 import argparse
+
+import settingsmanager
+
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
 # Add destination telemetry address argument
@@ -48,6 +51,8 @@ import logging
 import sys
 import time
 import os
+
+
 sys.path.insert(0, '')
 #sys.path.append('/simconnect')
 
@@ -139,6 +144,8 @@ min_firmware_version = 'v1.0.15'
 global dev_firmware_version
 dev_firmware_version = None
 
+import xmlutils
+
 class LoggingFilter(logging.Filter):
     def __init__(self, keywords):
         self.keywords = keywords
@@ -165,6 +172,7 @@ log_filter = LoggingFilter(log_filter_strings)
 
 console_handler.addFilter(log_filter)
 file_handler.addFilter(log_filter)
+
 
 def format_dict(data, prefix=""):
     output = ""
@@ -216,7 +224,7 @@ def config_has_changed(update=False) -> bool:
     
     # "hash" both mtimes together
     if args.xml is not None:
-        userfile=os.path.join(os.environ['LOCALAPPDATA'], "VPforce-TelemFFB", "userconfig.xml")
+        userfile=settingsmanager.SettingsWindow.userconfig_path
         tm = int(os.path.getmtime(userfile))
     else:
         tm = int(os.path.getmtime(configfile))
@@ -229,11 +237,13 @@ def config_has_changed(update=False) -> bool:
         _config = None # force reloading config on next get_config call
         return True
     return False
+
+
 def get_config_xml():
     global _config
     global settings_mgr
     if _config: return _config
-    a, b, main = settings_mgr.read_single_model('Global', 'Any')
+    a, b, main = xmlutils.read_single_model('Global', '')
     # user = settingsmanager.read_xml_file(overridefile, 'global', 'Aircraft', args.type)
     params = ConfigObj()
     params['system'] = {}
@@ -242,7 +252,7 @@ def get_config_xml():
         v = setting['value']
         if setting["grouping"] == "System":
             params['system'][k] = v
-            logging.warning(f"Got from SMITTY: {k} : {v}")
+            logging.warning(f"Got Globals from Settings Manager: {k} : {v}")
     # for setting in user:
     #     k = setting['name']
     #     v = setting['value']
@@ -313,7 +323,6 @@ class LogWindow(QMainWindow):
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
-
     currentAircraft: aircrafts_dcs.Aircraft = None
     currentAircraftName: str = None
     timedOut: bool = True
@@ -379,8 +388,8 @@ class TelemManager(QObject, threading.Thread):
             else:
                 send_source = data_source
             # cls_name,pattern, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
-            self.settings_manager.update_current_aircraft(send_source, aircraft_name)
-            cls_name,pattern, result = self.settings_manager.read_single_model(send_source, aircraft_name)
+
+            cls_name, pattern, result = xmlutils.read_single_model(send_source, aircraft_name)
             if cls_name == '': cls_name = 'Aircraft'
             for setting in result:
                 k = setting['name']
@@ -433,6 +442,7 @@ class TelemManager(QObject, threading.Thread):
             continue
 
     def process_data(self, data):
+
         data = data.split(";")
 
         telem_data = {}
@@ -480,7 +490,19 @@ class TelemManager(QObject, threading.Thread):
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
 
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
+                if args.xml is not None:
 
+                    if data_source == "MSFS2020":
+                        send_source = "MSFS"
+
+                    xmlutils.current_sim = send_source
+                    xmlutils.current_aircraft_name = aircraft_name
+                    # tried hiding, still crashes
+                    # if settings_mgr.isVisible():
+                    #     settings_mgr.hide()
+                    #settingsmanager.SettingsWindow.update_current_aircraft(settings_mgr)
+
+                    #self.settings_manager.update_current_aircraft(send_source, aircraft_name, cls_name)
                 Class = getattr(module, cls_name, None)
                 logging.debug(f"CLASS={Class.__name__}")
 
@@ -865,7 +887,7 @@ class MainWindow(QMainWindow):
             edit_button = QPushButton("Settings Manager")
             edit_button.setMinimumWidth(200)
             edit_button.setMaximumWidth(200)
-            edit_button.clicked.connect(lambda: (settings_manager.show(), settings_manager.get_current_model()))
+            edit_button.clicked.connect(self.toggle_settings_window)
             layout.addWidget(edit_button, alignment=Qt.AlignCenter)
 
         self.log_button = QPushButton("Open/Hide Log")
@@ -984,7 +1006,7 @@ class MainWindow(QMainWindow):
                                 dif_item = self.config_to_dict(section,uitem,valuestring)
                                 differences.append(dif_item)
 
-        SettingsWindow.write_converted_to_xml(settings_mgr, differences)
+        xmlutils.write_converted_to_xml(differences)
 
         message = f'\n\nConverted {overridefile} for {args.type} to XML.\nYou can now use the -X argument to use the new Settings Manager\n'
         print(message)
@@ -1053,6 +1075,15 @@ class MainWindow(QMainWindow):
             d.hide()
         else:
             d.show()
+
+    def toggle_settings_window(self):
+        if settings_mgr.isVisible():
+            settings_mgr.hide()
+        else:
+            settings_mgr.show()
+            print (f"# toggle settings window   {xmlutils.current_sim} {xmlutils.current_aircraft_name}")
+            settingsmanager.SettingsWindow.currentmodel_click(settings_mgr)
+            # settingsmanager.SettingsWindow.update_current_aircraft(TelemManager.currentsim, TelemManager.currentAircraftName)
 
     def exit_application(self):
         # Perform any cleanup or save operations here

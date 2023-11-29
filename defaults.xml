@@ -454,7 +454,6 @@
 		<Grouping>Basic</Grouping>
 		<displayname>Force Trim Button</displayname>
 		<name>force_trim_button</name>
-		<value>99</value>
 		<datatype>int</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -464,7 +463,6 @@
 		<Grouping>Basic</Grouping>
 		<displayname>Force Trim Reset Button</displayname>
 		<name>force_trim_reset_button</name>
-		<value>99</value>
 		<datatype>int</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -3715,6 +3713,34 @@
 		<value>2800</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_reset_button</name>
+		<type>HPGHelicopter</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_reset_button</name>
+		<type>HPGHelicopter</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_reset_button</name>
+		<type>Helicopter</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_reset_button</name>
+		<type>Helicopter</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
 	</classdefaults>
 	<classdefaults>
 		<name>aileron_area</name>
