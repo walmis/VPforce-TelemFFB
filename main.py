@@ -502,6 +502,7 @@ class TelemManager(QObject, threading.Thread):
                     #     settings_mgr.hide()
                     #settingsmanager.SettingsWindow.update_current_aircraft(settings_mgr)
 
+
                     #self.settings_manager.update_current_aircraft(send_source, aircraft_name, cls_name)
                 Class = getattr(module, cls_name, None)
                 logging.debug(f"CLASS={Class.__name__}")

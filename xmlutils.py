@@ -10,7 +10,7 @@ current_sim = ''
 current_aircraft_name = ''
 
 print_debugs = False
-print_method_calls = True
+print_method_calls = False
 
 
 def create_empty_userxml_file():

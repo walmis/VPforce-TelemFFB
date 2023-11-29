@@ -15,7 +15,7 @@ from settingswindow import Ui_SettingsWindow
 import xmlutils
 
 print_debugs = False
-print_method_calls = True
+print_method_calls = False
 
 
 def lprint(msg):
@@ -159,6 +159,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         # create model setting button
         self.b_createusermodel.clicked.connect(self.show_user_model_dialog)
+
+        # read prereqs
+        self.prereq_list = xmlutils.read_prereqs()
+
+        # Manual Link
+        bookmarked_section =  "https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#bookmark=id.og67qrvv8gt7"
+        # <a href="https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y">Read TelemFFB manual for settings details</a>
+        self.l_manual.setText(f'<a href="{bookmarked_section}">Read TelemFFB manual for instructions</a>')
 
         # Initial visibility of rows based on checkbox state
         self.toggle_rows()
@@ -324,6 +332,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
         list_length = len(self.data_list)
         pcount = 1
+        self.prereq_list = xmlutils.read_prereqs()
+        self.data_list = xmlutils.check_prereq_value(self.prereq_list,self.data_list)
+
         for row, data_dict in enumerate(sorted_data):
             #
             # hide 'type' setting in class mode
@@ -340,7 +351,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 for pr in self.prereq_list:
                     if pr['prereq']==data_dict['prereq']:
                         if pr['value'].lower() == 'false':
-                            lprint(f"name: {data_dict['displayname']} data: {data_dict['prereq']}  pr:{pr['prereq']}  value:{pr['value']}")
+                            print(f"name: {data_dict['displayname']} data: {data_dict['prereq']}  pr:{pr['prereq']}  value:{pr['value']}")
+
                             self.table_widget.setRowHeight(row, 0)
                             found_prereq = True
                             break
@@ -413,6 +425,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemIsEditable)
             info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
             replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemIsEditable)
+            value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
 
             #
             # disable in-table value editing here
@@ -500,7 +513,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 displayname_item = self.table_widget.item(row, 2, )
                 displayname = displayname_item.text()
                 value_item = self.table_widget.item(row, 3 )
-                value = value_item.text()
+
                 info_item = self.table_widget.item(row, 4 )
                 info = info_item.text()
                 name_item = self.table_widget.item(row, 5 )
@@ -513,6 +526,22 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 unit = unit_item.text()
                 state_item = self.table_widget.item(row, 9 )
                 state = state_item.text()
+
+                if datatype == 'bool':
+                    # For a checkbox
+                    value_state = str(value_item.data(Qt.CheckStateRole))
+                    if value_state == 0:
+                        value = 'False'
+                    else:
+                        value = 'True'
+                elif datatype in ['int', 'float', 'negfloat']:
+                    # For line edit
+                    value = value_item.text()
+                else:
+                    # For other cases
+
+                    value = value_item.text()
+
 
                 self.populate_propmgr(name, displayname, value, unit, validvalues, datatype, info, state)
         else:
@@ -535,7 +564,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             case 'bool':
                 self.cb_enable.show()
                 if value == '': value = 'false'
-                self.cb_enable.setCheckState(self.strtobool(value))
+                chkvalue = 0
+                if self.strtobool(value) == 1: chkvalue = 2
+                self.cb_enable.setCheckState(chkvalue)
                 #self.tb_value.show()
                 self.tb_value.setText(value)
             case 'float':
@@ -590,6 +621,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def update_button(self,):
         mprint("update_button")
         self.write_values(self.l_name.text(),self.tb_value.text())
+        self.reload_table()
 
     def update_textbox(self, value):
         mprint(f"update_textbox  {value}")
@@ -696,13 +728,13 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     # self.drp_sim.setCurrentText('')
                     # self.drp_sim.setCurrentText(mysim)
                 case 'Class':
-                    lprint(f"Override - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    lprint(f"Override - {self.sim}.{myclass}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
                     xmlutils.write_class_to_xml(self.sim, myclass, data_dict['value'],data_dict['name'])
                     # self.drp_class.setCurrentText('')
                     # self.drp_class.setCurrentText(myclass)
                 case 'Model':
-                    lprint(f"Override - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    xmlutils.write_models_to_xml(self.sim, self.drp_models.currentText(),data_dict['value'],data_dict['name'])
+                    lprint(f"Override - {self.sim}.{mymodel}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    xmlutils.write_models_to_xml(self.sim, mymodel,data_dict['value'],data_dict['name'])
 
                     # self.drp_models.setCurrentText('')
                     # self.drp_models.setCurrentText(mymodel)
@@ -958,14 +990,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         if self.sim == 'Global' and craft != 'Aircraft': return True
         return False
-
-
-
-
-
-
-
-
 
 
 
