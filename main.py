@@ -799,11 +799,10 @@ class MainWindow(QMainWindow):
             cfg_layout.addWidget(self.cfg_label)
 
         else:
-            # self.cfg_label.setText(f"XML Defaults File: {SettingsWindow.defaults_path}")
-            # self.cfg_label.setToolTip("Use the Settings Manager to customize aircraft settings")
+
             self.ovrd_label = ClickableLabel()
-            if os.path.exists(SettingsWindow.userconfig_path):
-                self.ovrd_label.setText(f"User File: {SettingsWindow.userconfig_path}")
+            if os.path.exists(settings_mgr.userconfig_path):
+                self.ovrd_label.setText(f"User File: {settings_mgr.userconfig_path}")
 
             self.ovrd_label.setToolTip("Use the Settings Manager to customize aircraft settings.\nClick to open the userconfig directory if you need to send the file for support.")
 
@@ -1101,7 +1100,6 @@ class MainWindow(QMainWindow):
             settings_mgr.show()
             print (f"# toggle settings window   {xmlutils.current_sim} {xmlutils.current_aircraft_name}")
             settings_mgr.currentmodel_click()
-            # settingsmanager.SettingsWindow.update_current_aircraft(TelemManager.currentsim, TelemManager.currentAircraftName)
 
     def exit_application(self):
         # Perform any cleanup or save operations here
@@ -1138,9 +1136,8 @@ class ClickableLabel(QLabel):
         super(ClickableLabel, self).__init__(parent)
 
     def mousePressEvent(self, event):
-        os.startfile(SettingsWindow.userconfig_rootpath,'open')
+        os.startfile(settings_mgr.userconfig_rootpath,'open')
         print("userpath opened")
-        # Example: SettingsWindow.some_function()
 
 def main():
     app = QApplication(sys.argv)
@@ -1150,7 +1147,8 @@ def main():
     #d.show()
     global settings_mgr
     settings_mgr = SettingsWindow(device=args.type)
-
+    icon_path = os.path.join(script_dir, "image/vpforceicon.png")
+    settings_mgr.setWindowIcon(QIcon(icon_path))
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
 
