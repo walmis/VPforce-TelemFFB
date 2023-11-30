@@ -15,15 +15,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import atexit
 import glob
-
 from traceback_with_variables import print_exc, prints_exc
-
-
 import argparse
-
-import settingsmanager
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -90,7 +84,6 @@ logger.addHandler(file_handler)
 
 import re
 
-import argparse
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame
@@ -116,7 +109,8 @@ from sc_manager import SimConnectManager
 from il2_telem import IL2Manager
 from aircraft_base import effects
 from settingsmanager import *
-import pprint
+import xmlutils
+
 effects_translator = utils.EffectTranslator()
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -144,7 +138,6 @@ min_firmware_version = 'v1.0.15'
 global dev_firmware_version
 dev_firmware_version = None
 
-import xmlutils
 
 class LoggingFilter(logging.Filter):
     def __init__(self, keywords):
@@ -224,7 +217,7 @@ def config_has_changed(update=False) -> bool:
     
     # "hash" both mtimes together
     if args.xml is not None:
-        userfile=settingsmanager.SettingsWindow.userconfig_path
+        userfile=settings_mgr.userconfig_path
         tm = int(os.path.getmtime(userfile))
     else:
         tm = int(os.path.getmtime(configfile))
@@ -1107,7 +1100,7 @@ class MainWindow(QMainWindow):
         else:
             settings_mgr.show()
             print (f"# toggle settings window   {xmlutils.current_sim} {xmlutils.current_aircraft_name}")
-            settingsmanager.SettingsWindow.currentmodel_click(settings_mgr)
+            settings_mgr.currentmodel_click()
             # settingsmanager.SettingsWindow.update_current_aircraft(TelemManager.currentsim, TelemManager.currentAircraftName)
 
     def exit_application(self):
