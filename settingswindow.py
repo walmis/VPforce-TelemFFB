@@ -9,6 +9,8 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtGui import QIcon
+import os
 
 
 class Ui_SettingsWindow(object):
@@ -17,6 +19,9 @@ class Ui_SettingsWindow(object):
         SettingsWindow.resize(800, 641)
         SettingsWindow.setMinimumSize(QtCore.QSize(800, 600))
         SettingsWindow.setMaximumSize(QtCore.QSize(800, 3000))
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
+        self.setWindowIcon(QIcon(icon_path))
         self.centralwidget = QtWidgets.QWidget(SettingsWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
