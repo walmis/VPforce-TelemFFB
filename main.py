@@ -64,7 +64,7 @@ if args.xml is None:
     logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", os.path.basename(args.configfile), "_",
                        os.path.basename(args.overridefile), ".log"])
 else:
-    logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_xmlconfig.log"])
+    logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), '_', args.type, "_xmlconfig.log"])
 log_file = os.path.join(log_folder, logname)
 
 # Create a logger instance
@@ -283,7 +283,7 @@ def get_config() -> ConfigObj:
 class LogWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Log Console")
+        self.setWindowTitle(f"Log Console ({args.type})")
         self.resize(800, 500)
 
         self.central_widget = QWidget()
@@ -382,6 +382,7 @@ class TelemManager(QObject, threading.Thread):
     def sm_get_aircraft_config(self, aircraft_name, data_source):
         params = {}
         cls_name = "UNKNOWN"
+        input_modeltype = ''
         try:
             if data_source == "MSFS2020":
                 send_source = "MSFS"
@@ -389,7 +390,15 @@ class TelemManager(QObject, threading.Thread):
                 send_source = data_source
             # cls_name,pattern, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
 
-            cls_name, pattern, result = xmlutils.read_single_model(send_source, aircraft_name)
+            if '.' in send_source:
+                input = send_source.split('.')
+                sim_temp = input[0]
+                the_sim = sim_temp.replace('2020', '')
+                input_modeltype = input[1]
+            else:
+                the_sim = send_source
+
+            cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype)
             if cls_name == '': cls_name = 'Aircraft'
             for setting in result:
                 k = setting['name']
@@ -403,6 +412,11 @@ class TelemManager(QObject, threading.Thread):
                     logging.warning(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
                 # print(f"SETTING:\n{setting}")
             params = utils.sanitize_dict(params)
+
+            xmlutils.current_sim = the_sim
+            xmlutils.current_aircraft_name = aircraft_name
+            xmlutils.current_class = cls_name
+            xmlutils.current_pattern = pattern
 
             return params, cls_name
 
@@ -490,20 +504,8 @@ class TelemManager(QObject, threading.Thread):
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
 
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-                if args.xml is not None:
 
-                    if data_source == "MSFS2020":
-                        send_source = "MSFS"
-
-                    xmlutils.current_sim = send_source
-                    xmlutils.current_aircraft_name = aircraft_name
-                    # tried hiding, still crashes
-                    # if settings_mgr.isVisible():
-                    #     settings_mgr.hide()
-                    #settingsmanager.SettingsWindow.update_current_aircraft(settings_mgr)
-
-
-                    #self.settings_manager.update_current_aircraft(send_source, aircraft_name, cls_name)
+                #self.settings_manager.update_current_aircraft(send_source, aircraft_name, cls_name)
                 Class = getattr(module, cls_name, None)
                 logging.debug(f"CLASS={Class.__name__}")
 
@@ -566,6 +568,17 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraft = Class(aircraft_name)
                 # self.currentAircraft.apply_settings(params)
                 self.currentAircraft.apply_settings(params)
+                if args.xml is not None:
+                    if settings_mgr.isVisible():
+                        settings_mgr.b_getcurrentmodel.click()
+
+                # future :
+                # pop create dialog on load where pattern is blank
+                # currently pops on aircraft change but not initial load if sim already running
+
+                # if xmlutils.current_sim != 'Global':
+                #     if xmlutils.current_pattern == '':
+                #         settings_mgr.b_createusermodel.click()
 
             self.currentAircraftName = aircraft_name
 
@@ -681,7 +694,18 @@ class MainWindow(QMainWindow):
     def __init__(self, settings_manager):
         super().__init__()
 
-        self.setGeometry(100, 100, 400, 700)
+        match args.type:
+            case 'joystick':
+                x_pos = 150
+                y_pos = 130
+            case 'pedals':
+                x_pos = 100
+                y_pos = 100
+            case 'collective':
+                x_pos = 50
+                y_pos = 70
+
+        self.setGeometry(x_pos, y_pos, 400, 700)
         if version:
             self.setWindowTitle(f"TelemFFB ({args.type}) ({version})")
         else:

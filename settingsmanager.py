@@ -32,9 +32,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'],"VPForce-TelemFFB")
     userconfig_path = os.path.join(userconfig_rootpath , 'userconfig.xml')
 
-    input_sim = ""
-    input_model_name = ""
-    input_model_type = ""
 
     sim = ""                             # DCS, MSFS, IL2       -- set in get_current_model below
     model_name = "unknown airplane"    # full model name with livery etc
@@ -56,8 +53,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # self.defaults_path = defaults_path
         # self.userconfig_path = userconfig_path
         main.args.type = device
-        self.input_sim = datasource
-        self.sim = self.input_sim
+        xmlutils.current_sim = datasource
+        self.sim = xmlutils.current_sim
+        self.setWindowTitle(f"TelemFFB Settings Manager ({main.args.type})")
         self.b_browse.clicked.connect(self.choose_directory)
         self.b_update.clicked.connect(self.update_button)
         self.slider_float.valueChanged.connect(self.update_textbox)
@@ -68,25 +66,25 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.backup_userconfig()
         self.init_ui()
 
-    def get_current_model(self,the_sim, dbg_model_name, dbg_crafttype = None, ):
+    def get_current_model(self,the_sim, dbg_model_name, dbg_crafttype = None ):
         mprint(f"get_current_model {the_sim}, {dbg_model_name}, {dbg_crafttype}")
         # in the future, get from simconnect.
         if the_sim is not None:
 
             self.sim = the_sim
         else:
-            self.sim = self.input_sim
+            self.sim = xmlutils.current_sim
         if dbg_model_name is not None:
             self.model_name = dbg_model_name     #type value in box for testing. will set textbox in future
         else:
-            if self.input_model_name is None:
+            if xmlutils.current_aircraft_name is None:
                 self.model_name = ''
             else:
                 self.model_name = self.input_model_name
         if dbg_crafttype is not None:
             self.crafttype = dbg_crafttype  # suggested, send whatever simconnect finds
         else:
-            self.crafttype = self.input_model_type
+            self.crafttype = xmlutils.current_class
 
         lprint(f'get current model {self.sim}  {self.model_name} {self.crafttype}')
 
@@ -97,7 +95,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.setup_model_list()
 
         # output a single model
-        self.model_type, self.model_pattern, self.data_list = xmlutils.read_single_model(self.sim, self.model_name )
+        self.model_type, self.model_pattern, self.data_list = xmlutils.read_single_model(self.sim, self.model_name, self.crafttype)
         self.drp_sim.blockSignals(True)
         self.drp_sim.setCurrentText(self.sim)
         self.drp_sim.blockSignals(False)
@@ -174,33 +172,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def currentmodel_click(self):
 
         mprint("currentmodel_click")
-        self.input_sim = xmlutils.current_sim
-        self.input_model_name = xmlutils.current_aircraft_name
-        self.get_current_model(self.input_sim, self.input_model_name)
+        self.sim = xmlutils.current_sim
+        self.model_name = xmlutils.current_aircraft_name
+        self.model_type = xmlutils.current_class
+        self.get_current_model(self.sim, self.model_name, self.model_type)
 
-    def update_current_aircraft(self):
-        mprint(f"update_current_aircraft ")
-        self.input_sim = xmlutils.current_sim
-        self.input_model_name = xmlutils.current_aircraft_name
-        if self.input_sim is not None:
-            if '.' in self.input_sim:        #  source came is as SIM.Aircrafttype, must split.
-                input = self.input_sim.split('.')
-                self.sim = input[0]
-                self.input_model_type = input[1]
-            else:
-                self.sim = self.input_sim
-                if self.input_model_type is not None:
-                    self.model_type = self.input_model_type
-                else:
-                    self.model_type = ''
-
-        self.model_name = self.input_model_name
-        # self.get_current_model(send_source, aircraft_name, ac_class)
-
-        if self.isVisible():
-        #    self.b_getcurrentmodel.click()
-        #    self.currentmodel_click()
-            self.get_current_model(self.sim,self.model_name, self.model_type)
 
     def backup_userconfig(self):
         mprint("backup_userconfig")
@@ -351,7 +327,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 for pr in self.prereq_list:
                     if pr['prereq']==data_dict['prereq']:
                         if pr['value'].lower() == 'false':
-                            print(f"name: {data_dict['displayname']} data: {data_dict['prereq']}  pr:{pr['prereq']}  value:{pr['value']}")
+                            lprint(f"name: {data_dict['displayname']} data: {data_dict['prereq']}  pr:{pr['prereq']}  value:{pr['value']}")
 
                             self.table_widget.setRowHeight(row, 0)
                             found_prereq = True
@@ -425,7 +401,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemIsEditable)
             info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
             replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemIsEditable)
-            value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
+            if not self.allow_in_table_editing:
+                value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
 
             #
             # disable in-table value editing here
@@ -451,8 +428,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setItem(row, 8, unit_item)
             self.table_widget.setItem(row, 9, state_item)
             #self.connected_rows.add(row)
-
-
 
 
             # make unselectable in not checked
@@ -856,7 +831,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         mprint("reload_table")
         self.table_widget.blockSignals(True)
         # Read all the data
-        self.model_type, self.model_pattern, self.data_list = xmlutils.read_single_model(self.sim, self.model_name)
+        self.model_type, self.model_pattern, self.data_list = xmlutils.read_single_model(self.sim, self.model_name, self.model_type)
         # Update the table with the new data
         self.table_widget.clearContents()
         # self.setup_table()

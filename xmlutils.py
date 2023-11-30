@@ -8,6 +8,8 @@ import xml.dom.minidom
 
 current_sim = ''
 current_aircraft_name = ''
+current_class = ''
+current_pattern = ''
 
 print_debugs = False
 print_method_calls = False
@@ -189,16 +191,9 @@ def read_default_class_data(the_sim, the_class):
     return class_data
 
 
-def read_single_model( sim, aircraft_name):
-    mprint(f"######################################\nread_single_model  sim {sim}, a/c name {aircraft_name}")
-    input_modeltype = ''
-    if '.' in sim:
-        input = sim.split('.')
-        sim_temp = input[0]
-        the_sim = sim_temp.replace('2020','')
-        input_modeltype = input[1]
-    else:
-        the_sim = sim
+def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
+    logging.info (f"Reading from XML:  Sim: {the_sim}, Aircraft name: {aircraft_name}, Class: {input_modeltype}")
+
 
     print_counts = False
     print_each_step = False  # for debugging
@@ -212,10 +207,11 @@ def read_single_model( sim, aircraft_name):
         model_pattern = usr_model_pattern
 
     # Extract the type from models data, if name is blank then use the class.  otherwise assume no type is set.
-    if aircraft_name == '':
-        model_class = input_modeltype
-    else:
-        model_class = ''   #self.model_type
+    # if aircraft_name == '':
+    #     model_class = input_modeltype
+    # else:
+    #     model_class = ''   #self.model_type
+    model_class = input_modeltype
 
     for model in model_data:
         if model['name'] == 'type':
@@ -227,8 +223,7 @@ def read_single_model( sim, aircraft_name):
             if model['name'] == 'type':
                 model_class = model['value']
                 break
-    if model_class == '':
-        model_class = input_modeltype
+
 
     # get default Aircraft settings for this sim and device
     simdata = read_xml_file(the_sim)
