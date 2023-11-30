@@ -505,7 +505,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if datatype == 'bool':
                     # For a checkbox
                     value_state = str(value_item.data(Qt.CheckStateRole))
-                    if value_state == 0:
+                    if value_state == '0':
                         value = 'False'
                     else:
                         value = 'True'
