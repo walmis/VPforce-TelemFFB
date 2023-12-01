@@ -19,6 +19,8 @@ import glob
 from traceback_with_variables import print_exc, prints_exc
 import argparse
 
+import globalvars
+
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
 # Add destination telemetry address argument
@@ -110,6 +112,7 @@ from il2_telem import IL2Manager
 from aircraft_base import effects
 from settingsmanager import *
 import xmlutils
+import globalvars
 
 effects_translator = utils.EffectTranslator()
 
@@ -236,6 +239,7 @@ def get_config_xml():
     global _config
     global settings_mgr
     if _config: return _config
+    globalvars.device = args.type
     a, b, main = xmlutils.read_single_model('Global', '')
     # user = settingsmanager.read_xml_file(overridefile, 'global', 'Aircraft', args.type)
     params = ConfigObj()
@@ -406,10 +410,10 @@ class TelemManager(QObject, threading.Thread):
                 # print(f"SETTING:\n{setting}")
             params = utils.sanitize_dict(params)
 
-            xmlutils.current_sim = the_sim
-            xmlutils.current_aircraft_name = aircraft_name
-            xmlutils.current_class = cls_name
-            xmlutils.current_pattern = pattern
+            globalvars.current_sim = the_sim
+            globalvars.current_aircraft_name = aircraft_name
+            globalvars.current_class = cls_name
+            globalvars.current_pattern = pattern
 
             return params, cls_name
 
@@ -569,8 +573,8 @@ class TelemManager(QObject, threading.Thread):
                 # pop create dialog on load where pattern is blank
                 # currently pops on aircraft change but not initial load if sim already running
 
-                # if xmlutils.current_sim != 'Global':
-                #     if xmlutils.current_pattern == '':
+                # if globalvars.current_sim != 'Global':
+                #     if globalvars.current_pattern == '':
                 #         settings_mgr.b_createusermodel.click()
 
             self.currentAircraftName = aircraft_name
@@ -801,8 +805,8 @@ class MainWindow(QMainWindow):
         else:
 
             self.ovrd_label = ClickableLabel()
-            if os.path.exists(settings_mgr.userconfig_path):
-                self.ovrd_label.setText(f"User File: {settings_mgr.userconfig_path}")
+            if os.path.exists(globalvars.userconfig_path):
+                self.ovrd_label.setText(f"User File: {globalvars.userconfig_path}")
 
             self.ovrd_label.setToolTip("Use the Settings Manager to customize aircraft settings.\nClick to open the userconfig directory if you need to send the file for support.")
 
@@ -1098,7 +1102,7 @@ class MainWindow(QMainWindow):
             settings_mgr.hide()
         else:
             settings_mgr.show()
-            print (f"# toggle settings window   {xmlutils.current_sim} {xmlutils.current_aircraft_name}")
+            print (f"# toggle settings window   {globalvars.current_sim} {globalvars.current_aircraft_name}")
             settings_mgr.currentmodel_click()
 
     def exit_application(self):
@@ -1136,7 +1140,7 @@ class ClickableLabel(QLabel):
         super(ClickableLabel, self).__init__(parent)
 
     def mousePressEvent(self, event):
-        os.startfile(settings_mgr.userconfig_rootpath,'open')
+        os.startfile(globalvars.userconfig_rootpath,'open')
         print("userpath opened")
 
 def main():
@@ -1145,6 +1149,8 @@ def main():
     global dev_firmware_version
     d = LogWindow()
     #d.show()
+    global device
+    globalvars.device = args.type
     global settings_mgr
     settings_mgr = SettingsWindow(device=args.type)
     icon_path = os.path.join(script_dir, "image/vpforceicon.png")
