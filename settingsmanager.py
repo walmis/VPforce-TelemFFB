@@ -305,7 +305,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def populate_table(self):
         mprint("populate_table")
         self.table_widget.blockSignals(True)
-        sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
+        #sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
+        sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'] == 'Debug', x['grouping'], x['displayname']))
+
         list_length = len(self.data_list)
         pcount = 1
         self.prereq_list = xmlutils.read_prereqs()
@@ -318,6 +320,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if self.edit_mode == 'Class' and data_dict['name'] == 'type':
                 self.table_widget.setRowHeight(row, 0)
                 continue
+
+            #
+            # hide 'show_debug' setting in non-global mode
+            #
+            if self.edit_mode != 'Global' and data_dict['name'] == 'show_debug':
+                self.table_widget.setRowHeight(row, 0)
+                continue
+
 
             # hide prereqs not satisfied
             #
@@ -395,6 +405,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                         item.setForeground(QtGui.QColor('darkMagenta'))
                     case 'Model (user)':
                         item.setForeground(QtGui.QColor('magenta'))
+                if data_dict['grouping'] == 'Debug':
+                    item.setForeground(QtGui.QColor('red'))
 
             # Make specific columns read-only
             grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemIsEditable)
