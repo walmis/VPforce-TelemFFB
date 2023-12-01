@@ -35,7 +35,7 @@ parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store
 
 # Add config file argument, default config.ini
 parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default='config.ini')
-parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='config.user.ini')
+parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='None')
 parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
 parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default='joystick')
 parser.add_argument('-X', '--xml', help='use XML config', nargs='?', const='default')
@@ -56,7 +56,7 @@ log_folder = os.path.join(os.environ['LOCALAPPDATA'],"VPForce-TelemFFB", 'log')
 #log_folder = './log'
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
-if args.xml is None:
+if args.overridefile!= 'None':
     logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", os.path.basename(args.configfile), "_",
                        os.path.basename(args.overridefile), ".log"])
 else:
@@ -219,7 +219,7 @@ def config_has_changed(update=False) -> bool:
     global _config
     
     # "hash" both mtimes together
-    if args.xml is not None:
+    if args.overridefile== 'None':
         userfile=settings_mgr.userconfig_path
         tm = int(os.path.getmtime(userfile))
     else:
@@ -261,7 +261,7 @@ def get_config_xml():
 def get_config() -> ConfigObj:
     global _config
     if _config: return _config
-    if args.xml is not None:
+    if args.overridefile== 'None':
         params = get_config_xml()
         config_has_changed(update=True)
         _config = params
@@ -342,7 +342,7 @@ class TelemManager(QObject, threading.Thread):
         # settings_manager.show()
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
-        if args.xml is not None:
+        if args.overridefile== 'None':
             config = get_config()
             params, class_name = self.sm_get_aircraft_config(aircraft_name, default_section)
             return params, class_name
@@ -565,7 +565,7 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraft = Class(aircraft_name)
                 # self.currentAircraft.apply_settings(params)
                 self.currentAircraft.apply_settings(params)
-                if args.xml is not None:
+                if args.overridefile== 'None':
                     if settings_mgr.isVisible():
                         settings_mgr.b_getcurrentmodel.click()
 
@@ -737,7 +737,7 @@ class MainWindow(QMainWindow):
         utilities_menu.addAction(reset_action)
 
         # Add settings converter
-        if args.xml is None:
+        if args.overridefile!= 'None':
             convert_settings_action = QAction('Convert user config.ini to XML',self)
             convert_settings_action.triggered.connect(self.convert_settings)
             utilities_menu.addAction(convert_settings_action)
@@ -789,7 +789,7 @@ class MainWindow(QMainWindow):
 
 
         # show xml file info
-        if args.xml is None:
+        if args.overridefile!= 'None':
             self.ovrd_label = QLabel()
             self.cfg_label.setText(f"Config File: {args.configfile}")
             self.cfg_label.setToolTip("You can use a custom configuration file by passing the -c argument to TelemFFB\n\nExample: \"VPForce-TelemFFB.exe -c customconfig.ini\"")
@@ -880,7 +880,7 @@ class MainWindow(QMainWindow):
 
         # Add the scroll area to the layout
         layout.addWidget(scroll_area)
-        if args.xml is None:
+        if args.overridefile!= 'None':
             edit_button = QPushButton("Edit Config File")
             edit_button.setMinimumWidth(200)
             edit_button.setMaximumWidth(200)
