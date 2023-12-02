@@ -273,8 +273,8 @@ class AircraftBase(object):
 
         if self._sim_is("DCS") or self._sim_is("IL2"):
             y_gs = telem_data.get("ACCs")[0]
-        elif self._sim_is("MSFS"):
-            y_gs = telem_data.get("G_BODY_Z")
+        elif self._sim_is("MSFS2020"):
+            y_gs = telem_data.get("AccBody")[2]
         if not self.anything_has_changed("decel", y_gs):
             return
         if not sum(telem_data.get("WeightOnWheels")):

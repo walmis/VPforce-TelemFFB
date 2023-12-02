@@ -709,6 +709,7 @@ class Aircraft(AircraftBase):
         self._update_runway_rumble(telem_data)
         self._update_buffeting(telem_data)
         self._update_flight_controls(telem_data)
+        self._decel_effect(telem_data)
 
         if self.flaps_motion_intensity > 0:
             flps = max(telem_data.get("Flaps", 0))
