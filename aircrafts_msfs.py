@@ -152,6 +152,8 @@ class Aircraft(AircraftBase):
     dampener = utils.Derivative()
     center_spring_on_pause = False
 
+    use_legacy_bindings = False
+
 
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
@@ -1160,8 +1162,12 @@ class Helicopter(Aircraft):
                 pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
                 if self.cyclic_spring_init:
-                    send_event_to_msfs("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
-                    send_event_to_msfs("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
+                    if self.use_legacy_bindings:
+                        send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
+                        send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
+                    else:
+                        send_event_to_msfs("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
+                        send_event_to_msfs("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
 
             self.spring_x.cpOffset = int(self.cpO_x) + self.cyclic_physical_trim_x_offs
             self.spring_y.cpOffset = int(self.cpO_y) + self.cyclic_physical_trim_y_offs
@@ -1230,8 +1236,10 @@ class Helicopter(Aircraft):
                     self.spring.stop()
                 else:
                     return
-
-            send_event_to_msfs("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
+            if self.use_legacy_bindings:
+                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
+            else:
+                send_event_to_msfs("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
