@@ -4,6 +4,16 @@ This is not an exhaustive change log (see github for that).  This file only outl
 ##  November 23th, 2023
 ############################################
 # General
+- Fix engine rumble(s) not stopping if setting is disabled while sim is active
+# MSFS
+- Add legacy bindings option when TelemFFB controls the axes for helicopters that still use the fixed-wing bindings
+- Allow sending of axes information if Helicopter is configured without force-trim enabled
+- Fix 'deceleration effect' not working in MSFS
+
+############################################
+##  November 23th, 2023
+############################################
+# General
 - New integrated updater app!
  - Upon startup, TelemFFB will check for available updates and, if available, prompt you to download and install.  If you proceed, TelemFFB will quit and the updater app will launch and allow you to install the update with the push of a button
     - You may optionally restart TelemFFB automatically when the update is complete
