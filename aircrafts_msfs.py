@@ -792,7 +792,7 @@ class JetAircraft(Aircraft):
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
-        if self.engine_rumble:
+        if self.engine_rumble or self._jet_rumble_is_playing:
             self._update_jet_engine_rumble(telem_data)
 
         self._gforce_effect(telem_data)
@@ -813,7 +813,7 @@ class TurbopropAircraft(PropellerAircraft):
         #     self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
         # if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
         #     super()._gforce_effect(telem_data)
-        if self.engine_rumble:
+        if self.engine_rumble or self._jet_rumble_is_playing:
             self._update_jet_engine_rumble(telem_data)
 
 class GliderAircraft(Aircraft):

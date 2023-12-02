@@ -602,6 +602,13 @@ class AircraftBase(object):
             effects["aoa"].constant(mag, dir).start()
 
     def _update_engine_rumble(self, rpm):
+        if not self.engine_rumble:
+            effects.dispose("prop_rpm0-1")
+            effects.dispose("prop_rpm0-2")
+            effects.dispose("prop_rpm1-1")
+            effects.dispose("prop_rpm1-2")
+            self._engine_rumble_is_playing = 0
+            return
         if type(rpm) == list:
             rpm = max(rpm)
 
@@ -719,11 +726,12 @@ class AircraftBase(object):
             self._ab_is_playing = 0
 
     def _update_jet_engine_rumble(self, telem_data):
-        if not self.jet_engine_rumble_intensity and not self._jet_rumble_is_playing:
+        if not self.engine_rumble or (not self.jet_engine_rumble_intensity and not self._jet_rumble_is_playing):
             effects.dispose("je_rumble_1_1")
             effects.dispose("je_rumble_1_2")
             effects.dispose("je_rumble_2_1")
             effects.dispose("je_rumble_2_2")
+            self._jet_rumble_is_playing = 0
             return 
         
         frequency = self.jet_engine_rumble_freq
