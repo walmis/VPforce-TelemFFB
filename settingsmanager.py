@@ -71,10 +71,13 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         mprint(f"get_current_model {the_sim}, {dbg_model_name}, {dbg_crafttype}")
         # in the future, get from simconnect.
         if the_sim is not None:
-
-            self.sim = the_sim
+            if the_sim == '':
+                self.sim = 'Global'
+            else:
+                self.sim = the_sim
         else:
             self.sim = globalvars.current_sim
+
         if dbg_model_name is not None:
             self.model_name = dbg_model_name     #type value in box for testing. will set textbox in future
         else:
@@ -667,8 +670,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         myclass = self.drp_class.currentText()
         mymodel = self.drp_models.currentText()
         match self.edit_mode:
-            case 'Global' | 'Sim':
-                xmlutils.write_sim_to_xml( self.sim, new_value, name)
+            case 'Global':
+                xmlutils.write_global_to_xml(new_value, name)
+                self.drp_sim.setCurrentText('')
+                self.drp_sim.setCurrentText(mysim)
+            case 'Sim':
+                xmlutils.write_sim_to_xml(self.sim, new_value, name)
                 self.drp_sim.setCurrentText('')
                 self.drp_sim.setCurrentText(mysim)
             case 'Class':
@@ -710,9 +717,16 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             # add row to userconfig
             match self.edit_mode:
-                case 'Global' | 'Sim':
-                    lprint(f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    xmlutils.write_sim_to_xml(self.sim,data_dict['value'],data_dict['name'])
+                case 'Global':
+                    lprint(
+                        f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    xmlutils.write_global_to_xml(data_dict['value'], data_dict['name'])
+                    # self.drp_sim.setCurrentText('')
+                    # self.drp_sim.setCurrentText(mysim)
+                case 'Sim':
+                    lprint(
+                        f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
+                    xmlutils.write_sim_to_xml(self.sim, data_dict['value'], data_dict['name'])
                     # self.drp_sim.setCurrentText('')
                     # self.drp_sim.setCurrentText(mysim)
                 case 'Class':
@@ -737,7 +751,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 case 'Global':
                     lprint(
                         f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    xmlutils.erase_sim_from_xml(self.sim,data_dict['value'], data_dict['name'])
+                    xmlutils.erase_global_from_xml(data_dict['value'], data_dict['name'])
                     # self.drp_sim.setCurrentText('')
                     # self.drp_sim.setCurrentText(mysim)
                 case 'Sim':

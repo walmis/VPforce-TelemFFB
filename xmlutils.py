@@ -323,10 +323,10 @@ def read_user_sim_data(the_sim):
 
     # Iterate through models elements
     # for model_elem in root.findall(f'.//simSettings[sim="{the_sim}" or sim="any"][device="{globalvars.device}" or device="any"]'):
-    for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{globalvars.device}"]'):   # + \
-                      # root.findall(f'.//simSettings[sim="any"][device="{globalvars.device}"]') + \
-                      # root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]') + \
-                      # root.findall(f'.//simSettings[sim="any"][device="any"]'):
+    for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{globalvars.device}"]') + \
+                       root.findall(f'.//simSettings[sim="any"][device="{globalvars.device}"]') + \
+                       root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]')  + \
+                       root.findall(f'.//simSettings[sim="any"][device="any"]'):
 
         if model_elem.find('name') is not None:
 
@@ -556,6 +556,43 @@ def write_sim_to_xml(the_sim, the_value, setting_name):
             f"Added <simSettings> element with values: sim={the_sim}, device={globalvars.device}, value={the_value}, name={setting_name}")
 
 
+def write_global_to_xml( the_value, setting_name):
+    mprint(f"write_global_to_xml  {the_value}, {setting_name}")
+    # Load the existing XML file or create a new one if it doesn't exist
+    tree = ET.parse(globalvars.userconfig_path)
+    root = tree.getroot()
+
+    # Check if an identical <simSettings> element already exists
+    sim_elem = root.find(f'.//simSettings[sim="Global"]'
+                         f'[name="{setting_name}"]')
+
+    if sim_elem is not None:
+        # Update the value of the existing element
+        for child_elem in sim_elem:
+            if child_elem.tag == 'value':
+                child_elem.text = str(the_value)
+            if child_elem.tag == 'device':
+                child_elem.text = 'any'
+        tree.write(globalvars.userconfig_path)
+        logging.info(f"Updated <simSettings> element with values: sim=Global, device=any, "
+                     f"value={the_value}, name={setting_name}")
+
+    else:
+        # Create a new <simSettings> element
+        sims = ET.SubElement(root, "simSettings")
+        for tag, value in [("name", setting_name),
+                           ("value", the_value),
+                           ("sim", 'Global'),
+                           ("device", 'any')]:
+            ET.SubElement(sims, tag).text = value
+
+        # Write the modified XML back to the file
+        tree = ET.ElementTree(root)
+        tree.write(globalvars.userconfig_path)
+        logging.info(
+            f"Added <simSettings> element with values: sim=Global, device='any', value={the_value}, name={setting_name}")
+
+
 def write_converted_to_xml(differences):
     sim_set = []
     class_set = []
@@ -652,6 +689,29 @@ def erase_sim_from_xml(the_sim, the_value, setting_name):
         # Write the modified XML back to the file
         tree.write(globalvars.userconfig_path)
         logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={globalvars.device}, value={the_value}, name={setting_name}")
+
+def erase_global_from_xml(the_value, setting_name):
+    mprint(f"erase_global_from_xml   {the_value}, {setting_name}")
+    # Load the existing XML file or create a new one if it doesn't exist
+    tree = ET.parse(globalvars.userconfig_path)
+    root = tree.getroot()
+
+    elements_to_remove = []
+    for sim_elem in root.findall(f'.//simSettings[sim="Global"]'
+                                   f'[value="{the_value}"]'
+                                   f'[name="{setting_name}"]'):
+
+        if sim_elem is not None:
+            elements_to_remove.append(sim_elem)
+        else:
+            lprint ("sim setting not found")
+
+    # Remove the elements outside the loop
+    for elem in elements_to_remove:
+        root.remove(elem)
+        # Write the modified XML back to the file
+        tree.write(globalvars.userconfig_path)
+        logging.info(f"Removed <simSettings> element with values: sim=Global, device=any, value={the_value}, name={setting_name}")
 
 def sort_elements(tree):    #  unused for now.
     # Parse the XML file
