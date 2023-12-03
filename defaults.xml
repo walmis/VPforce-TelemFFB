@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <TelemFFB>
 	<defaults>
 		<Grouping>Engine</Grouping>
@@ -726,13 +726,22 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
+		<displayname>Trim Follwing</displayname>
+		<name>trim_following</name>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
 		<displayname>Aileron Trim Gain (physical)</displayname>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<value>1.0</value>
 		<datatype>negfloat</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>trim_following</prereq>
 		<validvalues>+/- 100%</validvalues>
 	</defaults>
 	<defaults>
@@ -743,7 +752,7 @@
 		<datatype>negfloat</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>trim_following</prereq>
 		<validvalues>+/- 100%</validvalues>
 	</defaults>
 	<defaults>
@@ -754,7 +763,7 @@
 		<datatype>negfloat</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>trim_following</prereq>
 		<validvalues>+/- 100%</validvalues>
 	</defaults>
 	<defaults>
@@ -765,8 +774,10 @@
 		<datatype>negfloat</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>trim_following</prereq>
 		<validvalues>+/- 100%</validvalues>
+		<info>adjust virtual y % so that trim ingame does not pitch aircraft when stick held
+## nose down trim. if the nose goes up, raise the virtual % - if the nose goes down, lower the virtual % - you can go negativ</info>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -1001,7 +1012,7 @@
 		<datatype>negfloat</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>trim_following</prereq>
 		<validvalues>+/- 100%</validvalues>
 	</defaults>
 	<defaults>
@@ -1012,7 +1023,7 @@
 		<datatype>negfloat</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
-		<prereq>telemffb_controls_axes</prereq>
+		<prereq>trim_following</prereq>
 		<validvalues>+/- 100%</validvalues>
 	</defaults>
 	<defaults>
