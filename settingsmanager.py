@@ -420,14 +420,15 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Make specific columns read-only
             grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemIsEditable)
             displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemIsEditable)
+            displayname_item.setToolTip(data_dict['info'])
             info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
             replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemIsEditable)
-            if self.allow_in_table_editing:
+            if not self.allow_in_table_editing:
                 value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
 
             #
             # disable in-table value editing here
-            # if not self.allow_in_table_editing:
+            # if self.allow_in_table_editing:
             #     value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
 
             # Set the row count based on the actual data
@@ -448,6 +449,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setItem(row, 7, datatype_item)
             self.table_widget.setItem(row, 8, unit_item)
             self.table_widget.setItem(row, 9, state_item)
+
+
             #self.connected_rows.add(row)
 
 
@@ -481,7 +484,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         #mprint("clear_propmgr")
         self.l_displayname.setText("Select a Row to Edit")
         self.cb_enable.hide()
-        self.t_info.hide()
+        self.t_info.setText('')
         self.l_validvalues.hide()
         self.l_value.hide()
         self.l_name.hide()
@@ -549,9 +552,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if state.lower() == 'false':
             return
         self.l_displayname.setText(displayname)
-        if info != 'None' and info != '':
+        if info != 'None':
             self.t_info.setText(info)
-            self.t_info.show()
+            self.t_info.setToolTip(info)
+        else:
+            self.t_info.setText('')
+            self.t_info.setToolTip('')
         self.l_name.setText(name)
         self.tb_value.setText(value)
         self.l_name.show()
