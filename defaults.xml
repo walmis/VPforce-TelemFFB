@@ -2,7 +2,7 @@
 <TelemFFB>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<displayname>Afterburner</displayname>
+		<displayname>Afterburner Rumble</displayname>
 		<name>afterburner_effect_intensity</name>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
@@ -30,12 +30,12 @@
 		<joystick>true</joystick>
 		<prereq>aircraft_is_spring_centered</prereq>
 		<validvalues>0-100%</validvalues>
+		<info>faq</info>
 	</defaults>
 	<defaults>
 		<Grouping>FlyByWire</Grouping>
 		<displayname>Enable FlyByWire (FBW)</displayname>
 		<name>aircraft_is_fbw</name>
-		<value>false</value>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
