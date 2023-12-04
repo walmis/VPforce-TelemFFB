@@ -307,7 +307,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         # disable in-table value editing here
-        if not self.allow_in_table_editing:
+        if self.allow_in_table_editing:
             self.table_widget.itemChanged.connect(self.handle_item_change)  # Connect to the custom function
 
 
@@ -422,7 +422,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemIsEditable)
             info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
             replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemIsEditable)
-            if not self.allow_in_table_editing:
+            if self.allow_in_table_editing:
                 value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
 
             #
@@ -885,7 +885,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if not checkstate:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)   # no editing if not allowed in this mode
             # disable in-table value editing here
-            if not self.allow_in_table_editing:
+            if self.allow_in_table_editing:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)  #
             return item
         elif datatype == 'int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat':
