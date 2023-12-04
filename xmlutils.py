@@ -1,4 +1,4 @@
-import globalvars
+# import globalvars
 import logging
 import xml.etree.ElementTree as ET
 import os
@@ -10,28 +10,26 @@ print_debugs = False
 print_method_calls = False
 
 
-def create_empty_userxml_file():
-    if not os.path.isfile(globalvars.userconfig_path):
-        # Create an empty XML file with the specified root element
-        root = ET.Element("TelemFFB")
-        tree = ET.ElementTree(root)
-        # Create a backup directory if it doesn't exist
-        if not os.path.exists(globalvars.userconfig_rootpath):
-            os.makedirs(globalvars.userconfig_rootpath)
-        tree.write(globalvars.userconfig_path)
-        logging.info(f"Empty XML file created at {globalvars.userconfig_path}")
-    else:
-        logging.info(f"XML file exists at {globalvars.userconfig_path}")
+device = ''
+userconfig_path = ''
+defaults_path = ''
+
+
+def update_vars(_device, _userconfig_path, _defaults_path):
+    global device, userconfig_path, defaults_path
+    device = _device
+    userconfig_path = _userconfig_path
+    defaults_path = _defaults_path
 
 
 def read_xml_file(the_sim):
     mprint(f"read_xml_file  {the_sim}")
-    tree = ET.parse(globalvars.defaults_path)
+    tree = ET.parse(defaults_path)
     root = tree.getroot()
 
     # Collect data in a list of dictionaries
     data_list = []
-    for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{globalvars.device}="true"]'):
+    for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{device}="true"]'):
 
         grouping = defaults_elem.find('Grouping').text
         name = defaults_elem.find('name').text
@@ -81,11 +79,11 @@ def read_xml_file(the_sim):
 
 def read_models(the_sim):
     all_models = ['']
-    tree = ET.parse(globalvars.defaults_path)
+    tree = ET.parse(defaults_path)
     root = tree.getroot()
 
-    for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{globalvars.device}"]') + \
-                      root.findall(f'.//models[sim="any"][device="{globalvars.device}"]') + \
+    for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
+                      root.findall(f'.//models[sim="any"][device="{device}"]') + \
                       root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
                       root.findall(f'.//models[sim="any"][device="any"]'):
 
@@ -95,12 +93,12 @@ def read_models(the_sim):
             if pattern.text not in all_models:
                 all_models.append(pattern.text)
 
-    create_empty_userxml_file()
-    tree = ET.parse(globalvars.userconfig_path)
+    # create_empty_userxml_file() - handled by TelemFFB on startup via utils.py
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
-    for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{globalvars.device}"]') + \
-                      root.findall(f'.//models[sim="any"][device="{globalvars.device}"]') + \
+    for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
+                      root.findall(f'.//models[sim="any"][device="{device}"]') + \
                       root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
                       root.findall(f'.//models[sim="any"][device="any"]'):
 
@@ -123,9 +121,9 @@ def read_models_data(file_path, sim, full_model_name):
     found_pattern = ''
 
     # Iterate through models elements
-    #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{globalvars.device}"]'):
-    for model_elem in root.findall(f'.//models[sim="{sim}"][device="{globalvars.device}"]') + \
-                      root.findall(f'.//models[sim="any"][device="{globalvars.device}"]') + \
+    #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{device}"]'):
+    for model_elem in root.findall(f'.//models[sim="{sim}"][device="{device}"]') + \
+                      root.findall(f'.//models[sim="any"][device="{device}"]') + \
                       root.findall(f'.//models[sim="{sim}"][device="any"]') + \
                       root.findall(f'.//models[sim="any"][device="any"]'):
 
@@ -154,16 +152,16 @@ def read_models_data(file_path, sim, full_model_name):
 
 def read_default_class_data(the_sim, the_class):
     mprint(f"read_default_class_data  sim {the_sim}, class {the_class}")
-    tree = ET.parse(globalvars.defaults_path)
+    tree = ET.parse(defaults_path)
     root = tree.getroot()
 
     class_data = []
 
     # Iterate through models elements
-    #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{globalvars.device}"]'):
-    #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{globalvars.device}"]'):
-    for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{globalvars.device}"]') + \
-                      root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="{globalvars.device}"]') + \
+    #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]'):
+    #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]'):
+    for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]') + \
+                      root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="{device}"]') + \
                       root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
                       root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="any"]'):
 
@@ -194,8 +192,8 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
     print_each_step = False  # for debugging
 
     # Read models data first
-    model_data, def_model_pattern = read_models_data(globalvars.defaults_path, the_sim, aircraft_name)
-    user_model_data, usr_model_pattern = read_models_data(globalvars.userconfig_path, the_sim, aircraft_name)
+    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, aircraft_name)
+    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, aircraft_name)
 
     model_pattern = def_model_pattern
     if usr_model_pattern != '':
@@ -227,7 +225,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
 
     # see what we got
     if print_each_step:
-        lprint(f"\nSimresult: {the_sim} type: ''  device:{globalvars.device}\n")
+        lprint(f"\nSimresult: {the_sim} type: ''  device:{device}\n")
         printconfig(simdata)
 
     # combine base stuff
@@ -253,7 +251,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
 
         # see what we got
         if print_each_step:
-            lprint(f"\nDefaultsresult: {the_sim} type: {model_class}  device:{globalvars.device}\n")
+            lprint(f"\nDefaultsresult: {the_sim} type: {model_class}  device:{device}\n")
             printconfig(default_craft_result)
     else:
         default_craft_result = defaultdata
@@ -316,15 +314,15 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
 
 def read_user_sim_data(the_sim):
     mprint(f"read_user_sim_data {the_sim}")
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     sim_data = []
 
     # Iterate through models elements
-    # for model_elem in root.findall(f'.//simSettings[sim="{the_sim}" or sim="any"][device="{globalvars.device}" or device="any"]'):
-    for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{globalvars.device}"]') + \
-                       root.findall(f'.//simSettings[sim="any"][device="{globalvars.device}"]') + \
+    # for model_elem in root.findall(f'.//simSettings[sim="{the_sim}" or sim="any"][device="{device}" or device="any"]'):
+    for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{device}"]') + \
+                       root.findall(f'.//simSettings[sim="any"][device="{device}"]') + \
                        root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]')  + \
                        root.findall(f'.//simSettings[sim="any"][device="any"]'):
 
@@ -349,15 +347,15 @@ def read_user_sim_data(the_sim):
 
 def read_user_class_data(the_sim, crafttype):
     mprint(f"read_user_class_data  {the_sim}, {crafttype}")
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     model_data = []
 
     # Iterate through models elements
-    #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{globalvars.device}"]'):
-    for model_elem in root.findall(f'.//classSettings[sim="{the_sim}"][device="{globalvars.device}"]'):     # + \
-                      # root.findall(f'.//classSettings[sim="any"][device="{globalvars.device}"]') + \
+    #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]'):
+    for model_elem in root.findall(f'.//classSettings[sim="{the_sim}"][device="{device}"]'):     # + \
+                      # root.findall(f'.//classSettings[sim="any"][device="{device}"]') + \
                       # root.findall(f'.//classSettings[sim="{the_sim}"][device="any"]') + \
                       # root.findall(f'.//classSettings[sim="any"][device="any"]'):
         if model_elem.find('type') is not None:
@@ -426,12 +424,12 @@ def update_data_with_models(defaults_data, model_data, replacetext):
 def write_models_to_xml(the_sim, the_model, the_value, setting_name):
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     # Check if an identical <models> element already exists
     model_elem = root.find(f'.//models'  # [sim="{the_sim}"]'    # might be 'any' (from convert ini)
-                           f'[device="{globalvars.device}"]'
+                           f'[device="{device}"]'
                            f'[model="{the_model}"]'
                            f'[name="{setting_name}"]')
 
@@ -443,8 +441,8 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name):
             if child_elem.tag == 'sim':
                 if child_elem.text == 'any':
                     child_elem.text = the_sim
-        tree.write(globalvars.userconfig_path)
-        logging.info(f"Updated <models> element with values: sim={the_sim}, device={globalvars.device}, "
+        tree.write(userconfig_path)
+        logging.info(f"Updated <models> element with values: sim={the_sim}, device={device}, "
                      f"value={the_value}, model={the_model}, name={setting_name}")
 
     else:
@@ -457,7 +455,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name):
                     ("model", the_model),
                     ("value", the_value),
                     ("sim", the_sim),
-                    ("device", globalvars.device)
+                    ("device", device)
                 ]
             )
             for element in root.iter("models")
@@ -472,25 +470,25 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name):
                                ("model", the_model),
                                ("value", the_value),
                                ("sim", the_sim),
-                               ("device", globalvars.device)]:
+                               ("device", device)]:
                 ET.SubElement(models, tag).text = value
 
             # Write the modified XML back to the file
             tree = ET.ElementTree(root)
-            tree.write(globalvars.userconfig_path)
-            logging.info(f"Added <models> element with values: sim={the_sim}, device={globalvars.device}, "
+            tree.write(userconfig_path)
+            logging.info(f"Added <models> element with values: sim={the_sim}, device={device}, "
                          f"value={the_value}, model={the_model}, name={setting_name}")
 
 
 def write_class_to_xml(the_sim, the_class, the_value, setting_name):
     mprint(f"write_class_to_xml  {the_sim}, {the_class}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     # Check if an identical <classSettings> element already exists
     class_elem = root.find(f'.//classSettings[sim="{the_sim}"]'
-                           f'[device="{globalvars.device}"]'
+                           f'[device="{device}"]'
                            f'[type="{the_class}"]'
                            f'[name="{setting_name}"]')
 
@@ -499,8 +497,8 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name):
         for child_elem in class_elem:
             if child_elem.tag == 'value':
                 child_elem.text = str(the_value)
-        tree.write(globalvars.userconfig_path)
-        logging.info(f"Updated <classSettings> element with values: sim={the_sim}, device={globalvars.device}, "
+        tree.write(userconfig_path)
+        logging.info(f"Updated <classSettings> element with values: sim={the_sim}, device={device}, "
                      f"value={the_value}, model={the_class}, name={setting_name}")
 
     else:
@@ -510,25 +508,25 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name):
                            ("type", the_class),
                            ("value", the_value),
                            ("sim", the_sim),
-                           ("device", globalvars.device)]:
+                           ("device", device)]:
             ET.SubElement(classes, tag).text = value
 
         # Write the modified XML back to the file
         tree = ET.ElementTree(root)
-        tree.write(globalvars.userconfig_path)
-        logging.info(f"Added <classSettings> element with values: sim={the_sim}, device={globalvars.device}, "
+        tree.write(userconfig_path)
+        logging.info(f"Added <classSettings> element with values: sim={the_sim}, device={device}, "
                      f"value={the_value}, type={the_class}, name={setting_name}")
 
 
 def write_sim_to_xml(the_sim, the_value, setting_name):
     mprint(f"write_sim_to_xml {the_sim}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     # Check if an identical <simSettings> element already exists
     sim_elem = root.find(f'.//simSettings[sim="{the_sim}"]'
-                         f'[device="{globalvars.device}"]'
+                         f'[device="{device}"]'
                          f'[name="{setting_name}"]')
 
     if sim_elem is not None:
@@ -536,8 +534,8 @@ def write_sim_to_xml(the_sim, the_value, setting_name):
         for child_elem in sim_elem:
             if child_elem.tag == 'value':
                 child_elem.text = str(the_value)
-        tree.write(globalvars.userconfig_path)
-        logging.info(f"Updated <simSettings> element with values: sim={the_sim}, device={globalvars.device}, "
+        tree.write(userconfig_path)
+        logging.info(f"Updated <simSettings> element with values: sim={the_sim}, device={device}, "
                      f"value={the_value}, name={setting_name}")
 
     else:
@@ -546,20 +544,20 @@ def write_sim_to_xml(the_sim, the_value, setting_name):
         for tag, value in [("name", setting_name),
                            ("value", the_value),
                            ("sim", the_sim),
-                           ("device", globalvars.device)]:
+                           ("device", device)]:
             ET.SubElement(sims, tag).text = value
 
         # Write the modified XML back to the file
         tree = ET.ElementTree(root)
-        tree.write(globalvars.userconfig_path)
+        tree.write(userconfig_path)
         logging.info(
-            f"Added <simSettings> element with values: sim={the_sim}, device={globalvars.device}, value={the_value}, name={setting_name}")
+            f"Added <simSettings> element with values: sim={the_sim}, device={device}, value={the_value}, name={setting_name}")
 
 
 def write_global_to_xml( the_value, setting_name):
     mprint(f"write_global_to_xml  {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     # Check if an identical <simSettings> element already exists
@@ -573,7 +571,7 @@ def write_global_to_xml( the_value, setting_name):
                 child_elem.text = str(the_value)
             if child_elem.tag == 'device':
                 child_elem.text = 'any'
-        tree.write(globalvars.userconfig_path)
+        tree.write(userconfig_path)
         logging.info(f"Updated <simSettings> element with values: sim=Global, device=any, "
                      f"value={the_value}, name={setting_name}")
 
@@ -588,7 +586,7 @@ def write_global_to_xml( the_value, setting_name):
 
         # Write the modified XML back to the file
         tree = ET.ElementTree(root)
-        tree.write(globalvars.userconfig_path)
+        tree.write(userconfig_path)
         logging.info(
             f"Added <simSettings> element with values: sim=Global, device='any', value={the_value}, name={setting_name}")
 
@@ -617,11 +615,11 @@ def write_converted_to_xml(differences):
 def erase_models_from_xml(the_sim, the_model, the_value, setting_name):
     mprint(f"erase_models_from_xml  {the_sim} {the_model}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
     elements_to_remove = []
     for model_elem in root.findall(f'models[sim="{the_sim}"]'
-                                   f'[device="{globalvars.device}"]'
+                                   f'[device="{device}"]'
                                    f'[value="{the_value}"]'
                                    f'[model="{the_model}"]'
                                    f'[name="{setting_name}"]'):
@@ -635,19 +633,19 @@ def erase_models_from_xml(the_sim, the_model, the_value, setting_name):
     for elem in elements_to_remove:
         root.remove(elem)
         # Write the modified XML back to the file
-        tree.write(globalvars.userconfig_path)
-        logging.info(f"Removed <models> element with values: sim={the_sim}, device={globalvars.device}, "
+        tree.write(userconfig_path)
+        logging.info(f"Removed <models> element with values: sim={the_sim}, device={device}, "
                   f"value={the_value}, model={the_model}, name={setting_name}")
 
 
 def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
     mprint(f"erase_class_from_xml  {the_sim} {the_class}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
     elements_to_remove = []
     for class_elem in root.findall(f'.//classSettings[sim="{the_sim}"]'
-                                   f'[device="{globalvars.device}"]'
+                                   f'[device="{device}"]'
                                    f'[value="{the_value}"]'
                                    f'[type="{the_class}"]'
                                    f'[name="{setting_name}"]'):
@@ -661,20 +659,20 @@ def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
     for elem in elements_to_remove:
         root.remove(elem)
         # Write the modified XML back to the file
-        tree.write(globalvars.userconfig_path)
-        logging.info(f"Removed <classSettings> element with values: sim={the_sim}, device={globalvars.device}, "
+        tree.write(userconfig_path)
+        logging.info(f"Removed <classSettings> element with values: sim={the_sim}, device={device}, "
                   f"value={the_value}, type={the_class}, name={setting_name}")
 
 
 def erase_sim_from_xml(the_sim, the_value, setting_name):
     mprint(f"erase_sim_from_xml  {the_sim} {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     elements_to_remove = []
     for sim_elem in root.findall(f'.//simSettings[sim="{the_sim}"]'
-                                   f'[device="{globalvars.device}"]'
+                                   f'[device="{device}"]'
                                    f'[value="{the_value}"]'
                                    f'[name="{setting_name}"]'):
 
@@ -687,13 +685,13 @@ def erase_sim_from_xml(the_sim, the_value, setting_name):
     for elem in elements_to_remove:
         root.remove(elem)
         # Write the modified XML back to the file
-        tree.write(globalvars.userconfig_path)
-        logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={globalvars.device}, value={the_value}, name={setting_name}")
+        tree.write(userconfig_path)
+        logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={device}, value={the_value}, name={setting_name}")
 
 def erase_global_from_xml(the_value, setting_name):
     mprint(f"erase_global_from_xml   {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(globalvars.userconfig_path)
+    tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     elements_to_remove = []
@@ -710,7 +708,7 @@ def erase_global_from_xml(the_value, setting_name):
     for elem in elements_to_remove:
         root.remove(elem)
         # Write the modified XML back to the file
-        tree.write(globalvars.userconfig_path)
+        tree.write(userconfig_path)
         logging.info(f"Removed <simSettings> element with values: sim=Global, device=any, value={the_value}, name={setting_name}")
 
 def sort_elements(tree):    #  unused for now.
@@ -737,13 +735,13 @@ def sort_elements(tree):    #  unused for now.
 
     # Prettify the XML
     xml_str = xml.dom.minidom.parseString(ET.tostring(root)).toprettyxml()
-    with open(globalvars.userconfig_path, 'w') as xml_file:
+    with open(userconfig_path, 'w') as xml_file:
         xml_file.write(xml_str)
 
 
 
 def read_prereqs():
-    tree = ET.parse(globalvars.defaults_path)
+    tree = ET.parse(defaults_path)
     root = tree.getroot()
 
     # Collect data in a list of dictionaries

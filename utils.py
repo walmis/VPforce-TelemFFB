@@ -38,6 +38,7 @@ import urllib.request
 import json
 import ssl
 import io
+import xml.etree.ElementTree as ET
 
 
 class Smoother:
@@ -1044,7 +1045,20 @@ def fetch_latest_version():
         return False
     else:
         return None
-    
+
+def create_empty_userxml_file(path):
+    if not os.path.isfile(path):
+        # Create an empty XML file with the specified root element
+        root = ET.Element("TelemFFB")
+        tree = ET.ElementTree(root)
+        # Create a backup directory if it doesn't exist
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+        tree.write(path)
+        logging.info(f"Empty XML file created at {path}")
+    else:
+        logging.info(f"XML file exists at {path}")
+
 def self_update(zip_uri):
     r = urllib.request.urlopen(zip_uri, context=ssl._create_unverified_context())
     r.read()

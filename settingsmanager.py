@@ -1,6 +1,6 @@
 import logging
 
-import globalvars
+# import globalvars
 import sys
 import os
 import shutil
@@ -28,15 +28,13 @@ def mprint(msg):
         print(msg)
 
 class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
-    defaults_path = 'defaults.xml'
 
-    userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'],"VPForce-TelemFFB")
-    userconfig_path = os.path.join(userconfig_rootpath , 'userconfig.xml')
-
-
-    sim = ""                             # DCS, MSFS, IL2       -- set in get_current_model below
+    sim = "Global"                             # DCS, MSFS, IL2       -- set in get_current_model below
+    current_sim = "Global"
+    current_class = ""
     model_name = "unknown airplane"    # full model name with livery etc
     crafttype = ""                       # suggested, send whatever simconnect finds
+    current_aircraft_name = ""
 
     data_list = []
     prereq_list = []
@@ -47,16 +45,16 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     allow_in_table_editing = False
 
-    def __init__(self, datasource='Global', device = 'joystick'):
+    def __init__(self, datasource='Global', device='joystick', userconfig_path='', defaults_path=''):
         mprint(f"__init__ {datasource}, {device}")
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
-        # self.defaults_path = defaults_path
-        # self.userconfig_path = userconfig_path
-        #globalvars.device = device
+        self.defaults_path = defaults_path
+        self.userconfig_path = userconfig_path
+        self.device=device
         #globalvars.current_sim = datasource
-        self.sim = globalvars.current_sim
-        self.setWindowTitle(f"TelemFFB Settings Manager ({globalvars.device})")
+        self.sim = self.current_sim
+        self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")
         self.b_browse.clicked.connect(self.choose_directory)
         self.b_update.clicked.connect(self.update_button)
         self.slider_float.valueChanged.connect(self.update_textbox)
@@ -67,6 +65,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.backup_userconfig()
         self.init_ui()
 
+    @classmethod
+    def update_state_vars(cls, **kwargs):
+        for key, value in kwargs.items():
+            setattr(cls, key, value)
+
     def get_current_model(self,the_sim, dbg_model_name, dbg_crafttype = None ):
         mprint(f"get_current_model {the_sim}, {dbg_model_name}, {dbg_crafttype}")
         # in the future, get from simconnect.
@@ -76,19 +79,19 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             else:
                 self.sim = the_sim
         else:
-            self.sim = globalvars.current_sim
+            self.sim = self.current_sim
 
         if dbg_model_name is not None:
             self.model_name = dbg_model_name     #type value in box for testing. will set textbox in future
         else:
-            if globalvars.current_aircraft_name is None:
+            if self.current_aircraft_name is None:
                 self.model_name = ''
             else:
                 self.model_name = self.input_model_name
         if dbg_crafttype is not None:
             self.crafttype = dbg_crafttype  # suggested, send whatever simconnect finds
         else:
-            self.crafttype = globalvars.current_class
+            self.crafttype = self.current_class
 
         lprint(f'get current model {self.sim}  {self.model_name} {self.crafttype}')
 
@@ -120,7 +123,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 self.set_edit_mode('Class')
 
 
-        lprint(f"\nCurrent: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{globalvars.device}\n")
+        lprint(f"\nCurrent: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
         # put model name and class into UI
 
@@ -130,7 +133,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def init_ui(self):
         mprint(f"init_ui")
-        xmlutils.create_empty_userxml_file()
+
+        # xmlutils.create_empty_userxml_file()  # Now handled by TelemFFB on startup
 
         self.tb_currentmodel.setText(self.model_name)
 
@@ -146,7 +150,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         self.b_revert.clicked.connect(self.restore_userconfig_backup)
 
-        self.l_device.setText(globalvars.device)
+        self.l_device.setText(self.device)
         self.set_edit_mode(self.sim)
         # read models from xml files to populate dropdown
         self.setup_model_list()
@@ -176,16 +180,17 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def currentmodel_click(self):
 
         mprint("currentmodel_click")
-        self.sim = globalvars.current_sim
-        self.model_name = globalvars.current_aircraft_name
-        self.model_type = globalvars.current_class
+        self.sim = self.current_sim
+        self.model_name = self.current_aircraft_name
+        self.model_type = self.current_class
         self.get_current_model(self.sim, self.model_name, self.model_type)
 
 
     def backup_userconfig(self):
         mprint("backup_userconfig")
         # Ensure the userconfig.xml file exists
-        xmlutils.create_empty_userxml_file()
+        # xmlutils.create_empty_userxml_file()  # Now handled by TelemFFB on startup
+
         backup_path = self.userconfig_path + ".backup"
         # Create a timestamp
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -789,7 +794,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if self.model_name != '':
 
             self.model_type, self.model_pattern, self.data_list = xmlutils.read_single_model(self.sim, self.model_name)
-            lprint(f"\nmodel change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{globalvars.device}\n")
+            lprint(f"\nmodel change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
             # Update the table with the new data
             self.drp_class.blockSignals(True)
@@ -820,7 +825,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.reload_table()
 
             lprint(
-                f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{globalvars.device}\n")
+                f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
         else:
             lprint("class cleared")
@@ -852,7 +857,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         self.reload_table()
 
-        lprint(f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{globalvars.device}\n")
+        lprint(f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
     def reload_table(self):
         mprint("reload_table")
