@@ -609,7 +609,8 @@
 		<name>il2_cfg_validation</name>
 		<value>true</value>
 		<datatype>bool</datatype>
-		<IL2>true</IL2>
+		<Global>true</Global>
+		<IL2></IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<info>Enable/disable validation of the IL-2 config</info>
@@ -658,9 +659,10 @@
 		<Grouping>System</Grouping>
 		<displayname>IL2 Path</displayname>
 		<name>il2_path</name>
-		<value>'C:\Program Files\IL-2 Sturmovik Great Battles'</value>
+		<value>C:\Program Files\IL-2 Sturmovik Great Battles</value>
 		<datatype>path</datatype>
-		<IL2>true</IL2>
+		<Global>true</Global>
+		<IL2></IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<info>Path to IL2 root directory</info>
@@ -682,7 +684,8 @@
 		<name>il2_telem_port</name>
 		<value>34385</value>
 		<datatype>int</datatype>
-		<IL2>true</IL2>
+		<Global>true</Global>
+		<IL2></IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<info>port number for Il-2 telemetry senders</info>
@@ -3726,6 +3729,48 @@
 		<sim>IL2</sim>
 		<device>any</device>
 		</models>
+	<classdefaults>
+		<name>aircraft_is_fbw</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>aircraft_is_fbw</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>aircraft_is_fbw</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>aircraft_is_fbw</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>aircraft_is_fbw</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>aircraft_is_fbw</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
 	<classdefaults>
 		<name>afterburner_effect_intensity</name>
 		<type>JetAircraft</type>
