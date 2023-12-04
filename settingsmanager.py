@@ -15,7 +15,7 @@ from settingswindow import Ui_SettingsWindow
 
 import xmlutils
 
-print_debugs = False
+print_debugs = True
 print_method_calls = False
 
 
@@ -317,7 +317,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         #sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
         sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'] == 'Debug', x['grouping'], x['displayname']))
 
-        list_length = len(self.data_list)
+        list_length = len(self.data_list) -1
         pcount = 1
         self.prereq_list = xmlutils.read_prereqs()
         self.data_list = xmlutils.check_prereq_value(self.prereq_list,self.data_list)
@@ -346,9 +346,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 for pr in self.prereq_list:
                     if pr['prereq']==data_dict['prereq']:
                         if pr['value'].lower() == 'false':
-                            lprint(f"name: {data_dict['displayname']} data: {data_dict['prereq']}  pr:{pr['prereq']}  value:{pr['value']}")
+                            lprint(f"no prereq - name: {data_dict['displayname']} data: {data_dict['prereq']}  pr:{pr['prereq']}  value:{pr['value']}")
 
                             self.table_widget.setRowHeight(row, 0)
+
                             found_prereq = True
                             break
                 if found_prereq: continue
@@ -986,6 +987,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 case _:
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
+
+            if self.tb_currentmodel.text() == '':
+                self.b_createusermodel.setEnabled(False)
+                self.b_getcurrentmodel.setEnabled(False)
+            else:
+                self.b_getcurrentmodel.setEnabled(True)
 
         lprint(f"{mode} Mode")
 
