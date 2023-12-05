@@ -592,7 +592,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>can also run app with '-s IL2' argument.  See the VPforce manual for details on setting up TelemFFB for IL-2 </info>
+		<info>Don't look for updates</info>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>

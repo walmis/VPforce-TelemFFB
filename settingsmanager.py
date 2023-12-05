@@ -15,7 +15,7 @@ from settingswindow import Ui_SettingsWindow
 
 import xmlutils
 
-print_debugs = True
+print_debugs = False
 print_method_calls = False
 
 
@@ -291,9 +291,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name"]
         self.table_widget.setHorizontalHeaderLabels(headers)
         self.table_widget.setColumnWidth(0, 120)
-        self.table_widget.setColumnWidth(1, 120)
-        self.table_widget.setColumnWidth(2, 215)
-        self.table_widget.setColumnWidth(3, 120)
+        self.table_widget.setColumnWidth(1, 110)
+        self.table_widget.setColumnWidth(2, 210)
+        self.table_widget.setColumnWidth(3, 119)
         self.table_widget.setColumnHidden(4, True)
         self.table_widget.setColumnHidden(5, True)
         self.table_widget.setColumnHidden(6, True)

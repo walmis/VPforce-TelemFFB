@@ -134,7 +134,7 @@ def read_models_data(file_path, sim, full_model_name):
             pattern = unit_pattern.text
             if pattern is not None:
                 # Check if the full_model_name matches the pattern using re.match
-                if re.match(pattern, full_model_name):
+                if re.match(pattern, full_model_name) or pattern == full_model_name:
                     name = model_elem.find('name').text
                     value = model_elem.find('value').text
                     unit_elem = model_elem.find('unit')
@@ -146,6 +146,8 @@ def read_models_data(file_path, sim, full_model_name):
                     }
                     found_pattern = pattern
                     model_data.append(model_dict)
+                else:
+                    lprint (f"{pattern} does not match {full_model_name}")
 
     return model_data, found_pattern
 
