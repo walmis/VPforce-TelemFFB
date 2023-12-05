@@ -610,6 +610,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 self.drp_valuebox.clear()
                 valids = validvalues.split(',')
                 self.drp_valuebox.addItems(valids)
+                self.drp_valuebox.setCurrentText(value)
                 self.drp_valuebox.blockSignals(False)
             case 'path':
                 self.b_browse.show()
