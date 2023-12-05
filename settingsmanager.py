@@ -892,7 +892,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if not checkstate:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)   # no editing if not allowed in this mode
             # disable in-table value editing here
-            if self.allow_in_table_editing:
+            if not self.allow_in_table_editing:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)  #
             return item
         elif datatype == 'int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat':
