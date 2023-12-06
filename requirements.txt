@@ -4,3 +4,4 @@ pysimconnect @ https://github.com/walmis/pysimconnect/archive/refs/heads/master.
 traceback_with_variables
 libusb1
 pygetwindow
+requests

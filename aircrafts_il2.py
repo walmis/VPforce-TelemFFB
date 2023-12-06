@@ -253,7 +253,7 @@ class PropellerAircraft(Aircraft):
 
         super().on_telemetry(telem_data)
 
-        if self.engine_rumble: # if _engine_rumble_is_playing is true, check if we need to stop it
+        if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
             self._update_engine_rumble(telem_data.get("RPM", 0.0))
         if self.is_joystick():
             self.override_elevator_droop(telem_data)
@@ -277,8 +277,7 @@ class JetAircraft(Aircraft):
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
-
-        if self.jet_engine_rumble_intensity > 0 and self.engine_rumble:
+        if self.engine_rumble or self._jet_rumble_is_playing:
             self._update_jet_engine_rumble(telem_data)
 
         if self.gforce_effect_enable:
