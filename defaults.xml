@@ -452,12 +452,22 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
+		<displayname>Enable Force Trim</displayname>
+		<name>force_trim_enabled</name>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
 		<displayname>Force Trim Button</displayname>
 		<name>force_trim_button</name>
 		<datatype>int</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
+		<prereq>force_trim_enabled</prereq>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
@@ -467,6 +477,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
+		<prereq>force_trim_enabled</prereq>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
@@ -729,15 +740,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<displayname>Trim Follwing</displayname>
-		<name>trim_following</name>
-		<value>false</value>
-		<datatype>bool</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
 		<displayname>Aileron Trim Gain (physical)</displayname>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<value>1.0</value>
@@ -803,6 +805,21 @@
 		<joystick>true</joystick>
 		<prereq>telemffb_controls_axes</prereq>
 		<validvalues>0-100%</validvalues>
+	</defaults>
+	<defaults>
+		<Grouping>Debug</Grouping>
+		<displayname>lateral_force_gain</displayname>
+		<name>lateral_force_gain</name>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<Global>true</Global>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<prereq>show_debug</prereq>
 	</defaults>
 	<defaults>
 		<Grouping>System</Grouping>
@@ -1040,6 +1057,20 @@
 		<info>peak runway intensity, 0 to disable</info>
 		</defaults>
 	<defaults>
+		<Grouping>System</Grouping>
+		<displayname>Show Debug Settings</displayname>
+		<name>show_debug</name>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<Global>true</Global>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<displayname>Speedbrake Buffet</displayname>
 		<name>speedbrake_buffet_intensity</name>
@@ -1136,6 +1167,15 @@
 		<info>TelemFFB sends axis position to sim.  Do not assign in game or SPAD.next</info>
 	</defaults>
 	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<displayname>Trim Follwing</displayname>
+		<name>trim_following</name>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
 		<Grouping>Basic</Grouping>
 		<displayname>Trim Workaround</displayname>
 		<name>trim_workaround</name>
@@ -1205,35 +1245,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>System</Grouping>
-		<displayname>Show Debug Settings</displayname>
-		<name>show_debug</name>
-		<value>false</value>
-		<datatype>bool</datatype>
-		<Global>true</Global>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>Debug</Grouping>
-		<displayname>lateral_force_gain</displayname>
-		<name>lateral_force_gain</name>
-		<value>false</value>
-		<datatype>bool</datatype>
-		<Global>true</Global>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<prereq>show_debug</prereq>
 	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
@@ -4226,6 +4237,20 @@
 		<value>99</value>
 		<sim>MSFS</sim>
 		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_enabled</name>
+		<type>HPGHelicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_enabled</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>force_trim_reset_button</name>
