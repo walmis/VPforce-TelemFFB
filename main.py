@@ -985,8 +985,8 @@ class MainWindow(QMainWindow):
 
         # Create the grid layout
         settings_layout = QGridLayout()
-        # a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
-        a, b, result = xmlutils.read_single_model('MSFS', settings_mgr.current_aircraft_name)
+        #a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
+        a, b, result = xmlutils.read_single_model('MSFS', 'Cessna 172')
 
         # Add rows to the grid layout
         # for i in range(20):  # You can adjust the number of rows as needed
@@ -1151,57 +1151,110 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(layout)
 
     def generate_settings_row(self, item, i, settings_layout):
-        checkbox = QCheckBox("")
-        checkbox.setMaximumSize(QtCore.QSize(20, 20))
+
         rowdisabled = False
+        # booleans get a checkbox
         if item['datatype'] == 'bool':
+            checkbox = QCheckBox("")
+            checkbox.setMaximumSize(QtCore.QSize(20, 20))
+            checkbox.setObjectName(item['name'])
+
             if item['value'] == 'false':
                 checkbox.setCheckState(0)
                 rowdisabled = True
             else:
                 checkbox.setCheckState(2)
             settings_layout.addWidget(checkbox, i, 0)
+            checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
+
+        #everything has a name
         label = QLabel(f"{item['displayname'] }")
+        settings_layout.addWidget(label, i, 1)
 
         validvalues = item['validvalues'].split(',')
 
         slider = QSlider()
         slider.setOrientation(QtCore.Qt.Horizontal)
         slider.setObjectName(item['name'])
+
         line_edit = QLineEdit()
         line_edit.setText(item['value'])
-        line_edit.setMaximumSize(QtCore.QSize(80, 20))
+        line_edit.setAlignment(Qt.AlignHCenter)
+        line_edit.setObjectName(f"tb_{item['name']}")
+        line_edit.textChanged.connect(self.line_edit_changed)
+
         tool_button = QToolButton()
 
         # Connect the signals to custom slots
-        checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
         slider.valueChanged.connect(self.slider_changed)
         slider.sliderPressed.connect(self.sldDisconnect)
         slider.sliderReleased.connect(self.sldReconnect)
+        value_label = QLabel()
+        value_label.setAlignment(Qt.AlignHCenter)
+        value_label.setMaximumWidth(50)
+        value_label.setObjectName(f"lb_{item['name']}")
+
+        if item['datatype'] == 'float' or \
+           item['datatype'] == 'negfloat' :
+            settings_layout.addWidget(value_label, i, 3)
+            if '%' in item['value']:
+                pctval = int(item['value'].replace('%', ''))
+            else:
+                pctval = int(float(item['value']) * 100)
+            slider.setValue(pctval)
+            value_label.setText(str(pctval) + '%')
+            settings_layout.addWidget(slider, i, 2)
+            settings_layout.addWidget(value_label, i, 3)
 
         if item['datatype'] == 'float':
             # slider.setRange(validvalues(0),validvalues(1))
-            settings_layout.addWidget(slider, i, 2)
+            slider.setRange(0,100)
+
+
+        if item['datatype'] == 'negfloat':
+            slider.setRange(-100, 100)
+
+
+        if item['datatype'] == 'list':
+            dropbox = QComboBox()
+            dropbox.setObjectName(item['name'])
+            dropbox.addItems(validvalues)
+            dropbox.setCurrentText(item['value'])
+            settings_layout.addWidget(dropbox, i, 2)
+            dropbox.currentIndexChanged.connect(self.dropbox_changed)
 
         label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
         line_edit.setDisabled(rowdisabled)
         tool_button.setDisabled(rowdisabled)
 
-        settings_layout.addWidget(label, i, 1)
+        if item['datatype'] == 'int':
+            settings_layout.addWidget(line_edit, i, 2)
 
-        settings_layout.addWidget(line_edit, i, 3)
+
         settings_layout.addWidget(tool_button, i, 4)
 
     def checkbox_changed(self, name, state):
         print(f"Checkbox {name} changed. New state: {state}")
 
+    def dropbox_changed(self):
+        # print(f"Dropbox {name} changed. New value: {value}")
+        print(f"Dropbox {self.sender().objectName()} changed. New value: {self.sender().currentText()}")
+
+    def line_edit_changed(self):
+        # print(f"Dropbox {name} changed. New value: {value}")
+        print(f"Text box {self.sender().objectName()} changed. New value: {self.sender().text()}")
+
     def slider_changed(self):
         print(f"Slider {self.sender().objectName()} changed. New value: {self.sender().value()}")
+        label = self.findChild(QLabel, f"lb_{self.sender().objectName()}")
+        if label:
+            label.setText(str(self.sender().value()) + '%')
 
+    # prevent slider from sending values as you drag
     def sldDisconnect(self):
         self.sender().valueChanged.disconnect()
-
+    # reconnect slider after you let go
     def sldReconnect(self):
         self.sender().valueChanged.connect(self.slider_changed)
         self.sender().valueChanged.emit(self.sender().value())
