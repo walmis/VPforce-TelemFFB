@@ -39,7 +39,7 @@ parser.add_argument('-c', '--configfile', type=str, help='Config ini file (defau
 parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='None')
 parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
 parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default='joystick')
-parser.add_argument('-X', '--xml', help='use XML config', nargs='?', const='default')
+#parser.add_argument('-X', '--xml', help='use XML config', nargs='?', const='default')
 
 args = parser.parse_args()
 
@@ -101,8 +101,10 @@ import re
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QPainterPath
+from PyQt5.QtWidgets import QGridLayout, QToolButton
+
 # from PyQt5.QtWidgets import *
 # from PyQt5.QtCore import *
 # from PyQt5.QtGui import *
@@ -713,6 +715,11 @@ class SimConnectSock(SimConnectManager):
 class MainWindow(QMainWindow):
     def __init__(self, settings_manager):
         super().__init__()
+        # Get the absolute path of the script's directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        doc_url = 'https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.27yzpife8719'
+        dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
+        notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
 
         match args.type:
             case 'joystick':
@@ -733,8 +740,7 @@ class MainWindow(QMainWindow):
         global _update_available
         global _latest_version, _latest_url
         self.resize(400, 700)
-        # Get the absolute path of the script's directory
-        script_dir = os.path.dirname(os.path.abspath(__file__))
+
         # Create a layout for the main window
         layout = QVBoxLayout()
         notes_row_layout = QHBoxLayout()
@@ -760,6 +766,11 @@ class MainWindow(QMainWindow):
         reset_action.triggered.connect(self.reset_all_effects)
         utilities_menu.addAction(reset_action)
 
+        download_action = QAction('Download Other Versions', self)
+        download_action.triggered.connect(lambda: self.open_url(dl_url))
+        utilities_menu.addAction(download_action)
+
+
         update_action = QAction('Update TelemFFB', self)
         update_action.triggered.connect(self.update_from_menu)
         utilities_menu.addAction(update_action)
@@ -769,11 +780,23 @@ class MainWindow(QMainWindow):
             update_action.setDisabled(True)
         # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
 
+
         # Add settings converter
         if args.overridefile != 'None':
             convert_settings_action = QAction('Convert user config.ini to XML', self)
             convert_settings_action.triggered.connect(self.convert_settings)
             utilities_menu.addAction(convert_settings_action)
+
+        help_menu = menubar.addMenu('Help')
+
+        notes_action = QAction('Release Notes', self)
+        notes_action.triggered.connect(lambda url=notes_url: self.open_file(url))
+        help_menu.addAction(notes_action)
+
+        docs_action = QAction('Documentation', self)
+        docs_action.triggered.connect(lambda: self.open_url(doc_url))
+        help_menu.addAction(docs_action)
+
         # Create a line beneath the menu bar
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
@@ -781,26 +804,60 @@ class MainWindow(QMainWindow):
 
         # Add the line to the menu frame layout
         menu_frame_layout.addWidget(menubar)
+
         menu_frame_layout.addWidget(line)
         menu_frame_layout.setContentsMargins(0, 0, 0, 0)
 
         # Set the layout of the menu frame as the main layout
         layout.addWidget(menu_frame)
 
-        self.notes_label = QLabel()
-        notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
-        label_txt = 'Release Notes'
-        # self.notes_label.setOpenExternalLinks(True)
+        # Construct the absolute path of the icon file
+        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
+        self.setWindowIcon(QIcon(icon_path))
 
-        # Connect the linkActivated signal to the open_file method and pass the URL
-        self.notes_label.linkActivated.connect(lambda url=notes_url: self.open_file(url))
+        # self.notes_label = QLabel()
 
-        self.notes_label.setText(f'<a href="{notes_url}">{label_txt}</a>')
-        self.notes_label.setAlignment(Qt.AlignRight)
-        self.notes_label.setToolTip(notes_url)
+        # # self.notes_label.setOpenExternalLinks(True)
+        #
+        # label_txt = 'Release Notes'
+        # # Connect the linkActivated signal to the open_file method and pass the URL
+        # self.notes_label.linkActivated.connect(lambda url=notes_url: self.open_file(url))
+        #
+        # self.notes_label.setText(f'<a href="{notes_url}">{label_txt}</a>')
+        # self.notes_label.setAlignment(Qt.AlignRight)
+        # self.notes_label.setToolTip(notes_url)
+        #
+        # notes_row_layout.addWidget(self.notes_label)
+        # layout.addLayout(notes_row_layout)
+        cfg = get_config()
+        dcs_enabled = utils.sanitize_dict(cfg["system"]).get("dcs_enabled", False)
+        msfs_enabled = utils.sanitize_dict(cfg["system"]).get("msfs_enabled", False)
+        il2_enabled = utils.sanitize_dict(cfg["system"]).get("il2_enabled", False)
+        if args.sim == "DCS" or dcs_enabled:
+            dcs_enabled = 'True'
+            dcs_color = QColor(255,255,0)
+        else:
+            dcs_enabled = 'False'
+            dcs_color = QColor(255, 0, 0)
 
-        notes_row_layout.addWidget(self.notes_label)
-        layout.addLayout(notes_row_layout)
+        if args.sim == "MSFS" or msfs_enabled:
+            msfs_enabled = 'True'
+            msfs_color = QColor(255, 255, 0)
+        else:
+            msfs_enabled = 'False'
+            msfs_color = QColor(255, 0, 0)
+
+        if args.sim == "IL2" or il2_enabled:
+            il2_enabled = 'True'
+            il2_color = QColor(255, 255, 0)
+        else:
+            il2_enabled = 'False'
+            il2_color = QColor(255, 0, 0)
+
+        xplane_color = QColor(128,128,128)
+        condor_color = QColor(128, 128, 128)
+
+        logo_status_layout = QHBoxLayout()
 
         # Add a label for the image
         # Construct the absolute path of the image file
@@ -808,15 +865,198 @@ class MainWindow(QMainWindow):
         self.image_label = QLabel()
         pixmap = QPixmap(image_path)
         self.image_label.setPixmap(pixmap)
-        # Construct the absolute path of the icon file
-        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
-        self.setWindowIcon(QIcon(icon_path))
+
         # Add the image label to the layout
-        layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
+        logo_status_layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
         # layout.addWidget(QLabel(f"Config File: {args.configfile}"))
+
+        self.icon_size= QSize(18, 18)
+
+        status_layout = QGridLayout()
+        self.dcs_label_icon = QLabel("", self)
+        dcs_icon = self.create_colored_icon(dcs_color, self.icon_size)
+        self.dcs_label_icon.setPixmap(dcs_icon)
+        self.dcs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        dcs_label = QLabel("DCS", self)
+        status_layout.addWidget(self.dcs_label_icon, 0, 0)
+        status_layout.addWidget(dcs_label, 0, 1)
+
+        self.il2_label_icon = QLabel("", self)
+        il2_icon = self.create_colored_icon(il2_color, self.icon_size)
+        self.il2_label_icon.setPixmap(il2_icon)
+        self.il2_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        il2_label = QLabel("IL2", self)
+        status_layout.addWidget(self.il2_label_icon, 1, 0)
+        status_layout.addWidget(il2_label, 1, 1)
+
+        self.msfs_label_icon = QLabel("", self)
+        msfs_icon = self.create_colored_icon(msfs_color, self.icon_size)
+        self.msfs_label_icon.setPixmap(msfs_icon)
+        self.msfs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        msfs_label = QLabel("MSFS", self)
+        status_layout.addWidget(self.msfs_label_icon, 2, 0)
+        status_layout.addWidget(msfs_label, 2, 1)
+
+        self.xplane_label_icon = QLabel("", self)
+        xplane_icon = self.create_colored_icon(xplane_color, self.icon_size)
+        self.xplane_label_icon.setPixmap(xplane_icon)
+        self.xplane_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        xplane_label = QLabel("XPlane", self)
+        status_layout.addWidget(self.xplane_label_icon, 0, 2)
+        status_layout.addWidget(xplane_label, 0, 3)
+
+        self.condor_label_icon = QLabel("", self)
+        condor_icon = self.create_colored_icon(condor_color, self.icon_size)
+        self.condor_label_icon.setPixmap(condor_icon)
+        self.condor_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        condor_label = QLabel("Condor2", self)
+        status_layout.addWidget(self.condor_label_icon, 1, 2)
+        status_layout.addWidget(condor_label, 1, 3)
+
+        logo_status_layout.addLayout(status_layout)
+
+
+        layout.addLayout(logo_status_layout)
+
+
         cfg_layout = QHBoxLayout()
         self.cfg_label = QLabel()
 
+
+        # simlabel = QLabel(f"Sims Enabled: DCS: {dcs_enabled} | MSFS: {msfs_enabled} | IL2: {il2_enabled}")
+        # simlabel.setToolTip("Enable/Disable Sims in config file or use '-s DCS|MSFS' argument to specify")
+        # layout.addWidget(simlabel)
+
+        # Add a label and telemetry data label
+        # layout.addWidget(QLabel("Telemetry"))
+
+
+        self.radio_button_group = QButtonGroup()
+        radio_row_layout = QHBoxLayout()
+        self.settings_radio = QRadioButton("Settings")
+        self.telem_monitor_radio = QRadioButton("Telemetry Monitor")
+        self.effect_monitor_radio = QRadioButton("Effects Monitor")
+        self.hide_scroll_area = QRadioButton("Hide")
+
+        radio_row_layout.addWidget(self.settings_radio)
+        radio_row_layout.addWidget(self.telem_monitor_radio)
+        radio_row_layout.addWidget(self.effect_monitor_radio)
+        radio_row_layout.addWidget(self.hide_scroll_area)
+
+        self.settings_radio.setChecked(True)
+
+        self.radio_button_group.addButton(self.settings_radio)
+        self.radio_button_group.addButton(self.telem_monitor_radio)
+        self.radio_button_group.addButton(self.effect_monitor_radio)
+        self.radio_button_group.addButton(self.hide_scroll_area)
+
+        # self.radio_button_group.buttonClicked.connect(self.update_monitor_window)
+
+        layout.addLayout(radio_row_layout)
+
+
+        # Create a scrollable area
+        self.monitor_area = QScrollArea()
+        self.monitor_area.setWidgetResizable(True)
+
+        # Create the QLabel widget and set its properties
+        if cfg.get("EXCEPTION"):
+            error = cfg["EXCEPTION"]["ERROR"]
+            logging.error(f"CONFIG ERROR: {error}")
+            self.lbl_telem_data = QLabel(f"CONFIG ERROR: {error}")
+            QMessageBox.critical(None, "CONFIG ERROR", f"Error: {error}")
+        else:
+            self.lbl_telem_data = QLabel("Waiting for data...")
+        self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.lbl_telem_data.setWordWrap(True)
+
+        # Set the QLabel widget as the widget inside the scroll area
+        self.monitor_area.setWidget(self.lbl_telem_data)
+
+        # Add the scroll area to the layout
+        layout.addWidget(self.monitor_area)
+
+        # Create a scrollable area
+        self.settings_area = QScrollArea()
+        self.settings_area.setWidgetResizable(True)
+
+        # Create a widget to hold the layout
+        scroll_widget = QWidget()
+
+        # Create the grid layout
+        settings_layout = QGridLayout()
+        a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
+
+        # Add rows to the grid layout
+        # for i in range(20):  # You can adjust the number of rows as needed
+        #     self.generate_settings_row(i, settings_layout)
+
+        i=1
+        for item in result:
+            self.generate_settings_row(item, i, settings_layout)
+            i += 1
+
+        # Set the layout for the scroll_widget
+        scroll_widget.setLayout(settings_layout)
+
+        # Add the grid layout to the main layout
+        self.settings_area.setWidget(scroll_widget)
+
+        # Set the widget as the content of the scroll area
+        layout.addWidget(self.settings_area)
+
+        button_layout = QHBoxLayout()
+
+        if args.overridefile!= 'None':
+            edit_button = QPushButton("Edit Config File")
+            edit_button.setMinimumWidth(200)
+            edit_button.setMaximumWidth(200)
+
+            button_layout.addWidget(edit_button, alignment=Qt.AlignCenter)
+
+            # Create a sub-menu for the button
+            self.sub_menu = QMenu(edit_button)
+            # smgr_config_action = QAction("Settings Manager", self)
+            # smgr_config_action.triggered.connect(lambda: (settings_manager.show(), settings_manager.get_current_model()))
+            primary_config_action = QAction("Primary Config", self)
+            primary_config_action.triggered.connect(lambda: self.edit_config_file("Primary"))
+            if os.path.exists(args.overridefile):
+                user_config_action = QAction("User Config", self)
+                user_config_action.triggered.connect(lambda: self.edit_config_file("User"))
+
+            # self.sub_menu.addAction(smgr_config_action)
+            self.sub_menu.addAction(primary_config_action)
+            if os.path.exists(args.overridefile):
+                self.sub_menu.addAction(user_config_action)
+
+            # Connect the button's click event to show the sub-menu
+            edit_button.clicked.connect(self.show_sub_menu)
+        else:
+            edit_button = QPushButton("Settings Manager")
+            edit_button.setMinimumWidth(100)
+            edit_button.setMaximumWidth(200)
+            edit_button.clicked.connect(self.toggle_settings_window)
+            button_layout.addWidget(edit_button, alignment=Qt.AlignCenter)
+
+        self.log_button = QPushButton("Open/Hide Log")
+        self.log_button.setMinimumWidth(100)
+        self.log_button.setMaximumWidth(200)
+        self.log_button.clicked.connect(self.toggle_log_window)
+        button_layout.addWidget(self.log_button, alignment=Qt.AlignCenter)
+
+        # Add the exit button
+        exit_button = QPushButton("Exit")
+        exit_button.setMinimumWidth(100)  # Set the minimum width
+        exit_button.setMaximumWidth(200)  # Set the maximum width
+        exit_button.clicked.connect(self.exit_application)
+        button_layout.addWidget(exit_button, alignment=Qt.AlignCenter)
+
+        layout.addLayout(button_layout)
+
+        central_widget = QWidget()
+        central_widget.setLayout(layout)
+        self.setCentralWidget(central_widget)
+        self.layout = QVBoxLayout(central_widget)
 
         # show xml file info
         if args.overridefile!= 'None':
@@ -849,135 +1089,28 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(cfg_layout)
 
-        cfg = get_config()
-        dcs_enabled = utils.sanitize_dict(cfg["system"]).get("dcs_enabled", False)
-        msfs_enabled = utils.sanitize_dict(cfg["system"]).get("msfs_enabled", False)
-        il2_enabled = utils.sanitize_dict(cfg["system"]).get("il2_enabled", False)
-        if args.sim == "DCS" or dcs_enabled:
-            dcs_enabled = 'True'
-        else:
-            dcs_enabled = 'False'
-        if args.sim == "MSFS" or msfs_enabled:
-            msfs_enabled = 'True'
-        else:
-            msfs_enabled = 'False'
-        if args.sim == "IL2" or il2_enabled:
-            il2_enabled = 'True'
-        else:
-            il2_enabled = 'False'
-        simlabel = QLabel(f"Sims Enabled: DCS: {dcs_enabled} | MSFS: {msfs_enabled} | IL2: {il2_enabled}")
-        simlabel.setToolTip("Enable/Disable Sims in config file or use '-s DCS|MSFS' argument to specify")
-        layout.addWidget(simlabel)
-        # Add a label and telemetry data label
-        # layout.addWidget(QLabel("Telemetry"))
+        # link_row_layout = QHBoxLayout()
+        # self.doc_label = QLabel()
+        #
+        # label_txt = 'TelemFFB Documentation'
+        # self.doc_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        # self.doc_label.setOpenExternalLinks(True)
+        # self.doc_label.setText(f'<a href="{doc_url}">{label_txt}</a>')
+        # self.doc_label.setToolTip(doc_url)
+        # self.dl_label = QLabel()
+        #
+        # label_txt = 'Download Latest'
+        # self.dl_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        # self.dl_label.setOpenExternalLinks(True)
+        # self.dl_label.setText(f'<a href="{dl_url}">{label_txt}</a>')
+        # self.dl_label.setAlignment(Qt.AlignRight)
+        # self.dl_label.setToolTip(dl_url)
+        #
+        # link_row_layout.addWidget(self.doc_label)
+        # link_row_layout.addWidget(self.dl_label)
 
+        # layout.addLayout(link_row_layout)
 
-        self.radio_button_group = QButtonGroup()
-        radio_row_layout = QHBoxLayout()
-        self.telem_monitor_radio = QRadioButton("Telemetry Monitor")
-        self.effect_monitor_radio = QRadioButton("Effects Monitor")
-
-        radio_row_layout.addWidget(self.telem_monitor_radio)
-        radio_row_layout.addWidget(self.effect_monitor_radio)
-
-        self.telem_monitor_radio.setChecked(True)
-
-        self.radio_button_group.addButton(self.telem_monitor_radio)
-        self.radio_button_group.addButton(self.effect_monitor_radio)
-
-        # self.radio_button_group.buttonClicked.connect(self.update_monitor_window)
-
-        layout.addLayout(radio_row_layout)
-
-
-        # Create a scrollable area
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-
-        # Create the QLabel widget and set its properties
-        if cfg.get("EXCEPTION"):
-            error = cfg["EXCEPTION"]["ERROR"]
-            logging.error(f"CONFIG ERROR: {error}")
-            self.lbl_telem_data = QLabel(f"CONFIG ERROR: {error}")
-            QMessageBox.critical(None, "CONFIG ERROR", f"Error: {error}")
-        else:
-            self.lbl_telem_data = QLabel("Waiting for data...")
-        self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.lbl_telem_data.setWordWrap(True)
-
-        # Set the QLabel widget as the widget inside the scroll area
-        scroll_area.setWidget(self.lbl_telem_data)
-
-        # Add the scroll area to the layout
-        layout.addWidget(scroll_area)
-        if args.overridefile!= 'None':
-            edit_button = QPushButton("Edit Config File")
-            edit_button.setMinimumWidth(200)
-            edit_button.setMaximumWidth(200)
-
-            layout.addWidget(edit_button, alignment=Qt.AlignCenter)
-
-            # Create a sub-menu for the button
-            self.sub_menu = QMenu(edit_button)
-            # smgr_config_action = QAction("Settings Manager", self)
-            # smgr_config_action.triggered.connect(lambda: (settings_manager.show(), settings_manager.get_current_model()))
-            primary_config_action = QAction("Primary Config", self)
-            primary_config_action.triggered.connect(lambda: self.edit_config_file("Primary"))
-            if os.path.exists(args.overridefile):
-                user_config_action = QAction("User Config", self)
-                user_config_action.triggered.connect(lambda: self.edit_config_file("User"))
-
-            # self.sub_menu.addAction(smgr_config_action)
-            self.sub_menu.addAction(primary_config_action)
-            if os.path.exists(args.overridefile):
-                self.sub_menu.addAction(user_config_action)
-
-            # Connect the button's click event to show the sub-menu
-            edit_button.clicked.connect(self.show_sub_menu)
-        else:
-            edit_button = QPushButton("Settings Manager")
-            edit_button.setMinimumWidth(200)
-            edit_button.setMaximumWidth(200)
-            edit_button.clicked.connect(self.toggle_settings_window)
-            layout.addWidget(edit_button, alignment=Qt.AlignCenter)
-
-        self.log_button = QPushButton("Open/Hide Log")
-        self.log_button.setMinimumWidth(200)
-        self.log_button.setMaximumWidth(200)
-        self.log_button.clicked.connect(self.toggle_log_window)
-        layout.addWidget(self.log_button, alignment=Qt.AlignCenter)
-
-        # Add the exit button
-        exit_button = QPushButton("Exit")
-        exit_button.setMinimumWidth(200)  # Set the minimum width
-        exit_button.setMaximumWidth(200)  # Set the maximum width
-        exit_button.clicked.connect(self.exit_application)
-        layout.addWidget(exit_button, alignment=Qt.AlignCenter)
-
-        central_widget = QWidget()
-        central_widget.setLayout(layout)
-        self.setCentralWidget(central_widget)
-        self.layout = QVBoxLayout(central_widget)
-
-        link_row_layout = QHBoxLayout()
-        self.doc_label = QLabel()
-        doc_url = 'https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.27yzpife8719'
-        label_txt = 'TelemFFB Documentation'
-        self.doc_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        self.doc_label.setOpenExternalLinks(True)
-        self.doc_label.setText(f'<a href="{doc_url}">{label_txt}</a>')
-        self.doc_label.setToolTip(doc_url)
-        self.dl_label = QLabel()
-        dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
-        label_txt = 'Download Latest'
-        self.dl_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        self.dl_label.setOpenExternalLinks(True)
-        self.dl_label.setText(f'<a href="{dl_url}">{label_txt}</a>')
-        self.dl_label.setAlignment(Qt.AlignRight)
-        self.dl_label.setToolTip(dl_url)
-
-        link_row_layout.addWidget(self.doc_label)
-        link_row_layout.addWidget(self.dl_label)
 
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
@@ -1010,11 +1143,56 @@ class MainWindow(QMainWindow):
         version_row_layout.addWidget(self.version_label)
         version_row_layout.addWidget(self.firmware_label)
 
-        layout.addLayout(link_row_layout)
+
 
         layout.addLayout(version_row_layout)
 
         central_widget.setLayout(layout)
+
+    def generate_settings_row(self, item, i, settings_layout):
+        checkbox = QCheckBox("")
+        rowdisabled = False
+        if item['datatype'] == 'bool':
+            if item['value'] == 'false':
+                checkbox.setCheckState(0)
+                rowdisabled = True
+            else:
+                checkbox.setCheckState(2)
+            settings_layout.addWidget(checkbox, i, 0)
+        label = QLabel(f"{item['displayname'] }")
+
+        slider = QSlider()
+        slider.setOrientation(QtCore.Qt.Horizontal)
+        line_edit = QLineEdit()
+        line_edit.setText(item['value'])
+        line_edit.setMaximumSize(QtCore.QSize(80, 20))
+        tool_button = QToolButton()
+
+
+        label.setDisabled(rowdisabled)
+        slider.setDisabled(rowdisabled)
+        line_edit.setDisabled(rowdisabled)
+        tool_button.setDisabled(rowdisabled)
+
+        settings_layout.addWidget(label, i, 1)
+        settings_layout.addWidget(slider, i, 2)
+        settings_layout.addWidget(line_edit, i, 3)
+        settings_layout.addWidget(tool_button, i, 4)
+
+
+    def generate_settings_row_simple(self, i, settings_layout):
+        checkbox = QCheckBox("")
+        label = QLabel(f"Label {i}")
+        slider = QSlider()
+        slider.setOrientation(QtCore.Qt.Horizontal)
+        line_edit = QLineEdit()
+        line_edit.setMaximumSize(QtCore.QSize(80, 20))
+        tool_button = QToolButton()
+        settings_layout.addWidget(checkbox, i, 0)
+        settings_layout.addWidget(label, i, 1)
+        settings_layout.addWidget(slider, i, 2)
+        settings_layout.addWidget(line_edit, i, 3)
+        settings_layout.addWidget(tool_button, i, 4)
 
     def show_sub_menu(self):
         edit_button = self.sender()
@@ -1026,6 +1204,12 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(file_url)
         except Exception as e:
             logging.error(f"There was an error opening the file: {str(e)}")
+
+    def open_url(self, url):
+
+        # Open the URL
+        QDesktopServices.openUrl(QUrl(url))
+
     def reset_all_effects(self):
         result = QMessageBox.warning(None, "Are you sure?", "*** Only use this if you have effects which are 'stuck' ***\n\n  Proceeding will result in the destruction"
                                                             " of any effects which are currently being generated by the simulator and may result in requiring a restart of"
@@ -1064,10 +1248,46 @@ class MainWindow(QMainWindow):
 
         xmlutils.write_converted_to_xml(differences)
 
-        message = f'\n\nConverted {overridefile} for {args.type} to XML.\nYou can now use the -X argument to use the new Settings Manager\n'
+        message = f'\n\nConverted {overridefile} for {args.type} to XML.\nYou can now remove the -o argument to use the new Settings Manager\n'
         print(message)
 
+    def create_colored_icon(self, color, size):
+        # Create a QPixmap with the specified color and size
+        pixmap = QPixmap(size)
+        pixmap.fill(Qt.transparent)
 
+        # Draw a circle (optional)
+        painter = QPainter(pixmap)
+        painter.setBrush(color)
+        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+        painter.end()
+
+        return pixmap
+
+
+    def create_paused_icon(self, color, size):
+        pixmap = QPixmap(size)
+        pixmap.fill(Qt.transparent)
+
+        # Draw a circle (optional)
+        painter = QPainter(pixmap)
+        painter.setBrush(color)
+        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+
+        # Draw two vertical lines for the pause icon
+        line_length = int(size.width() / 3)
+        line_width = 1
+        line1_x = int((size.width()  / 2)- 2)
+        line2_x = int((size.width()  / 2)+ 2)
+        line_y = int((size.height() - line_length) / 2)
+
+        painter.setPen(QColor(Qt.white))
+        painter.drawLine(line1_x, line_y, line1_x, line_y + line_length)
+        painter.drawLine(line2_x, line_y, line2_x, line_y + line_length)
+
+        painter.end()
+
+        return pixmap
 
     def config_to_dict(self,section,name,value):
         sim=''
@@ -1165,12 +1385,47 @@ class MainWindow(QMainWindow):
                     if descr not in active_effects:
                         active_effects = '\n'.join([active_effects, descr])
             window_mode = self.radio_button_group.checkedButton()
+            active_color = QColor(0,255,0)
+            paused_color = QColor(0,0,255)
+            active_icon = self.create_colored_icon(active_color, self.icon_size)
+            paused_icon = self.create_paused_icon(paused_color, self.icon_size)
+            if items != '':
+                if data['SimPaused'] == 0:
+                    match data['src']:
+                        case 'DCS':
+                            self.msfs_label_icon.setPixmap(active_icon)
+                        case'IL2':
+                            self.msfs_label_icon.setPixmap(active_icon)
+                        case'MSFS2020':
+                            self.msfs_label_icon.setPixmap(active_icon)
+                elif data['SimPaused'] == 1:
+                    match data['src']:
+                        case 'DCS':
+                            self.msfs_label_icon.setPixmap(paused_icon)
+                        case 'IL2':
+                            self.msfs_label_icon.setPixmap(paused_icon)
+                        case 'MSFS2020':
+                            self.msfs_label_icon.setPixmap(paused_icon)
+
+
+
             if window_mode == self.telem_monitor_radio:
+                self.monitor_area.show()
+                self.settings_area.hide()
                 self.lbl_telem_data.setText(items)
                 self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
             elif window_mode == self.effect_monitor_radio:
+                self.monitor_area.show()
+                self.settings_area.hide()
                 self.lbl_telem_data.setText(active_effects)
                 self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            elif window_mode == self.settings_radio:
+                self.monitor_area.hide()
+                self.settings_area.show()
+            elif window_mode == self.hide_scroll_area:
+                self.monitor_area.hide()
+                self.settings_area.hide()
+
 
         except Exception as e:
             traceback.print_exc()
