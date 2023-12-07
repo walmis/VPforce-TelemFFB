@@ -985,7 +985,8 @@ class MainWindow(QMainWindow):
 
         # Create the grid layout
         settings_layout = QGridLayout()
-        a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
+        # a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
+        a, b, result = xmlutils.read_single_model('MSFS', settings_mgr.current_aircraft_name)
 
         # Add rows to the grid layout
         # for i in range(20):  # You can adjust the number of rows as needed
@@ -1151,6 +1152,7 @@ class MainWindow(QMainWindow):
 
     def generate_settings_row(self, item, i, settings_layout):
         checkbox = QCheckBox("")
+        checkbox.setMaximumSize(QtCore.QSize(20, 20))
         rowdisabled = False
         if item['datatype'] == 'bool':
             if item['value'] == 'false':
@@ -1161,13 +1163,25 @@ class MainWindow(QMainWindow):
             settings_layout.addWidget(checkbox, i, 0)
         label = QLabel(f"{item['displayname'] }")
 
+        validvalues = item['validvalues'].split(',')
+
         slider = QSlider()
         slider.setOrientation(QtCore.Qt.Horizontal)
+        slider.setObjectName(item['name'])
         line_edit = QLineEdit()
         line_edit.setText(item['value'])
         line_edit.setMaximumSize(QtCore.QSize(80, 20))
         tool_button = QToolButton()
 
+        # Connect the signals to custom slots
+        checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
+        slider.valueChanged.connect(self.slider_changed)
+        slider.sliderPressed.connect(self.sldDisconnect)
+        slider.sliderReleased.connect(self.sldReconnect)
+
+        if item['datatype'] == 'float':
+            # slider.setRange(validvalues(0),validvalues(1))
+            settings_layout.addWidget(slider, i, 2)
 
         label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
@@ -1175,10 +1189,22 @@ class MainWindow(QMainWindow):
         tool_button.setDisabled(rowdisabled)
 
         settings_layout.addWidget(label, i, 1)
-        settings_layout.addWidget(slider, i, 2)
+
         settings_layout.addWidget(line_edit, i, 3)
         settings_layout.addWidget(tool_button, i, 4)
 
+    def checkbox_changed(self, name, state):
+        print(f"Checkbox {name} changed. New state: {state}")
+
+    def slider_changed(self):
+        print(f"Slider {self.sender().objectName()} changed. New value: {self.sender().value()}")
+
+    def sldDisconnect(self):
+        self.sender().valueChanged.disconnect()
+
+    def sldReconnect(self):
+        self.sender().valueChanged.connect(self.slider_changed)
+        self.sender().valueChanged.emit(self.sender().value())
 
     def generate_settings_row_simple(self, i, settings_layout):
         checkbox = QCheckBox("")
