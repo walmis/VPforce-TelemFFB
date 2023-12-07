@@ -991,9 +991,10 @@ class MainWindow(QMainWindow):
         # Add rows to the grid layout
         # for i in range(20):  # You can adjust the number of rows as needed
         #     self.generate_settings_row(i, settings_layout)
+        sorted_data = sorted(result, key=lambda x: float(x['order']))
 
         i=1
-        for item in result:
+        for item in sorted_data:
             self.generate_settings_row(item, i, settings_layout)
             i += 1
 
@@ -1153,6 +1154,14 @@ class MainWindow(QMainWindow):
     def generate_settings_row(self, item, i, settings_layout):
 
         rowdisabled = False
+
+        show_order = True
+        if show_order:
+            order_lbl = QLabel()
+            order_lbl.setText(item['order'])
+            order_lbl.setMaximumWidth(30)
+            settings_layout.addWidget(order_lbl, i, 5)
+
         # booleans get a checkbox
         if item['datatype'] == 'bool':
             checkbox = QCheckBox("")
@@ -1169,6 +1178,7 @@ class MainWindow(QMainWindow):
 
         #everything has a name
         label = QLabel(f"{item['displayname'] }")
+        label.setToolTip(item['info'])
         settings_layout.addWidget(label, i, 1)
 
         validvalues = item['validvalues'].split(',')
@@ -1205,15 +1215,13 @@ class MainWindow(QMainWindow):
             value_label.setText(str(pctval) + '%')
             settings_layout.addWidget(slider, i, 2)
             settings_layout.addWidget(value_label, i, 3)
+            slider.setRange(int(validvalues[0]), int(validvalues[1]))
 
-        if item['datatype'] == 'float':
-            # slider.setRange(validvalues(0),validvalues(1))
-            slider.setRange(0,100)
-
-
-        if item['datatype'] == 'negfloat':
-            slider.setRange(-100, 100)
-
+        # if item['datatype'] == 'float':
+        #     slider.setRange(0,100)
+        #
+        # if item['datatype'] == 'negfloat':
+        #     slider.setRange(-100, 100)
 
         if item['datatype'] == 'list':
             dropbox = QComboBox()
@@ -1228,7 +1236,8 @@ class MainWindow(QMainWindow):
         line_edit.setDisabled(rowdisabled)
         tool_button.setDisabled(rowdisabled)
 
-        if item['datatype'] == 'int':
+        if item['datatype'] == 'int' or \
+           item['datatype'] == 'anyfloat' :
             settings_layout.addWidget(line_edit, i, 2)
 
 

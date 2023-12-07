@@ -32,6 +32,7 @@ def read_xml_file(the_sim):
     for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{device}="true"]'):
 
         grouping = defaults_elem.find('Grouping').text
+        order = defaults_elem.find('order').text
         name = defaults_elem.find('name').text
         displayname = defaults_elem.find('displayname').text
         datatype = defaults_elem.find('datatype').text
@@ -55,6 +56,7 @@ def read_xml_file(the_sim):
         # Store data in a dictionary
         data_dict = {
             'grouping': grouping,
+            'order': order,
             'name': name,
             'displayname': displayname,
             'value': value,
