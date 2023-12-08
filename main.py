@@ -598,7 +598,7 @@ class TelemManager(QObject, threading.Thread):
                     if settings_mgr.isVisible():
                         settings_mgr.b_getcurrentmodel.click()
                     # self.settings_layout.clear_layout()
-                    # self.settings_layout.reload_caller(None)
+                    self.settings_layout.reload_caller()
 
                 # future :
                 # pop create dialog on load where pattern is blank
@@ -1009,9 +1009,9 @@ class MainWindow(QMainWindow):
 
         # Create a widget to hold the layout
         scroll_widget = QWidget()
-        self.settings_layout = settings_layout
+        # self.settings_layout = settings_layout
         # settings_layout = SettingsLayout()
-        scroll_widget.setLayout(self.settings_layout)
+        scroll_widget.setLayout(settings_layout)
 
         # Add the grid layout to the main layout
         self.settings_area.setWidget(scroll_widget)
@@ -1025,10 +1025,10 @@ class MainWindow(QMainWindow):
         # test buttons
         test_layout = QHBoxLayout()
         clear_button = QPushButton('clear')
-        clear_button.clicked.connect(self.settings_layout.clear_layout)
+        clear_button.clicked.connect(settings_layout.clear_layout)
         test_layout.addWidget(clear_button)
         reload_button = QPushButton('reload')
-        reload_button.clicked.connect(self.settings_layout.reload_caller)
+        reload_button.clicked.connect(settings_layout.reload_caller)
         test_layout.addWidget(reload_button)
         layout.addLayout(test_layout)
 
@@ -1443,24 +1443,28 @@ class SettingsLayout(QGridLayout):
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.addItem(spacerItem, i, 1, 1, 1)
+        print (f"{i} rows with {self.count()} widgets")
 
     def reload_caller(self):
         self.reload_layout(None)
 
     def reload_layout(self, result=None):
+        self.clear_layout()
         if result is None:
             a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
 
         if result is not None:
             self.build_rows(result)
 
-
     def clear_layout(self):
+        print (f"clear_layout - count: {self.count()}")
         while self.count():
             item = self.takeAt(0)
             widget = item.widget()
             if widget:
+                self.removeWidget(widget)
                 widget.deleteLater()
+        print(f"clear_layout - count: {self.count()}")
 
 
     def generate_settings_row(self, item, i):
