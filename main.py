@@ -101,7 +101,7 @@ import re
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QEvent
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QPainterPath
 from PyQt5.QtWidgets import QGridLayout, QToolButton
 
@@ -1512,7 +1512,6 @@ class SettingsLayout(QGridLayout):
         slider = NoWheelSlider()
         slider.setOrientation(QtCore.Qt.Horizontal)
         slider.setObjectName(item['name'])
-        slider.installEventFilter(self)
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
