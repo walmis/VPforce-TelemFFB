@@ -127,7 +127,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.1</order>
+		<order>9.2</order>
 		<displayname>Force Trim Button</displayname>
 		<name>force_trim_button</name>
 		<prereq>force_trim_enabled</prereq>
@@ -138,7 +138,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.2</order>
+		<order>9.3</order>
 		<displayname>Force Trim Reset Button</displayname>
 		<name>force_trim_reset_button</name>
 		<prereq>force_trim_enabled</prereq>
@@ -160,18 +160,8 @@
 		<Element1>aoa_effect_enabled</Element1>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
-		<order>10</order>
-		<displayname>Trim Workaround</displayname>
-		<name>trim_workaround</name>
-		<value>false</value>
-		<datatype>bool</datatype>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>10.10</order>
+		<order>10.1</order>
 		<displayname>AoA Effect Max Force (DCS)</displayname>
 		<name>max_aoa_cf_force</name>
 		<prereq>aoa_effect_enabled</prereq>
@@ -183,7 +173,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>10.20</order>
+		<order>10.1</order>
 		<displayname>AoA Effect Gain (MSFS)</displayname>
 		<name>aoa_effect_gain</name>
 		<prereq>aoa_effect_enabled</prereq>
@@ -206,7 +196,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
-		<order>11.2</order>
+		<order>12</order>
 		<displayname>Enable Buffeting</displayname>
 		<name>il2_enable_buffet</name>
 		<prereq>il2_shake_master</prereq>
@@ -217,7 +207,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
-		<order>11.3</order>
+		<order>12.1</order>
 		<displayname>Buffeting Intensity</displayname>
 		<name>il2_buffeting_factor</name>
 		<prereq>il2_enable_buffet</prereq><IL2>true</IL2><joystick>true</joystick>
@@ -228,7 +218,7 @@
 		</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
-		<order>11.4</order>
+		<order>13</order>
 		<displayname>Enable Runway Rumble</displayname>
 		<name>il2_enable_runway_rumble</name>
 		<prereq>il2_shake_master</prereq>
@@ -240,7 +230,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
-		<order>11.5</order>
+		<order>13.1</order>
 		<displayname>Runway Rumble Intensity</displayname>
 		<name>il2_runway_rumble_intensity</name>
 		<prereq>il2_enable_runway_rumble</prereq>
@@ -253,7 +243,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
-		<order>11.6</order>
+		<order>14</order>
 		<displayname>Enable Weapon Effects</displayname>
 		<name>il2_enable_weapons</name>
 		<prereq>il2_shake_master</prereq>
@@ -265,7 +255,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
-		<order>11.7</order>
+		<order>14.1</order>
 		<displayname>Weaon Effect Intensity</displayname>
 		<name>il2_weapon_release_intensity</name>
 		<prereq>il2_enable_weapons</prereq>
@@ -278,7 +268,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
-		<order>12</order>
+		<order>15</order>
 		<displayname>Enable Wind Effect</displayname>
 		<name>wind_effect_enabled</name>
 		<value>false</value>
@@ -288,7 +278,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
-		<order>12.1</order>
+		<order>15.1</order>
 		<displayname>Wind Effect Max Inensity</displayname>
 		<name>wind_effect_max_intensity</name>
 		<value>0.4</value>
@@ -301,7 +291,7 @@
 		</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
-		<order>12.2</order>
+		<order>15.2</order>
 		<displayname>Wind Effect Scaling</displayname>
 		<name>wind_effect_scaling</name>
 		<value>1.0</value>
@@ -310,6 +300,16 @@
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<info>Adjust the overall intensity of the wind effect</info>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>16</order>
+		<displayname>Trim Workaround</displayname>
+		<name>trim_workaround</name>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
 	</defaults>
 	<defaults>
 		<Grouping>AoA Reduction</Grouping>
@@ -325,7 +325,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>AoA Reduction</Grouping>
-		<order>20.10</order>
+		<order>20.1</order>
 		<displayname>AoA Reduction Max Force</displayname>
 		<name>aoa_reduction_max_force</name>
 		<prereq>aoa_reduction_effect_enabled</prereq>
@@ -384,20 +384,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.10</order>
-		<displayname>Use Legacy Bindings</displayname>
-		<name>use_legacy_bindings</name>
-		<prereq>telemffb_controls_axes</prereq>
-		<datatype>bool</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<info>For helicopters that still use aileron/elevator or rudder bindings</info>
-		<Element1>telemffb_controls_axes.use_legacy_bindings</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
 		<order>30.20</order>
 		<displayname>X Axis Scale</displayname>
 		<name>joystick_x_axis_scale</name>
@@ -437,9 +423,52 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.50</order>
+		<order>30.5</order>
+		<displayname>Use Legacy Bindings</displayname>
+		<name>use_legacy_bindings</name>
+		<prereq>telemffb_controls_axes</prereq>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>For helicopters that still use aileron/elevator or rudder bindings</info>
+		<Element1>telemffb_controls_axes.use_legacy_bindings</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>30.70</order>
+		<displayname>Hands On Deadzone</displayname>
+		<name>hands_on_deadzone</name>
+		<prereq>telemffb_controls_axes</prereq>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<Element1>telemffb_controls_axes.hands_on_deadzone</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>30.80</order>
+		<displayname>Hands Off Deadzone</displayname>
+		<name>hands_off_deadzone</name>
+		<prereq>telemffb_controls_axes</prereq>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<Element1>telemffb_controls_axes.hands_off_deadzone</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>31</order>
 		<displayname>Trim Follwing</displayname>
 		<name>trim_following</name>
+		<prereq>telemffb_controls_axes</prereq>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
@@ -448,7 +477,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.51</order>
+		<order>31.2</order>
 		<displayname>X Trim Gain Physical</displayname>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<prereq>trim_following</prereq>
@@ -461,7 +490,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.52</order>
+		<order>31.3</order>
 		<displayname>X Trim Gain Virtual</displayname>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<prereq>trim_following</prereq>
@@ -474,7 +503,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.53</order>
+		<order>31.4</order>
 		<displayname>Y Trim Gain Physical</displayname>
 		<name>joystick_trim_follow_gain_physical_y</name>
 		<prereq>trim_following</prereq>
@@ -487,7 +516,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.54</order>
+		<order>31.5</order>
 		<displayname>Y Trim Gain Virtual</displayname>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<prereq>trim_following</prereq>
@@ -502,7 +531,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.55</order>
+		<order>31.6</order>
 		<displayname>Rudder Trim Gain (physical)</displayname>
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<prereq>trim_following</prereq>
@@ -515,7 +544,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.56</order>
+		<order>31.7</order>
 		<displayname>Rudder Trim Gain (virtual)</displayname>
 		<name>rudder_trim_follow_gain_virtual_x</name>
 		<prereq>trim_following</prereq>
@@ -528,9 +557,10 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.60</order>
+		<order>32</order>
 		<displayname>Enable Autopilot Following</displayname>
 		<name>ap_following</name>
+		<prereq>telemffb_controls_axes</prereq>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
@@ -539,7 +569,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.61</order>
+		<order>32.2</order>
 		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<name>invert_ap_x_axis</name>
 		<prereq>ap_following</prereq>
@@ -548,32 +578,6 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<Element1>telemffb_controls_axes.trim_following.ap_following.invert_ap_x_axis</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>30.70</order>
-		<displayname>Hands On Deadzone</displayname>
-		<name>hands_on_deadzone</name>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<validvalues>0,100</validvalues>
-		<Element1>telemffb_controls_axes.hands_on_deadzone</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>30.80</order>
-		<displayname>Hands Off Deadzone</displayname>
-		<name>hands_off_deadzone</name>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<validvalues>0,100</validvalues>
-		<Element1>telemffb_controls_axes.hands_off_deadzone</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
@@ -756,7 +760,7 @@
 		</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.1</order>
+		<order>50.2</order>
 		<displayname>Engine Rumble Low RPM</displayname>
 		<name>engine_rumble_lowrpm</name>
 		<prereq>engine_rumble</prereq>
@@ -770,7 +774,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.2</order>
+		<order>50.3</order>
 		<displayname>Engine Rumble Low Intensity</displayname>
 		<name>engine_rumble_lowrpm_intensity</name>
 		<prereq>engine_rumble</prereq>
@@ -785,7 +789,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.3</order>
+		<order>50.4</order>
 		<displayname>Engine Rumble High RPM</displayname>
 		<name>engine_rumble_highrpm</name>
 		<prereq>engine_rumble</prereq>
@@ -799,7 +803,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.4</order>
+		<order>50.5</order>
 		<displayname>Engine Rumble High Intensity</displayname>
 		<name>engine_rumble_highrpm_intensity</name>
 		<prereq>engine_rumble</prereq>
@@ -814,7 +818,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.5</order>
+		<order>50.6</order>
 		<displayname>Heli Engine Rumble Intensity</displayname>
 		<name>heli_engine_rumble_intensity</name>
 		<datatype>float</datatype>
@@ -828,7 +832,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.6</order>
+		<order>50.7</order>
 		<displayname>Jet Engine Rumble Freq</displayname>
 		<name>jet_engine_rumble_freq</name>
 		<datatype>int</datatype>
@@ -843,7 +847,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.7</order>
+		<order>50.8</order>
 		<displayname>Jet Engine Rumble</displayname>
 		<name>jet_engine_rumble_intensity</name>
 		<datatype>float</datatype>
@@ -857,7 +861,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.8</order>
+		<order>50.9</order>
 		<displayname>RPM Scale</displayname>
 		<name>rpm_scale</name>
 		<value>1.0</value>
@@ -1406,7 +1410,7 @@
 		<name>uncoordinated_turn_effect_enabled</name>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
-		<validvalues>simulate body acelleration effect on stick in uncoordinated turns</validvalues>
+		<info>simulate body acelleration effect on stick in uncoordinated turns</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
@@ -1490,7 +1494,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>System</Grouping>
-		<order>920.1</order>
+		<order>920.2</order>
 		<displayname>IL2 Path</displayname>
 		<name>il2_path</name>
 		<prereq>il2_enabled</prereq>
@@ -1518,7 +1522,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>System</Grouping>
-		<order>920.3</order>
+		<order>920.4</order>
 		<displayname>IL2 Config Validation</displayname>
 		<name>il2_cfg_validation</name>
 		<prereq>il2_enabled</prereq>
@@ -1545,7 +1549,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>System</Grouping>
-		<order>930.1</order>
+		<order>930.2</order>
 		<displayname>Telemetry Timeout</displayname>
 		<name>telemetry_timeout</name>
 		<prereq>msfs_enabled</prereq>

@@ -349,7 +349,7 @@ class TelemManager(QObject, threading.Thread):
     lastFrameTime: float
     numFrames: int = 0
 
-    def __init__(self, settings_manager) -> None:
+    def __init__(self, settings_manager, settings_layout) -> None:
         QObject.__init__(self)
         threading.Thread.__init__(self, daemon=True)
 
@@ -362,6 +362,7 @@ class TelemManager(QObject, threading.Thread):
         self.frameTimes = []
         self.timeout = 0.2
         self.settings_manager = settings_manager
+        self.settings_layout = settings_layout
         # settings_manager.show()
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
@@ -400,6 +401,7 @@ class TelemManager(QObject, threading.Thread):
         return (params, class_name)
 
     def sm_get_aircraft_config(self, aircraft_name, data_source):
+
         params = {}
         cls_name = "UNKNOWN"
         input_modeltype = ''
@@ -436,8 +438,10 @@ class TelemManager(QObject, threading.Thread):
                 current_sim=the_sim,
                 current_aircraft_name=aircraft_name,
                 current_class=cls_name,
-                current_pattern=pattern
-            )
+                current_pattern=pattern)
+            self.settings_layout.clear_layout()
+            self.settings_layout.reload_layout(result)
+
 
             return params, cls_name
 
@@ -965,11 +969,13 @@ class MainWindow(QMainWindow):
         current_craft_area.setLayout(current_craft_layout)
         layout.addWidget(current_craft_area)
 
+
         ################
         #  main scroll area
 
         self.monitor_area = QScrollArea()
         self.monitor_area.setWidgetResizable(True)
+        self.monitor_area.setMinimumHeight(100)
 
         # Create the QLabel widget and set its properties
         if cfg.get("EXCEPTION"):
@@ -981,7 +987,8 @@ class MainWindow(QMainWindow):
             self.lbl_telem_data = QLabel(f"Waiting for data...\n\n" + \
                                          f"DCS Enabled: {(cfg['system']['dcs_enabled'])}\n" + \
                                          f"IL2 Enabled: {(cfg['system']['il2_enabled'])}\n" + \
-                                         f"MSFS Enabled: {(cfg['system']['msfs_enabled'])}\n")
+                                         f"MSFS Enabled: {(cfg['system']['msfs_enabled'])}\n\n" + \
+                                         "Restart the app after changing enabled Sims")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_telem_data.setWordWrap(True)
 
@@ -1008,6 +1015,19 @@ class MainWindow(QMainWindow):
 
         # Set the widget as the content of the scroll area
         layout.addWidget(self.settings_area)
+
+        ##############
+        #  buttons
+
+        # test buttons
+        test_layout = QHBoxLayout()
+        clear_button = QPushButton('clear')
+        clear_button.clicked.connect(settings_layout.clear_layout)
+        test_layout.addWidget(clear_button)
+        reload_button = QPushButton('reload')
+        reload_button.clicked.connect(settings_layout.reload_caller)
+        test_layout.addWidget(reload_button)
+        layout.addLayout(test_layout)
 
         button_layout = QHBoxLayout()
 
@@ -1393,11 +1413,13 @@ class MainWindow(QMainWindow):
 
 class SettingsLayout(QGridLayout):
     expanded_items = []
+    prereq_list = []
     def __init__(self, parent=None):
         super(SettingsLayout, self).__init__(parent)
-        #a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
-        #a, b, result = xmlutils.read_single_model('sfdsdf', 'Cessna 172')
         result = None
+        a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
+        #a, b, result = xmlutils.read_single_model('MSFS', 'Cessna 172')
+
         # Add rows to the grid layout
         # for i in range(20):  # You can adjust the number of rows as needed
         #     self.generate_settings_row(i, settings_layout)
@@ -1406,12 +1428,36 @@ class SettingsLayout(QGridLayout):
 
     def build_rows(self,datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
-        i = 1
+        self.prereq_list = xmlutils.read_prereqs()
+        i = 0
         for item in sorted_data:
-            self.generate_settings_row(item, i)
             i += 1
+            if item['prereq'] in self.expanded_items or item['prereq'] == '':
+                self.generate_settings_row(item, i)
+            elif item['order'][-2:] == '.1':
+                i -= 1
+                self.generate_settings_row(item, i)
+
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.addItem(spacerItem, i, 1, 1, 1)
+
+    def reload_caller(self):
+        self.reload_layout(None)
+
+    def reload_layout(self, result=None):
+        if result is None:
+            a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
+
+        if result is not None:
+            self.build_rows(result)
+
+
+    def clear_layout(self):
+        while self.count():
+            item = self.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
 
     def generate_settings_row(self, item, i):
 
@@ -1422,26 +1468,40 @@ class SettingsLayout(QGridLayout):
             order_lbl = QLabel()
             order_lbl.setText(item['order'])
             order_lbl.setMaximumWidth(30)
-            self.addWidget(order_lbl, i, 5)
+            self.addWidget(order_lbl, i, 10)
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
             checkbox = QCheckBox("")
             checkbox.setMaximumSize(QtCore.QSize(20, 20))
+            checkbox.setMinimumSize(QtCore.QSize(20, 20))
             checkbox.setObjectName(item['name'])
-
+            checkbox.blockSignals(True)
             if item['value'] == 'false':
                 checkbox.setCheckState(0)
                 rowdisabled = True
             else:
                 checkbox.setCheckState(2)
+            checkbox.blockSignals(False)
             self.addWidget(checkbox, i, 0)
             checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
 
-        # everything has a name
+        # everything has a name, except for things that have a checkbox *and* slider
         label = QLabel(f"{item['displayname']}")
         label.setToolTip(item['info'])
+        label.setMinimumHeight(20)
+        label.setMinimumWidth(150)
+        label.setMaximumWidth(150)
+        if item['order'][-2:] == '.1':
+            olditem = self.itemAtPosition(i, 1)
+            if olditem is not None:
+                widget = olditem.widget()
+                if widget is not None:
+                    widget.deleteLater()
+                    self.removeWidget(widget)
+
         self.addWidget(label, i, 1)
+
 
         validvalues = item['validvalues'].split(',')
 
@@ -1450,12 +1510,22 @@ class SettingsLayout(QGridLayout):
         slider.setObjectName(item['name'])
 
         line_edit = QLineEdit()
+        line_edit.blockSignals(True)
         line_edit.setText(item['value'])
+        line_edit.blockSignals(False)
         line_edit.setAlignment(Qt.AlignHCenter)
         line_edit.setObjectName(f"tb_{item['name']}")
         line_edit.textChanged.connect(self.line_edit_changed)
 
-        tool_button = QToolButton()
+        expand_button = QToolButton()
+        if item['name'] in self.expanded_items:
+            expand_button.setArrowType(Qt.UpArrow)
+        else:
+            expand_button.setArrowType(Qt.DownArrow)
+        expand_button.setMaximumWidth(24)
+        expand_button.setMinimumWidth(24)
+        expand_button.setObjectName(f"{item['name']}")
+        expand_button.clicked.connect(self.expander_clicked)
 
         # Connect the signals to custom slots
         slider.valueChanged.connect(self.slider_changed)
@@ -1468,16 +1538,18 @@ class SettingsLayout(QGridLayout):
 
         if item['datatype'] == 'float' or \
                 item['datatype'] == 'negfloat':
-            self.addWidget(value_label, i, 3)
+            self.addWidget(value_label, i, 4)
             if '%' in item['value']:
                 pctval = int(item['value'].replace('%', ''))
             else:
                 pctval = int(float(item['value']) * 100)
+            slider.blockSignals(True)
             slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
-            self.addWidget(slider, i, 2)
-            self.addWidget(value_label, i, 3)
+            self.addWidget(slider, i, 3)
+            self.addWidget(value_label, i, 4)
             slider.setRange(int(validvalues[0]), int(validvalues[1]))
+            slider.blockSignals(False)
 
         # if item['datatype'] == 'float':
         #     slider.setRange(0,100)
@@ -1487,53 +1559,66 @@ class SettingsLayout(QGridLayout):
 
         if item['datatype'] == 'list':
             dropbox = QComboBox()
+            dropbox.setEditable(True)
+            dropbox.lineEdit().setAlignment(QtCore.Qt.AlignHCenter)
             dropbox.setObjectName(item['name'])
             dropbox.addItems(validvalues)
+            dropbox.blockSignals(True)
             dropbox.setCurrentText(item['value'])
-            self.addWidget(dropbox, i, 2)
+            dropbox.lineEdit().setReadOnly(True)
+            dropbox.blockSignals(False)
+            self.addWidget(dropbox, i, 3)
             dropbox.currentIndexChanged.connect(self.dropbox_changed)
 
         label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
         line_edit.setDisabled(rowdisabled)
-        tool_button.setDisabled(rowdisabled)
+        expand_button.setDisabled(rowdisabled)
 
         if item['datatype'] == 'int' or \
                 item['datatype'] == 'anyfloat':
-            self.addWidget(line_edit, i, 2)
+            self.addWidget(line_edit, i, 3)
 
-        self.addWidget(tool_button, i, 4)
+        if any(p_item['prereq'] == item['name'] for p_item in self.prereq_list):
+            self.addWidget(expand_button, i, 2)
 
-        if item['prereq'] != '':
-            print(f"hide row {i} - {item['name']} child of {item['prereq']}")
-            self.hide_row(i)
+        erase_button = QToolButton()
+        if item['replaced'] == 'Model (user)':
+            self.addWidget(erase_button,i,5)
+
 
         self.setRowStretch(i,0)
 
-    def hide_row(self, row):
-        self.setRowStretch(row, 0)
 
-
-    def show_row(self, row):
-        height = 40
-        self.setRowStretch(row, 1)
-        # grid_layout.setRowMinimumHeight(row, height)
 
     def checkbox_changed(self, name, state):
         print(f"Checkbox {name} changed. New state: {state}")
 
     def dropbox_changed(self):
-        # print(f"Dropbox {name} changed. New value: {value}")
         print(f"Dropbox {self.sender().objectName()} changed. New value: {self.sender().currentText()}")
 
     def line_edit_changed(self):
-        # print(f"Dropbox {name} changed. New value: {value}")
         print(f"Text box {self.sender().objectName()} changed. New value: {self.sender().text()}")
+
+    def expander_clicked(self):
+        print(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
+        if self.sender().arrowType() == Qt.DownArrow:
+            print ('expanded')
+            self.expanded_items.append(self.sender().objectName())
+            self.sender().setArrowType(Qt.UpArrow)
+            self.clear_layout()
+            self.reload_caller()
+        else:
+            print ('collapsed')
+            self.expanded_items.clear()
+            self.sender().setArrowType(Qt.DownArrow)
+            self.clear_layout()
+            self.reload_caller()
 
     def slider_changed(self):
         print(f"Slider {self.sender().objectName()} changed. New value: {self.sender().value()}")
         label = self.findChild(QLabel, f"lb_{self.sender().objectName()}")
-        if label:
+        if label is not None:
             label.setText(str(self.sender().value()) + '%')
 
         # prevent slider from sending values as you drag
@@ -1609,6 +1694,8 @@ def main():
     settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
     icon_path = os.path.join(script_dir, "image/vpforceicon.png")
     settings_mgr.setWindowIcon(QIcon(icon_path))
+    global settings_lyt
+    settings_lyt = SettingsLayout()
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
 
@@ -1649,7 +1736,7 @@ def main():
     window = MainWindow(settings_manager=settings_mgr)
     window.show()
 
-    telem_manager = TelemManager(settings_manager=settings_mgr)
+    telem_manager = TelemManager(settings_manager=settings_mgr, settings_layout=settings_lyt)
     telem_manager.start()
 
     telem_manager.telemetryReceived.connect(window.update_telemetry)
