@@ -267,6 +267,62 @@ class Aircraft(AircraftBase):
                 'Vs': 90 * knots,
                 'Vne': 415 * knots,
             },
+            'F-15': {
+                'Vs': 130 * knots,
+                'Vne': 800 * knots,
+            },
+            'MiG-15': {
+                'Vs': 120 * knots,
+                'Vne': 620 * knots,
+            },
+            'MiG-19': {
+                'Vs': 140 * knots,
+                'Vne': 850 * knots,
+            },
+            'F-14': {
+                'Vs': 145 * knots,
+                'Vne': 700 * knots,
+            },
+            'AV8BNA': {
+                'Vs': 80 * knots,
+                'Vne': 560 * knots,
+            },
+            'M-2000': {
+                'Vs': 120 * knots,
+                'Vne': 750 * knots,
+            },
+            'Mirage-F1': {
+                'Vs': 120 * knots,
+                'Vne': 800 * knots,
+            },
+            'JF-17': {
+                'Vs': 110 * knots,
+                'Vne': 800 * knots,
+            },
+            'MB-339': {
+                'Vs': 90 * knots,
+                'Vne': 460 * knots,
+            },
+            'A-10C': {
+                'Vs': 120 * knots,
+                'Vne': 450 * knots,
+            },
+            'AJS37': {
+                'Vs': 120 * knots,
+                'Vne': 810 * knots,
+            },
+            'F-5E': {
+                'Vs': 110 * knots,
+                'Vne': 800 * knots,
+            },
+            'FA-18C': {
+                'Vs': 135 * knots,
+                'Vne': 850 * knots,
+            },
+            'F-16': {
+                'Vs': 140 * knots,
+                'Vne': 915 * knots,
+            },
         }
 
         ac = telem_data.get("N")
@@ -473,7 +529,10 @@ class PropellerAircraft(Aircraft):
         
         self._update_wind_effect(telem_data)
         if self.aoa_effect_enabled:
-            self._update_aoa_effect(telem_data)
+            ac_perf = self.get_aircraft_perf(telem_data)
+            vs0 = ac_perf.get('vs0', 0)
+            vne = ac_perf.get('vne', 0)
+            self._update_aoa_effect(telem_data, minspeed=vs0, maxspeed=vne)
         self._gforce_effect(telem_data)
 
 

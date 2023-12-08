@@ -67,6 +67,7 @@ class Aircraft(AircraftBase):
     stall_aoa: float = 15.0  # Stall AoA
     aoa_effect_enabled: int = 1
 
+    aoa_effect_gain: float = 1.0
     engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
 
     runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
@@ -601,7 +602,7 @@ class Aircraft(AircraftBase):
                 y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
                 y_offs = clamp(y_offs, -1, 1)
                 # Take speed in relation to aircraft v speeds into account when moving offset based on aoa
-                y_offs = int(y_offs * 4096 * speed_factor)
+                y_offs = int(y_offs * 4096 * speed_factor * self.aoa_effect_gain)
                 self.spring_y.cpOffset = y_offs
 
             x_offs = phys_stick_x_offs

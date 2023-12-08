@@ -45,6 +45,7 @@ class AircraftBase(object):
 
     _engine_rumble_is_playing = 0
     elevator_droop_force = 0
+    aircraft_is_fbw = 0
 
     @property
     def telem_data(self):
@@ -579,17 +580,16 @@ class AircraftBase(object):
         else:
             effects.dispose('elev_droop')
 
-    def _update_aoa_effect(self, telem_data):
+    def _update_aoa_effect(self, telem_data, minspeed=50*kmh, maxspeed=140*kmh):
         if not self.is_joystick(): return
+        if self.aircraft_is_fbw or telem_data.get("ACisFBW"): return
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
-        if self._sim_is_msfs():
-            local_stall_aoa = telem_data.get("StallAoA")
-        else:
-            local_stall_aoa = self.stall_aoa
+        local_stall_aoa = self.stall_aoa
+
         if aoa:
             aoa = float(aoa)
-            speed_factor = utils.scale_clamp(tas, (50 * kmh, 140 * kmh), (0, 1.0))
+            speed_factor = utils.scale_clamp(tas, (minspeed, maxspeed), (0, 1.0))
             mag = utils.scale_clamp(abs(aoa), (0, local_stall_aoa), (0, self.max_aoa_cf_force))
             mag *= speed_factor
             if (aoa > 0):
