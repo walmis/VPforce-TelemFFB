@@ -644,7 +644,7 @@ class Aircraft(AircraftBase):
             
             if self.uncoordinated_turn_effect_enabled:
                 effects['uncoordinated_turn'].constant(mag, theta*deg).start()
-                print(mag, theta*deg)
+                # print(mag, theta*deg)
                 # self.const_force.constant(mag, theta*deg).start()
             else:
                 effects['uncoordinated_turn'].destroy()
