@@ -158,7 +158,7 @@ class AircraftBase(object):
         Generates bumps/etc on touchdown, rolling, field landing etc
         """
         if self.is_collective(): return
-        if not self.runway_rumble_intensity:
+        if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
             effects.dispose("runway0")
             effects.dispose("runway1")
             return

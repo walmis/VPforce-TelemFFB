@@ -73,7 +73,7 @@ class Aircraft(AircraftBase):
     engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
 
     runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
-
+    runway_rumble_enabled: bool = True
     gun_vibration_intensity: float = 0.12  # peak gunfire vibration intensity, 0 to disable
     cm_vibration_intensity: float = 0.12  # peak countermeasure release vibration intensity, 0 to disable
     weapon_release_intensity: float = 0.12  # peak weapon release vibration intensity, 0 to disable
