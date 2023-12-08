@@ -1107,13 +1107,32 @@
 		<Grouping>Movement</Grouping>
 		<order>86</order>
 		<displayname>Runway Rumble</displayname>
+		<name>runway_rumble_enabled</name>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>enable/disable runway rumble effect</info>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>86.1</order>
+		<displayname>Runway Rumble Intensity</displayname>
 		<name>runway_rumble_intensity</name>
+		<prereq>runway_rumble_enabled</prereq>
 		<value>0.2</value>
+		<sliderfactor>0.4</sliderfactor>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
+		<MSFS>true</MSFS>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues>
-		<info>peak runway intensity, 0 to disable</info>
+		<info>peak runway intensity</info>
 		</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
