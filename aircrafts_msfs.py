@@ -69,6 +69,7 @@ class Aircraft(AircraftBase):
 
     aoa_buffeting_enabled: bool = True
     aoa_effect_gain: float = 1.0
+    uncoordinated_turn_effect_enabled: int = 1
     engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
 
     runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
@@ -641,7 +642,12 @@ class Aircraft(AircraftBase):
 
             mag, theta = cf.to_polar()
             
-            self.const_force.constant(mag, theta*deg).start()
+            if self.uncoordinated_turn_effect_enabled:
+                effects['uncoordinated_turn'].constant(mag, theta*deg).start()
+                print(mag, theta*deg)
+                # self.const_force.constant(mag, theta*deg).start()
+            else:
+                effects['uncoordinated_turn'].destroy()
             self.spring.start() # ensure spring is started
 
         elif ffb_type == 'pedals':
