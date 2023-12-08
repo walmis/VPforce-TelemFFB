@@ -323,7 +323,7 @@ class AircraftBase(object):
         return (13.0, airflow_factor * buffeting_factor * self.buffeting_intensity)
 
     def _update_buffeting(self, telem_data: dict):
-        if not self.buffeting_intensity:
+        if not self.buffeting_intensity or not self.aoa_buffeting_enabled:
             return
         
         aoa = telem_data.get("AoA", 0)

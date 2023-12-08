@@ -41,6 +41,7 @@ class Aircraft(AircraftBase):
     deceleration_effect_enable_areyoureallysure = 0
     deceleration_max_force = 0.5
     ###
+    aoa_buffeting_enabled: bool = True
     buffeting_intensity : float = 0.2               # peak AoA buffeting intensity  0 to disable
     buffet_aoa : float          = 10.0              # AoA when buffeting starts
     stall_aoa : float           = 15.0              # Stall AoA

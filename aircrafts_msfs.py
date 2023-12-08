@@ -67,6 +67,7 @@ class Aircraft(AircraftBase):
     stall_aoa: float = 15.0  # Stall AoA
     aoa_effect_enabled: int = 1
 
+    aoa_buffeting_enabled: bool = True
     aoa_effect_gain: float = 1.0
     engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
 
