@@ -68,10 +68,12 @@ class Aircraft(AircraftBase):
     engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
     
     runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
+    il2_runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
 
     gun_vibration_intensity : float = 0.12          # peak gunfire vibration intensity, 0 to disable
     cm_vibration_intensity : float = 0.12           # peak countermeasure release vibration intensity, 0 to disable
     weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
+    il2_weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
     weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
     
     speedbrake_motion_intensity : float = 0.12      # peak vibration intensity when speed brake is moving, 0 to disable
@@ -133,25 +135,26 @@ class Aircraft(AircraftBase):
         gun = telem.get("Gun")
         rockets = telem.get("Rockets")
         if self.anything_has_changed("Bombs", bombs):
-            effects["bombs"].periodic(10, self.weapon_release_intensity, 0,effect_type=EFFECT_SAWTOOTHUP, duration=80).start(force=True)
+            effects["bombs"].periodic(10, self.il2_weapon_release_intensity, 0,effect_type=EFFECT_SAWTOOTHUP, duration=80).start(force=True)
         elif not self.anything_has_changed("Bombs", bombs, delta_ms=160):
             effects["bombs"].stop()
 
         if self.anything_has_changed("Gun", gun) and not self.gun_is_firing:
-            effects["gunfire"].periodic(canon_hz, self.weapon_release_intensity, 0).start(force=True)
+            effects["gunfire"].periodic(canon_hz, self.il2_weapon_release_intensity, 0).start(force=True)
             self.gun_is_firing = 1
-            logging.info(f"Gunfire={self.weapon_release_intensity}")
+            logging.info(f"Gunfire={self.il2_weapon_release_intensity}")
         elif not self.anything_has_changed("Gun", gun, delta_ms=100):
             # effects["gunfire"].stop()
             effects.dispose("gunfire")
             self.gun_is_firing = 0
 
         if self.anything_has_changed("Rockets", rockets):
-            effects["rockets"].periodic(50, self.weapon_release_intensity, 0, effect_type=EFFECT_SQUARE, duration=80).start(force=True)
+            effects["rockets"].periodic(50, self.il2_weapon_release_intensity, 0, effect_type=EFFECT_SQUARE, duration=80).start(force=True)
         if not self.anything_has_changed("Rockets", rockets, delta_ms=160):
             effects["rockets"].stop()
     def _update_runway_rumble(self, telem_data):
         if telem_data.get("TAS") > 1.0 and telem_data.get("AGL") < 10.0 and utils.average(telem_data.get("GearPos")) == 1:
+            self.runway_rumble_intensity = self.il2_runway_rumble_intensity
             super()._update_runway_rumble(telem_data)
         else:
             effects.dispose("runway0")
@@ -209,7 +212,7 @@ class Aircraft(AircraftBase):
         if self.il2_shake_master:
             if self.il2_enable_buffet:
                 self._update_buffeting(telem_data)
-            if self.runway_rumble_intensity > 0 and self.il2_enable_runway_rumble:
+            if self.il2_runway_rumble_intensity > 0 and self.il2_enable_runway_rumble:
                 self._update_runway_rumble(telem_data)
             if self.il2_enable_weapons:
                 self._update_cm_weapons(telem_data)
