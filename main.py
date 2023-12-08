@@ -101,7 +101,7 @@ import re
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QEvent
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QPainterPath
 from PyQt5.QtWidgets import QGridLayout, QToolButton
 
@@ -439,8 +439,8 @@ class TelemManager(QObject, threading.Thread):
                 current_aircraft_name=aircraft_name,
                 current_class=cls_name,
                 current_pattern=pattern)
-            self.settings_layout.clear_layout()
-            self.settings_layout.reload_layout(result)
+            # self.settings_layout.clear_layout()
+            # self.settings_layout.reload_layout(result)
 
 
             return params, cls_name
@@ -597,6 +597,8 @@ class TelemManager(QObject, threading.Thread):
                 if args.overridefile== 'None':
                     if settings_mgr.isVisible():
                         settings_mgr.b_getcurrentmodel.click()
+                    # self.settings_layout.clear_layout()
+                    # self.settings_layout.reload_caller(None)
 
                 # future :
                 # pop create dialog on load where pattern is blank
@@ -1460,6 +1462,7 @@ class SettingsLayout(QGridLayout):
             if widget:
                 widget.deleteLater()
 
+
     def generate_settings_row(self, item, i):
 
         rowdisabled = False
@@ -1506,9 +1509,10 @@ class SettingsLayout(QGridLayout):
 
         validvalues = item['validvalues'].split(',')
 
-        slider = QSlider()
+        slider = NoWheelSlider()
         slider.setOrientation(QtCore.Qt.Horizontal)
         slider.setObjectName(item['name'])
+        slider.installEventFilter(self)
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
@@ -1639,6 +1643,11 @@ class ClickableLabel(QLabel):
     def mousePressEvent(self, event):
         os.startfile(userconfig_rootpath,'open')
         print("userpath opened")
+
+class NoWheelSlider(QSlider):
+    def wheelEvent(self, event):
+        # Block the wheel event
+        event.ignore()
 
 def perform_update(auto=True):
     config = get_config()
