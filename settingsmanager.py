@@ -459,7 +459,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if not state:
                 for col in range(self.table_widget.columnCount()):
                     unselitem = self.table_widget.item(row, col)
-                    unselitem.setFlags(unselitem.flags() & ~Qt.ItemIsSelectable)
+                    if unselitem is not None:
+                        unselitem.setFlags(unselitem.flags() & ~Qt.ItemIsSelectable)
 
             # if row not in self.connected_rows:
             #     value_item.dataChanged.connect(self.handle_item_change)
