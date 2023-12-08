@@ -717,7 +717,7 @@ class SimConnectSock(SimConnectManager):
 
 # Subclass QMainWindow to customize your application's main window
 class MainWindow(QMainWindow):
-    def __init__(self, settings_manager):
+    def __init__(self, settings_manager, settings_layout):
         super().__init__()
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1007,8 +1007,9 @@ class MainWindow(QMainWindow):
 
         # Create a widget to hold the layout
         scroll_widget = QWidget()
-        settings_layout = SettingsLayout()
-        scroll_widget.setLayout(settings_layout)
+        self.settings_layout = settings_layout
+        # settings_layout = SettingsLayout()
+        scroll_widget.setLayout(self.settings_layout)
 
         # Add the grid layout to the main layout
         self.settings_area.setWidget(scroll_widget)
@@ -1022,10 +1023,10 @@ class MainWindow(QMainWindow):
         # test buttons
         test_layout = QHBoxLayout()
         clear_button = QPushButton('clear')
-        clear_button.clicked.connect(settings_layout.clear_layout)
+        clear_button.clicked.connect(self.settings_layout.clear_layout)
         test_layout.addWidget(clear_button)
         reload_button = QPushButton('reload')
-        reload_button.clicked.connect(settings_layout.reload_caller)
+        reload_button.clicked.connect(self.settings_layout.reload_caller)
         test_layout.addWidget(reload_button)
         layout.addLayout(test_layout)
 
@@ -1733,7 +1734,7 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
-    window = MainWindow(settings_manager=settings_mgr)
+    window = MainWindow(settings_manager=settings_mgr, settings_layout=settings_lyt)
     window.show()
 
     telem_manager = TelemManager(settings_manager=settings_mgr, settings_layout=settings_lyt)
