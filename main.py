@@ -343,13 +343,14 @@ class LogWindow(QMainWindow):
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
+    updateSettingsLayout = pyqtSignal()
     currentAircraft: aircrafts_dcs.Aircraft = None
     currentAircraftName: str = None
     timedOut: bool = True
     lastFrameTime: float
     numFrames: int = 0
 
-    def __init__(self, settings_manager, settings_layout) -> None:
+    def __init__(self, settings_manager) -> None:
         QObject.__init__(self)
         threading.Thread.__init__(self, daemon=True)
 
@@ -362,7 +363,9 @@ class TelemManager(QObject, threading.Thread):
         self.frameTimes = []
         self.timeout = 0.2
         self.settings_manager = settings_manager
-        self.settings_layout = settings_layout
+        # self.main_window = main_window
+        # self.settings_layout = self.main_window.settings_layout
+        # self.main_window = main_window
         # settings_manager.show()
 
     def get_aircraft_config(self, aircraft_name, default_section=None):
@@ -439,9 +442,6 @@ class TelemManager(QObject, threading.Thread):
                 current_aircraft_name=aircraft_name,
                 current_class=cls_name,
                 current_pattern=pattern)
-            # self.settings_layout.clear_layout()
-            # self.settings_layout.reload_layout(result)
-
 
             return params, cls_name
 
@@ -597,8 +597,11 @@ class TelemManager(QObject, threading.Thread):
                 if args.overridefile== 'None':
                     if settings_mgr.isVisible():
                         settings_mgr.b_getcurrentmodel.click()
-                    # self.settings_layout.clear_layout()
-                    self.settings_layout.reload_caller()
+                    # a,b,res = xmlutils.read_single_model(data_source, aircraft_name)
+                    # self.main_window.settings_layout.build_rows(res)
+                    # self.main_window.reload_button.click()
+                    # self.main_window.settings_layout.reload_caller()
+                    self.updateSettingsLayout.emit()
 
                 # future :
                 # pop create dialog on load where pattern is blank
@@ -719,14 +722,14 @@ class SimConnectSock(SimConnectManager):
 
 # Subclass QMainWindow to customize your application's main window
 class MainWindow(QMainWindow):
-    def __init__(self, settings_manager, settings_layout):
+    def __init__(self, settings_manager):
         super().__init__()
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
         doc_url = 'https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.27yzpife8719'
         dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
         notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
-
+        self.settings_layout = SettingsLayout()
         match args.type:
             case 'joystick':
                 x_pos = 150
@@ -1011,7 +1014,7 @@ class MainWindow(QMainWindow):
         scroll_widget = QWidget()
         # self.settings_layout = settings_layout
         # settings_layout = SettingsLayout()
-        scroll_widget.setLayout(settings_layout)
+        scroll_widget.setLayout(self.settings_layout)
 
         # Add the grid layout to the main layout
         self.settings_area.setWidget(scroll_widget)
@@ -1025,11 +1028,11 @@ class MainWindow(QMainWindow):
         # test buttons
         test_layout = QHBoxLayout()
         clear_button = QPushButton('clear')
-        clear_button.clicked.connect(settings_layout.clear_layout)
+        clear_button.clicked.connect(self.settings_layout.clear_layout)
         test_layout.addWidget(clear_button)
-        reload_button = QPushButton('reload')
-        reload_button.clicked.connect(settings_layout.reload_caller)
-        test_layout.addWidget(reload_button)
+        self.reload_button = QPushButton('reload')
+        self.reload_button.clicked.connect(self.settings_layout.reload_caller)
+        test_layout.addWidget(self.reload_button)
         layout.addLayout(test_layout)
 
         button_layout = QHBoxLayout()
@@ -1177,6 +1180,8 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(layout)
 
 
+    def update_settings(self):
+        self.settings_layout.reload_caller()
 
     def show_sub_menu(self):
         edit_button = self.sender()
@@ -1707,8 +1712,6 @@ def main():
     settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
     icon_path = os.path.join(script_dir, "image/vpforceicon.png")
     settings_mgr.setWindowIcon(QIcon(icon_path))
-    global settings_lyt
-    settings_lyt = SettingsLayout()
     sys.stdout = utils.OutLog(d.widget, sys.stdout)
     sys.stderr = utils.OutLog(d.widget, sys.stderr)
 
@@ -1746,13 +1749,14 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
-    window = MainWindow(settings_manager=settings_mgr, settings_layout=settings_lyt)
+    window = MainWindow(settings_manager=settings_mgr)
     window.show()
 
-    telem_manager = TelemManager(settings_manager=settings_mgr, settings_layout=settings_lyt)
+    telem_manager = TelemManager(settings_manager=settings_mgr)
     telem_manager.start()
 
     telem_manager.telemetryReceived.connect(window.update_telemetry)
+    telem_manager.updateSettingsLayout.connect(window.update_settings)
 
     dcs = NetworkThread(telem_manager, host="", port=34380)
     dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
