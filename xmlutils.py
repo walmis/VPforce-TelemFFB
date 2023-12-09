@@ -47,6 +47,8 @@ def read_xml_file(the_sim):
         info = (f"{info_elem.text}") if info_elem is not None else ""
         prereq_elem = defaults_elem.find('prereq')
         prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
+        sliderfactor_elem = defaults_elem.find('sliderfactor')
+        sliderfactor = (f"{sliderfactor_elem.text}") if sliderfactor_elem is not None else "1"
 
         if the_sim == 'Global':
             replaced = 'Global'
@@ -65,7 +67,8 @@ def read_xml_file(the_sim):
             'validvalues': validvalues,
             'replaced': replaced,
             'prereq': prereq,
-            'info': info
+            'info': info,
+            'sliderfactor': sliderfactor
         }
 
         data_list.append(data_dict)
@@ -616,15 +619,14 @@ def write_converted_to_xml(differences):
         write_models_to_xml(m['sim'], m['model'], m['value'], m['name'])
 
 
-def erase_models_from_xml(the_sim, the_model, the_value, setting_name):
-    mprint(f"erase_models_from_xml  {the_sim} {the_model}, {the_value}, {setting_name}")
+def erase_models_from_xml(the_sim, the_model, setting_name):
+    mprint(f"erase_models_from_xml  {the_sim} {the_model}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
     elements_to_remove = []
     for model_elem in root.findall(f'models[sim="{the_sim}"]'
-                                   f'[device="{device}"]'
-                                   f'[value="{the_value}"]'
+                                   f'[device="{device}"]'                                   
                                    f'[model="{the_model}"]'
                                    f'[name="{setting_name}"]'):
 
@@ -639,7 +641,7 @@ def erase_models_from_xml(the_sim, the_model, the_value, setting_name):
         # Write the modified XML back to the file
         tree.write(userconfig_path)
         logging.info(f"Removed <models> element with values: sim={the_sim}, device={device}, "
-                  f"value={the_value}, model={the_model}, name={setting_name}")
+                  f"model={the_model}, name={setting_name}")
 
 
 def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
@@ -756,14 +758,19 @@ def read_prereqs():
         prereq_elem = defaults_elem.find('prereq')
         prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
 
-        # Store data in a dictionary
-        data_dict = {
-            'prereq': prereq,
-            'value': 'False'
-        }
 
-        if data_dict is not None and data_dict['prereq'] != '' and data_dict not in data_list:
-            data_list.append(data_dict)
+        # Check if 'prereq' is already in the list
+        found = False
+        for data_dict in data_list:
+            if data_dict['prereq'] == prereq:
+                data_dict['count'] += 1
+                found = True
+                break
+
+        # If 'prereq' is not in the list, add a new entry
+        if not found:
+            data_list.append({'prereq': prereq, 'value': 'False', 'count': 1})
+
 
         # lprint(data_list)
 
@@ -778,7 +785,21 @@ def check_prereq_value(prereq_list,datalist):
                 prereq['value'] = item['value']
     return datalist
 
+def eliminate_no_prereq(datalist):
+    newlist = []
+    for d_item in datalist:
+        add_item = True
+        if d_item['prereq'] != '':
+            add_item = False
+            for p_item in datalist:
+                if d_item['prereq'] == p_item['name']:
+                    add_item = True
+                    break
 
+        if add_item:
+            newlist.append(d_item)
+
+    return newlist
 
 def printconfig( sorted_data):
     # lprint("printconfig: " +sorted_data)

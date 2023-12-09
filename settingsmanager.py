@@ -783,7 +783,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 case 'Model':
                     lprint(
                         f"Remove - {self.sim}.{self.drp_models.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    xmlutils.erase_models_from_xml(self.sim,self.drp_models.currentText(), data_dict['value'], data_dict['name'])
+                    xmlutils.erase_models_from_xml(self.sim,self.drp_models.currentText(), data_dict['name'])
                     # self.drp_models.setCurrentText('')
                     # self.drp_models.setCurrentText(mymodel)
                 # make value editable & reset view
