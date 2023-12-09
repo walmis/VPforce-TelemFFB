@@ -100,7 +100,8 @@ import re
 
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame
+    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
+    QDialogButtonBox, QSizePolicy, QSpacerItem
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QPainterPath
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
@@ -646,7 +647,8 @@ class TelemManager(QObject, threading.Thread):
     @prints_exc
     def run(self):
         global _config
-        self.timeout = utils.sanitize_dict(_config["system"]).get("telemetry_timeout", 200)/1000
+        # self.timeout = utils.sanitize_dict(_config["system"]).get("telemetry_timeout", 200)/1000
+        self.timeout = int(utils.read_system_settings().get('telemTimeout', 200))/1000
         logging.info(f"Telemetry timeout: {self.timeout}")
         while self._run:
             with self._cond:
@@ -721,8 +723,279 @@ class SimConnectSock(SimConnectManager):
         self._telem.submitFrame(f"Ev={event};" + ";".join(args))
 
 
+class Ui_SystemDialog(object):
+    def setupUi(self, SystemDialog):
+        if not SystemDialog.objectName():
+            SystemDialog.setObjectName(u"SystemDialog")
+        SystemDialog.resize(490, 355)
+        sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(SystemDialog.sizePolicy().hasHeightForWidth())
+        SystemDialog.setSizePolicy(sizePolicy)
+        SystemDialog.setMinimumSize(QSize(490, 355))
+        SystemDialog.setMaximumSize(QSize(490, 355))
+        self.line = QFrame(SystemDialog)
+        self.line.setObjectName(u"line")
+        self.line.setGeometry(QRect(9, 102, 466, 16))
+        font = QFont()
+        font.setBold(False)
+        font.setWeight(50)
+        self.line.setFont(font)
+        self.line.setLineWidth(2)
+        self.line.setMidLineWidth(1)
+        self.line.setFrameShape(QFrame.HLine)
+        self.line.setFrameShadow(QFrame.Sunken)
+        self.buttonBox = QDialogButtonBox(SystemDialog)
+        self.buttonBox.setObjectName(u"buttonBox")
+        self.buttonBox.setGeometry(QRect(310, 310, 156, 23))
+        self.buttonBox.setOrientation(Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
+        self.resetButton = QPushButton(SystemDialog)
+        self.resetButton.setObjectName(u"resetButton")
+        self.resetButton.setGeometry(QRect(20, 310, 101, 23))
+        self.widget = QWidget(SystemDialog)
+        self.widget.setObjectName(u"widget")
+        self.widget.setGeometry(QRect(20, 19, 258, 71))
+        self.gridLayout = QGridLayout(self.widget)
+        self.gridLayout.setObjectName(u"gridLayout")
+        self.gridLayout.setContentsMargins(0, 0, 0, 0)
+        self.label = QLabel(self.widget)
+        self.label.setObjectName(u"label")
 
-# Subclass QMainWindow to customize your application's main window
+        self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
+
+        self.logLevel = QComboBox(self.widget)
+        self.logLevel.setObjectName(u"logLevel")
+
+        self.gridLayout.addWidget(self.logLevel, 0, 1, 1, 1)
+
+        self.label_2 = QLabel(self.widget)
+        self.label_2.setObjectName(u"label_2")
+
+        self.gridLayout.addWidget(self.label_2, 1, 0, 1, 1)
+
+        self.telemTimeout = QLineEdit(self.widget)
+        self.telemTimeout.setObjectName(u"telemTimeout")
+
+        self.gridLayout.addWidget(self.telemTimeout, 1, 1, 1, 1)
+
+        self.ignoreUpdate = QCheckBox(self.widget)
+        self.ignoreUpdate.setObjectName(u"ignoreUpdate")
+
+        self.gridLayout.addWidget(self.ignoreUpdate, 2, 0, 1, 2)
+
+        self.widget1 = QWidget(SystemDialog)
+        self.widget1.setObjectName(u"widget1")
+        self.widget1.setGeometry(QRect(16, 133, 170, 65))
+        self.verticalLayout = QVBoxLayout(self.widget1)
+        self.verticalLayout.setObjectName(u"verticalLayout")
+        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
+        self.enableDCS = QCheckBox(self.widget1)
+        self.enableDCS.setObjectName(u"enableDCS")
+
+        self.verticalLayout.addWidget(self.enableDCS)
+
+        self.enableMSFS = QCheckBox(self.widget1)
+        self.enableMSFS.setObjectName(u"enableMSFS")
+
+        self.verticalLayout.addWidget(self.enableMSFS)
+
+        self.enableIL2 = QCheckBox(self.widget1)
+        self.enableIL2.setObjectName(u"enableIL2")
+
+        self.verticalLayout.addWidget(self.enableIL2)
+
+        self.widget2 = QWidget(SystemDialog)
+        self.widget2.setObjectName(u"widget2")
+        self.widget2.setGeometry(QRect(30, 204, 452, 75))
+        self.il2_sub_layout = QGridLayout(self.widget2)
+        self.il2_sub_layout.setObjectName(u"il2_sub_layout")
+        self.il2_sub_layout.setContentsMargins(0, 0, 0, 0)
+        self.validateIL2 = QCheckBox(self.widget2)
+        self.validateIL2.setObjectName(u"validateIL2")
+
+        self.il2_sub_layout.addWidget(self.validateIL2, 0, 0, 1, 1)
+
+        self.horizontalLayout = QHBoxLayout()
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.label_3 = QLabel(self.widget2)
+        self.label_3.setObjectName(u"label_3")
+        sizePolicy1 = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+        sizePolicy1.setHorizontalStretch(0)
+        sizePolicy1.setVerticalStretch(0)
+        sizePolicy1.setHeightForWidth(self.label_3.sizePolicy().hasHeightForWidth())
+        self.label_3.setSizePolicy(sizePolicy1)
+        self.label_3.setMinimumSize(QSize(98, 0))
+
+        self.horizontalLayout.addWidget(self.label_3)
+
+        self.pathIL2 = QLineEdit(self.widget2)
+        self.pathIL2.setObjectName(u"pathIL2")
+
+        self.horizontalLayout.addWidget(self.pathIL2)
+
+        self.browseIL2 = QToolButton(self.widget2)
+        self.browseIL2.setObjectName(u"browseIL2")
+
+        self.horizontalLayout.addWidget(self.browseIL2)
+
+
+        self.il2_sub_layout.addLayout(self.horizontalLayout, 1, 0, 1, 1)
+
+        self.horizontalLayout_2 = QHBoxLayout()
+        self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
+        self.label_4 = QLabel(self.widget2)
+        self.label_4.setObjectName(u"label_4")
+
+        self.horizontalLayout_2.addWidget(self.label_4)
+
+        self.portIL2 = QLineEdit(self.widget2)
+        self.portIL2.setObjectName(u"portIL2")
+
+        self.horizontalLayout_2.addWidget(self.portIL2)
+
+        self.horizontalSpacer = QSpacerItem(279, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.horizontalLayout_2.addItem(self.horizontalSpacer)
+
+
+        self.il2_sub_layout.addLayout(self.horizontalLayout_2, 2, 0, 1, 1)
+
+
+        self.retranslateUi(SystemDialog)
+
+        QMetaObject.connectSlotsByName(SystemDialog)
+    # setupUi
+
+    def retranslateUi(self, SystemDialog):
+        SystemDialog.setWindowTitle(QCoreApplication.translate("SystemDialog", u"System Settings", None))
+        self.resetButton.setText(QCoreApplication.translate("SystemDialog", u"Reset to  Defaults", None))
+        self.label.setText(QCoreApplication.translate("SystemDialog", u"System Logging Level:", None))
+        self.label_2.setText(QCoreApplication.translate("SystemDialog", u"Telemetry Timeout (ms):", None))
+        self.ignoreUpdate.setText(QCoreApplication.translate("SystemDialog", u"Disable Update Prompt on Startup", None))
+        self.enableDCS.setText(QCoreApplication.translate("SystemDialog", u"Enable DCS World Support", None))
+        self.enableMSFS.setText(QCoreApplication.translate("SystemDialog", u"Enable MSFS 2020 Support", None))
+        self.enableIL2.setText(QCoreApplication.translate("SystemDialog", u"Enable IL-2 Sturmovik Support", None))
+        self.validateIL2.setText(QCoreApplication.translate("SystemDialog", u"Auto IL-2 Telemetry setup", None))
+        self.label_3.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Install Path:", None))
+        self.browseIL2.setText(QCoreApplication.translate("SystemDialog", u"...", None))
+        self.label_4.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Telemetry Port:", None))
+    # retranslateUi
+
+
+
+
+
+class SystemSettingsDialog(QDialog, Ui_SystemDialog):
+    def __init__(self, parent=None):
+        super(SystemSettingsDialog, self).__init__(parent)
+        self.setupUi(self)
+        self.retranslateUi(self)
+
+        # Add "INFO" and "DEBUG" options to the logLevel combo box
+        self.logLevel.addItems(["INFO", "DEBUG"])
+
+        # Connect signals to slots
+        self.enableIL2.stateChanged.connect(self.toggle_il2_widgets)
+        self.browseIL2.clicked.connect(self.select_il2_directory)
+        self.buttonBox.accepted.connect(self.save_settings)
+        self.resetButton.clicked.connect(self.reset_settings)
+        self.buttonBox.rejected.connect(self.close)
+
+        # Set initial state
+        self.toggle_il2_widgets()
+
+        # Load settings from the registry and update widget states
+        self.load_settings()
+
+    def reset_settings(self):
+        # Load default settings and update widgets
+        # default_settings = utils.get_default_sys_settings()
+        self.load_settings(default=True)
+    def toggle_il2_widgets(self):
+        # Show/hide IL-2 related widgets based on checkbox state
+        il2_enabled = self.enableIL2.isChecked()
+        self.validateIL2.setVisible(il2_enabled)
+        self.label_3.setVisible(il2_enabled)
+        self.pathIL2.setVisible(il2_enabled)
+        self.browseIL2.setVisible(il2_enabled)
+        self.label_4.setVisible(il2_enabled)
+        self.portIL2.setVisible(il2_enabled)
+
+    def select_il2_directory(self):
+        # Open a directory dialog and set the result in the pathIL2 QLineEdit
+        directory = QFileDialog.getExistingDirectory(self, "Select IL-2 Install Path", "")
+        if directory:
+            self.pathIL2.setText(directory)
+
+    def save_settings(self):
+        # Create a dictionary with the values of all components
+        settings_dict = {
+            "logLevel": self.logLevel.currentText(),
+            "telemTimeout": int(self.telemTimeout.text()),
+            "ignoreUpdate": self.ignoreUpdate.isChecked(),
+            "enableDCS": self.enableDCS.isChecked(),
+            "enableMSFS": self.enableMSFS.isChecked(),
+            "enableIL2": self.enableIL2.isChecked(),
+            "validateIL2": self.validateIL2.isChecked(),
+            "pathIL2": self.pathIL2.text(),
+            "portIL2": int(self.portIL2.text()),
+        }
+
+        # Save settings to the registry
+        for key, value in settings_dict.items():
+            utils.set_reg(key, value)
+        self.accept()
+
+    def load_settings(self, default=False):
+        """
+        Load settings from the registry and update widget states.
+        """
+        if default:
+            settings_dict = utils.get_default_sys_settings()
+        else:
+            # Read settings from the registry
+            settings_dict = utils.read_system_settings()
+
+        # Update widget states based on the loaded settings
+        if 'logLevel' in settings_dict:
+            log_level = settings_dict['logLevel']
+            self.logLevel.setCurrentText(log_level)
+
+        if 'telemTimeout' in settings_dict:
+            telem_timeout = settings_dict['telemTimeout']
+            self.telemTimeout.setText(str(telem_timeout))
+
+        if 'ignoreUpdate' in settings_dict:
+            ignore_update = settings_dict['ignoreUpdate']
+            self.ignoreUpdate.setChecked(ignore_update)
+
+        if 'enableDCS' in settings_dict:
+            dcs_enabled = settings_dict['enableDCS']
+            self.enableDCS.setChecked(dcs_enabled)
+
+        if 'enableMSFS' in settings_dict:
+            msfs_enabled = settings_dict['enableMSFS']
+            self.enableMSFS.setChecked(msfs_enabled)
+
+        if 'enableIL2' in settings_dict:
+            il2_enabled = settings_dict['enableIL2']
+            self.enableIL2.setChecked(il2_enabled)
+            self.toggle_il2_widgets()
+
+        if 'validateIL2' in settings_dict:
+            il2_validate = settings_dict['validateIL2']
+            self.validateIL2.setChecked(il2_validate)
+
+        if 'pathIL2' in settings_dict:
+            il2_install_path = settings_dict['pathIL2']
+            self.pathIL2.setText(il2_install_path)
+
+        if 'portIL2' in settings_dict:
+            il2_port = settings_dict['portIL2']
+            self.portIL2.setText(str(il2_port))
+
 class MainWindow(QMainWindow):
     def __init__(self, settings_manager):
         super().__init__()
@@ -768,6 +1041,12 @@ class MainWindow(QMainWindow):
             QMenuBar { background-color: #f0f0f0; } /* Set the background color of the menu bar */
             QMenu::item:selected { color: red; } /* Set the text color when a menu item is selected */
         """)
+        # Add the "System" menu and its sub-option
+        system_menu = menubar.addMenu('System')
+
+        system_settings_action = QAction('System Settings', self)
+        system_settings_action.triggered.connect(self.open_system_settings_dialog)
+        system_menu.addAction(system_settings_action)
 
         # Create the "Utilities" menu
         utilities_menu = menubar.addMenu('Utilities')
@@ -845,24 +1124,18 @@ class MainWindow(QMainWindow):
         msfs_enabled = utils.sanitize_dict(cfg["system"]).get("msfs_enabled", False)
         il2_enabled = utils.sanitize_dict(cfg["system"]).get("il2_enabled", False)
         if args.sim == "DCS" or dcs_enabled:
-            dcs_enabled = 'True'
             dcs_color = QColor(255,255,0)
         else:
-            dcs_enabled = 'False'
             dcs_color = QColor(255, 0, 0)
 
         if args.sim == "MSFS" or msfs_enabled:
-            msfs_enabled = 'True'
             msfs_color = QColor(255, 255, 0)
         else:
-            msfs_enabled = 'False'
             msfs_color = QColor(255, 0, 0)
 
         if args.sim == "IL2" or il2_enabled:
-            il2_enabled = 'True'
             il2_color = QColor(255, 255, 0)
         else:
-            il2_enabled = 'False'
             il2_color = QColor(255, 0, 0)
 
         xplane_color = QColor(128,128,128)
@@ -995,9 +1268,9 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(None, "CONFIG ERROR", f"Error: {error}")
         else:
             self.lbl_telem_data = QLabel(f"Waiting for data...\n\n" + \
-                                         f"DCS Enabled: {(cfg['system']['dcs_enabled'])}\n" + \
-                                         f"IL2 Enabled: {(cfg['system']['il2_enabled'])}\n" + \
-                                         f"MSFS Enabled: {(cfg['system']['msfs_enabled'])}\n\n" + \
+                                         f"DCS Enabled: {utils.read_system_settings().get('enableDCS')}\n" + \
+                                         f"IL2 Enabled: {utils.read_system_settings().get('enableDCS')}\n" + \
+                                         f"MSFS Enabled: {utils.read_system_settings().get('enableDCS')}\n\n" + \
                                          "Restart the app after changing enabled Sims")
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_telem_data.setWordWrap(True)
@@ -1184,6 +1457,9 @@ class MainWindow(QMainWindow):
 
         central_widget.setLayout(layout)
 
+    def open_system_settings_dialog(self):
+        dialog = SystemSettingsDialog(self)
+        dialog.exec_()
 
     def update_settings(self):
         self.settings_layout.reload_caller()
@@ -1718,8 +1994,9 @@ class NoWheelSlider(QSlider):
         event.ignore()
 
 def perform_update(auto=True):
-    config = get_config()
-    ignore_auto_updates = utils.sanitize_dict(config["system"]).get("ignore_auto_updates", 0)
+    # config = get_config()
+    # ignore_auto_updates = utils.sanitize_dict(config["system"]).get("ignore_auto_updates", 0)
+    ignore_auto_updates = utils.read_system_settings().get('ignoreUpdate', False)
     if not auto:
         ignore_auto_updates = False
     update_ans = QMessageBox.No
@@ -1797,8 +2074,9 @@ def main():
         return
 
 
-    config = get_config()
-    ll = config["system"].get("logging_level", "INFO")
+    # config = get_config()
+    # ll = config["system"].get("logging_level", "INFO")
+    ll = utils.read_system_settings().get('loggingLevel', 'INFO')
     log_levels = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -1819,8 +2097,8 @@ def main():
     telem_manager.updateSettingsLayout.connect(window.update_settings)
 
     dcs = NetworkThread(telem_manager, host="", port=34380)
-    dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
-
+    # dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
+    dcs_enabled = utils.read_system_settings().get('enableDCS', False)
     if dcs_enabled or args.sim == "DCS":
         # check and install/update export lua script
         utils.install_export_lua()
@@ -1828,12 +2106,16 @@ def main():
         dcs.start()
 
     il2_mgr = IL2Manager()
-    il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
-    il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
-    il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
+    # il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
+    il2_port = utils.read_system_settings().get('portIL2', 34385)
+    # il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    il2_path = utils.read_system_settings().get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    # il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
+    il2_validate = utils.read_system_settings().get('validateIL2', True)
     il2 = NetworkThread(telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
 
-    il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
+    # il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
+    il2_enabled = utils.read_system_settings().get('enableIL2', False)
 
     if il2_enabled or args.sim == "IL2":
 
@@ -1846,7 +2128,8 @@ def main():
 
     sim_connect = SimConnectSock(telem_manager)
     try:
-        msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
+        # msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
+        msfs = utils.read_system_settings().get('enableMSFS', False)
         logging.debug(f"MSFS={msfs}")
         if msfs or args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")

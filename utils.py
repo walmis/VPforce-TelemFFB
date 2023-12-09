@@ -302,7 +302,81 @@ class Vector:
             m11 * self.x + m21 * self.y + m31 * self.z,
             m12 * self.x + m22 * self.y + m32 * self.z
         )
+def set_reg(name, value):
+    REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
+    try:
+        winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
 
+        # Check if the value is an integer
+        if isinstance(value, int):
+            reg_type = winreg.REG_DWORD
+        else:
+            reg_type = winreg.REG_SZ
+
+        winreg.SetValueEx(registry_key, name, 0, reg_type, value)
+        winreg.CloseKey(registry_key)
+        return True
+    except WindowsError:
+        return False
+
+def get_reg(name):
+    REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
+    try:
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
+
+        # Query the value and its type
+        value, reg_type = winreg.QueryValueEx(registry_key, name)
+
+        # If the type is REG_DWORD, return the integer value
+        if reg_type == winreg.REG_DWORD:
+            return value
+        else:
+            return str(value)  # Return as string for other types
+
+    except WindowsError:
+        return None
+
+def get_default_sys_settings():
+    def_syst_dict = {
+        'logLevel': 'INFO',
+        'telemTimeout': 200,
+        'ignoreUpdate': False,
+        'enableDCS': False,
+        'enableMSFS': False,
+        'enableIL2': False,
+        'validateIL2': True,
+        'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
+        'portIL2': 34385
+    }
+    return def_syst_dict
+def read_system_settings():
+    REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
+    def_syst_dict = get_default_sys_settings()
+
+    settings_dict = {}
+
+    try:
+        winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0,
+                                      winreg.KEY_READ | winreg.KEY_WRITE)
+
+        for key, default_value in def_syst_dict.items():
+            try:
+                value, _ = winreg.QueryValueEx(registry_key, key)
+                settings_dict[key] = value
+            except OSError:
+                # If the key does not exist, set it to the default value
+                reg_type = winreg.REG_DWORD if isinstance(default_value, int) else winreg.REG_SZ
+                winreg.SetValueEx(registry_key, key, 0, reg_type, default_value)
+                settings_dict[key] = default_value
+
+        winreg.CloseKey(registry_key)
+
+    except WindowsError:
+        pass
+
+    return settings_dict
 def mix(a, b, val):
     return a*(1-val) + b*(val)
 
