@@ -731,7 +731,7 @@ class MainWindow(QMainWindow):
         doc_url = 'https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.27yzpife8719'
         dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
         notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
-        self.settings_layout = SettingsLayout()
+        self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
         match args.type:
             case 'joystick':
                 x_pos = 150
@@ -1428,7 +1428,7 @@ class MainWindow(QMainWindow):
 class SettingsLayout(QGridLayout):
     expanded_items = []
     prereq_list = []
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, mainwindow=None):
         super(SettingsLayout, self).__init__(parent)
         result = None
         a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
@@ -1437,6 +1437,7 @@ class SettingsLayout(QGridLayout):
         # Add rows to the grid layout
         # for i in range(20):  # You can adjust the number of rows as needed
         #     self.generate_settings_row(i, settings_layout)
+        self.mainwindow = mainwindow
         if result is not None:
             self.build_rows(result)
 
