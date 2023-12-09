@@ -1680,8 +1680,8 @@ class SettingsLayout(QGridLayout):
         print(f"Slider {self.sender().objectName()} changed. New value: {self.sender().value()}")
         value_label_name = 'vl_' + self.sender().objectName().replace('s_', '')
         sliderfactor_name = 'sf_' + self.sender().objectName().replace('s_', '')
-        value_label = self.findChild(QLabel, value_label_name)
-        slider_label = self.findChild(QLabel, sliderfactor_name)
+        value_label = self.mainwindow.findChild(QLabel, value_label_name)
+        slider_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
         if value_label is not None:
             value_label.setText(str(self.sender().value()) + '%')
 
