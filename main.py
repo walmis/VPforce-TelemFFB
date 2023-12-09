@@ -1246,7 +1246,7 @@ class MainWindow(QMainWindow):
         self.cur_craft.setText('Unknown')
         current_craft_layout.addWidget(self.cur_craft)
         self.current_pattern = QLabel()
-        self.current_pattern.setText('(No Match')
+        self.current_pattern.setText('(No Match)')
         self.current_pattern.setAlignment(Qt.AlignRight)
         current_craft_layout.addWidget(self.current_pattern)
         current_craft_area.setLayout(current_craft_layout)
@@ -1676,17 +1676,17 @@ class MainWindow(QMainWindow):
                 if data['SimPaused'] == 0:
                     match data['src']:
                         case 'DCS':
-                            self.msfs_label_icon.setPixmap(active_icon)
+                            self.dcs_label_icon.setPixmap(active_icon)
                         case'IL2':
-                            self.msfs_label_icon.setPixmap(active_icon)
+                            self.il2_label_icon.setPixmap(active_icon)
                         case'MSFS2020':
                             self.msfs_label_icon.setPixmap(active_icon)
                 elif data['SimPaused'] == 1:
                     match data['src']:
                         case 'DCS':
-                            self.msfs_label_icon.setPixmap(paused_icon)
+                            self.dcs_label_icon.setPixmap(paused_icon)
                         case 'IL2':
-                            self.msfs_label_icon.setPixmap(paused_icon)
+                            self.il2_label_icon.setPixmap(paused_icon)
                         case 'MSFS2020':
                             self.msfs_label_icon.setPixmap(paused_icon)
 
@@ -1740,7 +1740,7 @@ class SettingsLayout(QGridLayout):
             if item['prereq'] in self.expanded_items or item['prereq'] == '':
                 self.generate_settings_row(item, i)
             elif item['order'][-2:] == '.1':
-                i -= 1   # bump .1 setting onto the enable row
+                # i -= 1   # bump .1 setting onto the enable row
                 self.generate_settings_row(item, i)
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
