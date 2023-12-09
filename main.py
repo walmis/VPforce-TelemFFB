@@ -1262,6 +1262,26 @@ class MainWindow(QMainWindow):
         current_craft_area.setLayout(current_craft_layout)
         layout.addWidget(current_craft_area)
 
+        show_craft_loader = True
+        if show_craft_loader:
+            test_craft_area = QWidget()
+            test_craft_layout = QHBoxLayout()
+            test_sim_lbl = QLabel('Sim:')
+            test_sim = QLineEdit()
+            test_sim.setMinimumWidth(70)
+            test_name_lbl = QLabel('Aircraft Name:')
+            test_name = QLineEdit()
+            test_name.setMinimumWidth(100)
+            test_button = QToolButton()
+            test_button.setMaximumWidth(20)
+            test_button.setText('>')
+            test_craft_layout.addWidget(test_sim_lbl)
+            test_craft_layout.addWidget(test_sim)
+            test_craft_layout.addWidget(test_name_lbl)
+            test_craft_layout.addWidget(test_name)
+            test_craft_layout.addWidget(test_button)
+            test_craft_area.setLayout(test_craft_layout)
+            layout.addWidget(test_craft_area)
 
         ################
         #  main scroll area
@@ -1604,6 +1624,30 @@ class MainWindow(QMainWindow):
 
         return pixmap
 
+    def create_x_icon(self, color, size):
+        pixmap = QPixmap(size)
+        pixmap.fill(Qt.transparent)
+
+        # Draw a circle (optional)
+        painter = QPainter(pixmap)
+        painter.setBrush(color)
+        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+
+        # Draw two vertical lines for the pause icon
+        line_length = int(size.width() / 3)
+        line_width = 1
+        line1_x = int((size.width() / 2) - 2)
+        line2_x = int((size.width() / 2) + 2)
+        line_y = int((size.height() - line_length) / 2)
+
+        painter.setPen(QColor(Qt.white))
+        painter.drawLine(line1_x, line_y, line2_x, line_y + line_length)
+        painter.drawLine(line2_x, line_y, line1_x, line_y + line_length)
+
+        painter.end()
+
+        return pixmap
+
     def config_to_dict(self,section,name,value):
         sim=''
         cls = ''
@@ -1794,7 +1838,7 @@ class SettingsLayout(QGridLayout):
             if item['prereq'] in self.expanded_items or item['prereq'] == '':
                 self.generate_settings_row(item, i)
             elif item['order'][-2:] == '.1':
-                # i -= 1   # bump .1 setting onto the enable row
+                i -= 1   # bump .1 setting onto the enable row
                 self.generate_settings_row(item, i)
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
@@ -1856,7 +1900,7 @@ class SettingsLayout(QGridLayout):
         label.setMinimumWidth(150)
         label.setMaximumWidth(150)
         if item['order'][-2:] == '.1':
-            olditem = self.itemAtPosition(i, 1)
+            olditem = self.itemAtPosition(i, 2)
             if olditem is not None:
                 widget = olditem.widget()
                 if widget is not None:
@@ -1977,9 +2021,10 @@ class SettingsLayout(QGridLayout):
         if item['datatype'] == 'int' or \
                 item['datatype'] == 'anyfloat':
             self.addWidget(line_edit, i, 3)
-
-        if any(p_item['prereq'] == item['name'] and p_item['count']> 1 for p_item in self.prereq_list):
-            self.addWidget(expand_button, i, 1)
+        if not rowdisabled:
+            for p_item in self.prereq_list:
+                if p_item['prereq'] == item['name'] and p_item['count'] > 1:
+                    self.addWidget(expand_button, i, 1)
 
         erase_button = QToolButton()
         erase_button.setObjectName(f"eb_{item['name']}")

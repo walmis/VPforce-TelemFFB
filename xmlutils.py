@@ -768,7 +768,7 @@ def read_prereqs():
                 break
 
         # If 'prereq' is not in the list, add a new entry
-        if not found:
+        if not found and prereq != '':
             data_list.append({'prereq': prereq, 'value': 'False', 'count': 1})
 
 
@@ -792,7 +792,7 @@ def eliminate_no_prereq(datalist):
         if d_item['prereq'] != '':
             add_item = False
             for p_item in datalist:
-                if d_item['prereq'] == p_item['name']:
+                if d_item['prereq'] == p_item['name'] and p_item['value'] == 'true':
                     add_item = True
                     break
 
