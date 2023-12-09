@@ -1267,11 +1267,22 @@ class MainWindow(QMainWindow):
             self.lbl_telem_data = QLabel(f"CONFIG ERROR: {error}")
             QMessageBox.critical(None, "CONFIG ERROR", f"Error: {error}")
         else:
-            self.lbl_telem_data = QLabel(f"Waiting for data...\n\n" + \
-                                         f"DCS Enabled: {utils.read_system_settings().get('enableDCS')}\n" + \
-                                         f"IL2 Enabled: {utils.read_system_settings().get('enableDCS')}\n" + \
-                                         f"MSFS Enabled: {utils.read_system_settings().get('enableDCS')}\n\n" + \
-                                         "Restart the app after changing enabled Sims")
+            dcs_enabled = utils.read_system_settings().get('enableDCS')
+            il2_enabled = utils.read_system_settings().get('enableIL2')
+            msfs_enabled = utils.read_system_settings().get('enableMSFS')
+
+            # Convert True/False to "enabled" or "disabled"
+            dcs_status = "Enabled" if dcs_enabled else "Disabled"
+            il2_status = "Enabled" if il2_enabled else "Disabled"
+            msfs_status = "Enabled" if msfs_enabled else "Disabled"
+
+            self.lbl_telem_data = QLabel(
+                f"Waiting for data...\n\n"
+                f"DCS Enabled: {dcs_status}\n"
+                f"IL2 Enabled: {il2_status}\n"
+                f"MSFS Enabled: {msfs_status}\n\n"
+                "Enable or Disable in System -> System Settings"
+            )
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_telem_data.setWordWrap(True)
 
