@@ -1267,18 +1267,19 @@ class MainWindow(QMainWindow):
             test_craft_area = QWidget()
             test_craft_layout = QHBoxLayout()
             test_sim_lbl = QLabel('Sim:')
-            test_sim = QLineEdit()
-            test_sim.setMinimumWidth(70)
+            self.test_sim = QLineEdit()
+            self.test_sim.setMinimumWidth(70)
             test_name_lbl = QLabel('Aircraft Name:')
-            test_name = QLineEdit()
-            test_name.setMinimumWidth(100)
+            self.test_name = QLineEdit()
+            self.test_name.setMinimumWidth(100)
             test_button = QToolButton()
             test_button.setMaximumWidth(20)
             test_button.setText('>')
+            test_button.clicked.connect(self.force_sim_aircraft)
             test_craft_layout.addWidget(test_sim_lbl)
-            test_craft_layout.addWidget(test_sim)
+            test_craft_layout.addWidget(self.test_sim)
             test_craft_layout.addWidget(test_name_lbl)
-            test_craft_layout.addWidget(test_name)
+            test_craft_layout.addWidget(self.test_name)
             test_craft_layout.addWidget(test_button)
             test_craft_area.setLayout(test_craft_layout)
             layout.addWidget(test_craft_area)
@@ -1499,6 +1500,11 @@ class MainWindow(QMainWindow):
         layout.addLayout(version_row_layout)
 
         central_widget.setLayout(layout)
+
+    def force_sim_aircraft(self):
+        settings_mgr.current_sim = self.test_sim.text()
+        settings_mgr.current_aircraft_name = self.test_name.text()
+        self.settings_layout.reload_caller()
 
     def open_system_settings_dialog(self):
         dialog = SystemSettingsDialog(self)
