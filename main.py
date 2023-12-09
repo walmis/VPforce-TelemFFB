@@ -1247,7 +1247,7 @@ class MainWindow(QMainWindow):
         current_craft_layout.addWidget(self.cur_craft)
         self.current_pattern = QLabel()
         self.current_pattern.setText('(No Match')
-        self.current_pattern.setAlignment(Qt.AlignHCenter)
+        self.current_pattern.setAlignment(Qt.AlignRight)
         current_craft_layout.addWidget(self.current_pattern)
         current_craft_area.setLayout(current_craft_layout)
         layout.addWidget(current_craft_area)
@@ -1315,14 +1315,16 @@ class MainWindow(QMainWindow):
         #  buttons
 
         # test buttons
-        test_layout = QHBoxLayout()
-        clear_button = QPushButton('clear')
-        clear_button.clicked.connect(self.settings_layout.clear_layout)
-        test_layout.addWidget(clear_button)
-        self.reload_button = QPushButton('reload')
-        self.reload_button.clicked.connect(self.settings_layout.reload_caller)
-        test_layout.addWidget(self.reload_button)
-        layout.addLayout(test_layout)
+        show_clear_reload = False
+        if show_clear_reload:
+            test_layout = QHBoxLayout()
+            clear_button = QPushButton('clear')
+            clear_button.clicked.connect(self.settings_layout.clear_layout)
+            test_layout.addWidget(clear_button)
+            self.reload_button = QPushButton('reload')
+            self.reload_button.clicked.connect(self.settings_layout.reload_caller)
+            test_layout.addWidget(self.reload_button)
+            layout.addLayout(test_layout)
 
         button_layout = QHBoxLayout()
 
@@ -1715,15 +1717,15 @@ class MainWindow(QMainWindow):
 class SettingsLayout(QGridLayout):
     expanded_items = []
     prereq_list = []
+    show_slider_debug = False
+    show_order_debug = False
+
     def __init__(self, parent=None, mainwindow=None):
         super(SettingsLayout, self).__init__(parent)
         result = None
         a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
         #a, b, result = xmlutils.read_single_model('MSFS', 'Cessna 172')
 
-        # Add rows to the grid layout
-        # for i in range(20):  # You can adjust the number of rows as needed
-        #     self.generate_settings_row(i, settings_layout)
         self.mainwindow = mainwindow
         if result is not None:
             self.build_rows(result)
@@ -1738,7 +1740,7 @@ class SettingsLayout(QGridLayout):
             if item['prereq'] in self.expanded_items or item['prereq'] == '':
                 self.generate_settings_row(item, i)
             elif item['order'][-2:] == '.1':
-                i -= 1
+                i -= 1   # bump .1 setting onto the enable row
                 self.generate_settings_row(item, i)
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
@@ -1771,8 +1773,7 @@ class SettingsLayout(QGridLayout):
 
         rowdisabled = False
 
-        show_order = True
-        if show_order:
+        if self.show_order_debug:
             order_lbl = QLabel()
             order_lbl.setText(item['order'])
             order_lbl.setMaximumWidth(30)
@@ -1781,8 +1782,8 @@ class SettingsLayout(QGridLayout):
         # booleans get a checkbox
         if item['datatype'] == 'bool':
             checkbox = QCheckBox("")
-            checkbox.setMaximumSize(QtCore.QSize(20, 20))
-            checkbox.setMinimumSize(QtCore.QSize(20, 20))
+            checkbox.setMaximumSize(QtCore.QSize(14, 20))
+            checkbox.setMinimumSize(QtCore.QSize(14, 20))
             checkbox.setObjectName(f"cb_{item['name']}")
             checkbox.blockSignals(True)
             if item['value'] == 'false':
@@ -1808,7 +1809,7 @@ class SettingsLayout(QGridLayout):
                     widget.deleteLater()
                     self.removeWidget(widget)
 
-        self.addWidget(label, i, 1)
+        self.addWidget(label, i, 2)
 
 
         validvalues = item['validvalues'].split(',')
@@ -1816,6 +1817,10 @@ class SettingsLayout(QGridLayout):
         slider = NoWheelSlider()
         slider.setOrientation(QtCore.Qt.Horizontal)
         slider.setObjectName(f"s_{item['name']}")
+
+        d_slider = NoWheelSlider()
+        d_slider.setOrientation(QtCore.Qt.Horizontal)
+        d_slider.setObjectName(f"d_{item['name']}")
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
@@ -1835,49 +1840,66 @@ class SettingsLayout(QGridLayout):
         expand_button.setObjectName(f"ex_{item['name']}")
         expand_button.clicked.connect(self.expander_clicked)
 
-        # Connect the signals to custom slots
 
-        # slider.valueChanged.connect(lambda factor=item['sliderfactor'], value=slider.value(), name=item['name']: self.slider_changed(name,value,factor))
-        # slider.sliderReleased.connect(lambda factor=item['sliderfactor'], value=slider.value(), name=item['name']: self.sldReconnect(name,value,factor))
 
-        # using objectName passing, used to work, now doesnt
-        slider.valueChanged.connect(self.slider_changed)
-        slider.sliderPressed.connect(self.sldDisconnect)
-        slider.sliderReleased.connect(self.sldReconnect)
 
         value_label = QLabel()
         value_label.setAlignment(Qt.AlignHCenter)
         value_label.setMaximumWidth(50)
         value_label.setObjectName(f"vl_{item['name']}")
         sliderfactor = QLabel(f"{item['sliderfactor']}")
-        sliderfactor.setMaximumWidth(20)
+        if self.show_slider_debug:
+            sliderfactor.setMaximumWidth(20)
+        else:
+            sliderfactor.setMaximumWidth(0)
         sliderfactor.setObjectName(f"sf_{item['name']}")
+
 
 
         if item['datatype'] == 'float' or \
                 item['datatype'] == 'negfloat':
             self.addWidget(value_label, i, 4)
-            value_label.blockSignals(True)
             # print(f"label {value_label.objectName()} for slider {slider.objectName()}")
+            factor = float(item['sliderfactor'])
             if '%' in item['value']:
                 pctval = int(item['value'].replace('%', ''))
             else:
                 pctval = int(float(item['value']) * 100)
+            pctval = int(round(pctval / factor))
+            if self.show_slider_debug:
+                print (f"read value: {item['value']}  factor: {item['sliderfactor']} slider: {pctval}")
             slider.blockSignals(True)
+            slider.setRange(int(validvalues[0]), int(validvalues[1]))
             slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
-            value_label.blockSignals(False)
+            slider.valueChanged.connect(self.slider_changed)
+            slider.sliderPressed.connect(self.sldDisconnect)
+            slider.sliderReleased.connect(self.sldReconnect)
             self.addWidget(slider, i, 3)
             self.addWidget(value_label, i, 4)
             self.addWidget(sliderfactor, i, 8)
-            slider.setRange(int(validvalues[0]), int(validvalues[1]))
+
             slider.blockSignals(False)
 
-        # if item['datatype'] == 'float':
-        #     slider.setRange(0,100)
-        #
-        # if item['datatype'] == 'negfloat':
-        #     slider.setRange(-100, 100)
+        if item['datatype'] == 'd_int' :
+            self.addWidget(value_label, i, 4)
+            d_val = int(item['value'])
+            factor = float(item['sliderfactor'])
+            val = int(round(d_val / factor))
+            if self.show_slider_debug:
+                print(f"read value: {item['value']}   d_slider: {val}")
+            d_slider.blockSignals(True)
+            d_slider.setRange(int(validvalues[0]), int(validvalues[1]))
+            d_slider.setValue(val)
+            value_label.setText(str(d_val))
+            d_slider.valueChanged.connect(self.d_slider_changed)
+            d_slider.sliderPressed.connect(self.sldDisconnect)
+            d_slider.sliderReleased.connect(self.d_sldReconnect)
+            self.addWidget(d_slider, i, 3)
+            self.addWidget(value_label, i, 4)
+            self.addWidget(sliderfactor, i, 8)
+
+            d_slider.blockSignals(False)
 
         if item['datatype'] == 'list':
             dropbox = QComboBox()
@@ -1894,6 +1916,7 @@ class SettingsLayout(QGridLayout):
 
         label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
+        d_slider.setDisabled(rowdisabled)
         line_edit.setDisabled(rowdisabled)
         expand_button.setDisabled(rowdisabled)
 
@@ -1902,7 +1925,7 @@ class SettingsLayout(QGridLayout):
             self.addWidget(line_edit, i, 3)
 
         if any(p_item['prereq'] == item['name'] and p_item['count']> 1 for p_item in self.prereq_list):
-            self.addWidget(expand_button, i, 2)
+            self.addWidget(expand_button, i, 1)
 
         erase_button = QToolButton()
         erase_button.setObjectName(f"eb_{item['name']}")
@@ -1914,7 +1937,7 @@ class SettingsLayout(QGridLayout):
 
         if item['replaced'] == 'Model (user)':
             self.addWidget(erase_button,i,5)
-            print(f"erase {item['name']} button set up")
+            #print(f"erase {item['name']} button set up")
 
 
         self.setRowStretch(i,0)
@@ -1964,31 +1987,50 @@ class SettingsLayout(QGridLayout):
 
 
     def slider_changed(self):
-        print(f"Slider {self.sender().objectName()} changed. New value: {self.sender().value()}")
+
         value_label_name = 'vl_' + self.sender().objectName().replace('s_', '')
         sliderfactor_name = 'sf_' + self.sender().objectName().replace('s_', '')
         value_label = self.mainwindow.findChild(QLabel, value_label_name)
-        slider_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
+        sliderfactor_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
+        value = 0
+        factor = 1.0
         if value_label is not None:
             value_label.setText(str(self.sender().value()) + '%')
+            value = int(self.sender().value())
+        if sliderfactor_label is not None:
+            factor = float(sliderfactor_label.text())
+        value_to_save = str(round(value * factor / 100, 4))
+        if self.show_slider_debug:
+            print(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
 
-        # prevent slider from sending values as you drag
+    def d_slider_changed(self):
+
+        value_label_name = 'vl_' + self.sender().objectName().replace('d_', '')
+        sliderfactor_name = 'sf_' + self.sender().objectName().replace('d_', '')
+        value_label = self.mainwindow.findChild(QLabel, value_label_name)
+        sliderfactor_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
+        factor = 1
+        if sliderfactor_label is not None:
+            factor = float(sliderfactor_label.text())
+        if value_label is not None:
+            value = self.sender().value()
+            value_to_save = str(round(value * factor))
+            value_label.setText(value_to_save)
+
+        if self.show_slider_debug:
+            print(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
 
     # prevent slider from sending values as you drag
-
     def sldDisconnect(self):
         self.sender().valueChanged.disconnect()
-        # reconnect slider after you let go
 
-    # def sldReconnect(self, name, value, factor):
-    #     self.sender().valueChanged.connect(
-    #         lambda f=factor, v=value, n=name: self.slider_changed(n,v,f))
-    #
-    #     self.sender().valueChanged.connect(self.slider_changed)
-    #     self.sender().valueChanged.emit(self.sender().value())
-
+    # reconnect slider after you let go
     def sldReconnect(self):
         self.sender().valueChanged.connect(self.slider_changed)
+        self.sender().valueChanged.emit(self.sender().value())
+
+    def d_sldReconnect(self):
+        self.sender().valueChanged.connect(self.d_slider_changed)
         self.sender().valueChanged.emit(self.sender().value())
 
 class ClickableLabel(QLabel):

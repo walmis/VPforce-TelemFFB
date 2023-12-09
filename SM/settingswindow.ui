@@ -212,11 +212,6 @@
       </property>
       <item>
        <property name="text">
-        <string>Global</string>
-       </property>
-      </item>
-      <item>
-       <property name="text">
         <string>DCS</string>
        </property>
       </item>

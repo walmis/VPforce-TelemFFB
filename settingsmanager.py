@@ -1,6 +1,5 @@
 import logging
 
-# import globalvars
 import sys
 import os
 import shutil
@@ -29,8 +28,8 @@ def mprint(msg):
 
 class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
-    sim = "Global"                             # DCS, MSFS, IL2       -- set in get_current_model below
-    current_sim = "Global"
+    sim = "nothing"                             # DCS, MSFS, IL2       -- set in get_current_model below
+    current_sim = "nothing"
     current_class = ""
     model_name = "unknown airplane"    # full model name with livery etc
     crafttype = ""                       # suggested, send whatever simconnect finds
@@ -45,14 +44,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     allow_in_table_editing = False
 
-    def __init__(self, datasource='Global', device='joystick', userconfig_path='', defaults_path=''):
+    def __init__(self, datasource='', device='joystick', userconfig_path='', defaults_path=''):
         mprint(f"__init__ {datasource}, {device}")
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
         self.defaults_path = defaults_path
         self.userconfig_path = userconfig_path
         self.device=device
-        #globalvars.current_sim = datasource
+
         self.sim = self.current_sim
         self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")
         self.b_browse.clicked.connect(self.choose_directory)
@@ -75,9 +74,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # in the future, get from simconnect.
         if the_sim is not None:
             if the_sim == '':
-                self.sim = 'Global'
-            else:
-                self.sim = the_sim
+                self.sim = 'nothing'
         else:
             self.sim = self.current_sim
 
@@ -138,7 +135,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         self.tb_currentmodel.setText(self.model_name)
 
-        self.get_current_model('Global', '')
+        self.get_current_model('', '')
         self.b_getcurrentmodel.clicked.connect(self.currentmodel_click)
 
         lprint (f"init {self.sim}")
@@ -155,6 +152,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # read models from xml files to populate dropdown
         self.setup_model_list()
         self.setup_class_list()
+        self.setup_sim_list()
 
         # allow changing sim dropdown
         self.drp_sim.currentIndexChanged.connect(lambda index: self.update_table_on_sim_change())
@@ -239,6 +237,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Handle canceled
             pass
 
+    def setup_sim_list(self):
+        mprint("setup_class_list")
+        self.drp_sim.blockSignals(True)
+        sims = ['DCS', 'IL2', 'MSFS', 'XPlane']
+        self.drp_sim.clear()
+        self.drp_sim.addItems(sims)
+        self.drp_sim.setCurrentText(self.sim)
+        self.drp_sim.blockSignals(False)
 
     def setup_class_list(self):
         mprint("setup_class_list")
@@ -246,11 +252,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
         match self.sim:
-            case 'Global':
-                # Assuming drp_class is your QComboBox
-                for disable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
-                    lprint (f"disable {disable}")
-                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
 
             case 'DCS':
                 for disable in { 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter'}:
@@ -330,14 +331,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 self.table_widget.setRowHeight(row, 0)
                 continue
 
-            #
-            # hide 'show_debug' setting in non-global mode
-            #
-            if self.edit_mode != 'Global' and data_dict['name'] == 'show_debug':
-                self.table_widget.setRowHeight(row, 0)
-                continue
-
-
             # hide prereqs not satisfied
             #
             found_prereq = False
@@ -399,10 +392,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Check if replaced is an empty string and set text color accordingly
             for item in [grouping_item, displayname_item, value_item, info_item, replaced_item]:
                 match data_dict['replaced']:
-                    case 'Global':
-                        item.setForeground(QtGui.QColor('gray'))
-                    case 'Global (user)':
-                        item.setForeground(QtGui.QColor('black'))
                     case 'Sim Default':
                         item.setForeground(QtGui.QColor('darkblue'))
                     case 'Sim (user)':
@@ -684,10 +673,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         myclass = self.drp_class.currentText()
         mymodel = self.drp_models.currentText()
         match self.edit_mode:
-            case 'Global':
-                xmlutils.write_global_to_xml(new_value, name)
-                self.drp_sim.setCurrentText('')
-                self.drp_sim.setCurrentText(mysim)
             case 'Sim':
                 xmlutils.write_sim_to_xml(self.sim, new_value, name)
                 self.drp_sim.setCurrentText('')
@@ -731,12 +716,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             # add row to userconfig
             match self.edit_mode:
-                case 'Global':
-                    lprint(
-                        f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    xmlutils.write_global_to_xml(data_dict['value'], data_dict['name'])
-                    # self.drp_sim.setCurrentText('')
-                    # self.drp_sim.setCurrentText(mysim)
                 case 'Sim':
                     lprint(
                         f"Override - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
@@ -762,12 +741,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         else:
             match self.edit_mode:
-                case 'Global':
-                    lprint(
-                        f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    xmlutils.erase_global_from_xml(data_dict['value'], data_dict['name'])
-                    # self.drp_sim.setCurrentText('')
-                    # self.drp_sim.setCurrentText(mysim)
                 case 'Sim':
                     lprint(
                         f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
@@ -842,7 +815,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.set_edit_mode('Sim')
             old_sim = self.sim
             lprint(self.model_type)
-            self.drp_sim.setCurrentText('Global')
+            self.drp_sim.setCurrentText('noting')
             self.drp_sim.setCurrentText(old_sim)
 
         self.table_widget.clearContents()
@@ -856,10 +829,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         self.sim = self.drp_sim.currentText()
 
-        if self.sim == 'Global':
-            self.set_edit_mode('Global')
-        else:
-            self.set_edit_mode('Sim')
+        self.set_edit_mode('Sim')
 
         self.setup_class_list()
         self.setup_model_list()
@@ -923,8 +893,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             state = False
         else:
             match self.edit_mode:
-                case 'Global':
-                    state = (override_text == 'Global (user)')
                 case 'Sim':
                     state = (override_text == 'Sim (user)')
                 case 'Class':
@@ -946,19 +914,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.edit_mode = mode
             self.setup_class_list()
             match mode:
-                case 'Global':
-
-                    self.drp_class.blockSignals(True)
-                    self.drp_models.blockSignals(True)
-                    self.drp_class.setCurrentText('')
-                    self.drp_models.setCurrentText('')
-                    self.model_name = ''
-                    self.model_type = ''
-                    self.drp_class.blockSignals(False)
-                    self.drp_models.blockSignals(False)
-                    self.drp_class.setEnabled(False)
-                    self.drp_models.setEnabled(False)
-                    self.b_createusermodel.setEnabled(False)
                 case 'Sim':
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
@@ -1010,10 +965,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if self.sim == 'IL2' and craft == 'Helicopter': return True
         if self.sim == 'IL2' and craft == 'TurbopropAircraft': return True
 
-        if self.sim == 'Global' and craft != 'Aircraft': return True
         return False
-
-
 
 
 class UserModelDialog(QDialog):
