@@ -161,7 +161,7 @@ version = utils.get_version()
 min_firmware_version = 'v1.0.15'
 global dev_firmware_version
 dev_firmware_version = None
-
+global dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
 
 _update_available = False
 _latest_version = None
@@ -905,7 +905,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         # Set initial state
         self.toggle_il2_widgets()
-
+        self.parent_window = parent
         # Load settings from the registry and update widget states
         self.load_settings()
 
@@ -946,6 +946,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # Save settings to the registry
         for key, value in settings_dict.items():
             utils.set_reg(key, value)
+        stop_sims()
+        init_sims()
+        self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2'], settings_dict)
+
         self.accept()
 
     def load_settings(self, default=False):
@@ -1120,26 +1124,34 @@ class MainWindow(QMainWindow):
         # notes_row_layout.addWidget(self.notes_label)
         # layout.addLayout(notes_row_layout)
         cfg = get_config()
-        dcs_enabled = utils.sanitize_dict(cfg["system"]).get("dcs_enabled", False)
-        msfs_enabled = utils.sanitize_dict(cfg["system"]).get("msfs_enabled", False)
-        il2_enabled = utils.sanitize_dict(cfg["system"]).get("il2_enabled", False)
+        dcs_enabled = utils.read_system_settings().get('enableDCS')
+        il2_enabled = utils.read_system_settings().get('enableIL2')
+        msfs_enabled = utils.read_system_settings().get('enableMSFS')
+
+        self.icon_size = QSize(18, 18)
         if args.sim == "DCS" or dcs_enabled:
             dcs_color = QColor(255,255,0)
+            dcs_icon = self.create_colored_icon(dcs_color, self.icon_size)
         else:
-            dcs_color = QColor(255, 0, 0)
+            dcs_color = QColor(128,128,128)
+            dcs_icon = self.create_x_icon(dcs_color, self.icon_size)
 
         if args.sim == "MSFS" or msfs_enabled:
             msfs_color = QColor(255, 255, 0)
+            msfs_icon = self.create_colored_icon(msfs_color, self.icon_size)
         else:
-            msfs_color = QColor(255, 0, 0)
+            msfs_color = QColor(128,128,128)
+            msfs_icon = self.create_x_icon(dcs_color, self.icon_size)
 
         if args.sim == "IL2" or il2_enabled:
             il2_color = QColor(255, 255, 0)
+            il2_icon = self.create_colored_icon(il2_color, self.icon_size)
         else:
-            il2_color = QColor(255, 0, 0)
+            il2_color = QColor(128,128,128)
+            il2_icon = self.create_x_icon(dcs_color, self.icon_size)
 
-        xplane_color = QColor(128,128,128)
-        condor_color = QColor(128, 128, 128)
+        # xplane_color = QColor(128,128,128)
+        # condor_color = QColor(128, 128, 128)
 
         logo_status_layout = QHBoxLayout()
 
@@ -1154,11 +1166,11 @@ class MainWindow(QMainWindow):
         logo_status_layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
         # layout.addWidget(QLabel(f"Config File: {args.configfile}"))
 
-        self.icon_size= QSize(18, 18)
+
 
         status_layout = QGridLayout()
         self.dcs_label_icon = QLabel("", self)
-        dcs_icon = self.create_colored_icon(dcs_color, self.icon_size)
+
         self.dcs_label_icon.setPixmap(dcs_icon)
         self.dcs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         dcs_label = QLabel("DCS", self)
@@ -1166,7 +1178,6 @@ class MainWindow(QMainWindow):
         status_layout.addWidget(dcs_label, 0, 1)
 
         self.il2_label_icon = QLabel("", self)
-        il2_icon = self.create_colored_icon(il2_color, self.icon_size)
         self.il2_label_icon.setPixmap(il2_icon)
         self.il2_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         il2_label = QLabel("IL2", self)
@@ -1174,28 +1185,27 @@ class MainWindow(QMainWindow):
         status_layout.addWidget(il2_label, 1, 1)
 
         self.msfs_label_icon = QLabel("", self)
-        msfs_icon = self.create_colored_icon(msfs_color, self.icon_size)
         self.msfs_label_icon.setPixmap(msfs_icon)
         self.msfs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         msfs_label = QLabel("MSFS", self)
         status_layout.addWidget(self.msfs_label_icon, 2, 0)
         status_layout.addWidget(msfs_label, 2, 1)
 
-        self.xplane_label_icon = QLabel("", self)
-        xplane_icon = self.create_colored_icon(xplane_color, self.icon_size)
-        self.xplane_label_icon.setPixmap(xplane_icon)
-        self.xplane_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        xplane_label = QLabel("XPlane", self)
-        status_layout.addWidget(self.xplane_label_icon, 0, 2)
-        status_layout.addWidget(xplane_label, 0, 3)
-
-        self.condor_label_icon = QLabel("", self)
-        condor_icon = self.create_colored_icon(condor_color, self.icon_size)
-        self.condor_label_icon.setPixmap(condor_icon)
-        self.condor_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        condor_label = QLabel("Condor2", self)
-        status_layout.addWidget(self.condor_label_icon, 1, 2)
-        status_layout.addWidget(condor_label, 1, 3)
+        # self.xplane_label_icon = QLabel("", self)
+        # xplane_icon = self.create_colored_icon(xplane_color, self.icon_size)
+        # self.xplane_label_icon.setPixmap(xplane_icon)
+        # self.xplane_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # xplane_label = QLabel("XPlane", self)
+        # status_layout.addWidget(self.xplane_label_icon, 0, 2)
+        # status_layout.addWidget(xplane_label, 0, 3)
+        #
+        # self.condor_label_icon = QLabel("", self)
+        # condor_icon = self.create_colored_icon(condor_color, self.icon_size)
+        # self.condor_label_icon.setPixmap(condor_icon)
+        # self.condor_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # condor_label = QLabel("Condor2", self)
+        # status_layout.addWidget(self.condor_label_icon, 1, 2)
+        # status_layout.addWidget(condor_label, 1, 3)
 
         logo_status_layout.addLayout(status_layout)
 
@@ -1547,7 +1557,29 @@ class MainWindow(QMainWindow):
 
         return pixmap
 
+    def create_x_icon(self, color, size):
+        pixmap = QPixmap(size)
+        pixmap.fill(Qt.transparent)
 
+        # Draw a circle (optional)
+        painter = QPainter(pixmap)
+        painter.setBrush(color)
+        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+
+        # Draw two vertical lines for the pause icon
+        line_length = int(size.width() / 3)
+        line_width = 1
+        line1_x = int((size.width() / 2) - 2)
+        line2_x = int((size.width() / 2) + 2)
+        line_y = int((size.height() - line_length) / 2)
+
+        painter.setPen(QColor(Qt.white))
+        painter.drawLine(line1_x, line_y, line2_x, line_y + line_length)
+        painter.drawLine(line2_x, line_y, line1_x, line_y + line_length)
+
+        painter.end()
+
+        return pixmap
     def create_paused_icon(self, color, size):
         pixmap = QPixmap(size)
         pixmap.fill(Qt.transparent)
@@ -1651,6 +1683,45 @@ class MainWindow(QMainWindow):
         if perform_update(auto=False):
             QCoreApplication.instance().quit()
 
+    def init_sim_indicators(self, sims, settings_dict):
+        label_icons = {
+            'DCS': self.dcs_label_icon,
+            'IL2': self.il2_label_icon,
+            'MSFS': self.msfs_label_icon,
+        }
+        enable_color = QColor(255, 255, 0)
+        disable_color = QColor(128, 128, 128)
+        enable_color = self.create_colored_icon(enable_color, self.icon_size)
+        disable_color = self.create_x_icon(disable_color, self.icon_size)
+        for sim in sims:
+            state = settings_dict.get(f"enable{sim}")
+            lb = label_icons[sim]
+            if state:
+                lb.setPixmap(enable_color)
+            else:
+                lb.setPixmap(disable_color)
+    def update_sim_indicators(self, source, state):
+        active_color = QColor(0, 255, 0)
+        paused_color = QColor(0, 0, 255)
+        active_icon = self.create_colored_icon(active_color, self.icon_size)
+        paused_icon = self.create_paused_icon(paused_color, self.icon_size)
+        if state:
+            match source:
+                case 'DCS':
+                    self.dcs_label_icon.setPixmap(active_icon)
+                case 'IL2':
+                    self.il2_label_icon.setPixmap(active_icon)
+                case 'MSFS2020':
+                    self.msfs_label_icon.setPixmap(active_icon)
+        else:
+            match source:
+                case 'DCS':
+                    self.dcs_label_icon.setPixmap(paused_icon)
+                case 'IL2':
+                    self.il2_label_icon.setPixmap(paused_icon)
+                case 'MSFS2020':
+                    self.msfs_label_icon.setPixmap(paused_icon)
+
     def update_telemetry(self, data: dict):
         try:
             items = ""
@@ -1668,27 +1739,10 @@ class MainWindow(QMainWindow):
                     if descr not in active_effects:
                         active_effects = '\n'.join([active_effects, descr])
             window_mode = self.radio_button_group.checkedButton()
-            active_color = QColor(0,255,0)
-            paused_color = QColor(0,0,255)
-            active_icon = self.create_colored_icon(active_color, self.icon_size)
-            paused_icon = self.create_paused_icon(paused_color, self.icon_size)
-            if items != '':
-                if data['SimPaused'] == 0:
-                    match data['src']:
-                        case 'DCS':
-                            self.dcs_label_icon.setPixmap(active_icon)
-                        case'IL2':
-                            self.il2_label_icon.setPixmap(active_icon)
-                        case'MSFS2020':
-                            self.msfs_label_icon.setPixmap(active_icon)
-                elif data['SimPaused'] == 1:
-                    match data['src']:
-                        case 'DCS':
-                            self.dcs_label_icon.setPixmap(paused_icon)
-                        case 'IL2':
-                            self.il2_label_icon.setPixmap(paused_icon)
-                        case 'MSFS2020':
-                            self.msfs_label_icon.setPixmap(paused_icon)
+
+
+            self.update_sim_indicators(data.get('src'), data.get('SimPaused', 0))
+
 
             self.cur_craft.setText(data['N'])
             self.current_pattern.setText(f"({settings_mgr.current_pattern})")
@@ -2091,13 +2145,61 @@ def perform_update(auto=True):
             print(e)
     return False
 
+def init_sims():
+    global dcs_telem, il2_telem, sim_connect_telem, telem_manager
+    dcs_telem = NetworkThread(telem_manager, host="", port=34380)
+    # dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
+    dcs_enabled = utils.read_system_settings().get('enableDCS', False)
+    if dcs_enabled or args.sim == "DCS":
+        # check and install/update export lua script
+        utils.install_export_lua()
+        logging.info("Starting DCS Telemetry Listener")
+        dcs_telem.start()
+
+    il2_mgr = IL2Manager()
+    # il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
+    il2_port = utils.read_system_settings().get('portIL2', 34385)
+    # il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    il2_path = utils.read_system_settings().get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    # il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
+    il2_validate = utils.read_system_settings().get('validateIL2', True)
+    il2_telem = NetworkThread(telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
+
+    # il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
+    il2_enabled = utils.read_system_settings().get('enableIL2', False)
+
+    if il2_enabled or args.sim == "IL2":
+
+        if il2_validate:
+            utils.analyze_il2_config(il2_path, port=il2_port)
+        else:
+            logging.warning(
+                "IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
+        logging.info("Starting IL2 Telemetry Listener")
+        il2_telem.start()
+
+    sim_connect_telem = SimConnectSock(telem_manager)
+    try:
+        # msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
+        msfs = utils.read_system_settings().get('enableMSFS', False)
+        logging.debug(f"MSFS={msfs}")
+        if msfs or args.sim == "MSFS":
+            logging.info("MSFS Enabled:  Starting Simconnect Manager")
+            sim_connect_telem.start()
+    except:
+        logging.exception("Error loading MSFS enable flag from config file")
+def stop_sims():
+    global dcs_telem, il2_telem, sim_connect_telem
+    dcs_telem.quit()
+    il2_telem.quit()
+    sim_connect_telem.quit()
 
 def main():
     app = QApplication(sys.argv)
     global d
     global dev_firmware_version
     d = LogWindow()
-    global settings_mgr
+    global settings_mgr, telem_manager
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
     settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
     icon_path = os.path.join(script_dir, "image/vpforceicon.png")
@@ -2149,52 +2251,11 @@ def main():
     telem_manager.telemetryReceived.connect(window.update_telemetry)
     telem_manager.updateSettingsLayout.connect(window.update_settings)
 
-    dcs = NetworkThread(telem_manager, host="", port=34380)
-    # dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
-    dcs_enabled = utils.read_system_settings().get('enableDCS', False)
-    if dcs_enabled or args.sim == "DCS":
-        # check and install/update export lua script
-        utils.install_export_lua()
-        logging.info("Starting DCS Telemetry Listener")
-        dcs.start()
-
-    il2_mgr = IL2Manager()
-    # il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
-    il2_port = utils.read_system_settings().get('portIL2', 34385)
-    # il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
-    il2_path = utils.read_system_settings().get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
-    # il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
-    il2_validate = utils.read_system_settings().get('validateIL2', True)
-    il2 = NetworkThread(telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
-
-    # il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
-    il2_enabled = utils.read_system_settings().get('enableIL2', False)
-
-    if il2_enabled or args.sim == "IL2":
-
-        if il2_validate:
-            utils.analyze_il2_config(il2_path, port=il2_port)
-        else:
-            logging.warning("IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
-        logging.info("Starting IL2 Telemetry Listener")
-        il2.start()
-
-    sim_connect = SimConnectSock(telem_manager)
-    try:
-        # msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
-        msfs = utils.read_system_settings().get('enableMSFS', False)
-        logging.debug(f"MSFS={msfs}")
-        if msfs or args.sim == "MSFS":
-            logging.info("MSFS Enabled:  Starting Simconnect Manager")
-            sim_connect.start()
-    except:
-        logging.exception("Error loading MSFS enable flag from config file")
+    init_sims()
 
     if not perform_update():
         app.exec_()
-    dcs.quit()
-    il2.quit()
-    sim_connect.quit()
+    stop_sims()
     telem_manager.quit()
 
 
