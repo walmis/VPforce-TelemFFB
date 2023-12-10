@@ -1504,6 +1504,7 @@ class MainWindow(QMainWindow):
     def force_sim_aircraft(self):
         settings_mgr.current_sim = self.test_sim.text()
         settings_mgr.current_aircraft_name = self.test_name.text()
+        self.monitor_area.hide()
         self.settings_layout.reload_caller()
 
     def open_system_settings_dialog(self):
@@ -1822,7 +1823,7 @@ class SettingsLayout(QGridLayout):
     expanded_items = []
     prereq_list = []
     show_slider_debug = False
-    show_order_debug = False
+    show_order_debug = True
 
     def __init__(self, parent=None, mainwindow=None):
         super(SettingsLayout, self).__init__(parent)
@@ -1837,6 +1838,7 @@ class SettingsLayout(QGridLayout):
     def build_rows(self,datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         self.prereq_list = xmlutils.read_prereqs()
+        sorted_data = xmlutils.eliminate_no_prereq(sorted_data)
         sorted_data = xmlutils.eliminate_no_prereq(sorted_data)
         i = 0
         for item in sorted_data:
@@ -1858,7 +1860,7 @@ class SettingsLayout(QGridLayout):
         self.clear_layout()
         if result is None:
             cls,pat,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
-
+            settings_mgr.current_pattern = pat
         if result is not None:
             self.build_rows(result)
 
