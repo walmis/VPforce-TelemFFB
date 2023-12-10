@@ -507,7 +507,6 @@ class PropellerAircraft(Aircraft):
 
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
-    rpm_scale : float = 45
     pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
     jet_engine_rumble_intensity = 0
 

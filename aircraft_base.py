@@ -40,7 +40,6 @@ class AircraftBase(object):
     gforce_effect_enable : bool = False
 
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
-    rpm_scale: float = 45
     smoother = utils.Smoother()
 
     _engine_rumble_is_playing = 0
