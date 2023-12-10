@@ -99,7 +99,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.setup_model_list()
 
         # output a single model
-        self.model_type, self.model_pattern, self.data_list = xmlutils.read_single_model(self.sim, self.model_name, self.crafttype)
+        if self.sim != 'nothing':
+            self.model_type, self.model_pattern, self.data_list = xmlutils.read_single_model(self.sim, self.model_name, self.crafttype)
         self.drp_sim.blockSignals(True)
         self.drp_sim.setCurrentText(self.sim)
         self.drp_sim.blockSignals(False)

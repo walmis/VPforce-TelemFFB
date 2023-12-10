@@ -50,10 +50,7 @@ def read_xml_file(the_sim):
         sliderfactor_elem = defaults_elem.find('sliderfactor')
         sliderfactor = (f"{sliderfactor_elem.text}") if sliderfactor_elem is not None else "1"
 
-        if the_sim == 'Global':
-            replaced = 'Global'
-        else:
-            replaced = 'Sim Default'
+        replaced = 'Sim Default'
 
         # Store data in a dictionary
         data_dict = {
@@ -237,8 +234,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
 
     # combine base stuff
     defaultdata = simdata
-    # if self.sim != 'Global':
-    #     for item in simdata: defaultdata.append(item)
+
 
     if print_counts:  lprint(f"defaultdata count {len(defaultdata)}")
 
@@ -263,28 +259,18 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
     else:
         default_craft_result = defaultdata
 
-    # get userconfig global overrides
-    userglobaldata = read_user_sim_data( 'Global')
-    if userglobaldata is not None:
-        # merge if there is any
-        def_craft_userglobal_result = update_data_with_models(default_craft_result, userglobaldata,'Global (user)')
-    else:
-        def_craft_userglobal_result = default_craft_result
-
-    if print_counts:  lprint(f"def_craft_userglobal_result count {len(def_craft_userglobal_result)}")
 
     # get userconfig sim overrides
-    if the_sim != 'Global':
-        user_default_data = read_user_sim_data(the_sim)
-        if user_default_data is not None:
-            # merge if there is any
-            def_craft_user_default_result = update_data_with_models(def_craft_userglobal_result, user_default_data, 'Sim (user)')
-        else:
-            def_craft_user_default_result = def_craft_userglobal_result
 
-        if print_counts:  lprint(f"def_craft_user_default_result count {len(def_craft_user_default_result)}")
+    user_default_data = read_user_sim_data(the_sim)
+    if user_default_data is not None:
+        # merge if there is any
+        def_craft_user_default_result = update_data_with_models(default_craft_result, user_default_data, 'Sim (user)')
     else:
-        def_craft_user_default_result = def_craft_userglobal_result
+        def_craft_user_default_result = default_craft_result
+
+    if print_counts:  lprint(f"def_craft_user_default_result count {len(def_craft_user_default_result)}")
+
 
     if model_class != "":
         # get userconfg craft specific type overrides
@@ -337,14 +323,13 @@ def read_user_sim_data(the_sim):
 
             name = model_elem.find('name').text
             value = model_elem.find('value').text
-            if the_sim == 'Global':
-                replaced = 'Global'
-            else:
-                replaced = 'Sim (user)'
+            unit_elem = model_elem.find('unit')
+            unit = unit_elem.text if unit_elem is not None else ""
+            replaced = 'Sim (user)'
             model_dict = {
                 'name': name,
                 'value': value,
-                'unit': '',
+                'unit': unit,
                 'replaced': replaced
             }
 
@@ -428,7 +413,7 @@ def update_data_with_models(defaults_data, model_data, replacetext):
     return updated_result
 
 
-def write_models_to_xml(the_sim, the_model, the_value, setting_name):
+def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''):
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
@@ -461,6 +446,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name):
                     ("name", setting_name),
                     ("model", the_model),
                     ("value", the_value),
+                    ("unit", unit),
                     ("sim", the_sim),
                     ("device", device)
                 ]
@@ -476,6 +462,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name):
             for tag, value in [("name", setting_name),
                                ("model", the_model),
                                ("value", the_value),
+                               ("unit", unit),
                                ("sim", the_sim),
                                ("device", device)]:
                 ET.SubElement(models, tag).text = value
@@ -487,8 +474,8 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name):
                          f"value={the_value}, model={the_model}, name={setting_name}")
 
 
-def write_class_to_xml(the_sim, the_class, the_value, setting_name):
-    mprint(f"write_class_to_xml  {the_sim}, {the_class}, {the_value}, {setting_name}")
+def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
+    mprint(f"write_class_to_xml  {the_sim}, {the_class}, {the_value}{unit}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
@@ -514,6 +501,7 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name):
         for tag, value in [("name", setting_name),
                            ("type", the_class),
                            ("value", the_value),
+                           ("unit", unit),
                            ("sim", the_sim),
                            ("device", device)]:
             ET.SubElement(classes, tag).text = value
@@ -522,10 +510,10 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name):
         tree = ET.ElementTree(root)
         tree.write(userconfig_path)
         logging.info(f"Added <classSettings> element with values: sim={the_sim}, device={device}, "
-                     f"value={the_value}, type={the_class}, name={setting_name}")
+                     f"value={the_value}{unit}, type={the_class}, name={setting_name}")
 
 
-def write_sim_to_xml(the_sim, the_value, setting_name):
+def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
     mprint(f"write_sim_to_xml {the_sim}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
@@ -550,6 +538,7 @@ def write_sim_to_xml(the_sim, the_value, setting_name):
         sims = ET.SubElement(root, "simSettings")
         for tag, value in [("name", setting_name),
                            ("value", the_value),
+                           ("unit", unit),
                            ("sim", the_sim),
                            ("device", device)]:
             ET.SubElement(sims, tag).text = value
@@ -558,44 +547,7 @@ def write_sim_to_xml(the_sim, the_value, setting_name):
         tree = ET.ElementTree(root)
         tree.write(userconfig_path)
         logging.info(
-            f"Added <simSettings> element with values: sim={the_sim}, device={device}, value={the_value}, name={setting_name}")
-
-
-def write_global_to_xml( the_value, setting_name):
-    mprint(f"write_global_to_xml  {the_value}, {setting_name}")
-    # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
-    root = tree.getroot()
-
-    # Check if an identical <simSettings> element already exists
-    sim_elem = root.find(f'.//simSettings[sim="Global"]'
-                         f'[name="{setting_name}"]')
-
-    if sim_elem is not None:
-        # Update the value of the existing element
-        for child_elem in sim_elem:
-            if child_elem.tag == 'value':
-                child_elem.text = str(the_value)
-            if child_elem.tag == 'device':
-                child_elem.text = 'any'
-        tree.write(userconfig_path)
-        logging.info(f"Updated <simSettings> element with values: sim=Global, device=any, "
-                     f"value={the_value}, name={setting_name}")
-
-    else:
-        # Create a new <simSettings> element
-        sims = ET.SubElement(root, "simSettings")
-        for tag, value in [("name", setting_name),
-                           ("value", the_value),
-                           ("sim", 'Global'),
-                           ("device", 'any')]:
-            ET.SubElement(sims, tag).text = value
-
-        # Write the modified XML back to the file
-        tree = ET.ElementTree(root)
-        tree.write(userconfig_path)
-        logging.info(
-            f"Added <simSettings> element with values: sim=Global, device='any', value={the_value}, name={setting_name}")
+            f"Added <simSettings> element with values: sim={the_sim}, device={device}, value={the_value}{unit}, name={setting_name}")
 
 
 def write_converted_to_xml(differences):
@@ -694,28 +646,6 @@ def erase_sim_from_xml(the_sim, the_value, setting_name):
         tree.write(userconfig_path)
         logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={device}, value={the_value}, name={setting_name}")
 
-def erase_global_from_xml(the_value, setting_name):
-    mprint(f"erase_global_from_xml   {the_value}, {setting_name}")
-    # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
-    root = tree.getroot()
-
-    elements_to_remove = []
-    for sim_elem in root.findall(f'.//simSettings[sim="Global"]'
-                                   f'[value="{the_value}"]'
-                                   f'[name="{setting_name}"]'):
-
-        if sim_elem is not None:
-            elements_to_remove.append(sim_elem)
-        else:
-            lprint ("sim setting not found")
-
-    # Remove the elements outside the loop
-    for elem in elements_to_remove:
-        root.remove(elem)
-        # Write the modified XML back to the file
-        tree.write(userconfig_path)
-        logging.info(f"Removed <simSettings> element with values: sim=Global, device=any, value={the_value}, name={setting_name}")
 
 def sort_elements(tree):    #  unused for now.
     # Parse the XML file
@@ -738,6 +668,8 @@ def sort_elements(tree):    #  unused for now.
     # for elem in sorted_elements:
     #     root.append(elem)
 ###
+
+# would be nice if it grouped sim,class,models
 
     # Prettify the XML
     xml_str = xml.dom.minidom.parseString(ET.tostring(root)).toprettyxml()
@@ -801,6 +733,23 @@ def eliminate_no_prereq(datalist):
 
     return newlist
 
+def filter_rows(data_list):
+    valid_rows = []
+
+    def has_valid_prereq(item):
+        if 'prereq' not in item or item['prereq'] == '':
+            return True
+        for row in data_list:
+            if row['name'] == item['prereq'] and row['value'].lower() == 'true' and has_valid_prereq(row):
+                return True
+        return False
+
+    for item in data_list:
+        if has_valid_prereq(item):
+            valid_rows.append(item)
+
+    return valid_rows
+
 def printconfig( sorted_data):
     # lprint("printconfig: " +sorted_data)
     show_source = False
@@ -818,8 +767,6 @@ def printconfig( sorted_data):
         tabstring = "\t\t"
         replacestring = ''
         if show_source:
-            if item['replaced'] == "Global": replacestring = " G"
-            if item['replaced'] == "Global (user)": replacestring = "UG"
             if item['replaced'] == "Sim Default": replacestring =  "SD"
             if item['replaced'] == "Sim (user)": replacestring = "UD"
             if item['replaced'] == "Class Default": replacestring = "SC"
