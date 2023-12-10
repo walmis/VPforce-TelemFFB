@@ -310,8 +310,13 @@ def set_reg(name, value):
 
         # Check if the value is an integer
         if isinstance(value, int):
+            # For integers, use REG_DWORD
             reg_type = winreg.REG_DWORD
+        elif isinstance(value, bytes):
+            # For binary data, use REG_BINARY
+            reg_type = winreg.REG_BINARY
         else:
+            # For strings, use REG_SZ
             reg_type = winreg.REG_SZ
 
         winreg.SetValueEx(registry_key, name, 0, reg_type, value)
@@ -330,6 +335,8 @@ def get_reg(name):
 
         # If the type is REG_DWORD, return the integer value
         if reg_type == winreg.REG_DWORD:
+            return value
+        elif reg_type == winreg.REG_BINARY:
             return value
         else:
             return str(value)  # Return as string for other types

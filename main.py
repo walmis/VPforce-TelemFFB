@@ -102,7 +102,7 @@ from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
     QDialogButtonBox, QSizePolicy, QSpacerItem
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QPainterPath
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
@@ -1072,6 +1072,10 @@ class MainWindow(QMainWindow):
             update_action.setDisabled(False)
         else:
             update_action.setDisabled(True)
+
+        reset_geometry = QAction('Reset Window Size/Position', self)
+        reset_geometry.triggered.connect(self.reset_window_size)
+        utilities_menu.addAction(reset_geometry)
         # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
 
 
@@ -1500,6 +1504,52 @@ class MainWindow(QMainWindow):
         layout.addLayout(version_row_layout)
 
         central_widget.setLayout(layout)
+        self.load_main_window_geometry()
+
+    def closeEvent(self, event):
+        # Perform cleanup before closing the application
+        self.exit_application()
+    def reset_window_size(self):
+        match args.type:
+            case 'joystick':
+                x_pos = 150
+                y_pos = 130
+            case 'pedals':
+                x_pos = 100
+                y_pos = 100
+            case 'collective':
+                x_pos = 50
+                y_pos = 70
+
+        self.setGeometry(x_pos, y_pos, 400, 700)
+    def load_main_window_geometry(self):
+        device_type = args.type
+        if device_type == 'joystick':
+            reg_key = 'jWindowGeometry'
+        elif device_type == 'pedals':
+            reg_key = 'pWindowGeometry'
+        elif device_type == 'collective':
+            reg_key = 'cWindowGeometry'
+
+        geometry = QByteArray(utils.get_reg(reg_key))
+        # pass
+        self.restoreGeometry(geometry)
+    def save_main_window_geometry(self):
+        # Capture the main window's geometry
+        device_type = args.type
+        geometry = self.saveGeometry()
+        geometry_bytes = bytes(geometry)
+        if device_type == 'joystick':
+            reg_key = 'jWindowGeometry'
+        elif device_type == 'pedals':
+            reg_key = 'pWindowGeometry'
+        elif device_type == 'collective':
+            reg_key = 'cWindowGeometry'
+        # Extract position and size
+        # x, y, width, height = geometry.x(), geometry.y(), geometry.width(), geometry.height()
+        # geometry_string = f"{x},{y},{width},{height}"
+        # Store the values in the registry
+        utils.set_reg(reg_key, geometry_bytes)
 
     def force_sim_aircraft(self):
         settings_mgr.current_sim = self.test_sim.text()
@@ -1728,6 +1778,7 @@ class MainWindow(QMainWindow):
 
     def exit_application(self):
         # Perform any cleanup or save operations here
+        self.save_main_window_geometry()
         QCoreApplication.instance().quit()
 
     def update_from_menu(self):
