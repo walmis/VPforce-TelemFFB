@@ -70,7 +70,6 @@ class Aircraft(AircraftBase):
     aoa_buffeting_enabled: bool = True
     aoa_effect_gain: float = 1.0
     uncoordinated_turn_effect_enabled: int = 1
-    engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
 
     runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
     runway_rumble_enabled: bool = True
@@ -768,18 +767,12 @@ class PropellerAircraft(Aircraft):
             self.on_timeout()
             return
         super().on_telemetry(telem_data)
-        ## Engine Rumble
-        current_rpm = telem_data["PropRPM"]
-        if isinstance(current_rpm, list):
-            current_rpm = max(current_rpm)
-        if self.engine_rumble or self._engine_rumble_is_playing:
-            self._update_engine_rumble(current_rpm)
-        #self._update_aoa_effect(telem_data) # currently calculated in  _update_flight_controls
+
+        self.update_piston_engine_rumble(telem_data)
+
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=800*kt2ms, spd_thresh_hi=140*kt2ms )
-        #if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
-        #    super()._gforce_effect(telem_data)
 
 
 class JetAircraft(Aircraft):
@@ -787,7 +780,6 @@ class JetAircraft(Aircraft):
     # flaps_motion_intensity = 0.0
 
     _ab_is_playing = 0
-    _jet_rumble_is_playing = 0
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -803,8 +795,7 @@ class JetAircraft(Aircraft):
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
-        if self.engine_rumble or self._jet_rumble_is_playing:
-            self._update_jet_engine_rumble(telem_data)
+        self._update_jet_engine_rumble(telem_data)
 
         self._gforce_effect(telem_data)
         self._update_ab_effect(telem_data)
@@ -824,8 +815,7 @@ class TurbopropAircraft(PropellerAircraft):
         #     self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
         # if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
         #     super()._gforce_effect(telem_data)
-        if self.engine_rumble or self._jet_rumble_is_playing:
-            self._update_jet_engine_rumble(telem_data)
+        self._update_jet_engine_rumble(telem_data)
 
 class GliderAircraft(Aircraft):
     def _update_force_trim(self, telem_data, x_axis=True, y_axis=True):

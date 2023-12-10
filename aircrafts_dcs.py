@@ -48,8 +48,7 @@ class Aircraft(AircraftBase):
     wind_effect_enabled : int = 0
     wind_effect_scaling: int = 0
     wind_effect_max_intensity: int = 0
-    engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
-    
+
     runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
     runway_rumble_enabled: bool = False
     gunfire_effect_enabled: bool = False
@@ -129,7 +128,6 @@ class Aircraft(AircraftBase):
         super().__init__(name, **kwargs)
         self.spring = effects["spring"].spring()
         self.damper = effects["damper"].damper()
-        self._jet_rumble_is_playing = 0
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.damage_enable_cmd_sent = 0
@@ -508,7 +506,6 @@ class PropellerAircraft(Aircraft):
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
     pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
-    jet_engine_rumble_intensity = 0
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -529,14 +526,14 @@ class PropellerAircraft(Aircraft):
         if self.is_joystick():
             self.override_elevator_droop(telem_data)
 
-        if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
-            self._update_engine_rumble(telem_data["ActualRPM"])
+        self.update_piston_engine_rumble(telem_data)
         
         self._update_wind_effect(telem_data)
         if self.aoa_effect_enabled:
             ac_perf = self.get_aircraft_perf(telem_data)
-            vs0 = ac_perf.get('vs0', 0)
-            vne = ac_perf.get('vne', 0)
+            vs0 = ac_perf.get('Vs0', 0)
+            vne = ac_perf.get('Vne', 0)
+            # print(f"Got Vs0={vs0}, Vne={vne}")
             self._update_aoa_effect(telem_data, minspeed=vs0, maxspeed=vne)
         self._gforce_effect(telem_data)
 
@@ -560,8 +557,7 @@ class JetAircraft(Aircraft):
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
-        if self.afterburner_effect_intensity > 0:
-            self._update_ab_effect(telem_data)
+        self._update_ab_effect(telem_data)
         if self.aoa_reduction_effect_enabled:
             self._aoa_reduction_force_effect(telem_data)
         if self.gforce_effect_enable:

@@ -734,9 +734,8 @@
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>50</order>
-		<displayname>Engine Rumble</displayname>
-		<name>engine_rumble</name>
-		<value>true</value>
+		<displayname>Piston Engine Effect</displayname>
+		<name>engine_prop_rumble_enabled</name>
 		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -749,7 +748,8 @@
 		<order>50.2</order>
 		<displayname>Engine Rumble Low RPM</displayname>
 		<name>engine_rumble_lowrpm</name>
-		<prereq>engine_rumble</prereq>
+		<prereq>engine_prop_rumble_enabled</prereq>
+		<value>650</value>
 		<sliderfactor>100</sliderfactor>
 		<validvalues>1,15</validvalues>
 		<datatype>d_int</datatype>
@@ -765,7 +765,9 @@
 		<order>50.3</order>
 		<displayname>Engine Rumble Low Intensity</displayname>
 		<name>engine_rumble_lowrpm_intensity</name>
-		<prereq>engine_rumble</prereq>
+		<prereq>engine_prop_rumble_enabled</prereq>
+		<value>0.06</value>
+		<sliderfactor>0.35</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
@@ -780,7 +782,8 @@
 		<order>50.4</order>
 		<displayname>Engine Rumble High RPM</displayname>
 		<name>engine_rumble_highrpm</name>
-		<prereq>engine_rumble</prereq>
+		<prereq>engine_prop_rumble_enabled</prereq>
+		<value>2800</value>
 		<sliderfactor>100</sliderfactor>
 		<validvalues>5,60</validvalues>
 		<datatype>d_int</datatype>
@@ -796,7 +799,9 @@
 		<order>50.5</order>
 		<displayname>Engine Rumble High Intensity</displayname>
 		<name>engine_rumble_highrpm_intensity</name>
-		<prereq>engine_rumble</prereq>
+		<prereq>engine_prop_rumble_enabled</prereq>
+		<value>0.03</value>
+		<sliderfactor>0.35</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
@@ -808,10 +813,23 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.6</order>
-		<displayname>Heli Engine Rumble Intensity</displayname>
+		<order>51</order>
+		<displayname>Heli Engine/Rotor Effect</displayname>
+		<name>engine_rotor_rumble_enabled</name>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<order>51.1</order>
+		<displayname>Heli Engine/Rotor Rumble Intensity</displayname>
 		<name>heli_engine_rumble_intensity</name>
-		<prereq>engine_rumble</prereq>
+		<prereq>engine_rotor_rumble_enabled</prereq>
+		<value>0.12</value>
+		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
@@ -823,10 +841,23 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.7</order>
+		<order>52</order>
+		<displayname>Jet Engine Effect</displayname>
+		<name>engine_jet_rumble_enabled</name>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<order>52.1</order>
 		<displayname>Jet Engine Rumble Freq</displayname>
 		<name>jet_engine_rumble_freq</name>
-		<prereq>engine_rumble</prereq>
+		<prereq>engine_jet_rumble_enabled</prereq>
+		<value>45</value>
 		<validvalues>20,60</validvalues>
 		<datatype>d_int</datatype>
 		<unit>hz</unit>
@@ -843,24 +874,10 @@
 		<order>50.8</order>
 		<displayname>Jet Engine Rumble</displayname>
 		<name>jet_engine_rumble_intensity</name>
-		<prereq>engine_rumble</prereq>
+		<prereq>engine_jet_rumble_enabled</prereq>
+		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>Engine</Grouping>
-		<order>50.9</order>
-		<displayname>RPM Scale</displayname>
-		<name>rpm_scale</name>
-		<prereq>engine_rumble</prereq>
-		<value>1.0</value>
-		<datatype>anyfloat</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
@@ -3692,13 +3709,6 @@
 		<device>joystick</device>
 		</models>
 	<models>
-		<name>rpm_scale</name>
-		<model>TF-51D</model>
-		<value>31.5</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
 		<name>runway_rumble_intensity</name>
 		<model>TF-51D</model>
 		<value>1.0</value>
@@ -4290,116 +4300,60 @@
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
-		<name>engine_rumble_highrpm</name>
+		<name>engine_prop_rumble_enabled</name>
 		<type>PropellerAircraft</type>
-		<value>2800</value>
+		<value>true</value>
 		<sim>any</sim>
-		<device>joystick</device>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>engine_rumble_highrpm</name>
-		<type>PropellerAircraft</type>
-		<value>2800</value>
+		<name>engine_rotor_rumble_enabled</name>
+		<type>Helicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>engine_rotor_rumble_enabled</name>
+		<type>Helicopter</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>engine_rotor_rumble_enabled</name>
+		<type>HPGHelicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>engine_jet_rumble_enabled</name>
+		<type>JetAircraft</type>
+		<value>true</value>
 		<sim>any</sim>
-		<device>pedals</device>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>engine_rumble_highrpm</name>
-		<type>TurbopropAircraft</type>
-		<value>2800</value>
+		<name>engine_jet_rumble_enabled</name>
+		<type>Helicopter</type>
+		<value>true</value>
 		<sim>MSFS</sim>
-		<device>joystick</device>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>engine_rumble_highrpm</name>
-		<type>TurbopropAircraft</type>
-		<value>2800</value>
+		<name>engine_jet_rumble_enabled</name>
+		<type>Helicopter</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>engine_jet_rumble_enabled</name>
+		<type>HPGHelicopter</type>
+		<value>true</value>
 		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_highrpm_intensity</name>
-		<type>PropellerAircraft</type>
-		<value>0.03</value>
-		<sim>any</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_highrpm_intensity</name>
-		<type>PropellerAircraft</type>
-		<value>0.03</value>
-		<sim>any</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_highrpm_intensity</name>
-		<type>TurbopropAircraft</type>
-		<value>0.03</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_highrpm_intensity</name>
-		<type>TurbopropAircraft</type>
-		<value>0.03</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_lowrpm</name>
-		<type>PropellerAircraft</type>
-		<value>650</value>
-		<sim>any</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_lowrpm</name>
-		<type>PropellerAircraft</type>
-		<value>650</value>
-		<sim>any</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_lowrpm</name>
-		<type>TurbopropAircraft</type>
-		<value>650</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_lowrpm</name>
-		<type>TurbopropAircraft</type>
-		<value>650</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_lowrpm_intensity</name>
-		<type>PropellerAircraft</type>
-		<value>0.06</value>
-		<sim>any</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_lowrpm_intensity</name>
-		<type>PropellerAircraft</type>
-		<value>0.06</value>
-		<sim>any</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_lowrpm_intensity</name>
-		<type>TurbopropAircraft</type>
-		<value>0.06</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>engine_rumble_lowrpm_intensity</name>
-		<type>TurbopropAircraft</type>
-		<value>0.06</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>etl_effect_enable</name>
@@ -4569,27 +4523,6 @@
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
-		<name>heli_engine_rumble_intensity</name>
-		<type>Helicopter</type>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>heli_engine_rumble_intensity</name>
-		<type>Helicopter</type>
-		<value>0.12</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>heli_engine_rumble_intensity</name>
-		<type>HPGHelicopter</type>
-		<value>0.12</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
 		<name>invert_ap_x_axis</name>
 		<type>JetAircraft</type>
 		<value>false</value>
@@ -4609,62 +4542,6 @@
 		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>Helicopter</type>
-		<value>45</value>
-		<unit>hz</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>Helicopter</type>
-		<value>45</value>
-		<unit>hz</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>HPGHelicopter</type>
-		<value>45</value>
-		<unit>hz</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>JetAircraft</type>
-		<value>45</value>
-		<unit>hz</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>JetAircraft</type>
-		<value>45</value>
-		<unit>hz</unit>
-		<sim>IL2</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>JetAircraft</type>
-		<value>45</value>
-		<unit>hz</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>jet_engine_rumble_freq</name>
-		<type>TurbopropAircraft</type>
-		<value>45</value>
-		<unit>hz</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>jet_engine_rumble_intensity</name>

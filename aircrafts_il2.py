@@ -65,8 +65,7 @@ class Aircraft(AircraftBase):
     stall_aoa : float           = 15.0              # Stall AoA
     wind_effect_enabled : int = 0
 
-    engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
-    
+
     runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
     il2_runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
 
@@ -114,7 +113,6 @@ class Aircraft(AircraftBase):
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
         self.gun_is_firing = 0
-        self._engine_rumble_is_playing = 0
         #clear any existing effects
         for e in effects.values(): e.destroy()
         effects.clear()
@@ -240,7 +238,6 @@ class PropellerAircraft(Aircraft):
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
 
-    _engine_rumble_is_playing = 0
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -251,8 +248,7 @@ class PropellerAircraft(Aircraft):
 
         super().on_telemetry(telem_data)
 
-        if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
-            self._update_engine_rumble(telem_data.get("RPM", 0.0))
+        self.update_piston_engine_rumble(telem_data)
         if self.is_joystick():
             self.override_elevator_droop(telem_data)
         if self.gforce_effect_enable:
@@ -265,7 +261,6 @@ class JetAircraft(Aircraft):
     #flaps_motion_intensity = 0.0
 
     _ab_is_playing = 0
-    _jet_rumble_is_playing = 0
 
       # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -275,8 +270,7 @@ class JetAircraft(Aircraft):
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
-        if self.engine_rumble or self._jet_rumble_is_playing:
-            self._update_jet_engine_rumble(telem_data)
+        self._update_jet_engine_rumble(telem_data)
 
         if self.gforce_effect_enable:
             self._gforce_effect(telem_data)
