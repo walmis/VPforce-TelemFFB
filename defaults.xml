@@ -5,9 +5,9 @@
 		<order>1</order>
 		<displayname>Class</displayname>
 		<name>type</name>
-		<validvalues>PropellerAircraft,JetAircraft</validvalues>
+		<validvalues>PropellerAircraft,JetAircraft,Helicopter</validvalues>
 		<datatype>list</datatype>
-		<IL2>true</IL2>
+		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -18,9 +18,9 @@
 		<order>1</order>
 		<displayname>Class</displayname>
 		<name>type</name>
-		<validvalues>PropellerAircraft,JetAircraft,Helicopter</validvalues>
+		<validvalues>PropellerAircraft,JetAircraft</validvalues>
 		<datatype>list</datatype>
-		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -151,23 +151,28 @@
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>10.1</order>
-		<displayname>AoA Effect Gain (MSFS)</displayname>
-		<name>aoa_effect_gain</name>
-		<value>1.0</value>
-		<MSFS>true</MSFS>
-		<info>amount of calculated AOA effect to apply</info>
-		<Element1>aoa_effect_enabled.aoa_effect_gain</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>10.1</order>
 		<displayname>AoA Effect Max Force (DCS)</displayname>
 		<name>max_aoa_cf_force</name>
 		<value>0.2</value>
 		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<info>Maximum constant force to apply for the AoA effect</info>
 		<Element1>aoa_effect_enabled.max_aoa_cf_force</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>10.1</order>
+		<displayname>AoA Effect Gain (MSFS)</displayname>
+		<name>aoa_effect_gain</name>
+		<value>1.0</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<info>amount of calculated AOA effect to apply</info>
+		<Element1>aoa_effect_enabled.aoa_effect_gain</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
@@ -666,6 +671,7 @@
 		<order>42.1</order>
 		<displayname>Buffeting Intensity</displayname>
 		<name>buffeting_intensity</name>
+		<prereq>aoa_buffeting_enabled</prereq>
 		<value>0.2</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -712,22 +718,22 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>44</order>
-		<displayname>Speedbrake Buffet</displayname>
+		<displayname>Spoiler Buffet</displayname>
 		<name>spoiler_buffet_intensity</name>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
-		<MSFS>true</MSFS>
+		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<info>peak buffeting intensity when spoilers deployed,  0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>44</order>
-		<displayname>Spoiler Buffet</displayname>
+		<displayname>Speedbrake Buffet</displayname>
 		<name>spoiler_buffet_intensity</name>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
-		<DCS>true</DCS>
+		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<info>peak buffeting intensity when spoilers deployed,  0 to disable</info>
 	</defaults>
@@ -813,6 +819,22 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
+		<order>50.8</order>
+		<displayname>Jet Engine Rumble</displayname>
+		<name>jet_engine_rumble_intensity</name>
+		<prereq>engine_jet_rumble_enabled</prereq>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
 		<order>51</order>
 		<displayname>Heli Engine/Rotor Effect</displayname>
 		<name>engine_rotor_rumble_enabled</name>
@@ -871,22 +893,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.8</order>
-		<displayname>Jet Engine Rumble</displayname>
-		<name>jet_engine_rumble_intensity</name>
-		<prereq>engine_jet_rumble_enabled</prereq>
-		<sliderfactor>0.4</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>Engine</Grouping>
 		<order>55</order>
 		<displayname>Afterburner Effect</displayname>
 		<name>afterburner_effect_enabled</name>
@@ -931,6 +937,7 @@
 		<order>60.1</order>
 		<displayname>ETL Effect</displayname>
 		<name>etl_effect_intensity</name>
+		<prereq>etl_effect_enable</prereq>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
@@ -1271,6 +1278,7 @@
 		<order>100.1</order>
 		<displayname>G Force Max Intensity</displayname>
 		<name>gforce_effect_max_intensity</name>
+		<prereq>gforce_effect_enable</prereq>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -1423,6 +1431,7 @@
 		<order>125.1</order>
 		<displayname>Damage Effect</displayname>
 		<name>damage_effect_intensity</name>
+		<prereq>damage_effect_enabled</prereq>
 		<value>0.4</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -1448,6 +1457,7 @@
 		<order>555.1</order>
 		<displayname>Uncoord Turn Effect Gain</displayname>
 		<name>lateral_force_gain</name>
+		<prereq>uncoordinated_turn_effect_enabled</prereq>
 		<value>0.2</value>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
