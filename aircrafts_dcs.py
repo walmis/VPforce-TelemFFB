@@ -51,9 +51,12 @@ class Aircraft(AircraftBase):
     engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
     
     runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
-    runway_rumble_enabled: bool = True
+    runway_rumble_enabled: bool = False
+    gunfire_effect_enabled: bool = False
     gun_vibration_intensity : float = 0.12          # peak gunfire vibration intensity, 0 to disable
+    countermeasure_effect_enabled: bool = False
     cm_vibration_intensity : float = 0.12           # peak countermeasure release vibration intensity, 0 to disable
+    weapon_release_effect_enabled: bool = False
     weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
     weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
     
@@ -63,7 +66,9 @@ class Aircraft(AircraftBase):
     spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
     spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
     
+    # gear_motion_effect_enabled: bool = True
     gear_motion_intensity : float = 0.12      # peak vibration intensity when gear is moving, 0 to disable
+    # gear_buffet_effect_enabled: bool = True
     gear_buffet_intensity : float = 0.15      # peak buffeting intensity when gear down during flight,  0 to disable
     
     flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable

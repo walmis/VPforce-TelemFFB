@@ -85,8 +85,10 @@ class Aircraft(AircraftBase):
     spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
     spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
 
-    gear_motion_intensity: float = 0.12  # peak vibration intensity when gear is moving, 0 to disable
-    gear_buffet_intensity: float = 0.15  # peak buffeting intensity when gear down during flight,  0 to disable
+    gear_motion_effect_enabled: bool = True
+    gear_motion_intensity: float = 0.12
+    gear_buffet_effect_enabled: bool = True
+    gear_buffet_intensity: float = 0.15     # peak buffeting intensity when gear down during flight,  0 to disable
 
     flaps_motion_intensity: float = 0.12  # peak vibration intensity when flaps are moving, 0 to disable
     flaps_buffet_intensity: float = 0.0  # peak buffeting intensity when flaps are deployed,  0 to disable

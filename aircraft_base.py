@@ -47,6 +47,17 @@ class AircraftBase(object):
     elevator_droop_force = 0
     aircraft_is_fbw = 0
 
+    gear_motion_effect_enabled: bool = False
+    gear_buffet_effect_enabled: bool = False
+    speedbrake_motion_effect_enabled: bool = False
+    speedbrake_buffet_effect_enabled: bool = False
+    flaps_motion_effect_enabled: bool = False
+    canopy_motion_effect_enabled: bool = False
+    spoiler_motion_effect_enabled: bool = False
+    spoiler_buffet_effect_enabled: bool = False
+
+    afterburner_effect_enabled: bool = True
+
     @property
     def telem_data(self):
         return self._telem_data
@@ -379,7 +390,7 @@ class AircraftBase(object):
         gun = telem.get("Gun")
         flares = telem.get("Flares")
         chaff = telem.get("Chaff")
-        if self.anything_has_changed("PayloadInfo", payload):
+        if self.anything_has_changed("PayloadInfo", payload) and self.weapon_release_effect_enabled:
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
@@ -389,10 +400,10 @@ class AircraftBase(object):
                 effects["payload_rel"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
                 effects["payload_rel"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction, duration=80).start(force=True) # force sending the start command to the device
-        elif not self.anything_has_changed("PayloadInfo", payload, delta_ms=160):
+        elif not self.anything_has_changed("PayloadInfo", payload, delta_ms=160) or not self.weapon_release_effect_enabled:
             effects["payload_rel"].stop ()
 
-        if self.anything_has_changed("Gun", gun):
+        if self.anything_has_changed("Gun", gun) and self.gunfire_effect_enabled:
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
@@ -402,10 +413,10 @@ class AircraftBase(object):
                 effects["gunfire"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
                 effects["gunfire"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction, duration=80).start(force=True)
-        elif not self.anything_has_changed("Gun", gun, delta_ms=160):
+        elif not self.anything_has_changed("Gun", gun, delta_ms=160) or not self.gunfire_effect_enabled:
             effects["gunfire"].stop()
 
-        if self.anything_has_changed("Flares", flares) or self.anything_has_changed("Chaff", chaff):
+        if (self.anything_has_changed("Flares", flares) or self.anything_has_changed("Chaff", chaff)) and self.countermeasure_effect_enabled:
             # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
             if self.weapon_effect_direction == -1:
                 # Init random number for effect direction
@@ -415,36 +426,32 @@ class AircraftBase(object):
                 effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
                 effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start(force=True)
-        if not self.anything_has_changed("Flares", flares, delta_ms=160) or self.anything_has_changed("Chaff", chaff, delta_ms=160):
+        if not (self.anything_has_changed("Flares", flares, delta_ms=160) or self.anything_has_changed("Chaff", chaff, delta_ms=160)) or not self.countermeasure_effect_enabled:
             effects["cm"].stop()
 
     def _update_flaps(self, flapspos):
-        if not self.flaps_motion_intensity: return
 
         # flapspos = data.get("Flaps")
-        if self.anything_has_changed("Flaps", flapspos, delta_ms=100):
+        if self.anything_has_changed("Flaps", flapspos, delta_ms=100) and self.flaps_motion_intensity > 0 and self.flaps_motion_effect_enabled:
             logging.debug(f"Flaps Pos: {flapspos}")
             effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, 0, 3).start()
         else:
             effects.dispose("flapsmovement")
 
     def _update_canopy(self, canopypos):
-        if not self.canopy_motion_intensity: return
 
         # canopypos = self._telem_data.get("canopy_value", 0)
-        if self.anything_has_changed("Canopy", canopypos, delta_ms=300):
+        if self.anything_has_changed("Canopy", canopypos, delta_ms=300) and self.canopy_motion_intensity > 0 and self.canopy_motion_effect_enabled:
             logging.debug(f"Canopy Pos: {canopypos}")
             effects["canopymovement"].periodic(120, self.canopy_motion_intensity, 0, 3).start()
         else:
             effects.dispose("canopymovement")
 
     def _update_landing_gear(self, gearpos, tas, spd_thresh_low=100, spd_thresh_high=150):
-        if not(self.gear_motion_intensity > 0 or self.gear_buffet_intensity > 0): return
 
-        # gearpos = self._telem_data.get("gear_value", 0)
         rumble_freq = 10
-        # tas =  self._telem_data.get("TAS", 0)
-        if self.anything_has_changed("gear_value", gearpos, 50):
+
+        if self.anything_has_changed("gear_value", gearpos, 50) and self.gear_motion_intensity > 0 and self.gear_motion_effect_enabled:
             logging.debug(f"Landing Gear Pos: {gearpos}")
             effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
             effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 45, 3, phase=120).start()
@@ -452,7 +459,7 @@ class AircraftBase(object):
             effects.dispose("gearmovement")
             effects.dispose("gearmovement2")
 
-        if tas > spd_thresh_low and gearpos > .1:
+        if (tas > spd_thresh_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
             # intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
 
@@ -467,17 +474,14 @@ class AircraftBase(object):
             effects.dispose("gearbuffet2")
 
     def _update_speed_brakes(self, spdbrk, tas, spd_thresh=70):
-        if not (self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0): return
-        # tas = self._telem_data.get("TAS",0)
 
-        # spdbrk = self._telem_data.get("speedbrakes_value", 0)
-        if self.anything_has_changed("speedbrakes_value", spdbrk, 50):
+        if self.anything_has_changed("speedbrakes_value", spdbrk, 50) and self.speedbrake_motion_intensity > 0 and self.speedbrake_motion_effect_enabled:
             logging.debug(f"Speedbrake Pos: {spdbrk}")
             effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, 0, 3).start()
         else:
             effects.dispose("speedbrakemovement")
 
-        if tas > spd_thresh and spdbrk > .1:
+        if tas > spd_thresh and spdbrk > .1 and self.speedbrake_buffet_intensity > 0 and self.speedbrake_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
             realtime_intensity = self.speedbrake_buffet_intensity * spdbrk
             effects["speedbrakebuffet"].periodic(13, realtime_intensity, utils.RandomDirectionModulator).start()
@@ -488,7 +492,6 @@ class AircraftBase(object):
             effects.dispose("speedbrakebuffet2")
 
     def _update_spoiler(self, spoiler, tas, spd_thresh_low=25, spd_thresh_hi=60):
-        if not (self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0): return
 
         # tas = self._telem_data.get("TAS",0)
         tas_intensity = utils.clamp_minmax(utils.scale(tas, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
@@ -500,7 +503,7 @@ class AircraftBase(object):
             return
         # average all spoiler values together
         if type(spoiler) == list:
-            if "F-14" in self._telem_data.get("N"):
+            if "F-14" in self._telem_data.get("N") and self._telem_data.get('src') == 'DCS':
                 # give %85 weight to inner spoilers for intensity calculation
                 spoiler_inner = (spoiler[1], spoiler[2])
                 spoiler_outer = (spoiler[0], spoiler[3])
@@ -508,7 +511,7 @@ class AircraftBase(object):
             else:
                 spoiler = sum(spoiler) / len(spoiler)
 
-        if self.spoiler_motion_intensity > 0:
+        if self.spoiler_motion_intensity > 0 and self.spoiler_motion_intensity > 0 and self.spoiler_motion_effect_enabled:
             if self.anything_has_changed("Spoilers", spoiler):
                 logging.debug(f"Spoilers Pos: {spoiler}")
                 effects["spoilermovement"].periodic(118, self.spoiler_motion_intensity, 0, 4).start()
@@ -518,7 +521,7 @@ class AircraftBase(object):
                 effects.dispose("spoilermovement")
                 effects.dispose("spoilermovement2")
 
-        if tas > spd_thresh_low and spoiler > .1:
+        if tas > spd_thresh_low and spoiler > .1 and self.spoiler_buffet_intensity > 0 and self.spoiler_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
             realtime_intensity = self.spoiler_buffet_intensity * spoiler * tas_intensity
             logging.debug(f"PLAYING SPOILER RUMBLE | intensity: {realtime_intensity}, d-factor: {spoiler}, s-factor: {tas_intensity}")
@@ -679,7 +682,10 @@ class AircraftBase(object):
     ######                            ######
     ########################################
     def _update_ab_effect(self, telem_data):
-        if not self.afterburner_effect_intensity:
+        if not self.afterburner_effect_intensity or not self.afterburner_effect_enabled:
+            effects.dispose("ab_rumble_1_1")
+            effects.dispose("ab_rumble_2_1")
+            self._ab_is_playing = 0
             return
 
         frequency = 20
