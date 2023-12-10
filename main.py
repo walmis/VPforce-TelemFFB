@@ -1531,9 +1531,10 @@ class MainWindow(QMainWindow):
         elif device_type == 'collective':
             reg_key = 'cWindowGeometry'
 
-        geometry = QByteArray(utils.get_reg(reg_key))
-        # pass
-        self.restoreGeometry(geometry)
+        geometry = utils.get_reg(reg_key)
+        if geometry is not None:
+            q_geometry = QByteArray(utils.get_reg(reg_key))
+            self.restoreGeometry(q_geometry)
     def save_main_window_geometry(self):
         # Capture the main window's geometry
         device_type = args.type
