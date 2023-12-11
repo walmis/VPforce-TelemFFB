@@ -183,6 +183,7 @@
 		<datatype>bool</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
@@ -194,6 +195,7 @@
 		<datatype>bool</datatype>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
@@ -204,7 +206,8 @@
 		<validvalues>0,100</validvalues><IL2>true</IL2><joystick>true</joystick>
 		<value>1.0</value>
 		<datatype>float</datatype>
-		<info></info>
+		<pedals>true</pedals>
+		<info>common setting for all buffeting (stall, gear, etc)  - IL2 limitation</info>
 		</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
@@ -585,7 +588,6 @@
 		<order>36</order>
 		<displayname>Collective Dampening Gain</displayname>
 		<name>collective_dampening_gain</name>
-		<value></value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
@@ -616,17 +618,295 @@
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
-		<order>40.2</order>
-		<displayname>Gear Buffet</displayname>
-		<name>gear_buffet_intensity</name>
-		<value>0.15</value>
+		<order>777</order>
+		<displayname>AoA/Stall Buffeting</displayname>
+		<name>aoa_buffeting_enabled</name>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>777.2</order>
+		<displayname>Buffeting Intensity</displayname>
+		<name>buffeting_intensity</name>
+		<prereq>aoa_buffeting_enabled</prereq>
+		<value>0.2</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>peak AoA buffeting intensity  0 to disable</info>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>777.3</order>
+		<displayname>Buffet Onset Aoa</displayname>
+		<name>buffet_aoa</name>
+		<prereq>aoa_buffeting_enabled</prereq>
+		<value>10</value>
+		<datatype>int</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>AoA when buffeting starts</info>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>777.4</order>
+		<displayname>Stall AoA</displayname>
+		<name>stall_aoa</name>
+		<prereq>aoa_buffeting_enabled</prereq>
+		<value>15</value>
+		<unit>deg</unit>
+		<datatype>int</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>Stall AoA</info>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>778</order>
+		<displayname>Gear Buffet Enable</displayname>
+		<name>gear_buffet_effect_enabled</name>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>778.1</order>
+		<displayname>Gear Buffet</displayname>
+		<name>gear_buffet_intensity</name>
+		<prereq>gear_buffet_effect_enabled</prereq>
+		<value>0.15</value>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<info>Peak intensity for gear drag buffeting effect</info>
 		</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>779</order>
+		<displayname>Gear Motion Enable</displayname>
+		<name>gear_motion_effect_enabled</name>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>779.1</order>
+		<displayname>Gear Motion</displayname>
+		<name>gear_motion_intensity</name>
+		<prereq>gear_motion_effect_enabled</prereq>
+		<value>0.15</value>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>peak vibration intensity when gear is moving, 0 to disable</info>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>780</order>
+		<displayname>Speedbrake Buffet Enable</displayname>
+		<name>speedbrake_buffet_effect_enabled</name>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>780.1</order>
+		<displayname>Speedbrake Buffet</displayname>
+		<name>speedbrake_buffet_intensity</name>
+		<prereq>speedbrake_buffet_effect_enabled</prereq>
+		<value>0.15</value>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>Peak intensity for speed brake buffeting effect</info>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>781</order>
+		<displayname>Speedbrake Motion Enable</displayname>
+		<name>speedbrake_motion_effect_enabled</name>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>781.1</order>
+		<displayname>Speedbrake Motion</displayname>
+		<name>speedbrake_motion_intensity</name>
+		<prereq>speedbrake_motion_effect_enabled</prereq>
+		<value>0.15</value>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>peak vibration intensity when speed brake is moving</info>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>782</order>
+		<displayname>Spoiler Buffet Enable</displayname>
+		<name>spoiler_buffet_effect_enabled</name>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>782.1</order>
+		<displayname>Spoiler Buffet</displayname>
+		<name>spoiler_buffet_intensity</name>
+		<prereq>spoiler_buffet_effect_enabled</prereq>
+		<value>0.15</value>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>peak buffeting intensity when spoilers deployed,  0 to disable</info>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>783</order>
+		<displayname>Spoiler Motion Enable</displayname>
+		<name>spoiler_motion_effect_enabled</name>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>783.1</order>
+		<displayname>Spoiler Motion</displayname>
+		<name>spoiler_motion_intensity</name>
+		<prereq>spoiler_motion_effect_enabled</prereq>
+		<value>0.15</value>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>F14 Only, peak vibration intensity when spoilers is moving, 0 to disable</info>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>784</order>
+		<displayname>Canopy Motion Enable</displayname>
+		<name>canopy_motion_effect_enabled</name>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>784.1</order>
+		<displayname>Canopy Motion</displayname>
+		<name>canopy_motion_intensity</name>
+		<prereq>canopy_motion_effect_enabled</prereq>
+		<value>0.12</value>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>peak vibration intensity when canopy is moving, 0 to disable</info>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>785</order>
+		<displayname>Flaps Motion Enable</displayname>
+		<name>flaps_motion_effect_enabled</name>
+		<datatype>bool</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>785.1</order>
+		<displayname>Flaps Motion</displayname>
+		<name>flaps_motion_intensity</name>
+		<prereq>flaps_motion_effect_enabled</prereq>
+		<value>0.15</value>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>peak vibration intensity when flaps are moving, 0 to disable</info>
+	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>41.10</order>
@@ -655,89 +935,6 @@
 		<collective>true</collective>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>42</order>
-		<displayname>AoA/Stall Buffeting</displayname>
-		<name>aoa_buffeting_enabled</name>
-		<datatype>bool</datatype>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>42.1</order>
-		<displayname>Buffeting Intensity</displayname>
-		<name>buffeting_intensity</name>
-		<prereq>aoa_buffeting_enabled</prereq>
-		<value>0.2</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<info>peak AoA buffeting intensity  0 to disable</info>
-		</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>42.2</order>
-		<displayname>Buffet Onset Aoa</displayname>
-		<name>buffet_aoa</name>
-		<prereq>aoa_buffeting_enabled</prereq>
-		<value>10</value>
-		<datatype>int</datatype>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<info>AoA when buffeting starts</info>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>42.3</order>
-		<displayname>Stall AoA</displayname>
-		<prereq>aoa_buffeting_enabled</prereq>
-		<unit>deg</unit>
-		<name>stall_aoa</name>
-		<value>15</value>
-		<datatype>int</datatype>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<info>Stall AoA</info>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>43</order>
-		<displayname>Speedbrake Buffet</displayname>
-		<name>speedbrake_buffet_intensity</name>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<info>Peak intensity for speed brake buffeting effect</info>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>44</order>
-		<displayname>Spoiler Buffet</displayname>
-		<name>spoiler_buffet_intensity</name>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<info>peak buffeting intensity when spoilers deployed,  0 to disable</info>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>44</order>
-		<displayname>Speedbrake Buffet</displayname>
-		<name>spoiler_buffet_intensity</name>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<info>peak buffeting intensity when spoilers deployed,  0 to disable</info>
-	</defaults>
-	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>50</order>
 		<displayname>Piston Engine Effect</displayname>
@@ -748,6 +945,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<collective>true</collective>
 		</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
@@ -764,6 +962,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<collective>true</collective>
 		<info>low RPM threshold for low rpm intensity setting</info>
 	</defaults>
 	<defaults>
@@ -781,6 +980,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<collective>true</collective>
 		<info>peak intenstiy of engine rumble at low RPM threshold</info>
 	</defaults>
 	<defaults>
@@ -798,6 +998,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<collective>true</collective>
 		<info>high RPM threshold for high rpm intensity setting</info>
 	</defaults>
 	<defaults>
@@ -815,6 +1016,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<collective>true</collective>
 		<info>peak intensity of engine rumble at high RPM threshold</info>
 	</defaults>
 	<defaults>
@@ -843,6 +1045,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
@@ -872,6 +1075,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
@@ -902,6 +1106,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<collective>true</collective>
 		<info>Max intensity of afterburner rumble effect&lt;br&gt;&lt;br&gt;Set to 0 to disable</info>
 	</defaults>
 	<defaults>
@@ -918,6 +1123,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<collective>true</collective>
 		<info>Max intensity of afterburner rumble effect&lt;br&gt;&lt;br&gt;Set to 0 to disable</info>
 	</defaults>
 	<defaults>
@@ -1056,48 +1262,6 @@
 		</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
-		<order>80</order>
-		<displayname>Canopy Motion</displayname>
-		<name>canopy_motion_intensity</name>
-		<value>0.12</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<info>peak vibration intensity when canopy is moving, 0 to disable</info>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>81</order>
-		<displayname>Flaps Motion</displayname>
-		<name>flaps_motion_intensity</name>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<info>peak vibration intensity when flaps are moving, 0 to disable</info>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>82</order>
-		<displayname>Gear Motion</displayname>
-		<name>gear_motion_intensity</name>
-		<value>0.15</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<info>peak vibration intensity when gear is moving, 0 to disable</info>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
 		<order>85</order>
 		<displayname>Enable Nosewheel Shimmy</displayname>
 		<name>nosewheel_shimmy</name>
@@ -1173,39 +1337,6 @@
 		<collective>true</collective>
 		<info>peak runway intensity</info>
 		</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>87</order>
-		<displayname>Speedbrake Motion</displayname>
-		<name>speedbrake_motion_intensity</name>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<info>peak vibration intensity when speed brake is moving</info>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>87</order>
-		<displayname>Speedbrake Motion</displayname>
-		<name>spoiler_motion_intensity</name>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<info>F14 Only, peak vibration intensity when spoilers is moving, 0 to disable</info>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>88</order>
-		<displayname>Spoiler Motion</displayname>
-		<name>spoiler_motion_intensity</name>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<info>F14 Only, peak vibration intensity when spoilers is moving, 0 to disable</info>
-	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>90</order>
@@ -4449,30 +4580,30 @@
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>flaps_motion_intensity</name>
+		<name>flaps_motion_effect_enabled</name>
 		<type>JetAircraft</type>
-		<value>0.1</value>
+		<value>true</value>
 		<sim>any</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>flaps_motion_intensity</name>
+		<name>flaps_motion_effect_enabled</name>
 		<type>GliderAircraft</type>
-		<value>0.2</value>
+		<value>true</value>
 		<sim>any</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>flaps_motion_intensity</name>
+		<name>flaps_motion_effect_enabled</name>
 		<type>PropellerAircraft</type>
-		<value>0.2</value>
+		<value>true</value>
 		<sim>any</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>flaps_motion_intensity</name>
+		<name>flaps_motion_effect_enabled</name>
 		<type>TurbopropAircraft</type>
-		<value>0.2</value>
+		<value>true</value>
 		<sim>any</sim>
 		<device>any</device>
 	</classdefaults>
@@ -5090,60 +5221,116 @@
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
-		<name>speedbrake_buffet_intensity</name>
+		<name>speedbrake_buffet_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>speedbrake_buffet_effect_enabled</name>
 		<type>JetAircraft</type>
-		<value>0.15</value>
-		<sim>any</sim>
-		<device>joystick</device>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>speedbrake_buffet_intensity</name>
-		<type>TurbopropAircraft</type>
-		<value>0.15</value>
-		<sim>any</sim>
-		<device>joystick</device>
+		<name>speedbrake_motion_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>speedbrake_motion_intensity</name>
+		<name>speedbrake_motion_effect_enabled</name>
 		<type>JetAircraft</type>
-		<value>0.2</value>
-		<sim>any</sim>
-		<device>joystick</device>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>speedbrake_motion_intensity</name>
-		<type>TurbopropAircraft</type>
-		<value>0.2</value>
-		<sim>any</sim>
-		<device>joystick</device>
+		<name>spoiler_buffet_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>spoiler_buffet_intensity</name>
+		<name>spoiler_buffet_effect_enabled</name>
 		<type>JetAircraft</type>
-		<value>0.2</value>
-		<sim>any</sim>
-		<device>joystick</device>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>spoiler_buffet_intensity</name>
-		<type>TurbopropAircraft</type>
-		<value>0.2</value>
-		<sim>any</sim>
-		<device>joystick</device>
+		<name>spoiler_buffet_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>spoiler_motion_intensity</name>
+		<name>spoiler_buffet_effect_enabled</name>
 		<type>JetAircraft</type>
-		<value>0.2</value>
-		<sim>any</sim>
-		<device>joystick</device>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>spoiler_motion_intensity</name>
+		<name>spoiler_buffet_effect_enabled</name>
 		<type>TurbopropAircraft</type>
-		<value>0.2</value>
-		<sim>any</sim>
-		<device>joystick</device>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>spoiler_buffet_effect_enabled</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>spoiler_motion_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>spoiler_motion_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>spoiler_motion_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>spoiler_motion_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>spoiler_motion_effect_enabled</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>spoiler_motion_effect_enabled</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
