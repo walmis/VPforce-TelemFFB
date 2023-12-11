@@ -26,26 +26,25 @@ fpss2gs = 1 / 32.17405
 
 
 class AircraftBase(object):
-    damper_force = 0
-    inertia_force = 0
+    damper_force: float = 0
+    inertia_force: float = 0
 
     engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
     engine_prop_rumble_enabled: bool = True  # Engine Rumble - Piston specific - based on Prop RPM
     engine_rotor_rumble_enabled: bool = False  # Engine Rumble - Helicopter specific - based on Rotor RPM
 
     engine_rumble_intensity: float = 0.02
-    engine_rumble_lowrpm = 450
+    engine_rumble_lowrpm: int = 450
     engine_rumble_lowrpm_intensity: float = 0.12
-    engine_rumble_highrpm = 2800
+    engine_rumble_highrpm: int  = 2800
     engine_rumble_highrpm_intensity: float = 0.06
 
     gforce_effect_enable : bool = False
 
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
-    smoother = utils.Smoother()
 
-    elevator_droop_force = 0
-    aircraft_is_fbw = 0
+    elevator_droop_force: float = 0.0
+    aircraft_is_fbw: bool = False
 
     gear_motion_effect_enabled: bool = False
     gear_buffet_effect_enabled: bool = False
@@ -57,6 +56,11 @@ class AircraftBase(object):
     spoiler_buffet_effect_enabled: bool = False
 
     afterburner_effect_enabled: bool = True
+
+    etl_effect_enable: bool = True
+    overspeed_effect_enable: bool = True
+
+    smoother = utils.Smoother()
 
     @property
     def telem_data(self):
@@ -473,6 +477,8 @@ class AircraftBase(object):
             effects.dispose("gearbuffet2")
 
     def _update_speed_brakes(self, spdbrk, tas, spd_thresh=70):
+        if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
+            return
 
         if self.anything_has_changed("speedbrakes_value", spdbrk, 50) and self.speedbrake_motion_intensity > 0 and self.speedbrake_motion_effect_enabled:
             logging.debug(f"Speedbrake Pos: {spdbrk}")
@@ -491,6 +497,8 @@ class AircraftBase(object):
             effects.dispose("speedbrakebuffet2")
 
     def _update_spoiler(self, spoiler, tas, spd_thresh_low=25, spd_thresh_hi=60):
+        if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
+            return
 
         # tas = self._telem_data.get("TAS",0)
         tas_intensity = utils.clamp_minmax(utils.scale(tas, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
@@ -771,9 +779,13 @@ class AircraftBase(object):
         if mod == "UH-60L":
             # UH60 always shows positive value for tailwheel
             WoW = telem_data.get("WeightOnWheels")[0] + telem_data.get("WeightOnWheels")[2]
-        rotor = telem_data.get("RotorRPM")
+        rotor = telem_data.get("RotorRPM", 0)
         if WoW > 0:
             # logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
+            effects.dispose("etlX")
+            effects.dispose("etlY")
+            effects.dispose("overspeedX")
+            effects.dispose("overspeedY")
             return
         if blade_ct is None:
             if "UH-1H" in mod:
@@ -795,33 +807,29 @@ class AircraftBase(object):
                 blade_ct = 2
                 rotor = 250
 
-        if rotor:
-            self.etl_shake_frequency = (rotor / 75) * blade_ct
+        self.etl_shake_frequency = (rotor / 75) * blade_ct
+        self.overspeed_shake_frequency = self.etl_shake_frequency * 0.75
 
         etl_mid = (self.etl_start_speed + self.etl_stop_speed) / 2.0
 
-        if tas >= self.etl_start_speed and tas <= self.etl_stop_speed:
+        if (tas >= self.etl_start_speed and tas <= self.etl_stop_speed) and self.etl_effect_intensity and self.etl_effect_enable:
             shake = self.etl_effect_intensity * utils.gaussian_scaling(tas, self.etl_start_speed, self.etl_stop_speed, peak_percentage=0.5, curve_width=.7)
-        # logging.debug(f"Gaussian Scaling calc = {shake}")
-            logging.debug(f"Playing ETL shake (freq = {self.etl_shake_frequency}, intens= {shake})")
-
-        elif tas >= self.overspeed_shake_start:
-            shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start, self.overspeed_shake_start + 15, curvature=.7)
-            # shake = utils.scale_clamp(tas, (self.overspeed_shake_start, self.overspeed_shake_start+20), (0, self.overspeed_shake_intensity))
-            logging.debug(f"Overspeed shake (freq = {self.etl_shake_frequency}, intens= {shake}) ")
-        else:
-            shake = 0
-
-        # telem_data["dbg_shake"] = shake
-
-        if shake:
             effects["etlY"].periodic(self.etl_shake_frequency, shake, 0).start()
             effects["etlX"].periodic(self.etl_shake_frequency + 4, shake, 90).start()
-            # effects["etlY"].periodic(12, shake, 0).start()
+            logging.debug(f"Playing ETL shake (freq = {self.etl_shake_frequency}, intens= {shake})")
         else:
-            effects["etlX"].stop()
-            effects["etlY"].stop()
-            # effects["etlY"].stop()
+            effects.dispose("etlX")
+            effects.dispose("etlY")
+
+        if tas >= self.overspeed_shake_start:
+            shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start, self.overspeed_shake_start + 15, curvature=.7)
+            effects["overspeedY"].periodic(self.overspeed_shake_frequency, shake, 0).start()
+            effects["overspeedX"].periodic(self.overspeed_shake_frequency + 4, shake, 90).start()
+            logging.debug(f"Overspeed shake (freq = {self.etl_shake_frequency}, intens= {shake}) ")
+        else:
+            effects.dispose("overspeedX")
+            effects.dispose("overspeedY")
+
 
     def _update_heli_engine_rumble(self, telem_data, blade_ct=None):
         if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:

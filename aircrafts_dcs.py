@@ -586,5 +586,4 @@ class Helicopter(Aircraft):
         super().on_telemetry(telem_data)
 
         self._calc_etl_effect(telem_data)
-        if self.engine_rumble:
-            self._update_heli_engine_rumble(telem_data)
+        self._update_heli_engine_rumble(telem_data)

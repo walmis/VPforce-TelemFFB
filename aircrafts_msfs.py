@@ -1321,6 +1321,7 @@ class HPGHelicopter(Helicopter):
     hands_on_x_active = 0
     hands_on_y_active = 0
     send_individual_hands_on = 0
+    vrs_effect_enable: bool = True
     vrs_effect_intensity = 0
 
     def __init__(self, name, **kwargs):
@@ -1641,7 +1642,7 @@ class HPGHelicopter(Helicopter):
             vrs_intensity = 0
 
 
-        if vrs_intensity:
+        if vrs_intensity and self.vrs_effect_intensity and self.vrs_effect_enable:
             effects["vrs_buffet"].periodic(10, self.vrs_effect_intensity * vrs_intensity, utils.RandomDirectionModulator).start()
         else:
             effects.dispose("vrs_buffet")
