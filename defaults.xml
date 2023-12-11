@@ -323,6 +323,7 @@
 		<order>20.1</order>
 		<displayname>AoA Reduction Max Force</displayname>
 		<name>aoa_reduction_max_force</name>
+		<prereq>aoa_reduction_effect_enabled</prereq>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -334,7 +335,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>AoA Reduction</Grouping>
-		<order>20.20</order>
+		<order>20.2</order>
 		<displayname>Critical AoA Max Speed</displayname>
 		<name>critical_aoa_max</name>
 		<prereq>aoa_reduction_effect_enabled</prereq>
@@ -349,7 +350,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>AoA Reduction</Grouping>
-		<order>20.30</order>
+		<order>20.3</order>
 		<displayname>Critical AoA Start Speed</displayname>
 		<name>critical_aoa_start</name>
 		<prereq>aoa_reduction_effect_enabled</prereq>
@@ -378,7 +379,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.20</order>
+		<order>30.2</order>
 		<displayname>X Axis Scale</displayname>
 		<name>joystick_x_axis_scale</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -391,7 +392,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.30</order>
+		<order>30.3</order>
 		<displayname>Y Axis Scale</displayname>
 		<name>joystick_y_axis_scale</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -404,7 +405,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.40</order>
+		<order>30.4</order>
 		<displayname>Rudder (X) Axis Scale</displayname>
 		<name>rudder_x_axis_scale</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -431,7 +432,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.70</order>
+		<order>30.7</order>
 		<displayname>Hands On Deadzone</displayname>
 		<name>hands_on_deadzone</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -445,7 +446,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>30.80</order>
+		<order>30.8</order>
 		<displayname>Hands Off Deadzone</displayname>
 		<name>hands_off_deadzone</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -909,7 +910,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
-		<order>41.10</order>
+		<order>41.1</order>
 		<displayname>Overpeed Shake Intensity</displayname>
 		<name>overspeed_shake_intensity</name>
 		<validvalues>0,100</validvalues>
@@ -922,7 +923,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
-		<order>41.20</order>
+		<order>41.2</order>
 		<displayname>Overpeed Shake Start Speed</displayname>
 		<name>overspeed_shake_start</name>
 		<validvalues>m/s,kt,mph,kph</validvalues>
@@ -1021,22 +1022,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
-		<order>50.8</order>
-		<displayname>Jet Engine Rumble</displayname>
-		<name>jet_engine_rumble_intensity</name>
-		<prereq>engine_jet_rumble_enabled</prereq>
-		<sliderfactor>0.4</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>Engine</Grouping>
 		<order>51</order>
 		<displayname>Heli Engine/Rotor Effect</displayname>
 		<name>engine_rotor_rumble_enabled</name>
@@ -1080,6 +1065,22 @@
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>52.1</order>
+		<displayname>Jet Engine Rumble</displayname>
+		<name>jet_engine_rumble_intensity</name>
+		<prereq>engine_jet_rumble_enabled</prereq>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Engine</Grouping>
+		<order>52.2</order>
 		<displayname>Jet Engine Rumble Freq</displayname>
 		<name>jet_engine_rumble_freq</name>
 		<prereq>engine_jet_rumble_enabled</prereq>
@@ -1611,6 +1612,910 @@
 		<collective>true</collective>
 	</defaults>
 	<models>
+		<name>type</name>
+		<model>A-10A.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>A-10C.*</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>A-10C.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>cm_vibration_intensity</name>
+		<model>AH-64D_BLK_II</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>AH-64D_BLK_II</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>AH-64D_BLK_II</model>
+		<value>6</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>AH-64D_BLK_II</model>
+		<value>22</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gun_vibration_intensity</name>
+		<model>AH-64D_BLK_II</model>
+		<value>0.12</value>
+		<unit></unit>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>AH-64D_BLK_II</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>AH-64D_BLK_II</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>AJS37</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>AJS37</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>AV8BNA</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>trim_workaround</name>
+		<model>AV8BNA</model>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>AV8BNA</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Bf-109K-4</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-14.*</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>spoiler_buffet_intensity</name>
+		<model>F-14.*</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>spoiler_motion_intensity</name>
+		<model>F-14.*</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>F-14.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>F-15C</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-15ESE</model>
+		<value>3.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-15ESE</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>flaps_motion_intensity</name>
+		<model>F-16C_50</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>flaps_motion_intensity</name>
+		<model>F-16C_50</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-16C_50</model>
+		<value>3.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-16C_50</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-5E</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-5E</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aoa_reduction_max_force</name>
+		<model>FA-18C_hornet</model>
+		<value>0.7</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>flaps_motion_intensity</name>
+		<model>FA-18C_hornet</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>flaps_motion_intensity</name>
+		<model>FA-18C_hornet</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>FA-18C_hornet</model>
+		<value>3.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>FA-18C_hornet</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>FlyInside B47.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>FW-190A8</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>FW-190D9</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>FW-190D9</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>FW-190D9</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>I-16</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>JF-17</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>JF-17</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>Ka-50</model>
+		<value>6</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>Ka-50</model>
+		<value>22</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>Ka-50</model>
+		<value>70</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Ka-50</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>M-2000C</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>M-2000C</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MB-339.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>MB-399.*</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Mi-24P</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Mi-8MT</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MiG-15.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>trim_workaround</name>
+		<model>MiG-19.*</model>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>MiG-19.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>buffet_aoa</name>
+		<model>MiG-21.*</model>
+		<value>8</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>MiG-21.*</model>
+		<value>0.25</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MiG-21.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MiG-29.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>Mirage-F1.*</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Mirage-F1.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MosquitoFBMkVI</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-47D.*</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>P-51D</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>P-51D</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-51D</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>cm_vibration_intensity</name>
+		<model>SA342.*</model>
+		<value>0.15</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>SA342.*</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>SA342.*</model>
+		<value>6</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>SA342.*</model>
+		<value>22</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>SA342.*</model>
+		<value>0.25</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>SA342.*</model>
+		<value>75</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>SA342.*</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>SA342.*</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>Shrike.*</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>buffet_aoa</name>
+		<model>SpitfireLFMkIX</model>
+		<value>12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>stall_aoa</name>
+		<model>SpitfireLFMkIX</model>
+		<value>16</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>SpitfireLFMkIX</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>Su-25.*</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Su-25.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Su-27.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>Su-33</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Su-33</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>TF-51D</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>gear_buffet_intensity</name>
+		<model>TF-51D</model>
+		<value>0.15</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>inertia_force</name>
+		<model>TF-51D</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>TF-51D</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+
+	<models>
+	<name>type</name>
+	<model>TF-51D</model>
+	<value>PropellerAircraft</value>
+	<sim>DCS</sim>
+	<device>any</device>
+	</models>
+	<models>
+		<name>cm_vibration_intensity</name>
+		<model>UH-1H</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>UH-1H</model>
+		<value>0.25</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>UH-1H</model>
+		<value>10</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>UH-1H</model>
+		<value>20</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gun_vibration_intensity</name>
+		<model>UH-1H</model>
+		<value>0.1</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>UH-1H</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>UH-1H</model>
+		<value>60</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>UH-1H</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>UH-1H</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>cm_vibration_intensity</name>
+		<model>UH-60L</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>UH-60L</model>
+		<value>0.25</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>UH-60L</model>
+		<value>20</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gun_vibration_intensity</name>
+		<model>UH-60L</model>
+		<value>0.1</value>
+		<unit></unit>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>UH-60L</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>UH-60L</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>A-20B</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Bf 109.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Bf 110.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Fw 190.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>He 111.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Hs 129 B-2</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>I-16 type 24</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Il-2 mod.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Ju 88 A-4</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>La-5 ser.8</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>LaGG-3 ser.29</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MC.202 ser.VIII</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Me 262 A</model>
+		<value>JetAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MiG-3 ser.24</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-38J-25</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-39L-1</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-40E-1</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-47D-28</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-51D-15</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Pe-2 ser.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Spitfire Mk.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Tempest Mk.V ser.2</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Yak-1 ser.69</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Yak-7B series 36</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
 		<name>etl_effect_intensity</name>
 		<model>222B.*</model>
 		<value>0.1</value>
@@ -1728,34 +2633,6 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>type</name>
-		<model>A-10A.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>A-10C.*</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>A-10C.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>A-20B</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
 		<name>aileron_gain</name>
 		<model>A2A Piper PA-24.*</model>
 		<value>0.06</value>
@@ -1825,58 +2702,6 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
-	<models>
-		<name>cm_vibration_intensity</name>
-		<model>AH-64D_BLK_II</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>AH-64D_BLK_II</model>
-		<value>0.3</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>AH-64D_BLK_II</model>
-		<value>6</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>AH-64D_BLK_II</model>
-		<value>22</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>gun_vibration_intensity</name>
-		<model>AH-64D_BLK_II</model>
-		<value>0.12</value>
-		<unit></unit>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>AH-64D_BLK_II</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>weapon_release_intensity</name>
-		<model>AH-64D_BLK_II</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
 	<models>
 		<name>type</name>
 		<model>Airbus H135.*</model>
@@ -2013,20 +2838,6 @@
 		<model>Airbus H160.*</model>
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>AJS37</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>AJS37</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -2212,27 +3023,6 @@
 		<model>Asobo XCub</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>AV8BNA</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>trim_workaround</name>
-		<model>AV8BNA</model>
-		<value>true</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>AV8BNA</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
 		<device>any</device>
 		</models>
 	<models>
@@ -2426,27 +3216,6 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
-	<models>
-		<name>type</name>
-		<model>Bf 109.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Bf 110.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Bf-109K-4</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
 	<models>
 		<name>aircraft_is_fbw</name>
 		<model>Boeing F/A 18.*</model>
@@ -2780,132 +3549,6 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>runway_rumble_intensity</name>
-		<model>F-14.*</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>spoiler_buffet_intensity</name>
-		<model>F-14.*</model>
-		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>spoiler_motion_intensity</name>
-		<model>F-14.*</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>F-14.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>F-15C</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>F-15ESE</model>
-		<value>3.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>F-15ESE</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>flaps_motion_intensity</name>
-		<model>F-16C_50</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>flaps_motion_intensity</name>
-		<model>F-16C_50</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>F-16C_50</model>
-		<value>3.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>F-16C_50</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>F-5E</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>F-5E</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>aoa_reduction_max_force</name>
-		<model>FA-18C_hornet</model>
-		<value>0.7</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>flaps_motion_intensity</name>
-		<model>FA-18C_hornet</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>flaps_motion_intensity</name>
-		<model>FA-18C_hornet</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>FA-18C_hornet</model>
-		<value>3.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>FA-18C_hornet</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
 		<name>cyclic_spring_gain</name>
 		<model>FCP SA 342.*</model>
 		<value>0.6</value>
@@ -3031,13 +3674,6 @@
 		<device>pedals</device>
 	</models>
 	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>FlyInside B47.*</model>
-		<value>0.3</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>etl_effect_intensity</name>
 		<model>FlyInside B47.*</model>
 		<value>0.3</value>
@@ -3132,97 +3768,6 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>type</name>
-		<model>Fw 190.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>FW-190A8</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>FW-190D9</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>FW-190D9</model>
-		<value>1.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>FW-190D9</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>He 111.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Hs 129 B-2</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>I-16</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>I-16 type 24</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Il-2 mod.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>JF-17</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>JF-17</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Ju 88 A-4</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
 		<name>joystick_ap_following</name>
 		<model>Juice Goose.*</model>
 		<value>false</value>
@@ -3236,254 +3781,6 @@
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>Ka-50</model>
-		<value>6</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>Ka-50</model>
-		<value>22</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>Ka-50</model>
-		<value>70</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Ka-50</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>La-5 ser.8</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>LaGG-3 ser.29</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>M-2000C</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>M-2000C</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MB-339.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>MB-399.*</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>MC.202 ser.VIII</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Me 262 A</model>
-		<value>JetAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Mi-24P</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Mi-8MT</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MiG-15.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>trim_workaround</name>
-		<model>MiG-19.*</model>
-		<value>true</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>MiG-19.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>buffet_aoa</name>
-		<model>MiG-21.*</model>
-		<value>8</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>MiG-21.*</model>
-		<value>0.25</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MiG-21.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MiG-29.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MiG-3 ser.24</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>Mirage-F1.*</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Mirage-F1.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MosquitoFBMkVI</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-38J-25</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-39L-1</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-40E-1</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-47D.*</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>P-47D-28</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>P-51D</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>P-51D</model>
-		<value>1.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-51D</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-51D-15</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Pe-2 ser.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>pesim-maule-m7235.*</model>
@@ -3613,78 +3910,12 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>cm_vibration_intensity</name>
-		<model>SA342.*</model>
-		<value>0.15</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>SA342.*</model>
-		<value>0.3</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>SA342.*</model>
-		<value>6</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>SA342.*</model>
-		<value>22</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>SA342.*</model>
-		<value>0.25</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>SA342.*</model>
-		<value>75</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>SA342.*</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>weapon_release_intensity</name>
-		<model>SA342.*</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
 		<name>type</name>
 		<model>Savage Grravel.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>Shrike.*</model>
-		<value>0.3</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
 	<models>
 		<name>etl_effect_intensity</name>
 		<model>Shrike.*</model>
@@ -3738,69 +3969,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>type</name>
-		<model>Spitfire Mk.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>buffet_aoa</name>
-		<model>SpitfireLFMkIX</model>
-		<value>12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>stall_aoa</name>
-		<model>SpitfireLFMkIX</model>
-		<value>16</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>SpitfireLFMkIX</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>Su-25.*</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Su-25.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Su-27.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>Su-33</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Su-33</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
 		<name>spoiler_buffet_intensity</name>
 		<model>TBM 930 Asobo</model>
 		<value>0.0</value>
@@ -3821,159 +3989,6 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
-	<models>
-		<name>type</name>
-		<model>Tempest Mk.V ser.2</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>TF-51D</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>gear_buffet_intensity</name>
-		<model>TF-51D</model>
-		<value>0.15</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>inertia_force</name>
-		<model>TF-51D</model>
-		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>TF-51D</model>
-		<value>1.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-
-	<models>
-	<name>type</name>
-	<model>TF-51D</model>
-	<value>PropellerAircraft</value>
-	<sim>DCS</sim>
-	<device>any</device>
-	</models>
-	<models>
-		<name>cm_vibration_intensity</name>
-		<model>UH-1H</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>UH-1H</model>
-		<value>0.25</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>UH-1H</model>
-		<value>10</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>UH-1H</model>
-		<value>20</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>gun_vibration_intensity</name>
-		<model>UH-1H</model>
-		<value>0.1</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>UH-1H</model>
-		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>UH-1H</model>
-		<value>60</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>UH-1H</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>weapon_release_intensity</name>
-		<model>UH-1H</model>
-		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>cm_vibration_intensity</name>
-		<model>UH-60L</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>UH-60L</model>
-		<value>0.25</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>UH-60L</model>
-		<value>20</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>gun_vibration_intensity</name>
-		<model>UH-60L</model>
-		<value>0.1</value>
-		<unit></unit>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>UH-60L</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>weapon_release_intensity</name>
-		<model>UH-60L</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
 	<models>
 		<name>aileron_gain</name>
 		<model>Vertigo.*</model>
@@ -4014,20 +4029,6 @@
 		<model>XCub.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Yak-1 ser.69</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Yak-7B series 36</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
 		<device>any</device>
 		</models>
 	<classdefaults>
@@ -4506,6 +4507,13 @@
 	<classdefaults>
 		<name>etl_effect_enable</name>
 		<type>Helicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>etl_effect_enable</name>
+		<type>HPGHelicopter</type>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>any</device>

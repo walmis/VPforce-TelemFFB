@@ -1275,11 +1275,19 @@ class MainWindow(QMainWindow):
             test_craft_area = QWidget()
             test_craft_layout = QHBoxLayout()
             test_sim_lbl = QLabel('Sim:')
-            self.test_sim = QLineEdit()
-            self.test_sim.setMinimumWidth(70)
+            test_sim_lbl.setMaximumWidth(30)
+            test_sim_lbl.setAlignment(Qt.AlignRight)
+            sims = ['', 'DCS', 'IL2', 'MSFS']
+            self.test_sim = QComboBox()
+            self.test_sim.setMaximumWidth(60)
+            self.test_sim.addItems(sims)
+            self.test_sim.currentIndexChanged.connect(self.test_sim_changed)
             test_name_lbl = QLabel('Aircraft Name:')
-            self.test_name = QLineEdit()
+            test_name_lbl.setMaximumWidth(90)
+            test_name_lbl.setAlignment(Qt.AlignRight)
+            self.test_name = QComboBox()
             self.test_name.setMinimumWidth(100)
+            self.test_name.setEditable(True)
             test_button = QToolButton()
             test_button.setMaximumWidth(20)
             test_button.setText('>')
@@ -1510,6 +1518,13 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(layout)
         self.load_main_window_geometry()
 
+    def test_sim_changed(self):
+        models = xmlutils.read_models(self.test_sim.currentText())
+        self.test_name.blockSignals(True)
+        self.test_name.clear()
+        self.test_name.addItems(models)
+        self.test_name.blockSignals(False)
+
     def closeEvent(self, event):
         # Perform cleanup before closing the application
         self.exit_application()
@@ -1557,8 +1572,9 @@ class MainWindow(QMainWindow):
         utils.set_reg(reg_key, geometry_bytes)
 
     def force_sim_aircraft(self):
-        settings_mgr.current_sim = self.test_sim.text()
-        settings_mgr.current_aircraft_name = self.test_name.text()
+        settings_mgr.current_sim = self.test_sim.currentText()
+        settings_mgr.current_aircraft_name = self.test_name.currentText()
+        self.settings_layout.expanded_items.clear()
         self.monitor_area.hide()
         self.settings_layout.reload_caller()
 
@@ -1880,6 +1896,7 @@ class SettingsLayout(QGridLayout):
     prereq_list = []
     show_slider_debug = False
     show_order_debug = True
+    bump_up = True
 
     chk_col = 0
     exp_col = 1
@@ -1902,10 +1919,99 @@ class SettingsLayout(QGridLayout):
         if result is not None:
             self.build_rows(result)
 
+
+    def append_prereq_count (self, datalist):
+        for item in datalist:
+            item['prereq_count'] = ''
+            item['has_expander'] = ''
+            for pr in self.prereq_list:
+                if item['name'] == pr['prereq']:
+                    item['prereq_count'] = pr['count']
+            p_count = 0
+            if item['prereq_count'] != '':
+                p_count = int(item['prereq_count'])
+
+            if p_count > 1 or (p_count == 1 and item['hasbump'] != 'true'):
+                item['has_expander'] = 'true'
+
+    def has_bump(self,datalist):
+        for item in datalist:
+            item['hasbump'] = ''
+            bumped_up = item['order'][-2:] == '.1'
+            if bumped_up:
+                for b in datalist:
+                    if item['prereq'] == b['name']:
+                        b['hasbump'] = 'true'
+
+    def add_expanded (self, datalist):
+        for item in datalist:
+            item['parent_expanded'] = ''
+            for exp in self.expanded_items:
+                if item['prereq'] == exp:
+                    item['parent_expanded'] = 'true'
+                else:
+                    item['parent_expanded'] = 'false'
+
+    def is_visible (self,datalist):
+
+        for item in datalist:
+            bumped_up = item['order'][-2:] == '.1'
+            iv = 'false'
+            cond =''
+            if item['prereq'] == '':
+                iv = 'true'
+                cond = 'no prereq needed'
+            else:
+                for p in datalist:
+                    if item['prereq'] == p['name']:
+                        if p['value'] == 'true':
+                            if p['has_expander'] == 'true':
+                                if p['name'] in self.expanded_items:
+                                    iv = 'true'
+                                    cond = 'item parent expanded'
+                                else:
+                                    if p['hasbump'] == 'true':
+                                        if bumped_up:
+                                            iv = 'true'
+                                            cond = 'parent hasbump & bumped'
+                            else:
+                                if p['is_visible']=='true':
+                                    if p['hasbump'] == 'true':
+                                        if bumped_up:
+                                            iv = 'true'
+                                            cond = 'parent hasbump & bumped no expander par vis'
+                        break
+
+
+            item['is_visible'] = iv
+            if iv == 'true':
+                print (f"{item['displayname']} visible because {cond}")
+
+    def eliminate_invisible(self,datalist):
+        newlist = []
+        for item in datalist:
+            if item['is_visible'] == 'true':
+                newlist.append(item)
+
+        for item in newlist:
+            # Check if 'prereq' is not empty and exists in the list
+            if item['prereq'] and any(row['name'] == item['prereq'] for row in newlist):
+                # Find the corresponding prereq item
+                prereq_item = next(row for row in newlist if row['name'] == item['prereq'])
+
+                # Increment 'prereq_count' in the current item
+                item['prereq_count'] = prereq_item.get('prereq_count', 0) + 1
+
+        return newlist
+
     def build_rows(self,datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         self.prereq_list = xmlutils.read_prereqs()
-        sorted_data = xmlutils.filter_rows(sorted_data)
+        self.has_bump(sorted_data)
+        self.append_prereq_count(sorted_data)
+        self.add_expanded(sorted_data)
+        self.is_visible(sorted_data)
+        newlist = self.eliminate_invisible(sorted_data)
 
         def is_expanded (item):
             if item['name'] in self.expanded_items:
@@ -1915,17 +2021,19 @@ class SettingsLayout(QGridLayout):
                     return True
             return False
 
-
-
         i = 0
-        for item in sorted_data:
+        for item in newlist:
             bumped_up = item['order'][-2:] == '.1'
-            if is_expanded(item) or item['prereq'] == '':
+            rowdisabled = False
+            addrow = False
+            is_expnd = is_expanded(item)
+            print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
+            if item['is_visible'] == 'true':
                 i += 1
                 if bumped_up:
-                    i -= 1   # bump .1 setting onto the enable row
-                    pass
-                self.generate_settings_row(item, i)
+                    if self.bump_up:  # debug
+                        i -= 1   # bump .1 setting onto the enable row
+                self.generate_settings_row(item, i, rowdisabled)
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.addItem(spacerItem, i+1, 1, 1, 1)
@@ -1952,11 +2060,8 @@ class SettingsLayout(QGridLayout):
                 widget.deleteLater()
         print(f"clear_layout - count: {self.count()}")
 
-
-    def generate_settings_row(self, item, i):
-
+    def generate_settings_row(self, item, i, rowdisabled=False):
         entry_colspan = 2
-        rowdisabled = False
         validvalues = item['validvalues'].split(',')
 
         if self.show_order_debug:
@@ -2010,11 +2115,11 @@ class SettingsLayout(QGridLayout):
             olditem = self.itemAtPosition(i, self.lbl_col)
             if olditem is not None:
                 self.remove_widget(olditem)
-            for p_item in self.prereq_list:
-                if p_item['prereq'] == item['prereq'] and p_item['count'] == 1:
-                    olditem = self.itemAtPosition(i, self.exp_col)
-                    if olditem is not None:
-                        self.remove_widget(olditem)
+            # for p_item in self.prereq_list:
+            #     if p_item['prereq'] == item['prereq'] and p_item['count'] == 1:
+            #         olditem = self.itemAtPosition(i, self.exp_col)
+            #         if olditem is not None:
+            #             self.remove_widget(olditem)
 
         self.addWidget(label, i, self.lbl_col)
 
@@ -2122,12 +2227,23 @@ class SettingsLayout(QGridLayout):
 
         if item['datatype'] == 'int' or item['datatype'] == 'anyfloat':
             self.addWidget(line_edit, i, self.entry_col, 1, entry_colspan)
+
         if not rowdisabled:
-            for p_item in self.prereq_list:
-                if p_item['prereq'] == item['name'] : # and p_item['count'] > 1:
+            # for p_item in self.prereq_list:
+            #     if p_item['prereq'] == item['name'] : # and p_item['count'] > 1:
+            p_count = 0
+            if item['prereq_count'] != '':
+                p_count = int(item['prereq_count'])
+
+            if item['has_expander'] == 'true':
+                if item['name'] in self.expanded_items:
+                    row_count = int(item['prereq_count'])
+                    if item['hasbump'] != 'true':
+                        row_count += 1
+                    expand_button.setMaximumHeight(200)
+                    self.addWidget(expand_button, i, self.exp_col, row_count, 1)
+                else:
                     self.addWidget(expand_button, i, self.exp_col)
-
-
 
         label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
@@ -2207,7 +2323,7 @@ class SettingsLayout(QGridLayout):
 
             self.expanded_items.append(settingname)
             self.sender().setArrowType(Qt.UpArrow)
-            # self.clear_layout()
+
             self.reload_caller()
         else:
             print ('collapsed')
@@ -2217,7 +2333,7 @@ class SettingsLayout(QGridLayout):
                     new_exp_items.append(ex)
             self.expanded_items = new_exp_items
             self.sender().setArrowType(Qt.DownArrow)
-            # self.clear_layout()
+
             self.reload_caller()
 
     # def slider_changed(self, name, value, factor):
