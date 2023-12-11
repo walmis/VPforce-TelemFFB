@@ -34,6 +34,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     model_name = "unknown airplane"    # full model name with livery etc
     crafttype = ""                       # suggested, send whatever simconnect finds
     current_aircraft_name = ""
+    current_pattern = ''
 
     data_list = []
     prereq_list = []
@@ -229,8 +230,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Handle accepted
             new_aircraft = dialog.tb_current_aircraft.text()
             new_combo_box_value = dialog.combo_box.currentText()
-            logging.info (f"New: {new_aircraft} {new_combo_box_value}")
-            xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type')
+            pat_to_clone = dialog.models_combo_box.currentText()
+            if new_combo_box_value != '':
+                logging.info (f"New: {new_aircraft} {new_combo_box_value}")
+                xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type')
+            else:
+                logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
+                xmlutils.clone_pattern(self.sim, pat_to_clone, new_aircraft)
+
             self.model_name = new_aircraft
             self.tb_currentmodel.setText(new_aircraft)
             self.get_current_model(self.sim, new_aircraft)
@@ -990,6 +997,8 @@ class UserModelDialog(QDialog):
 
         label6 = QLabel("And choose the aircraft class:")
 
+        label7 = QLabel("Or, choose an existing pattern to clone:")
+
         classes = []
         match sim:
             case 'DCS':
@@ -1005,9 +1014,20 @@ class UserModelDialog(QDialog):
         self.tb_current_aircraft.setAlignment(Qt.AlignHCenter)
 
         self.combo_box = QComboBox()
+        self.combo_box.addItem('')
         self.combo_box.addItems(classes)
         self.combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
         self.combo_box.setCurrentText(current_type)
+
+        models = xmlutils.read_models(sim)
+        self.models_combo_box = QComboBox()
+        self.models_combo_box.blockSignals(True)
+        self.models_combo_box.addItem('')
+        self.models_combo_box.addItems(models)
+        self.models_combo_box.setCurrentText('')
+        self.models_combo_box.currentIndexChanged.connect(self.pattern_changed)
+        self.models_combo_box.blockSignals(False)
+        self.models_combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
 
         ok_button = QPushButton("OK")
         ok_button.setStyleSheet("text-align:center;")
@@ -1025,6 +1045,9 @@ class UserModelDialog(QDialog):
         layout.addWidget(label6)
         layout.addWidget(self.combo_box)
 
+        layout.addWidget(label7)
+        layout.addWidget(self.models_combo_box)
+
         layout.addWidget(ok_button)
         layout.addWidget(cancel_button)
 
@@ -1032,6 +1055,9 @@ class UserModelDialog(QDialog):
 
         ok_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
+
+    def pattern_changed(self):
+        self.combo_box.setCurrentText('')
 
 
 if __name__ == "__main__":

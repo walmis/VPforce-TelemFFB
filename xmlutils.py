@@ -550,6 +550,13 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
         logging.info(
             f"Added <simSettings> element with values: sim={the_sim}, device={device}, value={the_value}{unit}, name={setting_name}")
 
+def clone_pattern(the_sim, old_pattern, new_pattern):
+    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, old_pattern)
+    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, old_pattern)
+    for item in model_data:
+        write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'])
+    for item in user_model_data:
+        write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'])
 
 def write_converted_to_xml(differences):
     sim_set = []

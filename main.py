@@ -130,7 +130,6 @@ import xmlutils
 
 effects_translator = utils.EffectTranslator()
 
-
 if os.path.basename(args.configfile) == args.configfile:
     # just the filename is present, assume it is in the script directory
     # print("Config File is in the script dir")
@@ -426,6 +425,7 @@ class TelemManager(QObject, threading.Thread):
                 the_sim = send_source
 
             cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype)
+            settings_mgr.current_pattern = pattern
             if cls_name == '': cls_name = 'Aircraft'
             for setting in result:
                 k = setting['name']
@@ -1007,6 +1007,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 class MainWindow(QMainWindow):
     def __init__(self, settings_manager):
         super().__init__()
+        self.show_new_craft_button = False
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
         doc_url = 'https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.27yzpife8719'
@@ -1263,14 +1264,28 @@ class MainWindow(QMainWindow):
         self.cur_craft = QLabel()
         self.cur_craft.setText('Unknown')
         current_craft_layout.addWidget(self.cur_craft)
-        self.current_pattern = QLabel()
-        self.current_pattern.setText('(No Match)')
-        self.current_pattern.setAlignment(Qt.AlignRight)
-        current_craft_layout.addWidget(self.current_pattern)
+        self.cur_pattern = QLabel()
+        self.cur_pattern.setText('(No Match)')
+        self.cur_pattern.setAlignment(Qt.AlignRight)
+        current_craft_layout.addWidget(self.cur_pattern)
         current_craft_area.setLayout(current_craft_layout)
         layout.addWidget(current_craft_area)
 
-        show_craft_loader = True
+        ##################
+        #  new craft button
+
+        new_craft_layout = QHBoxLayout()
+        self.new_craft_button = QPushButton('Create/clone config for new aircraft')
+        new_craft_layout.addWidget(self.new_craft_button)
+        self.new_craft_button.clicked.connect(self.show_user_model_dialog)
+        layout.addLayout(new_craft_layout)
+        self.new_craft_button.hide()
+
+        #####################
+        #  test loading buttons, set to true for debug
+
+        show_craft_loader = False
+
         if show_craft_loader:
             test_craft_area = QWidget()
             test_craft_layout = QHBoxLayout()
@@ -1797,6 +1812,26 @@ class MainWindow(QMainWindow):
             print (f"# toggle settings window   {settings_mgr.current_sim} {settings_mgr.current_aircraft_name}")
             settings_mgr.currentmodel_click()
 
+    def show_user_model_dialog(self):
+        mprint("show_user_model_dialog")
+        current_aircraft = self.cur_craft.text()
+        dialog = UserModelDialog(settings_mgr.current_sim, current_aircraft, settings_mgr.current_class, self)
+        result = dialog.exec_()
+        if result == QtWidgets.QDialog.Accepted:
+            # Handle accepted
+            new_aircraft = dialog.tb_current_aircraft.text()
+            new_combo_box_value = dialog.combo_box.currentText()
+            pat_to_clone = dialog.models_combo_box.currentText()
+            if new_combo_box_value != '':
+                logging.info(f"New: {new_aircraft} {new_combo_box_value}")
+                xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type')
+            else:
+                logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
+                xmlutils.clone_pattern(settings_mgr.current_sim,pat_to_clone,new_aircraft)
+        else:
+            # Handle canceled
+            pass
+
     def exit_application(self):
         # Perform any cleanup or save operations here
         self.save_main_window_geometry()
@@ -1866,9 +1901,15 @@ class MainWindow(QMainWindow):
 
             self.update_sim_indicators(data.get('src'), data.get('SimPaused', 0))
 
+            shown_pattern = settings_mgr.current_pattern
+            if settings_mgr.current_pattern == '':
+                shown_pattern = 'using defaults'
+                self.new_craft_button.show()
+            else:
+                self.new_craft_button.hide()
 
             self.cur_craft.setText(data['N'])
-            self.current_pattern.setText(f"({settings_mgr.current_pattern})")
+            self.cur_pattern.setText(f"({shown_pattern})")
 
             if window_mode == self.telem_monitor_radio:
                 self.monitor_area.show()
@@ -1894,9 +1935,11 @@ class MainWindow(QMainWindow):
 class SettingsLayout(QGridLayout):
     expanded_items = []
     prereq_list = []
-    show_slider_debug = False
-    show_order_debug = True
-    bump_up = True
+    ##########
+    # debug settings
+    show_slider_debug = False   # set to true for slider values shown
+    show_order_debug = False    # set to true for order numbers shown
+    bump_up = True              # set to false for no row bumping up
 
     chk_col = 0
     exp_col = 1
@@ -1984,8 +2027,9 @@ class SettingsLayout(QGridLayout):
 
 
             item['is_visible'] = iv
-            if iv.lower() == 'true':
-                print (f"{item['displayname']} visible because {cond}")
+            # for things not showing debugging:
+            # if iv.lower() == 'true':
+            #     print (f"{item['displayname']} visible because {cond}")
 
     def eliminate_invisible(self,datalist):
         newlist = []
@@ -2028,7 +2072,7 @@ class SettingsLayout(QGridLayout):
             rowdisabled = False
             addrow = False
             is_expnd = is_expanded(item)
-            print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
+            #print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
             if item['is_visible'].lower() == 'true':
                 i += 1
                 if bumped_up:
@@ -2038,7 +2082,7 @@ class SettingsLayout(QGridLayout):
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.addItem(spacerItem, i+1, 1, 1, 1)
-        print (f"{i} rows with {self.count()} widgets")
+        #print (f"{i} rows with {self.count()} widgets")
 
     def reload_caller(self):
         self.reload_layout(None)
