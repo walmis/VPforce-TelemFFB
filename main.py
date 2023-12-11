@@ -1964,19 +1964,19 @@ class SettingsLayout(QGridLayout):
             else:
                 for p in datalist:
                     if item['prereq'] == p['name']:
-                        if p['value'] == 'true':
-                            if p['has_expander'] == 'true':
+                        if p['value'].lower() == 'true':
+                            if p['has_expander'].lower() == 'true':
                                 if p['name'] in self.expanded_items:
                                     iv = 'true'
                                     cond = 'item parent expanded'
                                 else:
-                                    if p['hasbump'] == 'true':
+                                    if p['hasbump'].lower() == 'true':
                                         if bumped_up:
                                             iv = 'true'
                                             cond = 'parent hasbump & bumped'
                             else:
-                                if p['is_visible']=='true':
-                                    if p['hasbump'] == 'true':
+                                if p['is_visible'].lower() == 'true':
+                                    if p['hasbump'].lower() == 'true':
                                         if bumped_up:
                                             iv = 'true'
                                             cond = 'parent hasbump & bumped no expander par vis'
@@ -1984,7 +1984,7 @@ class SettingsLayout(QGridLayout):
 
 
             item['is_visible'] = iv
-            if iv == 'true':
+            if iv.lower() == 'true':
                 print (f"{item['displayname']} visible because {cond}")
 
     def eliminate_invisible(self,datalist):
@@ -1999,7 +1999,7 @@ class SettingsLayout(QGridLayout):
             for row in newlist:
                 if row['prereq'] == item['name']:
                     pcount += 1
-                    if row['has_expander'] == 'true':
+                    if row['has_expander'].lower() == 'true':
                         pcount -= 1
             item['prereq_count'] = str(pcount)
 
@@ -2029,7 +2029,7 @@ class SettingsLayout(QGridLayout):
             addrow = False
             is_expnd = is_expanded(item)
             print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
-            if item['is_visible'] == 'true':
+            if item['is_visible'].lower() == 'true':
                 i += 1
                 if bumped_up:
                     if self.bump_up:  # debug
@@ -2179,7 +2179,10 @@ class SettingsLayout(QGridLayout):
             if self.show_slider_debug:
                 print (f"read value: {item['value']}  factor: {item['sliderfactor']} slider: {pctval}")
             slider.blockSignals(True)
-            slider.setRange(int(validvalues[0]), int(validvalues[1]))
+            if validvalues is None or validvalues == '':
+                pass
+            else:
+                slider.setRange(int(validvalues[0]), int(validvalues[1]))
             slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
             slider.valueChanged.connect(self.slider_changed)
@@ -2236,10 +2239,10 @@ class SettingsLayout(QGridLayout):
             if item['prereq_count'] != '':
                 p_count = int(item['prereq_count'])
 
-            if item['has_expander'] == 'true':
+            if item['has_expander'].lower() == 'true':
                 if item['name'] in self.expanded_items:
                     row_count = int(item['prereq_count'])
-                    if item['hasbump'] != 'true':
+                    if item['hasbump'].lower() != 'true':
                         row_count += 1
                     expand_button.setMaximumHeight(200)
                     self.addWidget(expand_button, i, self.exp_col, row_count, 1)

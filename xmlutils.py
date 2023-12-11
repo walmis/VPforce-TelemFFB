@@ -244,6 +244,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
         craftresult = read_default_class_data(the_sim, model_class)
 
         if craftresult is not None:
+            # place for eliminating !Class data?
 
             # merge if there is any
             default_craft_result = update_default_data_with_craft_result(defaultdata, craftresult)
@@ -298,8 +299,8 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
 
     prereq_list = read_prereqs()
     final_w_prereqs = check_prereq_value(prereq_list, final_result)
-
-    sorted_data = sorted(final_w_prereqs, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
+    final_wo_prereqs = eliminate_no_prereq(final_w_prereqs)
+    sorted_data = sorted(final_wo_prereqs, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
     # lprint(f"final count {len(final_result)}")
 
     return model_class, model_pattern, sorted_data
@@ -724,7 +725,7 @@ def eliminate_no_prereq(datalist):
         if d_item['prereq'] != '':
             add_item = False
             for p_item in datalist:
-                if d_item['prereq'] == p_item['name'] and p_item['value'] == 'true':
+                if d_item['prereq'] == p_item['name'] and p_item['value'].lower() == 'true':
                     add_item = True
                     break
 
