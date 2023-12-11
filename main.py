@@ -1885,13 +1885,20 @@ class MainWindow(QMainWindow):
                         v = "[" + ", ".join([f"{x:.3f}" if not isinstance(x, str) else x for x in v]) + "]"
                     items += f"{k}: {v}\n"
             active_effects = ""
+            active_settings = []
             for key in effects.dict.keys():
                 if effects[key].started:
-                    descr = effects_translator.get_translation(key)
+                    descr = effects_translator.get_translation(key)[0]
+                    settingname = effects_translator.get_translation(key)[1]
                     if descr not in active_effects:
                         active_effects = '\n'.join([active_effects, descr])
+                    if settingname not in active_settings:
+                        active_settings.append(settingname)
             window_mode = self.radio_button_group.checkedButton()
 
+            # update slider colors
+            if window_mode == self.settings_radio:
+                pass
 
             self.update_sim_indicators(data.get('src'), data.get('SimPaused', 0))
 
