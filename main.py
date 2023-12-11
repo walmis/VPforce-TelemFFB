@@ -1994,13 +1994,14 @@ class SettingsLayout(QGridLayout):
                 newlist.append(item)
 
         for item in newlist:
-            # Check if 'prereq' is not empty and exists in the list
-            if item['prereq'] and any(row['name'] == item['prereq'] for row in newlist):
-                # Find the corresponding prereq item
-                prereq_item = next(row for row in newlist if row['name'] == item['prereq'])
-
-                # Increment 'prereq_count' in the current item
-                item['prereq_count'] = prereq_item.get('prereq_count', 0) + 1
+            item['prereq_count'] = '0'
+            pcount = 0
+            for row in newlist:
+                if row['prereq'] == item['name']:
+                    pcount += 1
+                    if row['has_expander'] == 'true':
+                        pcount -= 1
+            item['prereq_count'] = str(pcount)
 
         return newlist
 
