@@ -911,6 +911,33 @@
 		<info>speed at which the ETL effect will stop - m/s</info>
 	</defaults>
 	<defaults>
+		<Grouping>VRS</Grouping>
+		<order>61</order>
+		<displayname>VRS Effect</displayname>
+		<name>vrs_effect_enable</name>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>Vortex Ring State effect</info>
+	</defaults>
+	<defaults>
+		<Grouping>VRS</Grouping>
+		<order>61.1</order>
+		<displayname>VRS Effect</displayname>
+		<name>vrs_effect_intensity</name>
+		<prereq>vrs_effect_enable</prereq>
+		<value>0.12</value>
+		<sliderfactor>0.5</sliderfactor>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<info>Max intensity of VRS effect</info>
+	</defaults>
+	<defaults>
 		<Grouping>G Force</Grouping>
 		<order>62</order>
 		<displayname>Enable Decelleration Effect</displayname>
@@ -4685,6 +4712,13 @@
 		<name>type</name>
 		<type>HPGHelicopter</type>
 		<value>HPGHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_effect_enable</name>
+		<type>HPGHelicopter</type>
+		<value>true</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
