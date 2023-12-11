@@ -613,7 +613,7 @@ class AircraftBase(object):
 
         if self._sim_is('DCS'):
             rpm = telem_data.get("ActualRPM", 0.0)
-        elif self._sim_is('MSFS'):
+        elif self._sim_is('MSFS2020'):
             rpm = telem_data.get("PropRPM", 0.0)
         elif self._sim_is('IL2'):
             rpm = telem_data.get("RPM", 0.0)
