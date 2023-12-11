@@ -2227,7 +2227,20 @@ class SettingsLayout(QGridLayout):
             self.addWidget(dropbox, i, self.entry_col, 1, entry_colspan)
             dropbox.currentIndexChanged.connect(self.dropbox_changed)
 
-
+        if item['datatype'] == 'path':
+            browse_button = QPushButton()
+            browse_button.blockSignals(True)
+            if item['value'] == '-':
+                browse_button.setText('Browse...')
+            else:
+                button_text = item['value']
+                p_length = len(item['value'])
+                if p_length > 45:
+                    button_text = f"{button_text[:10]}...{button_text[-25:]}"
+                browse_button.setText(button_text)
+            browse_button.blockSignals(False)
+            browse_button.clicked.connect(self.browse_for_config)
+            self.addWidget(browse_button, i, self.entry_col, 1, entry_colspan)
 
         if item['datatype'] == 'int' or item['datatype'] == 'anyfloat':
             self.addWidget(line_edit, i, self.entry_col, 1, entry_colspan)
@@ -2287,6 +2300,18 @@ class SettingsLayout(QGridLayout):
         print(f"Erase {name} clicked")
         xmlutils.erase_models_from_xml(settings_mgr.current_sim, settings_mgr.current_pattern, name)
         self.reload_caller()
+
+    def browse_for_config(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+
+        # Open the file browser dialog
+        file_path, _ = QFileDialog.getOpenFileName(self.mainwindow, "Choose File", "", "vpconf Files (*.vpconf);;All Files (*)", options=options)
+
+        if file_path:
+            lprint(f"Selected File: {file_path}")
+            xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,file_path,'vpconf')
+            self.reload_caller()
 
     def dropbox_changed(self):
         setting_name = self.sender().objectName().replace('db_', '')
