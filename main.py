@@ -242,15 +242,15 @@ _config_mtime = 0
 def config_has_changed(update=False) -> bool:
     global _config_mtime
     global _config
-    
     # "hash" both mtimes together
-    if args.overridefile== 'None':
-        userfile=settings_mgr.userconfig_path
-        tm = int(os.path.getmtime(userfile))
-    else:
-        tm = int(os.path.getmtime(configfile))
-        if os.path.exists(overridefile):
-            tm += int(os.path.getmtime(overridefile))
+    tm = int(os.path.getmtime(defaults_path)) + int(os.path.getmtime(userconfig_path))
+    # if args.overridefile== 'None':
+    #     userfile=settings_mgr.userconfig_path
+    #     tm = int(os.path.getmtime(userfile))
+    # else:
+    #     tm = int(os.path.getmtime(configfile))
+    #     if os.path.exists(overridefile):
+    #         tm += int(os.path.getmtime(overridefile))
     if update:
         _config_mtime = tm
 
