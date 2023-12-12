@@ -1561,6 +1561,8 @@ class MainWindow(QMainWindow):
 
         central_widget.setLayout(layout)
         self.load_main_window_geometry()
+        self.last_height = None
+        self.last_width = None
 
     def test_sim_changed(self):
         models = xmlutils.read_models(self.test_sim.currentText())
@@ -1598,6 +1600,8 @@ class MainWindow(QMainWindow):
         if geometry is not None:
             q_geometry = QByteArray(utils.get_reg(reg_key))
             self.restoreGeometry(q_geometry)
+        self.last_height = self.height()
+        self.last_width = self.width()
         self.telem_monitor_radio.click()
 
     def save_main_window_geometry(self):
@@ -1925,14 +1929,16 @@ class MainWindow(QMainWindow):
         #print(f"BUTTON!!!!!!!!{button}")
         window_mode = self.radio_button_group.checkedButton()
         if button == self.telem_monitor_radio:
-            # self.telem_area.show()
-            # self.effects_area.show()
+
             self.monitor_widget.show()
             self.settings_area.hide()
-            # self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-            # self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-            self.setMaximumWidth(600)
-            self.setMaximumHeight(10240)
+            self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+
+            self.resize(self.last_width, self.last_height)
+
+            # self.setMaximumWidth(600)
+            # self.setMaximumHeight(10240)
         # elif button == self.effect_monitor_radio:
         #     self.monitor_area.show()
         #     self.settings_area.hide()
@@ -1942,13 +1948,19 @@ class MainWindow(QMainWindow):
         elif button == self.settings_radio:
             self.monitor_widget.hide()
             self.settings_area.show()
-            self.setMaximumWidth(600)
-            self.setMaximumHeight(10240)
+
+            self.resize(self.last_width, self.last_height)
+
+            # self.setMaximumWidth(600)
+            # self.setMaximumHeight(10240)
         elif button == self.hide_scroll_area:
+            self.last_height = self.height()
+            self.last_width = self.width()
             self.monitor_widget.hide()
             self.settings_area.hide()
-            self.setMaximumWidth(400)
-            self.setMaximumHeight(235)
+            self.resize(400,235)
+            # self.setMaximumWidth(400)
+            # self.setMaximumHeight(235)
     def update_telemetry(self, data: dict):
         try:
             items = ""
