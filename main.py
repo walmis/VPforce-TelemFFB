@@ -1229,11 +1229,8 @@ class MainWindow(QMainWindow):
         # status_layout.addWidget(self.condor_label_icon, 1, 2)
         # status_layout.addWidget(condor_label, 1, 3)
 
-        logo_status_layout.addLayout(status_layout)
-        logo_status_layout.setAlignment(Qt.AlignLeft)
 
 
-        layout.addLayout(logo_status_layout)
 
 
         cfg_layout = QHBoxLayout()
@@ -1241,18 +1238,19 @@ class MainWindow(QMainWindow):
 
         ###########
         #  radio buttons
+        radio_widget = QWidget()
 
         self.radio_button_group = QButtonGroup()
         radio_row_layout = QHBoxLayout()
         radio_row_layout.setAlignment(Qt.AlignLeft)
         self.settings_radio = QRadioButton("Settings")
-        self.telem_monitor_radio = QRadioButton("Telemetry Monitor")
-        self.effect_monitor_radio = QRadioButton("Effects Monitor")
+        self.telem_monitor_radio = QRadioButton("Monitor")
+        # self.effect_monitor_radio = QRadioButton("Effects Monitor")
         self.hide_scroll_area = QRadioButton("Hide")
 
         radio_row_layout.addWidget(self.settings_radio)
         radio_row_layout.addWidget(self.telem_monitor_radio)
-        radio_row_layout.addWidget(self.effect_monitor_radio)
+        # radio_row_layout.addWidget(self.effect_monitor_radio)
         radio_row_layout.addWidget(self.hide_scroll_area)
 
 
@@ -1260,13 +1258,20 @@ class MainWindow(QMainWindow):
 
         self.radio_button_group.addButton(self.settings_radio)
         self.radio_button_group.addButton(self.telem_monitor_radio)
-        self.radio_button_group.addButton(self.effect_monitor_radio)
+        # self.radio_button_group.addButton(self.effect_monitor_radio)
         self.radio_button_group.addButton(self.hide_scroll_area)
         self.radio_button_group.buttonClicked.connect(self.switch_window_view)
 
         # self.radio_button_group.buttonClicked.connect(self.update_monitor_window)
 
-        layout.addLayout(radio_row_layout)
+        # layout.addLayout(radio_row_layout)
+        radio_widget.setLayout(radio_row_layout)
+
+        status_layout.addWidget(radio_widget, 2, 0,1,6)
+
+        logo_status_layout.addLayout(status_layout)
+        logo_status_layout.setAlignment(Qt.AlignLeft)
+        layout.addLayout(logo_status_layout)
 
         ############
         # current craft
@@ -1276,7 +1281,7 @@ class MainWindow(QMainWindow):
         current_craft_layout.setAlignment(Qt.AlignLeft)
         cur_sim = QLabel()
         cur_sim.setText("Current Aircraft:")
-        cur_sim.setAlignment(Qt.AlignRight)
+        cur_sim.setAlignment(Qt.AlignLeft)
         cur_sim.setMaximumWidth(80)
         current_craft_layout.addWidget(cur_sim)
         self.cur_craft = QLabel()
@@ -1335,9 +1340,15 @@ class MainWindow(QMainWindow):
         ################
         #  main scroll area
 
-        self.monitor_area = QScrollArea()
-        self.monitor_area.setWidgetResizable(True)
-        self.monitor_area.setMinimumHeight(100)
+        self.monitor_widget = QWidget()
+        self.telem_area = QScrollArea()
+        monitor_area_layout = QGridLayout()
+        self.telem_area.setWidgetResizable(True)
+        self.telem_area.setMinimumHeight(100)
+
+        self.effects_area = QScrollArea()
+        self.effects_area.setWidgetResizable(True)
+        self.effects_area.setMinimumHeight(100)
 
         # Create the QLabel widget and set its properties
         if cfg.get("EXCEPTION"):
@@ -1364,12 +1375,27 @@ class MainWindow(QMainWindow):
             )
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_telem_data.setWordWrap(True)
+        self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.lbl_telem_data.setStyleSheet("""padding: 2px""")
+
 
         # Set the QLabel widget as the widget inside the scroll area
-        self.monitor_area.setWidget(self.lbl_telem_data)
+        self.telem_area.setWidget(self.lbl_telem_data)
 
+        self.lbl_effects_data = QLabel()
+        self.effects_area.setWidget(self.lbl_effects_data)
+        # self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignRight)
+        self.lbl_effects_data.setStyleSheet("""padding: 2px""")
+        telem_lbl = QLabel('Telemetry:')
+        effect_lbl = QLabel('Active Effects:')
+        monitor_area_layout.addWidget(telem_lbl,0,0)
+        monitor_area_layout.addWidget(effect_lbl,0,1)
+        monitor_area_layout.addWidget(self.telem_area, 1, 0)
+        monitor_area_layout.addWidget(self.effects_area,1,1)
+
+        self.monitor_widget.setLayout(monitor_area_layout)
         # Add the scroll area to the layout
-        layout.addWidget(self.monitor_area)
+        layout.addWidget(self.monitor_widget)
 
         # Create a scrollable area
         self.settings_area = QScrollArea()
@@ -1886,17 +1912,19 @@ class MainWindow(QMainWindow):
         #print(f"BUTTON!!!!!!!!{button}")
         window_mode = self.radio_button_group.checkedButton()
         if button == self.telem_monitor_radio:
-            self.monitor_area.show()
+            self.telem_area.show()
+            self.effects_area.show()
             self.settings_area.hide()
             self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
             self.setMaximumWidth(600)
             self.setMaximumHeight(10240)
-        elif button == self.effect_monitor_radio:
-            self.monitor_area.show()
-            self.settings_area.hide()
-            self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-            self.setMaximumWidth(600)
-            self.setMaximumHeight(600)
+        # elif button == self.effect_monitor_radio:
+        #     self.monitor_area.show()
+        #     self.settings_area.hide()
+        #     self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        #     self.setMaximumWidth(600)
+        #     self.setMaximumHeight(600)
         elif button == self.settings_radio:
             self.monitor_area.hide()
             self.settings_area.show()
@@ -1957,8 +1985,8 @@ class MainWindow(QMainWindow):
 
             if window_mode == self.telem_monitor_radio:
                 self.lbl_telem_data.setText(items)
-            elif window_mode == self.effect_monitor_radio:
-                self.lbl_telem_data.setText(active_effects)
+            # elif window_mode == self.effect_monitor_radio:
+                self.lbl_effects_data.setText(active_effects)
 
 
         except Exception as e:

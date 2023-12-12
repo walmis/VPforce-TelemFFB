@@ -981,9 +981,16 @@ class UserModelDialog(QDialog):
     def __init__(self, sim, current_aircraft, current_type, parent=None):
         super(UserModelDialog, self).__init__(parent)
         self.combo_box = None
+        self.models_combo_box = None
         self.tb_current_aircraft = None
         self.setWindowTitle("Create Model Setting")
         self.init_ui(sim, current_aircraft,current_type)
+
+    def class_combo_changed(self):
+        self.models_combo_box.setCurrentText('')
+
+    def pattern_changed(self):
+        self.combo_box.setCurrentText('')
 
     def init_ui(self,sim,current_aircraft,current_type):
 
@@ -1018,6 +1025,7 @@ class UserModelDialog(QDialog):
         self.combo_box.addItem('')
         self.combo_box.addItems(classes)
         self.combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
+        self.combo_box.currentIndexChanged.connect(self.class_combo_changed)
         self.combo_box.setCurrentText(current_type)
 
         models = xmlutils.read_models(sim)
@@ -1057,8 +1065,8 @@ class UserModelDialog(QDialog):
         ok_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
 
-    def pattern_changed(self):
-        self.combo_box.setCurrentText('')
+
+
 
 
 if __name__ == "__main__":
