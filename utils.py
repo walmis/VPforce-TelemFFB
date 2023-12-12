@@ -123,7 +123,7 @@ class EffectTranslator:
             "prop_rpm0-2" : ["Propeller Engine Rumble", "engine_rumble_lowrpm_intensity" ],
             "prop_rpm1-1" : ["Propeller Engine Rumble", "engine_rumble_highrpm_intensity" ],
             "prop_rpm1-2" : ["Propeller Engine Rumble", "engine_rumble_highrpm_intensity" ],
-            "rockets" : ["Rocket Fire", "" ],
+            "rockets" : ["Rocket Fire", "il2_weapon_release_intensity" ],
             "rotor_rpm0-1" : ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity" ],
             "rotor_rpm1-1" : ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity" ],
             "runway0" : ["Runway Rumble", "runway_rumble_intensity" ],

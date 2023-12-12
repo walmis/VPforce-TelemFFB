@@ -2173,11 +2173,11 @@ class SettingsLayout(QGridLayout):
 
         slider = NoWheelSlider()
         slider.setOrientation(QtCore.Qt.Horizontal)
-        slider.setObjectName(f"s_{item['name']}")
+        slider.setObjectName(f"sld_{item['name']}")
 
         d_slider = NoWheelSlider()
         d_slider.setOrientation(QtCore.Qt.Horizontal)
-        d_slider.setObjectName(f"d_{item['name']}")
+        d_slider.setObjectName(f"dsld_{item['name']}")
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
@@ -2185,7 +2185,7 @@ class SettingsLayout(QGridLayout):
         line_edit.setText(item['value'])
         line_edit.blockSignals(False)
         line_edit.setAlignment(Qt.AlignHCenter)
-        line_edit.setObjectName(f"le_{item['name']}")
+        line_edit.setObjectName(f"vle_{item['name']}")
         line_edit.textChanged.connect(self.line_edit_changed)
 
         expand_button = QToolButton()
@@ -2368,7 +2368,7 @@ class SettingsLayout(QGridLayout):
 
     def unit_dropbox_changed(self):
         setting_name = self.sender().objectName().replace('ud_', '')
-        line_edit_name = 'le_' + self.sender().objectName().replace('ud_', '')
+        line_edit_name = 'vle_' + self.sender().objectName().replace('ud_', '')
         line_edit = self.mainwindow.findChild(QLineEdit, line_edit_name)
         value = ''
         unit = self.sender().currentText()
@@ -2379,8 +2379,8 @@ class SettingsLayout(QGridLayout):
         self.reload_caller()
 
     def line_edit_changed(self):
-        setting_name = self.sender().objectName().replace('le_', '')
-        unit_dropbox_name = 'ud_' + self.sender().objectName().replace('le_', '')
+        setting_name = self.sender().objectName().replace('vle_', '')
+        unit_dropbox_name = 'ud_' + self.sender().objectName().replace('vle_', '')
         unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
         unit = ''
         if unit_dropbox is not None:
@@ -2416,9 +2416,9 @@ class SettingsLayout(QGridLayout):
 
 
     def slider_changed(self):
-        setting_name = self.sender().objectName().replace('s_', '')
-        value_label_name = 'vl_' + self.sender().objectName().replace('s_', '')
-        sliderfactor_name = 'sf_' + self.sender().objectName().replace('s_', '')
+        setting_name = self.sender().objectName().replace('sld_', '')
+        value_label_name = 'vl_' + self.sender().objectName().replace('sld_', '')
+        sliderfactor_name = 'sf_' + self.sender().objectName().replace('sld_', '')
         value_label = self.mainwindow.findChild(QLabel, value_label_name)
         sliderfactor_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
         value = 0
@@ -2435,10 +2435,10 @@ class SettingsLayout(QGridLayout):
         self.reload_caller()
 
     def d_slider_changed(self):
-        setting_name = self.sender().objectName().replace('d_', '')
-        value_label_name = 'vl_' + self.sender().objectName().replace('d_', '')
-        sliderfactor_name = 'sf_' + self.sender().objectName().replace('d_', '')
-        unit_dropbox_name = 'ud_' + self.sender().objectName().replace('d_', '')
+        setting_name = self.sender().objectName().replace('dsld_', '')
+        value_label_name = 'vl_' + self.sender().objectName().replace('dsld_', '')
+        sliderfactor_name = 'sf_' + self.sender().objectName().replace('dsld_', '')
+        unit_dropbox_name = 'ud_' + self.sender().objectName().replace('dsld_', '')
         unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
         unit = ''
         if unit_dropbox is not None:
