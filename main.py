@@ -104,7 +104,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLay
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
     QDialogButtonBox, QSizePolicy, QSpacerItem
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence, QIntValidator
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 # from PyQt5.QtWidgets import *
@@ -913,6 +913,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.parent_window = parent
         # Load settings from the registry and update widget states
         self.load_settings()
+        int_validator = QIntValidator()
+        self.telemTimeout.setValidator(int_validator)
 
     def reset_settings(self):
         # Load default settings and update widgets
@@ -1561,8 +1563,8 @@ class MainWindow(QMainWindow):
 
         central_widget.setLayout(layout)
         self.load_main_window_geometry()
-        self.last_height = None
-        self.last_width = None
+        self.last_height = self.height()
+        self.last_width = self.width()
 
     def test_sim_changed(self):
         models = xmlutils.read_models(self.test_sim.currentText())
@@ -1619,7 +1621,10 @@ class MainWindow(QMainWindow):
         # x, y, width, height = geometry.x(), geometry.y(), geometry.width(), geometry.height()
         # geometry_string = f"{x},{y},{width},{height}"
         # Store the values in the registry
-        utils.set_reg(reg_key, geometry_bytes)
+        if not self.hide_scroll_area.isChecked():
+            utils.set_reg(reg_key, geometry_bytes)
+        else:
+            pass
 
     def force_sim_aircraft(self):
         settings_mgr.current_sim = self.test_sim.currentText()
@@ -1958,7 +1963,7 @@ class MainWindow(QMainWindow):
             self.last_width = self.width()
             self.monitor_widget.hide()
             self.settings_area.hide()
-            self.resize(400,235)
+            self.resize(0,0)
             # self.setMaximumWidth(400)
             # self.setMaximumHeight(235)
     def update_telemetry(self, data: dict):
