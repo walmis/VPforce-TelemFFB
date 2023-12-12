@@ -1391,7 +1391,7 @@ class MainWindow(QMainWindow):
 
         self.lbl_effects_data = QLabel()
         self.effects_area.setWidget(self.lbl_effects_data)
-        # self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignRight)
+        self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.lbl_effects_data.setStyleSheet("""padding: 2px""")
         telem_lbl = QLabel('Telemetry:')
         effect_lbl = QLabel('Active Effects:')
