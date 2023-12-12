@@ -1259,7 +1259,7 @@ class MainWindow(QMainWindow):
         radio_row_layout.addWidget(self.hide_scroll_area)
 
 
-        self.settings_radio.setChecked(True)
+        # self.settings_radio.setChecked(True)
 
         self.radio_button_group.addButton(self.settings_radio)
         self.radio_button_group.addButton(self.telem_monitor_radio)
@@ -1292,11 +1292,13 @@ class MainWindow(QMainWindow):
         self.cur_craft = QLabel()
         self.cur_craft.setText('Unknown')
         current_craft_layout.addWidget(self.cur_craft)
+        self.cur_craft.setAlignment(Qt.AlignLeft)
         self.cur_pattern = QLabel()
         self.cur_pattern.setText('(No Match)')
         self.cur_pattern.setAlignment(Qt.AlignRight)
         current_craft_layout.addWidget(self.cur_pattern)
         current_craft_area.setLayout(current_craft_layout)
+        current_craft_layout.setAlignment(Qt.AlignLeft)
         layout.addWidget(current_craft_area)
 
         ##################
@@ -1596,6 +1598,7 @@ class MainWindow(QMainWindow):
         if geometry is not None:
             q_geometry = QByteArray(utils.get_reg(reg_key))
             self.restoreGeometry(q_geometry)
+
     def save_main_window_geometry(self):
         # Capture the main window's geometry
         device_type = args.type
@@ -1921,11 +1924,12 @@ class MainWindow(QMainWindow):
         #print(f"BUTTON!!!!!!!!{button}")
         window_mode = self.radio_button_group.checkedButton()
         if button == self.telem_monitor_radio:
-            self.telem_area.show()
-            self.effects_area.show()
+            # self.telem_area.show()
+            # self.effects_area.show()
+            self.monitor_widget.show()
             self.settings_area.hide()
-            self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-            self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            # self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            # self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
             self.setMaximumWidth(600)
             self.setMaximumHeight(10240)
         # elif button == self.effect_monitor_radio:
@@ -1935,12 +1939,12 @@ class MainWindow(QMainWindow):
         #     self.setMaximumWidth(600)
         #     self.setMaximumHeight(600)
         elif button == self.settings_radio:
-            self.monitor_area.hide()
+            self.monitor_widget.hide()
             self.settings_area.show()
             self.setMaximumWidth(600)
             self.setMaximumHeight(10240)
         elif button == self.hide_scroll_area:
-            self.monitor_area.hide()
+            self.monitor_widget.hide()
             self.settings_area.hide()
             self.setMaximumWidth(400)
             self.setMaximumHeight(235)
