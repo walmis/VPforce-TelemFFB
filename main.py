@@ -1047,9 +1047,10 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
 
         # Set the background color of the menu bar
+        # "#ab37c8" is VPForce purple
         menubar.setStyleSheet("""
             QMenuBar { background-color: #f0f0f0; } /* Set the background color of the menu bar */
-            QMenu::item:selected { color: red; } /* Set the text color when a menu item is selected */
+            QMenu::item:selected { color: "#ab37c8"; } /* Set the text color when a menu item is selected */
         """)
         # Add the "System" menu and its sub-option
         system_menu = menubar.addMenu('System')
@@ -1057,6 +1058,14 @@ class MainWindow(QMainWindow):
         system_settings_action = QAction('System Settings', self)
         system_settings_action.triggered.connect(self.open_system_settings_dialog)
         system_menu.addAction(system_settings_action)
+
+        settings_manager_action = QAction('Edit Sim/Class Defaults && Offline Models', self)
+        settings_manager_action.triggered.connect(self.toggle_settings_window)
+        system_menu.addAction(settings_manager_action)
+
+        log_window_action = QAction('Show/Hide Log Window', self)
+        log_window_action.triggered.connect(self.toggle_log_window)
+        system_menu.addAction(log_window_action)
 
         # Create the "Utilities" menu
         utilities_menu = menubar.addMenu('Utilities')
@@ -1391,29 +1400,30 @@ class MainWindow(QMainWindow):
             test_layout.addWidget(self.reload_button)
             layout.addLayout(test_layout)
 
-        button_layout = QHBoxLayout()
-
-
-        edit_button = QPushButton("Settings Manager")
-        edit_button.setMinimumWidth(130)
-        edit_button.setMaximumWidth(200)
-        edit_button.clicked.connect(self.toggle_settings_window)
-        button_layout.addWidget(edit_button, alignment=Qt.AlignCenter)
-
-        self.log_button = QPushButton("Open/Hide Log")
-        self.log_button.setMinimumWidth(130)
-        self.log_button.setMaximumWidth(200)
-        self.log_button.clicked.connect(self.toggle_log_window)
-        button_layout.addWidget(self.log_button, alignment=Qt.AlignCenter)
-
-        # Add the exit button
-        exit_button = QPushButton("Exit")
-        exit_button.setMinimumWidth(130)  # Set the minimum width
-        exit_button.setMaximumWidth(200)  # Set the maximum width
-        exit_button.clicked.connect(self.exit_application)
-        button_layout.addWidget(exit_button, alignment=Qt.AlignCenter)
-
-        layout.addLayout(button_layout)
+        # buttons replaced with menus
+        #
+        # button_layout = QHBoxLayout()
+        #
+        # edit_button = QPushButton("Settings Manager")
+        # edit_button.setMinimumWidth(130)
+        # edit_button.setMaximumWidth(200)
+        # edit_button.clicked.connect(self.toggle_settings_window)
+        # button_layout.addWidget(edit_button, alignment=Qt.AlignCenter)
+        #
+        # self.log_button = QPushButton("Open/Hide Log")
+        # self.log_button.setMinimumWidth(130)
+        # self.log_button.setMaximumWidth(200)
+        # self.log_button.clicked.connect(self.toggle_log_window)
+        # button_layout.addWidget(self.log_button, alignment=Qt.AlignCenter)
+        #
+        # # Add the exit button
+        # exit_button = QPushButton("Exit")
+        # exit_button.setMinimumWidth(130)  # Set the minimum width
+        # exit_button.setMaximumWidth(200)  # Set the maximum width
+        # exit_button.clicked.connect(self.exit_application)
+        # button_layout.addWidget(exit_button, alignment=Qt.AlignCenter)
+        #
+        # layout.addLayout(button_layout)
 
         central_widget = QWidget()
         central_widget.setLayout(layout)
