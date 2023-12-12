@@ -102,7 +102,7 @@ import re
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
-    QDialogButtonBox, QSizePolicy, QSpacerItem
+    QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence, QIntValidator
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
@@ -1346,6 +1346,33 @@ class MainWindow(QMainWindow):
         self.test_craft_area.hide()
         layout.addWidget(self.test_craft_area)
 
+        self.tab_widget = QTabWidget(self)
+        self.tab_widget.setTabShape(QTabWidget.Triangular)  # Set triangular tab shape
+        self.tab_widget.addTab(QWidget(), "Monitor")
+        self.tab_widget.addTab(QWidget(), "Settings")
+        self.tab_widget.addTab(QWidget(), "Hide")
+        self.tab_widget.currentChanged.connect(self.switch_window_view)
+
+        # Set the main window area height to 0
+        self.tab_widget.setFixedHeight(14)
+        style_sheet = """
+                    QTabBar::tab:selected {
+                        background-color: #ab37c8;
+                        color: white;
+                    }
+                """
+        self.tab_widget.setStyleSheet(style_sheet)
+
+        # Create a horizontal line widget
+        line_widget = QFrame(self)
+        line_widget.setFrameShape(QFrame.HLine)
+        line_widget.setFrameShadow(QFrame.Sunken)
+
+        # Add the tab widget and line widget to the main layout
+        layout.addWidget( self.tab_widget)
+        layout.setSpacing(0)
+        layout.addWidget(line_widget)
+
         ################
         #  main scroll area
 
@@ -1395,6 +1422,8 @@ class MainWindow(QMainWindow):
         self.effects_area.setWidget(self.lbl_effects_data)
         self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.lbl_effects_data.setStyleSheet("""padding: 2px""")
+
+
         telem_lbl = QLabel('Telemetry:')
         effect_lbl = QLabel('Active Effects:')
         monitor_area_layout.addWidget(telem_lbl,0,0)
@@ -1563,8 +1592,8 @@ class MainWindow(QMainWindow):
 
         central_widget.setLayout(layout)
         self.load_main_window_geometry()
-        self.last_height = self.height()
-        self.last_width = self.width()
+        # self.last_height = self.height()
+        # self.last_width = self.width()
 
     def test_sim_changed(self):
         models = xmlutils.read_models(self.test_sim.currentText())
@@ -1604,7 +1633,8 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(q_geometry)
         self.last_height = self.height()
         self.last_width = self.width()
-        self.telem_monitor_radio.click()
+        self.tab_widget.setCurrentIndex(0)
+        # self.telem_monitor_radio.click()
 
     def save_main_window_geometry(self):
         # Capture the main window's geometry
@@ -1930,10 +1960,10 @@ class MainWindow(QMainWindow):
                     self.il2_label_icon.setPixmap(paused_icon)
                 case 'MSFS2020':
                     self.msfs_label_icon.setPixmap(paused_icon)
-    def switch_window_view(self, button):
-        #print(f"BUTTON!!!!!!!!{button}")
-        window_mode = self.radio_button_group.checkedButton()
-        if button == self.telem_monitor_radio:
+
+    def switch_window_view(self, index):
+
+        if index == 0:
 
             self.monitor_widget.show()
             self.settings_area.hide()
@@ -1941,31 +1971,40 @@ class MainWindow(QMainWindow):
             self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
 
             self.resize(self.last_width, self.last_height)
-
-            # self.setMaximumWidth(600)
-            # self.setMaximumHeight(10240)
-        # elif button == self.effect_monitor_radio:
-        #     self.monitor_area.show()
-        #     self.settings_area.hide()
-        #     self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        #     self.setMaximumWidth(600)
-        #     self.setMaximumHeight(600)
-        elif button == self.settings_radio:
+        elif index == 1:
             self.monitor_widget.hide()
             self.settings_area.show()
 
             self.resize(self.last_width, self.last_height)
 
-            # self.setMaximumWidth(600)
-            # self.setMaximumHeight(10240)
-        elif button == self.hide_scroll_area:
+        elif index == 2:
             self.last_height = self.height()
             self.last_width = self.width()
             self.monitor_widget.hide()
             self.settings_area.hide()
             self.resize(0,0)
-            # self.setMaximumWidth(400)
-            # self.setMaximumHeight(235)
+        # if button == self.telem_monitor_radio:
+        #
+        #     self.monitor_widget.show()
+        #     self.settings_area.hide()
+        #     self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        #     self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        #
+        #     self.resize(self.last_width, self.last_height)
+        #
+        # elif button == self.settings_radio:
+        #     self.monitor_widget.hide()
+        #     self.settings_area.show()
+        #
+        #     self.resize(self.last_width, self.last_height)
+        #
+        # elif button == self.hide_scroll_area:
+        #     self.last_height = self.height()
+        #     self.last_width = self.width()
+        #     self.monitor_widget.hide()
+        #     self.settings_area.hide()
+        #     self.resize(0,0)
+
     def update_telemetry(self, data: dict):
         try:
             items = ""
@@ -1986,11 +2025,11 @@ class MainWindow(QMainWindow):
                         active_effects = '\n'.join([active_effects, descr])
                     if settingname not in active_settings:
                         active_settings.append(settingname)
-            window_mode = self.radio_button_group.checkedButton()
-
+            # window_mode = self.radio_button_group.checkedButton()
+            window_mode = self.tab_widget.currentIndex()
             # update slider colors
             vpf_purple = "#ab37c8" # rgb(171, 55, 200)
-            if window_mode == self.settings_radio:
+            if window_mode == 1:
                 sliders = self.findChildren(NoWheelSlider)
                 for my_slider in sliders:
                     slidername = my_slider.objectName().replace('sld_','')
@@ -2014,7 +2053,7 @@ class MainWindow(QMainWindow):
             self.cur_craft.setText(data['N'])
             self.cur_pattern.setText(f"(Matched: {shown_pattern})")
 
-            if window_mode == self.telem_monitor_radio:
+            if window_mode == 0:
                 self.lbl_telem_data.setText(items)
             # elif window_mode == self.effect_monitor_radio:
                 self.lbl_effects_data.setText(active_effects)
