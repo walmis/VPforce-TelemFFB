@@ -1598,6 +1598,7 @@ class MainWindow(QMainWindow):
         if geometry is not None:
             q_geometry = QByteArray(utils.get_reg(reg_key))
             self.restoreGeometry(q_geometry)
+        self.telem_monitor_radio.click()
 
     def save_main_window_geometry(self):
         # Capture the main window's geometry
