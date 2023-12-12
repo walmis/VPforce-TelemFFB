@@ -1049,8 +1049,9 @@ class MainWindow(QMainWindow):
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
         menubar.setStyleSheet("""
-            QMenuBar { background-color: #f0f0f0; } /* Set the background color of the menu bar */
-            QMenu::item:selected { color: "#ab37c8"; } /* Set the text color when a menu item is selected */
+            QMenuBar { background-color: #f0f0f0; } 
+            QMenu::item {background-color: transparent;}
+            QMenu::item:selected { color: #ffffff; background-color: "#ab37c8"; } 
         """)
         # Add the "System" menu and its sub-option
         system_menu = menubar.addMenu('System')
@@ -1066,6 +1067,10 @@ class MainWindow(QMainWindow):
         log_window_action = QAction('Show/Hide Log Window', self)
         log_window_action.triggered.connect(self.toggle_log_window)
         system_menu.addAction(log_window_action)
+
+        cfg_log_folder_action = QAction('Open Config/Log Directory',self)
+        cfg_log_folder_action.triggered.connect(self.open_cfg_dir)
+        system_menu.addAction(cfg_log_folder_action)
 
         # Create the "Utilities" menu
         utilities_menu = menubar.addMenu('Utilities')
@@ -1465,6 +1470,7 @@ class MainWindow(QMainWindow):
         # show xml file info
         if args.overridefile!= 'None':
             self.ovrd_label = QLabel()
+            self.ovrd_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
             self.cfg_label.setText(f"Config File: {args.configfile}")
             self.cfg_label.setToolTip("You can use a custom configuration file by passing the -c argument to TelemFFB\n\nExample: \"VPForce-TelemFFB.exe -c customconfig.ini\"")
 
@@ -1475,23 +1481,24 @@ class MainWindow(QMainWindow):
 
             self.ovrd_label.setToolTip("Rename \'config.user.ini.README\' to \'config.user.ini\' or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o argument\n\nExample \"VPForce-TelemFFB.exe -o myconfig.user.ini\" (starting TelemFFB without the override flag will look for the default config.user.ini)")
             cfg_layout.addWidget(self.cfg_label)
+            self.cfg_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
+            cfg_layout.addWidget(self.ovrd_label)
+            cfg_layout.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
+            layout.addLayout(cfg_layout)
 
-        else:
-
-            self.ovrd_label = ClickableLabel()
-            if os.path.exists(userconfig_path):
-                self.ovrd_label.setText(f"User File: {userconfig_path}")
-
-            self.ovrd_label.setToolTip("Use the Settings Manager to customize aircraft settings.\nClick to open the userconfig directory if you need to send the file for support.")
-
-
-        self.ovrd_label.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
-        self.cfg_label.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
-
-
-        cfg_layout.addWidget(self.ovrd_label)
-        cfg_layout.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
-        layout.addLayout(cfg_layout)
+        # else:
+        #
+        #     self.ovrd_label = ClickableLabel()
+        #     self.ovrd_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
+        #     if os.path.exists(userconfig_path):
+        #         self.ovrd_label.setText(f"User File: {userconfig_path}")
+        #
+        #     self.ovrd_label.setToolTip("Use the Settings Manager to customize aircraft settings.\nClick to open the userconfig directory if you need to send the file for support.")
+        #
+        #
+        # cfg_layout.addWidget(self.ovrd_label)
+        # cfg_layout.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
+        # layout.addLayout(cfg_layout)
 
         # link_row_layout = QHBoxLayout()
         # self.doc_label = QLabel()
@@ -1676,6 +1683,8 @@ class MainWindow(QMainWindow):
 
         message = f'\n\nConverted {overridefile} for {args.type} to XML.\nYou can now remove the -o argument to use the new Settings Manager\n'
         print(message)
+    def open_cfg_dir(self):
+        os.startfile(userconfig_rootpath, 'open')
 
     def create_colored_icon(self, color, size):
         # Create a QPixmap with the specified color and size
@@ -2526,6 +2535,9 @@ class SettingsLayout(QGridLayout):
     def d_sldReconnect(self):
         self.sender().valueChanged.connect(self.d_slider_changed)
         self.sender().valueChanged.emit(self.sender().value())
+
+
+
 
 class ClickableLabel(QLabel):
     def __init__(self, parent=None):
