@@ -42,7 +42,8 @@ parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) |
 #parser.add_argument('-X', '--xml', help='use XML config', nargs='?', const='default')
 
 args = parser.parse_args()
-
+args.sim = str.upper(args.sim)
+args.type = str.lower(args.type)
 import json
 import logging
 import sys
@@ -1819,6 +1820,7 @@ class MainWindow(QMainWindow):
         if perform_update(auto=False):
             QCoreApplication.instance().quit()
 
+
     def init_sim_indicators(self, sims, settings_dict):
         label_icons = {
             'DCS': self.dcs_label_icon,
@@ -1836,12 +1838,13 @@ class MainWindow(QMainWindow):
                 lb.setPixmap(enable_color)
             else:
                 lb.setPixmap(disable_color)
-    def update_sim_indicators(self, source, state):
+
+    def update_sim_indicators(self, source, pause):
         active_color = QColor(0, 255, 0)
         paused_color = QColor(0, 0, 255)
         active_icon = self.create_colored_icon(active_color, self.icon_size)
         paused_icon = self.create_paused_icon(paused_color, self.icon_size)
-        if state:
+        if not pause:
             match source:
                 case 'DCS':
                     self.dcs_label_icon.setPixmap(active_icon)
