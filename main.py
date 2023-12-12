@@ -1993,7 +1993,7 @@ class MainWindow(QMainWindow):
             if window_mode == self.settings_radio:
                 sliders = self.findChildren(NoWheelSlider)
                 for my_slider in sliders:
-                    slidername = my_slider.objectName().replace('s_','')
+                    slidername = my_slider.objectName().replace('sld_','')
                     #print (slidername)
                     my_slider.blockSignals(True)
                     if slidername in active_settings:
