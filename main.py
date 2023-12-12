@@ -1011,7 +1011,7 @@ class MainWindow(QMainWindow):
         self.show_new_craft_button = False
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        doc_url = 'https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#heading=h.27yzpife8719'
+        doc_url = 'https://vpforcecontrols.com/downloads/VPforce_Rhino_Manual.pdf'
         dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
         notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
@@ -1625,7 +1625,7 @@ class MainWindow(QMainWindow):
         settings_mgr.current_sim = self.test_sim.currentText()
         settings_mgr.current_aircraft_name = self.test_name.currentText()
         self.settings_layout.expanded_items.clear()
-        self.monitor_area.hide()
+        self.monitor_widget.hide()
         self.settings_layout.reload_caller()
 
     def open_system_settings_dialog(self):
