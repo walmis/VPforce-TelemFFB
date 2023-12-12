@@ -2098,14 +2098,12 @@ class SettingsLayout(QGridLayout):
             self.build_rows(result)
 
     def clear_layout(self):
-        print (f"clear_layout - count: {self.count()}")
         while self.count():
             item = self.takeAt(0)
             widget = item.widget()
             if widget:
                 self.removeWidget(widget)
                 widget.deleteLater()
-        print(f"clear_layout - count: {self.count()}")
 
     def generate_settings_row(self, item, i, rowdisabled=False):
         entry_colspan = 2

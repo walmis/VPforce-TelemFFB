@@ -72,8 +72,8 @@ def read_xml_file(the_sim):
 
         # lprint(data_list)
     # Sort the data by grouping and then by name
-
-    sorted_data = sorted(data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
+    sorted_data = sorted(data_list, key=lambda x: float(x['order']))
+    # sorted_data = sorted(data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
     # lprint(sorted_data)
     # printconfig(sim, craft, sorted_data)
     return sorted_data
@@ -300,7 +300,8 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
     prereq_list = read_prereqs()
     final_w_prereqs = check_prereq_value(prereq_list, final_result)
     final_wo_prereqs = eliminate_no_prereq(final_w_prereqs)
-    sorted_data = sorted(final_wo_prereqs, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
+    # sorted_data = sorted(final_wo_prereqs, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['name']))
+    sorted_data = sorted(final_wo_prereqs, key=lambda x: float(x['order']))
     # lprint(f"final count {len(final_result)}")
 
     return model_class, model_pattern, sorted_data

@@ -323,8 +323,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def populate_table(self):
         mprint("populate_table")
         self.table_widget.blockSignals(True)
-        #sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'], x['displayname']))
-        sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'] == 'Debug', x['grouping'], x['displayname']))
+
+        # sorted_data = sorted(self.data_list, key=lambda x: (x['grouping'] != 'Basic', x['grouping'] == 'Debug', x['grouping'], x['displayname']))
+        sorted_data = sorted(self.data_list, key=lambda x: float(x['order']))
 
         list_length = len(self.data_list) -1
         pcount = 1
