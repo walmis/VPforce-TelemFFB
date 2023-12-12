@@ -2140,9 +2140,24 @@ class SettingsLayout(QGridLayout):
 
         return newlist
 
+    def read_active_prereqs(self,datalist):
+        p_list = []
+        for item in datalist:
+            found = False
+            count = 0
+            for p in datalist:
+                if item['name'] == p['prereq']:
+                    count += 1
+                    found = True
+                # If 'prereq' is not in the list, add a new entry
+            if found:
+                p_list.append({'prereq': item['name'], 'value': 'False', 'count': count})
+        return p_list
+
     def build_rows(self,datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
-        self.prereq_list = xmlutils.read_prereqs()
+        # self.prereq_list = xmlutils.read_prereqs()
+        self.prereq_list = self.read_active_prereqs(sorted_data)
         self.has_bump(sorted_data)
         self.append_prereq_count(sorted_data)
         self.add_expanded(sorted_data)
