@@ -1193,6 +1193,7 @@ class MainWindow(QMainWindow):
         self.dcs_label_icon.setPixmap(dcs_icon)
         self.dcs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         dcs_label = QLabel("DCS", self)
+        dcs_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.dcs_label_icon, 0, 0)
         status_layout.addWidget(dcs_label, 0, 1)
 
@@ -1200,6 +1201,7 @@ class MainWindow(QMainWindow):
         self.il2_label_icon.setPixmap(il2_icon)
         self.il2_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         il2_label = QLabel("IL2", self)
+        il2_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.il2_label_icon, 0, 2)
         status_layout.addWidget(il2_label, 0, 3)
 
@@ -1207,6 +1209,7 @@ class MainWindow(QMainWindow):
         self.msfs_label_icon.setPixmap(msfs_icon)
         self.msfs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         msfs_label = QLabel("MSFS", self)
+        msfs_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.msfs_label_icon, 0, 4)
         status_layout.addWidget(msfs_label, 0, 5)
 
@@ -1227,6 +1230,7 @@ class MainWindow(QMainWindow):
         # status_layout.addWidget(condor_label, 1, 3)
 
         logo_status_layout.addLayout(status_layout)
+        logo_status_layout.setAlignment(Qt.AlignLeft)
 
 
         layout.addLayout(logo_status_layout)
@@ -1240,6 +1244,7 @@ class MainWindow(QMainWindow):
 
         self.radio_button_group = QButtonGroup()
         radio_row_layout = QHBoxLayout()
+        radio_row_layout.setAlignment(Qt.AlignLeft)
         self.settings_radio = QRadioButton("Settings")
         self.telem_monitor_radio = QRadioButton("Telemetry Monitor")
         self.effect_monitor_radio = QRadioButton("Effects Monitor")
@@ -1268,6 +1273,7 @@ class MainWindow(QMainWindow):
 
         current_craft_area = QWidget()
         current_craft_layout = QHBoxLayout()
+        current_craft_layout.setAlignment(Qt.AlignLeft)
         cur_sim = QLabel()
         cur_sim.setText("Current Aircraft:")
         cur_sim.setAlignment(Qt.AlignRight)
@@ -1453,12 +1459,12 @@ class MainWindow(QMainWindow):
             self.ovrd_label.setToolTip("Use the Settings Manager to customize aircraft settings.\nClick to open the userconfig directory if you need to send the file for support.")
 
 
-        self.ovrd_label.setAlignment(Qt.AlignLeft)
-        self.cfg_label.setAlignment(Qt.AlignLeft)
+        self.ovrd_label.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
+        self.cfg_label.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
 
 
         cfg_layout.addWidget(self.ovrd_label)
-
+        cfg_layout.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
         layout.addLayout(cfg_layout)
 
         # link_row_layout = QHBoxLayout()
@@ -1515,8 +1521,7 @@ class MainWindow(QMainWindow):
         version_row_layout.addWidget(self.version_label)
         version_row_layout.addWidget(self.firmware_label)
 
-
-
+        version_row_layout.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
         layout.addLayout(version_row_layout)
 
         central_widget.setLayout(layout)
@@ -1948,7 +1953,7 @@ class MainWindow(QMainWindow):
                 self.new_craft_button.hide()
 
             self.cur_craft.setText(data['N'])
-            self.cur_pattern.setText(f"({shown_pattern})")
+            self.cur_pattern.setText(f"(Matched: {shown_pattern})")
 
             if window_mode == self.telem_monitor_radio:
                 self.lbl_telem_data.setText(items)
