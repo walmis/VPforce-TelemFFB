@@ -104,7 +104,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLay
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
     QDialogButtonBox, QSizePolicy, QSpacerItem
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QPainterPath
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 # from PyQt5.QtWidgets import *
@@ -1296,36 +1296,35 @@ class MainWindow(QMainWindow):
         #####################
         #  test loading buttons, set to true for debug
 
-        show_craft_loader = False
 
-        if show_craft_loader:
-            test_craft_area = QWidget()
-            test_craft_layout = QHBoxLayout()
-            test_sim_lbl = QLabel('Sim:')
-            test_sim_lbl.setMaximumWidth(30)
-            test_sim_lbl.setAlignment(Qt.AlignRight)
-            sims = ['', 'DCS', 'IL2', 'MSFS']
-            self.test_sim = QComboBox()
-            self.test_sim.setMaximumWidth(60)
-            self.test_sim.addItems(sims)
-            self.test_sim.currentIndexChanged.connect(self.test_sim_changed)
-            test_name_lbl = QLabel('Aircraft Name:')
-            test_name_lbl.setMaximumWidth(90)
-            test_name_lbl.setAlignment(Qt.AlignRight)
-            self.test_name = QComboBox()
-            self.test_name.setMinimumWidth(100)
-            self.test_name.setEditable(True)
-            test_button = QToolButton()
-            test_button.setMaximumWidth(20)
-            test_button.setText('>')
-            test_button.clicked.connect(self.force_sim_aircraft)
-            test_craft_layout.addWidget(test_sim_lbl)
-            test_craft_layout.addWidget(self.test_sim)
-            test_craft_layout.addWidget(test_name_lbl)
-            test_craft_layout.addWidget(self.test_name)
-            test_craft_layout.addWidget(test_button)
-            test_craft_area.setLayout(test_craft_layout)
-            layout.addWidget(test_craft_area)
+        self.test_craft_area = QWidget()
+        test_craft_layout = QHBoxLayout()
+        test_sim_lbl = QLabel('Sim:')
+        test_sim_lbl.setMaximumWidth(30)
+        test_sim_lbl.setAlignment(Qt.AlignRight)
+        sims = ['', 'DCS', 'IL2', 'MSFS']
+        self.test_sim = QComboBox()
+        self.test_sim.setMaximumWidth(60)
+        self.test_sim.addItems(sims)
+        self.test_sim.currentIndexChanged.connect(self.test_sim_changed)
+        test_name_lbl = QLabel('Aircraft Name:')
+        test_name_lbl.setMaximumWidth(90)
+        test_name_lbl.setAlignment(Qt.AlignRight)
+        self.test_name = QComboBox()
+        self.test_name.setMinimumWidth(100)
+        self.test_name.setEditable(True)
+        test_button = QToolButton()
+        test_button.setMaximumWidth(20)
+        test_button.setText('>')
+        test_button.clicked.connect(self.force_sim_aircraft)
+        test_craft_layout.addWidget(test_sim_lbl)
+        test_craft_layout.addWidget(self.test_sim)
+        test_craft_layout.addWidget(test_name_lbl)
+        test_craft_layout.addWidget(self.test_name)
+        test_craft_layout.addWidget(test_button)
+        self.test_craft_area.setLayout(test_craft_layout)
+        self.test_craft_area.hide()
+        layout.addWidget(self.test_craft_area)
 
         ################
         #  main scroll area
@@ -1384,6 +1383,7 @@ class MainWindow(QMainWindow):
 
         # Set the widget as the content of the scroll area
         layout.addWidget(self.settings_area)
+        self.settings_area.hide()
 
         ##############
         #  buttons
@@ -1794,12 +1794,19 @@ class MainWindow(QMainWindow):
             d.show()
 
     def toggle_settings_window(self):
-        if settings_mgr.isVisible():
-            settings_mgr.hide()
+        modifiers = QApplication.keyboardModifiers()
+        if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier):
+            if self.test_craft_area.isVisible():
+                self.test_craft_area.hide()
+            else:
+                self.test_craft_area.show()
         else:
-            settings_mgr.show()
-            print (f"# toggle settings window   {settings_mgr.current_sim} {settings_mgr.current_aircraft_name}")
-            settings_mgr.currentmodel_click()
+            if settings_mgr.isVisible():
+                settings_mgr.hide()
+            else:
+                settings_mgr.show()
+                print (f"# toggle settings window   {settings_mgr.current_sim} {settings_mgr.current_aircraft_name}")
+                settings_mgr.currentmodel_click()
 
     def show_user_model_dialog(self):
         mprint("show_user_model_dialog")
@@ -1871,22 +1878,30 @@ class MainWindow(QMainWindow):
                 case 'MSFS2020':
                     self.msfs_label_icon.setPixmap(paused_icon)
     def switch_window_view(self, button):
-        print(f"BUTTON!!!!!!!!{button}")
+        #print(f"BUTTON!!!!!!!!{button}")
         window_mode = self.radio_button_group.checkedButton()
         if button == self.telem_monitor_radio:
             self.monitor_area.show()
             self.settings_area.hide()
             self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            self.setMaximumWidth(600)
+            self.setMaximumHeight(10240)
         elif button == self.effect_monitor_radio:
             self.monitor_area.show()
             self.settings_area.hide()
             self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+            self.setMaximumWidth(600)
+            self.setMaximumHeight(600)
         elif button == self.settings_radio:
             self.monitor_area.hide()
             self.settings_area.show()
+            self.setMaximumWidth(600)
+            self.setMaximumHeight(10240)
         elif button == self.hide_scroll_area:
             self.monitor_area.hide()
             self.settings_area.hide()
+            self.setMaximumWidth(400)
+            self.setMaximumHeight(235)
     def update_telemetry(self, data: dict):
         try:
             items = ""
