@@ -1190,23 +1190,23 @@ class MainWindow(QMainWindow):
         self.il2_label_icon.setPixmap(il2_icon)
         self.il2_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         il2_label = QLabel("IL2", self)
-        status_layout.addWidget(self.il2_label_icon, 1, 0)
-        status_layout.addWidget(il2_label, 1, 1)
+        status_layout.addWidget(self.il2_label_icon, 0, 2)
+        status_layout.addWidget(il2_label, 0, 3)
 
         self.msfs_label_icon = QLabel("", self)
         self.msfs_label_icon.setPixmap(msfs_icon)
         self.msfs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         msfs_label = QLabel("MSFS", self)
-        status_layout.addWidget(self.msfs_label_icon, 2, 0)
-        status_layout.addWidget(msfs_label, 2, 1)
+        status_layout.addWidget(self.msfs_label_icon, 0, 4)
+        status_layout.addWidget(msfs_label, 0, 5)
 
         # self.xplane_label_icon = QLabel("", self)
         # xplane_icon = self.create_colored_icon(xplane_color, self.icon_size)
         # self.xplane_label_icon.setPixmap(xplane_icon)
         # self.xplane_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         # xplane_label = QLabel("XPlane", self)
-        # status_layout.addWidget(self.xplane_label_icon, 0, 2)
-        # status_layout.addWidget(xplane_label, 0, 3)
+        # status_layout.addWidget(self.xplane_label_icon, 1, 0)
+        # status_layout.addWidget(xplane_label, 1, 1)
         #
         # self.condor_label_icon = QLabel("", self)
         # condor_icon = self.create_colored_icon(condor_color, self.icon_size)
@@ -1897,8 +1897,18 @@ class MainWindow(QMainWindow):
             window_mode = self.radio_button_group.checkedButton()
 
             # update slider colors
+            vpf_purple = "#ab37c8" # rgb(171, 55, 200)
             if window_mode == self.settings_radio:
-                pass
+                sliders = self.findChildren(NoWheelSlider)
+                for my_slider in sliders:
+                    slidername = my_slider.objectName().replace('s_','')
+                    #print (slidername)
+                    my_slider.blockSignals(True)
+                    if slidername in active_settings:
+                        my_slider.setHandleColor("#17c411")
+                    else:
+                        my_slider.setHandleColor(vpf_purple)
+                    my_slider.blockSignals(False)
 
             self.update_sim_indicators(data.get('src'), data.get('SimPaused', 0))
 
@@ -2467,9 +2477,55 @@ class ClickableLabel(QLabel):
         print("userpath opened")
 
 class NoWheelSlider(QSlider):
+    def __init__(self, *args, **kwargs):
+        super(NoWheelSlider, self).__init__(*args, **kwargs)
+        # Default colors
+        self.groove_color = "#bbb"
+        self.handle_color = "#ab37c8"
+        self.handle_height = 20
+        self.handle_width = 16
+
+        # Apply styles
+        self.update_styles()
     def wheelEvent(self, event):
         # Block the wheel event
         event.ignore()
+
+    def update_styles(self):
+        # Generate CSS based on color and size properties
+        css = f"""
+            QSlider::groove:horizontal {{
+                border: 1px solid #565a5e;
+                height: 8px;  /* Adjusted groove height */
+                background: {self.groove_color};
+                margin: 0;
+                border-radius: 3px;  /* Adjusted border radius */
+            }}
+            QSlider::handle:horizontal {{
+                background: {self.handle_color};
+                border: 1px solid #565a5e;
+                width: {self.handle_width}px;  /* Adjusted handle width */
+                height: {self.handle_height}px;  /* Adjusted handle height */
+                border-radius: {self.handle_height / 4}px;  /* Adjusted border radius */
+                margin-top: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
+                margin-bottom: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
+                margin-left: -1px;  /* Adjusted left margin */
+                margin-right: -1px;  /* Adjusted right margin */
+            }}
+        """
+        self.setStyleSheet(css)
+
+    def setGrooveColor(self, color):
+        self.groove_color = color
+        self.update_styles()
+
+    def setHandleColor(self, color):
+        self.handle_color = color
+        self.update_styles()
+
+    def setHandleHeight(self, height):
+        self.handle_height = height
+        self.update_styles()
 
 def perform_update(auto=True):
     # config = get_config()
