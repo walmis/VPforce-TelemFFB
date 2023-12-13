@@ -1036,7 +1036,7 @@ class MainWindow(QMainWindow):
         global _update_available
         global _latest_version, _latest_url
         self.resize(400, 700)
-
+        self.hidden_active = False
         # Create a layout for the main window
         layout = QVBoxLayout()
         notes_row_layout = QHBoxLayout()
@@ -1224,6 +1224,7 @@ class MainWindow(QMainWindow):
         msfs_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.msfs_label_icon, 0, 4)
         status_layout.addWidget(msfs_label, 0, 5)
+        status_layout.setAlignment(Qt.AlignRight)
 
         # self.xplane_label_icon = QLabel("", self)
         # xplane_icon = self.create_colored_icon(xplane_color, self.icon_size)
@@ -1244,6 +1245,7 @@ class MainWindow(QMainWindow):
         sim_status_area.setLayout(status_layout)
 
         rh_status_layout.addWidget(sim_status_area)
+        rh_status_layout.setAlignment(Qt.AlignRight)
 
         ############
         # current craft
@@ -1357,6 +1359,7 @@ class MainWindow(QMainWindow):
         self.effects_area = QScrollArea()
         self.effects_area.setWidgetResizable(True)
         self.effects_area.setMinimumHeight(100)
+        self.effects_area.setMaximumWidth(200)
 
         # Create the QLabel widget and set its properties
         if cfg.get("EXCEPTION"):
@@ -1442,31 +1445,6 @@ class MainWindow(QMainWindow):
             test_layout.addWidget(self.reload_button)
             layout.addLayout(test_layout)
 
-        # buttons replaced with menus
-        #
-        # button_layout = QHBoxLayout()
-        #
-        # edit_button = QPushButton("Settings Manager")
-        # edit_button.setMinimumWidth(130)
-        # edit_button.setMaximumWidth(200)
-        # edit_button.clicked.connect(self.toggle_settings_window)
-        # button_layout.addWidget(edit_button, alignment=Qt.AlignCenter)
-        #
-        # self.log_button = QPushButton("Open/Hide Log")
-        # self.log_button.setMinimumWidth(130)
-        # self.log_button.setMaximumWidth(200)
-        # self.log_button.clicked.connect(self.toggle_log_window)
-        # button_layout.addWidget(self.log_button, alignment=Qt.AlignCenter)
-        #
-        # # Add the exit button
-        # exit_button = QPushButton("Exit")
-        # exit_button.setMinimumWidth(130)  # Set the minimum width
-        # exit_button.setMaximumWidth(200)  # Set the maximum width
-        # exit_button.clicked.connect(self.exit_application)
-        # button_layout.addWidget(exit_button, alignment=Qt.AlignCenter)
-        #
-        # layout.addLayout(button_layout)
-
         central_widget = QWidget()
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
@@ -1485,60 +1463,16 @@ class MainWindow(QMainWindow):
                 self.ovrd_label.setText(f"User Override File: None")
 
             self.ovrd_label.setToolTip("Rename \'config.user.ini.README\' to \'config.user.ini\' or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o argument\n\nExample \"VPForce-TelemFFB.exe -o myconfig.user.ini\" (starting TelemFFB without the override flag will look for the default config.user.ini)")
-            cfg_layout.addWidget(self.cfg_label)
-            self.cfg_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
-            cfg_layout.addWidget(self.ovrd_label)
-            cfg_layout.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
-            layout.addLayout(cfg_layout)
-
-        # else:
-        #
-        #     self.ovrd_label = ClickableLabel()
-        #     self.ovrd_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
-        #     if os.path.exists(userconfig_path):
-        #         self.ovrd_label.setText(f"User File: {userconfig_path}")
-        #
-        #     self.ovrd_label.setToolTip("Use the Settings Manager to customize aircraft settings.\nClick to open the userconfig directory if you need to send the file for support.")
-        #
-        #
-        # cfg_layout.addWidget(self.ovrd_label)
-        # cfg_layout.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
-        # layout.addLayout(cfg_layout)
-
-        # link_row_layout = QHBoxLayout()
-        # self.doc_label = QLabel()
-        #
-        # label_txt = 'TelemFFB Documentation'
-        # self.doc_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        # self.doc_label.setOpenExternalLinks(True)
-        # self.doc_label.setText(f'<a href="{doc_url}">{label_txt}</a>')
-        # self.doc_label.setToolTip(doc_url)
-        # self.dl_label = QLabel()
-        #
-        # label_txt = 'Download Latest'
-        # self.dl_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        # self.dl_label.setOpenExternalLinks(True)
-        # self.dl_label.setText(f'<a href="{dl_url}">{label_txt}</a>')
-        # self.dl_label.setAlignment(Qt.AlignRight)
-        # self.dl_label.setToolTip(dl_url)
-        #
-        # link_row_layout.addWidget(self.doc_label)
-        # link_row_layout.addWidget(self.dl_label)
-
-        # layout.addLayout(link_row_layout)
-
 
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
 
-        status_text = "UNKNOWN"
         status = utils.fetch_latest_version()
         if status == False:
             status_text = "Up To Date"
         elif status == None:
             status_text = "UNKNOWN"
         else:
-            # print(_update_available)
             _update_available = True
             _latest_version, _latest_url = status
             logging.info(f"<<<<Update available - new version={_latest_version}>>>>")
@@ -1555,17 +1489,17 @@ class MainWindow(QMainWindow):
         self.firmware_label.setText(f'Rhino Firmware: {dev_firmware_version}')
 
         self.version_label.setAlignment(Qt.AlignLeft)
-        self.firmware_label.setAlignment(Qt.AlignLeft)
+        self.firmware_label.setAlignment(Qt.AlignRight)
         version_row_layout.addWidget(self.version_label)
         version_row_layout.addWidget(self.firmware_label)
 
-        version_row_layout.setAlignment(Qt.AlignLeft|Qt.AlignBottom)
+        version_row_layout.setAlignment(Qt.AlignBottom)
         layout.addLayout(version_row_layout)
 
         central_widget.setLayout(layout)
         self.load_main_window_geometry()
-        # self.last_height = self.height()
-        # self.last_width = self.width()
+        self.last_height = self.height()
+        self.last_width = self.width()
 
     def test_sim_changed(self):
         models = xmlutils.read_models(self.test_sim.currentText())
@@ -1938,7 +1872,10 @@ class MainWindow(QMainWindow):
     def switch_window_view(self, index):
 
         if index == 0:
-
+            if not self.hidden_active:
+                self.last_height = self.height()
+                self.last_width = self.width()
+            self.hidden_active = False
             self.monitor_widget.show()
             self.settings_area.hide()
             self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
@@ -1946,12 +1883,17 @@ class MainWindow(QMainWindow):
 
             self.resize(self.last_width, self.last_height)
         elif index == 1:
+            if not self.hidden_active:
+                self.last_height = self.height()
+                self.last_width = self.width()
+            self.hidden_active = False
             self.monitor_widget.hide()
             self.settings_area.show()
 
             self.resize(self.last_width, self.last_height)
 
         elif index == 2:
+            self.hidden_active = True
             self.last_height = self.height()
             self.last_width = self.width()
             self.monitor_widget.hide()
