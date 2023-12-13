@@ -3,9 +3,8 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
                              QVBoxLayout, QPushButton, QFileDialog)
 from PyQt5.QtGui import QPixmap, QIcon
-from multiprocessing import Process
+
 import os
-import multiprocessing
 import subprocess
 import winreg
 import sys

@@ -415,17 +415,21 @@ def update_data_with_models(defaults_data, model_data, replacetext):
     return updated_result
 
 
-def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''):
+def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', anydevice=False):
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
-
-    # Check if an identical <models> element already exists
-    model_elem = root.find(f'.//models'  # [sim="{the_sim}"]'    # might be 'any' (from convert ini)
-                           f'[device="{device}"]'
-                           f'[model="{the_model}"]'
-                           f'[name="{setting_name}"]')
+    model_elem = None
+    if anydevice:
+        the_device = 'any'
+    else:
+        the_device = device
+        # Check if an identical <models> element already exists
+        model_elem = root.find(f'.//models'  # [sim="{the_sim}"]'    # might be 'any' (from convert ini)
+                               f'[device="{the_device}"]'
+                               f'[model="{the_model}"]'
+                               f'[name="{setting_name}"]')
 
     if model_elem is not None:
         # Update the value of the existing element
@@ -450,7 +454,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''):
                     ("value", the_value),
                     ("unit", unit),
                     ("sim", the_sim),
-                    ("device", device)
+                    ("device", the_device)
                 ]
             )
             for element in root.iter("models")
@@ -466,13 +470,13 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''):
                                ("value", the_value),
                                ("unit", unit),
                                ("sim", the_sim),
-                               ("device", device)]:
+                               ("device", the_device)]:
                 ET.SubElement(models, tag).text = value
 
             # Write the modified XML back to the file
             tree = ET.ElementTree(root)
             tree.write(userconfig_path)
-            logging.info(f"Added <models> element with values: sim={the_sim}, device={device}, "
+            logging.info(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
                          f"value={the_value}, model={the_model}, name={setting_name}")
 
 

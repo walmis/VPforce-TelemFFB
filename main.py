@@ -104,7 +104,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLay
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
     QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence, QIntValidator
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence, QIntValidator, QCursor
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 # from PyQt5.QtWidgets import *
@@ -167,6 +167,9 @@ _update_available = False
 _latest_version = None
 _latest_url = None
 _current_version = version
+
+vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
+
 class LoggingFilter(logging.Filter):
     def __init__(self, keywords):
         self.keywords = keywords
@@ -626,6 +629,7 @@ class TelemManager(QObject, threading.Thread):
                 logging.info("Configuration has changed, reloading")
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
                 self.currentAircraft.apply_settings(params)
+                self.updateSettingsLayout.emit()
             try:
                 _tm = time.perf_counter()
                 self.currentAircraft._telem_data = telem_data
@@ -1124,7 +1128,6 @@ class MainWindow(QMainWindow):
 
         # Add the line to the menu frame layout
         menu_frame_layout.addWidget(menubar)
-
         menu_frame_layout.addWidget(line)
         menu_frame_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -1189,7 +1192,7 @@ class MainWindow(QMainWindow):
         self.image_label.setPixmap(pixmap)
 
         # Add the image label to the layout
-        logo_status_layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
+        logo_status_layout.addWidget(self.image_label, alignment=Qt.AlignVCenter | Qt.AlignLeft)
         # layout.addWidget(QLabel(f"Config File: {args.configfile}"))
 
         rh_status_area = QWidget()
@@ -1202,7 +1205,7 @@ class MainWindow(QMainWindow):
         self.dcs_label_icon.setPixmap(dcs_icon)
         self.dcs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         dcs_label = QLabel("DCS", self)
-        dcs_label.setStyleSheet("""padding: 3px""")
+        dcs_label.setStyleSheet("""padding: 2px""")
         dcs_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.dcs_label_icon, 0, 0)
         status_layout.addWidget(dcs_label, 0, 1)
@@ -1211,7 +1214,7 @@ class MainWindow(QMainWindow):
         self.il2_label_icon.setPixmap(il2_icon)
         self.il2_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         il2_label = QLabel("IL2", self)
-        il2_label.setStyleSheet("""padding: 3px""")
+        il2_label.setStyleSheet("""padding: 2px""")
         il2_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.il2_label_icon, 0, 2)
         status_layout.addWidget(il2_label, 0, 3)
@@ -1220,7 +1223,7 @@ class MainWindow(QMainWindow):
         self.msfs_label_icon.setPixmap(msfs_icon)
         self.msfs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         msfs_label = QLabel("MSFS", self)
-        msfs_label.setStyleSheet("""padding: 3px""")
+        msfs_label.setStyleSheet("""padding: 2px""")
         msfs_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.msfs_label_icon, 0, 4)
         status_layout.addWidget(msfs_label, 0, 5)
@@ -1253,19 +1256,18 @@ class MainWindow(QMainWindow):
 
         cur_ac_lbl = QLabel()
         cur_ac_lbl.setText("Current Aircraft:")
-        cur_ac_lbl.setAlignment(Qt.AlignLeft)
-        cur_ac_lbl.setStyleSheet("""padding: 0.5px""")
-        cur_ac_lbl.setMaximumWidth(90)
+        cur_ac_lbl.setAlignment(Qt.AlignHCenter)
+        cur_ac_lbl.setStyleSheet("""padding: 0.2px""")
 
         self.cur_craft = QLabel()
         self.cur_craft.setText('Unknown')
-        self.cur_craft.setStyleSheet("""padding: 0.5px""")
-        self.cur_craft.setAlignment(Qt.AlignLeft)
+        self.cur_craft.setStyleSheet("""padding: 0.2px""")
+        self.cur_craft.setAlignment(Qt.AlignHCenter)
 
         self.cur_pattern = QLabel()
         self.cur_pattern.setText('(No Match)')
-        self.cur_pattern.setStyleSheet("""padding: 0.5px""")
-        self.cur_pattern.setAlignment(Qt.AlignLeft)
+        self.cur_pattern.setStyleSheet("""padding: 0.2px""")
+        self.cur_pattern.setAlignment(Qt.AlignHCenter)
 
         rh_status_layout.addWidget(cur_ac_lbl)
         rh_status_layout.addWidget(self.cur_craft)
@@ -1280,9 +1282,23 @@ class MainWindow(QMainWindow):
         ##################
         #  new craft button
 
-        new_craft_layout = QHBoxLayout()
+        new_craft_layout = QVBoxLayout()
         self.new_craft_button = QPushButton('Create/clone config for new aircraft')
+        ncb_css = """QPushButton {
+                            background-color: #ab37c8;
+                            border-style: outset;
+                            border-width: 1px;
+                            border-radius: 10px;
+                            border-color: black;
+                            color: white;
+                            font: bold 14px;
+                            min-width: 10em;
+                            padding: 5px;
+                        }"""
+        self.new_craft_button.setStyleSheet(ncb_css)
+        self.new_craft_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
         new_craft_layout.addWidget(self.new_craft_button)
+        new_craft_layout.addSpacing(7)
         self.new_craft_button.clicked.connect(self.show_user_model_dialog)
         layout.addLayout(new_craft_layout)
         self.new_craft_button.hide()
@@ -1325,6 +1341,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(QWidget(), "Monitor")
         self.tab_widget.addTab(QWidget(), "Settings")
         self.tab_widget.addTab(QWidget(), "Hide")
+        self.tab_widget.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
         self.tab_widget.currentChanged.connect(self.switch_window_view)
 
         # Set the main window area height to 0
@@ -1807,11 +1824,16 @@ class MainWindow(QMainWindow):
         if result == QtWidgets.QDialog.Accepted:
             # Handle accepted
             new_aircraft = dialog.tb_current_aircraft.text()
+            if new_aircraft == current_aircraft:
+                qm = QMessageBox()
+                ret = qm.question(self, 'Create Match Pattern', "Are you sure you want to match on the\nfull aircraft name and not a search pattern?", qm.Yes | qm.No)
+                if ret == qm.No:
+                    return
             new_combo_box_value = dialog.combo_box.currentText()
             pat_to_clone = dialog.models_combo_box.currentText()
             if new_combo_box_value != '':
                 logging.info(f"New: {new_aircraft} {new_combo_box_value}")
-                xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type')
+                xmlutils.write_models_to_xml(settings_mgr.current_sim, new_aircraft, new_combo_box_value, 'type',None, True)
             else:
                 logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
                 xmlutils.clone_pattern(settings_mgr.current_sim,pat_to_clone,new_aircraft)
@@ -1944,24 +1966,26 @@ class MainWindow(QMainWindow):
             # window_mode = self.radio_button_group.checkedButton()
             window_mode = self.tab_widget.currentIndex()
             # update slider colors
-            vpf_purple = "#ab37c8" # rgb(171, 55, 200)
+
             if window_mode == 1:
                 sliders = self.findChildren(NoWheelSlider)
                 for my_slider in sliders:
                     slidername = my_slider.objectName().replace('sld_','')
                     #print (slidername)
                     my_slider.blockSignals(True)
-                    if slidername in active_settings:
-                        my_slider.setHandleColor("#17c411")
-                    else:
-                        my_slider.setHandleColor(vpf_purple)
+                    for a_s in active_settings:
+                        if bool(re.search(a_s, slidername)):
+                            my_slider.setHandleColor("#17c411")
+                            break
+                        else:
+                            my_slider.setHandleColor(vpf_purple)
                     my_slider.blockSignals(False)
 
             self.update_sim_indicators(data.get('src'), data.get('SimPaused', 0))
 
             shown_pattern = settings_mgr.current_pattern
             if settings_mgr.current_pattern == '':
-                shown_pattern = 'using defaults'
+                shown_pattern = 'Using defaults'
                 self.new_craft_button.show()
             else:
                 self.new_craft_button.hide()
@@ -1987,8 +2011,8 @@ class SettingsLayout(QGridLayout):
     show_order_debug = False    # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
 
-    chk_col = 0
-    exp_col = 1
+    chk_col = 1
+    exp_col = 0
     lbl_col = 2
     entry_col = 3
     unit_col = 4
@@ -2249,10 +2273,11 @@ class SettingsLayout(QGridLayout):
         if item['name'] in self.expanded_items:
             expand_button.setArrowType(Qt.UpArrow)
         else:
-            expand_button.setArrowType(Qt.DownArrow)
+            expand_button.setArrowType(Qt.RightArrow)
         expand_button.setMaximumWidth(24)
         expand_button.setMinimumWidth(24)
         expand_button.setObjectName(f"ex_{item['name']}")
+        expand_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
         expand_button.clicked.connect(self.expander_clicked)
 
 
@@ -2333,6 +2358,7 @@ class SettingsLayout(QGridLayout):
         if item['datatype'] == 'path':
             browse_button = QPushButton()
             browse_button.blockSignals(True)
+            browse_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
             if item['value'] == '-':
                 browse_button.setText('Browse...')
             else:
@@ -2381,8 +2407,9 @@ class SettingsLayout(QGridLayout):
         erase_button.clicked.connect(lambda _, name=item['name']: self.erase_setting(name))
 
         if item['replaced'] == 'Model (user)':
-            self.addWidget(erase_button,i, self.erase_col)
-            #print(f"erase {item['name']} button set up")
+            if item['name'] != 'type':  # dont erase type on mainwindow settings
+                self.addWidget(erase_button,i, self.erase_col)
+                #print(f"erase {item['name']} button set up")
 
 
         self.setRowStretch(i,0)
@@ -2450,7 +2477,7 @@ class SettingsLayout(QGridLayout):
     def expander_clicked(self):
         print(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
         settingname = self.sender().objectName().replace('ex_','')
-        if self.sender().arrowType() == Qt.DownArrow:
+        if self.sender().arrowType() == Qt.RightArrow:
             print ('expanded')
 
             self.expanded_items.append(settingname)
@@ -2544,10 +2571,10 @@ class NoWheelSlider(QSlider):
         super(NoWheelSlider, self).__init__(*args, **kwargs)
         # Default colors
         self.groove_color = "#bbb"
-        self.handle_color = "#ab37c8"
+        self.handle_color = vpf_purple
         self.handle_height = 20
         self.handle_width = 16
-
+        self.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
         # Apply styles
         self.update_styles()
     def wheelEvent(self, event):

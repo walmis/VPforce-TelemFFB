@@ -233,7 +233,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             pat_to_clone = dialog.models_combo_box.currentText()
             if new_combo_box_value != '':
                 logging.info (f"New: {new_aircraft} {new_combo_box_value}")
-                xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type')
+                xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type', None,True)
             else:
                 logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
                 xmlutils.clone_pattern(self.sim, pat_to_clone, new_aircraft)
@@ -987,10 +987,14 @@ class UserModelDialog(QDialog):
         self.init_ui(sim, current_aircraft,current_type)
 
     def class_combo_changed(self):
+        self.models_combo_box.blockSignals(True)
         self.models_combo_box.setCurrentText('')
+        self.models_combo_box.blockSignals(False)
 
     def pattern_changed(self):
+        self.combo_box.blockSignals(True)
         self.combo_box.setCurrentText('')
+        self.combo_box.blockSignals(False)
 
     def init_ui(self,sim,current_aircraft,current_type):
 
@@ -1022,11 +1026,14 @@ class UserModelDialog(QDialog):
         self.tb_current_aircraft.setAlignment(Qt.AlignHCenter)
 
         self.combo_box = QComboBox()
+        self.combo_box.blockSignals(True)
         self.combo_box.addItem('')
         self.combo_box.addItems(classes)
         self.combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
-        self.combo_box.currentIndexChanged.connect(self.class_combo_changed)
         self.combo_box.setCurrentText(current_type)
+        self.combo_box.currentIndexChanged.connect(self.class_combo_changed)
+        self.combo_box.blockSignals(False)
+
 
         models = xmlutils.read_models(sim)
         self.models_combo_box = QComboBox()
