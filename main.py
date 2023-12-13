@@ -1192,14 +1192,17 @@ class MainWindow(QMainWindow):
         logo_status_layout.addWidget(self.image_label, alignment=Qt.AlignTop | Qt.AlignLeft)
         # layout.addWidget(QLabel(f"Config File: {args.configfile}"))
 
+        rh_status_area = QWidget()
+        rh_status_layout = QVBoxLayout()
 
-
+        sim_status_area = QWidget()
         status_layout = QGridLayout()
         self.dcs_label_icon = QLabel("", self)
 
         self.dcs_label_icon.setPixmap(dcs_icon)
         self.dcs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         dcs_label = QLabel("DCS", self)
+        dcs_label.setStyleSheet("""padding: 3px""")
         dcs_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.dcs_label_icon, 0, 0)
         status_layout.addWidget(dcs_label, 0, 1)
@@ -1208,6 +1211,7 @@ class MainWindow(QMainWindow):
         self.il2_label_icon.setPixmap(il2_icon)
         self.il2_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         il2_label = QLabel("IL2", self)
+        il2_label.setStyleSheet("""padding: 3px""")
         il2_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.il2_label_icon, 0, 2)
         status_layout.addWidget(il2_label, 0, 3)
@@ -1216,6 +1220,7 @@ class MainWindow(QMainWindow):
         self.msfs_label_icon.setPixmap(msfs_icon)
         self.msfs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         msfs_label = QLabel("MSFS", self)
+        msfs_label.setStyleSheet("""padding: 3px""")
         msfs_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.msfs_label_icon, 0, 4)
         status_layout.addWidget(msfs_label, 0, 5)
@@ -1236,72 +1241,39 @@ class MainWindow(QMainWindow):
         # status_layout.addWidget(self.condor_label_icon, 1, 2)
         # status_layout.addWidget(condor_label, 1, 3)
 
+        sim_status_area.setLayout(status_layout)
 
-
-
-
-        cfg_layout = QHBoxLayout()
-        self.cfg_label = QLabel()
-
-        ###########
-        #  radio buttons
-        radio_widget = QWidget()
-
-        self.radio_button_group = QButtonGroup()
-        radio_row_layout = QHBoxLayout()
-        radio_row_layout.setAlignment(Qt.AlignLeft)
-        self.settings_radio = QRadioButton("Settings")
-        self.telem_monitor_radio = QRadioButton("Monitor")
-        # self.effect_monitor_radio = QRadioButton("Effects Monitor")
-        self.hide_scroll_area = QRadioButton("Hide")
-
-        radio_row_layout.addWidget(self.settings_radio)
-        radio_row_layout.addWidget(self.telem_monitor_radio)
-        # radio_row_layout.addWidget(self.effect_monitor_radio)
-        radio_row_layout.addWidget(self.hide_scroll_area)
-
-
-        # self.settings_radio.setChecked(True)
-
-        self.radio_button_group.addButton(self.settings_radio)
-        self.radio_button_group.addButton(self.telem_monitor_radio)
-        # self.radio_button_group.addButton(self.effect_monitor_radio)
-        self.radio_button_group.addButton(self.hide_scroll_area)
-        self.radio_button_group.buttonClicked.connect(self.switch_window_view)
-
-        # self.radio_button_group.buttonClicked.connect(self.update_monitor_window)
-
-        # layout.addLayout(radio_row_layout)
-        radio_widget.setLayout(radio_row_layout)
-
-        status_layout.addWidget(radio_widget, 2, 0,1,6)
-
-        logo_status_layout.addLayout(status_layout)
-        logo_status_layout.setAlignment(Qt.AlignLeft)
-        layout.addLayout(logo_status_layout)
+        rh_status_layout.addWidget(sim_status_area)
 
         ############
         # current craft
 
-        current_craft_area = QWidget()
-        current_craft_layout = QHBoxLayout()
-        current_craft_layout.setAlignment(Qt.AlignLeft)
-        cur_sim = QLabel()
-        cur_sim.setText("Current Aircraft:")
-        cur_sim.setAlignment(Qt.AlignLeft)
-        cur_sim.setMaximumWidth(80)
-        current_craft_layout.addWidget(cur_sim)
+
+        cur_ac_lbl = QLabel()
+        cur_ac_lbl.setText("Current Aircraft:")
+        cur_ac_lbl.setAlignment(Qt.AlignLeft)
+        cur_ac_lbl.setStyleSheet("""padding: 0.5px""")
+        cur_ac_lbl.setMaximumWidth(90)
+
         self.cur_craft = QLabel()
         self.cur_craft.setText('Unknown')
-        current_craft_layout.addWidget(self.cur_craft)
+        self.cur_craft.setStyleSheet("""padding: 0.5px""")
         self.cur_craft.setAlignment(Qt.AlignLeft)
+
         self.cur_pattern = QLabel()
         self.cur_pattern.setText('(No Match)')
-        self.cur_pattern.setAlignment(Qt.AlignRight)
-        current_craft_layout.addWidget(self.cur_pattern)
-        current_craft_area.setLayout(current_craft_layout)
-        current_craft_layout.setAlignment(Qt.AlignLeft)
-        layout.addWidget(current_craft_area)
+        self.cur_pattern.setStyleSheet("""padding: 0.5px""")
+        self.cur_pattern.setAlignment(Qt.AlignLeft)
+
+        rh_status_layout.addWidget(cur_ac_lbl)
+        rh_status_layout.addWidget(self.cur_craft)
+        rh_status_layout.addWidget(self.cur_pattern)
+
+        rh_status_area.setLayout(rh_status_layout)
+
+        logo_status_layout.addWidget(rh_status_area)
+
+        layout.addLayout(logo_status_layout)
 
         ##################
         #  new craft button
