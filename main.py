@@ -1545,10 +1545,13 @@ class MainWindow(QMainWindow):
         device_type = args.type
         if device_type == 'joystick':
             reg_key = 'jWindowGeometry'
+            tab_key = 'jTab'
         elif device_type == 'pedals':
             reg_key = 'pWindowGeometry'
+            tab_key = 'pTab'
         elif device_type == 'collective':
             reg_key = 'cWindowGeometry'
+            tab_key = 'cTab'
 
         geometry = utils.get_reg(reg_key)
         if geometry is not None:
@@ -1556,7 +1559,17 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(q_geometry)
         self.last_height = self.height()
         self.last_width = self.width()
-        self.tab_widget.setCurrentIndex(0)
+        lasttab = utils.get_reg(tab_key)
+        remember_tab = utils.get_reg('rememberTab')
+        if remember_tab is None:
+            remember_tab = 1
+        if remember_tab == 1:
+            if lasttab is not None:
+                self.tab_widget.setCurrentIndex(lasttab)
+            else:
+                self.tab_widget.setCurrentIndex(0)
+        else:
+            self.tab_widget.setCurrentIndex(0)
         # self.telem_monitor_radio.click()
 
     def save_main_window_geometry(self):
@@ -1566,20 +1579,23 @@ class MainWindow(QMainWindow):
         geometry_bytes = bytes(geometry)
         if device_type == 'joystick':
             reg_key = 'jWindowGeometry'
+            tab_key = 'jTab'
         elif device_type == 'pedals':
             reg_key = 'pWindowGeometry'
+            tab_key = 'pTab'
         elif device_type == 'collective':
             reg_key = 'cWindowGeometry'
+            tab_key = 'cTab'
         # Extract position and size
         # x, y, width, height = geometry.x(), geometry.y(), geometry.width(), geometry.height()
         # geometry_string = f"{x},{y},{width},{height}"
         # Store the values in the registry
+        utils.set_reg(tab_key,self.tab_widget.currentIndex())
 
-
-        if self.tab_widget.currentIndex() != 2:
-            utils.set_reg(reg_key, geometry_bytes)
-        else:
-            pass
+        # if self.tab_widget.currentIndex() != 2:
+        utils.set_reg(reg_key, geometry_bytes)
+        # else:
+        #     pass
 
     def force_sim_aircraft(self):
         settings_mgr.current_sim = self.test_sim.currentText()

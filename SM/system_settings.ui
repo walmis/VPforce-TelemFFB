@@ -85,25 +85,22 @@
     <string>Reset to  Defaults</string>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>20</x>
      <y>19</y>
-     <width>258</width>
-     <height>71</height>
+     <width>391</width>
+     <height>94</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout">
-    <item row="0" column="0">
-     <widget class="QLabel" name="label">
+    <item row="2" column="0" colspan="2">
+     <widget class="QCheckBox" name="ignoreUpdate">
       <property name="text">
-       <string>System Logging Level:</string>
+       <string>Disable Update Prompt on Startup</string>
       </property>
      </widget>
-    </item>
-    <item row="0" column="1">
-     <widget class="QComboBox" name="logLevel"/>
     </item>
     <item row="1" column="0">
      <widget class="QLabel" name="label_2">
@@ -115,16 +112,26 @@
     <item row="1" column="1">
      <widget class="QLineEdit" name="telemTimeout"/>
     </item>
-    <item row="2" column="0" colspan="2">
-     <widget class="QCheckBox" name="ignoreUpdate">
+    <item row="0" column="0">
+     <widget class="QLabel" name="label">
       <property name="text">
-       <string>Disable Update Prompt on Startup</string>
+       <string>System Logging Level:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QComboBox" name="logLevel"/>
+    </item>
+    <item row="2" column="2">
+     <widget class="QCheckBox" name="rememberTab">
+      <property name="text">
+       <string>Open to Last Tab Used</string>
       </property>
      </widget>
     </item>
    </layout>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>16</x>
@@ -157,7 +164,7 @@
     </item>
    </layout>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>30</x>

@@ -359,7 +359,8 @@ def get_default_sys_settings():
         'enableIL2': False,
         'validateIL2': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
-        'portIL2': 34385
+        'portIL2': 34385,
+        'rememberTab': True
     }
     return def_syst_dict
 def read_system_settings():
