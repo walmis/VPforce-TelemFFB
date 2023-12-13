@@ -2729,7 +2729,7 @@ def stop_sims():
 
 def main():
     app = QApplication(sys.argv)
-    # app.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
+    app.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
     global d
     global dev_firmware_version
     d = LogWindow()
