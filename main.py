@@ -1623,7 +1623,9 @@ class MainWindow(QMainWindow):
         # x, y, width, height = geometry.x(), geometry.y(), geometry.width(), geometry.height()
         # geometry_string = f"{x},{y},{width},{height}"
         # Store the values in the registry
-        if not self.hide_scroll_area.isChecked():
+
+
+        if self.tab_widget.currentIndex() != 2:
             utils.set_reg(reg_key, geometry_bytes)
         else:
             pass
@@ -2742,7 +2744,7 @@ def stop_sims():
 
 def main():
     app = QApplication(sys.argv)
-    app.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
+    # app.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
     global d
     global dev_firmware_version
     d = LogWindow()
