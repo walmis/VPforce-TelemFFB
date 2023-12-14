@@ -155,7 +155,6 @@ userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'],"VPForce-TelemFFB"
 userconfig_path = os.path.join(userconfig_rootpath , 'userconfig.xml')
 
 utils.create_empty_userxml_file(userconfig_path)
-# xmlutils.update_vars(args.type, userconfig_path, defaults_path)
 
 version = utils.get_version()
 min_firmware_version = 'v1.0.15'
@@ -269,7 +268,6 @@ def get_config_xml():
     if _config: return _config
     # a, b, main = xmlutils.read_single_model('Global', '')
     main = []
-    # user = settingsmanager.read_xml_file(overridefile, 'global', 'Aircraft', args.type)
     params = ConfigObj()
     params['system'] = {}
     for setting in main:
@@ -278,12 +276,6 @@ def get_config_xml():
         if setting["grouping"] == "System":
             params['system'][k] = v
             logging.warning(f"Got Globals from Settings Manager: {k} : {v}")
-    # for setting in user:
-    #     k = setting['name']
-    #     v = setting['value']
-    #     if setting["grouping"] == "System":
-    #         params['system'][k] = v
-    #         logging.warning(f"Got USER config from SMITTY: {k} : {v}")
     return params
 
 def get_config() -> ConfigObj:
@@ -418,7 +410,6 @@ class TelemManager(QObject, threading.Thread):
                 send_source = "MSFS"
             else:
                 send_source = data_source
-            # cls_name,pattern, result = settingsmanager.read_single_model(configfile, send_source, aircraft_name, args.type, userconfig_path=overridefile)
 
             if '.' in send_source:
                 input = send_source.split('.')
@@ -1512,12 +1503,38 @@ class MainWindow(QMainWindow):
 
         version_row_layout.setAlignment(Qt.AlignBottom)
         layout.addLayout(version_row_layout)
+        self.configmode_group = QButtonGroup()
+        self.cb_joystick = QCheckBox('Joystick')
+        self.cb_pedals = QCheckBox('Pedals')
+        self.cb_collective = QCheckBox('Collective')
+
+
+        config_scope_row = QHBoxLayout()
+        self.configmode_group.addButton(self.cb_joystick, 1)
+        self.configmode_group.addButton(self.cb_pedals, 2)
+        self.configmode_group.addButton(self.cb_collective, 3)
+        self.configmode_group.buttonClicked[int].connect(self.change_config_scope)
+        config_scope_row.addWidget(self.cb_joystick)
+        config_scope_row.addWidget(self.cb_pedals)
+        config_scope_row.addWidget(self.cb_collective)
+        layout.addLayout(config_scope_row)
+
+
 
         central_widget.setLayout(layout)
         self.load_main_window_geometry()
         self.last_height = self.height()
         self.last_width = self.width()
 
+    def change_config_scope(self, arg):
+        # print(F"CHANGE SCOPE: {arg}")
+        if arg == 1:
+            xmlutils.update_vars('joystick', userconfig_path, defaults_path)
+        elif arg == 2:
+            xmlutils.update_vars('pedals', userconfig_path, defaults_path)
+        elif arg == 3:
+            xmlutils.update_vars('collective', userconfig_path, defaults_path)
+        self.update_settings()
     def test_sim_changed(self):
         models = xmlutils.read_models(self.test_sim.currentText())
         self.test_name.blockSignals(True)
