@@ -985,14 +985,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # Create a dictionary with the values of all components
         tp = args.type
         if tp == 'joystick':
-            wnd = 'jTab'
-            vw = 'jSaveV'
+            wnd = 'jSaveW'
+            vw = 'jSaveT'
         elif tp == 'pedals':
-            wnd = 'pTab'
-            vw = 'pSaveV'
+            wnd = 'pSaveW'
+            vw = 'pSaveT'
         elif tp == 'collective':
-            wnd = 'cTab'
-            vw = 'cSaveV'
+            wnd = 'cSaveW'
+            vw = 'cSaveT'
         settings_dict = {
             "logLevel": self.logLevel.currentText(),
             "telemTimeout": int(self.telemTimeout.text()),
@@ -1067,28 +1067,28 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             il2_port = settings_dict['portIL2']
             self.portIL2.setText(str(il2_port))
 
-        if 'jTab' in settings_dict and args.type == 'joystick':
-            save_window = settings_dict['jTab']
+        if 'jSaveW' in settings_dict and args.type == 'joystick':
+            save_window = settings_dict['jSaveW']
             self.cb_save_geometry.setChecked(save_window)
 
-        if 'pTab' in settings_dict and args.type == 'pedals':
-            save_window = settings_dict['pTab']
+        if 'pSaveW' in settings_dict and args.type == 'pedals':
+            save_window = settings_dict['pSaveW']
             self.cb_save_geometry.setChecked(save_window)
 
-        if 'cTab' in settings_dict and args.type == 'collective':
-            save_window = settings_dict['cTab']
+        if 'cSaveW' in settings_dict and args.type == 'collective':
+            save_window = settings_dict['cSaveW']
             self.cb_save_geometry.setChecked(save_window)
 
-        if 'jSaveV' in settings_dict and args.type == 'joystick':
-            save_window = settings_dict['jSaveV']
+        if 'jSaveT' in settings_dict and args.type == 'joystick':
+            save_window = settings_dict['jSaveT']
             self.cb_save_view.setChecked(save_window)
 
-        if 'pSaveV' in settings_dict and args.type == 'pedals':
-            save_window = settings_dict['pSaveV']
+        if 'pSaveT' in settings_dict and args.type == 'pedals':
+            save_window = settings_dict['pSaveT']
             self.cb_save_view.setChecked(save_window)
 
-        if 'cSaveV' in settings_dict and args.type == 'collective':
-            save_window = settings_dict['cSaveV']
+        if 'cSaveT' in settings_dict and args.type == 'collective':
+            save_window = settings_dict['cSaveT']
             self.cb_save_view.setChecked(save_window)
 
 class MainWindow(QMainWindow):
@@ -1100,6 +1100,7 @@ class MainWindow(QMainWindow):
         doc_url = 'https://vpforcecontrols.com/downloads/VPforce_Rhino_Manual.pdf'
         dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
         notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
+        self.system_settings_dict = utils.read_system_settings(args.type)
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
         match args.type:
             case 'joystick':
@@ -1612,6 +1613,8 @@ class MainWindow(QMainWindow):
         #layout.addLayout(config_scope_row)
 
         central_widget.setLayout(layout)
+
+        ### Load Stored Geomoetry
         self.load_main_window_geometry()
         self.last_height = self.height()
         self.last_width = self.width()
@@ -1651,33 +1654,35 @@ class MainWindow(QMainWindow):
     def load_main_window_geometry(self):
         device_type = args.type
         if device_type == 'joystick':
-            reg_key = 'jWindowGeometry'
+            load_geometry_key = 'jSaveW'
+            geometry_key = 'jWindowGeometry'
+            load_tab_key = 'jSaveT'
             tab_key = 'jTab'
         elif device_type == 'pedals':
-            reg_key = 'pWindowGeometry'
+            load_geometry_key = 'pSaveW'
+            geometry_key = 'pWindowGeometry'
+            load_tab_key = 'pSaveT'
             tab_key = 'pTab'
         elif device_type == 'collective':
-            reg_key = 'cWindowGeometry'
-            tab_key = 'cTab'
+            load_geometry_key = 'pSaveW'
+            geometry_key = 'cWindowGeometry'
+            load_tab_key = 'cSaveT'
+            tab_key = 'pTab'
 
-        geometry = utils.get_reg(reg_key)
-        if geometry is not None:
-            q_geometry = QByteArray(utils.get_reg(reg_key))
+        geometry = utils.get_reg(geometry_key)
+        load_geometry = utils.get_reg(load_geometry_key)
+        load_tab = utils.get_reg(load_tab_key)
+        tab = utils.get_reg(tab_key)
+
+        if geometry is not None and load_geometry:
+            q_geometry = QByteArray(geometry)
             self.restoreGeometry(q_geometry)
         self.last_height = self.height()
         self.last_width = self.width()
-        lasttab = utils.get_reg(tab_key)
-        remember_tab = utils.get_reg('rememberTab')
-        if remember_tab is None:
-            remember_tab = 1
-        if remember_tab == 1:
-            if lasttab is not None:
-                self.tab_widget.setCurrentIndex(lasttab)
-            else:
-                self.tab_widget.setCurrentIndex(0)
-        else:
-            self.tab_widget.setCurrentIndex(0)
-        # self.telem_monitor_radio.click()
+
+        if load_tab:
+            self.tab_widget.setCurrentIndex(tab)
+
 
     def save_main_window_geometry(self):
         # Capture the main window's geometry

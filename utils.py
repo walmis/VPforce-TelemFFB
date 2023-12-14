@@ -352,14 +352,17 @@ def get_reg(name):
 def get_default_sys_settings(tp):
     # tp = args.type
     if tp == 'joystick':
-        wnd = 'jTab'
-        vw = 'jSaveV'
+        wnd = 'jSaveW'
+        vw = 'jSaveT'
+        tb = 'jTab'
     elif tp == 'pedals':
-        wnd = 'pTab'
-        vw = 'pSaveV'
+        wnd = 'pSaveW'
+        vw = 'pSaveT'
+        tb = 'pTab'
     elif tp == 'collective':
-        wnd = 'cTab'
-        vw = 'cSaveV'
+        wnd = 'cSaveW'
+        vw = 'cSaveT'
+        tb = 'cTab'
     def_syst_dict = {
         'logLevel': 'INFO',
         'telemTimeout': 200,
@@ -373,6 +376,7 @@ def get_default_sys_settings(tp):
         'rememberTab': True,
         wnd: True,
         vw: True,
+        tb: 1,
     }
     return def_syst_dict
 def read_system_settings(tp):
