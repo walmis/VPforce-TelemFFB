@@ -1607,9 +1607,9 @@ class MainWindow(QMainWindow):
         config_scope_row.addWidget(self.cb_joystick)
         config_scope_row.addWidget(self.cb_pedals)
         config_scope_row.addWidget(self.cb_collective)
-        layout.addLayout(config_scope_row)
 
 
+        #layout.addLayout(config_scope_row)
 
         central_widget.setLayout(layout)
         self.load_main_window_geometry()
