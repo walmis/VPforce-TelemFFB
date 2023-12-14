@@ -970,6 +970,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseIL2.setEnabled(il2_enabled)
         self.label_4.setEnabled(il2_enabled)
         self.portIL2.setEnabled(il2_enabled)
+        if il2_enabled:
+            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
+        else:
+            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(image/disabledcheckbox.png); }")
 
     def select_il2_directory(self):
         # Open a directory dialog and set the result in the pathIL2 QLineEdit
