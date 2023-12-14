@@ -2131,7 +2131,7 @@ class SettingsLayout(QGridLayout):
     ##########
     # debug settings
     show_slider_debug = False   # set to true for slider values shown
-    show_order_debug = False    # set to true for order numbers shown
+    show_order_debug = True # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
 
     chk_col = 1

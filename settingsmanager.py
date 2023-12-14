@@ -1020,6 +1020,9 @@ class UserModelDialog(QDialog):
             case 'MSFS':
                 classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter']
 
+        # FOR TESTING
+        classes.append('AllSettings')
+
         label_aircraft = QtWidgets.QLabel("Current Aircraft:")
         self.tb_current_aircraft = QtWidgets.QLineEdit()
         self.tb_current_aircraft.setText(current_aircraft)
