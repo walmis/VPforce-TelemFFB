@@ -648,7 +648,7 @@ class TelemManager(QObject, threading.Thread):
     def run(self):
         global _config
         # self.timeout = utils.sanitize_dict(_config["system"]).get("telemetry_timeout", 200)/1000
-        self.timeout = int(utils.read_system_settings().get('telemTimeout', 200))/1000
+        self.timeout = int(utils.read_system_settings(args.type).get('telemTimeout', 200))/1000
         logging.info(f"Telemetry timeout: {self.timeout}")
         while self._run:
             with self._cond:
@@ -722,22 +722,21 @@ class SimConnectSock(SimConnectManager):
         args = [str(x) for x in args]
         self._telem.submitFrame(f"Ev={event};" + ";".join(args))
 
-
 class Ui_SystemDialog(object):
     def setupUi(self, SystemDialog):
         if not SystemDialog.objectName():
             SystemDialog.setObjectName(u"SystemDialog")
-        SystemDialog.resize(490, 355)
+        SystemDialog.resize(490, 463)
         sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(SystemDialog.sizePolicy().hasHeightForWidth())
         SystemDialog.setSizePolicy(sizePolicy)
         SystemDialog.setMinimumSize(QSize(490, 355))
-        SystemDialog.setMaximumSize(QSize(490, 355))
+        SystemDialog.setMaximumSize(QSize(490, 800))
         self.line = QFrame(SystemDialog)
         self.line.setObjectName(u"line")
-        self.line.setGeometry(QRect(9, 102, 466, 16))
+        self.line.setGeometry(QRect(9, 114, 466, 16))
         font = QFont()
         font.setBold(False)
         font.setWeight(50)
@@ -748,78 +747,78 @@ class Ui_SystemDialog(object):
         self.line.setFrameShadow(QFrame.Sunken)
         self.buttonBox = QDialogButtonBox(SystemDialog)
         self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setGeometry(QRect(310, 310, 156, 23))
+        self.buttonBox.setGeometry(QRect(310, 430, 156, 23))
         self.buttonBox.setOrientation(Qt.Horizontal)
         self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
         self.resetButton = QPushButton(SystemDialog)
         self.resetButton.setObjectName(u"resetButton")
-        self.resetButton.setGeometry(QRect(20, 310, 101, 23))
-        self.widget = QWidget(SystemDialog)
-        self.widget.setObjectName(u"widget")
-        self.widget.setGeometry(QRect(20, 19, 258, 71))
-        self.gridLayout = QGridLayout(self.widget)
+        self.resetButton.setGeometry(QRect(20, 430, 101, 23))
+        self.layoutWidget = QWidget(SystemDialog)
+        self.layoutWidget.setObjectName(u"layoutWidget")
+        self.layoutWidget.setGeometry(QRect(20, 31, 258, 71))
+        self.gridLayout = QGridLayout(self.layoutWidget)
         self.gridLayout.setObjectName(u"gridLayout")
         self.gridLayout.setContentsMargins(0, 0, 0, 0)
-        self.label = QLabel(self.widget)
+        self.label = QLabel(self.layoutWidget)
         self.label.setObjectName(u"label")
 
         self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
 
-        self.logLevel = QComboBox(self.widget)
+        self.logLevel = QComboBox(self.layoutWidget)
         self.logLevel.setObjectName(u"logLevel")
 
         self.gridLayout.addWidget(self.logLevel, 0, 1, 1, 1)
 
-        self.label_2 = QLabel(self.widget)
+        self.label_2 = QLabel(self.layoutWidget)
         self.label_2.setObjectName(u"label_2")
 
         self.gridLayout.addWidget(self.label_2, 1, 0, 1, 1)
 
-        self.telemTimeout = QLineEdit(self.widget)
+        self.telemTimeout = QLineEdit(self.layoutWidget)
         self.telemTimeout.setObjectName(u"telemTimeout")
 
         self.gridLayout.addWidget(self.telemTimeout, 1, 1, 1, 1)
 
-        self.ignoreUpdate = QCheckBox(self.widget)
+        self.ignoreUpdate = QCheckBox(self.layoutWidget)
         self.ignoreUpdate.setObjectName(u"ignoreUpdate")
 
         self.gridLayout.addWidget(self.ignoreUpdate, 2, 0, 1, 2)
 
-        self.widget1 = QWidget(SystemDialog)
-        self.widget1.setObjectName(u"widget1")
-        self.widget1.setGeometry(QRect(16, 133, 170, 65))
-        self.verticalLayout = QVBoxLayout(self.widget1)
+        self.layoutWidget1 = QWidget(SystemDialog)
+        self.layoutWidget1.setObjectName(u"layoutWidget1")
+        self.layoutWidget1.setGeometry(QRect(16, 150, 170, 65))
+        self.verticalLayout = QVBoxLayout(self.layoutWidget1)
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
-        self.enableDCS = QCheckBox(self.widget1)
+        self.enableDCS = QCheckBox(self.layoutWidget1)
         self.enableDCS.setObjectName(u"enableDCS")
 
         self.verticalLayout.addWidget(self.enableDCS)
 
-        self.enableMSFS = QCheckBox(self.widget1)
+        self.enableMSFS = QCheckBox(self.layoutWidget1)
         self.enableMSFS.setObjectName(u"enableMSFS")
 
         self.verticalLayout.addWidget(self.enableMSFS)
 
-        self.enableIL2 = QCheckBox(self.widget1)
+        self.enableIL2 = QCheckBox(self.layoutWidget1)
         self.enableIL2.setObjectName(u"enableIL2")
 
         self.verticalLayout.addWidget(self.enableIL2)
 
-        self.widget2 = QWidget(SystemDialog)
-        self.widget2.setObjectName(u"widget2")
-        self.widget2.setGeometry(QRect(30, 204, 452, 75))
-        self.il2_sub_layout = QGridLayout(self.widget2)
+        self.layoutWidget2 = QWidget(SystemDialog)
+        self.layoutWidget2.setObjectName(u"layoutWidget2")
+        self.layoutWidget2.setGeometry(QRect(30, 221, 452, 75))
+        self.il2_sub_layout = QGridLayout(self.layoutWidget2)
         self.il2_sub_layout.setObjectName(u"il2_sub_layout")
         self.il2_sub_layout.setContentsMargins(0, 0, 0, 0)
-        self.validateIL2 = QCheckBox(self.widget2)
+        self.validateIL2 = QCheckBox(self.layoutWidget2)
         self.validateIL2.setObjectName(u"validateIL2")
 
         self.il2_sub_layout.addWidget(self.validateIL2, 0, 0, 1, 1)
 
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.label_3 = QLabel(self.widget2)
+        self.label_3 = QLabel(self.layoutWidget2)
         self.label_3.setObjectName(u"label_3")
         sizePolicy1 = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         sizePolicy1.setHorizontalStretch(0)
@@ -830,12 +829,12 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout.addWidget(self.label_3)
 
-        self.pathIL2 = QLineEdit(self.widget2)
+        self.pathIL2 = QLineEdit(self.layoutWidget2)
         self.pathIL2.setObjectName(u"pathIL2")
 
         self.horizontalLayout.addWidget(self.pathIL2)
 
-        self.browseIL2 = QToolButton(self.widget2)
+        self.browseIL2 = QToolButton(self.layoutWidget2)
         self.browseIL2.setObjectName(u"browseIL2")
 
         self.horizontalLayout.addWidget(self.browseIL2)
@@ -845,12 +844,12 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
-        self.label_4 = QLabel(self.widget2)
+        self.label_4 = QLabel(self.layoutWidget2)
         self.label_4.setObjectName(u"label_4")
 
         self.horizontalLayout_2.addWidget(self.label_4)
 
-        self.portIL2 = QLineEdit(self.widget2)
+        self.portIL2 = QLineEdit(self.layoutWidget2)
         self.portIL2.setObjectName(u"portIL2")
 
         self.horizontalLayout_2.addWidget(self.portIL2)
@@ -861,6 +860,49 @@ class Ui_SystemDialog(object):
 
 
         self.il2_sub_layout.addLayout(self.horizontalLayout_2, 2, 0, 1, 1)
+
+        self.line_2 = QFrame(SystemDialog)
+        self.line_2.setObjectName(u"line_2")
+        self.line_2.setGeometry(QRect(10, 307, 466, 16))
+        self.line_2.setFont(font)
+        self.line_2.setLineWidth(2)
+        self.line_2.setMidLineWidth(1)
+        self.line_2.setFrameShape(QFrame.HLine)
+        self.line_2.setFrameShadow(QFrame.Sunken)
+        self.label_5 = QLabel(SystemDialog)
+        self.label_5.setObjectName(u"label_5")
+        self.label_5.setGeometry(QRect(20, 10, 47, 13))
+        font1 = QFont()
+        font1.setBold(True)
+        font1.setUnderline(True)
+        font1.setWeight(75)
+        self.label_5.setFont(font1)
+        self.label_6 = QLabel(SystemDialog)
+        self.label_6.setObjectName(u"label_6")
+        self.label_6.setGeometry(QRect(20, 130, 71, 16))
+        self.label_6.setFont(font1)
+        self.label_7 = QLabel(SystemDialog)
+        self.label_7.setObjectName(u"label_7")
+        self.label_7.setGeometry(QRect(20, 320, 91, 16))
+        self.label_7.setFont(font1)
+        self.label_8 = QLabel(SystemDialog)
+        self.label_8.setObjectName(u"label_8")
+        self.label_8.setGeometry(QRect(30, 340, 101, 16))
+        self.widget = QWidget(SystemDialog)
+        self.widget.setObjectName(u"widget")
+        self.widget.setGeometry(QRect(36, 360, 184, 42))
+        self.verticalLayout_2 = QVBoxLayout(self.widget)
+        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
+        self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
+        self.cb_save_geometry = QCheckBox(self.widget)
+        self.cb_save_geometry.setObjectName(u"cb_save_geometry")
+
+        self.verticalLayout_2.addWidget(self.cb_save_geometry)
+
+        self.cb_save_view = QCheckBox(self.widget)
+        self.cb_save_view.setObjectName(u"cb_save_view")
+
+        self.verticalLayout_2.addWidget(self.cb_save_view)
 
 
         self.retranslateUi(SystemDialog)
@@ -881,10 +923,13 @@ class Ui_SystemDialog(object):
         self.label_3.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Install Path:", None))
         self.browseIL2.setText(QCoreApplication.translate("SystemDialog", u"...", None))
         self.label_4.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Telemetry Port:", None))
+        self.label_5.setText(QCoreApplication.translate("SystemDialog", u"System:", None))
+        self.label_6.setText(QCoreApplication.translate("SystemDialog", u"Sim Setup:", None))
+        self.label_7.setText(QCoreApplication.translate("SystemDialog", u"Other Settings: ", None))
+        self.label_8.setText(QCoreApplication.translate("SystemDialog", u"Startup  Behavior:", None))
+        self.cb_save_geometry.setText(QCoreApplication.translate("SystemDialog", u"Restore window size and position", None))
+        self.cb_save_view.setText(QCoreApplication.translate("SystemDialog", u"Restore last tab view", None))
     # retranslateUi
-
-
-
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
@@ -918,12 +963,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def toggle_il2_widgets(self):
         # Show/hide IL-2 related widgets based on checkbox state
         il2_enabled = self.enableIL2.isChecked()
-        self.validateIL2.setVisible(il2_enabled)
-        self.label_3.setVisible(il2_enabled)
-        self.pathIL2.setVisible(il2_enabled)
-        self.browseIL2.setVisible(il2_enabled)
-        self.label_4.setVisible(il2_enabled)
-        self.portIL2.setVisible(il2_enabled)
+        # self.il2_sub_layout.setEnabled(il2_enabled)
+        self.validateIL2.setEnabled(il2_enabled)
+        self.label_3.setEnabled(il2_enabled)
+        self.pathIL2.setEnabled(il2_enabled)
+        self.browseIL2.setEnabled(il2_enabled)
+        self.label_4.setEnabled(il2_enabled)
+        self.portIL2.setEnabled(il2_enabled)
 
     def select_il2_directory(self):
         # Open a directory dialog and set the result in the pathIL2 QLineEdit
@@ -933,6 +979,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
     def save_settings(self):
         # Create a dictionary with the values of all components
+        tp = args.type
+        if tp == 'joystick':
+            wnd = 'jTab'
+            vw = 'jSaveV'
+        elif tp == 'pedals':
+            wnd = 'pTab'
+            vw = 'pSaveV'
+        elif tp == 'collective':
+            wnd = 'cTab'
+            vw = 'cSaveV'
         settings_dict = {
             "logLevel": self.logLevel.currentText(),
             "telemTimeout": int(self.telemTimeout.text()),
@@ -943,6 +999,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "validateIL2": self.validateIL2.isChecked(),
             "pathIL2": self.pathIL2.text(),
             "portIL2": int(self.portIL2.text()),
+            wnd: self.cb_save_geometry.isChecked(),
+            vw: self.cb_save_view.isChecked(),
+
         }
 
         # Save settings to the registry
@@ -959,11 +1018,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         Load settings from the registry and update widget states.
         """
         if default:
-            settings_dict = utils.get_default_sys_settings()
+            settings_dict = utils.get_default_sys_settings(args.type)
+            self.cb_save_geometry.setChecked(True)
+            self.cb_save_view.setChecked(True)
         else:
             # Read settings from the registry
-            settings_dict = utils.read_system_settings()
-
+            settings_dict = utils.read_system_settings(args.type)
+            pass
         # Update widget states based on the loaded settings
         if 'logLevel' in settings_dict:
             log_level = settings_dict['logLevel']
@@ -1001,6 +1062,30 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if 'portIL2' in settings_dict:
             il2_port = settings_dict['portIL2']
             self.portIL2.setText(str(il2_port))
+
+        if 'jTab' in settings_dict and args.type == 'joystick':
+            save_window = settings_dict['jTab']
+            self.cb_save_geometry.setChecked(save_window)
+
+        if 'pTab' in settings_dict and args.type == 'pedals':
+            save_window = settings_dict['pTab']
+            self.cb_save_geometry.setChecked(save_window)
+
+        if 'cTab' in settings_dict and args.type == 'collective':
+            save_window = settings_dict['cTab']
+            self.cb_save_geometry.setChecked(save_window)
+
+        if 'jSaveV' in settings_dict and args.type == 'joystick':
+            save_window = settings_dict['jSaveV']
+            self.cb_save_view.setChecked(save_window)
+
+        if 'pSaveV' in settings_dict and args.type == 'pedals':
+            save_window = settings_dict['pSaveV']
+            self.cb_save_view.setChecked(save_window)
+
+        if 'cSaveV' in settings_dict and args.type == 'collective':
+            save_window = settings_dict['cSaveV']
+            self.cb_save_view.setChecked(save_window)
 
 class MainWindow(QMainWindow):
     def __init__(self, settings_manager):
@@ -1144,9 +1229,9 @@ class MainWindow(QMainWindow):
         # notes_row_layout.addWidget(self.notes_label)
         # layout.addLayout(notes_row_layout)
         cfg = get_config()
-        dcs_enabled = utils.read_system_settings().get('enableDCS')
-        il2_enabled = utils.read_system_settings().get('enableIL2')
-        msfs_enabled = utils.read_system_settings().get('enableMSFS')
+        dcs_enabled = utils.read_system_settings(args.type).get('enableDCS')
+        il2_enabled = utils.read_system_settings(args.type).get('enableIL2')
+        msfs_enabled = utils.read_system_settings(args.type).get('enableMSFS')
 
         self.icon_size = QSize(18, 18)
         if args.sim == "DCS" or dcs_enabled:
@@ -1376,9 +1461,9 @@ class MainWindow(QMainWindow):
             self.lbl_telem_data = QLabel(f"CONFIG ERROR: {error}")
             QMessageBox.critical(None, "CONFIG ERROR", f"Error: {error}")
         else:
-            dcs_enabled = utils.read_system_settings().get('enableDCS')
-            il2_enabled = utils.read_system_settings().get('enableIL2')
-            msfs_enabled = utils.read_system_settings().get('enableMSFS')
+            dcs_enabled = utils.read_system_settings(args.type).get('enableDCS')
+            il2_enabled = utils.read_system_settings(args.type).get('enableIL2')
+            msfs_enabled = utils.read_system_settings(args.type).get('enableMSFS')
 
             # Convert True/False to "enabled" or "disabled"
             dcs_status = "Enabled" if dcs_enabled else "Disabled"
@@ -1503,11 +1588,12 @@ class MainWindow(QMainWindow):
 
         version_row_layout.setAlignment(Qt.AlignBottom)
         layout.addLayout(version_row_layout)
+
+
         self.configmode_group = QButtonGroup()
         self.cb_joystick = QCheckBox('Joystick')
         self.cb_pedals = QCheckBox('Pedals')
         self.cb_collective = QCheckBox('Collective')
-
 
         config_scope_row = QHBoxLayout()
         self.configmode_group.addButton(self.cb_joystick, 1)
@@ -2653,7 +2739,7 @@ class NoWheelSlider(QSlider):
 def perform_update(auto=True):
     # config = get_config()
     # ignore_auto_updates = utils.sanitize_dict(config["system"]).get("ignore_auto_updates", 0)
-    ignore_auto_updates = utils.read_system_settings().get('ignoreUpdate', False)
+    ignore_auto_updates = utils.read_system_settings(args.type).get('ignoreUpdate', False)
     if not auto:
         ignore_auto_updates = False
     update_ans = QMessageBox.No
@@ -2699,7 +2785,7 @@ def init_sims():
     global dcs_telem, il2_telem, sim_connect_telem, telem_manager
     dcs_telem = NetworkThread(telem_manager, host="", port=34380)
     # dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
-    dcs_enabled = utils.read_system_settings().get('enableDCS', False)
+    dcs_enabled = utils.read_system_settings(args.type).get('enableDCS', False)
     if dcs_enabled or args.sim == "DCS":
         # check and install/update export lua script
         utils.install_export_lua()
@@ -2708,15 +2794,15 @@ def init_sims():
 
     il2_mgr = IL2Manager()
     # il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
-    il2_port = utils.read_system_settings().get('portIL2', 34385)
+    il2_port = utils.read_system_settings(args.type).get('portIL2', 34385)
     # il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
-    il2_path = utils.read_system_settings().get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    il2_path = utils.read_system_settings(args.type).get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
     # il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
-    il2_validate = utils.read_system_settings().get('validateIL2', True)
+    il2_validate = utils.read_system_settings(args.type).get('validateIL2', True)
     il2_telem = NetworkThread(telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
 
     # il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
-    il2_enabled = utils.read_system_settings().get('enableIL2', False)
+    il2_enabled = utils.read_system_settings(args.type).get('enableIL2', False)
 
     if il2_enabled or args.sim == "IL2":
 
@@ -2731,7 +2817,7 @@ def init_sims():
     sim_connect_telem = SimConnectSock(telem_manager)
     try:
         # msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
-        msfs = utils.read_system_settings().get('enableMSFS', False)
+        msfs = utils.read_system_settings(args.type).get('enableMSFS', False)
         logging.debug(f"MSFS={msfs}")
         if msfs or args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")
@@ -2782,7 +2868,7 @@ def main():
 
     # config = get_config()
     # ll = config["system"].get("logging_level", "INFO")
-    ll = utils.read_system_settings().get('loggingLevel', 'INFO')
+    ll = utils.read_system_settings(args.type).get('loggingLevel', 'INFO')
     log_levels = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,

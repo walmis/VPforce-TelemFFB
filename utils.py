@@ -349,7 +349,17 @@ def get_reg(name):
     except WindowsError:
         return None
 
-def get_default_sys_settings():
+def get_default_sys_settings(tp):
+    # tp = args.type
+    if tp == 'joystick':
+        wnd = 'jTab'
+        vw = 'jSaveV'
+    elif tp == 'pedals':
+        wnd = 'pTab'
+        vw = 'pSaveV'
+    elif tp == 'collective':
+        wnd = 'cTab'
+        vw = 'cSaveV'
     def_syst_dict = {
         'logLevel': 'INFO',
         'telemTimeout': 200,
@@ -360,12 +370,14 @@ def get_default_sys_settings():
         'validateIL2': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
         'portIL2': 34385,
-        'rememberTab': True
+        'rememberTab': True,
+        wnd: True,
+        vw: True,
     }
     return def_syst_dict
-def read_system_settings():
+def read_system_settings(tp):
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
-    def_syst_dict = get_default_sys_settings()
+    def_syst_dict = get_default_sys_settings(tp)
 
     settings_dict = {}
 

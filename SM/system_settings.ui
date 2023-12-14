@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>490</width>
-    <height>355</height>
+    <height>463</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -25,7 +25,7 @@
   <property name="maximumSize">
    <size>
     <width>490</width>
-    <height>355</height>
+    <height>800</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -35,7 +35,7 @@
    <property name="geometry">
     <rect>
      <x>9</x>
-     <y>102</y>
+     <y>114</y>
      <width>466</width>
      <height>16</height>
     </rect>
@@ -60,7 +60,7 @@
    <property name="geometry">
     <rect>
      <x>310</x>
-     <y>310</y>
+     <y>430</y>
      <width>156</width>
      <height>23</height>
     </rect>
@@ -76,7 +76,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>310</y>
+     <y>430</y>
      <width>101</width>
      <height>23</height>
     </rect>
@@ -89,18 +89,21 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>19</y>
-     <width>391</width>
-     <height>94</height>
+     <y>31</y>
+     <width>258</width>
+     <height>71</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout">
-    <item row="2" column="0" colspan="2">
-     <widget class="QCheckBox" name="ignoreUpdate">
+    <item row="0" column="0">
+     <widget class="QLabel" name="label">
       <property name="text">
-       <string>Disable Update Prompt on Startup</string>
+       <string>System Logging Level:</string>
       </property>
      </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QComboBox" name="logLevel"/>
     </item>
     <item row="1" column="0">
      <widget class="QLabel" name="label_2">
@@ -112,20 +115,10 @@
     <item row="1" column="1">
      <widget class="QLineEdit" name="telemTimeout"/>
     </item>
-    <item row="0" column="0">
-     <widget class="QLabel" name="label">
+    <item row="2" column="0" colspan="2">
+     <widget class="QCheckBox" name="ignoreUpdate">
       <property name="text">
-       <string>System Logging Level:</string>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="1">
-     <widget class="QComboBox" name="logLevel"/>
-    </item>
-    <item row="2" column="2">
-     <widget class="QCheckBox" name="rememberTab">
-      <property name="text">
-       <string>Open to Last Tab Used</string>
+       <string>Disable Update Prompt on Startup</string>
       </property>
      </widget>
     </item>
@@ -135,7 +128,7 @@
    <property name="geometry">
     <rect>
      <x>16</x>
-     <y>133</y>
+     <y>150</y>
      <width>170</width>
      <height>65</height>
     </rect>
@@ -168,7 +161,7 @@
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>204</y>
+     <y>221</y>
      <width>452</width>
      <height>75</height>
     </rect>
@@ -246,7 +239,134 @@
     </item>
    </layout>
   </widget>
+  <widget class="Line" name="line_2">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>307</y>
+     <width>466</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <weight>50</weight>
+     <bold>false</bold>
+    </font>
+   </property>
+   <property name="lineWidth">
+    <number>2</number>
+   </property>
+   <property name="midLineWidth">
+    <number>1</number>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_5">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>10</y>
+     <width>47</width>
+     <height>13</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <weight>75</weight>
+     <bold>true</bold>
+     <underline>true</underline>
+    </font>
+   </property>
+   <property name="text">
+    <string>System:</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_6">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>130</y>
+     <width>71</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <weight>75</weight>
+     <bold>true</bold>
+     <underline>true</underline>
+    </font>
+   </property>
+   <property name="text">
+    <string>Sim Setup:</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_7">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>320</y>
+     <width>91</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <weight>75</weight>
+     <bold>true</bold>
+     <underline>true</underline>
+    </font>
+   </property>
+   <property name="text">
+    <string>Other Settings: </string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_8">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>340</y>
+     <width>101</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Startup  Behavior:</string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="">
+   <property name="geometry">
+    <rect>
+     <x>36</x>
+     <y>360</y>
+     <width>184</width>
+     <height>42</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_2">
+    <item>
+     <widget class="QCheckBox" name="cb_save_geometry">
+      <property name="text">
+       <string>Restore window size and position</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QCheckBox" name="cb_save_view">
+      <property name="text">
+       <string>Restore last tab view</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
  </widget>
  <resources/>
  <connections/>
+ <buttongroups>
+  <buttongroup name="viewRadioGroup"/>
+ </buttongroups>
 </ui>
