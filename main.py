@@ -1602,14 +1602,7 @@ class MainWindow(QMainWindow):
         version_row_layout.setAlignment(Qt.AlignBottom)
         layout.addLayout(version_row_layout)
 
-
-
-
         central_widget.setLayout(layout)
-
-        self.fetch_version_thread = utils.FetchLatestVersionThread()
-        self.fetch_version_thread.version_result_signal.connect(self.update_version_result)
-        self.fetch_version_thread.start()
 
         ### Load Stored Geomoetry
         self.load_main_window_geometry()
@@ -2934,6 +2927,11 @@ def main():
 
     window = MainWindow(settings_manager=settings_mgr)
     window.show()
+
+    fetch_version_thread = utils.FetchLatestVersionThread()
+    fetch_version_thread.version_result_signal.connect(window.update_version_result)
+    fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
+    fetch_version_thread.start()
 
     telem_manager = TelemManager(settings_manager=settings_mgr)
     telem_manager.start()

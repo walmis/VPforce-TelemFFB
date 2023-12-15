@@ -1114,33 +1114,36 @@ def winreg_get(path, key):
 
 class FetchLatestVersionThread(QThread):
     version_result_signal = pyqtSignal(str, str)
-
+    error_signal = pyqtSignal(str)
     def run(self):
-        ctx = ssl._create_unverified_context()
-
-        current_version = get_version()
-        latest_version = None
-        latest_url = None
-        url = "https://vpforcecontrols.com/downloads/TelemFFB/"
-        file = "latest.json"
-        send_url = url + file
-
         try:
-            with urllib.request.urlopen(send_url, context=ctx,) as req:
-                latest = json.loads(req.read().decode())
-                latest_version = latest["version"]
-                latest_url = url + latest["filename"]
-        except:
-            logging.exception(f"Error checking latest version status: {url}")
+            ctx = ssl._create_unverified_context()
 
-        if current_version != latest_version and latest_version is not None and latest_url is not None:
-            logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
-            self.version_result_signal.emit(latest_version, latest_url)
-        elif current_version == latest_version:
-            self.version_result_signal.emit(0, 0)
-        else:
-            self.version_result_signal.emit(-1, -1)
+            current_version = get_version()
+            latest_version = None
+            latest_url = None
+            url = "https://vpforcecontrols.com/downloads/TelemFFB/"
+            file = "latest.json"
+            send_url = url + file
 
+            try:
+                with urllib.request.urlopen(send_url, context=ctx,) as req:
+                    latest = json.loads(req.read().decode())
+                    latest_version = latest["version"]
+                    latest_url = url + latest["filename"]
+            except Exception as e:
+                logging.exception(f"Error checking latest version status: {url}")
+                self.error_signal.emit(str(e))
+
+            if current_version != latest_version and latest_version is not None and latest_url is not None:
+                logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
+                self.version_result_signal.emit(latest_version, latest_url)
+            elif current_version == latest_version:
+                self.version_result_signal.emit("uptodate", "uptodate")
+            else:
+                self.version_result_signal.emit("error", "error")
+        except Exception as e:
+            self.error_signal.emit(str(e))
 
 
 def get_version():
