@@ -1020,9 +1020,9 @@ class FetchLatestVersionThread(QThread):
                 logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
                 self.version_result_signal.emit(latest_version, latest_url)
             elif current_version == latest_version:
-                self.version_result_signal.emit(0, 0)
+                self.version_result_signal.emit("uptodate", "uptodate")
             else:
-                self.version_result_signal.emit(-1, -1)
+                self.version_result_signal.emit("error", "error")
         except Exception as e:
             self.error_signal.emit(str(e))
 

@@ -848,11 +848,11 @@ class MainWindow(QMainWindow):
         status = False
         self.update_action.setDisabled(False)
 
-        if vers == 0:
+        if vers == "uptodate":
             status_text = "Up To Date"
             status = False
             self.version_label.setText(f'Version Status: {status_text}')
-        elif vers == -1:
+        elif vers == "error":
             status_text = "UNKNOWN"
             status = None
             self.version_label.setText(f'Version Status: {status_text}')
