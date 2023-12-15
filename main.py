@@ -1173,7 +1173,7 @@ class MainWindow(QMainWindow):
         reset_action.triggered.connect(self.reset_all_effects)
         utilities_menu.addAction(reset_action)
 
-        self.update_action = QAction('Update TelemFFB', self)
+        self.update_action = QAction('Install Latest TelemFFB', self)
         self.update_action.triggered.connect(self.update_from_menu)
         utilities_menu.addAction(self.update_action)
         self.update_action.setDisabled(True)
@@ -1622,16 +1622,13 @@ class MainWindow(QMainWindow):
         global _latest_url
         _latest_version = vers
         _latest_url = url
-        status = False
-        self.update_action.setDisabled(False)
 
-        if vers == 0:
+        if vers == "uptodate":
             status_text = "Up To Date"
-            status = False
+            self.update_action.setDisabled(True)
             self.version_label.setText(f'Version Status: {status_text}')
-        elif vers == -1:
+        elif vers == "error":
             status_text = "UNKNOWN"
-            status = None
             self.version_label.setText(f'Version Status: {status_text}')
         else:
             # print(_update_available)
@@ -1639,6 +1636,8 @@ class MainWindow(QMainWindow):
             logging.info(f"<<<<Update available - new version={vers}>>>>")
 
             status_text = f"New version <a href='{url}'><b>{vers}</b></a> is available!"
+            self.update_action.setDisabled(False)
+            self.update_action.setText("Install Latest TelemFFB")
             self.version_label.setToolTip(url)
             self.version_label.setText(f'Version Status: {status_text}')
         self.perform_update(auto=True)
