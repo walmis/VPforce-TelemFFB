@@ -145,7 +145,12 @@ if os.path.basename(args.overridefile) == args.overridefile:
 else:
     # assume is absolute path to file
     overridefile = args.overridefile
+if getattr(sys, 'frozen', False):
+    appmode = 'Executable'
+else:
+    appmode = 'Source'
 
+logging.info(f"TelemFFB starting up from {appmode}:  Args= {args.__dict__}")
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
     utils.teleplot.configure(args.teleplot)
