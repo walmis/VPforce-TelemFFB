@@ -1,4 +1,11 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+############################################
+##  December 14th, 2023
+############################################
+# General
+- Move the version/update checking to a separate thread to avoid extended loading times when update server can not be reached
+# MSFS
+- Avoid error condition when prop thrust is a negative value (reverse thrust)
 
 ############################################
 ##  November 23th, 2023
