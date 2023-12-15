@@ -482,9 +482,10 @@ class Aircraft(AircraftBase):
 
         # calculate air flow velocity exiting the prop
         # based on https://www.grc.nasa.gov/www/k-12/airplane/propth.html
-        _prop_air_vel = sqrt(
-            2 * telem_data["PropThrust1"] / 
-                (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
+        _prop_thrust1 = telem_data.get('PropThrust1', 0)
+        if _prop_thrust1 < 0:
+            _prop_thrust1 = 0
+        _prop_air_vel = sqrt(2 * _prop_thrust1 / (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
 
         if abs(incidence_vec.y) > 0.5 or _prop_air_vel > 1: # avoid edge cases
             _elevator_aoa = atan2(-incidence_vec.y, _prop_air_vel) * deg
