@@ -837,9 +837,7 @@ class MainWindow(QMainWindow):
 
         central_widget.setLayout(layout)
 
-        self.fetch_version_thread = utils.FetchLatestVersionThread()
-        self.fetch_version_thread.version_result_signal.connect(self.update_version_result)
-        self.fetch_version_thread.start()
+
 
     def update_version_result(self, vers, url):
         global _update_available
@@ -1037,7 +1035,10 @@ def main():
 
     window = MainWindow()
     window.show()
-
+    fetch_version_thread = utils.FetchLatestVersionThread()
+    fetch_version_thread.version_result_signal.connect(window.update_version_result)
+    fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
+    fetch_version_thread.start()
     telem_manager = TelemManager()
     telem_manager.start()
 
