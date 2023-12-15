@@ -165,6 +165,7 @@ version = utils.get_version()
 min_firmware_version = 'v1.0.15'
 global dev_firmware_version
 dev_firmware_version = None
+global dev_serial
 global dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
 
 _update_available = False
@@ -1186,6 +1187,12 @@ class MainWindow(QMainWindow):
         reset_geometry.triggered.connect(self.reset_window_size)
         utilities_menu.addAction(reset_geometry)
         # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
+        menubar.setStyleSheet("QAction:disabled { color: red; }")
+
+        self.vpconf_action = QAction("Launch VPforce Configurator", self)
+        self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf(dev_serial))
+        utilities_menu.addAction(self.vpconf_action)
+
 
 
         # Add settings converter
@@ -2881,6 +2888,7 @@ def main():
     app.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
     global d
     global dev_firmware_version
+    global dev_serial
     d = LogWindow()
     global settings_mgr, telem_manager
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
@@ -2901,6 +2909,7 @@ def main():
         if args.reset:
             dev.resetEffects()
         dev_firmware_version = dev.get_firmware_version()
+        dev_serial = dev.serial
         if dev_firmware_version:
             logging.info(f"Rhino Firmware: {dev_firmware_version}")
             minver = re.sub(r'\D', '', min_firmware_version)
