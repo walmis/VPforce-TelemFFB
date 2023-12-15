@@ -25,6 +25,9 @@ import select
 from time import monotonic
 import logging
 import sys
+
+from PyQt5.QtCore import QThread, pyqtSignal
+
 import winpaths
 import winreg
 import socket
@@ -989,6 +992,38 @@ def winreg_get(path, key):
     except WindowsError:
         return None
 
+
+class FetchLatestVersionThread(QThread):
+    version_result_signal = pyqtSignal(str, str)
+
+    def run(self):
+        ctx = ssl._create_unverified_context()
+
+        current_version = get_version()
+        latest_version = None
+        latest_url = None
+        url = "https://vpforcecontrols.com/downloads/TelemFFB/"
+        file = "latest.json"
+        send_url = url + file
+
+        try:
+            with urllib.request.urlopen(send_url, context=ctx,) as req:
+                latest = json.loads(req.read().decode())
+                latest_version = latest["version"]
+                latest_url = url + latest["filename"]
+        except:
+            logging.exception(f"Error checking latest version status: {url}")
+
+        if current_version != latest_version and latest_version is not None and latest_url is not None:
+            logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
+            self.version_result_signal.emit(latest_version, latest_url)
+        elif current_version == latest_version:
+            self.version_result_signal.emit(0, 0)
+        else:
+            self.version_result_signal.emit(-1, -1)
+
+
+
 def get_version():
     ver = "UNKNOWN"
     try:
@@ -1003,32 +1038,32 @@ def get_version():
     except: pass
     return ver
 
-def fetch_latest_version():
-
-    ctx = ssl._create_unverified_context()
-
-    current_version = get_version()
-    latest_version = None
-    latest_url = None
-    url = "https://vpforcecontrols.com/downloads/TelemFFB/"
-    file = "latest.json"
-    send_url = url + file
-
-    try:
-        with urllib.request.urlopen(send_url, context=ctx) as req:
-            latest = json.loads(req.read().decode())
-            latest_version = latest["version"]
-            latest_url = url + latest["filename"]
-    except:
-        logging.exception(f"Error checking latest version status: {url}")
- 
-    if current_version != latest_version and latest_version is not None and latest_url is not None:
-        logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
-        return latest_version, latest_url
-    elif current_version == latest_version:
-        return False
-    else:
-        return None
+# def fetch_latest_version():
+#
+#     ctx = ssl._create_unverified_context()
+#
+#     current_version = get_version()
+#     latest_version = None
+#     latest_url = None
+#     url = "https://vpforcecontrols.com/downloads/TelemFFB/"
+#     file = "latest.json"
+#     send_url = url + file
+#
+#     try:
+#         with urllib.request.urlopen(send_url, context=ctx, timeout=5) as req:
+#             latest = json.loads(req.read().decode())
+#             latest_version = latest["version"]
+#             latest_url = url + latest["filename"]
+#     except:
+#         logging.exception(f"Error checking latest version status: {url}")
+#
+#     if current_version != latest_version and latest_version is not None and latest_url is not None:
+#         logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
+#         return latest_version, latest_url
+#     elif current_version == latest_version:
+#         return False
+#     else:
+#         return None
     
 def self_update(zip_uri):
     r = urllib.request.urlopen(zip_uri, context=ssl._create_unverified_context())
