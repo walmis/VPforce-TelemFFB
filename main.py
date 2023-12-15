@@ -1171,18 +1171,11 @@ class MainWindow(QMainWindow):
         self.update_action.triggered.connect(self.update_from_menu)
         utilities_menu.addAction(self.update_action)
         self.update_action.setDisabled(True)
+
         download_action = QAction('Download Other Versions', self)
         download_action.triggered.connect(lambda: self.open_url(dl_url))
         utilities_menu.addAction(download_action)
 
-
-        update_action = QAction('Update TelemFFB', self)
-        update_action.triggered.connect(self.update_from_menu)
-        utilities_menu.addAction(update_action)
-        if utils.fetch_latest_version():
-            update_action.setDisabled(False)
-        else:
-            update_action.setDisabled(True)
 
         reset_geometry = QAction('Reset Window Size/Position', self)
         reset_geometry.triggered.connect(self.reset_window_size)
@@ -1420,6 +1413,24 @@ class MainWindow(QMainWindow):
         self.test_craft_area.setLayout(test_craft_layout)
         self.test_craft_area.hide()
         layout.addWidget(self.test_craft_area)
+        self.configmode_group = QButtonGroup()
+        self.cb_joystick = QCheckBox('Joystick')
+        self.cb_pedals = QCheckBox('Pedals')
+        self.cb_collective = QCheckBox('Collective')
+
+        self.config_scope_row = QHBoxLayout()
+        self.configmode_group.addButton(self.cb_joystick, 1)
+        self.configmode_group.addButton(self.cb_pedals, 2)
+        self.configmode_group.addButton(self.cb_collective, 3)
+        self.configmode_group.buttonClicked[int].connect(self.change_config_scope)
+        self.config_scope_row.addWidget(self.cb_joystick)
+        self.config_scope_row.addWidget(self.cb_pedals)
+        self.config_scope_row.addWidget(self.cb_collective)
+        self.cb_joystick.setVisible(False)
+        self.cb_pedals.setVisible(False)
+        self.cb_collective.setVisible(False)
+
+        layout.addLayout(self.config_scope_row)
 
         self.tab_widget = QTabWidget(self)
         self.tab_widget.setTabShape(QTabWidget.Triangular)  # Set triangular tab shape
@@ -1445,7 +1456,7 @@ class MainWindow(QMainWindow):
         line_widget.setFrameShadow(QFrame.Sunken)
 
         # Add the tab widget and line widget to the main layout
-        layout.addWidget( self.tab_widget)
+        layout.addWidget(self.tab_widget)
         layout.setSpacing(0)
         layout.addWidget(line_widget)
 
@@ -1587,22 +1598,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(version_row_layout)
 
 
-        self.configmode_group = QButtonGroup()
-        self.cb_joystick = QCheckBox('Joystick')
-        self.cb_pedals = QCheckBox('Pedals')
-        self.cb_collective = QCheckBox('Collective')
 
-        config_scope_row = QHBoxLayout()
-        self.configmode_group.addButton(self.cb_joystick, 1)
-        self.configmode_group.addButton(self.cb_pedals, 2)
-        self.configmode_group.addButton(self.cb_collective, 3)
-        self.configmode_group.buttonClicked[int].connect(self.change_config_scope)
-        config_scope_row.addWidget(self.cb_joystick)
-        config_scope_row.addWidget(self.cb_pedals)
-        config_scope_row.addWidget(self.cb_collective)
-
-
-        #layout.addLayout(config_scope_row)
 
         central_widget.setLayout(layout)
 
@@ -2063,6 +2059,19 @@ class MainWindow(QMainWindow):
                 self.last_width = self.width()
             self.hidden_active = False
             self.monitor_widget.hide()
+            modifiers = QApplication.keyboardModifiers()
+            if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier):
+                self.cb_joystick.setVisible(True)
+                self.cb_pedals.setVisible(True)
+                self.cb_collective.setVisible(True)
+                match args.type:
+                    case 'joystick':
+                        self.cb_joystick.setChecked(True)
+                    case 'pedals':
+                        self.cb_pedals.setChecked(True)
+                    case 'collective':
+                        self.cb_collective.setChecked(True)
+
             self.settings_area.show()
 
             self.resize(self.last_width, self.last_height)
@@ -2154,6 +2163,55 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             traceback.print_exc()
+
+    def perform_update(self, auto=True):
+        # config = get_config()
+        # ignore_auto_updates = utils.sanitize_dict(config["system"]).get("ignore_auto_updates", 0)
+        ignore_auto_updates = utils.read_system_settings(args.type).get('ignoreUpdate', False)
+        if not auto:
+            ignore_auto_updates = False
+        update_ans = QMessageBox.No
+        proceed_ans = QMessageBox.Cancel
+        is_exe = getattr(sys, 'frozen',
+                         False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
+        # is_exe = True
+        if is_exe and _update_available and not ignore_auto_updates:
+            # vers, url = utils.fetch_latest_version()
+            update_ans = QMessageBox.Yes
+            if auto:
+                update_ans = QMessageBox.information(None, "Update Available!!",
+                                                     f"A new version of TelemFFB is available ({_latest_version}).\n\nWould you like to automatically download and install it now?\n\nYou may also update later from the Utilities menu, or the\nnext time TelemFFB starts.\n\n~~ Note ~~ If you no longer wish to see this message on startup,\nyou may enable `ignore_auto_updates` in your user config.\n\nYou will still be able to update via the Utilities menu",
+                                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+            if update_ans == QMessageBox.Yes:
+                proceed_ans = QMessageBox.information(None, "TelemFFB Updater",
+                                                      f"TelemFFB will now exit and launch the updater.\n\nOnce the update is complete, TelemFFB will restart.\n\n~~ Please Note~~~  The primary `config.ini` file will be overwritten.  If you\nhave made changes to `config.ini`, please back up the file or move the modifications to a user config file before upgrading.\n\nPress OK to continue",
+                                                      QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
+
+            if proceed_ans == QMessageBox.Ok:
+                global _current_version
+                updater_source_path = os.path.join(os.path.dirname(__file__), 'updater', 'updater.exe')
+                updater_execution_path = os.path.join(os.path.dirname(__file__), 'updater.exe')
+
+                # Copy the updater executable with forced overwrite
+                shutil.copy2(updater_source_path, updater_execution_path)
+                active_args, unknown_args = parser.parse_known_args()
+                args_list = [f'--{k}={v}' for k, v in vars(active_args).items() if
+                             v is not None and v != parser.get_default(k)]
+                call = [updater_execution_path, "--current_version", _current_version] + args_list
+                subprocess.Popen(call, cwd=os.path.dirname(__file__))
+                if auto:
+                    QCoreApplication.instance().quit()
+                else:
+                    return True
+        else:
+            try:
+                updater_execution_path = os.path.join(os.path.dirname(__file__), 'updater.exe')
+                if os.path.exists(updater_execution_path):
+                    os.remove(updater_execution_path)
+            except Exception as e:
+                print(e)
+        return False
 
 class SettingsLayout(QGridLayout):
     expanded_items = []
@@ -2769,55 +2827,6 @@ class NoWheelSlider(QSlider):
     def setHandleHeight(self, height):
         self.handle_height = height
         self.update_styles()
-
-def perform_update(self, auto=True):
-        # config = get_config()
-    # ignore_auto_updates = utils.sanitize_dict(config["system"]).get("ignore_auto_updates", 0)
-    ignore_auto_updates = utils.read_system_settings(args.type).get('ignoreUpdate', False)
-        if not auto:
-            ignore_auto_updates = False
-        update_ans = QMessageBox.No
-        proceed_ans = QMessageBox.Cancel
-        is_exe = getattr(sys, 'frozen',
-                         False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
-        # is_exe = True
-        if is_exe and _update_available and not ignore_auto_updates:
-            # vers, url = utils.fetch_latest_version()
-            update_ans = QMessageBox.Yes
-            if auto:
-                update_ans = QMessageBox.information(None, "Update Available!!",
-                                                     f"A new version of TelemFFB is available ({_latest_version}).\n\nWould you like to automatically download and install it now?\n\nYou may also update later from the Utilities menu, or the\nnext time TelemFFB starts.\n\n~~ Note ~~ If you no longer wish to see this message on startup,\nyou may enable `ignore_auto_updates` in your user config.\n\nYou will still be able to update via the Utilities menu",
-                                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-
-            if update_ans == QMessageBox.Yes:
-                proceed_ans = QMessageBox.information(None, "TelemFFB Updater",
-                                                      f"TelemFFB will now exit and launch the updater.\n\nOnce the update is complete, TelemFFB will restart.\n\n~~ Please Note~~~  The primary `config.ini` file will be overwritten.  If you\nhave made changes to `config.ini`, please back up the file or move the modifications to a user config file before upgrading.\n\nPress OK to continue",
-                                                      QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
-
-            if proceed_ans == QMessageBox.Ok:
-                global _current_version
-                updater_source_path = os.path.join(os.path.dirname(__file__), 'updater', 'updater.exe')
-                updater_execution_path = os.path.join(os.path.dirname(__file__), 'updater.exe')
-
-                # Copy the updater executable with forced overwrite
-                shutil.copy2(updater_source_path, updater_execution_path)
-                active_args, unknown_args = parser.parse_known_args()
-                args_list = [f'--{k}={v}' for k, v in vars(active_args).items() if
-                             v is not None and v != parser.get_default(k)]
-                call = [updater_execution_path, "--current_version", _current_version] + args_list
-                subprocess.Popen(call, cwd=os.path.dirname(__file__))
-                if auto:
-                    QCoreApplication.instance().quit()
-                else:
-                    return True
-        else:
-            try:
-                updater_execution_path = os.path.join(os.path.dirname(__file__), 'updater.exe')
-                if os.path.exists(updater_execution_path):
-                    os.remove(updater_execution_path)
-            except Exception as e:
-                print(e)
-        return False
 
 
 def init_sims():
