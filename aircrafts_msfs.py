@@ -1163,7 +1163,7 @@ class Helicopter(Aircraft):
                 pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
                 pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-                if self.cyclic_spring_init:
+                if self.cyclic_spring_init or not self.force_trim_enabled:
                     if self.use_legacy_bindings:
                         send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
                         send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
