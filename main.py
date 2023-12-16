@@ -2782,9 +2782,9 @@ def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
                 sim = 'MSFS'
 
     # if sim is still blank here, must be a model
-    if sim == '':
+    if isim != '':
         model = section
-        sim = 'any'
+        sim = isim
         cls = ''
 
     data_dict = {
@@ -2793,7 +2793,8 @@ def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
         'sim': sim,
         'class': cls,
         'model': model,
-        'device': args.type
+        'device': device,
+        'new_ac': new_ac
     }
     print(data_dict)
     return data_dict
@@ -2835,7 +2836,7 @@ def convert_settings(cfg=configfile, usr=overridefile, window=None):
                     dev = "any"
                 else:
                     dev = args.type
-                dif_item = config_to_dict(section, key, valuestring, isim=sim, device=dev)
+                dif_item = config_to_dict(section, key, valuestring, isim=sim, device=dev, new_ac=True)
                 differences.append(dif_item)
 
     xmlutils.write_converted_to_xml(differences)

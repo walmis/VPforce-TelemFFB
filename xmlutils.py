@@ -569,7 +569,7 @@ def write_converted_to_xml(differences):
     model_set = []
 
     for dif in differences:
-        if dif['sim'] == 'any':
+        if dif['new_ac']:
             model_set.append(dif)
         else:
             if dif['class'] != '':
