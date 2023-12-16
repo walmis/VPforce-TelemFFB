@@ -877,7 +877,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)  #
             return item
         elif datatype == 'int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat':
-            line_edit = QLineEdit(str(value) + str(unit))
+            the_unit = str(unit)
+            if the_unit == 'None':
+                the_unit = ''
+            line_edit = QLineEdit(str(value) + the_unit)
             item = QTableWidgetItem(line_edit.text())  # Set the widget
             if not checkstate:
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)   # no editing if not allowed in this mode
