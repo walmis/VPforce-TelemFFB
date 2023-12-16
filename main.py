@@ -253,9 +253,9 @@ def load_legacy_config(filename, raise_errors=True) -> ConfigObj:
 
 def config_has_changed(update=False) -> bool:
     global _config_mtime
-    global _config
+    # global _config
     # "hash" both mtimes together
-    tm = int(os.path.getmtime(defaults_path)) + int(os.path.getmtime(userconfig_path))
+    tm = int(os.path.getmtime(userconfig_path))
     # if args.overridefile== 'None':
     #     userfile=settings_mgr.userconfig_path
     #     tm = int(os.path.getmtime(userfile))
@@ -263,11 +263,11 @@ def config_has_changed(update=False) -> bool:
     #     tm = int(os.path.getmtime(configfile))
     #     if os.path.exists(overridefile):
     #         tm += int(os.path.getmtime(overridefile))
-    if update:
-        _config_mtime = tm
+    # if update:
 
     if _config_mtime != tm:
-        _config = None # force reloading config on next get_config call
+        # _config = None # force reloading config on next get_config call
+        _config_mtime = tm
         return True
     return False
 
