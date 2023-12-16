@@ -16,7 +16,6 @@
 #
 
 import glob
-import shutil
 
 from traceback_with_variables import print_exc, prints_exc
 import argparse
@@ -49,7 +48,10 @@ import logging
 import sys
 import time
 import os
+import utils
 
+
+system_settings = utils.read_system_settings(args.type)
 
 sys.path.insert(0, '')
 # sys.path.append('/simconnect')
@@ -63,17 +65,18 @@ if args.overridefile == 'None':
         args.overridefile = 'config.user.ini'
     else:
         pass
+else:
+    if not os.path.isfile(args.overridefile):
+        logging.warning(f"Override file {args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
+        args.overridefile = 'None'
 
 
-log_folder = os.path.join(os.environ['LOCALAPPDATA'],"VPForce-TelemFFB", 'log')
+log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
 #log_folder = './log'
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
-if args.overridefile!= 'None':
-    logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), "_", os.path.basename(args.configfile), "_",
-                       os.path.basename(args.overridefile), ".log"])
-else:
-    logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), '_', args.type, "_xmlconfig.log"])
+
+logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), '_', args.type, "_xmlconfig.log"])
 log_file = os.path.join(log_folder, logname)
 
 # Create a logger instance
@@ -107,16 +110,12 @@ from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect,
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence, QIntValidator, QCursor
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
-# from PyQt5.QtWidgets import *
-# from PyQt5.QtCore import *
-# from PyQt5.QtGui import *
 
 import socket
 import threading
 import aircrafts_dcs
 import aircrafts_msfs
 import aircrafts_il2
-import utils
 import subprocess
 
 import traceback
@@ -130,6 +129,9 @@ from settingsmanager import *
 import xmlutils
 
 effects_translator = utils.EffectTranslator()
+
+_config: ConfigObj = None
+_config_mtime = 0
 
 if os.path.basename(args.configfile) == args.configfile:
     # just the filename is present, assume it is in the script directory
@@ -145,6 +147,7 @@ if os.path.basename(args.overridefile) == args.overridefile:
 else:
     # assume is absolute path to file
     overridefile = args.overridefile
+
 if getattr(sys, 'frozen', False):
     appmode = 'Executable'
 else:
@@ -156,8 +159,8 @@ if args.teleplot:
     utils.teleplot.configure(args.teleplot)
 
 defaults_path = 'defaults.xml'
-userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'],"VPForce-TelemFFB")
-userconfig_path = os.path.join(userconfig_rootpath , 'userconfig.xml')
+userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
+userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
 
 utils.create_empty_userxml_file(userconfig_path)
 
@@ -175,6 +178,7 @@ _current_version = version
 
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 
+
 class LoggingFilter(logging.Filter):
     def __init__(self, keywords):
         self.keywords = keywords
@@ -187,6 +191,7 @@ class LoggingFilter(logging.Filter):
                 return False
         # If none of the keywords are found, allow the message to be logged
         return True
+
 
 # Create a list of keywords to filter
 log_filter_strings = [
@@ -213,7 +218,7 @@ def format_dict(data, prefix=""):
     return output
 
 
-def load_config(filename, raise_errors=True) -> ConfigObj:
+def load_legacy_config(filename, raise_errors=True) -> ConfigObj:
     if not os.path.sep in filename:
         #construct absolute path
         config_path = os.path.join(os.path.dirname(__file__), filename)
@@ -243,10 +248,9 @@ def load_config(filename, raise_errors=True) -> ConfigObj:
         err["system"]["dcs_enabled"] = 0
         return err
 
-_config : ConfigObj = None
-_config_mtime = 0
 
 # if update is true, update the current modified time
+
 def config_has_changed(update=False) -> bool:
     global _config_mtime
     global _config
@@ -268,39 +272,39 @@ def config_has_changed(update=False) -> bool:
     return False
 
 
-def get_config_xml():
-    global _config
-    global settings_mgr
-    if _config: return _config
-    # a, b, main = xmlutils.read_single_model('Global', '')
-    main = []
-    params = ConfigObj()
-    params['system'] = {}
-    for setting in main:
-        k = setting['name']
-        v = setting['value']
-        if setting["grouping"] == "System":
-            params['system'][k] = v
-            logging.warning(f"Got Globals from Settings Manager: {k} : {v}")
-    return params
+# def get_config_xml():
+#     global _config
+#     global settings_mgr
+#     if _config: return _config
+#     # a, b, main = xmlutils.read_single_model('Global', '')
+#     main = []
+#     params = ConfigObj()
+#     params['system'] = {}
+#     for setting in main:
+#         k = setting['name']
+#         v = setting['value']
+#         if setting["grouping"] == "System":
+#             params['system'][k] = v
+#             logging.warning(f"Got Globals from Settings Manager: {k} : {v}")
+#     return params
 
-def get_config() -> ConfigObj:
-    global _config
-    if _config: return _config
-    if args.overridefile== 'None':
-        params = get_config_xml()
-        config_has_changed(update=True)
-        _config = params
-        return params
-
-    main = load_config(configfile)
-    user = load_config(overridefile, raise_errors=False)
-    if user and main:
-        main.merge(user)   
-    
-    config_has_changed(update=True)
-    _config = main
-    return main
+# def get_config() -> ConfigObj:
+#     global _config
+#     if _config: return _config
+#     if args.overridefile== 'None':
+#         params = get_config_xml()
+#         config_has_changed(update=True)
+#         _config = params
+#         return params
+#
+#     main = load_config(configfile)
+#     user = load_config(overridefile, raise_errors=False)
+#     if user and main:
+#         main.merge(user)
+#
+#     config_has_changed(update=True)
+#     _config = main
+#     return main
 
 
 class LogWindow(QMainWindow):
@@ -366,48 +370,9 @@ class TelemManager(QObject, threading.Thread):
         self.frameTimes = []
         self.timeout = 0.2
         self.settings_manager = settings_manager
-        # self.main_window = main_window
-        # self.settings_layout = self.main_window.settings_layout
-        # self.main_window = main_window
-        # settings_manager.show()
 
-    def get_aircraft_config(self, aircraft_name, default_section=None):
-        if args.overridefile== 'None':
-            config = get_config()
-            params, class_name = self.sm_get_aircraft_config(aircraft_name, default_section)
-            return params, class_name
-        config = get_config()
 
-        if default_section:
-            logging.info(f"Loading parameters from '{default_section}' section")
-            params = utils.sanitize_dict(config[default_section])
-        else:
-            params = utils.sanitize_dict(config["default"])
-
-        class_name = "Aircraft"
-        for section,conf in config.items():
-            # find matching aircraft in config
-            if re.match(section, aircraft_name):
-                conf = utils.sanitize_dict(conf)
-                logging.info(f"Found section [{section}] for aircraft '{aircraft_name}' in config")
-                class_name = conf.get("type", "Aircraft")
-
-                # load params from that class in config
-                s = ".".join([default_section, class_name] if default_section else [class_name])
-                logging.info(f"Loading parameters from [{s}] section")
-                class_params = config.get(s)
-                if class_params:
-                    class_params = utils.sanitize_dict(class_params)
-                    params.update(class_params)
-                else:
-                    logging.warning(f"Section [{s}] does not exist")
-
-                params.update(conf)
-
-        return (params, class_name)
-
-    def sm_get_aircraft_config(self, aircraft_name, data_source):
-
+    def get_aircraft_config(self, aircraft_name, data_source):
         params = {}
         cls_name = "UNKNOWN"
         input_modeltype = ''
@@ -433,7 +398,7 @@ class TelemManager(QObject, threading.Thread):
                 v = setting['value']
                 u = setting['unit']
                 if u is not None:
-                    vu= v+u
+                    vu = v + u
                 else:
                     vu = v
                 if setting['value'] != '-':
@@ -449,12 +414,12 @@ class TelemManager(QObject, threading.Thread):
                 current_class=cls_name,
                 current_pattern=pattern)
 
-
             return params, cls_name
 
             # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
         except Exception as e:
             logging.warning(f"Error getting settings from Settings Manager:{e}")
+
 
     def quit(self):
         self._run = False
@@ -496,7 +461,7 @@ class TelemManager(QObject, threading.Thread):
 
         self.frameTimes.append(int((time.perf_counter() - self.lastFrameTime)*1000))
         if len(self.frameTimes) > 50: self.frameTimes.pop(0)
-        
+
         telem_data["frameTimes"] = [self.frameTimes[-1], max(self.frameTimes)]
 
 
@@ -532,7 +497,7 @@ class TelemManager(QObject, threading.Thread):
             module = aircrafts_dcs
 
         if aircraft_name and aircraft_name != self.currentAircraftName:
-            
+
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
 
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
@@ -601,14 +566,14 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraft = Class(aircraft_name)
                 # self.currentAircraft.apply_settings(params)
                 self.currentAircraft.apply_settings(params)
-                if args.overridefile== 'None':
-                    if settings_mgr.isVisible():
-                        settings_mgr.b_getcurrentmodel.click()
-                    # a,b,res = xmlutils.read_single_model(data_source, aircraft_name)
-                    # self.main_window.settings_layout.build_rows(res)
-                    # self.main_window.reload_button.click()
-                    # self.main_window.settings_layout.reload_caller()
-                    self.updateSettingsLayout.emit()
+                # if args.overridefile== 'None':
+                if settings_mgr.isVisible():
+                    settings_mgr.b_getcurrentmodel.click()
+                # a,b,res = xmlutils.read_single_model(data_source, aircraft_name)
+                # self.main_window.settings_layout.build_rows(res)
+                # self.main_window.reload_button.click()
+                # self.main_window.settings_layout.reload_caller()
+                self.updateSettingsLayout.emit()
 
 
                 # future :
@@ -687,7 +652,7 @@ class NetworkThread(threading.Thread):
 
         s.settimeout(0.1)
         s.bind(("", self._port))
-        logging.info(f"Listening on UDP :{self._port}")  
+        logging.info(f"Listening on UDP :{self._port}")
 
         while self._run:
             try:
@@ -700,7 +665,7 @@ class NetworkThread(threading.Thread):
                 continue
             except socket.timeout:
                 continue
-    
+
     def quit(self):
         self._run = False
 
@@ -1097,6 +1062,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             save_window = settings_dict['cSaveT']
             self.cb_save_view.setChecked(save_window)
 
+
 class MainWindow(QMainWindow):
     def __init__(self, settings_manager):
         super().__init__()
@@ -1198,7 +1164,7 @@ class MainWindow(QMainWindow):
         # Add settings converter
         if args.overridefile != 'None':
             convert_settings_action = QAction('Convert user config.ini to XML', self)
-            convert_settings_action.triggered.connect(self.convert_settings)
+            convert_settings_action.triggered.connect(lambda: autoconvert_config(self))
             utilities_menu.addAction(convert_settings_action)
 
         help_menu = menubar.addMenu('Help')
@@ -1242,7 +1208,7 @@ class MainWindow(QMainWindow):
         #
         # notes_row_layout.addWidget(self.notes_label)
         # layout.addLayout(notes_row_layout)
-        cfg = get_config()
+        # cfg = get_config()
         dcs_enabled = utils.read_system_settings(args.type).get('enableDCS')
         il2_enabled = utils.read_system_settings(args.type).get('enableIL2')
         msfs_enabled = utils.read_system_settings(args.type).get('enableMSFS')
@@ -1487,28 +1453,23 @@ class MainWindow(QMainWindow):
         self.effects_area.setMaximumWidth(200)
 
         # Create the QLabel widget and set its properties
-        if cfg.get("EXCEPTION"):
-            error = cfg["EXCEPTION"]["ERROR"]
-            logging.error(f"CONFIG ERROR: {error}")
-            self.lbl_telem_data = QLabel(f"CONFIG ERROR: {error}")
-            QMessageBox.critical(None, "CONFIG ERROR", f"Error: {error}")
-        else:
-            dcs_enabled = utils.read_system_settings(args.type).get('enableDCS')
-            il2_enabled = utils.read_system_settings(args.type).get('enableIL2')
-            msfs_enabled = utils.read_system_settings(args.type).get('enableMSFS')
 
-            # Convert True/False to "enabled" or "disabled"
-            dcs_status = "Enabled" if dcs_enabled else "Disabled"
-            il2_status = "Enabled" if il2_enabled else "Disabled"
-            msfs_status = "Enabled" if msfs_enabled else "Disabled"
+        dcs_enabled = utils.read_system_settings(args.type).get('enableDCS')
+        il2_enabled = utils.read_system_settings(args.type).get('enableIL2')
+        msfs_enabled = utils.read_system_settings(args.type).get('enableMSFS')
 
-            self.lbl_telem_data = QLabel(
-                f"Waiting for data...\n\n"
-                f"DCS Enabled: {dcs_status}\n"
-                f"IL2 Enabled: {il2_status}\n"
-                f"MSFS Enabled: {msfs_status}\n\n"
-                "Enable or Disable in System -> System Settings"
-            )
+        # Convert True/False to "enabled" or "disabled"
+        dcs_status = "Enabled" if dcs_enabled else "Disabled"
+        il2_status = "Enabled" if il2_enabled else "Disabled"
+        msfs_status = "Enabled" if msfs_enabled else "Disabled"
+
+        self.lbl_telem_data = QLabel(
+            f"Waiting for data...\n\n"
+            f"DCS Enabled: {dcs_status}\n"
+            f"IL2 Enabled: {il2_status}\n"
+            f"MSFS Enabled: {msfs_status}\n\n"
+            "Enable or Disable in System -> System Settings"
+        )
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_telem_data.setWordWrap(True)
         self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
@@ -1576,18 +1537,18 @@ class MainWindow(QMainWindow):
         self.layout = QVBoxLayout(central_widget)
 
         # show xml file info
-        if args.overridefile!= 'None':
-            self.ovrd_label = QLabel()
-            self.ovrd_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
-            self.cfg_label.setText(f"Config File: {args.configfile}")
-            self.cfg_label.setToolTip("You can use a custom configuration file by passing the -c argument to TelemFFB\n\nExample: \"VPForce-TelemFFB.exe -c customconfig.ini\"")
-
-            if os.path.exists(args.overridefile):
-                self.ovrd_label.setText(f"User Override File: {args.overridefile}")
-            else:
-                self.ovrd_label.setText(f"User Override File: None")
-
-            self.ovrd_label.setToolTip("Rename \'config.user.ini.README\' to \'config.user.ini\' or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o argument\n\nExample \"VPForce-TelemFFB.exe -o myconfig.user.ini\" (starting TelemFFB without the override flag will look for the default config.user.ini)")
+        # if args.overridefile!= 'None':
+        #     self.ovrd_label = QLabel()
+        #     self.ovrd_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
+        #     self.cfg_label.setText(f"Config File: {args.configfile}")
+        #     self.cfg_label.setToolTip("You can use a custom configuration file by passing the -c argument to TelemFFB\n\nExample: \"VPForce-TelemFFB.exe -c customconfig.ini\"")
+        #
+        #     if os.path.exists(args.overridefile):
+        #         self.ovrd_label.setText(f"User Override File: {args.overridefile}")
+        #     else:
+        #         self.ovrd_label.setText(f"User Override File: None")
+        #
+        #     self.ovrd_label.setToolTip("Rename \'config.user.ini.README\' to \'config.user.ini\' or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o argument\n\nExample \"VPForce-TelemFFB.exe -o myconfig.user.ini\" (starting TelemFFB without the override flag will look for the default config.user.ini)")
 
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
@@ -1775,35 +1736,8 @@ class MainWindow(QMainWindow):
             except Exception as error:
                 pass
 
-    def convert_settings(self):
-        differences = []
-        defaultconfig = load_config(configfile)
-        userconfig = load_config(overridefile, raise_errors=False)
-        def_sections = defaultconfig.sections
-        usr_sections = userconfig.sections
-
-        for section,dconf in defaultconfig.items():
-            #print (f"reading {section}")
 
 
-            def_params = utils.sanitize_dict(defaultconfig[section])
-            if section in usr_sections:
-
-                usr_params = utils.sanitize_dict(userconfig[section])
-                for ditem in def_params:
-                    #print (f"{section} - {ditem} = {def_params[ditem]}" )
-                    for uitem in usr_params:
-                        if ditem == uitem:
-                            if def_params[ditem] != usr_params[uitem]:
-                                #print(f"{section} - {uitem} = {usr_params[uitem]}")
-                                valuestring = str(usr_params[uitem])
-                                dif_item = self.config_to_dict(section,uitem,valuestring)
-                                differences.append(dif_item)
-
-        xmlutils.write_converted_to_xml(differences)
-
-        message = f'\n\nConverted {overridefile} for {args.type} to XML.\nYou can now remove the -o argument to use the new Settings Manager\n'
-        print(message)
     def open_cfg_dir(self):
         os.startfile(userconfig_rootpath, 'open')
 
@@ -1891,61 +1825,20 @@ class MainWindow(QMainWindow):
 
         return pixmap
 
-    def config_to_dict(self,section,name,value):
-        sim=''
-        cls = ''
-        model = ''
-        match section:
-            case 'system':
-                sim = 'Global'
-            case 'DCS':
-                sim = 'DCS'
-            case 'IL2':
-                sim = 'IL2'
-            case 'MSFS2020':
-                sim = 'MSFS'
 
-        if '.' in section:
-            subsection = section.split('.')
-            ssim = subsection[0]
-            cls = subsection[1]
-            match ssim:
-                case 'DCS':
-                    sim = 'DCS'
-                case 'IL2':
-                    sim = 'IL2'
-                case 'MSFS2020':
-                    sim = 'MSFS'
 
-        # if sim is still blank here, must be a model
-        if sim == '':
-            model = section
-            sim = 'any'
-            cls = ''
-
-        data_dict = {
-            'name': name,
-            'value': value,
-            'sim' : sim,
-            'class': cls,
-            'model': model,
-            'device': args.type
-        }
-        print (data_dict)
-        return data_dict
-
-    def edit_config_file(self, config_type):
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        if config_type == "Primary":
-            config_file = args.configfile
-        elif config_type == "User":
-            config_file = args.overridefile
-        config_path = os.path.join(script_dir, config_file)
-        file_url = QUrl.fromLocalFile(config_path)
-        try:
-            QDesktopServices.openUrl(file_url)
-        except:
-            logging.error(f"There was an error opening the config file")
+    # def edit_config_file(self, config_type):
+    #     script_dir = os.path.dirname(os.path.abspath(__file__))
+    #     if config_type == "Primary":
+    #         config_file = args.configfile
+    #     elif config_type == "User":
+    #         config_file = args.overridefile
+    #     config_path = os.path.join(script_dir, config_file)
+    #     file_url = QUrl.fromLocalFile(config_path)
+    #     try:
+    #         QDesktopServices.openUrl(file_url)
+    #     except:
+    #         logging.error(f"There was an error opening the config file")
 
 
     def toggle_log_window(self):
@@ -2169,8 +2062,6 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
 
     def perform_update(self, auto=True):
-        # config = get_config()
-        # ignore_auto_updates = utils.sanitize_dict(config["system"]).get("ignore_auto_updates", 0)
         ignore_auto_updates = utils.read_system_settings(args.type).get('ignoreUpdate', False)
         if not auto:
             ignore_auto_updates = False
@@ -2833,6 +2724,89 @@ class NoWheelSlider(QSlider):
         self.update_styles()
 
 
+def config_to_dict(section,name,value):
+    sim=''
+    cls = ''
+    model = ''
+    match section:
+        case 'system':
+            sim = 'Global'
+        case 'DCS':
+            sim = 'DCS'
+        case 'IL2':
+            sim = 'IL2'
+        case 'MSFS2020':
+            sim = 'MSFS'
+
+    if '.' in section:
+        subsection = section.split('.')
+        ssim = subsection[0]
+        cls = subsection[1]
+        match ssim:
+            case 'DCS':
+                sim = 'DCS'
+            case 'IL2':
+                sim = 'IL2'
+            case 'MSFS2020':
+                sim = 'MSFS'
+
+    # if sim is still blank here, must be a model
+    if sim == '':
+        model = section
+        sim = 'any'
+        cls = ''
+
+    data_dict = {
+        'name': name,
+        'value': value,
+        'sim' : sim,
+        'class': cls,
+        'model': model,
+        'device': args.type
+    }
+    print(data_dict)
+    return data_dict
+
+
+def convert_settings(cfg=configfile, usr=overridefile):
+    differences = []
+    defaultconfig = load_legacy_config(cfg)
+    userconfig = load_legacy_config(usr, raise_errors=False)
+    def_sections = defaultconfig.sections
+    usr_sections = userconfig.sections
+
+    for section,dconf in defaultconfig.items():
+        #print (f"reading {section}")
+
+        def_params = utils.sanitize_dict(defaultconfig[section])
+        if section in usr_sections:
+
+            usr_params = utils.sanitize_dict(userconfig[section])
+            for ditem in def_params:
+                #print (f"{section} - {ditem} = {def_params[ditem]}" )
+                for uitem in usr_params:
+                    if ditem == uitem:
+                        if def_params[ditem] != usr_params[uitem]:
+                            #print(f"{section} - {uitem} = {usr_params[uitem]}")
+                            valuestring = str(usr_params[uitem])
+                            dif_item = config_to_dict(section,uitem,valuestring)
+                            differences.append(dif_item)
+    xmlutils.write_converted_to_xml(differences)
+    logging.info(f'\n\nConverted {usr} for {args.type} to XML.\nYou can now remove the -o argument to use the new Settings Manager\n')
+
+
+def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
+    test = False
+    if args.overridefile != 'None':
+        ans = QMessageBox.information(main_window, "Important TelemFFB Update Notification", f"The 'ini' config file type is now deprecated.\n\nThis version of TelemFFB uses a new UI driven config model\n\nIt appears you are using a user override file ({args.overridefile}).  Would you\nlike to auto-convert that file to the new config model?\n\nIf you choose not to, you may also perform the conversion from\nthe Utilities menu\n\nProceeding will convert the config and re-name your\nexisting user config to '{os.path.basename(usr)}.legacy'", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if ans == QMessageBox.No:
+            return
+        # perform the conversion
+        convert_settings(cfg=cfg, usr=usr)
+        if not test: os.rename(usr,f"{usr}.legacy")
+        QMessageBox.information(main_window, "Conversion Completed", "The conversion is complete.  You may now continue to use TelemFFB.\n\nTo avoid unnecessary log messages, please remove any '-c' or '-o' arguments from your startup shortcut as they are no longer supported")
+
+
 def init_sims():
     global dcs_telem, il2_telem, sim_connect_telem, telem_manager
     dcs_telem = NetworkThread(telem_manager, host="", port=34380)
@@ -2935,7 +2909,7 @@ def main():
 
     window = MainWindow(settings_manager=settings_mgr)
     window.show()
-
+    autoconvert_config(window)
     fetch_version_thread = utils.FetchLatestVersionThread()
     fetch_version_thread.version_result_signal.connect(window.update_version_result)
     fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
