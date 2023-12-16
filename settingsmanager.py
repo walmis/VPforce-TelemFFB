@@ -233,7 +233,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             pat_to_clone = dialog.models_combo_box.currentText()
             if new_combo_box_value != '':
                 logging.info (f"New: {new_aircraft} {new_combo_box_value}")
-                xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type', None,True)
+                xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type', None)
             else:
                 logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
                 xmlutils.clone_pattern(self.sim, pat_to_clone, new_aircraft)

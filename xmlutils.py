@@ -415,18 +415,18 @@ def update_data_with_models(defaults_data, model_data, replacetext):
     return updated_result
 
 
-def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', anydevice=False):
+def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''):
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
     model_elem = None
-    if anydevice:
+    the_device = device
+    if setting_name == 'type':
         the_device = 'any'
     else:
-        the_device = device
         # Check if an identical <models> element already exists
-        model_elem = root.find(f'.//models'  # [sim="{the_sim}"]'    # might be 'any' (from convert ini)
+        model_elem = root.find(f'.//models[sim="{the_sim}"]'  
                                f'[device="{the_device}"]'
                                f'[model="{the_model}"]'
                                f'[name="{setting_name}"]')
@@ -436,11 +436,8 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', an
         for child_elem in model_elem:
             if child_elem.tag == 'value':
                 child_elem.text = str(the_value)
-            if child_elem.tag == 'sim':
-                if child_elem.text == 'any':
-                    child_elem.text = the_sim
         tree.write(userconfig_path)
-        logging.info(f"Updated <models> element with values: sim={the_sim}, device={device}, "
+        logging.info(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}, model={the_model}, name={setting_name}")
 
     else:
