@@ -1377,7 +1377,7 @@ class MainWindow(QMainWindow):
         self.test_sim = QComboBox()
         self.test_sim.setMaximumWidth(60)
         self.test_sim.addItems(sims)
-        self.test_sim.currentIndexChanged.connect(self.test_sim_changed)
+        self.test_sim.currentTextChanged.connect(self.test_sim_changed)
         test_name_lbl = QLabel('Aircraft Name:')
         test_name_lbl.setMaximumWidth(90)
         test_name_lbl.setAlignment(Qt.AlignRight)
@@ -2339,7 +2339,7 @@ class SettingsLayout(QGridLayout):
                 unit_dropbox.addItems(validvalues)
                 unit_dropbox.setCurrentText(item['unit'])
             unit_dropbox.setObjectName(f"ud_{item['name']}")
-            unit_dropbox.currentIndexChanged.connect(self.unit_dropbox_changed)
+            unit_dropbox.currentTextChanged.connect(self.unit_dropbox_changed)
             self.addWidget(unit_dropbox, i, self.unit_col)
             unit_dropbox.blockSignals(False)
             unit_dropbox.setDisabled(rowdisabled)
@@ -2464,7 +2464,7 @@ class SettingsLayout(QGridLayout):
             dropbox.lineEdit().setReadOnly(True)
             dropbox.blockSignals(False)
             self.addWidget(dropbox, i, self.entry_col, 1, entry_colspan)
-            dropbox.currentIndexChanged.connect(self.dropbox_changed)
+            dropbox.currentTextChanged.connect(self.dropbox_changed)
 
         if item['datatype'] == 'path':
             browse_button = QPushButton()

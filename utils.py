@@ -452,6 +452,9 @@ def to_number(v : str):
         if v.lower().endswith("ft"):  # handle ft->m conversion
             scale = 0.3048
             v = v.strip("ft")
+        if v.lower().endswith("in"):  # handle in->m conversion
+            scale = 0.0254
+            v = v.strip("in")
         if v.lower().endswith("m^2"):  # strip out m meters suffix
             v = v.strip("m^2")
         if v.lower().endswith("ft^2"):  # handle ft^2->m^2 conversion
