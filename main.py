@@ -1131,6 +1131,11 @@ class MainWindow(QMainWindow):
         cfg_log_folder_action.triggered.connect(self.open_cfg_dir)
         system_menu.addAction(cfg_log_folder_action)
 
+        exit_app_action = QAction('Quit TelemFFB', self)
+        exit_app_action.triggered.connect(self.exit_application)
+        system_menu.addAction(exit_app_action)
+
+
         # Create the "Utilities" menu
         utilities_menu = menubar.addMenu('Utilities')
 
