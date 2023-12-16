@@ -2724,8 +2724,34 @@ class NoWheelSlider(QSlider):
         self.update_styles()
 
 
-def config_to_dict(section,name,value):
-    sim=''
+def select_sim_for_conversion(window, aircraft_name):
+    msg_box = QMessageBox(window)
+    msg_box.setIcon(QMessageBox.Question)
+    msg_box.setText(f"Please select the simulator to which '{aircraft_name}' from your user configuration belongs:")
+    msg_box.setWindowTitle("Simulator Selection")
+
+    msfs_button = QPushButton("MSFS")
+    dcs_button = QPushButton("DCS")
+    il2_button = QPushButton("IL2")
+
+    msg_box.addButton(msfs_button, QMessageBox.YesRole)
+    msg_box.addButton(dcs_button, QMessageBox.NoRole)
+    msg_box.addButton(il2_button, QMessageBox.NoRole)
+
+    result = msg_box.exec_()
+
+    if result == 0:  # MSFS button
+        return "MSFS"
+    elif result == 1:  # DCS button
+        return "DCS"
+    elif result == 2:  # IL2 button
+        return "IL2"
+    else:
+        return None
+
+
+def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
+    sim = ''
     cls = ''
     model = ''
     match section:
@@ -2759,7 +2785,7 @@ def config_to_dict(section,name,value):
     data_dict = {
         'name': name,
         'value': value,
-        'sim' : sim,
+        'sim': sim,
         'class': cls,
         'model': model,
         'device': args.type
@@ -2768,7 +2794,48 @@ def config_to_dict(section,name,value):
     return data_dict
 
 
-def convert_settings(cfg=configfile, usr=overridefile):
+# def convert_system_settings(usr=overridefile):
+
+def convert_settings(cfg=configfile, usr=overridefile, window=None):
+    differences = []
+    defaultconfig = ConfigObj(cfg)
+    userconfig = ConfigObj(usr, raise_errors=False)
+
+    def_params = {section: utils.sanitize_dict(defaultconfig[section]) for section in defaultconfig}
+    usr_params = {section: utils.sanitize_dict(userconfig[section]) for section in userconfig}
+
+    for section in usr_params:
+        if section in def_params:
+            # Compare common keys with different values
+            for key, value in usr_params[section].items():
+                if key in def_params[section] and def_params[section][key] != value:
+                    valuestring = str(value)
+                    dif_item = config_to_dict(section, key, valuestring)
+                    differences.append(dif_item)
+
+            # Identify keys that exist only in the user configuration
+            for key, value in usr_params[section].items():
+                if key not in def_params[section]:
+                    valuestring = str(value)
+                    dif_item = config_to_dict(section, key, valuestring)
+                    differences.append(dif_item)
+        else:
+            # All keys in the user configuration section are new
+            # non matching sectios must be new aircraft
+
+            sim = select_sim_for_conversion(window, section)
+            for key, value in usr_params[section].items():
+                valuestring = str(value)
+                if key == "type":
+                    dev = "any"
+                else:
+                    dev = args.type
+                dif_item = config_to_dict(section, key, valuestring, isim=sim, device=dev)
+                differences.append(dif_item)
+
+    xmlutils.write_converted_to_xml(differences)
+
+def convert_settings_old(cfg=configfile, usr=overridefile):
     differences = []
     defaultconfig = load_legacy_config(cfg)
     userconfig = load_legacy_config(usr, raise_errors=False)
@@ -2796,13 +2863,13 @@ def convert_settings(cfg=configfile, usr=overridefile):
 
 
 def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
-    test = False
+    test = True
     if args.overridefile != 'None':
         ans = QMessageBox.information(main_window, "Important TelemFFB Update Notification", f"The 'ini' config file type is now deprecated.\n\nThis version of TelemFFB uses a new UI driven config model\n\nIt appears you are using a user override file ({args.overridefile}).  Would you\nlike to auto-convert that file to the new config model?\n\nIf you choose not to, you may also perform the conversion from\nthe Utilities menu\n\nProceeding will convert the config and re-name your\nexisting user config to '{os.path.basename(usr)}.legacy'", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
         if ans == QMessageBox.No:
             return
         # perform the conversion
-        convert_settings(cfg=cfg, usr=usr)
+        convert_settings(cfg=cfg, usr=usr, window=main_window)
         if not test: os.rename(usr,f"{usr}.legacy")
         QMessageBox.information(main_window, "Conversion Completed", "The conversion is complete.  You may now continue to use TelemFFB.\n\nTo avoid unnecessary log messages, please remove any '-c' or '-o' arguments from your startup shortcut as they are no longer supported")
 
