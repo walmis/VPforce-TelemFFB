@@ -376,6 +376,8 @@ class AircraftBase(object):
         # freq, mag = self._calc_buffeting(aoa, tas, telem_data)
         # manage periodic effect for buffeting
         mag = airflow_factor * buffeting_factor * self.buffeting_intensity
+        pct_max_stall_buffet = mag / self.buffeting_intensity
+        telem_data['_pct_max_stall_buffet'] = pct_max_stall_buffet
         #logging.debug(f"Buffeting: {mag}")
         effects["buffeting"].periodic(freq, mag, utils.RandomDirectionModulator).start()
         # effects["buffeting2"].periodic(freq, mag, 45, phase=120).start()
