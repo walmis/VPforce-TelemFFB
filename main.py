@@ -1136,6 +1136,11 @@ class MainWindow(QMainWindow):
         cfg_log_folder_action.triggered.connect(self.open_cfg_dir)
         system_menu.addAction(cfg_log_folder_action)
 
+        reset_geometry = QAction('Reset Window Size/Position', self)
+        reset_geometry.triggered.connect(self.reset_window_size)
+        system_menu.addAction(reset_geometry)
+
+        # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
         exit_app_action = QAction('Quit TelemFFB', self)
         exit_app_action.triggered.connect(self.exit_application)
         system_menu.addAction(exit_app_action)
@@ -1158,16 +1163,11 @@ class MainWindow(QMainWindow):
         download_action.triggered.connect(lambda: self.open_url(dl_url))
         utilities_menu.addAction(download_action)
 
-
-        reset_geometry = QAction('Reset Window Size/Position', self)
-        reset_geometry.triggered.connect(self.reset_window_size)
-        utilities_menu.addAction(reset_geometry)
-        # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
-        menubar.setStyleSheet("QAction:disabled { color: red; }")
-
         self.vpconf_action = QAction("Launch VPforce Configurator", self)
         self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf(dev_serial))
         utilities_menu.addAction(self.vpconf_action)
+
+
 
 
 
@@ -1186,6 +1186,10 @@ class MainWindow(QMainWindow):
         docs_action = QAction('Documentation', self)
         docs_action.triggered.connect(lambda: self.open_url(doc_url))
         help_menu.addAction(docs_action)
+
+        self.support_action = QAction("Create support bundle", self)
+        self.support_action.triggered.connect(lambda: utils.create_support_bundle(userconfig_rootpath))
+        help_menu.addAction(self.support_action)
 
         # Create a line beneath the menu bar
         line = QFrame()

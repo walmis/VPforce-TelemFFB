@@ -19,6 +19,8 @@ import math
 import os
 import random
 import re
+import shutil
+import zipfile
 from collections import defaultdict, deque
 
 import select
@@ -27,6 +29,7 @@ import logging
 import sys
 
 from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtWidgets import QFileDialog
 
 import winpaths
 import winreg
@@ -385,6 +388,88 @@ def get_default_sys_settings(tp):
         tb: 1,
     }
     return def_syst_dict
+
+
+def create_support_bundle(userconfig_rootpath):
+    # Get the  system settings
+    sys_dict = read_all_system_settings()
+
+    # Prompt the user for the destination and filename for the zip file
+    file_dialog = QFileDialog()
+    file_dialog.setFileMode(QFileDialog.AnyFile)
+    file_dialog.setAcceptMode(QFileDialog.AcceptSave)
+    file_dialog.setNameFilter("Zip Files (*.zip)")
+
+    if file_dialog.exec_():
+        # Get the selected file path
+        zip_file_path = file_dialog.selectedFiles()[0]
+
+        # Create a temporary folder to store files
+        temp_folder = "temp_support_bundle"
+        os.makedirs(temp_folder, exist_ok=True)
+
+        try:
+            # Save userconfig.xml to the temporary folder
+            userconfig_path = os.path.join(temp_folder, "userconfig.xml")
+            shutil.copy(os.path.join(userconfig_rootpath, "userconfig.xml"), userconfig_path)
+
+            # Save the contents of the 'log' folder to the temporary folder
+            log_folder_path = os.path.join(temp_folder, "log")
+            shutil.copytree(os.path.join(userconfig_rootpath, "log"), log_folder_path)
+
+            # Save system settings to a temporary .cfg file
+            cfg_file_path = os.path.join(temp_folder, "system_settings.cfg")
+            with open(cfg_file_path, "w") as cfg_file:
+                # Write each key-value pair as 'key=value' on a new line
+                for key, value in sys_dict.items():
+                    cfg_file.write(f"{key}={value}\n")
+
+            # Create the support zip file
+            with zipfile.ZipFile(zip_file_path, 'w') as support_zip:
+                # Add userconfig.xml, log folder, and system settings .cfg file to the zip
+                support_zip.write(userconfig_path, "userconfig.xml")
+                for folder_name, subfolders, filenames in os.walk(log_folder_path):
+                    for filename in filenames:
+                        file_path = os.path.join(folder_name, filename)
+                        arcname = os.path.relpath(file_path, temp_folder)
+                        support_zip.write(file_path, os.path.join("log", arcname))
+                support_zip.write(cfg_file_path, "system_settings.cfg")
+
+        finally:
+            # Clean up the temporary folder
+            shutil.rmtree(temp_folder)
+
+def read_all_system_settings():
+    REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
+
+    settings_dict = {}
+
+    try:
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
+
+        # Iterate through all values in the registry key
+        index = 0
+        while True:
+            try:
+                name, value, _ = winreg.EnumValue(registry_key, index)
+                settings_dict[name] = value
+                index += 1
+            except WindowsError as e:
+                # Break when there are no more values
+                if e.winerror == 259:  # ERROR_NO_MORE_ITEMS
+                    break
+    except WindowsError:
+        # Handle errors (key not found, etc.)
+        pass
+    finally:
+        try:
+            winreg.CloseKey(registry_key)
+        except UnboundLocalError:
+            # Handle case where registry_key is not defined
+            pass
+
+    return settings_dict
+
 def read_system_settings(tp):
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
     def_syst_dict = get_default_sys_settings(tp)
