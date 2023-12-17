@@ -145,8 +145,8 @@ class Aircraft(AircraftBase):
 
     force_trim_enabled = 0
     cyclic_spring_gain = 1.0
-    force_trim_button = "not_configured"
-    force_trim_reset_button = "not_configured"
+    force_trim_button = 0
+    force_trim_reset_button = 0
     include_dynamic_stick_forces = True
 
     elevator_force_trim = 0
@@ -831,7 +831,7 @@ class GliderAircraft(Aircraft):
         offs_y = 0
         if ffb_type != "joystick":
             return
-        if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
+        if self.force_trim_button == 0 or self.force_trim_reset_button == 0:
             logging.warning("Force trim enabled but buttons not configured")
             return
 
@@ -1039,7 +1039,7 @@ class Helicopter(Aircraft):
         if ffb_type == "joystick":
             if self.force_trim_enabled:
 
-                if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
+                if self.force_trim_button == 0 or self.force_trim_reset_button == 0:
                     logging.warning("Force trim enabled but buttons not configured")
                     return
                 self.spring = effects["cyclic_spring"].spring()
