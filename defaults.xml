@@ -56,6 +56,18 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
+		<order>2.5</order>
+		<displayname>Aileron Max</displayname>
+		<name>max_aileron_coeff</name>
+		<info>Aileron maximum value for use in dynamic forces calculations</info>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
 		<order>3</order>
 		<displayname>Elevator Gain</displayname>
 		<name>elevator_gain</name>
@@ -68,11 +80,35 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
+		<order>3.5</order>
+		<displayname>Elevator Max</displayname>
+		<name>max_elevator_coeff</name>
+		<info>Elevator maximum value for use in dynamic forces calculations</info>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
 		<order>4</order>
 		<displayname>Rudder Gain</displayname>
 		<name>rudder_gain</name>
 		<info>Rudder gain value for use in dynamic forces calculations</info>
 		<sliderfactor>0.5</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>4.5</order>
+		<displayname>Rudder Max</displayname>
+		<name>max_rudder_coeff</name>
+		<info>Rudder maximum value for use in dynamic forces calculations</info>
+		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
@@ -1543,7 +1579,7 @@
 		<order>791.1</order>
 		<displayname>Speedbrake Motion</displayname>
 		<name>speedbrake_motion_intensity</name>
-		<info>peak vibration intensity when speed brake is moving</info>
+		<info>s</info>
 		<prereq>speedbrake_motion_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -4126,141 +4162,6 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>TBM 830.*</model>
-		<value>0.01</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>aileron_spring_gain</name>
-		<model>TBM 830.*</model>
-		<value>0.08</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>aircraft_is_spring_centered</name>
-		<model>TBM 830.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>TBM 830.*</model>
-		<value>0.02</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_spring_gain</name>
-		<model>TBM 830.*</model>
-		<value>0.08</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>engine_rumble_lowrpm_intensity</name>
-		<model>TBM 830.*</model>
-		<value>0.042</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>TBM 830.*</model>
-		<value>-0.48</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>TBM 830.*</model>
-		<value>7.57</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>TBM 830.*</model>
-		<value>7.57</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>rudder_gain</name>
-		<model>TBM 830.*</model>
-		<value>0.03</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>rudder_spring_gain</name>
-		<model>TBM 830.*</model>
-		<value>0.11</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>TBM 830.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>TBM 830.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>aileron_gain</name>
-		<model>TBM 930.*</model>
-		<value>0.01</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>aileron_spring_gain</name>
-		<model>TBM 930.*</model>
-		<value>0.08</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>aircraft_is_spring_centered</name>
-		<model>TBM 930.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>aircraft_is_spring_centered</name>
-		<model>TBM 930.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>TBM 930.*</model>
-		<value>0.02</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_spring_gain</name>
-		<model>TBM 930.*</model>
-		<value>0.08</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>engine_rumble_lowrpm_intensity</name>
 		<model>TBM 930.*</model>
 		<value>0.042</value>
@@ -4283,14 +4184,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>prop_diameter</name>
-		<model>TBM 930.*</model>
-		<value>7.57</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
 		<name>rudder_gain</name>
 		<model>TBM 930.*</model>
 		<value>0.03</value>
@@ -4298,18 +4191,32 @@
 		<device>pedals</device>
 	</models>
 	<models>
-		<name>rudder_spring_gain</name>
+		<name>aileron_gain</name>
 		<model>TBM 930.*</model>
-		<value>0.11</value>
+		<value>0.25</value>
 		<sim>MSFS</sim>
-		<device>pedals</device>
+		<device>joystick</device>
 	</models>
 	<models>
-		<name>type</name>
+		<name>elevator_gain</name>
 		<model>TBM 930.*</model>
-		<value>TurbopropAircraft</value>
+		<value>0.25</value>
 		<sim>MSFS</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>TBM 930.*</model>
+		<value>0.34</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>TBM 930.*</model>
+		<value>0.34</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -4542,6 +4449,48 @@
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>max_aileron_coeff</name>
+		<type>TurbopropAircraft</type>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>max_elevator_coeff</name>
+		<type>TurbopropAircraft</type>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>max_rudder_coeff</name>
+		<type>TurbopropAircraft</type>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>max_aileron_coeff</name>
+		<type>PropellerAircraft</type>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>max_elevator_coeff</name>
+		<type>PropellerAircraft</type>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>max_rudder_coeff</name>
+		<type>PropellerAircraft</type>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>aileron_gain</name>
@@ -6090,34 +6039,6 @@
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
-	<classdefaults>
-		<name>uncoordinated_turn_effect_enabled</name>
-		<type>GliderAircraft</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</classdefaults>
-	<classdefaults>
-		<name>uncoordinated_turn_effect_enabled</name>
-		<type>JetAircraft</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</classdefaults>
-	<classdefaults>
-		<name>uncoordinated_turn_effect_enabled</name>
-		<type>PropellerAircraft</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</classdefaults>
-	<classdefaults>
-		<name>uncoordinated_turn_effect_enabled</name>
-		<type>TurbopropAircraft</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</classdefaults>
 <classdefaults>
 		<name>use_legacy_bindings</name>
 		<type>Helicopter</type>
