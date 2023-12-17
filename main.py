@@ -106,7 +106,8 @@ from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
     QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
+    QThread
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence, QIntValidator, QCursor
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
@@ -1057,6 +1058,40 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             save_window = settings_dict['cSaveT']
             self.cb_save_view.setChecked(save_window)
 
+
+class ButtonPressThread(QThread):
+    button_pressed = pyqtSignal(str, int)
+
+    def __init__(self, device, button_name, timeout=5):
+        super(ButtonPressThread, self).__init__()
+        self.device = device
+        self.button_name = button_name
+        self.timeout = timeout
+        self.prev_button_state = None
+
+    def run(self):
+        start_time = time.time()
+        emit_sent = 0
+        input_data = self.device.device.getInput()
+
+        initial_buttons = input_data.getPressedButtons()
+
+        while not emit_sent and time.time() - start_time < self.timeout:
+            input_data = self.device.device.getInput()
+            current_btns = set(input_data.getPressedButtons())
+
+            # Check for new button press
+            for btn in current_btns:
+                if not btn in initial_buttons:
+                    self.button_pressed.emit(self.button_name, btn)
+                    emit_sent = 1
+
+            self.prev_button_state = current_btns
+            time.sleep(0.1)
+
+        # Emit signal for timeout with value 0
+        if not emit_sent:
+            self.button_pressed.emit(self.button_name, 0)
 
 class MainWindow(QMainWindow):
     def __init__(self, settings_manager):
@@ -2659,11 +2694,15 @@ class SettingsLayout(QGridLayout):
         button_name = self.sender().objectName().replace('pb_', '')
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText("Push a button! ")
-        # listen for button loop
-        pass
 
-    # def slider_changed(self, name, value, factor):
-    #     print(f"Slider {name} changed. New value: {value}  factor: {factor}")
+        # Start a thread to fetch button press with a timeout
+        self.thread = ButtonPressThread(self.device, button_name)
+        self.thread.button_pressed.connect(self.update_button)
+        self.thread.start()
+
+    def update_button(self, button_name, value):
+        the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
+        the_button.setText(str(value))
 
 
     def slider_changed(self):
