@@ -38,7 +38,7 @@ parser.add_argument('-c', '--configfile', type=str, help='Config ini file (defau
 parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='None')
 parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
 parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default='joystick')
-#parser.add_argument('-X', '--xml', help='use XML config', nargs='?', const='default')
+parser.add_argument('--headless', action='store_true', help='Run in headless mode')
 
 args = parser.parse_args()
 args.sim = str.upper(args.sim)
@@ -50,7 +50,7 @@ import time
 import os
 import utils
 
-
+headless_mode = args.headless
 system_settings = utils.read_system_settings(args.type)
 
 sys.path.insert(0, '')
@@ -3061,12 +3061,14 @@ def main():
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
     window = MainWindow(settings_manager=settings_mgr)
-    window.show()
-    autoconvert_config(window)
-    fetch_version_thread = utils.FetchLatestVersionThread()
-    fetch_version_thread.version_result_signal.connect(window.update_version_result)
-    fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
-    fetch_version_thread.start()
+
+    if not headless_mode:
+        window.show()
+        autoconvert_config(window)
+        fetch_version_thread = utils.FetchLatestVersionThread()
+        fetch_version_thread.version_result_signal.connect(window.update_version_result)
+        fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
+        fetch_version_thread.start()
 
     telem_manager = TelemManager(settings_manager=settings_mgr)
     telem_manager.start()
