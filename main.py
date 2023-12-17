@@ -2016,6 +2016,23 @@ class MainWindow(QMainWindow):
         #     self.settings_area.hide()
         #     self.resize(0,0)
 
+    def interpolate_color(self, color1, color2, value):
+        # Ensure value is between 0 and 1
+        value = max(0.0, min(1.0, value))
+
+        # Extract individual color components
+        r1, g1, b1, a1 = color1.getRgb()
+        r2, g2, b2, a2 = color2.getRgb()
+
+        # Interpolate each color component
+        r = int(r1 + (r2 - r1) * value)
+        g = int(g1 + (g2 - g1) * value)
+        b = int(b1 + (b2 - b1) * value)
+        a = int(a1 + (a2 - a1) * value)
+
+        # Create and return the interpolated color
+        return QColor(r, g, b, a)
+
     def update_telemetry(self, data: dict):
         try:
             items = ""
@@ -2039,13 +2056,35 @@ class MainWindow(QMainWindow):
             # window_mode = self.radio_button_group.checkedButton()
             window_mode = self.tab_widget.currentIndex()
             # update slider colors
-
+            pct_max_a = data.get('pct_max_a', 0)
+            pct_max_e = data.get('pct_max_e', 0)
+            pct_max_r = data.get('pct_max_r', 0)
+            qcolor_green = QColor("#17c411")
+            qcolor_purple = QColor(vpf_purple)
             if window_mode == 1:
                 sliders = self.findChildren(NoWheelSlider)
                 for my_slider in sliders:
                     slidername = my_slider.objectName().replace('sld_','')
-                    #print (slidername)
                     my_slider.blockSignals(True)
+
+                    if slidername == 'max_elevator_coeff':
+                        new_color = self.interpolate_color(qcolor_purple, qcolor_green, pct_max_e)
+                        my_slider.setHandleColor(new_color.name())
+                        # print(new_color)
+                        my_slider.blockSignals(False)
+                        continue
+                    if slidername == 'max_aileron_coeff':
+                        new_color = self.interpolate_color(qcolor_purple, qcolor_green, pct_max_a)
+                        my_slider.setHandleColor(new_color.name())
+                        # print(new_color)
+                        my_slider.blockSignals(False)
+                        continue
+                    if slidername == 'max_rudder_coeff':
+                        new_color = self.interpolate_color(qcolor_purple, qcolor_green, pct_max_r)
+                        my_slider.setHandleColor(new_color.name())
+                        # print(new_color)
+                        my_slider.blockSignals(False)
+                        continue
                     for a_s in active_settings:
                         if bool(re.search(a_s, slidername)):
                             my_slider.setHandleColor("#17c411")
