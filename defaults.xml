@@ -128,7 +128,7 @@
 	<defaults>
 		<Grouping>Basic</Grouping>
 		<order>9</order>
-		<displayname>Enable Force Trim</displayname>
+		<displayname>Force Trim</displayname>
 		<name>force_trim_enabled</name>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
@@ -142,7 +142,7 @@
 		<name>force_trim_button</name>
 		<info>Button # to hold to release spring while moving axis</info>
 		<prereq>force_trim_enabled</prereq>
-		<datatype>int</datatype>
+		<datatype>button</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
@@ -154,7 +154,7 @@
 		<name>force_trim_reset_button</name>
 		<info>Button # to recenter spring trims</info>
 		<prereq>force_trim_enabled</prereq>
-		<datatype>int</datatype>
+		<datatype>button</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
@@ -172,7 +172,7 @@
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>20</order>
-		<displayname>Enable Spring Centering (not FBW)</displayname>
+		<displayname>Spring Centering (not FBW)</displayname>
 		<name>aircraft_is_spring_centered</name>
 		<info>Enable spring centering for aircraft while maintaining dynamic forces&lt;br&gt;&lt;br&gt; Do not use together with FBW</info>
 		<write_any_device>true</write_any_device>
@@ -225,7 +225,7 @@
 	<defaults>
 		<Grouping>FlyByWire</Grouping>
 		<order>25</order>
-		<displayname>Enable FlyByWire (FBW)</displayname>
+		<displayname>FlyByWire (FBW)</displayname>
 		<name>aircraft_is_fbw</name>
 		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
 		<datatype>bool</datatype>
@@ -391,6 +391,7 @@
 		<order>31.2</order>
 		<displayname>X Trim Gain Physical</displayname>
 		<name>joystick_trim_follow_gain_physical_x</name>
+		<info>Aileron/Cyclic Lateral physical movement scalar</info>
 		<prereq>trim_following</prereq>
 		<value>1.0</value>
 		<validvalues>-100,100</validvalues>
@@ -417,6 +418,7 @@
 		<order>31.4</order>
 		<displayname>Y Trim Gain Physical</displayname>
 		<name>joystick_trim_follow_gain_physical_y</name>
+		<info>Elevator/Cyclic Longitudinal physical movement scalar</info>
 		<prereq>trim_following</prereq>
 		<value>1.0</value>
 		<validvalues>-100,100</validvalues>
@@ -444,6 +446,7 @@
 		<order>31.6</order>
 		<displayname>Rudder Trim Gain (physical)</displayname>
 		<name>rudder_trim_follow_gain_physical_x</name>
+		<info>Rudder physical trim movement scalar</info>
 		<prereq>trim_following</prereq>
 		<value>1.0</value>
 		<validvalues>-100,100</validvalues>
@@ -468,7 +471,7 @@
 	<defaults>
 		<Grouping>Axis Control</Grouping>
 		<order>32</order>
-		<displayname>Enable Autopilot Following</displayname>
+		<displayname>Autopilot Following</displayname>
 		<name>ap_following</name>
 		<info>Enable physical stick following of autopilot movements</info>
 		<prereq>telemffb_controls_axes</prereq>
@@ -550,7 +553,7 @@
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>39</order>
-		<displayname>Enable Pedal Trimming</displayname>
+		<displayname>Pedal Trimming</displayname>
 		<name>pedal_trimming_enabled</name>
 		<value>true</value>
 		<datatype>bool</datatype>
@@ -561,7 +564,7 @@
 	<defaults>
 		<Grouping>G Force</Grouping>
 		<order>100.1</order>
-		<displayname>G Force Max Intensity</displayname>
+		<displayname>G Force Effect</displayname>
 		<name>gforce_effect_max_intensity</name>
 		<prereq>gforce_effect_enable</prereq>
 		<value>1.0</value>
@@ -623,6 +626,7 @@
 		<order>110</order>
 		<displayname>Elevator Prop Flow</displayname>
 		<name>elevator_prop_flow_ratio</name>
+		<info>Scaling of dynamic effects on elevator</info>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
@@ -647,7 +651,9 @@
 		<order>112</order>
 		<displayname>Rudder Prop Flow</displayname>
 		<name>rudder_prop_flow_ratio</name>
-		<datatype>anyfloat</datatype>
+		<info>Scaling of dynamic effects on rudder</info>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 	</defaults>
@@ -716,7 +722,7 @@
 	<defaults>
 		<Grouping>ETL</Grouping>
 		<order>230</order>
-		<displayname>Enable ETL Effect</displayname>
+		<displayname>ETL Effect</displayname>
 		<name>etl_effect_enable</name>
 		<info>Enable Effective Translational Lift Shimmy</info>
 		<write_any_device>true</write_any_device>
@@ -777,7 +783,7 @@
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>250</order>
-		<displayname>Heli Engine/Rotor Effect</displayname>
+		<displayname>Heli Engine/Rotor Rumble</displayname>
 		<name>engine_rotor_rumble_enabled</name>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
@@ -790,7 +796,7 @@
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>250.1</order>
-		<displayname>Heli Engine/Rotor Rumble Intensity</displayname>
+		<displayname>Heli Engine/Rotor Rumble</displayname>
 		<name>heli_engine_rumble_intensity</name>
 		<info>peak rumble intensity for helicopter engine/rotor effect</info>
 		<prereq>engine_rotor_rumble_enabled</prereq>
@@ -836,9 +842,9 @@
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>300</order>
-		<displayname>Afterburner Effect</displayname>
+		<displayname>Afterburner Rumble</displayname>
 		<name>afterburner_effect_enabled</name>
-		<info>Max intensity of afterburner rumble effect&lt;br&gt;&lt;br&gt;Set to 0 to disable</info>
+		<info>Enable afterburner rumble effect</info>
 		<write_any_device>true</write_any_device>
 		<validvalues>0,100</validvalues>
 		<datatype>bool</datatype>
@@ -853,7 +859,7 @@
 		<order>300.1</order>
 		<displayname>Afterburner Rumble</displayname>
 		<name>afterburner_effect_intensity</name>
-		<info>Max intensity of afterburner rumble effect&lt;br&gt;&lt;br&gt;Set to 0 to disable</info>
+		<info>Max intensity of afterburner rumble effect</info>
 		<prereq>afterburner_effect_enabled</prereq>
 		<value>0.2</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -868,7 +874,7 @@
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>330</order>
-		<displayname>Propeller Rumble Effect</displayname>
+		<displayname>Propeller Rumble</displayname>
 		<name>engine_prop_rumble_enabled</name>
 		<info>Enable Propeller Rumble</info>
 		<write_any_device>true</write_any_device>
@@ -902,7 +908,7 @@
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>330.3</order>
-		<displayname>Engine Rumble Low Intensity</displayname>
+		<displayname>Engine Rumble Low Rumble</displayname>
 		<name>engine_rumble_lowrpm_intensity</name>
 		<info>peak intenstiy of engine rumble at low RPM threshold</info>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -939,7 +945,7 @@
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>330.5</order>
-		<displayname>Engine Rumble High Intensity</displayname>
+		<displayname>Engine Rumble High Rumble</displayname>
 		<name>engine_rumble_highrpm_intensity</name>
 		<info>peak intensity of engine rumble at high RPM threshold</info>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -957,7 +963,7 @@
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>360</order>
-		<displayname>Jet Engine Effect</displayname>
+		<displayname>Jet Engine Rumble</displayname>
 		<name>engine_jet_rumble_enabled</name>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
@@ -1016,7 +1022,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>512</order>
-		<displayname>Enable Buffeting</displayname>
+		<displayname>Buffeting</displayname>
 		<name>il2_enable_buffet</name>
 		<prereq>il2_shake_master</prereq>
 		<value>true</value>
@@ -1028,7 +1034,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>512.1</order>
-		<displayname>Buffeting Intensity</displayname>
+		<displayname>Buffeting</displayname>
 		<name>il2_buffeting_factor</name>
 		<info>common setting for all buffeting (stall, gear, etc)  - IL2 limitation</info>
 		<prereq>il2_enable_buffet</prereq>
@@ -1040,7 +1046,7 @@
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>513</order>
-		<displayname>Enable Runway Rumble</displayname>
+		<displayname>Runway Rumble</displayname>
 		<name>il2_enable_runway_rumble</name>
 		<prereq>il2_shake_master</prereq>
 		<value>true</value>
@@ -1052,7 +1058,7 @@
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>513.1</order>
-		<displayname>Runway Rumble Intensity</displayname>
+		<displayname>Runway Rumble</displayname>
 		<name>il2_runway_rumble_intensity</name>
 		<prereq>il2_enable_runway_rumble</prereq>
 		<value>0.12</value>
@@ -1066,7 +1072,7 @@
 	<defaults>
 		<Grouping>Weapons</Grouping>
 		<order>514</order>
-		<displayname>Enable Weapon Effects</displayname>
+		<displayname>Weapon Effects</displayname>
 		<name>il2_enable_weapons</name>
 		<prereq>il2_shake_master</prereq>
 		<value>true</value>
@@ -1078,7 +1084,7 @@
 	<defaults>
 		<Grouping>Weapons</Grouping>
 		<order>514.1</order>
-		<displayname>Weaon Effect Intensity</displayname>
+		<displayname>Weapon Effects</displayname>
 		<name>il2_weapon_release_intensity</name>
 		<prereq>il2_enable_weapons</prereq>
 		<value>0.2</value>
@@ -1204,9 +1210,9 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>730.1</order>
-		<displayname>Buffeting Intensity</displayname>
+		<displayname>AoA/Stall Buffeting</displayname>
 		<name>buffeting_intensity</name>
-		<info>peak AoA buffeting intensity  0 to disable</info>
+		<info>Peak AoA buffeting intensity</info>
 		<prereq>aoa_buffeting_enabled</prereq>
 		<value>0.2</value>
 		<validvalues>0,100</validvalues>
@@ -1250,7 +1256,7 @@
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>740</order>
-		<displayname>Canopy Motion Enable</displayname>
+		<displayname>Canopy Motion</displayname>
 		<name>canopy_motion_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<value>true</value>
@@ -1279,7 +1285,7 @@
 	<defaults>
 		<Grouping>Weapons</Grouping>
 		<order>750</order>
-		<displayname>Enable Damage Effect</displayname>
+		<displayname>Damage Effect</displayname>
 		<name>damage_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<value>false</value>
@@ -1307,7 +1313,7 @@
 	<defaults>
 		<Grouping>G Force</Grouping>
 		<order>755</order>
-		<displayname>Enable Decelleration Effect</displayname>
+		<displayname>Decelleration Effect</displayname>
 		<name>deceleration_effect_enable</name>
 		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		<write_any_device>true</write_any_device>
@@ -1334,7 +1340,7 @@
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>760</order>
-		<displayname>Flaps Motion Enable</displayname>
+		<displayname>Flaps Motion</displayname>
 		<name>flaps_motion_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
@@ -1366,7 +1372,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>770</order>
-		<displayname>Gear Buffet Enable</displayname>
+		<displayname>Gear Buffet</displayname>
 		<name>gear_buffet_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<value>true</value>
@@ -1397,7 +1403,7 @@
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>775</order>
-		<displayname>Gear Motion Enable</displayname>
+		<displayname>Gear Motion</displayname>
 		<name>gear_motion_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<value>true</value>
@@ -1430,7 +1436,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>777</order>
-		<displayname>Enable Overpeed Shake </displayname>
+		<displayname>Overpeed Shake </displayname>
 		<name>overspeed_shake_enable</name>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
@@ -1443,7 +1449,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>777.1</order>
-		<displayname>Overpeed Shake Intensity</displayname>
+		<displayname>Overpeed Shake </displayname>
 		<name>overspeed_shake_intensity</name>
 		<prereq>overspeed_shake_enable</prereq>
 		<validvalues>0,100</validvalues>
@@ -1487,7 +1493,7 @@
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>780.1</order>
-		<displayname>Runway Rumble Intensity</displayname>
+		<displayname>Runway Rumble</displayname>
 		<name>runway_rumble_intensity</name>
 		<info>Peak runway rumble intensity</info>
 		<prereq>runway_rumble_enabled</prereq>
@@ -1504,7 +1510,7 @@
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>785</order>
-		<displayname>Enable Nosewheel Shimmy</displayname>
+		<displayname>Nosewheel Shimmy</displayname>
 		<name>nosewheel_shimmy</name>
 		<value>false</value>
 		<datatype>bool</datatype>
@@ -1550,7 +1556,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>790</order>
-		<displayname>Speedbrake Buffet Enable</displayname>
+		<displayname>Speedbrake Buffet</displayname>
 		<name>speedbrake_buffet_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
@@ -1578,7 +1584,7 @@
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>791</order>
-		<displayname>Speedbrake Motion Enable</displayname>
+		<displayname>Speedbrake Motion</displayname>
 		<name>speedbrake_motion_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
@@ -1606,7 +1612,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>792</order>
-		<displayname>Spoiler Buffet Enable</displayname>
+		<displayname>Spoiler Buffet</displayname>
 		<name>spoiler_buffet_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
@@ -1636,7 +1642,7 @@
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>793</order>
-		<displayname>Spoiler Motion Enable</displayname>
+		<displayname>Spoiler Motion</displayname>
 		<name>spoiler_motion_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
@@ -1688,7 +1694,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>810</order>
-		<displayname>Enable Wind Effect</displayname>
+		<displayname>Wind Effect</displayname>
 		<name>wind_effect_enabled</name>
 		<write_any_device>true</write_any_device>
 		<value>false</value>
@@ -1699,7 +1705,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>810.1</order>
-		<displayname>Wind Effect Max Inensity</displayname>
+		<displayname>Wind Effect</displayname>
 		<name>wind_effect_max_intensity</name>
 		<info>Adjust the maximum intensity the wind effect can attain</info>
 		<prereq>wind_effect_enabled</prereq>
@@ -2453,6 +2459,14 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Beechcraft King Air.*</model>
+		<value>8.8</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>aileron_gain</name>
 		<model>Beechcraft King Air.*</model>
@@ -5133,30 +5147,79 @@
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
-		<name>force_trim_reset_button</name>
+		<name>force_trim_enabled</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_button</name>
+		<type>GliderAircraft</type>
+		<value>0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_button</name>
 		<type>Helicopter</type>
-		<value>99</value>
+		<value>0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_button</name>
+		<type>Helicopter</type>
+		<value>0</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_button</name>
+		<type>HPGHelicopter</type>
+		<value>0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_button</name>
+		<type>HPGHelicopter</type>
+		<value>0</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_reset_button</name>
+		<type>GliderAircraft</type>
+		<value>0</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>force_trim_reset_button</name>
 		<type>Helicopter</type>
-		<value>99</value>
+		<value>0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_reset_button</name>
+		<type>Helicopter</type>
+		<value>0</value>
 		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
 	<classdefaults>
 		<name>force_trim_reset_button</name>
 		<type>HPGHelicopter</type>
-		<value>99</value>
+		<value>0</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>force_trim_reset_button</name>
 		<type>HPGHelicopter</type>
-		<value>99</value>
+		<value>0</value>
 		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
