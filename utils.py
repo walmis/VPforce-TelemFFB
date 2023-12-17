@@ -370,7 +370,7 @@ def get_default_sys_settings(tp):
         vw = 'cSaveT'
         tb = 'cTab'
     def_syst_dict = {
-        '': 'INFO',
+        'logLevel': 'INFO',
         'telemTimeout': 200,
         'ignoreUpdate': False,
         'enableDCS': False,

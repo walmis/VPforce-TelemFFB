@@ -985,7 +985,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         stop_sims()
         init_sims()
         self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2'], settings_dict)
-
+        # adjust logging level:
+        ll = self.logLevel.currentText()
+        if ll == "INFO":
+            logger.setLevel(logging.INFO)
+        elif ll == "DEBUG":
+            logger.setLevel(logging.DEBUG)
         self.accept()
 
     def load_settings(self, default=False):
@@ -2993,7 +2998,7 @@ def main():
 
     # config = get_config()
     # ll = config["system"].get("logging_level", "INFO")
-    ll = utils.read_system_settings(args.type).get('loggingLevel', 'INFO')
+    ll = utils.read_system_settings(args.type).get('logLevel', 'INFO')
     log_levels = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
