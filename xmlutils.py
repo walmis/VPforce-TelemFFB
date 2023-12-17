@@ -79,6 +79,23 @@ def read_xml_file(the_sim):
     return sorted_data
 
 
+def read_anydevice_settings(the_sim):
+
+    tree = ET.parse(defaults_path)
+    root = tree.getroot()
+
+    # Collect data in a list of dictionaries
+    data_list = []
+    for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][write_any_device="true"]'):
+
+        name_elem = defaults_elem.find('name')
+        if name_elem is not None:
+            name = name_elem.text
+            data_list.append(name)
+
+    return data_list
+
+
 def read_models(the_sim):
     all_models = ['']
     tree = ET.parse(defaults_path)
@@ -422,20 +439,24 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''):
     root = tree.getroot()
     model_elem = None
     the_device = device
-    if setting_name == 'type':
+    write_any_device_list = read_anydevice_settings(the_sim)
+    if setting_name in write_any_device_list:
         the_device = 'any'
-    else:
-        # Check if an identical <models> element already exists
-        model_elem = root.find(f'.//models[sim="{the_sim}"]'  
+
+    # Check if an identical <models> element already exists
+    model_elem = root.find(f'.//models[sim="{the_sim}"]'  
                                f'[device="{the_device}"]'
                                f'[model="{the_model}"]'
                                f'[name="{setting_name}"]')
+
 
     if model_elem is not None:
         # Update the value of the existing element
         for child_elem in model_elem:
             if child_elem.tag == 'value':
                 child_elem.text = str(the_value)
+            if child_elem.tag == 'unit':
+                child_elem.text = str(unit)
         tree.write(userconfig_path)
         logging.info(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}, model={the_model}, name={setting_name}")
@@ -482,10 +503,13 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
-
+    the_device = device
+    write_any_device_list = read_anydevice_settings(the_sim)
+    if setting_name in write_any_device_list:
+        the_device = 'any'
     # Check if an identical <classSettings> element already exists
     class_elem = root.find(f'.//classSettings[sim="{the_sim}"]'
-                           f'[device="{device}"]'
+                           f'[device="{the_device}"]'
                            f'[type="{the_class}"]'
                            f'[name="{setting_name}"]')
 
@@ -495,7 +519,7 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
             if child_elem.tag == 'value':
                 child_elem.text = str(the_value)
         tree.write(userconfig_path)
-        logging.info(f"Updated <classSettings> element with values: sim={the_sim}, device={device}, "
+        logging.info(f"Updated <classSettings> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}, model={the_class}, name={setting_name}")
 
     else:
@@ -506,13 +530,13 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
                            ("value", the_value),
                            ("unit", unit),
                            ("sim", the_sim),
-                           ("device", device)]:
+                           ("device", the_device)]:
             ET.SubElement(classes, tag).text = value
 
         # Write the modified XML back to the file
         tree = ET.ElementTree(root)
         tree.write(userconfig_path)
-        logging.info(f"Added <classSettings> element with values: sim={the_sim}, device={device}, "
+        logging.info(f"Added <classSettings> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}{unit}, type={the_class}, name={setting_name}")
 
 
@@ -521,10 +545,13 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
-
+    the_device = device
+    write_any_device_list = read_anydevice_settings(the_sim)
+    if setting_name in write_any_device_list:
+        the_device = 'any'
     # Check if an identical <simSettings> element already exists
     sim_elem = root.find(f'.//simSettings[sim="{the_sim}"]'
-                         f'[device="{device}"]'
+                         f'[device="{the_device}"]'
                          f'[name="{setting_name}"]')
 
     if sim_elem is not None:
@@ -533,7 +560,7 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
             if child_elem.tag == 'value':
                 child_elem.text = str(the_value)
         tree.write(userconfig_path)
-        logging.info(f"Updated <simSettings> element with values: sim={the_sim}, device={device}, "
+        logging.info(f"Updated <simSettings> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}, name={setting_name}")
 
     else:
@@ -543,14 +570,14 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
                            ("value", the_value),
                            ("unit", unit),
                            ("sim", the_sim),
-                           ("device", device)]:
+                           ("device", the_device)]:
             ET.SubElement(sims, tag).text = value
 
         # Write the modified XML back to the file
         tree = ET.ElementTree(root)
         tree.write(userconfig_path)
         logging.info(
-            f"Added <simSettings> element with values: sim={the_sim}, device={device}, value={the_value}{unit}, name={setting_name}")
+            f"Added <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}{unit}, name={setting_name}")
 
 def clone_pattern(the_sim, old_pattern, new_pattern):
     model_data, def_model_pattern = read_models_data(defaults_path, the_sim, old_pattern)
@@ -586,9 +613,13 @@ def erase_models_from_xml(the_sim, the_model, setting_name):
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
+    the_device = device
+    write_any_device_list = read_anydevice_settings(the_sim)
+    if setting_name in write_any_device_list:
+        the_device = 'any'
     elements_to_remove = []
     for model_elem in root.findall(f'models[sim="{the_sim}"]'
-                                   f'[device="{device}"]'                                   
+                                   f'[device="{the_device}"]'                                   
                                    f'[model="{the_model}"]'
                                    f'[name="{setting_name}"]'):
 
@@ -602,7 +633,7 @@ def erase_models_from_xml(the_sim, the_model, setting_name):
         root.remove(elem)
         # Write the modified XML back to the file
         tree.write(userconfig_path)
-        logging.info(f"Removed <models> element with values: sim={the_sim}, device={device}, "
+        logging.info(f"Removed <models> element with values: sim={the_sim}, device={the_device}, "
                   f"model={the_model}, name={setting_name}")
 
 
@@ -611,9 +642,13 @@ def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
+    the_device = device
+    write_any_device_list = read_anydevice_settings(the_sim)
+    if setting_name in write_any_device_list:
+        the_device = 'any'
     elements_to_remove = []
     for class_elem in root.findall(f'.//classSettings[sim="{the_sim}"]'
-                                   f'[device="{device}"]'
+                                   f'[device="{the_device}"]'
                                    f'[value="{the_value}"]'
                                    f'[type="{the_class}"]'
                                    f'[name="{setting_name}"]'):
@@ -628,7 +663,7 @@ def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
         root.remove(elem)
         # Write the modified XML back to the file
         tree.write(userconfig_path)
-        logging.info(f"Removed <classSettings> element with values: sim={the_sim}, device={device}, "
+        logging.info(f"Removed <classSettings> element with values: sim={the_sim}, device={the_device}, "
                   f"value={the_value}, type={the_class}, name={setting_name}")
 
 
@@ -637,10 +672,13 @@ def erase_sim_from_xml(the_sim, the_value, setting_name):
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
-
+    the_device = device
+    write_any_device_list = read_anydevice_settings(the_sim)
+    if setting_name in write_any_device_list:
+        the_device = 'any'
     elements_to_remove = []
     for sim_elem in root.findall(f'.//simSettings[sim="{the_sim}"]'
-                                   f'[device="{device}"]'
+                                   f'[device="{the_device}"]'
                                    f'[value="{the_value}"]'
                                    f'[name="{setting_name}"]'):
 
@@ -654,7 +692,7 @@ def erase_sim_from_xml(the_sim, the_value, setting_name):
         root.remove(elem)
         # Write the modified XML back to the file
         tree.write(userconfig_path)
-        logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={device}, value={the_value}, name={setting_name}")
+        logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}, name={setting_name}")
 
 
 def sort_elements(tree):    #  unused for now.
