@@ -2902,7 +2902,7 @@ def convert_settings_old(cfg=configfile, usr=overridefile):
 
 
 def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
-    test = True
+    test = False
     if args.overridefile != 'None':
         ans = QMessageBox.information(main_window, "Important TelemFFB Update Notification", f"The 'ini' config file type is now deprecated.\n\nThis version of TelemFFB uses a new UI driven config model\n\nIt appears you are using a user override file ({args.overridefile}).  Would you\nlike to auto-convert that file to the new config model?\n\nIf you choose not to, you may also perform the conversion from\nthe Utilities menu\n\nProceeding will convert the config and re-name your\nexisting user config to '{os.path.basename(usr)}.legacy'", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
         if ans == QMessageBox.No:
