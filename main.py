@@ -2800,7 +2800,27 @@ def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
     return data_dict
 
 
-# def convert_system_settings(usr=overridefile):
+def convert_system_settings(sys_dict):
+    map_dict = {
+    'ignore_auto_updates': 'ignoreUpdate',
+    'logging_level': 'logLevel',
+    'telemetry_timeout': 'telemTimeout',
+    'msfs_enabled': 'enableMSFS',
+    'dcs_enabled': 'enableDCS',
+    'il2_enabled': 'enableIL2',
+    'il2_telem_port': 'portIL2',
+    'il2_cfg_validation': 'validateIL2',
+    'il2_path': 'pathIL2',
+    }
+
+    sys_dict = utils.sanitize_dict(sys_dict)
+    for key, value in sys_dict.items():
+        reg_key = map_dict.get(key, None)
+        if reg_key is None:
+            logging.error(f"System Setting conversion error: '{key}' is not a valid setting!")
+            continue
+        utils.set_reg(reg_key, value)
+    pass
 
 def convert_settings(cfg=configfile, usr=overridefile, window=None):
     differences = []
@@ -2809,8 +2829,11 @@ def convert_settings(cfg=configfile, usr=overridefile, window=None):
 
     def_params = {section: utils.sanitize_dict(defaultconfig[section]) for section in defaultconfig}
     usr_params = {section: utils.sanitize_dict(userconfig[section]) for section in userconfig}
-
+    sys = userconfig.get('system', None)
     for section in usr_params:
+        if section == 'system':
+            convert_system_settings(usr_params[section])
+            continue
         if section in def_params:
             # Compare common keys with different values
             for key, value in usr_params[section].items():
@@ -2824,6 +2847,7 @@ def convert_settings(cfg=configfile, usr=overridefile, window=None):
                 if key not in def_params[section]:
                     valuestring = str(value)
                     dif_item = config_to_dict(section, key, valuestring)
+                    differences.append(dif_item)
                     differences.append(dif_item)
         else:
             # All keys in the user configuration section are new

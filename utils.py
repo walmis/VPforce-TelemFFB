@@ -316,6 +316,9 @@ def set_reg(name, value):
         winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
         registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
 
+        if isinstance(value, bool):
+            # Convert boolean to integer (1 for True, 0 for False)
+            value = int(value)
         # Check if the value is an integer
         if isinstance(value, int):
             # For integers, use REG_DWORD
@@ -367,7 +370,7 @@ def get_default_sys_settings(tp):
         vw = 'cSaveT'
         tb = 'cTab'
     def_syst_dict = {
-        'logLevel': 'INFO',
+        '': 'INFO',
         'telemTimeout': 200,
         'ignoreUpdate': False,
         'enableDCS': False,
@@ -417,6 +420,10 @@ def to_number(v : str):
     If unable, return the original string
     """
     orig_v = v
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, int):
+        v = str(v)
     try:
         # handle boolean strings -> bool return
         lower = v.lower()
