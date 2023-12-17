@@ -619,19 +619,16 @@ class Aircraft(AircraftBase):
                     # logging.debug(f"fto={force_trim_y_offset} | Offset={offs}")
 
             max_coeff_y = int(4096*self.max_elevator_coeff)
-
-            self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, max_coeff_y)
-            ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
+            ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, max_coeff_y)
             logging.debug(f"Elev Coef: {ec}")
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
-            #self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
+
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = ec
 
             max_coeff_x = int(4096*self.max_aileron_coeff)
-            ac = clamp(int(4096 * aileron_coeff), base_elev_coeff, max_coeff_x)
+            ac = clamp(int(4096 * aileron_coeff), base_ailer_coeff, max_coeff_x)
             logging.debug(f"Ailer Coef: {ac}")
 
-            self.spring_x.positiveCoefficient = clamp(int(4096 * aileron_coeff), base_ailer_coeff, 4096)
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = ac
 
             # update spring data
             self.spring.effect.setCondition(self.spring_y)
@@ -697,13 +694,6 @@ class Aircraft(AircraftBase):
 
                 send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
 
-
-            # if self.ap_following and ap_active:
-            #     y_coeff = 4096
-            #     x_coeff = 4096
-            # else:
-            #     y_coeff = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
-            #     x_coeff = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
             self.const_force.constant(rud_force, 270).start()
             self.spring.start()
 
