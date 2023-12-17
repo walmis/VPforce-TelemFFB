@@ -620,12 +620,16 @@ class Aircraft(AircraftBase):
 
             max_coeff_y = int(4096*self.max_elevator_coeff)
             ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, max_coeff_y)
+            pct_max_e = ec/max_coeff_y
+            telem_data["pct_max_e"] = pct_max_e
             logging.debug(f"Elev Coef: {ec}")
 
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = ec
 
             max_coeff_x = int(4096*self.max_aileron_coeff)
             ac = clamp(int(4096 * aileron_coeff), base_ailer_coeff, max_coeff_x)
+            pct_max_a = ac / max_coeff_x
+            telem_data["pct_max_a"] = pct_max_a
             logging.debug(f"Ailer Coef: {ac}")
 
             self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = ac
@@ -673,7 +677,8 @@ class Aircraft(AircraftBase):
                 virtual_rudder_x_offs = 0
             max_coeff_x = int(4096*self.max_rudder_coeff)
             x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, max_coeff_x)
-
+            pct_max_r = x_coeff / max_coeff_x
+            telem_data["pct_max_r"] = pct_max_r
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
             self.spring_x.cpOffset = phys_rudder_x_offs
 
