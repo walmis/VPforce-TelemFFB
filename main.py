@@ -2215,7 +2215,7 @@ class SettingsLayout(QGridLayout):
         self.mainwindow = mainwindow
         if result is not None:
             self.build_rows(result)
-
+        self.device = HapticEffect()
 
     def append_prereq_count (self, datalist):
         for item in datalist:
