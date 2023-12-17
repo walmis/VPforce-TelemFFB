@@ -116,7 +116,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>5</order>
+		<order>105</order>
 		<displayname>Elevator Droop Moment</displayname>
 		<name>elevator_droop_moment</name>
 		<validvalues>0,100</validvalues>
@@ -594,7 +594,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>FlyByWire</Grouping>
-		<order>70</order>
+		<order>25</order>
 		<displayname>Enable FlyByWire (FBW)</displayname>
 		<name>aircraft_is_fbw</name>
 		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
@@ -605,7 +605,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>FlyByWire</Grouping>
-		<order>70.2</order>
+		<order>25.2</order>
 		<displayname>FBW Aileron Gain</displayname>
 		<name>fbw_aileron_gain</name>
 		<info>Fixed spring gain for FBW aircraft</info>
@@ -618,7 +618,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>FlyByWire</Grouping>
-		<order>70.3</order>
+		<order>25.3</order>
 		<displayname>FBW Elevator Gain</displayname>
 		<name>fbw_elevator_gain</name>
 		<info>Fixed spring gain for FBW aircraft</info>
@@ -631,7 +631,7 @@
 		</defaults>
 	<defaults>
 		<Grouping>FlyByWire</Grouping>
-		<order>70.4</order>
+		<order>25.4</order>
 		<displayname>FBW Rudder Gain</displayname>
 		<name>fbw_rudder_gain</name>
 		<info>Fixed spring gain for FBW aircraft</info>
@@ -1881,26 +1881,12 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>A2A Piper PA-24.*</model>
-		<value>0.06</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>elevator_droop_moment</name>
 		<model>A2A Piper PA-24.*</model>
 		<value>0.2</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 		</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>A2A Piper PA-24.*</model>
-		<value>0.4</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
 	<models>
 		<name>elevator_prop_flow_ratio</name>
 		<model>A2A Piper PA-24.*</model>
@@ -1923,12 +1909,55 @@
 		<device>joystick</device>
 	</models>
 	<models>
-		<name>rudder_gain</name>
+		<name>prop_diameter</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>74</value>
+		<unit>in</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>0.14</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>0.27</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>0.27</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>0.55</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
 		<model>A2A Piper PA-24.*</model>
 		<value>0.3</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
-		</models>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
 	<models>
 		<name>type</name>
 		<model>A2A Piper PA-24.*</model>
