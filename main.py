@@ -2339,7 +2339,7 @@ class SettingsLayout(QGridLayout):
                 unit_dropbox.addItems(validvalues)
                 unit_dropbox.setCurrentText(item['unit'])
             unit_dropbox.setObjectName(f"ud_{item['name']}")
-            unit_dropbox.currentTextChanged.connect(self.unit_dropbox_changed)
+            unit_dropbox.currentIndexChanged.connect(self.unit_dropbox_changed)
             self.addWidget(unit_dropbox, i, self.unit_col)
             unit_dropbox.blockSignals(False)
             unit_dropbox.setDisabled(rowdisabled)
@@ -2378,7 +2378,7 @@ class SettingsLayout(QGridLayout):
         line_edit.blockSignals(False)
         line_edit.setAlignment(Qt.AlignHCenter)
         line_edit.setObjectName(f"vle_{item['name']}")
-        line_edit.textChanged.connect(self.line_edit_changed)
+        line_edit.editingFinished.connect(self.line_edit_changed)
 
         expand_button = QToolButton()
         if item['name'] in self.expanded_items:
