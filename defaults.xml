@@ -47,7 +47,7 @@
 		<order>2</order>
 		<displayname>Aileron Gain</displayname>
 		<name>aileron_gain</name>
-		<info>Aileron gain value for use in dynamic forces calculations</info>
+		<info>Aileron gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner</info>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -57,9 +57,9 @@
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>2.5</order>
-		<displayname>Aileron Max</displayname>
+		<displayname>Aileron Max Force</displayname>
 		<name>max_aileron_coeff</name>
-		<info>Aileron maximum value for use in dynamic forces calculations</info>
+		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -71,7 +71,7 @@
 		<order>3</order>
 		<displayname>Elevator Gain</displayname>
 		<name>elevator_gain</name>
-		<info>Elevator gain value for use in dynamic forces calculations</info>
+		<info>Elevator gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner</info>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -81,9 +81,9 @@
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>3.5</order>
-		<displayname>Elevator Max</displayname>
+		<displayname>Elevator Max Force</displayname>
 		<name>max_elevator_coeff</name>
-		<info>Elevator maximum value for use in dynamic forces calculations</info>
+		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -95,7 +95,7 @@
 		<order>4</order>
 		<displayname>Rudder Gain</displayname>
 		<name>rudder_gain</name>
-		<info>Rudder gain value for use in dynamic forces calculations</info>
+		<info>Rudder gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner</info>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -105,9 +105,9 @@
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>4.5</order>
-		<displayname>Rudder Max</displayname>
+		<displayname>Rudder Max Force</displayname>
 		<name>max_rudder_coeff</name>
-		<info>Rudder maximum value for use in dynamic forces calculations</info>
+		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -115,20 +115,11 @@
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>105</order>
-		<displayname>Elevator Droop Moment</displayname>
-		<name>elevator_droop_moment</name>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
 		<Grouping>Basic</Grouping>
 		<order>8</order>
 		<displayname>Cyclic Spring Gain</displayname>
 		<name>cyclic_spring_gain</name>
+		<info>Strength of cyclic spring</info>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
@@ -149,6 +140,7 @@
 		<order>9.2</order>
 		<displayname>Force Trim Button</displayname>
 		<name>force_trim_button</name>
+		<info>Button # to hold to release spring while moving axis</info>
 		<prereq>force_trim_enabled</prereq>
 		<datatype>int</datatype>
 		<MSFS>true</MSFS>
@@ -160,98 +152,12 @@
 		<order>9.3</order>
 		<displayname>Force Trim Reset Button</displayname>
 		<name>force_trim_reset_button</name>
+		<info>Button # to recenter spring trims</info>
 		<prereq>force_trim_enabled</prereq>
 		<datatype>int</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>11</order>
-		<displayname>IL2 Shake Master</displayname>
-		<name>il2_shake_master</name>
-		<value>true</value>
-		<datatype>bool</datatype>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>12</order>
-		<displayname>Enable Buffeting</displayname>
-		<name>il2_enable_buffet</name>
-		<prereq>il2_shake_master</prereq>
-		<value>true</value>
-		<datatype>bool</datatype>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>12.1</order>
-		<displayname>Buffeting Intensity</displayname>
-		<name>il2_buffeting_factor</name>
-		<info>common setting for all buffeting (stall, gear, etc)  - IL2 limitation</info>
-		<prereq>il2_enable_buffet</prereq>
-		<validvalues>0,100</validvalues><IL2>true</IL2><joystick>true</joystick>
-		<value>1.0</value>
-		<datatype>float</datatype>
-		<pedals>true</pedals>
-		</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>13</order>
-		<displayname>Enable Runway Rumble</displayname>
-		<name>il2_enable_runway_rumble</name>
-		<prereq>il2_shake_master</prereq>
-		<value>true</value>
-		<datatype>bool</datatype>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>13.1</order>
-		<displayname>Runway Rumble Intensity</displayname>
-		<name>il2_runway_rumble_intensity</name>
-		<prereq>il2_enable_runway_rumble</prereq>
-		<value>0.12</value>
-		<sliderfactor>0.4</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Weapons</Grouping>
-		<order>14</order>
-		<displayname>Enable Weapon Effects</displayname>
-		<name>il2_enable_weapons</name>
-		<prereq>il2_shake_master</prereq>
-		<value>true</value>
-		<datatype>bool</datatype>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Weapons</Grouping>
-		<order>14.1</order>
-		<displayname>Weaon Effect Intensity</displayname>
-		<name>il2_weapon_release_intensity</name>
-		<prereq>il2_enable_weapons</prereq>
-		<value>0.2</value>
-		<sliderfactor>0.5</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
@@ -268,7 +174,7 @@
 		<order>20</order>
 		<displayname>Enable Spring Centering (not FBW)</displayname>
 		<name>aircraft_is_spring_centered</name>
-		<info>Enable spring centering for aircraft while maintaining dynamic forces</info>
+		<info>Enable spring centering for aircraft while maintaining dynamic forces&lt;br&gt;&lt;br&gt; Do not use together with FBW</info>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
@@ -280,7 +186,7 @@
 		<order>20.2</order>
 		<displayname>Aileron Spring Gain</displayname>
 		<name>aileron_spring_gain</name>
-		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the max value set in VPforce Configurator</info>
+		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<prereq>aircraft_is_spring_centered</prereq>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -294,7 +200,7 @@
 		<order>20.3</order>
 		<displayname>Elevator Spring Gain</displayname>
 		<name>elevator_spring_gain</name>
-		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the max value set in VPforce Configurator</info>
+		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<prereq>aircraft_is_spring_centered</prereq>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -308,7 +214,7 @@
 		<order>20.4</order>
 		<displayname>Rudder Spring Gain</displayname>
 		<name>rudder_spring_gain</name>
-		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the max value set in VPforce Configurator</info>
+		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<prereq>aircraft_is_spring_centered</prereq>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -316,6 +222,56 @@
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 	</defaults>
+	<defaults>
+		<Grouping>FlyByWire</Grouping>
+		<order>25</order>
+		<displayname>Enable FlyByWire (FBW)</displayname>
+		<name>aircraft_is_fbw</name>
+		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>FlyByWire</Grouping>
+		<order>25.2</order>
+		<displayname>FBW Aileron Gain</displayname>
+		<name>fbw_aileron_gain</name>
+		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<prereq>aircraft_is_fbw</prereq>
+		<value>0.6</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>FlyByWire</Grouping>
+		<order>25.3</order>
+		<displayname>FBW Elevator Gain</displayname>
+		<name>fbw_elevator_gain</name>
+		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<prereq>aircraft_is_fbw</prereq>
+		<value>0.6</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		</defaults>
+	<defaults>
+		<Grouping>FlyByWire</Grouping>
+		<order>25.4</order>
+		<displayname>FBW Rudder Gain</displayname>
+		<name>fbw_rudder_gain</name>
+		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<prereq>aircraft_is_fbw</prereq>
+		<value>0.5</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
 		<order>30</order>
@@ -335,6 +291,7 @@
 		<order>30.2</order>
 		<displayname>X Axis Scale</displayname>
 		<name>joystick_x_axis_scale</name>
+		<info>Scaling of axis position sent to game</info>
 		<prereq>telemffb_controls_axes</prereq>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
@@ -348,6 +305,7 @@
 		<order>30.3</order>
 		<displayname>Y Axis Scale</displayname>
 		<name>joystick_y_axis_scale</name>
+		<info>Scaling of axis position sent to game</info>
 		<prereq>telemffb_controls_axes</prereq>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
@@ -361,6 +319,7 @@
 		<order>30.4</order>
 		<displayname>Rudder (X) Axis Scale</displayname>
 		<name>rudder_x_axis_scale</name>
+		<info>Scaling of axis position sent to game</info>
 		<prereq>telemffb_controls_axes</prereq>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
@@ -388,6 +347,7 @@
 		<order>30.7</order>
 		<displayname>Hands On Deadzone</displayname>
 		<name>hands_on_deadzone</name>
+		<info>Distance required to trigger a hands-on condition</info>
 		<prereq>telemffb_controls_axes</prereq>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -402,6 +362,7 @@
 		<order>30.8</order>
 		<displayname>Hands Off Deadzone</displayname>
 		<name>hands_off_deadzone</name>
+		<info>Distance at which hands-off resumes (set lower than hands-on)</info>
 		<prereq>telemffb_controls_axes</prereq>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -416,11 +377,13 @@
 		<order>31</order>
 		<displayname>Trim Following</displayname>
 		<name>trim_following</name>
+		<info>Enable physical stick movement with in-game trims</info>
 		<prereq>telemffb_controls_axes</prereq>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 		<Element1>telemffb_controls_axes.trim_following</Element1>
 	</defaults>
 	<defaults>
@@ -513,6 +476,7 @@
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 		<Element1>telemffb_controls_axes.trim_following.ap_following</Element1>
 	</defaults>
 	<defaults>
@@ -533,6 +497,7 @@
 		<order>35</order>
 		<displayname>Collective AP Spring Gain</displayname>
 		<name>collective_ap_spring_gain</name>
+		<info>Strength of spring force in Autopilot</info>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
@@ -554,7 +519,7 @@
 		<order>37</order>
 		<displayname>Pedal Dampening Gain</displayname>
 		<name>pedal_dampening_gain</name>
-		<info>Percent of damper setting in VPConf</info>
+		<info>Percent of damper setting in VPForce Configurator</info>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
@@ -565,7 +530,7 @@
 		<order>38</order>
 		<displayname>Pedal Spring Gain</displayname>
 		<name>pedal_spring_gain</name>
-		<info>Percent of spring setting in VPConf</info>
+		<info>Percent of spring setting in VPForce Configurator</info>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
@@ -592,56 +557,6 @@
 		<DCS>true</DCS>
 		<pedals>true</pedals>
 	</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>25</order>
-		<displayname>Enable FlyByWire (FBW)</displayname>
-		<name>aircraft_is_fbw</name>
-		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
-		<datatype>bool</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>25.2</order>
-		<displayname>FBW Aileron Gain</displayname>
-		<name>fbw_aileron_gain</name>
-		<info>Fixed spring gain for FBW aircraft</info>
-		<prereq>aircraft_is_fbw</prereq>
-		<value>0.6</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>25.3</order>
-		<displayname>FBW Elevator Gain</displayname>
-		<name>fbw_elevator_gain</name>
-		<info>Fixed spring gain for FBW aircraft</info>
-		<prereq>aircraft_is_fbw</prereq>
-		<value>0.6</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>25.4</order>
-		<displayname>FBW Rudder Gain</displayname>
-		<name>fbw_rudder_gain</name>
-		<info>Fixed spring gain for FBW aircraft</info>
-		<prereq>aircraft_is_fbw</prereq>
-		<value>0.5</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-		</defaults>
 	<defaults><Grouping>G Force</Grouping><order>100</order><displayname>G Force Effect</displayname><name>gforce_effect_enable</name><value>true</value><datatype>bool</datatype><IL2>true</IL2><joystick>true</joystick></defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
@@ -692,6 +607,17 @@
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>105</order>
+		<displayname>Elevator Droop Moment</displayname>
+		<name>elevator_droop_moment</name>
+		<info>Strength of elevator droop at rest (pushes stick forward)</info>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
 	<defaults>
 		<Grouping>Prop</Grouping>
 		<order>110</order>
@@ -1077,11 +1003,98 @@
 		<collective>true</collective>
 	</defaults>
 	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>500</order>
+		<displayname>IL2 Shake Master</displayname>
+		<name>il2_shake_master</name>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>512</order>
+		<displayname>Enable Buffeting</displayname>
+		<name>il2_enable_buffet</name>
+		<prereq>il2_shake_master</prereq>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>512.1</order>
+		<displayname>Buffeting Intensity</displayname>
+		<name>il2_buffeting_factor</name>
+		<info>common setting for all buffeting (stall, gear, etc)  - IL2 limitation</info>
+		<prereq>il2_enable_buffet</prereq>
+		<validvalues>0,100</validvalues><IL2>true</IL2><joystick>true</joystick>
+		<value>1.0</value>
+		<datatype>float</datatype>
+		<pedals>true</pedals>
+		</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>513</order>
+		<displayname>Enable Runway Rumble</displayname>
+		<name>il2_enable_runway_rumble</name>
+		<prereq>il2_shake_master</prereq>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>513.1</order>
+		<displayname>Runway Rumble Intensity</displayname>
+		<name>il2_runway_rumble_intensity</name>
+		<prereq>il2_enable_runway_rumble</prereq>
+		<value>0.12</value>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Weapons</Grouping>
+		<order>514</order>
+		<displayname>Enable Weapon Effects</displayname>
+		<name>il2_enable_weapons</name>
+		<prereq>il2_shake_master</prereq>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Weapons</Grouping>
+		<order>514.1</order>
+		<displayname>Weaon Effect Intensity</displayname>
+		<name>il2_weapon_release_intensity</name>
+		<prereq>il2_enable_weapons</prereq>
+		<value>0.2</value>
+		<sliderfactor>0.5</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>710</order>
 		<displayname>AoA Effect</displayname>
 		<name>aoa_effect_enabled</name>
-		<info>Enable or disable the dynamic AoA based forces effect</info>
+		<info>Enable or disable the dynamic Angle of Attack (AoA) based force effect</info>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
 		<DCS>true</DCS>
@@ -1094,7 +1107,7 @@
 		<order>710.1</order>
 		<displayname>AoA Effect Gain</displayname>
 		<name>aoa_effect_gain</name>
-		<info>amount of calculated AOA effect to apply</info>
+		<info>Amount of calculated AOA effect to apply</info>
 		<prereq>aoa_effect_enabled</prereq>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
@@ -1106,7 +1119,7 @@
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>710.1</order>
-		<displayname>AoA Effect Max Force (DCS)</displayname>
+		<displayname>AoA Effect Max Force</displayname>
 		<name>max_aoa_cf_force</name>
 		<info>Maximum constant force to apply for the AoA effect</info>
 		<prereq>aoa_effect_enabled</prereq>
@@ -1224,7 +1237,7 @@
 		<order>730.4</order>
 		<displayname>Stall AoA</displayname>
 		<name>stall_aoa</name>
-		<info>Stall AoA</info>
+		<info>Stall Angle of Attack</info>
 		<prereq>aoa_buffeting_enabled</prereq>
 		<value>15</value>
 		<unit>deg</unit>
@@ -1252,7 +1265,7 @@
 		<order>740.1</order>
 		<displayname>Canopy Motion</displayname>
 		<name>canopy_motion_intensity</name>
-		<info>peak vibration intensity when canopy is moving, 0 to disable</info>
+		<info>Peak vibration intensity when canopy is moving</info>
 		<prereq>canopy_motion_effect_enabled</prereq>
 		<value>0.12</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1281,7 +1294,7 @@
 		<order>750.1</order>
 		<displayname>Damage Effect</displayname>
 		<name>damage_effect_intensity</name>
-		<info>peak vibration intensity when flaps are moving, 0 to disable</info>
+		<info>Peak vibration intensity when flaps are moving</info>
 		<prereq>damage_effect_enabled</prereq>
 		<value>0.4</value>
 		<validvalues>0,100</validvalues>
@@ -1337,7 +1350,7 @@
 		<order>760.1</order>
 		<displayname>Flaps Motion</displayname>
 		<name>flaps_motion_intensity</name>
-		<info>peak vibration intensity when flaps are moving, 0 to disable</info>
+		<info>Peak vibration intensity when flaps are moving</info>
 		<prereq>flaps_motion_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1401,7 +1414,7 @@
 		<order>775.1</order>
 		<displayname>Gear Motion</displayname>
 		<name>gear_motion_intensity</name>
-		<info>peak vibration intensity when gear is moving, 0 to disable</info>
+		<info>Peak vibration intensity when gear is moving</info>
 		<prereq>gear_motion_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1461,7 +1474,7 @@
 		<order>780</order>
 		<displayname>Runway Rumble</displayname>
 		<name>runway_rumble_enabled</name>
-		<info>enable/disable runway rumble effect</info>
+		<info>Enable/disable runway rumble effect</info>
 		<write_any_device>true</write_any_device>
 		<value>true</value>
 		<datatype>bool</datatype>
@@ -1476,7 +1489,7 @@
 		<order>780.1</order>
 		<displayname>Runway Rumble Intensity</displayname>
 		<name>runway_rumble_intensity</name>
-		<info>peak runway intensity</info>
+		<info>Peak runway rumble intensity</info>
 		<prereq>runway_rumble_enabled</prereq>
 		<value>0.2</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1579,7 +1592,7 @@
 		<order>791.1</order>
 		<displayname>Speedbrake Motion</displayname>
 		<name>speedbrake_motion_intensity</name>
-		<info>s</info>
+		<info>Peak intensity for speed brake motion effect</info>
 		<prereq>speedbrake_motion_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1608,7 +1621,7 @@
 		<order>792.1</order>
 		<displayname>Spoiler Buffet</displayname>
 		<name>spoiler_buffet_intensity</name>
-		<info>peak buffeting intensity when spoilers deployed,  0 to disable</info>
+		<info>peak buffeting intensity when spoilers deployed</info>
 		<prereq>spoiler_buffet_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1637,7 +1650,7 @@
 		<order>793.1</order>
 		<displayname>Spoiler Motion</displayname>
 		<name>spoiler_motion_intensity</name>
-		<info>F14 Only, peak vibration intensity when spoilers is moving, 0 to disable</info>
+		<info>F14 Only, peak vibration intensity when spoilers are moving</info>
 		<prereq>spoiler_motion_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
