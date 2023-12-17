@@ -5,6 +5,7 @@
 		<order>1</order>
 		<displayname>Class</displayname>
 		<name>type</name>
+		<info>Aircraft Type</info>
 		<write_any_device>true</write_any_device>
 		<validvalues>PropellerAircraft,JetAircraft,Helicopter</validvalues>
 		<datatype>list</datatype>
@@ -12,13 +13,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Aircraft Type</info>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
 		<order>1</order>
 		<displayname>Class</displayname>
 		<name>type</name>
+		<info>Aircraft Type</info>
 		<write_any_device>true</write_any_device>
 		<validvalues>PropellerAircraft,JetAircraft</validvalues>
 		<datatype>list</datatype>
@@ -26,13 +27,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Aircraft Type</info>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
 		<order>1</order>
 		<displayname>Class</displayname>
 		<name>type</name>
+		<info>Aircraft Type</info>
 		<write_any_device>true</write_any_device>
 		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,HPGHelicopter,GliderAircraft</validvalues>
 		<datatype>list</datatype>
@@ -40,43 +41,42 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Aircraft Type</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>2</order>
 		<displayname>Aileron Gain</displayname>
 		<name>aileron_gain</name>
+		<info>Aileron gain value for use in dynamic forces calculations</info>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>Aileron gain value for use in dynamic forces calculations</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>3</order>
 		<displayname>Elevator Gain</displayname>
 		<name>elevator_gain</name>
+		<info>Elevator gain value for use in dynamic forces calculations</info>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>Elevator gain value for use in dynamic forces calculations</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>4</order>
 		<displayname>Rudder Gain</displayname>
 		<name>rudder_gain</name>
+		<info>Rudder gain value for use in dynamic forces calculations</info>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
-		<info>Rudder gain value for use in dynamic forces calculations</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
@@ -158,12 +158,12 @@
 		<order>12.1</order>
 		<displayname>Buffeting Intensity</displayname>
 		<name>il2_buffeting_factor</name>
+		<info>common setting for all buffeting (stall, gear, etc)  - IL2 limitation</info>
 		<prereq>il2_enable_buffet</prereq>
 		<validvalues>0,100</validvalues><IL2>true</IL2><joystick>true</joystick>
 		<value>1.0</value>
 		<datatype>float</datatype>
 		<pedals>true</pedals>
-		<info>common setting for all buffeting (stall, gear, etc)  - IL2 limitation</info>
 		</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
@@ -232,62 +232,66 @@
 		<order>20</order>
 		<displayname>Enable Spring Centering (not FBW)</displayname>
 		<name>aircraft_is_spring_centered</name>
+		<info>Enable spring centering for aircraft while maintaining dynamic forces</info>
+		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<info>Enable spring centering for aircraft while&lt;br&gt;maintaining dynamic forces</info>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>20.4</order>
-		<displayname>Rudder Spring Gain</displayname>
-		<name>rudder_spring_gain</name>
-		<prereq>aircraft_is_spring_centered</prereq>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues><pedals>true</pedals>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the max value set in VPforce Configurator</info>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>20.2</order>
 		<displayname>Aileron Spring Gain</displayname>
 		<name>aileron_spring_gain</name>
+		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the max value set in VPforce Configurator</info>
 		<prereq>aircraft_is_spring_centered</prereq>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
+		<value>0.3</value>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the max value set in VPforce Configurator</info>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>20.3</order>
 		<displayname>Elevator Spring Gain</displayname>
 		<name>elevator_spring_gain</name>
+		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the max value set in VPforce Configurator</info>
 		<prereq>aircraft_is_spring_centered</prereq>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
+		<value>0.3</value>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the max value set in VPforce Configurator</info>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>20.4</order>
+		<displayname>Rudder Spring Gain</displayname>
+		<name>rudder_spring_gain</name>
+		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the max value set in VPforce Configurator</info>
+		<prereq>aircraft_is_spring_centered</prereq>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value><pedals>true</pedals>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
 		<order>30</order>
 		<displayname>Axis Control</displayname>
 		<name>telemffb_controls_axes</name>
+		<info>TelemFFB sends axis position to sim.  Do not assign in game or SPAD.next</info>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>TelemFFB sends axis position to sim.  Do not assign in game or SPAD.next</info>
 		<Element1>telemffb_controls_axes</Element1>
 	</defaults>
 	<defaults>
@@ -334,13 +338,13 @@
 		<order>30.5</order>
 		<displayname>Use Legacy Bindings</displayname>
 		<name>use_legacy_bindings</name>
+		<info>For helicopters that still use aileron/elevator or rudder bindings</info>
 		<prereq>telemffb_controls_axes</prereq>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>For helicopters that still use aileron/elevator or rudder bindings</info>
 		<Element1>telemffb_controls_axes.use_legacy_bindings</Element1>
 	</defaults>
 	<defaults>
@@ -374,7 +378,7 @@
 	<defaults>
 		<Grouping>Axis Control</Grouping>
 		<order>31</order>
-		<displayname>Trim Follwing</displayname>
+		<displayname>Trim Following</displayname>
 		<name>trim_following</name>
 		<prereq>telemffb_controls_axes</prereq>
 		<value>false</value>
@@ -427,14 +431,13 @@
 		<order>31.5</order>
 		<displayname>Y Trim Gain Virtual</displayname>
 		<name>joystick_trim_follow_gain_virtual_y</name>
+		<info>Adjust virtual y % so that trim ingame does not pitch aircraft when stick held. &lt;br&gt;&lt;br&gt; To configure, slowly apply nose down trim. if the nose goes up, raise the virtual % - if the nose goes down, lower the virtual % - you can go negative.</info>
 		<prereq>trim_following</prereq>
 		<value>0.2</value>
 		<validvalues>-100,100</validvalues>
 		<datatype>negfloat</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>adjust virtual y % so that trim ingame does not pitch aircraft when stick held
-## nose down trim. if the nose goes up, raise the virtual % - if the nose goes down, lower the virtual % - you can go negativ</info>
 		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_physical_x</Element1>
 	</defaults>
 	<defaults>
@@ -468,6 +471,7 @@
 		<order>32</order>
 		<displayname>Enable Autopilot Following</displayname>
 		<name>ap_following</name>
+		<info>Enable physical stick following of autopilot movements</info>
 		<prereq>telemffb_controls_axes</prereq>
 		<value>true</value>
 		<datatype>bool</datatype>
@@ -480,6 +484,7 @@
 		<order>32.2</order>
 		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<name>invert_ap_x_axis</name>
+		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
 		<prereq>ap_following</prereq>
 		<value>false</value>
 		<datatype>bool</datatype>
@@ -513,122 +518,37 @@
 		<order>37</order>
 		<displayname>Pedal Dampening Gain</displayname>
 		<name>pedal_dampening_gain</name>
+		<info>Percent of damper setting in VPConf</info>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
-		<info>Percent of damper setting in VPConf</info>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>38</order>
 		<displayname>Pedal Spring Gain</displayname>
 		<name>pedal_spring_gain</name>
+		<info>Percent of spring setting in VPConf</info>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
-		<info>Percent of spring setting in VPConf</info>
 	</defaults>
 	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>70</order>
-		<displayname>Enable FlyByWire (FBW)</displayname>
-		<name>aircraft_is_fbw</name>
-		<datatype>bool</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
-	</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>70.2</order>
-		<displayname>FBW Aileron Gain</displayname>
-		<name>fbw_aileron_gain</name>
-		<prereq>aircraft_is_fbw</prereq>
-		<value>0.6</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<info>Fixed spring gain for FBW aircraft</info>
-	</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>70.3</order>
-		<displayname>FBW Elevator Gain</displayname>
-		<name>fbw_elevator_gain</name>
-		<prereq>aircraft_is_fbw</prereq>
-		<value>0.6</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<info>Fixed spring gain for FBW aircraft</info>
-		</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>70.4</order>
-		<displayname>FBW Rudder Gain</displayname>
-		<name>fbw_rudder_gain</name>
-		<prereq>aircraft_is_fbw</prereq>
-		<value>0.5</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-		<info>Fixed spring gain for FBW aircraft</info>
-		</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>85</order>
-		<displayname>Enable Nosewheel Shimmy</displayname>
-		<name>nosewheel_shimmy</name>
-		<value>false</value>
-		<datatype>bool</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>85.1</order>
-		<displayname>Nosewheel Shimmy</displayname>
-		<name>nosewheel_shimmy_intensity</name>
-		<value>0.15</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>85.2</order>
-		<displayname>Nosewheel Shimmy min brakes</displayname>
-		<name>nosewheel_shimmy_min_brakes</name>
-		<prereq>nosewheel_shimmy</prereq>
-		<value>0.65</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-		</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
-		<order>85.3</order>
-		<displayname>Nosewheel Shimmy min speed</displayname>
-		<name>nosewheel_shimmy_min_speed</name>
-		<prereq>nosewheel_shimmy</prereq>
-		<value>7</value>
-		<validvalues>m/s,kt,mph,kph</validvalues>
-		<unit>m/s</unit>
-		<datatype>int</datatype>
-		<MSFS>true</MSFS>
+		<Grouping>SpringCenter</Grouping>
+		<order>38.2</order>
+		<displayname>Pedal Spring Mode</displayname>
+		<name>pedal_spring_mode</name>
+		<info>0=dcs default, 1=spring disabled, 2=static. Spring enabled using "pedal_spring_gain" spring setting, 3=dynamic and V speeds</info>
+		<validvalues>0,1,2,3</validvalues>
+		<datatype>list</datatype>
+		<DCS>true</DCS>
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
-		<order>95</order>
+		<order>39</order>
 		<displayname>Enable Pedal Trimming</displayname>
 		<name>pedal_trimming_enabled</name>
 		<value>true</value>
@@ -637,16 +557,55 @@
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>96</order>
-		<displayname>Pedal Spring Mode</displayname>
-		<name>pedal_spring_mode</name>
-		<validvalues>0,1,2,3</validvalues>
-		<datatype>list</datatype>
-		<DCS>true</DCS>
+		<Grouping>FlyByWire</Grouping>
+		<order>70</order>
+		<displayname>Enable FlyByWire (FBW)</displayname>
+		<name>aircraft_is_fbw</name>
+		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<info>0=dcs default, 1=spring disabled, 2=static. Spring enabled using "pedal_spring_gain" spring setting, 3=dynamic and V speeds</info>
 	</defaults>
+	<defaults>
+		<Grouping>FlyByWire</Grouping>
+		<order>70.2</order>
+		<displayname>FBW Aileron Gain</displayname>
+		<name>fbw_aileron_gain</name>
+		<info>Fixed spring gain for FBW aircraft</info>
+		<prereq>aircraft_is_fbw</prereq>
+		<value>0.6</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>FlyByWire</Grouping>
+		<order>70.3</order>
+		<displayname>FBW Elevator Gain</displayname>
+		<name>fbw_elevator_gain</name>
+		<info>Fixed spring gain for FBW aircraft</info>
+		<prereq>aircraft_is_fbw</prereq>
+		<value>0.6</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		</defaults>
+	<defaults>
+		<Grouping>FlyByWire</Grouping>
+		<order>70.4</order>
+		<displayname>FBW Rudder Gain</displayname>
+		<name>fbw_rudder_gain</name>
+		<info>Fixed spring gain for FBW aircraft</info>
+		<prereq>aircraft_is_fbw</prereq>
+		<value>0.5</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		</defaults>
 	<defaults><Grouping>G Force</Grouping><order>100</order><displayname>G Force Effect</displayname><name>gforce_effect_enable</name><value>true</value><datatype>bool</datatype><IL2>true</IL2><joystick>true</joystick></defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
@@ -712,6 +671,7 @@
 		<order>111</order>
 		<displayname>Prop Diameter</displayname>
 		<name>prop_diameter</name>
+		<info>Aircraft Prop Diameter</info>
 		<write_any_device>true</write_any_device>
 		<validvalues>m,ft,in</validvalues>
 		<datatype>anyfloat</datatype>
@@ -747,30 +707,31 @@
 		<order>120.2</order>
 		<displayname>Countermeasure Release</displayname>
 		<name>cm_vibration_intensity</name>
+		<info>peak intensity for countermeasure release effect, 0 to disable</info>
 		<value>0.2</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
-		<info>peak intensity for countermeasure release effect, 0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
 		<order>120.3</order>
 		<displayname>Gun Vibration</displayname>
 		<name>gun_vibration_intensity</name>
+		<info>peak intenstiy for gunfire effect, 0 to disable</info>
 		<value>0.2</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
-		<info>peak intenstiy for gunfire effect, 0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
 		<order>120.4</order>
 		<displayname>Weapon Release</displayname>
 		<name>weapon_release_intensity</name>
+		<info>peak intensity for weapons release effect, 0 to disable</info>
 		<value>0.2</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -778,24 +739,24 @@
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<info>peak intensity for weapons release effect, 0 to disable</info>
 		</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
 		<order>120.5</order>
 		<displayname>Weapon Effect Direction</displayname>
 		<name>weapon_effect_direction</name>
+		<info>Direction of applied force for weapons effects | range 0-359 or set to -1 for random</info>
 		<value>-1</value>
 		<datatype>int</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
-		<info>Direction of applied force for weapons effects | range 0-359 or set to -1 for random</info>
 	</defaults>
 	<defaults>
 		<Grouping>ETL</Grouping>
 		<order>230</order>
 		<displayname>Enable ETL Effect</displayname>
 		<name>etl_effect_enable</name>
+		<info>Enable Effective Translational Lift Shimmy</info>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
 		<DCS>true</DCS>
@@ -809,6 +770,7 @@
 		<order>230.1</order>
 		<displayname>ETL Effect</displayname>
 		<name>etl_effect_intensity</name>
+		<info>Effective Translational Lift Shimmy Intensity</info>
 		<prereq>etl_effect_enable</prereq>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -823,6 +785,7 @@
 		<order>230.2</order>
 		<displayname>ETL Start Speed</displayname>
 		<name>etl_start_speed</name>
+		<info>speed at which the ETL effect will start - m/s</info>
 		<prereq>etl_effect_enable</prereq>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<datatype>int</datatype>
@@ -832,13 +795,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>speed at which the ETL effect will start - m/s</info>
 	</defaults>
 	<defaults>
 		<Grouping>ETL</Grouping>
 		<order>230.3</order>
 		<displayname>ETL Stop Speed</displayname>
 		<name>etl_stop_speed</name>
+		<info>speed at which the ETL effect will stop - m/s</info>
 		<prereq>etl_effect_enable</prereq>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<datatype>int</datatype>
@@ -848,7 +811,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>speed at which the ETL effect will stop - m/s</info>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
@@ -868,6 +830,7 @@
 		<order>250.1</order>
 		<displayname>Heli Engine/Rotor Rumble Intensity</displayname>
 		<name>heli_engine_rumble_intensity</name>
+		<info>peak rumble intensity for helicopter engine/rotor effect</info>
 		<prereq>engine_rotor_rumble_enabled</prereq>
 		<value>0.12</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -878,26 +841,26 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak rumble intensity for helicopter engine/rotor effect</info>
 	</defaults>
 	<defaults>
 		<Grouping>VRS</Grouping>
 		<order>270</order>
 		<displayname>VRS Effect</displayname>
 		<name>vrs_effect_enable</name>
+		<info>Vortex Ring State effect</info>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Vortex Ring State effect</info>
 	</defaults>
 	<defaults>
 		<Grouping>VRS</Grouping>
 		<order>270.1</order>
 		<displayname>VRS Effect</displayname>
 		<name>vrs_effect_intensity</name>
+		<info>Max intensity of VRS effect</info>
 		<prereq>vrs_effect_enable</prereq>
 		<value>0.12</value>
 		<sliderfactor>0.5</sliderfactor>
@@ -907,13 +870,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Max intensity of VRS effect</info>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>300</order>
 		<displayname>Afterburner Effect</displayname>
 		<name>afterburner_effect_enabled</name>
+		<info>Max intensity of afterburner rumble effect&lt;br&gt;&lt;br&gt;Set to 0 to disable</info>
 		<write_any_device>true</write_any_device>
 		<validvalues>0,100</validvalues>
 		<datatype>bool</datatype>
@@ -922,13 +885,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Max intensity of afterburner rumble effect&lt;br&gt;&lt;br&gt;Set to 0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>300.1</order>
 		<displayname>Afterburner Rumble</displayname>
 		<name>afterburner_effect_intensity</name>
+		<info>Max intensity of afterburner rumble effect&lt;br&gt;&lt;br&gt;Set to 0 to disable</info>
 		<prereq>afterburner_effect_enabled</prereq>
 		<value>0.2</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -939,13 +902,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Max intensity of afterburner rumble effect&lt;br&gt;&lt;br&gt;Set to 0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>330</order>
-		<displayname>Piston Engine Effect</displayname>
+		<displayname>Propeller Rumble Effect</displayname>
 		<name>engine_prop_rumble_enabled</name>
+		<info>Enable Propeller Rumble</info>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
 		<DCS>true</DCS>
@@ -960,6 +923,7 @@
 		<order>330.2</order>
 		<displayname>Engine Rumble Low RPM</displayname>
 		<name>engine_rumble_lowrpm</name>
+		<info>low RPM threshold for low rpm intensity setting</info>
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<value>650</value>
 		<write_any_device>true</write_any_device>
@@ -972,13 +936,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>low RPM threshold for low rpm intensity setting</info>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>330.3</order>
 		<displayname>Engine Rumble Low Intensity</displayname>
 		<name>engine_rumble_lowrpm_intensity</name>
+		<info>peak intenstiy of engine rumble at low RPM threshold</info>
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<value>0.06</value>
 		<sliderfactor>0.35</sliderfactor>
@@ -990,13 +954,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak intenstiy of engine rumble at low RPM threshold</info>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>330.4</order>
 		<displayname>Engine Rumble High RPM</displayname>
 		<name>engine_rumble_highrpm</name>
+		<info>high RPM threshold for high rpm intensity setting</info>
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<value>2800</value>
 		<write_any_device>true</write_any_device>
@@ -1009,13 +973,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>high RPM threshold for high rpm intensity setting</info>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
 		<order>330.5</order>
 		<displayname>Engine Rumble High Intensity</displayname>
 		<name>engine_rumble_highrpm_intensity</name>
+		<info>peak intensity of engine rumble at high RPM threshold</info>
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<value>0.03</value>
 		<sliderfactor>0.35</sliderfactor>
@@ -1027,7 +991,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak intensity of engine rumble at high RPM threshold</info>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
@@ -1064,6 +1027,7 @@
 		<order>360.2</order>
 		<displayname>Jet Engine Rumble Freq</displayname>
 		<name>jet_engine_rumble_freq</name>
+		<info>Most DCS helos are jet driven, enable the jet engine effect</info>
 		<prereq>engine_jet_rumble_enabled</prereq>
 		<value>45</value>
 		<validvalues>20,60</validvalues>
@@ -1075,19 +1039,18 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Most DCS helos are jet driven, enable the jet engine effect</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>710</order>
 		<displayname>AoA Effect</displayname>
 		<name>aoa_effect_enabled</name>
+		<info>Enable or disable the dynamic AoA based forces effect</info>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>Enable or disable the dynamic AoA based forces effect</info>
 		<Element1>aoa_effect_enabled</Element1>
 	</defaults>
 	<defaults>
@@ -1095,13 +1058,13 @@
 		<order>710.1</order>
 		<displayname>AoA Effect Gain</displayname>
 		<name>aoa_effect_gain</name>
+		<info>amount of calculated AOA effect to apply</info>
 		<prereq>aoa_effect_enabled</prereq>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>amount of calculated AOA effect to apply</info>
 		<Element1>aoa_effect_enabled.aoa_effect_gain</Element1>
 	</defaults>
 	<defaults>
@@ -1109,13 +1072,13 @@
 		<order>710.1</order>
 		<displayname>AoA Effect Max Force (DCS)</displayname>
 		<name>max_aoa_cf_force</name>
+		<info>Maximum constant force to apply for the AoA effect</info>
 		<prereq>aoa_effect_enabled</prereq>
 		<value>0.2</value>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
-		<info>Maximum constant force to apply for the AoA effect</info>
 		<Element1>aoa_effect_enabled.max_aoa_cf_force</Element1>
 	</defaults>
 	<defaults>
@@ -1123,12 +1086,12 @@
 		<order>720</order>
 		<displayname>AoA Reduction</displayname>
 		<name>aoa_reduction_effect_enabled</name>
+		<info>Enable or disable the AoA reduction force effect</info>
 		<write_any_device>true</write_any_device>
 		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>Enable or disable the AoA reduction force effect</info>
 		<Element1>aoa_reduction_effect_enabled</Element1>
 	</defaults>
 	<defaults>
@@ -1136,6 +1099,7 @@
 		<order>720.1</order>
 		<displayname>AoA Reduction Max Force</displayname>
 		<name>aoa_reduction_max_force</name>
+		<info>Max constant force to apply for AoA Reduction Effect&lt;br&gt;&lt;br&gt;This is a percentage of the constant force value in VPforce Configurator</info>
 		<prereq>aoa_reduction_effect_enabled</prereq>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
@@ -1143,7 +1107,6 @@
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>Max constant force to apply for AoA Reduction Effect&lt;br&gt;&lt;br&gt;This is a percentage of the constant force value in VPforce Configurator</info>
 		<Element1>aoa_reduction_effect_enabled.aoa_reduction_max_force</Element1>
 	</defaults>
 	<defaults>
@@ -1151,6 +1114,7 @@
 		<order>720.2</order>
 		<displayname>Critical AoA Max Speed</displayname>
 		<name>critical_aoa_max</name>
+		<info>AoA at which applied force maxes out</info>
 		<prereq>aoa_reduction_effect_enabled</prereq>
 		<value>25</value>
 		<unit>deg</unit>
@@ -1158,7 +1122,6 @@
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>AoA at which applied force maxes out</info>
 		<Element1>aoa_reduction_effect_enabled.critical_aoa_max</Element1>
 	</defaults>
 	<defaults>
@@ -1166,6 +1129,7 @@
 		<order>720.3</order>
 		<displayname>Critical AoA Start Speed</displayname>
 		<name>critical_aoa_start</name>
+		<info>AoA at which to begin applying force</info>
 		<prereq>aoa_reduction_effect_enabled</prereq>
 		<value>22</value>
 		<unit>deg</unit>
@@ -1173,7 +1137,6 @@
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>AoA at which to begin applying force</info>
 		<Element1>aoa_reduction_effect_enabled.critical_aoa_start</Element1>
 	</defaults>
 	<defaults>
@@ -1194,6 +1157,7 @@
 		<order>730.1</order>
 		<displayname>Buffeting Intensity</displayname>
 		<name>buffeting_intensity</name>
+		<info>peak AoA buffeting intensity  0 to disable</info>
 		<prereq>aoa_buffeting_enabled</prereq>
 		<value>0.2</value>
 		<validvalues>0,100</validvalues>
@@ -1203,13 +1167,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak AoA buffeting intensity  0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>730.3</order>
 		<displayname>Buffet Onset Aoa</displayname>
 		<name>buffet_aoa</name>
+		<info>AoA when buffeting starts</info>
 		<prereq>aoa_buffeting_enabled</prereq>
 		<value>10</value>
 		<unit>deg</unit>
@@ -1218,13 +1182,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>AoA when buffeting starts</info>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>730.4</order>
 		<displayname>Stall AoA</displayname>
 		<name>stall_aoa</name>
+		<info>Stall AoA</info>
 		<prereq>aoa_buffeting_enabled</prereq>
 		<value>15</value>
 		<unit>deg</unit>
@@ -1233,7 +1197,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Stall AoA</info>
 	</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
@@ -1253,6 +1216,7 @@
 		<order>740.1</order>
 		<displayname>Canopy Motion</displayname>
 		<name>canopy_motion_intensity</name>
+		<info>peak vibration intensity when canopy is moving, 0 to disable</info>
 		<prereq>canopy_motion_effect_enabled</prereq>
 		<value>0.12</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1262,7 +1226,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak vibration intensity when canopy is moving, 0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
@@ -1282,6 +1245,7 @@
 		<order>750.1</order>
 		<displayname>Damage Effect</displayname>
 		<name>damage_effect_intensity</name>
+		<info>peak vibration intensity when flaps are moving, 0 to disable</info>
 		<prereq>damage_effect_enabled</prereq>
 		<value>0.4</value>
 		<validvalues>0,100</validvalues>
@@ -1290,26 +1254,26 @@
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<info>peak vibration intensity when flaps are moving, 0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
 		<order>755</order>
 		<displayname>Enable Decelleration Effect</displayname>
 		<name>deceleration_effect_enable</name>
+		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		<write_any_device>true</write_any_device>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
 		<order>755.1</order>
 		<displayname>Decelleration Max Force</displayname>
 		<name>deceleration_max_force</name>
+		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		<prereq>deceleration_effect_enable</prereq>
 		<value>0.6</value>
 		<validvalues>0,100</validvalues>
@@ -1317,7 +1281,6 @@
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
@@ -1338,6 +1301,7 @@
 		<order>760.1</order>
 		<displayname>Flaps Motion</displayname>
 		<name>flaps_motion_intensity</name>
+		<info>peak vibration intensity when flaps are moving, 0 to disable</info>
 		<prereq>flaps_motion_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1349,7 +1313,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak vibration intensity when flaps are moving, 0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
@@ -1370,6 +1333,7 @@
 		<order>770.1</order>
 		<displayname>Gear Buffet</displayname>
 		<name>gear_buffet_intensity</name>
+		<info>Peak intensity for gear drag buffeting effect</info>
 		<prereq>gear_buffet_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1380,7 +1344,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Peak intensity for gear drag buffeting effect</info>
 		</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
@@ -1402,6 +1365,7 @@
 		<order>775.1</order>
 		<displayname>Gear Motion</displayname>
 		<name>gear_motion_intensity</name>
+		<info>peak vibration intensity when gear is moving, 0 to disable</info>
 		<prereq>gear_motion_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1413,7 +1377,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak vibration intensity when gear is moving, 0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
@@ -1462,6 +1425,7 @@
 		<order>780</order>
 		<displayname>Runway Rumble</displayname>
 		<name>runway_rumble_enabled</name>
+		<info>enable/disable runway rumble effect</info>
 		<write_any_device>true</write_any_device>
 		<value>true</value>
 		<datatype>bool</datatype>
@@ -1470,13 +1434,13 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>enable/disable runway rumble effect</info>
 	</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>780.1</order>
 		<displayname>Runway Rumble Intensity</displayname>
 		<name>runway_rumble_intensity</name>
+		<info>peak runway intensity</info>
 		<prereq>runway_rumble_enabled</prereq>
 		<value>0.2</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1487,8 +1451,53 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak runway intensity</info>
 		</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>785</order>
+		<displayname>Enable Nosewheel Shimmy</displayname>
+		<name>nosewheel_shimmy</name>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>785.1</order>
+		<displayname>Nosewheel Shimmy</displayname>
+		<name>nosewheel_shimmy_intensity</name>
+		<value>0.15</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>785.2</order>
+		<displayname>Nosewheel Shimmy min brakes</displayname>
+		<name>nosewheel_shimmy_min_brakes</name>
+		<prereq>nosewheel_shimmy</prereq>
+		<value>0.65</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>785.3</order>
+		<displayname>Nosewheel Shimmy min speed</displayname>
+		<name>nosewheel_shimmy_min_speed</name>
+		<prereq>nosewheel_shimmy</prereq>
+		<value>7</value>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<unit>m/s</unit>
+		<datatype>int</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>790</order>
@@ -1506,6 +1515,7 @@
 		<order>790.1</order>
 		<displayname>Speedbrake Buffet</displayname>
 		<name>speedbrake_buffet_intensity</name>
+		<info>Peak intensity for speed brake buffeting effect</info>
 		<prereq>speedbrake_buffet_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1515,7 +1525,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>Peak intensity for speed brake buffeting effect</info>
 	</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
@@ -1534,6 +1543,7 @@
 		<order>791.1</order>
 		<displayname>Speedbrake Motion</displayname>
 		<name>speedbrake_motion_intensity</name>
+		<info>peak vibration intensity when speed brake is moving</info>
 		<prereq>speedbrake_motion_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1543,7 +1553,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak vibration intensity when speed brake is moving</info>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
@@ -1563,6 +1572,7 @@
 		<order>792.1</order>
 		<displayname>Spoiler Buffet</displayname>
 		<name>spoiler_buffet_intensity</name>
+		<info>peak buffeting intensity when spoilers deployed,  0 to disable</info>
 		<prereq>spoiler_buffet_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1573,7 +1583,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>peak buffeting intensity when spoilers deployed,  0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
@@ -1592,6 +1601,7 @@
 		<order>793.1</order>
 		<displayname>Spoiler Motion</displayname>
 		<name>spoiler_motion_intensity</name>
+		<info>F14 Only, peak vibration intensity when spoilers is moving, 0 to disable</info>
 		<prereq>spoiler_motion_effect_enabled</prereq>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
@@ -1601,18 +1611,17 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<info>F14 Only, peak vibration intensity when spoilers is moving, 0 to disable</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>800</order>
 		<displayname>Uncoord Turn Effect</displayname>
 		<name>uncoordinated_turn_effect_enabled</name>
+		<info>simulate body acelleration effect on stick in uncoordinated turns</info>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<info>simulate body acelleration effect on stick in uncoordinated turns</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
@@ -1643,6 +1652,7 @@
 		<order>810.1</order>
 		<displayname>Wind Effect Max Inensity</displayname>
 		<name>wind_effect_max_intensity</name>
+		<info>Adjust the maximum intensity the wind effect can attain</info>
 		<prereq>wind_effect_enabled</prereq>
 		<value>0.4</value>
 		<validvalues>0,100</validvalues>
@@ -1650,20 +1660,19 @@
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<info>Adjust the maximum intensity the wind effect can attain</info>
 		</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>810.2</order>
 		<displayname>Wind Effect Scaling</displayname>
 		<name>wind_effect_scaling</name>
+		<info>Adjust the overall intensity of the wind effect</info>
 		<prereq>wind_effect_enabled</prereq>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
-		<info>Adjust the overall intensity of the wind effect</info>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
@@ -1690,905 +1699,6 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 	</defaults>
-	<models>
-		<name>type</name>
-		<model>A-10A.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>A-10C.*</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>A-10C.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>cm_vibration_intensity</name>
-		<model>AH-64D_BLK_II</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>AH-64D_BLK_II</model>
-		<value>0.3</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>AH-64D_BLK_II</model>
-		<value>6</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>AH-64D_BLK_II</model>
-		<value>22</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>gun_vibration_intensity</name>
-		<model>AH-64D_BLK_II</model>
-		<value>0.12</value>
-		<unit></unit>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>AH-64D_BLK_II</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>weapon_release_intensity</name>
-		<model>AH-64D_BLK_II</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>AJS37</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>AJS37</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>AV8BNA</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>trim_workaround</name>
-		<model>AV8BNA</model>
-		<value>true</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>AV8BNA</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Bf-109K-4</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>F-14.*</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>spoiler_buffet_intensity</name>
-		<model>F-14.*</model>
-		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>spoiler_motion_intensity</name>
-		<model>F-14.*</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>F-14.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>F-15C</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>F-15ESE</model>
-		<value>3.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>F-15ESE</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>flaps_motion_intensity</name>
-		<model>F-16C_50</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>flaps_motion_intensity</name>
-		<model>F-16C_50</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>F-16C_50</model>
-		<value>3.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>F-16C_50</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>F-5E</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>F-5E</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>aoa_reduction_max_force</name>
-		<model>FA-18C_hornet</model>
-		<value>0.7</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>flaps_motion_intensity</name>
-		<model>FA-18C_hornet</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>flaps_motion_intensity</name>
-		<model>FA-18C_hornet</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>FA-18C_hornet</model>
-		<value>3.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>FA-18C_hornet</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>FW-190A8</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>FW-190D9</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>FW-190D9</model>
-		<value>1.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>FW-190D9</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>I-16</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>JF-17</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>JF-17</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>Ka-50</model>
-		<value>6</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>Ka-50</model>
-		<value>22</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>Ka-50</model>
-		<value>70</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Ka-50</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>M-2000C</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>M-2000C</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MB-339.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>MB-399.*</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Mi-24P</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Mi-8MT</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MiG-15.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>trim_workaround</name>
-		<model>MiG-19.*</model>
-		<value>true</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>MiG-19.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>buffet_aoa</name>
-		<model>MiG-21.*</model>
-		<value>8</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>MiG-21.*</model>
-		<value>0.25</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MiG-21.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MiG-29.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>Mirage-F1.*</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Mirage-F1.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MosquitoFBMkVI</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-47D.*</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>P-51D</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>P-51D</model>
-		<value>1.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-51D</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>cm_vibration_intensity</name>
-		<model>SA342.*</model>
-		<value>0.15</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>SA342.*</model>
-		<value>0.3</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>SA342.*</model>
-		<value>6</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>SA342.*</model>
-		<value>22</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>SA342.*</model>
-		<value>0.25</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>SA342.*</model>
-		<value>75</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>SA342.*</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>weapon_release_intensity</name>
-		<model>SA342.*</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>Shrike.*</model>
-		<value>0.3</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>buffet_aoa</name>
-		<model>SpitfireLFMkIX</model>
-		<value>12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>stall_aoa</name>
-		<model>SpitfireLFMkIX</model>
-		<value>16</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>SpitfireLFMkIX</model>
-		<value>PropellerAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>Su-25.*</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Su-25.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Su-27.*</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>Su-33</model>
-		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Su-33</model>
-		<value>JetAircraft</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>TF-51D</model>
-		<value>0.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>gear_buffet_intensity</name>
-		<model>TF-51D</model>
-		<value>0.15</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>inertia_force</name>
-		<model>TF-51D</model>
-		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>TF-51D</model>
-		<value>1.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
-
-	<models>
-	<name>type</name>
-	<model>TF-51D</model>
-	<value>PropellerAircraft</value>
-	<sim>DCS</sim>
-	<device>any</device>
-	</models>
-	<models>
-		<name>cm_vibration_intensity</name>
-		<model>UH-1H</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>UH-1H</model>
-		<value>0.25</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>UH-1H</model>
-		<value>10</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>UH-1H</model>
-		<value>20</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>gun_vibration_intensity</name>
-		<model>UH-1H</model>
-		<value>0.1</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>UH-1H</model>
-		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>UH-1H</model>
-		<value>60</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>UH-1H</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>weapon_release_intensity</name>
-		<model>UH-1H</model>
-		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>cm_vibration_intensity</name>
-		<model>UH-60L</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>UH-60L</model>
-		<value>0.25</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>UH-60L</model>
-		<value>20</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>gun_vibration_intensity</name>
-		<model>UH-60L</model>
-		<value>0.1</value>
-		<unit></unit>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>UH-60L</model>
-		<value>Helicopter</value>
-		<sim>DCS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>weapon_release_intensity</name>
-		<model>UH-60L</model>
-		<value>0.12</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>A-20B</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Bf 109.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Bf 110.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Fw 190.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>He 111.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Hs 129 B-2</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>I-16 type 24</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Il-2 mod.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Ju 88 A-4</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>La-5 ser.8</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>LaGG-3 ser.29</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MC.202 ser.VIII</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Me 262 A</model>
-		<value>JetAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>MiG-3 ser.24</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-38J-25</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-39L-1</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-40E-1</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-47D-28</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>P-51D-15</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Pe-2 ser.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Spitfire Mk.*</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Tempest Mk.V ser.2</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-
-
-	<models>
-		<name>type</name>
-		<model>Yak-1 ser.69</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>type</name>
-		<model>Yak-7B series 36</model>
-		<value>PropellerAircraft</value>
-		<sim>IL2</sim>
-		<device>any</device>
-		</models>
 	<models>
 		<name>etl_effect_intensity</name>
 		<model>222B.*</model>
@@ -2707,6 +1817,34 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>type</name>
+		<model>A-10A.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>A-10C.*</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>A-10C.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>A-20B</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
 		<name>aileron_gain</name>
 		<model>A2A Piper PA-24.*</model>
 		<value>0.06</value>
@@ -2776,6 +1914,58 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>cm_vibration_intensity</name>
+		<model>AH-64D_BLK_II</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>AH-64D_BLK_II</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>AH-64D_BLK_II</model>
+		<value>6</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>AH-64D_BLK_II</model>
+		<value>22</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gun_vibration_intensity</name>
+		<model>AH-64D_BLK_II</model>
+		<value>0.12</value>
+		<unit></unit>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>AH-64D_BLK_II</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>AH-64D_BLK_II</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
 	<models>
 		<name>type</name>
 		<model>Airbus H135.*</model>
@@ -2912,6 +2102,20 @@
 		<model>Airbus H160.*</model>
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>AJS37</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>AJS37</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -3115,10 +2319,46 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Asobo XCub</model>
+		<value>0.65</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Asobo XCub</model>
+		<value>6.66</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Asobo XCub</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>AV8BNA</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>trim_workaround</name>
+		<model>AV8BNA</model>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>AV8BNA</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
 		<device>any</device>
 		</models>
 	<models>
@@ -3282,6 +2522,27 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>Bf 109.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Bf 110.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Bf-109K-4</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
 		<name>aircraft_is_fbw</name>
 		<model>Boeing F/A 18.*</model>
 		<value>true</value>
@@ -3329,6 +2590,13 @@
 		<value>0.6</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</models>
+	<models>
+		<name>fbw_rudder_gain</name>
+		<model>Boeing F/A 18.*</model>
+		<value>0.24</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
 	</models>
 	<models>
 		<name>flaps_motion_intensity</name>
@@ -3572,6 +2840,63 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>aileron_gain</name>
+		<model>DA40 TDI.*</model>
+		<value>0.045</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>DA40 TDI.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>DA40 TDI.*</model>
+		<value>0.08</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>DA40 TDI.*</model>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>nosewheel_shimmy</name>
+		<model>DA40 TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>DA40 TDI.*</model>
+		<value>6.1352</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>DA40 TDI.*</model>
+		<value>0.09</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>DA40 TDI.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>DA62.*</model>
 		<value>PropellerAircraft</value>
@@ -3581,7 +2906,7 @@
 	<models>
 		<name>elevator_droop_moment</name>
 		<model>DoubleEnder.*</model>
-		<value>30%</value>
+		<value>0.3</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -3595,7 +2920,7 @@
 	<models>
 		<name>engine_rumble_lowrpm_intensity</name>
 		<model>DoubleEnder.*</model>
-		<value>12%</value>
+		<value>0.12</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -3677,6 +3002,132 @@
 		<model>Experimental Mini-500.*</model>
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-14.*</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>spoiler_buffet_intensity</name>
+		<model>F-14.*</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>spoiler_motion_intensity</name>
+		<model>F-14.*</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>F-14.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>F-15C</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-15ESE</model>
+		<value>3.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-15ESE</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>flaps_motion_intensity</name>
+		<model>F-16C_50</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>flaps_motion_intensity</name>
+		<model>F-16C_50</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-16C_50</model>
+		<value>3.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-16C_50</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-5E</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-5E</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aoa_reduction_max_force</name>
+		<model>FA-18C_hornet</model>
+		<value>0.7</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>flaps_motion_intensity</name>
+		<model>FA-18C_hornet</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>flaps_motion_intensity</name>
+		<model>FA-18C_hornet</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>FA-18C_hornet</model>
+		<value>3.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>FA-18C_hornet</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
 		<device>any</device>
 		</models>
 	<models>
@@ -3906,6 +3357,97 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>type</name>
+		<model>Fw 190.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>FW-190A8</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>FW-190D9</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>FW-190D9</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>FW-190D9</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>He 111.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Hs 129 B-2</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>I-16</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>I-16 type 24</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Il-2 mod.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>JF-17</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>JF-17</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Ju 88 A-4</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
 		<name>joystick_ap_following</name>
 		<model>Juice Goose.*</model>
 		<value>false</value>
@@ -3948,12 +3490,169 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>etl_start_speed</name>
+		<model>Ka-50</model>
+		<value>6</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>Ka-50</model>
+		<value>22</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>Ka-50</model>
+		<value>70</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Ka-50</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>La-5 ser.8</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>LaGG-3 ser.29</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
 		<name>type</name>
 		<model>Lama SA315B.*</model>
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>M-2000C</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>M-2000C</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MB-339.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>MB-399.*</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>MC.202 ser.VIII</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Me 262 A</model>
+		<value>JetAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Mi-24P</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Mi-8MT</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MiG-15.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>trim_workaround</name>
+		<model>MiG-19.*</model>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>MiG-19.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>buffet_aoa</name>
+		<model>MiG-21.*</model>
+		<value>8</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>MiG-21.*</model>
+		<value>0.25</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MiG-21.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MiG-29.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MiG-3 ser.24</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
 	<models>
 		<name>invert_ap_x_axis</name>
 		<model>Milviz 310R.*</model>
@@ -3968,6 +3667,97 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>Mirage-F1.*</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Mirage-F1.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>MosquitoFBMkVI</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-38J-25</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-39L-1</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-40E-1</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-47D.*</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>P-47D-28</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>P-51D</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>P-51D</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-51D</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-51D-15</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Pe-2 ser.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>pesim-maule-m7235.*</model>
@@ -4148,6 +3938,65 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>cm_vibration_intensity</name>
+		<model>SA342.*</model>
+		<value>0.15</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>SA342.*</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>SA342.*</model>
+		<value>6</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>SA342.*</model>
+		<value>22</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>SA342.*</model>
+		<value>0.25</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>SA342.*</model>
+		<value>75</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>SA342.*</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>SA342.*</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
 		<name>type</name>
 		<model>Savage Grravel.*</model>
 		<value>PropellerAircraft</value>
@@ -4175,6 +4024,13 @@
 		<value>30</value>
 		<unit>kt</unit>
 		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>Shrike.*</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
 		<device>any</device>
 	</models>
 	<models>
@@ -4207,26 +4063,414 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>spoiler_buffet_intensity</name>
-		<model>TBM 930 Asobo</model>
-		<value>0.0</value>
-		<sim>MSFS</sim>
+		<name>type</name>
+		<model>Spitfire Mk.*</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>buffet_aoa</name>
+		<model>SpitfireLFMkIX</model>
+		<value>12</value>
+		<sim>DCS</sim>
 		<device>joystick</device>
+		</models>
+	<models>
+		<name>stall_aoa</name>
+		<model>SpitfireLFMkIX</model>
+		<value>16</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>SpitfireLFMkIX</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</models>
 	<models>
-		<name>spoiler_motion_intensity</name>
-		<model>TBM 930 Asobo</model>
+		<name>buffeting_intensity</name>
+		<model>Su-25.*</model>
 		<value>0.0</value>
-		<sim>MSFS</sim>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Su-25.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Su-27.*</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>Su-33</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
-		<model>TBM 930 Asobo</model>
+		<model>Su-33</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>TBM 830.*</model>
+		<value>0.01</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aileron_spring_gain</name>
+		<model>TBM 830.*</model>
+		<value>0.08</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aircraft_is_spring_centered</name>
+		<model>TBM 830.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>TBM 830.*</model>
+		<value>0.02</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_spring_gain</name>
+		<model>TBM 830.*</model>
+		<value>0.08</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>engine_rumble_lowrpm_intensity</name>
+		<model>TBM 830.*</model>
+		<value>0.042</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>TBM 830.*</model>
+		<value>-0.48</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>TBM 830.*</model>
+		<value>7.57</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>TBM 830.*</model>
+		<value>7.57</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>TBM 830.*</model>
+		<value>0.03</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>rudder_spring_gain</name>
+		<model>TBM 830.*</model>
+		<value>0.11</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>TBM 830.*</model>
 		<value>TurbopropAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>TBM 830.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>TBM 930.*</model>
+		<value>0.01</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aileron_spring_gain</name>
+		<model>TBM 930.*</model>
+		<value>0.08</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aircraft_is_spring_centered</name>
+		<model>TBM 930.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>aircraft_is_spring_centered</name>
+		<model>TBM 930.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>TBM 930.*</model>
+		<value>0.02</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_spring_gain</name>
+		<model>TBM 930.*</model>
+		<value>0.08</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>engine_rumble_lowrpm_intensity</name>
+		<model>TBM 930.*</model>
+		<value>0.042</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>TBM 930.*</model>
+		<value>-0.48</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>TBM 930.*</model>
+		<value>7.57</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>TBM 930.*</model>
+		<value>7.57</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>TBM 930.*</model>
+		<value>0.03</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>rudder_spring_gain</name>
+		<model>TBM 930.*</model>
+		<value>0.11</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>TBM 930.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>TBM 930.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Tempest Mk.V ser.2</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
 		</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>TF-51D</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>gear_buffet_intensity</name>
+		<model>TF-51D</model>
+		<value>0.15</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>inertia_force</name>
+		<model>TF-51D</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>TF-51D</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+
+	<models>
+	<name>type</name>
+	<model>TF-51D</model>
+	<value>PropellerAircraft</value>
+	<sim>DCS</sim>
+	<device>any</device>
+	</models>
+	<models>
+		<name>cm_vibration_intensity</name>
+		<model>UH-1H</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>UH-1H</model>
+		<value>0.25</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>UH-1H</model>
+		<value>10</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>UH-1H</model>
+		<value>20</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gun_vibration_intensity</name>
+		<model>UH-1H</model>
+		<value>0.1</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>UH-1H</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>UH-1H</model>
+		<value>60</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>UH-1H</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>UH-1H</model>
+		<value>0.2</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>cm_vibration_intensity</name>
+		<model>UH-60L</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>UH-60L</model>
+		<value>0.25</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>UH-60L</model>
+		<value>20</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gun_vibration_intensity</name>
+		<model>UH-60L</model>
+		<value>0.1</value>
+		<unit></unit>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>UH-60L</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>weapon_release_intensity</name>
+		<model>UH-60L</model>
+		<value>0.12</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
 	<models>
 		<name>aileron_gain</name>
 		<model>Vertigo.*</model>
@@ -4267,6 +4511,22 @@
 		<model>XCub.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
+		<device>any</device>
+		</models>
+
+
+	<models>
+		<name>type</name>
+		<model>Yak-1 ser.69</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>Yak-7B series 36</model>
+		<value>PropellerAircraft</value>
+		<sim>IL2</sim>
 		<device>any</device>
 		</models>
 	<classdefaults>

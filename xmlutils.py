@@ -130,7 +130,7 @@ def read_models(the_sim):
     return sorted(all_models)
 
 
-def read_models_data(file_path, sim, full_model_name):
+def read_models_data(file_path, sim, full_model_name, alldevices=False):
     mprint(f"read_models_data  {file_path}, {sim}, {full_model_name}")
     # runs on both defaults and userconfig xml files
     tree = ET.parse(file_path)
@@ -139,13 +139,19 @@ def read_models_data(file_path, sim, full_model_name):
     model_data = []
     found_pattern = ''
 
-    # Iterate through models elements
-    #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{device}"]'):
-    for model_elem in root.findall(f'.//models[sim="{sim}"][device="{device}"]') + \
-                      root.findall(f'.//models[sim="any"][device="{device}"]') + \
-                      root.findall(f'.//models[sim="{sim}"][device="any"]') + \
-                      root.findall(f'.//models[sim="any"][device="any"]'):
+    if alldevices:
+        # Iterate through models elements
+        #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{device}"]'):
+        all_models = root.findall(f'.//models[sim="{sim}"]') + \
+                          root.findall(f'.//models[sim="any"]')
+    else:
+        all_models = root.findall(f'.//models[sim="{sim}"][device="{device}"]') + \
+                          root.findall(f'.//models[sim="any"][device="{device}"]') + \
+                          root.findall(f'.//models[sim="{sim}"][device="any"]') + \
+                          root.findall(f'.//models[sim="any"][device="any"]')
 
+    # Iterate through models elements
+    for model_elem in all_models:
         # Assuming 'model' is the element containing the wildcard pattern
 
         unit_pattern = model_elem.find('model')
@@ -158,10 +164,12 @@ def read_models_data(file_path, sim, full_model_name):
                     value = model_elem.find('value').text
                     unit_elem = model_elem.find('unit')
                     unit = unit_elem.text if unit_elem is not None else ""
+                    saved_device = model_elem.find('device').text
                     model_dict = {
                         'name': name,
                         'value': value,
-                        'unit': unit
+                        'unit': unit,
+                        'device': saved_device
                     }
                     found_pattern = pattern
                     model_data.append(model_dict)
@@ -432,13 +440,14 @@ def update_data_with_models(defaults_data, model_data, replacetext):
     return updated_result
 
 
-def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''):
+def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', the_device=''):
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
     model_elem = None
-    the_device = device
+    if the_device == '':
+        the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
     if setting_name in write_any_device_list:
         the_device = 'any'
@@ -580,12 +589,12 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
             f"Added <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}{unit}, name={setting_name}")
 
 def clone_pattern(the_sim, old_pattern, new_pattern):
-    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, old_pattern)
-    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, old_pattern)
+    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, old_pattern, True)
+    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, old_pattern, True)
     for item in model_data:
-        write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'])
+        write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'], item['device'])
     for item in user_model_data:
-        write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'])
+        write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'], item['device'])
 
 def write_converted_to_xml(differences):
     sim_set = []
