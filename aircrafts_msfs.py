@@ -235,6 +235,9 @@ class Aircraft(AircraftBase):
         self.use_fbw_for_ap_follow = True
 
         self.invert_ap_x_axis = False
+        self.max_elevator_coeff = 0.5
+        self.max_aileron_coeff = 0.5
+        self.max_rudder_coeff = 0.5
 
         global sim_connect
         if sim_connect is None:
@@ -615,12 +618,16 @@ class Aircraft(AircraftBase):
 
                     # logging.debug(f"fto={force_trim_y_offset} | Offset={offs}")
 
-            self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
+            max_coeff_y = int(4096*self.max_elevator_coeff)
+
+            self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, max_coeff_y)
             ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
             logging.debug(f"Elev Coef: {ec}")
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
             #self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
-            ac = clamp(int(4096 * aileron_coeff), base_elev_coeff, 4096)
+
+            max_coeff_x = int(4096*self.max_aileron_coeff)
+            ac = clamp(int(4096 * aileron_coeff), base_elev_coeff, max_coeff_x)
             logging.debug(f"Ailer Coef: {ac}")
 
             self.spring_x.positiveCoefficient = clamp(int(4096 * aileron_coeff), base_ailer_coeff, 4096)
@@ -667,7 +674,8 @@ class Aircraft(AircraftBase):
             else:
                 phys_rudder_x_offs = 0
                 virtual_rudder_x_offs = 0
-            x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, 4096)
+            max_coeff_x = int(4096*self.max_rudder_coeff)
+            x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, max_coeff_x)
 
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
             self.spring_x.cpOffset = phys_rudder_x_offs
