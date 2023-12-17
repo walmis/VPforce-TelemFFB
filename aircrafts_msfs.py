@@ -831,7 +831,7 @@ class GliderAircraft(Aircraft):
         offs_y = 0
         if ffb_type != "joystick":
             return
-        if self.force_trim_button == 0 or self.force_trim_reset_button == 0:
+        if self.force_trim_button == 0:
             logging.warning("Force trim enabled but buttons not configured")
             return
 
@@ -839,7 +839,10 @@ class GliderAircraft(Aircraft):
         input_data = HapticEffect.device.getInput()
 
         force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
-        trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+        if self.force_trim_reset_button > 0:
+            trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+        else:
+            trim_reset_pressed = False
         x, y = input_data.axisXY()
         if force_trim_pressed:
             if x_axis:
@@ -1039,14 +1042,17 @@ class Helicopter(Aircraft):
         if ffb_type == "joystick":
             if self.force_trim_enabled:
 
-                if self.force_trim_button == 0 or self.force_trim_reset_button == 0:
+                if self.force_trim_button == 0:
                     logging.warning("Force trim enabled but buttons not configured")
                     return
                 self.spring = effects["cyclic_spring"].spring()
                 input_data = HapticEffect.device.getInput()
 
                 force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
-                trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+                if self.force_trim_reset_button > 0:
+                    trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+                else:
+                    trim_reset_pressed = False
                 x, y = input_data.axisXY()
                 if force_trim_pressed:
                     self.spring_x.positiveCoefficient = 0
