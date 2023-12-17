@@ -2056,11 +2056,11 @@ class MainWindow(QMainWindow):
             # window_mode = self.radio_button_group.checkedButton()
             window_mode = self.tab_widget.currentIndex()
             # update slider colors
-            pct_max_a = data.get('pct_max_a', 0)
-            pct_max_e = data.get('pct_max_e', 0)
-            pct_max_r = data.get('pct_max_r', 0)
+            pct_max_a = data.get('_pct_max_a', 0)
+            pct_max_e = data.get('_pct_max_e', 0)
+            pct_max_r = data.get('_pct_max_r', 0)
             qcolor_green = QColor("#17c411")
-            qcolor_purple = QColor(vpf_purple)
+            qcolor_grey = QColor("grey")
             if window_mode == 1:
                 sliders = self.findChildren(NoWheelSlider)
                 for my_slider in sliders:
@@ -2068,19 +2068,19 @@ class MainWindow(QMainWindow):
                     my_slider.blockSignals(True)
 
                     if slidername == 'max_elevator_coeff':
-                        new_color = self.interpolate_color(qcolor_purple, qcolor_green, pct_max_e)
+                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_e)
                         my_slider.setHandleColor(new_color.name())
                         # print(new_color)
                         my_slider.blockSignals(False)
                         continue
                     if slidername == 'max_aileron_coeff':
-                        new_color = self.interpolate_color(qcolor_purple, qcolor_green, pct_max_a)
+                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_a)
                         my_slider.setHandleColor(new_color.name())
                         # print(new_color)
                         my_slider.blockSignals(False)
                         continue
                     if slidername == 'max_rudder_coeff':
-                        new_color = self.interpolate_color(qcolor_purple, qcolor_green, pct_max_r)
+                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_r)
                         my_slider.setHandleColor(new_color.name())
                         # print(new_color)
                         my_slider.blockSignals(False)
