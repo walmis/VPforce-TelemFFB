@@ -2430,6 +2430,14 @@ class SettingsLayout(QGridLayout):
         expand_button.clicked.connect(self.expander_clicked)
 
 
+        usb_button_text = f"Button {item['value']}"
+        if item['value'] == '0':
+            usb_button_text = 'Click to Configure'
+        self.usbdevice_button = QPushButton(usb_button_text)
+        self.usbdevice_button.setObjectName(f"pb_{item['name']}")
+        self.usbdevice_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        self.usbdevice_button.clicked.connect(self.usb_button_clicked)
+
         value_label = QLabel()
         value_label.setAlignment(Qt.AlignHCenter)
         value_label.setMaximumWidth(50)
@@ -2522,6 +2530,9 @@ class SettingsLayout(QGridLayout):
 
         if item['datatype'] == 'int' or item['datatype'] == 'anyfloat':
             self.addWidget(line_edit, i, self.entry_col, 1, entry_colspan)
+
+        if item['datatype'] == 'button':
+            self.addWidget(self.usbdevice_button, i, self.entry_col, 1, entry_colspan)
 
         if not rowdisabled:
             # for p_item in self.prereq_list:
@@ -2643,6 +2654,13 @@ class SettingsLayout(QGridLayout):
             self.sender().setArrowType(Qt.DownArrow)
 
             self.reload_caller()
+
+    def usb_button_clicked(self):
+        button_name = self.sender().objectName().replace('pb_', '')
+        the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
+        the_button.setText("Push a button! ")
+        # listen for button loop
+        pass
 
     # def slider_changed(self, name, value, factor):
     #     print(f"Slider {name} changed. New value: {value}  factor: {factor}")
