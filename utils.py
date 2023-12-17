@@ -1251,7 +1251,8 @@ def launch_vpconf(serial):
         env = {}
         env["PATH"] = os.environ["PATH"]
         # logging.info(f"Loading vpconf for aircraft with: {vpconf_path} -config {params['vpconf']} -serial {serial}")
-        subprocess.call([vpconf_path, "-serial", serial], cwd=workdir, env=env)
+        call = [vpconf_path, "-serial", serial]
+        subprocess.Popen(call, cwd=workdir, env=env)
 def get_version():
     ver = "UNKNOWN"
     try:
