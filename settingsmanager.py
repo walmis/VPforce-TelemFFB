@@ -981,8 +981,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
 class UserModelDialog(QDialog):
+    the_sim = ''
     def __init__(self, sim, current_aircraft, current_type, parent=None):
         super(UserModelDialog, self).__init__(parent)
+        self.the_sim = sim
         self.combo_box = None
         self.models_combo_box = None
         self.tb_current_aircraft = None
@@ -991,6 +993,7 @@ class UserModelDialog(QDialog):
 
     def class_combo_changed(self):
         self.models_combo_box.blockSignals(True)
+        self.setup_models()
         self.models_combo_box.setCurrentText('')
         self.models_combo_box.blockSignals(False)
 
@@ -999,8 +1002,17 @@ class UserModelDialog(QDialog):
         self.combo_box.setCurrentText('')
         self.combo_box.blockSignals(False)
 
-    def init_ui(self,sim,current_aircraft,current_type):
+    def setup_models(self):
+        models = xmlutils.read_models(self.the_sim, self.combo_box.currentText())
+        self.models_combo_box.clear()
+        self.models_combo_box.blockSignals(True)
+        self.models_combo_box.addItem('')
+        self.models_combo_box.addItems(models)
+        self.models_combo_box.setCurrentText('')
 
+        self.models_combo_box.blockSignals(False)
+
+    def init_ui(self,sim,current_aircraft,current_type):
 
         layout = QVBoxLayout()
 
@@ -1041,15 +1053,11 @@ class UserModelDialog(QDialog):
         self.combo_box.blockSignals(False)
 
 
-        models = xmlutils.read_models(sim)
         self.models_combo_box = QComboBox()
-        self.models_combo_box.blockSignals(True)
-        self.models_combo_box.addItem('')
-        self.models_combo_box.addItems(models)
-        self.models_combo_box.setCurrentText('')
-        self.models_combo_box.currentIndexChanged.connect(self.pattern_changed)
-        self.models_combo_box.blockSignals(False)
+        self.setup_models()
         self.models_combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
+        # self.models_combo_box.currentIndexChanged.connect(self.pattern_changed)
+
 
         ok_button = QPushButton("OK")
         ok_button.setStyleSheet("text-align:center;")

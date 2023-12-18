@@ -273,227 +273,40 @@
 		<pedals>true</pedals>
 		</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<Grouping>Dynamic Forces</Grouping>
 		<order>30</order>
-		<displayname>Axis Control</displayname>
-		<name>telemffb_controls_axes</name>
-		<info>TelemFFB sends axis position to sim.  Do not assign in game or SPAD.next</info>
-		<value>false</value>
-		<datatype>bool</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<Element1>telemffb_controls_axes</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>30.2</order>
-		<displayname>X Axis Scale</displayname>
-		<name>joystick_x_axis_scale</name>
-		<info>Scaling of axis position sent to game</info>
-		<prereq>telemffb_controls_axes</prereq>
-		<value>1.0</value>
+		<displayname>Elevator Droop Moment</displayname>
+		<name>elevator_droop_moment</name>
+		<info>Strength of elevator droop at rest (pushes stick forward)</info>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.joystick_x_axis_scale</Element1>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>30.3</order>
-		<displayname>Y Axis Scale</displayname>
-		<name>joystick_y_axis_scale</name>
-		<info>Scaling of axis position sent to game</info>
-		<prereq>telemffb_controls_axes</prereq>
-		<value>1.0</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.joystick_y_axis_scale</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>30.4</order>
-		<displayname>Rudder (X) Axis Scale</displayname>
-		<name>rudder_x_axis_scale</name>
-		<info>Scaling of axis position sent to game</info>
-		<prereq>telemffb_controls_axes</prereq>
-		<value>1.0</value>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.rudder_x_axis_scale</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>30.5</order>
-		<displayname>Use Legacy Bindings</displayname>
-		<name>use_legacy_bindings</name>
-		<info>For helicopters that still use aileron/elevator or rudder bindings</info>
-		<prereq>telemffb_controls_axes</prereq>
-		<datatype>bool</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<Element1>telemffb_controls_axes.use_legacy_bindings</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>30.7</order>
-		<displayname>Hands On Deadzone</displayname>
-		<name>hands_on_deadzone</name>
-		<info>Distance required to trigger a hands-on condition</info>
-		<prereq>telemffb_controls_axes</prereq>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<Element1>telemffb_controls_axes.hands_on_deadzone</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>30.8</order>
-		<displayname>Hands Off Deadzone</displayname>
-		<name>hands_off_deadzone</name>
-		<info>Distance at which hands-off resumes (set lower than hands-on)</info>
-		<prereq>telemffb_controls_axes</prereq>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<Element1>telemffb_controls_axes.hands_off_deadzone</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<Grouping>Prop</Grouping>
 		<order>31</order>
-		<displayname>Trim Following</displayname>
-		<name>trim_following</name>
-		<info>Enable physical stick movement with in-game trims</info>
-		<prereq>telemffb_controls_axes</prereq>
-		<value>false</value>
-		<datatype>bool</datatype>
+		<displayname>Elevator Prop Flow</displayname>
+		<name>elevator_prop_flow_ratio</name>
+		<info>Scaling of dynamic effects on elevator</info>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.trim_following</Element1>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>31.2</order>
-		<displayname>X Trim Gain Physical</displayname>
-		<name>joystick_trim_follow_gain_physical_x</name>
-		<info>Aileron/Cyclic Lateral physical movement scalar</info>
-		<prereq>trim_following</prereq>
-		<value>1.0</value>
-		<validvalues>-100,100</validvalues>
-		<datatype>negfloat</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.joystick_trim_follow_gain_physical_x</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>31.3</order>
-		<displayname>X Trim Gain Virtual</displayname>
-		<name>joystick_trim_follow_gain_virtual_x</name>
-		<prereq>trim_following</prereq>
-		<value>0.2</value>
-		<validvalues>-100,100</validvalues>
-		<datatype>negfloat</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.joystick_trim_follow_gain_virtual_x</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>31.4</order>
-		<displayname>Y Trim Gain Physical</displayname>
-		<name>joystick_trim_follow_gain_physical_y</name>
-		<info>Elevator/Cyclic Longitudinal physical movement scalar</info>
-		<prereq>trim_following</prereq>
-		<value>1.0</value>
-		<validvalues>-100,100</validvalues>
-		<datatype>negfloat</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.joystick_trim_follow_gain_physical_y</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>31.5</order>
-		<displayname>Y Trim Gain Virtual</displayname>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<info>Adjust virtual y % so that trim ingame does not pitch aircraft when stick held. &lt;br&gt;&lt;br&gt; To configure, slowly apply nose down trim. if the nose goes up, raise the virtual % - if the nose goes down, lower the virtual % - you can go negative.</info>
-		<prereq>trim_following</prereq>
-		<value>0.2</value>
-		<validvalues>-100,100</validvalues>
-		<datatype>negfloat</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_physical_x</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>31.6</order>
-		<displayname>Rudder Trim Gain (physical)</displayname>
-		<name>rudder_trim_follow_gain_physical_x</name>
-		<info>Rudder physical trim movement scalar</info>
-		<prereq>trim_following</prereq>
-		<value>1.0</value>
-		<validvalues>-100,100</validvalues>
-		<datatype>negfloat</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_physical_x</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>31.7</order>
-		<displayname>Rudder Trim Gain (virtual)</displayname>
-		<name>rudder_trim_follow_gain_virtual_x</name>
-		<prereq>trim_following</prereq>
-		<value>0.2</value>
-		<validvalues>-100,100</validvalues>
-		<datatype>negfloat</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_virtual_x</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<Grouping>Prop</Grouping>
 		<order>32</order>
-		<displayname>Autopilot Following</displayname>
-		<name>ap_following</name>
-		<info>Enable physical stick following of autopilot movements</info>
-		<prereq>telemffb_controls_axes</prereq>
-		<value>true</value>
-		<datatype>bool</datatype>
+		<displayname>Prop Diameter</displayname>
+		<name>prop_diameter</name>
+		<info>Aircraft Prop Diameter</info>
+		<write_any_device>true</write_any_device>
+		<validvalues>m,ft,in</validvalues>
+		<datatype>anyfloat</datatype>
+		<unit>m</unit>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.trim_following.ap_following</Element1>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>32.2</order>
-		<displayname>Invert Aileron Autopilot Axis</displayname>
-		<name>invert_ap_x_axis</name>
-		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
-		<prereq>ap_following</prereq>
-		<value>false</value>
-		<datatype>bool</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.ap_following.invert_ap_x_axis</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
@@ -507,6 +320,17 @@
 		<collective>true</collective>
 	</defaults>
 	<defaults>
+		<Grouping>Prop</Grouping>
+		<order>35</order>
+		<displayname>Rudder Prop Flow</displayname>
+		<name>rudder_prop_flow_ratio</name>
+		<info>Scaling of dynamic effects on rudder</info>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>36</order>
 		<displayname>Collective Dampening Gain</displayname>
@@ -515,6 +339,19 @@
 		<datatype>float</datatype>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Prop</Grouping>
+		<order>36</order>
+		<displayname>Rotor Blade Count</displayname>
+		<name>rotor_blade_count</name>
+		<write_any_device>true</write_any_device>
+		<datatype>int</datatype>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
 		<collective>true</collective>
 	</defaults>
 	<defaults>
@@ -559,6 +396,229 @@
 		<datatype>bool</datatype>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90</order>
+		<displayname>Axis Control</displayname>
+		<name>telemffb_controls_axes</name>
+		<info>TelemFFB sends axis position to sim.  Do not assign in game or SPAD.next</info>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<Element1>telemffb_controls_axes</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90.2</order>
+		<displayname>X Axis Scale</displayname>
+		<name>joystick_x_axis_scale</name>
+		<info>Scaling of axis position sent to game</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<value>1.0</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<Element1>telemffb_controls_axes.joystick_x_axis_scale</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90.3</order>
+		<displayname>Y Axis Scale</displayname>
+		<name>joystick_y_axis_scale</name>
+		<info>Scaling of axis position sent to game</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<value>1.0</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<Element1>telemffb_controls_axes.joystick_y_axis_scale</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90.4</order>
+		<displayname>Rudder (X) Axis Scale</displayname>
+		<name>rudder_x_axis_scale</name>
+		<info>Scaling of axis position sent to game</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<value>1.0</value>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<Element1>telemffb_controls_axes.rudder_x_axis_scale</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90.5</order>
+		<displayname>Use Legacy Bindings</displayname>
+		<name>use_legacy_bindings</name>
+		<info>For helicopters that still use aileron/elevator or rudder bindings</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<Element1>telemffb_controls_axes.use_legacy_bindings</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90.7</order>
+		<displayname>Hands On Deadzone</displayname>
+		<name>hands_on_deadzone</name>
+		<info>Distance required to trigger a hands-on condition</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<Element1>telemffb_controls_axes.hands_on_deadzone</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90.8</order>
+		<displayname>Hands Off Deadzone</displayname>
+		<name>hands_off_deadzone</name>
+		<info>Distance at which hands-off resumes (set lower than hands-on)</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<Element1>telemffb_controls_axes.hands_off_deadzone</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91</order>
+		<displayname>Trim Following</displayname>
+		<name>trim_following</name>
+		<info>Enable physical stick movement with in-game trims</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<Element1>telemffb_controls_axes.trim_following</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91.2</order>
+		<displayname>X Trim Gain Physical</displayname>
+		<name>joystick_trim_follow_gain_physical_x</name>
+		<info>Aileron/Cyclic Lateral physical movement scalar</info>
+		<prereq>trim_following</prereq>
+		<value>1.0</value>
+		<validvalues>-100,100</validvalues>
+		<datatype>negfloat</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<Element1>telemffb_controls_axes.trim_following.joystick_trim_follow_gain_physical_x</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91.3</order>
+		<displayname>X Trim Gain Virtual</displayname>
+		<name>joystick_trim_follow_gain_virtual_x</name>
+		<prereq>trim_following</prereq>
+		<value>0.2</value>
+		<validvalues>-100,100</validvalues>
+		<datatype>negfloat</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<Element1>telemffb_controls_axes.trim_following.joystick_trim_follow_gain_virtual_x</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91.4</order>
+		<displayname>Y Trim Gain Physical</displayname>
+		<name>joystick_trim_follow_gain_physical_y</name>
+		<info>Elevator/Cyclic Longitudinal physical movement scalar</info>
+		<prereq>trim_following</prereq>
+		<value>1.0</value>
+		<validvalues>-100,100</validvalues>
+		<datatype>negfloat</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<Element1>telemffb_controls_axes.trim_following.joystick_trim_follow_gain_physical_y</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91.5</order>
+		<displayname>Y Trim Gain Virtual</displayname>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<info>Adjust virtual y % so that trim ingame does not pitch aircraft when stick held. &lt;br&gt;&lt;br&gt; To configure, slowly apply nose down trim. if the nose goes up, raise the virtual % - if the nose goes down, lower the virtual % - you can go negative.</info>
+		<prereq>trim_following</prereq>
+		<value>0.2</value>
+		<validvalues>-100,100</validvalues>
+		<datatype>negfloat</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_physical_x</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91.6</order>
+		<displayname>Rudder Trim Gain (physical)</displayname>
+		<name>rudder_trim_follow_gain_physical_x</name>
+		<info>Rudder physical trim movement scalar</info>
+		<prereq>trim_following</prereq>
+		<value>1.0</value>
+		<validvalues>-100,100</validvalues>
+		<datatype>negfloat</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_physical_x</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91.7</order>
+		<displayname>Rudder Trim Gain (virtual)</displayname>
+		<name>rudder_trim_follow_gain_virtual_x</name>
+		<prereq>trim_following</prereq>
+		<value>0.2</value>
+		<validvalues>-100,100</validvalues>
+		<datatype>negfloat</datatype>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_virtual_x</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>92</order>
+		<displayname>Autopilot Following</displayname>
+		<name>ap_following</name>
+		<info>Enable physical stick following of autopilot movements</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<value>true</value>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<Element1>telemffb_controls_axes.trim_following.ap_following</Element1>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>92.2</order>
+		<displayname>Invert Aileron Autopilot Axis</displayname>
+		<name>invert_ap_x_axis</name>
+		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
+		<prereq>ap_following</prereq>
+		<value>false</value>
+		<datatype>bool</datatype>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<Element1>telemffb_controls_axes.trim_following.ap_following.invert_ap_x_axis</Element1>
 	</defaults>
 	<defaults><Grouping>G Force</Grouping><order>100</order><displayname>G Force Effect</displayname><name>gforce_effect_enable</name><value>true</value><datatype>bool</datatype><IL2>true</IL2><joystick>true</joystick></defaults>
 	<defaults>
@@ -610,66 +670,6 @@
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>105</order>
-		<displayname>Elevator Droop Moment</displayname>
-		<name>elevator_droop_moment</name>
-		<info>Strength of elevator droop at rest (pushes stick forward)</info>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<Grouping>Prop</Grouping>
-		<order>110</order>
-		<displayname>Elevator Prop Flow</displayname>
-		<name>elevator_prop_flow_ratio</name>
-		<info>Scaling of dynamic effects on elevator</info>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<Grouping>Prop</Grouping>
-		<order>111</order>
-		<displayname>Prop Diameter</displayname>
-		<name>prop_diameter</name>
-		<info>Aircraft Prop Diameter</info>
-		<write_any_device>true</write_any_device>
-		<validvalues>m,ft,in</validvalues>
-		<datatype>anyfloat</datatype>
-		<unit>m</unit>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Prop</Grouping>
-		<order>112</order>
-		<displayname>Rudder Prop Flow</displayname>
-		<name>rudder_prop_flow_ratio</name>
-		<info>Scaling of dynamic effects on rudder</info>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Prop</Grouping>
-		<order>113</order>
-		<displayname>Rotor Blade Count</displayname>
-		<name>rotor_blade_count</name>
-		<write_any_device>true</write_any_device>
-		<datatype>int</datatype>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
 		<order>120.2</order>
@@ -1734,6 +1734,7 @@
 		<order>899</order>
 		<displayname>Center on Pause/Slew</displayname>
 		<name>center_spring_on_pause</name>
+		<info>Force spring centering when in pause/slew mode&lt;br&gt;&lt;br&gt;When disabled, you will need to bring the axis close to center to re-establish axis control</info>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<MSFS>true</MSFS>
@@ -1745,6 +1746,7 @@
 		<order>902</order>
 		<displayname>Configurator File</displayname>
 		<name>vpconf</name>
+		<info>Load a specific .vpconf file (created with VPForce Configurator)&lt;br&gt;&lt;br&gt;When using this function, it will remain active until set again by another sim, class, or model setting</info>
 		<value>-</value>
 		<datatype>path</datatype>
 		<DCS>true</DCS>
@@ -2295,6 +2297,14 @@
 		<value>GliderAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Asobo DG1001E Neo.*</model>
+		<value>5.2</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
 		</models>
 	<models>
 		<name>type</name>
@@ -2769,9 +2779,10 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
+		<name>prop_diameter</name>
 		<model>Cessna 152.*</model>
-		<value>0.05</value>
+		<value>5.9</value>
+		<unit>ft</unit>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -2779,13 +2790,6 @@
 		<name>elevator_droop_moment</name>
 		<model>Cessna 152.*</model>
 		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Cessna 152.*</model>
-		<value>0.8</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -2797,6 +2801,48 @@
 		<device>joystick</device>
 		</models>
 	<models>
+		<name>max_elevator_coeff</name>
+		<model>Cessna 152.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Cessna 152.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Cessna 152.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>Cessna 152.*</model>
+		<value>0.09</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>Cessna 152.*</model>
+		<value>0.13</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>Cessna 152.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Cessna 152.*</model>
 		<value>PropellerAircraft</value>
@@ -2804,86 +2850,79 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Cessna 172.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>Cessna 172.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>joystick_trim_follow_gain_physical_x</name>
-		<model>Cessna 172.*</model>
-		<value>0.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_x</name>
-		<model>Cessna 172.*</model>
-		<value>0.1</value>
+		<name>max_elevator_coeff</name>
+		<model>Cessna (172|Skyhawk).*</model>
+		<value>0.48</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Cessna 172.*</model>
-		<value>0.4</value>
+		<name>elevator_gain</name>
+		<model>Cessna (172|Skyhawk).*</model>
+		<value>0.085</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Cessna (172|Skyhawk).*</model>
+		<value>0.38</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>Cessna (172|Skyhawk).*</model>
+		<value>0.08</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Cessna (172|Skyhawk).*</model>
+		<value>0.4</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>Cessna (172|Skyhawk).*</model>
+		<value>0.15</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
 	</models>
 	<models>
 		<name>prop_diameter</name>
-		<model>Cessna 172.*</model>
+		<model>Cessna (172|Skyhawk).*</model>
 		<value>80</value>
 		<unit>in</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
 	<models>
-		<name>type</name>
-		<model>Cessna 172.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-		</models>
-	<models>
-		<name>aileron_gain</name>
-		<model>Cessna Skyhawk.*</model>
-		<value>0.04</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>elevator_droop_moment</name>
-		<model>Cessna Skyhawk.*</model>
+		<model>Cessna (172|Skyhawk).*</model>
 		<value>0.3</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>invert_ap_x_axis</name>
-		<model>Cessna Skyhawk.*</model>
+		<model>Cessna (172|Skyhawk).*</model>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Cessna Skyhawk.*</model>
+		<model>Cessna (172|Skyhawk).*</model>
 		<value>0.55</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
-		<model>Cessna Skyhawk.*</model>
+		<model>Cessna (172|Skyhawk).*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
@@ -2909,6 +2948,48 @@
 		<unit>in</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>Cessna( 208B)? Grand Caravan.*</model>
+		<value>0.06</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>Cessna( 208B)? Grand Caravan.*</model>
+		<value>0.03</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>Cessna( 208B)? Grand Caravan.*</model>
+		<value>0.04</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Cessna( 208B)? Grand Caravan.*</model>
+		<value>0.44</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Cessna( 208B)? Grand Caravan.*</model>
+		<value>0.19</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Cessna( 208B)? Grand Caravan.*</model>
+		<value>0.43</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -2989,6 +3070,63 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>aileron_gain</name>
+		<model>DA40-NG.*</model>
+		<value>0.045</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>DA40-NG.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>DA40-NG.*</model>
+		<value>0.08</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>DA40-NG.*</model>
+		<value>-0.11</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>nosewheel_shimmy</name>
+		<model>DA40-NG.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>DA40-NG.*</model>
+		<value>6.1352</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>DA40-NG.*</model>
+		<value>0.09</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>DA40-NG.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>DA62.*</model>
 		<value>PropellerAircraft</value>
@@ -3045,6 +3183,56 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>DR400.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>DR400.*</model>
+		<value>5.77</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>DR400.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>DR400.*</model>
+		<value>0.29</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>DR400.*</model>
+		<value>0.62</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>DR400.*</model>
+		<value>0.11</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>DR400.*</model>
+		<value>0.18</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>etl_effect_intensity</name>
 		<model>Experimental Mini-500.*</model>
 		<value>0.2</value>
@@ -3096,6 +3284,63 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>type</name>
+		<model>Extra 330.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Extra 330.*</model>
+		<value>0.36</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>Extra 330.*</model>
+		<value>0.185</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Extra 330.*</model>
+		<value>6.5</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Extra 330.*</model>
+		<value>0.23</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Extra 330.*</model>
+		<value>0.27</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>Extra 330.*</model>
+		<value>0.22</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Extra 330.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
 	<models>
 		<name>runway_rumble_intensity</name>
 		<model>F-14.*</model>
@@ -3285,6 +3530,14 @@
 		<name>type</name>
 		<model>FlightDesignCT Asobo</model>
 		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>FlightDesignCT Asobo</model>
+		<value>5.66</value>
+		<unit>ft</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
@@ -3780,6 +4033,77 @@
 		<sim>DCS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>0.21</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>5.9</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>0.4</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>0.16</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>0.18</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_following</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>0.65</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>Mudry Cap 10 C.*</model>
+		<value>0.18</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
 	<models>
 		<name>type</name>
 		<model>P-38J-25</model>

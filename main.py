@@ -1062,7 +1062,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 class ButtonPressThread(QThread):
     button_pressed = pyqtSignal(str, int)
 
-    def __init__(self, device, button_name, timeout=5):
+    def __init__(self, device, button_obj, timeout=5):
+        button_name = button_obj.objectName().replace('pb_', '')
+        self.button_obj = button_obj
         super(ButtonPressThread, self).__init__()
         self.device = device
         self.button_name = button_name
@@ -1079,7 +1081,8 @@ class ButtonPressThread(QThread):
         while not emit_sent and time.time() - start_time < self.timeout:
             input_data = self.device.device.getInput()
             current_btns = set(input_data.getPressedButtons())
-
+            countdown = int(self.timeout - (time.time()- start_time))
+            self.button_obj.setText(f"Push a button! {countdown}..")
             # Check for new button press
             for btn in current_btns:
                 if not btn in initial_buttons:
@@ -1916,7 +1919,7 @@ class MainWindow(QMainWindow):
                     return
             new_combo_box_value = dialog.combo_box.currentText()
             pat_to_clone = dialog.models_combo_box.currentText()
-            if new_combo_box_value != '':
+            if pat_to_clone == '':
                 logging.info(f"New: {new_aircraft} {new_combo_box_value}")
                 xmlutils.write_models_to_xml(settings_mgr.current_sim, new_aircraft, new_combo_box_value, 'type', None)
             else:
@@ -2694,15 +2697,24 @@ class SettingsLayout(QGridLayout):
         button_name = self.sender().objectName().replace('pb_', '')
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText("Push a button! ")
+        # listen for button loop
+        # result = ''
+        # if result != '':
+        #     xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, result, button_name)
+        #     self.reload_caller()
+        # pass
 
         # Start a thread to fetch button press with a timeout
-        self.thread = ButtonPressThread(self.device, button_name)
+        self.thread = ButtonPressThread(self.device, self.sender())
         self.thread.button_pressed.connect(self.update_button)
         self.thread.start()
 
     def update_button(self, button_name, value):
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText(str(value))
+        if str(value) != '0':
+            xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
+        self.reload_caller()
 
 
     def slider_changed(self):
