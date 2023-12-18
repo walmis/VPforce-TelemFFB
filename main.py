@@ -2698,12 +2698,6 @@ class SettingsLayout(QGridLayout):
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText("Push a button! ")
         # listen for button loop
-        # result = ''
-        # if result != '':
-        #     xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, result, button_name)
-        #     self.reload_caller()
-        # pass
-
         # Start a thread to fetch button press with a timeout
         self.thread = ButtonPressThread(self.device, self.sender())
         self.thread.button_pressed.connect(self.update_button)

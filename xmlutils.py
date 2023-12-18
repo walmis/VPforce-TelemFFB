@@ -1,5 +1,6 @@
 # import globalvars
 import logging
+import time
 import xml.etree.ElementTree as ET
 import os
 import re
@@ -96,16 +97,19 @@ def read_anydevice_settings(the_sim):
     return data_list
 
 
-def read_models(the_sim):
+def read_models(the_sim, the_class=''):
     all_models = ['']
     tree = ET.parse(defaults_path)
     root = tree.getroot()
-
-    for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
+    if the_class == '':
+        def_models =  root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
                       root.findall(f'.//models[sim="any"][device="{device}"]') + \
                       root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
-                      root.findall(f'.//models[sim="any"][device="any"]'):
+                      root.findall(f'.//models[sim="any"][device="any"]')
+    else:
+        def_models = root.findall(f'.//models[sim="{the_sim}"][value="{the_class}"]')
 
+    for model_elem in def_models:
         pattern = model_elem.find('model')
         # lprint (pattern.text)
         if pattern is not None:
@@ -115,12 +119,14 @@ def read_models(the_sim):
     # create_empty_userxml_file() - handled by TelemFFB on startup via utils.py
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
-
-    for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
+    if the_class == '':
+        usr_models =  root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
                       root.findall(f'.//models[sim="any"][device="{device}"]') + \
                       root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
-                      root.findall(f'.//models[sim="any"][device="any"]'):
-
+                      root.findall(f'.//models[sim="any"][device="any"]')
+    else:
+        usr_models = root.findall(f'.//models[sim="{the_sim}"][value="{the_class}"]')
+    for model_elem in usr_models:
         pattern = model_elem.find('model')
         # lprint (pattern.text)
         if pattern is not None:
@@ -216,6 +222,7 @@ def read_default_class_data(the_sim, the_class):
 def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
     logging.info (f"Reading from XML:  Sim: {the_sim}, Aircraft name: {aircraft_name}, Class: {input_modeltype}")
 
+    time.sleep(0.1)
 
     print_counts = False
     print_each_step = False  # for debugging
@@ -591,10 +598,11 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
 def clone_pattern(the_sim, old_pattern, new_pattern):
     model_data, def_model_pattern = read_models_data(defaults_path, the_sim, old_pattern, True)
     user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, old_pattern, True)
+    for item in user_model_data:
+        model_data.append(item)
     for item in model_data:
         write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'], item['device'])
-    for item in user_model_data:
-        write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'], item['device'])
+
 
 def write_converted_to_xml(differences):
     sim_set = []
