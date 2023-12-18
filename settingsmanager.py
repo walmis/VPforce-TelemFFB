@@ -56,6 +56,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.sim = self.current_sim
         self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")
         self.b_browse.clicked.connect(self.choose_directory)
+        # self.b_usb_button.clicked.connect(self.usb_button_clicked)
         self.b_update.clicked.connect(self.update_button)
         self.slider_float.valueChanged.connect(self.update_textbox)
         self.cb_enable.stateChanged.connect(self.cb_enable_setvalue)
@@ -493,6 +494,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_valuebox.hide()
         self.tb_value.hide()
         self.b_browse.hide()
+        self.b_usb_button.hide()
 
     def handle_item_click(self):
         #mprint("handle_item_click")
@@ -597,9 +599,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 self.slider_float.setValue(pctval)
                 self.tb_value.setText(str(pctval) + '%')
 
-            case 'int' | 'text' | 'anyfloat':
+            case 'int' | 'text' | 'anyfloat' | 'button':
                 self.l_value.show()
                 self.tb_value.show()
+
+            # case 'button':
+            #
+            #     self.b_usb_button.setText(f"Button {value}")
+            #     self.b_usb_button.show()
 
             case 'list':
                 self.l_value.show()
@@ -634,6 +641,25 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def update_dropbox(self):
         mprint("update_dropbox")
         self.tb_value.setText(self.drp_valuebox.currentText())
+
+    # needs work....using value box for now.
+    # def usb_button_clicked(self):
+    #     button_name = self.sender().objectName().replace('pb_', '')
+    #     the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
+    #     the_button.setText("Push a button! ")
+    #     # listen for button loop
+    #     # Start a thread to fetch button press with a timeout
+    #     self.thread = mainwindow.ButtonPressThread(self.device, self.sender())
+    #     self.thread.button_pressed.connect(self.update_usb_button)
+    #     self.thread.start()
+    #
+    # def update_usb_button(self, button_name, value):
+    #     the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
+    #     the_button.setText(str(value))
+    #     if str(value) != '0':
+    #         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
+    #     self.reload_caller()
+
 
     def choose_directory(self):
         mprint("choose_directory")
@@ -981,8 +1007,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
 class UserModelDialog(QDialog):
+    the_sim = ''
     def __init__(self, sim, current_aircraft, current_type, parent=None):
         super(UserModelDialog, self).__init__(parent)
+        self.the_sim = sim
         self.combo_box = None
         self.models_combo_box = None
         self.tb_current_aircraft = None
@@ -991,6 +1019,7 @@ class UserModelDialog(QDialog):
 
     def class_combo_changed(self):
         self.models_combo_box.blockSignals(True)
+        self.setup_models()
         self.models_combo_box.setCurrentText('')
         self.models_combo_box.blockSignals(False)
 
@@ -999,8 +1028,17 @@ class UserModelDialog(QDialog):
         self.combo_box.setCurrentText('')
         self.combo_box.blockSignals(False)
 
-    def init_ui(self,sim,current_aircraft,current_type):
+    def setup_models(self):
+        models = xmlutils.read_models(self.the_sim, self.combo_box.currentText())
+        self.models_combo_box.clear()
+        self.models_combo_box.blockSignals(True)
+        self.models_combo_box.addItem('')
+        self.models_combo_box.addItems(models)
+        self.models_combo_box.setCurrentText('')
 
+        self.models_combo_box.blockSignals(False)
+
+    def init_ui(self,sim,current_aircraft,current_type):
 
         layout = QVBoxLayout()
 
@@ -1041,15 +1079,11 @@ class UserModelDialog(QDialog):
         self.combo_box.blockSignals(False)
 
 
-        models = xmlutils.read_models(sim)
         self.models_combo_box = QComboBox()
-        self.models_combo_box.blockSignals(True)
-        self.models_combo_box.addItem('')
-        self.models_combo_box.addItems(models)
-        self.models_combo_box.setCurrentText('')
-        self.models_combo_box.currentIndexChanged.connect(self.pattern_changed)
-        self.models_combo_box.blockSignals(False)
+        self.setup_models()
         self.models_combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
+        # self.models_combo_box.currentIndexChanged.connect(self.pattern_changed)
+
 
         ok_button = QPushButton("OK")
         ok_button.setStyleSheet("text-align:center;")
