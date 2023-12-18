@@ -4787,6 +4787,70 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>prop_diameter</name>
+		<model>Wilga.*</model>
+		<value>2.65</value>
+		<unit>m</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>Wilga.*</model>
+		<value>0.12</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Wilga.*</model>
+		<value>0.43</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Wilga.*</model>
+		<value>0.37</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>Wilga.*</model>
+		<value>0.06</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>Wilga.*</model>
+		<value>0.185</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Wilga.*</model>
+		<value>0.66</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>elevator_prop_flow_ratio</name>
+		<model>Wilga.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_droop_moment</name>
+		<model>Wilga.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>XCub.*</model>
 		<value>0.6</value>

@@ -1268,14 +1268,14 @@ class MainWindow(QMainWindow):
             msfs_icon = self.create_colored_icon(msfs_color, self.icon_size)
         else:
             msfs_color = QColor(128,128,128)
-            msfs_icon = self.create_x_icon(dcs_color, self.icon_size)
+            msfs_icon = self.create_x_icon(msfs_color, self.icon_size)
 
         if args.sim == "IL2" or il2_enabled:
             il2_color = QColor(255, 255, 0)
             il2_icon = self.create_colored_icon(il2_color, self.icon_size)
         else:
             il2_color = QColor(128,128,128)
-            il2_icon = self.create_x_icon(dcs_color, self.icon_size)
+            il2_icon = self.create_x_icon(il2_color, self.icon_size)
 
         # xplane_color = QColor(128,128,128)
         # condor_color = QColor(128, 128, 128)
@@ -1298,8 +1298,8 @@ class MainWindow(QMainWindow):
 
         sim_status_area = QWidget()
         status_layout = QGridLayout()
-        self.dcs_label_icon = QLabel("", self)
 
+        self.dcs_label_icon = QLabel("", self)
         self.dcs_label_icon.setPixmap(dcs_icon)
         self.dcs_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         dcs_label = QLabel("DCS", self)
