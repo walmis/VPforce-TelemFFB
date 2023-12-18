@@ -1126,7 +1126,8 @@ class Helicopter(Aircraft):
 
                     input_data = HapticEffect.device.getInput()
 
-                    force_trim_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+
+                    # force_trim_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
                     phys_x, phys_y = input_data.axisXY()
 
                     self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
