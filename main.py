@@ -1216,7 +1216,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'startMinCollective': self.cb_min_enable_c.isChecked(),
             'pidJoystick': str(self.tb_pid_j.text()),
             'pidPedals': str(self.tb_pid_p.text()),
-            'pidCollectibe': str(self.tb_pid_c.text()),
+            'pidCollective': str(self.tb_pid_c.text()),
         }
 
         instance_settings_dict = {
