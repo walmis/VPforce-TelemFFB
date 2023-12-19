@@ -473,7 +473,8 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
                 child_elem.text = str(the_value)
             if child_elem.tag == 'unit':
                 child_elem.text = str(unit)
-        tree.write(userconfig_path)
+        if the_model != '':
+            tree.write(userconfig_path)
         logging.info(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}, model={the_model}, name={setting_name}")
 

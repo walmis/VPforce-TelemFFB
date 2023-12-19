@@ -2954,7 +2954,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             print(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
-        self.reload_caller()
+        # self.reload_caller()
 
     def d_slider_changed(self):
         setting_name = self.sender().objectName().replace('dsld_', '')
@@ -2978,7 +2978,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             print(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
-        self.reload_caller()
+        # self.reload_caller()
 
     # prevent slider from sending values as you drag
     def sldDisconnect(self):
@@ -3017,6 +3017,14 @@ class NoKeyScrollArea(QScrollArea):
         for slider in self.sliders:
             try:
                 slider.keyPressEvent(event)
+            except:
+                pass
+
+    def keyReleaseEvent(self, event):
+        # Forward keypress events to all sliders
+        for slider in self.sliders:
+            try:
+                slider.keyReleaseEvent(event)
             except:
                 pass
 
@@ -3083,7 +3091,9 @@ class NoWheelSlider(QSlider):
         self.is_mouse_over = False
 
     def keyPressEvent(self, event):
+
         if self.is_mouse_over:
+            # self.blockSignals(True)
             if event.key() == Qt.Key_Left:
                 self.setValue(self.value() - 1)
             elif event.key() == Qt.Key_Right:
@@ -3093,12 +3103,18 @@ class NoWheelSlider(QSlider):
         # else:
         #     super().keyPressEvent(event)
 
-    # def keyReleaseEvent(self, event):
-    #     if self.is_mouse_over:
-    #         # Handle key release if needed
-    #         pass
-    #     else:
-    #         super().keyReleaseEvent(event)
+    def keyReleaseEvent(self, event):
+
+        if self.is_mouse_over:
+            self.blockSignals(False)
+            # if event.key() == Qt.Key_Left:
+            #     self.valueChanged.emit(self.value() - 1)
+            # elif event.key() == Qt.Key_Right:
+            #     self.valueChanged.emit(self.value() + 1)
+
+            pass
+        else:
+            super().keyReleaseEvent(event)
 
 
 def select_sim_for_conversion(window, aircraft_name):
