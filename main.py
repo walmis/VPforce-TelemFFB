@@ -1044,7 +1044,7 @@ class Ui_SystemDialog(object):
         self.lab_auto_launch.setText(QCoreApplication.translate("SystemDialog", u"Auto\nLaunch:", None))
         self.lab_start_min.setText(QCoreApplication.translate("SystemDialog", u"Start\nMinimized:", None))
         self.cb_al_enable_j.setText("")
-        self.rb_master_c.setText(QCoreApplication.translate("SystemDialog", u"Colective", None))
+        self.rb_master_c.setText(QCoreApplication.translate("SystemDialog", u"Collective", None))
         self.tb_pid_j.setText(QCoreApplication.translate("SystemDialog", u"2055", None))
         self.cb_min_enable_c.setText("")
         self.rb_master_p.setText(QCoreApplication.translate("SystemDialog", u"Pedals", None))
