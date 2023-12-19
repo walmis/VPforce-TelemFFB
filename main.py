@@ -1719,14 +1719,14 @@ class MainWindow(QMainWindow):
         self.tab_widget.setStyleSheet(style_sheet)
 
         # Create a horizontal line widget
-        line_widget = QFrame(self)
-        line_widget.setFrameShape(QFrame.HLine)
-        line_widget.setFrameShadow(QFrame.Sunken)
+        self.line_widget = QFrame(self)
+        self.line_widget.setFrameShape(QFrame.HLine)
+        self.line_widget.setFrameShadow(QFrame.Sunken)
 
         # Add the tab widget and line widget to the main layout
         layout.addWidget(self.tab_widget)
         layout.setSpacing(0)
-        layout.addWidget(line_widget)
+        layout.addWidget(self.line_widget)
 
         ################
         #  main scroll area
@@ -1875,8 +1875,6 @@ class MainWindow(QMainWindow):
         self.last_height = self.height()
         self.last_width = self.width()
 
-
-
     def update_version_result(self, vers, url):
         global _update_available
         global _latest_version
@@ -1903,8 +1901,6 @@ class MainWindow(QMainWindow):
             self.version_label.setText(f'Version Status: {status_text}')
         self.perform_update(auto=True)
 
-
-
     def change_config_scope(self, arg):
         # print(F"CHANGE SCOPE: {arg}")
         if arg == 1:
@@ -1914,6 +1910,7 @@ class MainWindow(QMainWindow):
         elif arg == 3:
             xmlutils.update_vars('collective', userconfig_path, defaults_path)
         self.update_settings()
+
     def test_sim_changed(self):
         models = xmlutils.read_models(self.test_sim.currentText())
         self.test_name.blockSignals(True)
@@ -1924,6 +1921,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         # Perform cleanup before closing the application
         self.exit_application()
+
     def reset_window_size(self):
         match args.type:
             case 'joystick':
@@ -1937,6 +1935,7 @@ class MainWindow(QMainWindow):
                 y_pos = 70
 
         self.setGeometry(x_pos, y_pos, 400, 700)
+
     def load_main_window_geometry(self):
         device_type = args.type
         sys_settings = utils.read_system_settings(args.type)
@@ -1963,7 +1962,6 @@ class MainWindow(QMainWindow):
 
         if load_tab:
             self.tab_widget.setCurrentIndex(tab)
-
 
     def save_main_window_geometry(self):
         # Capture the main window's geometry
@@ -2030,8 +2028,6 @@ class MainWindow(QMainWindow):
                 HapticEffect.device.resetEffects()
             except Exception as error:
                 pass
-
-
 
     def open_cfg_dir(self):
         os.startfile(userconfig_rootpath, 'open')
@@ -2201,6 +2197,7 @@ class MainWindow(QMainWindow):
                 self.last_width = self.width()
             self.hidden_active = False
             self.monitor_widget.show()
+            self.line_widget.show()
             self.settings_area.hide()
             self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
             self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
@@ -2226,7 +2223,7 @@ class MainWindow(QMainWindow):
                         self.cb_collective.setChecked(True)
 
             self.settings_area.show()
-
+            self.line_widget.hide()
             self.resize(self.last_width, self.last_height)
 
         elif index == 2:
@@ -2235,6 +2232,7 @@ class MainWindow(QMainWindow):
             self.last_width = self.width()
             self.monitor_widget.hide()
             self.settings_area.hide()
+            self.line_widget.show()
             self.resize(0,0)
         # if button == self.telem_monitor_radio:
         #
