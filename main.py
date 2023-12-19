@@ -2872,7 +2872,7 @@ class SettingsLayout(QGridLayout):
         value = self.sender().currentText()
         print(f"Dropbox {setting_name} changed. New value: {value}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name)
-        self.reload_caller()
+        # self.reload_caller()
 
     def unit_dropbox_changed(self):
         setting_name = self.sender().objectName().replace('ud_', '')
@@ -2884,7 +2884,7 @@ class SettingsLayout(QGridLayout):
             value = line_edit.text()
         print(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
-        self.reload_caller()
+        # self.reload_caller()
 
     def line_edit_changed(self):
         setting_name = self.sender().objectName().replace('vle_', '')
@@ -2896,7 +2896,7 @@ class SettingsLayout(QGridLayout):
         value = self.sender().text()
         print(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
-        self.reload_caller()
+        # self.reload_caller()
 
     def expander_clicked(self):
         print(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
