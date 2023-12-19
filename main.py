@@ -44,7 +44,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLay
     QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
     QThread
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence, QIntValidator, QCursor
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QIntValidator, QCursor
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
@@ -1787,7 +1787,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.monitor_widget)
 
         # Create a scrollable area
-        self.settings_area = QScrollArea()
+        self.settings_area = NoKeyScrollArea()
+        self.settings_area.setObjectName('theScrollArea')
         self.settings_area.setWidgetResizable(True)
 
         ##############
@@ -1797,6 +1798,7 @@ class MainWindow(QMainWindow):
         scroll_widget = QWidget()
         # self.settings_layout = settings_layout
         # settings_layout = SettingsLayout()
+        all_sliders = []
         scroll_widget.setLayout(self.settings_layout)
 
         # Add the grid layout to the main layout
@@ -1805,6 +1807,12 @@ class MainWindow(QMainWindow):
         # Set the widget as the content of the scroll area
         layout.addWidget(self.settings_area)
         self.settings_area.hide()
+
+        #### send sliders to keypress
+        # for i in range(self.settings_layout.all_sliders.count()):
+        #     item = self.settings_area.all_sliders.itemAt(i)
+        #     if isinstance(item.widget(), NoWheelSlider):
+        #         self.settings_area.all_sliders.addSlider(item.widget())
 
         ##############
         #  buttons
@@ -1866,6 +1874,8 @@ class MainWindow(QMainWindow):
         self.load_main_window_geometry()
         self.last_height = self.height()
         self.last_width = self.width()
+
+
 
     def update_version_result(self, vers, url):
         global _update_available
@@ -2399,7 +2409,7 @@ class SettingsLayout(QGridLayout):
     ##########
     # debug settings
     show_slider_debug = False   # set to true for slider values shown
-    show_order_debug = True # set to true for order numbers shown
+    show_order_debug = False # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
 
     chk_col = 1
@@ -2412,6 +2422,8 @@ class SettingsLayout(QGridLayout):
     fct_col = 10
     ord_col = 11
 
+    all_sliders = []
+
     def __init__(self, parent=None, mainwindow=None):
         super(SettingsLayout, self).__init__(parent)
         result = None
@@ -2423,6 +2435,17 @@ class SettingsLayout(QGridLayout):
         if result is not None:
             self.build_rows(result)
         self.device = HapticEffect()
+        #### send sliders to keypress
+        # for i in range(self.count()):
+        #     item = self.itemAt(i)
+        #     if isinstance(item.widget(), NoWheelSlider):
+        #         self.addSlider(item.widget())
+    def handleScrollKeyPressEvent(self, event):
+        # Forward key events to each slider in the layout
+        for i in range(self.count()):
+            item = self.itemAt(i)
+            if isinstance(item.widget(), NoWheelSlider()):
+                item.widget().handleKeyPressEvent(event)
 
     def append_prereq_count (self, datalist):
         for item in datalist:
@@ -2692,7 +2715,6 @@ class SettingsLayout(QGridLayout):
         sliderfactor.setObjectName(f"sf_{item['name']}")
 
 
-
         if item['datatype'] == 'float' or \
                 item['datatype'] == 'negfloat':
 
@@ -2799,6 +2821,8 @@ class SettingsLayout(QGridLayout):
         line_edit.setDisabled(rowdisabled)
         expand_button.setDisabled(rowdisabled)
 
+        self.parent().parent().parent().addSlider(slider)
+        self.parent().parent().parent().addSlider(d_slider)
 
         erase_button = QToolButton()
         erase_button.setObjectName(f"eb_{item['name']}")
@@ -2973,7 +2997,6 @@ class SettingsLayout(QGridLayout):
 
 
 
-
 class ClickableLabel(QLabel):
     def __init__(self, parent=None):
         super(ClickableLabel, self).__init__(parent)
@@ -2981,6 +3004,23 @@ class ClickableLabel(QLabel):
     def mousePressEvent(self, event):
         os.startfile(userconfig_rootpath,'open')
         print("userpath opened")
+
+class NoKeyScrollArea(QScrollArea):
+    def __init__(self):
+        super().__init__()
+
+        self.sliders = []
+
+    def addSlider(self, slider):
+        self.sliders.append(slider)
+
+    def keyPressEvent(self, event):
+        # Forward keypress events to all sliders
+        for slider in self.sliders:
+            try:
+                slider.keyPressEvent(event)
+            except:
+                pass
 
 class NoWheelSlider(QSlider):
     def __init__(self, *args, **kwargs):
@@ -2993,6 +3033,11 @@ class NoWheelSlider(QSlider):
         self.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
         # Apply styles
         self.update_styles()
+
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setMouseTracking(True)
+        self.is_mouse_over = False
+
     def wheelEvent(self, event):
         # Block the wheel event
         event.ignore()
@@ -3032,6 +3077,30 @@ class NoWheelSlider(QSlider):
     def setHandleHeight(self, height):
         self.handle_height = height
         self.update_styles()
+
+    def enterEvent(self, event):
+        self.is_mouse_over = True
+
+    def leaveEvent(self, event):
+        self.is_mouse_over = False
+
+    def keyPressEvent(self, event):
+        if self.is_mouse_over:
+            if event.key() == Qt.Key_Left:
+                self.setValue(self.value() - 1)
+            elif event.key() == Qt.Key_Right:
+                self.setValue(self.value() + 1)
+            else:
+                super().keyPressEvent(event)
+        # else:
+        #     super().keyPressEvent(event)
+
+    # def keyReleaseEvent(self, event):
+    #     if self.is_mouse_over:
+    #         # Handle key release if needed
+    #         pass
+    #     else:
+    #         super().keyReleaseEvent(event)
 
 
 def select_sim_for_conversion(window, aircraft_name):

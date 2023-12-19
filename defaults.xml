@@ -791,9 +791,10 @@
 		<Grouping>Weapons</Grouping>
 		<order>120.5</order>
 		<name>weapon_effect_direction</name>
-		<info>Direction of applied force for weapons effects | range 0-359 or set to -1 for random</info>
+		<info>Direction of applied force for weapons effects&lt;br&gt;&lt;br&gt;Rrange 0-359 or set to -1 for random</info>
+		<validvalues>-1,359</validvalues>
 		<value>-1</value>
-		<datatype>int</datatype>
+		<datatype>d_int</datatype>
 		<displayname>Weapon Effect Direction</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
@@ -994,7 +995,7 @@
 		<sliderfactor>0.35</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
-		<displayname>Engine Rumble Low Rumble</displayname>
+		<displayname>Engine Rumble Low Intensity</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
@@ -1031,7 +1032,7 @@
 		<sliderfactor>0.35</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
-		<displayname>Engine Rumble High Rumble</displayname>
+		<displayname>Engine Rumble High Intensity</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
