@@ -358,23 +358,18 @@ def get_reg(name):
     except WindowsError:
         return None
 
-def get_default_sys_settings(tp):
-    # tp = args.type
-    if tp == 'joystick':
-        wnd = 'jSaveW'
-        vw = 'jSaveT'
-        tb = 'jTab'
-    elif tp == 'pedals':
-        wnd = 'pSaveW'
-        vw = 'pSaveT'
-        tb = 'pTab'
-    elif tp == 'collective':
-        wnd = 'cSaveW'
-        vw = 'cSaveT'
-        tb = 'cTab'
-    def_syst_dict = {
+
+def get_default_sys_settings(cmb=False):
+
+
+    instance_sys_dict = {
         'logLevel': 'INFO',
         'telemTimeout': 200,
+        'saveWindow': False,
+        'saveLastTab': False,
+    }
+
+    globl_sys_dict = {
         'ignoreUpdate': False,
         'enableDCS': False,
         'enableMSFS': False,
@@ -382,12 +377,27 @@ def get_default_sys_settings(tp):
         'validateIL2': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
         'portIL2': 34385,
-        'rememberTab': True,
-        wnd: True,
-        vw: True,
-        tb: 1,
+        'masterInstance': 1,
+        'autolaunchMaster': False,
+        'autolaunchJoystick': False,
+        'autolaunchPedals': False,
+        'autolaunchCollective': False,
+        'startMinJoystick': False,
+        'startMinPedals': False,
+        'startMinCollective': False,
+        'pidJoystick': 2055,
+        'pidPedals': '',
+        'pidCollectibe': '',
+
+
     }
-    return def_syst_dict
+
+    if cmb:
+        sys_dict = globl_sys_dict.copy()
+        sys_dict.update(instance_sys_dict)
+        return sys_dict
+    else:
+        return instance_sys_dict, globl_sys_dict
 
 
 def create_support_bundle(userconfig_rootpath):
@@ -472,30 +482,44 @@ def read_all_system_settings():
 
 def read_system_settings(tp):
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
-    def_syst_dict = get_default_sys_settings(tp)
+    def_inst_sys_dict, def_global_sys_dict = get_default_sys_settings(cmb=False)
 
     settings_dict = {}
+    g_settings_dict = {}
+    i_settings_dict = {}
 
+    g_key = 'Sys'
+    i_key = f'{tp}Sys'
     try:
+        #try to create the path key in case it doesn't exist
         winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
         registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0,
                                       winreg.KEY_READ | winreg.KEY_WRITE)
-
-        for key, default_value in def_syst_dict.items():
-            try:
-                value, _ = winreg.QueryValueEx(registry_key, key)
-                settings_dict[key] = value
-            except OSError:
-                # If the key does not exist, set it to the default value
-                reg_type = winreg.REG_DWORD if isinstance(default_value, int) else winreg.REG_SZ
-                winreg.SetValueEx(registry_key, key, 0, reg_type, default_value)
-                settings_dict[key] = default_value
+        # for key, default_value in def_sys_dict.items():
+        try:
+            #try to read the global system settings key
+            value, _ = winreg.QueryValueEx(registry_key, g_key)
+            g_settings_dict = json.loads(value)
+        except OSError:
+            # If the key does not exist, set it to the default value
+            # reg_type = winreg.REG_DWORD if isinstance(default_value, int) else winreg.REG_SZ
+            winreg.SetValueEx(registry_key, g_key, 0, winreg.REG_SZ, json.dumps(def_global_sys_dict))
+            g_settings_dict = def_global_sys_dict
+        try:
+            #try to read the instance system settings key
+            value, _ = winreg.QueryValueEx(registry_key, i_key)
+            i_settings_dict = json.loads(value)
+        except OSError:
+            # If the key does not exist, set it to the default value
+            # reg_type = winreg.REG_DWORD if isinstance(default_value, int) else winreg.REG_SZ
+            winreg.SetValueEx(registry_key, i_key, 0, winreg.REG_SZ, json.dumps(def_inst_sys_dict))
+            i_settings_dict = def_inst_sys_dict
 
         winreg.CloseKey(registry_key)
-
     except WindowsError:
         pass
-
+    settings_dict = g_settings_dict.copy()
+    settings_dict.update(i_settings_dict)
     return settings_dict
 def mix(a, b, val):
     return a*(1-val) + b*(val)

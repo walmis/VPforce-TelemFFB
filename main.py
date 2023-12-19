@@ -19,7 +19,33 @@ import glob
 
 from traceback_with_variables import print_exc, prints_exc
 import argparse
+import json
+import logging
+import sys
+import time
+import os
+import utils
+import re
+import socket
+import threading
 
+import subprocess
+
+import traceback
+from ffb_rhino import HapticEffect
+from configobj import ConfigObj
+
+from settingsmanager import *
+import xmlutils
+
+from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
+    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
+    QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
+    QThread
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence, QIntValidator, QCursor
+from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -43,12 +69,6 @@ parser.add_argument('--headless', action='store_true', help='Run in headless mod
 args = parser.parse_args()
 args.sim = str.upper(args.sim)
 args.type = str.lower(args.type)
-import json
-import logging
-import sys
-import time
-import os
-import utils
 
 headless_mode = args.headless
 system_settings = utils.read_system_settings(args.type)
@@ -57,6 +77,19 @@ sys.path.insert(0, '')
 # sys.path.append('/simconnect')
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
+_config: ConfigObj
+_config_mtime = 0
+effects_translator = utils.EffectTranslator()
+version = utils.get_version()
+min_firmware_version = 'v1.0.15'
+global dev_firmware_version, dev_serial, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
+
+_update_available = False
+_latest_version = None
+_latest_url = None
+_current_version = version
+vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 
 if args.overridefile == 'None':
     # Need to determine if user is using default config.user.ini without passing the override flag:
@@ -72,7 +105,7 @@ else:
 
 
 log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
-#log_folder = './log'
+
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
 
@@ -100,39 +133,13 @@ file_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
-import re
 
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
-    QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
-    QThread
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeySequence, QIntValidator, QCursor
-from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
-
-
-import socket
-import threading
 import aircrafts_dcs
 import aircrafts_msfs
 import aircrafts_il2
-import subprocess
-
-import traceback
-from ffb_rhino import HapticEffect
-from configobj import ConfigObj
-
 from sc_manager import SimConnectManager
 from il2_telem import IL2Manager
 from aircraft_base import effects
-from settingsmanager import *
-import xmlutils
-
-effects_translator = utils.EffectTranslator()
-
-_config: ConfigObj = None
-_config_mtime = 0
 
 if os.path.basename(args.configfile) == args.configfile:
     # just the filename is present, assume it is in the script directory
@@ -164,20 +171,6 @@ userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB
 userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
 
 utils.create_empty_userxml_file(userconfig_path)
-
-version = utils.get_version()
-min_firmware_version = 'v1.0.15'
-global dev_firmware_version
-dev_firmware_version = None
-global dev_serial
-global dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
-
-_update_available = False
-_latest_version = None
-_latest_url = None
-_current_version = version
-
-vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 
 
 class LoggingFilter(logging.Filter):
@@ -688,17 +681,17 @@ class Ui_SystemDialog(object):
     def setupUi(self, SystemDialog):
         if not SystemDialog.objectName():
             SystemDialog.setObjectName(u"SystemDialog")
-        SystemDialog.resize(490, 463)
+        SystemDialog.resize(591, 524)
         sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(SystemDialog.sizePolicy().hasHeightForWidth())
         SystemDialog.setSizePolicy(sizePolicy)
         SystemDialog.setMinimumSize(QSize(490, 355))
-        SystemDialog.setMaximumSize(QSize(490, 800))
+        SystemDialog.setMaximumSize(QSize(800, 800))
         self.line = QFrame(SystemDialog)
         self.line.setObjectName(u"line")
-        self.line.setGeometry(QRect(9, 114, 466, 16))
+        self.line.setGeometry(QRect(9, 168, 571, 16))
         font = QFont()
         font.setBold(False)
         font.setWeight(50)
@@ -709,12 +702,12 @@ class Ui_SystemDialog(object):
         self.line.setFrameShadow(QFrame.Sunken)
         self.buttonBox = QDialogButtonBox(SystemDialog)
         self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setGeometry(QRect(310, 430, 156, 23))
+        self.buttonBox.setGeometry(QRect(402, 484, 156, 23))
         self.buttonBox.setOrientation(Qt.Horizontal)
         self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
         self.resetButton = QPushButton(SystemDialog)
         self.resetButton.setObjectName(u"resetButton")
-        self.resetButton.setGeometry(QRect(20, 430, 101, 23))
+        self.resetButton.setGeometry(QRect(20, 484, 101, 23))
         self.layoutWidget = QWidget(SystemDialog)
         self.layoutWidget.setObjectName(u"layoutWidget")
         self.layoutWidget.setGeometry(QRect(20, 31, 258, 71))
@@ -748,7 +741,7 @@ class Ui_SystemDialog(object):
 
         self.layoutWidget1 = QWidget(SystemDialog)
         self.layoutWidget1.setObjectName(u"layoutWidget1")
-        self.layoutWidget1.setGeometry(QRect(16, 150, 170, 65))
+        self.layoutWidget1.setGeometry(QRect(16, 204, 170, 65))
         self.verticalLayout = QVBoxLayout(self.layoutWidget1)
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
@@ -769,7 +762,7 @@ class Ui_SystemDialog(object):
 
         self.layoutWidget2 = QWidget(SystemDialog)
         self.layoutWidget2.setObjectName(u"layoutWidget2")
-        self.layoutWidget2.setGeometry(QRect(30, 221, 452, 75))
+        self.layoutWidget2.setGeometry(QRect(30, 275, 452, 75))
         self.il2_sub_layout = QGridLayout(self.layoutWidget2)
         self.il2_sub_layout.setObjectName(u"il2_sub_layout")
         self.il2_sub_layout.setContentsMargins(0, 0, 0, 0)
@@ -780,16 +773,16 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.label_3 = QLabel(self.layoutWidget2)
-        self.label_3.setObjectName(u"label_3")
+        self.lab_pathIL2 = QLabel(self.layoutWidget2)
+        self.lab_pathIL2.setObjectName(u"lab_pathIL2")
         sizePolicy1 = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         sizePolicy1.setHorizontalStretch(0)
         sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.label_3.sizePolicy().hasHeightForWidth())
-        self.label_3.setSizePolicy(sizePolicy1)
-        self.label_3.setMinimumSize(QSize(98, 0))
+        sizePolicy1.setHeightForWidth(self.lab_pathIL2.sizePolicy().hasHeightForWidth())
+        self.lab_pathIL2.setSizePolicy(sizePolicy1)
+        self.lab_pathIL2.setMinimumSize(QSize(98, 0))
 
-        self.horizontalLayout.addWidget(self.label_3)
+        self.horizontalLayout.addWidget(self.lab_pathIL2)
 
         self.pathIL2 = QLineEdit(self.layoutWidget2)
         self.pathIL2.setObjectName(u"pathIL2")
@@ -806,10 +799,10 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
-        self.label_4 = QLabel(self.layoutWidget2)
-        self.label_4.setObjectName(u"label_4")
+        self.lab_portIL2 = QLabel(self.layoutWidget2)
+        self.lab_portIL2.setObjectName(u"lab_portIL2")
 
-        self.horizontalLayout_2.addWidget(self.label_4)
+        self.horizontalLayout_2.addWidget(self.lab_portIL2)
 
         self.portIL2 = QLineEdit(self.layoutWidget2)
         self.portIL2.setObjectName(u"portIL2")
@@ -825,7 +818,7 @@ class Ui_SystemDialog(object):
 
         self.line_2 = QFrame(SystemDialog)
         self.line_2.setObjectName(u"line_2")
-        self.line_2.setGeometry(QRect(10, 307, 466, 16))
+        self.line_2.setGeometry(QRect(10, 361, 571, 16))
         self.line_2.setFont(font)
         self.line_2.setLineWidth(2)
         self.line_2.setMidLineWidth(1)
@@ -841,30 +834,184 @@ class Ui_SystemDialog(object):
         self.label_5.setFont(font1)
         self.label_6 = QLabel(SystemDialog)
         self.label_6.setObjectName(u"label_6")
-        self.label_6.setGeometry(QRect(20, 130, 71, 16))
+        self.label_6.setGeometry(QRect(20, 184, 71, 16))
         self.label_6.setFont(font1)
         self.label_7 = QLabel(SystemDialog)
         self.label_7.setObjectName(u"label_7")
-        self.label_7.setGeometry(QRect(20, 320, 91, 16))
+        self.label_7.setGeometry(QRect(20, 374, 91, 16))
         self.label_7.setFont(font1)
         self.label_8 = QLabel(SystemDialog)
         self.label_8.setObjectName(u"label_8")
-        self.label_8.setGeometry(QRect(30, 340, 101, 16))
-        self.widget = QWidget(SystemDialog)
-        self.widget.setObjectName(u"widget")
-        self.widget.setGeometry(QRect(36, 360, 184, 42))
-        self.verticalLayout_2 = QVBoxLayout(self.widget)
+        self.label_8.setGeometry(QRect(30, 394, 101, 16))
+        self.layoutWidget3 = QWidget(SystemDialog)
+        self.layoutWidget3.setObjectName(u"layoutWidget3")
+        self.layoutWidget3.setGeometry(QRect(36, 414, 184, 42))
+        self.verticalLayout_2 = QVBoxLayout(self.layoutWidget3)
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
         self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
-        self.cb_save_geometry = QCheckBox(self.widget)
+        self.cb_save_geometry = QCheckBox(self.layoutWidget3)
         self.cb_save_geometry.setObjectName(u"cb_save_geometry")
 
         self.verticalLayout_2.addWidget(self.cb_save_geometry)
 
-        self.cb_save_view = QCheckBox(self.widget)
+        self.cb_save_view = QCheckBox(self.layoutWidget3)
         self.cb_save_view.setObjectName(u"cb_save_view")
 
         self.verticalLayout_2.addWidget(self.cb_save_view)
+
+        self.label_10 = QLabel(SystemDialog)
+        self.label_10.setObjectName(u"label_10")
+        self.label_10.setGeometry(QRect(315, 152, 151, 16))
+        self.label_12 = QLabel(SystemDialog)
+        self.label_12.setObjectName(u"label_12")
+        self.label_12.setGeometry(QRect(386, 45, 51, 26))
+        self.label_12.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        self.label_9 = QLabel(SystemDialog)
+        self.label_9.setObjectName(u"label_9")
+        self.label_9.setGeometry(QRect(313, 45, 42, 26))
+        self.lab_auto_launch = QLabel(SystemDialog)
+        self.lab_auto_launch.setObjectName(u"lab_auto_launch")
+        self.lab_auto_launch.setEnabled(False)
+        self.lab_auto_launch.setGeometry(QRect(450, 45, 38, 26))
+        self.lab_auto_launch.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        self.lab_start_min = QLabel(SystemDialog)
+        self.lab_start_min.setObjectName(u"lab_start_min")
+        self.lab_start_min.setEnabled(False)
+        self.lab_start_min.setGeometry(QRect(513, 45, 49, 26))
+        self.lab_start_min.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        self.line_3 = QFrame(SystemDialog)
+        self.line_3.setObjectName(u"line_3")
+        self.line_3.setGeometry(QRect(283, 10, 20, 141))
+        self.line_3.setFont(font)
+        self.line_3.setLineWidth(2)
+        self.line_3.setFrameShape(QFrame.VLine)
+        self.line_3.setFrameShadow(QFrame.Sunken)
+        self.layoutWidget4 = QWidget(SystemDialog)
+        self.layoutWidget4.setObjectName(u"layoutWidget4")
+        self.layoutWidget4.setGeometry(QRect(313, 74, 262, 74))
+        self.gridLayout_2 = QGridLayout(self.layoutWidget4)
+        self.gridLayout_2.setObjectName(u"gridLayout_2")
+        self.gridLayout_2.setContentsMargins(0, 0, 0, 0)
+        self.cb_al_enable_j = QCheckBox(self.layoutWidget4)
+        self.cb_al_enable_j.setObjectName(u"cb_al_enable_j")
+        self.cb_al_enable_j.setEnabled(False)
+
+        self.gridLayout_2.addWidget(self.cb_al_enable_j, 0, 3, 1, 1)
+
+        self.horizontalSpacer_3 = QSpacerItem(40, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_3, 2, 2, 1, 1)
+
+        self.rb_master_c = QRadioButton(self.layoutWidget4)
+
+        self.rb_master_c.setObjectName(u"rb_master_c")
+
+        self.gridLayout_2.addWidget(self.rb_master_c, 2, 0, 1, 1)
+
+        self.tb_pid_c = QLineEdit(self.layoutWidget4)
+        self.tb_pid_c.setObjectName(u"tb_pid_c")
+        self.tb_pid_c.setMaximumSize(QSize(50, 16777215))
+
+        self.gridLayout_2.addWidget(self.tb_pid_c, 2, 1, 1, 1)
+
+        self.tb_pid_j = QLineEdit(self.layoutWidget4)
+        self.tb_pid_j.setObjectName(u"tb_pid_j")
+        self.tb_pid_j.setMaximumSize(QSize(50, 16777215))
+
+        self.gridLayout_2.addWidget(self.tb_pid_j, 0, 1, 1, 1)
+
+        self.tb_pid_p = QLineEdit(self.layoutWidget4)
+        self.tb_pid_p.setObjectName(u"tb_pid_p")
+        self.tb_pid_p.setMaximumSize(QSize(50, 16777215))
+
+        self.gridLayout_2.addWidget(self.tb_pid_p, 1, 1, 1, 1)
+
+        self.cb_min_enable_c = QCheckBox(self.layoutWidget4)
+        self.cb_min_enable_c.setObjectName(u"cb_min_enable_c")
+        self.cb_min_enable_c.setEnabled(False)
+
+        self.gridLayout_2.addWidget(self.cb_min_enable_c, 2, 5, 1, 1)
+
+        self.rb_master_p = QRadioButton(self.layoutWidget4)
+        self.rb_master_p.setObjectName(u"rb_master_p")
+
+        self.gridLayout_2.addWidget(self.rb_master_p, 1, 0, 1, 1)
+
+        self.cb_min_enable_j = QCheckBox(self.layoutWidget4)
+        self.cb_min_enable_j.setObjectName(u"cb_min_enable_j")
+        self.cb_min_enable_j.setEnabled(False)
+
+        self.gridLayout_2.addWidget(self.cb_min_enable_j, 0, 5, 1, 1)
+
+        self.cb_min_enable_p = QCheckBox(self.layoutWidget4)
+        self.cb_min_enable_p.setObjectName(u"cb_min_enable_p")
+        self.cb_min_enable_p.setEnabled(False)
+
+        self.gridLayout_2.addWidget(self.cb_min_enable_p, 1, 5, 1, 1)
+
+        self.cb_al_enable_p = QCheckBox(self.layoutWidget4)
+        self.cb_al_enable_p.setObjectName(u"cb_al_enable_p")
+        self.cb_al_enable_p.setEnabled(False)
+
+        self.gridLayout_2.addWidget(self.cb_al_enable_p, 1, 3, 1, 1)
+
+        self.rb_master_j = QRadioButton(self.layoutWidget4)
+        self.rb_master_j.setObjectName(u"rb_master_j")
+        self.rb_master_j.setChecked(True)
+
+        self.gridLayout_2.addWidget(self.rb_master_j, 0, 0, 1, 1)
+
+        self.horizontalSpacer_2 = QSpacerItem(40, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_2, 0, 2, 1, 1)
+
+        self.horizontalSpacer_4 = QSpacerItem(40, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_4, 1, 2, 1, 1)
+
+        self.cb_al_enable_c = QCheckBox(self.layoutWidget4)
+        self.cb_al_enable_c.setObjectName(u"cb_al_enable_c")
+        self.cb_al_enable_c.setEnabled(False)
+
+        self.gridLayout_2.addWidget(self.cb_al_enable_c, 2, 3, 1, 1)
+
+        self.horizontalSpacer_7 = QSpacerItem(46, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_7, 0, 4, 1, 1)
+
+        self.horizontalSpacer_6 = QSpacerItem(46, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_6, 1, 4, 1, 1)
+
+        self.horizontalSpacer_5 = QSpacerItem(46, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_5, 2, 4, 1, 1)
+
+        self.widget = QWidget(SystemDialog)
+        self.widget.setObjectName(u"widget")
+        self.widget.setGeometry(QRect(310, 10, 269, 22))
+        self.horizontalLayout_3 = QHBoxLayout(self.widget)
+        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
+        self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
+        self.label_11 = QLabel(self.widget)
+        self.label_11.setObjectName(u"label_11")
+        self.label_11.setFont(font1)
+
+        self.horizontalLayout_3.addWidget(self.label_11)
+
+        self.horizontalSpacer_8 = QSpacerItem(37, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.horizontalLayout_3.addItem(self.horizontalSpacer_8)
+
+        self.cb_al_enable = QCheckBox(self.widget)
+        self.cb_al_enable.setObjectName(u"cb_al_enable")
+        font2 = QFont()
+        font2.setBold(False)
+        font2.setUnderline(False)
+        font2.setWeight(50)
+        self.cb_al_enable.setFont(font2)
+
+        self.horizontalLayout_3.addWidget(self.cb_al_enable)
 
 
         self.retranslateUi(SystemDialog)
@@ -882,16 +1029,34 @@ class Ui_SystemDialog(object):
         self.enableMSFS.setText(QCoreApplication.translate("SystemDialog", u"Enable MSFS 2020 Support", None))
         self.enableIL2.setText(QCoreApplication.translate("SystemDialog", u"Enable IL-2 Sturmovik Support", None))
         self.validateIL2.setText(QCoreApplication.translate("SystemDialog", u"Auto IL-2 Telemetry setup", None))
-        self.label_3.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Install Path:", None))
+        self.lab_pathIL2.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Install Path:", None))
         self.browseIL2.setText(QCoreApplication.translate("SystemDialog", u"...", None))
-        self.label_4.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Telemetry Port:", None))
+        self.lab_portIL2.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Telemetry Port:", None))
         self.label_5.setText(QCoreApplication.translate("SystemDialog", u"System:", None))
         self.label_6.setText(QCoreApplication.translate("SystemDialog", u"Sim Setup:", None))
         self.label_7.setText(QCoreApplication.translate("SystemDialog", u"Other Settings: ", None))
         self.label_8.setText(QCoreApplication.translate("SystemDialog", u"Startup  Behavior:", None))
         self.cb_save_geometry.setText(QCoreApplication.translate("SystemDialog", u"Restore window size and position", None))
         self.cb_save_view.setText(QCoreApplication.translate("SystemDialog", u"Restore last tab view", None))
+        self.label_10.setText(QCoreApplication.translate("SystemDialog", u"Rhino default = 2055", None))
+        self.label_12.setText(QCoreApplication.translate("SystemDialog", u"USB\nProduct ID", None))
+        self.label_9.setText(QCoreApplication.translate("SystemDialog", u"Master\nInstance", None))
+        self.lab_auto_launch.setText(QCoreApplication.translate("SystemDialog", u"Auto\nLaunch:", None))
+        self.lab_start_min.setText(QCoreApplication.translate("SystemDialog", u"Start\nMinimized:", None))
+        self.cb_al_enable_j.setText("")
+        self.rb_master_c.setText(QCoreApplication.translate("SystemDialog", u"Colective", None))
+        self.tb_pid_j.setText(QCoreApplication.translate("SystemDialog", u"2055", None))
+        self.cb_min_enable_c.setText("")
+        self.rb_master_p.setText(QCoreApplication.translate("SystemDialog", u"Pedals", None))
+        self.cb_min_enable_j.setText("")
+        self.cb_min_enable_p.setText("")
+        self.cb_al_enable_p.setText("")
+        self.rb_master_j.setText(QCoreApplication.translate("SystemDialog", u"Joystick", None))
+        self.cb_al_enable_c.setText("")
+        self.label_11.setText(QCoreApplication.translate("SystemDialog", u"Launch Options:", None))
+        self.cb_al_enable.setText(QCoreApplication.translate("SystemDialog", u"Enable Auto-Launch", None))
     # retranslateUi
+
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
@@ -900,37 +1065,108 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.setupUi(self)
         self.retranslateUi(self)
 
-        # Add "INFO" and "DEBUG" options to the logLevel combo box
+        # Add  "INFO" and "DEBUG" options to the logLevel combo box
         self.logLevel.addItems(["INFO", "DEBUG"])
+        self.master_button_group = QButtonGroup()
+        self.master_button_group.setObjectName(u"master_button_group")
+        self.master_button_group.addButton(self.rb_master_j, id=1)
+        self.master_button_group.addButton(self.rb_master_p, id=2)
+        self.master_button_group.addButton(self.rb_master_c, id=3)
 
         # Connect signals to slots
         self.enableIL2.stateChanged.connect(self.toggle_il2_widgets)
         self.browseIL2.clicked.connect(self.select_il2_directory)
         self.buttonBox.accepted.connect(self.save_settings)
         self.resetButton.clicked.connect(self.reset_settings)
+        self.master_button_group.buttonClicked.connect(lambda button: self.change_master_widgets(button))
+        self.cb_al_enable.stateChanged.connect(self.toggle_al_widgets)
         self.buttonBox.rejected.connect(self.close)
 
         # Set initial state
         self.toggle_il2_widgets()
+        self.toggle_al_widgets()
         self.parent_window = parent
         # Load settings from the registry and update widget states
         self.load_settings()
         int_validator = QIntValidator()
         self.telemTimeout.setValidator(int_validator)
+        self.tb_pid_j.setValidator(int_validator)
+        self.tb_pid_p.setValidator(int_validator)
+        self.tb_pid_c.setValidator(int_validator)
 
     def reset_settings(self):
         # Load default settings and update widgets
         # default_settings = utils.get_default_sys_settings()
         self.load_settings(default=True)
+
+    def change_master_widgets(self, button):
+        if button == self.rb_master_j:
+            self.cb_al_enable_j.setChecked(False)
+            self.cb_al_enable_j.setVisible(False)
+            self.cb_min_enable_j.setChecked(False)
+            self.cb_min_enable_j.setVisible(False)
+            self.cb_al_enable_c.setVisible(True)
+            self.cb_min_enable_c.setVisible(True)
+            self.cb_al_enable_p.setVisible(True)
+            self.cb_min_enable_p.setVisible(True)
+        elif button == self.rb_master_p:
+            self.cb_al_enable_p.setChecked(False)
+            self.cb_al_enable_p.setVisible(False)
+            self.cb_min_enable_p.setChecked(False)
+            self.cb_min_enable_p.setVisible(False)
+            self.cb_al_enable_c.setVisible(True)
+            self.cb_min_enable_c.setVisible(True)
+            self.cb_al_enable_j.setVisible(True)
+            self.cb_min_enable_j.setVisible(True)
+
+        elif button == self.rb_master_c:
+            self.cb_al_enable_c.setChecked(False)
+            self.cb_al_enable_c.setVisible(False)
+            self.cb_min_enable_c.setChecked(False)
+            self.cb_min_enable_c.setVisible(False)
+            self.cb_al_enable_j.setVisible(True)
+            self.cb_min_enable_j.setVisible(True)
+            self.cb_al_enable_p.setVisible(True)
+            self.cb_min_enable_p.setVisible(True)
+
+    def toggle_al_widgets(self):
+        al_enabled = self.cb_al_enable.isChecked()
+        self.lab_auto_launch.setEnabled(al_enabled)
+        self.lab_start_min.setEnabled(al_enabled)
+        self.cb_al_enable_j.setEnabled(al_enabled)
+        self.cb_al_enable_p.setEnabled(al_enabled)
+        self.cb_al_enable_c.setEnabled(al_enabled)
+        self.cb_min_enable_j.setEnabled(al_enabled)
+        self.cb_min_enable_p.setEnabled(al_enabled)
+        self.cb_min_enable_c.setEnabled(al_enabled)
+
+        if al_enabled:
+            style = "QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }"
+            self.cb_al_enable.setStyleSheet(style)
+            self.cb_al_enable_j.setStyleSheet(style)
+            self.cb_al_enable_p.setStyleSheet(style)
+            self.cb_al_enable_c.setStyleSheet(style)
+            self.cb_min_enable_j.setStyleSheet(style)
+            self.cb_min_enable_p.setStyleSheet(style)
+            self.cb_min_enable_c.setStyleSheet(style)
+        else:
+            style = "QCheckBox::indicator:checked {image: url(image/disabledcheckbox.png); }"
+        self.cb_al_enable.setStyleSheet(style)
+        self.cb_al_enable_j.setStyleSheet(style)
+        self.cb_al_enable_p.setStyleSheet(style)
+        self.cb_al_enable_c.setStyleSheet(style)
+        self.cb_min_enable_j.setStyleSheet(style)
+        self.cb_min_enable_p.setStyleSheet(style)
+        self.cb_min_enable_c.setStyleSheet(style)
     def toggle_il2_widgets(self):
         # Show/hide IL-2 related widgets based on checkbox state
         il2_enabled = self.enableIL2.isChecked()
         # self.il2_sub_layout.setEnabled(il2_enabled)
         self.validateIL2.setEnabled(il2_enabled)
-        self.label_3.setEnabled(il2_enabled)
+        self.lab_pathIL2.setEnabled(il2_enabled)
         self.pathIL2.setEnabled(il2_enabled)
         self.browseIL2.setEnabled(il2_enabled)
-        self.label_4.setEnabled(il2_enabled)
+        self.lab_portIL2.setEnabled(il2_enabled)
         self.portIL2.setEnabled(il2_enabled)
         if il2_enabled:
             self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
@@ -942,40 +1178,68 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         directory = QFileDialog.getExistingDirectory(self, "Select IL-2 Install Path", "")
         if directory:
             self.pathIL2.setText(directory)
+    def validate_settings(self):
+        master = self.master_button_group.checkedId()
+        match master:
+            case 1:
+                val_entry = self.tb_pid_j.text()
+            case 2:
+                val_entry = self.tb_pid_p.text()
+            case 3:
+                val_entry = self.tb_pid_c.text()
+        if val_entry == '':
+            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the selected Master Instance')
+            return False
+
+        return True
+
+
 
     def save_settings(self):
         # Create a dictionary with the values of all components
         tp = args.type
-        if tp == 'joystick':
-            wnd = 'jSaveW'
-            vw = 'jSaveT'
-        elif tp == 'pedals':
-            wnd = 'pSaveW'
-            vw = 'pSaveT'
-        elif tp == 'collective':
-            wnd = 'cSaveW'
-            vw = 'cSaveT'
-        settings_dict = {
-            "logLevel": self.logLevel.currentText(),
-            "telemTimeout": int(self.telemTimeout.text()),
-            "ignoreUpdate": self.ignoreUpdate.isChecked(),
+
+        global_settings_dict = {
             "enableDCS": self.enableDCS.isChecked(),
             "enableMSFS": self.enableMSFS.isChecked(),
             "enableIL2": self.enableIL2.isChecked(),
             "validateIL2": self.validateIL2.isChecked(),
             "pathIL2": self.pathIL2.text(),
-            "portIL2": int(self.portIL2.text()),
-            wnd: self.cb_save_geometry.isChecked(),
-            vw: self.cb_save_view.isChecked(),
-
+            "portIL2": str(self.portIL2.text()),
+            'masterInstance': self.master_button_group.checkedId(),
+            'autolaunchMaster': self.cb_al_enable.isChecked(),
+            'autolaunchJoystick': self.cb_al_enable_j.isChecked(),
+            'autolaunchPedals': self.cb_al_enable_p.isChecked(),
+            'autolaunchCollective': self.cb_al_enable_c.isChecked(),
+            'startMinJoystick': self.cb_min_enable_j.isChecked(),
+            'startMinPedals': self.cb_min_enable_p.isChecked(),
+            'startMinCollective': self.cb_min_enable_c.isChecked(),
+            'pidJoystick': str(self.tb_pid_j.text()),
+            'pidPedals': str(self.tb_pid_p.text()),
+            'pidCollectibe': str(self.tb_pid_c.text()),
         }
 
+        instance_settings_dict = {
+            "logLevel": self.logLevel.currentText(),
+            "telemTimeout": str(self.telemTimeout.text()),
+            "ignoreUpdate": self.ignoreUpdate.isChecked(),
+            "saveWindow": self.cb_save_geometry.isChecked(),
+            "saveLastTab": self.cb_save_view.isChecked(),
+        }
+
+
         # Save settings to the registry
-        for key, value in settings_dict.items():
-            utils.set_reg(key, value)
+        g_settings = json.dumps(global_settings_dict)
+        i_settings = json.dumps(instance_settings_dict)
+        utils.set_reg('Sys', g_settings)
+        utils.set_reg(f'{tp}Sys', i_settings)
+
+        if not self.validate_settings():
+            return
+
         stop_sims()
         init_sims()
-        self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2'], settings_dict)
+        self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2'], global_settings_dict)
         # adjust logging level:
         ll = self.logLevel.currentText()
         if ll == "INFO":
@@ -989,7 +1253,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         Load settings from the registry and update widget states.
         """
         if default:
-            settings_dict = utils.get_default_sys_settings(args.type)
+            settings_dict = utils.get_default_sys_settings(cmb=True)
             self.cb_save_geometry.setChecked(True)
             self.cb_save_view.setChecked(True)
         else:
@@ -997,66 +1261,50 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             settings_dict = utils.read_system_settings(args.type)
             pass
         # Update widget states based on the loaded settings
-        if 'logLevel' in settings_dict:
-            log_level = settings_dict['logLevel']
-            self.logLevel.setCurrentText(log_level)
+        self.logLevel.setCurrentText(settings_dict.get('logLevel', 'INFO'))
 
-        if 'telemTimeout' in settings_dict:
-            telem_timeout = settings_dict['telemTimeout']
-            self.telemTimeout.setText(str(telem_timeout))
+        self.telemTimeout.setText(str(settings_dict.get('telemTimeout', 200)))
 
-        if 'ignoreUpdate' in settings_dict:
-            ignore_update = settings_dict['ignoreUpdate']
-            self.ignoreUpdate.setChecked(ignore_update)
+        self.ignoreUpdate.setChecked(settings_dict.get('ignoreUpdate', False))
 
-        if 'enableDCS' in settings_dict:
-            dcs_enabled = settings_dict['enableDCS']
-            self.enableDCS.setChecked(dcs_enabled)
+        self.enableDCS.setChecked(settings_dict.get('enableDCS', False))
 
-        if 'enableMSFS' in settings_dict:
-            msfs_enabled = settings_dict['enableMSFS']
-            self.enableMSFS.setChecked(msfs_enabled)
+        self.enableMSFS.setChecked(settings_dict.get('enableMSFS', False))
 
-        if 'enableIL2' in settings_dict:
-            il2_enabled = settings_dict['enableIL2']
-            self.enableIL2.setChecked(il2_enabled)
-            self.toggle_il2_widgets()
+        self.enableIL2.setChecked(settings_dict.get('enableIL2', False))
+        self.toggle_il2_widgets()
 
-        if 'validateIL2' in settings_dict:
-            il2_validate = settings_dict['validateIL2']
-            self.validateIL2.setChecked(il2_validate)
+        self.validateIL2.setChecked(settings_dict.get('validateIL2', True))
 
-        if 'pathIL2' in settings_dict:
-            il2_install_path = settings_dict['pathIL2']
-            self.pathIL2.setText(il2_install_path)
+        self.pathIL2.setText(settings_dict.get('pathIL2', 'C:/Program Files/IL-2 Sturmovik Great Battles'))
 
-        if 'portIL2' in settings_dict:
-            il2_port = settings_dict['portIL2']
-            self.portIL2.setText(str(il2_port))
+        self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
 
-        if 'jSaveW' in settings_dict and args.type == 'joystick':
-            save_window = settings_dict['jSaveW']
-            self.cb_save_geometry.setChecked(save_window)
+        self.cb_save_geometry.setChecked(settings_dict.get('saveWindow', True))
 
-        if 'pSaveW' in settings_dict and args.type == 'pedals':
-            save_window = settings_dict['pSaveW']
-            self.cb_save_geometry.setChecked(save_window)
+        self.cb_save_view.setChecked(settings_dict.get('saveLastTab', True))
 
-        if 'cSaveW' in settings_dict and args.type == 'collective':
-            save_window = settings_dict['cSaveW']
-            self.cb_save_geometry.setChecked(save_window)
+        self.tb_pid_j.setText(str(settings_dict.get('pidJoystick', '')))
 
-        if 'jSaveT' in settings_dict and args.type == 'joystick':
-            save_window = settings_dict['jSaveT']
-            self.cb_save_view.setChecked(save_window)
+        self.tb_pid_p.setText(str(settings_dict.get('pidPedals', '')))
 
-        if 'pSaveT' in settings_dict and args.type == 'pedals':
-            save_window = settings_dict['pSaveT']
-            self.cb_save_view.setChecked(save_window)
+        self.tb_pid_c.setText(str(settings_dict.get('pidCollective', '')))
 
-        if 'cSaveT' in settings_dict and args.type == 'collective':
-            save_window = settings_dict['cSaveT']
-            self.cb_save_view.setChecked(save_window)
+        self.cb_al_enable.setChecked(settings_dict.get('autolaunchMaster', False))
+
+        self.cb_al_enable_j.setChecked(settings_dict.get('autolaunchJoystick', False))
+        self.cb_al_enable_p.setChecked(settings_dict.get('autolaunchPedals', False))
+        self.cb_al_enable_c.setChecked(settings_dict.get('autolaunchCollective', False))
+
+        self.cb_min_enable_j.setChecked(settings_dict.get('startMinJoystick', False))
+        self.cb_min_enable_p.setChecked(settings_dict.get('startMinPedals', False))
+        self.cb_min_enable_c.setChecked(settings_dict.get('startMinCollective', False))
+
+        self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
+        self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
+        self.toggle_al_widgets()
+
+
 
 
 class ButtonPressThread(QThread):
@@ -1681,25 +1929,20 @@ class MainWindow(QMainWindow):
         self.setGeometry(x_pos, y_pos, 400, 700)
     def load_main_window_geometry(self):
         device_type = args.type
+        sys_settings = utils.read_system_settings(args.type)
         if device_type == 'joystick':
-            load_geometry_key = 'jSaveW'
             geometry_key = 'jWindowGeometry'
-            load_tab_key = 'jSaveT'
             tab_key = 'jTab'
         elif device_type == 'pedals':
-            load_geometry_key = 'pSaveW'
             geometry_key = 'pWindowGeometry'
-            load_tab_key = 'pSaveT'
             tab_key = 'pTab'
         elif device_type == 'collective':
-            load_geometry_key = 'pSaveW'
             geometry_key = 'cWindowGeometry'
-            load_tab_key = 'cSaveT'
-            tab_key = 'pTab'
+            tab_key = 'cTab'
 
         geometry = utils.get_reg(geometry_key)
-        load_geometry = utils.get_reg(load_geometry_key)
-        load_tab = utils.get_reg(load_tab_key)
+        load_geometry = sys_settings.get('saveWindow', False)
+        load_tab = sys_settings.get('saveLastTab', False)
         tab = utils.get_reg(tab_key)
 
         if geometry is not None and load_geometry:
@@ -1796,7 +2039,7 @@ class MainWindow(QMainWindow):
 
         return pixmap
 
-    def create_x_icon(self, color, size):
+    def create_paused_icon(self, color, size):
         pixmap = QPixmap(size)
         pixmap.fill(Qt.transparent)
 
@@ -1810,29 +2053,6 @@ class MainWindow(QMainWindow):
         line_width = 1
         line1_x = int((size.width() / 2) - 2)
         line2_x = int((size.width() / 2) + 2)
-        line_y = int((size.height() - line_length) / 2)
-
-        painter.setPen(QColor(Qt.white))
-        painter.drawLine(line1_x, line_y, line2_x, line_y + line_length)
-        painter.drawLine(line2_x, line_y, line1_x, line_y + line_length)
-
-        painter.end()
-
-        return pixmap
-    def create_paused_icon(self, color, size):
-        pixmap = QPixmap(size)
-        pixmap.fill(Qt.transparent)
-
-        # Draw a circle (optional)
-        painter = QPainter(pixmap)
-        painter.setBrush(color)
-        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
-
-        # Draw two vertical lines for the pause icon
-        line_length = int(size.width() / 3)
-        line_width = 1
-        line1_x = int((size.width()  / 2)- 2)
-        line2_x = int((size.width()  / 2)+ 2)
         line_y = int((size.height() - line_length) / 2)
 
         painter.setPen(QColor(Qt.white))
@@ -1866,22 +2086,6 @@ class MainWindow(QMainWindow):
         painter.end()
 
         return pixmap
-
-
-
-    # def edit_config_file(self, config_type):
-    #     script_dir = os.path.dirname(os.path.abspath(__file__))
-    #     if config_type == "Primary":
-    #         config_file = args.configfile
-    #     elif config_type == "User":
-    #         config_file = args.overridefile
-    #     config_path = os.path.join(script_dir, config_file)
-    #     file_url = QUrl.fromLocalFile(config_path)
-    #     try:
-    #         QDesktopServices.openUrl(file_url)
-    #     except:
-    #         logging.error(f"There was an error opening the config file")
-
 
     def toggle_log_window(self):
         if d.isVisible():
@@ -3018,7 +3222,7 @@ def init_sims():
 
     il2_mgr = IL2Manager()
     # il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
-    il2_port = utils.read_system_settings(args.type).get('portIL2', 34385)
+    il2_port = int(utils.read_system_settings(args.type).get('portIL2', 34385))
     # il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
     il2_path = utils.read_system_settings(args.type).get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
     # il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
