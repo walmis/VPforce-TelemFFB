@@ -387,7 +387,7 @@ def get_default_sys_settings(cmb=False):
         'startMinCollective': False,
         'pidJoystick': 2055,
         'pidPedals': '',
-        'pidCollectibe': '',
+        'pidCollective': '',
 
 
     }
