@@ -74,6 +74,11 @@ args = parser.parse_args()
 headless_mode = args.headless
 
 system_settings = utils.read_system_settings(args.type)
+config_was_default = False
+
+if system_settings.get('wasDefault', False):
+    config_was_default = True
+
 
 if args.device is None:
     master_rb = system_settings.get('masterInstance', 1)
