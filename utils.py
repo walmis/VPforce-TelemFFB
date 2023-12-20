@@ -487,7 +487,7 @@ def read_system_settings(tp):
     settings_dict = {}
     g_settings_dict = {}
     i_settings_dict = {}
-
+    was_default = False
     g_key = 'Sys'
     i_key = f'{tp}Sys'
     try:
@@ -505,6 +505,7 @@ def read_system_settings(tp):
             # reg_type = winreg.REG_DWORD if isinstance(default_value, int) else winreg.REG_SZ
             winreg.SetValueEx(registry_key, g_key, 0, winreg.REG_SZ, json.dumps(def_global_sys_dict))
             g_settings_dict = def_global_sys_dict
+            was_default = True
         try:
             #try to read the instance system settings key
             value, _ = winreg.QueryValueEx(registry_key, i_key)
@@ -514,12 +515,15 @@ def read_system_settings(tp):
             # reg_type = winreg.REG_DWORD if isinstance(default_value, int) else winreg.REG_SZ
             winreg.SetValueEx(registry_key, i_key, 0, winreg.REG_SZ, json.dumps(def_inst_sys_dict))
             i_settings_dict = def_inst_sys_dict
+            was_default = True
 
         winreg.CloseKey(registry_key)
     except WindowsError:
         pass
     settings_dict = g_settings_dict.copy()
     settings_dict.update(i_settings_dict)
+    if was_default:
+        settings_dict['wasDefault'] = True
     return settings_dict
 def mix(a, b, val):
     return a*(1-val) + b*(val)

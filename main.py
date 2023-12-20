@@ -3479,7 +3479,7 @@ def main():
     global dev_firmware_version
     global dev_serial
     d = LogWindow()
-    global settings_mgr, telem_manager
+    global settings_mgr, telem_manager, config_was_default
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
     settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
     icon_path = os.path.join(script_dir, "image/vpforceicon.png")
@@ -3544,6 +3544,8 @@ def main():
     init_sims()
 
     launch_children(app)
+    if config_was_default:
+        window.open_system_settings_dialog()
 
     app.exec_()
     stop_sims()
