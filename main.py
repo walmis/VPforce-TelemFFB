@@ -1532,7 +1532,8 @@ class MainWindow(QMainWindow):
 
         # Add a label for the image
         # Construct the absolute path of the image file
-        image_path = os.path.join(script_dir, "image/vpforcelogo.png")
+        global _device_logo
+        image_path = os.path.join(script_dir, f"image/{_device_logo}")
         self.image_label = QLabel()
         pixmap = QPixmap(image_path)
         self.image_label.setPixmap(pixmap)
