@@ -56,22 +56,61 @@ parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default=None,
 parser.add_argument('-p', '--plot', type=str, nargs='+',
                     help='Telemetry item names to send to teleplot, separated by spaces')
 
-parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default="ffff:2055")
+parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default=None)
 parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
 
 # Add config file argument, default config.ini
 parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default='config.ini')
 parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='None')
 parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
-parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default='joystick')
+parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default=None)
 parser.add_argument('--headless', action='store_true', help='Run in headless mode')
+parser.add_argument('--child', action='store_true', help='Is a child instance')
+parser.add_argument('--minimize', action='store_true', help='Minimize on startup')
 
 args = parser.parse_args()
-args.sim = str.upper(args.sim)
-args.type = str.lower(args.type)
+
 
 headless_mode = args.headless
+
 system_settings = utils.read_system_settings(args.type)
+
+if args.device is None:
+    master_rb = system_settings.get('masterInstance', 1)
+    match master_rb:
+        case 1:
+            _device_pid = system_settings.get('pidJoystick', 2055)
+            _device_type = 'joystick'
+            _device_logo = 'vpforcelogo_j.png'
+        case 2:
+            _device_pid = system_settings.get('pidPedals', 2055)
+            _device_type = 'pedals'
+            _device_logo = 'vpforcelogo_p.png'
+        case 3:
+            _device_pid = system_settings.get('pidCollective', 2055)
+            _device_type = 'collective'
+            _device_logo = 'vpforcelogo_c.png'
+        case _:
+            _device_pid = system_settings.get('pidJoystick', 2055)
+            _device_type = 'joystick'
+            _device_logo = 'vpforcelogo_j.png'
+    _device_vid_pid = f"FFFF:{_device_pid}"
+    args.type = _device_type
+else:
+    _device_pid = args.device.split(":")[1]
+    _device_vid_pid = args.device
+    match str.lower(args.type):
+        case 'joystick':
+            _device_logo = 'vpforcelogo_j.png'
+        case 'pedals':
+            _device_logo = 'vpforcelogo_p.png'
+        case 'collective':
+            _device_logo = 'vpforcelogo_c.png'
+        case _:
+            _device_logo = 'vpforcelogo_j.png'
+
+args.sim = str.upper(args.sim)
+args.type = str.lower(args.type)
 
 sys.path.insert(0, '')
 # sys.path.append('/simconnect')
@@ -109,7 +148,7 @@ log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
 
-logname = "".join(["TelemFFB", "_", args.device.replace(":", "-"), '_', args.type, "_xmlconfig.log"])
+logname = "".join(["TelemFFB", "_", _device_vid_pid.replace(":", "-"), '_', args.type, "_xmlconfig.log"])
 log_file = os.path.join(log_folder, logname)
 
 # Create a logger instance
@@ -133,6 +172,11 @@ file_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
+defaults_path = 'defaults.xml'
+userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
+userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
+
+utils.create_empty_userxml_file(userconfig_path)
 
 import aircrafts_dcs
 import aircrafts_msfs
@@ -166,11 +210,7 @@ if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
     utils.teleplot.configure(args.teleplot)
 
-defaults_path = 'defaults.xml'
-userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
 
-utils.create_empty_userxml_file(userconfig_path)
 
 
 class LoggingFilter(logging.Filter):
@@ -1087,6 +1127,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.toggle_al_widgets()
         self.parent_window = parent
         # Load settings from the registry and update widget states
+        self.current_al_dict = {}
         self.load_settings()
         int_validator = QIntValidator()
         self.telemTimeout.setValidator(int_validator)
@@ -1227,6 +1268,24 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "saveLastTab": self.cb_save_view.isChecked(),
         }
 
+        key_list = [
+            'autolaunchMaster',
+            'autolaunchJoystick',
+            'autolaunchPedals',
+            'autolaunchCollective',
+            'startMinJoystick',
+            'startMinPedals',
+            'startMinCollective',
+            'pidJoystick',
+            'pidPedals',
+            'pidCollective',
+        ]
+        saved_al_dict = {}
+        for key in key_list:
+            saved_al_dict[key] = global_settings_dict[key]
+
+        if self.current_al_dict != saved_al_dict:
+            QMessageBox.information(self, "Restart Required", "The Auto-Launch or Master Device settings have changed.  Please restart TelemFFB.")
 
         # Save settings to the registry
         g_settings = json.dumps(global_settings_dict)
@@ -1303,6 +1362,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
         self.toggle_al_widgets()
+
+        #build record of auto-launch settings to see if they changed on save:
+        key_list = [
+            'autolaunchMaster',
+            'autolaunchJoystick',
+            'autolaunchPedals',
+            'autolaunchCollective',
+            'startMinJoystick',
+            'startMinPedals',
+            'startMinCollective',
+            'pidJoystick',
+            'pidPedals',
+            'pidCollective',
+        ]
+        for key in key_list:
+            self.current_al_dict[key] = settings_dict[key]
 
 
 
@@ -3354,6 +3429,39 @@ def stop_sims():
     dcs_telem.quit()
     il2_telem.quit()
     sim_connect_telem.quit()
+def launch_children(app):
+    if not system_settings.get('autolaunchMaster', False) or args.child:
+        return
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    if getattr(sys, 'frozen', False):
+        app = ['VPForce-TelemFFB.exe']
+    else:
+        app = ['python', 'main.py']
+
+    # full_path = os.path.join(script_dir, app)
+    try:
+        if system_settings.get('autolaunchJoystick', False) and _device_type != 'joystick':
+            min = ['--minimize'] if system_settings.get('startMinJoystick', False) else []
+            vidpid = f"FFFF:{system_settings.get('pidJoystick', 2055)}"
+            command = app + ['-D', vidpid, '-t', 'joystick', '--child'] + min
+            logging.info(f"Auto-Launch: starting instance: {command}")
+            subprocess.Popen(command)
+        if system_settings.get('autolaunchPedals', False) and _device_type != 'pedals':
+            min = ['--minimize'] if system_settings.get('startMinPedals', False) else []
+            vidpid = f"FFFF:{system_settings.get('pidPedals', 2055)}"
+            command = app + ['-D', vidpid, '-t', 'pedals', '--child'] + min
+            logging.info(f"Auto-Launch: starting instance: {command}")
+            subprocess.Popen(command)
+        if system_settings.get('autolaunchCollective', False) and _device_type != 'collective':
+            min = ['--minimize'] if system_settings.get('startMinCollective', False) else []
+            vidpid = f"FFFF:{system_settings.get('pidCollective', 2055)}"
+            command = app + ['-D', vidpid, '-t', 'collective', '--child'] + min
+            logging.info(f"Auto-Launch: starting instance: {command}")
+            subprocess.Popen(command)
+    except Exception as e:
+        logging.error(f"Error during Auto-Launch sequence: {e}")
 
 def main():
     app = QApplication(sys.argv)
@@ -3375,7 +3483,7 @@ def main():
 
 
 
-    vid_pid = [int(x, 16) for x in args.device.split(":")]
+    vid_pid = [int(x, 16) for x in _device_vid_pid.split(":")]
     try:
         dev = HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
         if args.reset:
@@ -3389,9 +3497,8 @@ def main():
             if devver < minver:
                 QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
     except Exception as e:
-        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open Rhino HID at {args.device}\nError: {e}")
-        return
-
+        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {_device_vid_pid} for device: {_device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
+        dev_firmware_version = 'ERROR'
 
     # config = get_config()
     # ll = config["system"].get("logging_level", "INFO")
@@ -3408,13 +3515,16 @@ def main():
 
     window = MainWindow(settings_manager=settings_mgr)
 
-    if not headless_mode:
+    # if not headless_mode:
+    if args.minimize:
+        window.showMinimized()
+    else:
         window.show()
-        autoconvert_config(window)
-        fetch_version_thread = utils.FetchLatestVersionThread()
-        fetch_version_thread.version_result_signal.connect(window.update_version_result)
-        fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
-        fetch_version_thread.start()
+    autoconvert_config(window)
+    fetch_version_thread = utils.FetchLatestVersionThread()
+    fetch_version_thread.version_result_signal.connect(window.update_version_result)
+    fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
+    fetch_version_thread.start()
 
     telem_manager = TelemManager(settings_manager=settings_mgr)
     telem_manager.start()
@@ -3424,7 +3534,8 @@ def main():
 
     init_sims()
 
-    # if not perform_update():
+    launch_children(app)
+
     app.exec_()
     stop_sims()
     telem_manager.quit()
