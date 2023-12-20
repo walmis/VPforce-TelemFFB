@@ -3046,8 +3046,21 @@ class NoWheelSlider(QSlider):
         self.is_mouse_over = False
 
     def wheelEvent(self, event):
-        # Block the wheel event
-        event.ignore()
+        if event.modifiers() & Qt.ShiftModifier:
+            # Adjust the value by increments of 1
+            current_value = self.value()
+            if event.angleDelta().y() > 0:
+                new_value = current_value + 1
+            elif event.angleDelta().y() < 0:
+                new_value = current_value - 1
+
+            # Ensure the new value is within the valid range
+            new_value = max(self.minimum(), min(self.maximum(), new_value))
+
+            self.setValue(new_value)
+            event.accept()
+        else:
+            event.ignore()
 
     def update_styles(self):
         # Generate CSS based on color and size properties
