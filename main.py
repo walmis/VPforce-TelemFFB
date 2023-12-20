@@ -102,6 +102,10 @@ if args.device is None:
     _device_vid_pid = f"FFFF:{_device_pid}"
     args.type = _device_type
 else:
+    if args.type is None:
+        _device_type = 'joystick'
+        args.type = _device_type
+
     _device_pid = args.device.split(":")[1]
     _device_vid_pid = args.device
     match str.lower(args.type):
