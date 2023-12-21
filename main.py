@@ -41,7 +41,7 @@ import xmlutils
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
-    QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget
+    QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget, QGroupBox
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
     QThread
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QIntValidator, QCursor
@@ -70,35 +70,39 @@ parser.add_argument('--minimize', action='store_true', help='Minimize on startup
 
 args = parser.parse_args()
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 headless_mode = args.headless
 
 system_settings = utils.read_system_settings(args.type)
 config_was_default = False
+_launched_joystick = False
+_launched_pedals = False
+_launched_collective = False
 
 if system_settings.get('wasDefault', False):
     config_was_default = True
 
-
+_vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
 if args.device is None:
     master_rb = system_settings.get('masterInstance', 1)
     match master_rb:
         case 1:
             _device_pid = system_settings.get('pidJoystick', 2055)
             _device_type = 'joystick'
-            _device_logo = 'vpforcelogo_j.png'
+            _device_logo = os.path.join(script_dir, 'image/logo_j.png')
         case 2:
             _device_pid = system_settings.get('pidPedals', 2055)
             _device_type = 'pedals'
-            _device_logo = 'vpforcelogo_p.png'
+            _device_logo = os.path.join(script_dir, 'image/logo_p.png')
         case 3:
             _device_pid = system_settings.get('pidCollective', 2055)
             _device_type = 'collective'
-            _device_logo = 'vpforcelogo_c.png'
+            _device_logo = os.path.join(script_dir, 'image/logo_c.png')
         case _:
             _device_pid = system_settings.get('pidJoystick', 2055)
             _device_type = 'joystick'
-            _device_logo = 'vpforcelogo_j.png'
+            _device_logo = os.path.join(script_dir, 'image/logo_j.png')
     _device_vid_pid = f"FFFF:{_device_pid}"
     args.type = _device_type
 else:
@@ -110,13 +114,13 @@ else:
     _device_vid_pid = args.device
     match str.lower(args.type):
         case 'joystick':
-            _device_logo = 'vpforcelogo_j.png'
+            _device_logo = os.path.join(script_dir, 'image/logo_j.png')
         case 'pedals':
-            _device_logo = 'vpforcelogo_p.png'
+            _device_logo = os.path.join(script_dir, 'image/logo_p.png')
         case 'collective':
-            _device_logo = 'vpforcelogo_c.png'
+            _device_logo = os.path.join(script_dir, 'image/logo_c.png')
         case _:
-            _device_logo = 'vpforcelogo_j.png'
+            _device_logo = os.path.join(script_dir, 'image/logo_j.png')
 
 args.sim = str.upper(args.sim)
 args.type = str.lower(args.type)
@@ -124,7 +128,6 @@ args.type = str.lower(args.type)
 sys.path.insert(0, '')
 # sys.path.append('/simconnect')
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
 
 _config: ConfigObj
 _config_mtime = 0
@@ -1437,6 +1440,7 @@ class MainWindow(QMainWindow):
         doc_url = 'https://vpforcecontrols.com/downloads/VPforce_Rhino_Manual.pdf'
         dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
         notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
+        self._current_config_scope = args.type
         self.system_settings_dict = utils.read_system_settings(args.type)
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
         match args.type:
@@ -1616,15 +1620,27 @@ class MainWindow(QMainWindow):
 
         # Add a label for the image
         # Construct the absolute path of the image file
-        global _device_logo
-        image_path = os.path.join(script_dir, f"image/{_device_logo}")
-        self.image_label = QLabel()
-        pixmap = QPixmap(image_path)
-        self.image_label.setPixmap(pixmap)
+        self.logo_stack = QGroupBox()
+        global _device_logo, _vpf_logo
+        self.vpflogo_label = QLabel(self.logo_stack)
+        self.devicetype_label = ClickLogo(self.logo_stack)
+        self.devicetype_label.clicked.connect(self.device_logo_click_event)
+        pixmap = QPixmap(_vpf_logo)
+        pixmap2 = QPixmap(_device_logo)
+        self.vpflogo_label.setPixmap(pixmap)
+        self.devicetype_label.setPixmap(pixmap2)
+        self.devicetype_label.setScaledContents(True)
 
-        # Add the image label to the layout
-        logo_status_layout.addWidget(self.image_label, alignment=Qt.AlignVCenter | Qt.AlignLeft)
-        # layout.addWidget(QLabel(f"Config File: {args.configfile}"))
+        # Resize QGroupBox to match the size of the larger label
+        max_width = pixmap.width()
+        max_height = pixmap.height()
+        self.logo_stack.setFixedSize(max_width, max_height)
+        self.logo_stack.setStyleSheet("QGroupBox { border: none; }")
+        # Align self.image_label2 with the upper left corner of self.image_label
+        self.devicetype_label.move(self.vpflogo_label.pos())
+
+        # Add the image labels to the layout
+        logo_status_layout.addWidget(self.logo_stack, alignment=Qt.AlignVCenter | Qt.AlignLeft)
 
         rh_status_area = QWidget()
         rh_status_layout = QVBoxLayout()
@@ -1959,6 +1975,40 @@ class MainWindow(QMainWindow):
         self.load_main_window_geometry()
         self.last_height = self.height()
         self.last_width = self.width()
+    def enable_device_logo_click(self, state):
+        self.devicetype_label.setClickable(state)
+        self.devicetype_label.setStyleSheet(
+            "QLabel {"
+            # "   background-color: #4CAF50;"  # Set background color
+            # "   color: white;"               # Set text color
+            # "   padding: 1px;"               # Add padding
+            "   border-radius: 4px;"         # Add rounded corners
+            # "   border: 2px solid #808080;"  # Add border
+            "}"
+            "QLabel:hover {"
+            "   background-color: #DCDCDC;"  # Change background color on hover
+            "}"
+        )
+
+    def device_logo_click_event(self):
+        global _launched_pedals, _launched_collective, _launched_collective
+        print("External function executed on label click")
+        print(self._current_config_scope)
+        if self._current_config_scope == 'joystick':
+            if _launched_pedals or _device_type == 'pedals':
+                self.change_config_scope(2)
+            elif _launched_collective or _device_type == 'collective':
+                self.change_config_scope(3)
+        elif self._current_config_scope == 'pedals':
+            if _launched_collective or _device_type == 'collective':
+                self.change_config_scope(3)
+            elif _launched_joystick or _device_type == 'joystick':
+                self.change_config_scope(1)
+        elif self._current_config_scope == 'collective':
+            if _launched_joystick or _device_type == 'joystick':
+                self.change_config_scope(1)
+            elif _launched_pedals or _device_type == 'pedals':
+                self.change_config_scope(2)
 
     def update_version_result(self, vers, url):
         global _update_available
@@ -1990,10 +2040,20 @@ class MainWindow(QMainWindow):
         # print(F"CHANGE SCOPE: {arg}")
         if arg == 1:
             xmlutils.update_vars('joystick', userconfig_path, defaults_path)
+            self._current_config_scope = 'joystick'
+            new_device_logo = os.path.join(script_dir, 'image/logo_j.png')
         elif arg == 2:
             xmlutils.update_vars('pedals', userconfig_path, defaults_path)
+            self._current_config_scope = 'pedals'
+            new_device_logo = os.path.join(script_dir, 'image/logo_p.png')
         elif arg == 3:
             xmlutils.update_vars('collective', userconfig_path, defaults_path)
+            self._current_config_scope = 'collective'
+            new_device_logo = os.path.join(script_dir, 'image/logo_c.png')
+        pixmap = QPixmap(new_device_logo)
+        self.devicetype_label.setPixmap(pixmap)
+        self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
+        self.tab_widget.setCurrentIndex(1) #force to settings tab since that is the only one affected by this function
         self.update_settings()
 
     def test_sim_changed(self):
@@ -3215,6 +3275,37 @@ class NoWheelSlider(QSlider):
             super().keyReleaseEvent(event)
 
 
+class ClickLogo(QLabel):
+    clicked = pyqtSignal()
+    def __init__(self, parent=None):
+
+        super(ClickLogo, self).__init__(parent)
+
+        # Initial clickable state
+        self._clickable = False
+
+    def setClickable(self, clickable):
+        self._clickable = clickable
+        if clickable:
+            self.setCursor(Qt.PointingHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
+
+    def mousePressEvent(self, event):
+        if self._clickable:
+            self.clicked.emit()
+
+    def enterEvent(self, event):
+        if self._clickable:
+            self.setCursor(Qt.PointingHandCursor)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.setCursor(Qt.ArrowCursor)
+        super().leaveEvent(event)
+
+
+
 def select_sim_for_conversion(window, aircraft_name):
     msg_box = QMessageBox(window)
     msg_box.setIcon(QMessageBox.Question)
@@ -3433,17 +3524,24 @@ def init_sims():
             sim_connect_telem.start()
     except:
         logging.exception("Error loading MSFS enable flag from config file")
+
+
 def stop_sims():
     global dcs_telem, il2_telem, sim_connect_telem
     dcs_telem.quit()
     il2_telem.quit()
     sim_connect_telem.quit()
-def launch_children(app):
+
+
+def launch_children(window):
+    global _launched_joystick, _launched_pedals, _launched_collective
     if not system_settings.get('autolaunchMaster', False) or args.child:
         return
-
+    window.enable_device_logo_click(True)
     script_dir = os.path.dirname(os.path.abspath(__file__))
-
+    current_title = window.windowTitle()
+    new_title = f"** MASTER INSTANCE ** {current_title}"
+    window.setWindowTitle(new_title)
     if getattr(sys, 'frozen', False):
         app = ['VPForce-TelemFFB.exe']
     else:
@@ -3457,18 +3555,21 @@ def launch_children(app):
             command = app + ['-D', vidpid, '-t', 'joystick', '--child'] + min
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
+            _launched_joystick = True
         if system_settings.get('autolaunchPedals', False) and _device_type != 'pedals':
             min = ['--minimize'] if system_settings.get('startMinPedals', False) else []
             vidpid = f"FFFF:{system_settings.get('pidPedals', 2055)}"
             command = app + ['-D', vidpid, '-t', 'pedals', '--child'] + min
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
+            _launched_pedals = True
         if system_settings.get('autolaunchCollective', False) and _device_type != 'collective':
             min = ['--minimize'] if system_settings.get('startMinCollective', False) else []
             vidpid = f"FFFF:{system_settings.get('pidCollective', 2055)}"
             command = app + ['-D', vidpid, '-t', 'collective', '--child'] + min
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
+            _launched_collective = True
     except Exception as e:
         logging.error(f"Error during Auto-Launch sequence: {e}")
 
@@ -3543,7 +3644,7 @@ def main():
 
     init_sims()
 
-    launch_children(app)
+    launch_children(window)
     if config_was_default:
         window.open_system_settings_dialog()
 
