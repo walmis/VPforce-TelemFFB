@@ -88,19 +88,19 @@ if args.device is None:
     master_rb = system_settings.get('masterInstance', 1)
     match master_rb:
         case 1:
-            _device_pid = system_settings.get('pidJoystick', 2055)
+            _device_pid = system_settings.get('pidJoystick', "2055")
             _device_type = 'joystick'
             _device_logo = os.path.join(script_dir, 'image/logo_j.png')
         case 2:
-            _device_pid = system_settings.get('pidPedals', 2055)
+            _device_pid = system_settings.get('pidPedals', "2055")
             _device_type = 'pedals'
             _device_logo = os.path.join(script_dir, 'image/logo_p.png')
         case 3:
-            _device_pid = system_settings.get('pidCollective', 2055)
+            _device_pid = system_settings.get('pidCollective', "2055")
             _device_type = 'collective'
             _device_logo = os.path.join(script_dir, 'image/logo_c.png')
         case _:
-            _device_pid = system_settings.get('pidJoystick', 2055)
+            _device_pid = system_settings.get('pidJoystick', "2055")
             _device_type = 'joystick'
             _device_logo = os.path.join(script_dir, 'image/logo_j.png')
     _device_vid_pid = f"FFFF:{_device_pid}"
@@ -3551,21 +3551,21 @@ def launch_children(window):
     try:
         if system_settings.get('autolaunchJoystick', False) and _device_type != 'joystick':
             min = ['--minimize'] if system_settings.get('startMinJoystick', False) else []
-            vidpid = f"FFFF:{system_settings.get('pidJoystick', 2055)}"
+            vidpid = f"FFFF:{system_settings.get('pidJoystick', '2055')}"
             command = app + ['-D', vidpid, '-t', 'joystick', '--child'] + min
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
             _launched_joystick = True
         if system_settings.get('autolaunchPedals', False) and _device_type != 'pedals':
             min = ['--minimize'] if system_settings.get('startMinPedals', False) else []
-            vidpid = f"FFFF:{system_settings.get('pidPedals', 2055)}"
+            vidpid = f"FFFF:{system_settings.get('pidPedals', '2055')}"
             command = app + ['-D', vidpid, '-t', 'pedals', '--child'] + min
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
             _launched_pedals = True
         if system_settings.get('autolaunchCollective', False) and _device_type != 'collective':
             min = ['--minimize'] if system_settings.get('startMinCollective', False) else []
-            vidpid = f"FFFF:{system_settings.get('pidCollective', 2055)}"
+            vidpid = f"FFFF:{system_settings.get('pidCollective', '2055')}"
             command = app + ['-D', vidpid, '-t', 'collective', '--child'] + min
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
