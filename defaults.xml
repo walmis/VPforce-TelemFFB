@@ -5535,42 +5535,42 @@
 	<classdefaults>
 		<name>aoa_effect_enabled</name>
 		<type>GliderAircraft</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>aoa_effect_enabled</name>
 		<type>JetrAircraft</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>aoa_effect_enabled</name>
 		<type>JetrAircraft</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>aoa_effect_enabled</name>
 		<type>PropellerAircraft</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>aoa_effect_enabled</name>
 		<type>PropellerAircraft</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>aoa_effect_enabled</name>
 		<type>TurbopropAircraft</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -7040,7 +7040,7 @@
 	<classdefaults>
 		<name>aircraft_is_fbw</name>
 		<type>AllSettings</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
