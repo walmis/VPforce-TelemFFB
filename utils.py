@@ -359,8 +359,24 @@ def get_reg(name):
         return None
 
 
-def get_default_sys_settings(cmb=False):
+def get_default_sys_settings(device_id, device_type, cmb=False):
+    pid_j = ''
+    pid_p = ''
+    pid_c = ''
+    if device_id is None:
+        device = '2055'
+    elif ':' in device_id:
+        device = device_id.split(":")[1]
 
+    if device_type is None:
+        device_type = 'joystick'
+    match device_type:
+        case 'joystick':
+            pid_j = device
+        case 'pedals':
+            pid_p = device
+        case 'collective':
+            pid_c = device
 
     instance_sys_dict = {
         'logLevel': 'INFO',
@@ -385,9 +401,9 @@ def get_default_sys_settings(cmb=False):
         'startMinJoystick': False,
         'startMinPedals': False,
         'startMinCollective': False,
-        'pidJoystick': '2055',
-        'pidPedals': '',
-        'pidCollective': '',
+        'pidJoystick': pid_j,
+        'pidPedals': pid_p,
+        'pidCollective': pid_c,
 
 
     }
@@ -480,9 +496,10 @@ def read_all_system_settings():
 
     return settings_dict
 
-def read_system_settings(tp):
+
+def read_system_settings(pid, tp):
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
-    def_inst_sys_dict, def_global_sys_dict = get_default_sys_settings(cmb=False)
+    def_inst_sys_dict, def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
 
     settings_dict = {}
     g_settings_dict = {}

@@ -74,11 +74,12 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 headless_mode = args.headless
 
-system_settings = utils.read_system_settings(args.type)
 config_was_default = False
 _launched_joystick = False
 _launched_pedals = False
 _launched_collective = False
+
+system_settings = utils.read_system_settings(args.device, args.type)
 
 if system_settings.get('wasDefault', False):
     config_was_default = True
@@ -109,6 +110,8 @@ else:
     if args.type is None:
         _device_type = 'joystick'
         args.type = _device_type
+    else:
+        _device_type = args.type
 
     _device_pid = args.device.split(":")[1]
     _device_vid_pid = args.device
@@ -655,7 +658,7 @@ class TelemManager(QObject, threading.Thread):
     def run(self):
         global _config
         # self.timeout = utils.sanitize_dict(_config["system"]).get("telemetry_timeout", 200)/1000
-        self.timeout = int(utils.read_system_settings(args.type).get('telemTimeout', 200))/1000
+        self.timeout = int(utils.read_system_settings(args.device, args.type).get('telemTimeout', 200))/1000
         logging.info(f"Telemetry timeout: {self.timeout}")
         while self._run:
             with self._cond:
@@ -1324,12 +1327,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         Load settings from the registry and update widget states.
         """
         if default:
-            settings_dict = utils.get_default_sys_settings(cmb=True)
+            settings_dict = utils.get_default_sys_settings(args.device, args.type, cmb=True)
             self.cb_save_geometry.setChecked(True)
             self.cb_save_view.setChecked(True)
         else:
             # Read settings from the registry
-            settings_dict = utils.read_system_settings(args.type)
+            settings_dict = utils.read_system_settings(args.device, args.type)
             pass
         # Update widget states based on the loaded settings
         self.logLevel.setCurrentText(settings_dict.get('logLevel', 'INFO'))
@@ -1441,7 +1444,7 @@ class MainWindow(QMainWindow):
         dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
         notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         self._current_config_scope = args.type
-        self.system_settings_dict = utils.read_system_settings(args.type)
+        self.system_settings_dict = utils.read_system_settings(args.device, args.type)
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
         match args.type:
             case 'joystick':
@@ -1587,9 +1590,9 @@ class MainWindow(QMainWindow):
         # notes_row_layout.addWidget(self.notes_label)
         # layout.addLayout(notes_row_layout)
         # cfg = get_config()
-        dcs_enabled = utils.read_system_settings(args.type).get('enableDCS')
-        il2_enabled = utils.read_system_settings(args.type).get('enableIL2')
-        msfs_enabled = utils.read_system_settings(args.type).get('enableMSFS')
+        dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS')
+        il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2')
+        msfs_enabled = utils.read_system_settings(args.device, args.type).get('enableMSFS')
 
         self.icon_size = QSize(18, 18)
         if args.sim == "DCS" or dcs_enabled:
@@ -1846,9 +1849,9 @@ class MainWindow(QMainWindow):
 
         # Create the QLabel widget and set its properties
 
-        dcs_enabled = utils.read_system_settings(args.type).get('enableDCS')
-        il2_enabled = utils.read_system_settings(args.type).get('enableIL2')
-        msfs_enabled = utils.read_system_settings(args.type).get('enableMSFS')
+        dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS')
+        il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2')
+        msfs_enabled = utils.read_system_settings(args.device, args.type).get('enableMSFS')
 
         # Convert True/False to "enabled" or "disabled"
         dcs_status = "Enabled" if dcs_enabled else "Disabled"
@@ -2090,7 +2093,7 @@ class MainWindow(QMainWindow):
 
     def load_main_window_geometry(self):
         device_type = args.type
-        sys_settings = utils.read_system_settings(args.type)
+        sys_settings = utils.read_system_settings(args.device, args.type)
         if device_type == 'joystick':
             geometry_key = 'jWindowGeometry'
             tab_key = 'jTab'
@@ -2507,7 +2510,7 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
 
     def perform_update(self, auto=True):
-        ignore_auto_updates = utils.read_system_settings(args.type).get('ignoreUpdate', False)
+        ignore_auto_updates = utils.read_system_settings(args.device, args.type).get('ignoreUpdate', False)
         if not auto:
             ignore_auto_updates = False
         update_ans = QMessageBox.No
@@ -3340,6 +3343,7 @@ def select_sim_for_conversion(window, aircraft_name):
 
 
 def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
+    classes = ['PropellerAircraft', 'JetAircraft', 'TurbopropAircraft', 'Glider', 'Helicopter', 'HPGHelicopter']
     sim = ''
     cls = ''
     model = ''
@@ -3355,21 +3359,29 @@ def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
 
     if '.' in section:
         subsection = section.split('.')
-        ssim = subsection[0]
-        cls = subsection[1]
-        match ssim:
-            case 'DCS':
-                sim = 'DCS'
-            case 'IL2':
-                sim = 'IL2'
-            case 'MSFS2020':
-                sim = 'MSFS'
+        if subsection[1] in classes:  # Make sure it is actually a sim/class section and not a regex aircraft section
+            ssim = subsection[0]
+            cls = subsection[1]
+            match ssim:
+                case 'DCS':
+                    sim = 'DCS'
+                case 'IL2':
+                    sim = 'IL2'
+                case 'MSFS2020':
+                    sim = 'MSFS'
 
-    # if sim is still blank here, must be a model
+    # if isim is present, is a new aircraft and user has responded with the sim information, add as new model
     if isim != '':
         model = section
         sim = isim
         cls = ''
+
+    # if sim is still blank here, must be a default model section in the user config
+    if sim == '':
+        model = section
+        sim = 'any'
+        cls = ''
+
 
     data_dict = {
         'name': name,
@@ -3385,26 +3397,52 @@ def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
 
 
 def convert_system_settings(sys_dict):
-    map_dict = {
-    'ignore_auto_updates': 'ignoreUpdate',
-    'logging_level': 'logLevel',
-    'telemetry_timeout': 'telemTimeout',
-    'msfs_enabled': 'enableMSFS',
-    'dcs_enabled': 'enableDCS',
-    'il2_enabled': 'enableIL2',
-    'il2_telem_port': 'portIL2',
-    'il2_cfg_validation': 'validateIL2',
-    'il2_path': 'pathIL2',
+    map_dev_dict = {
+        'logging_level': 'logLevel',
+        'telemetry_timeout': 'telemTimeout',
     }
 
+    map_sys_dict = {
+        'ignore_auto_updates': 'ignoreUpdate',
+        'msfs_enabled': 'enableMSFS',
+        'dcs_enabled': 'enableDCS',
+        'il2_enabled': 'enableIL2',
+        'il2_telem_port': 'portIL2',
+        'il2_cfg_validation': 'validateIL2',
+        'il2_path': 'pathIL2',
+    }
+
+    def_dev_dict, def_sys_dict = utils.get_default_sys_settings(args.device, args.type)
+
     sys_dict = utils.sanitize_dict(sys_dict)
-    for key, value in sys_dict.items():
-        reg_key = map_dict.get(key, None)
-        if reg_key is None:
-            logging.error(f"System Setting conversion error: '{key}' is not a valid setting!")
-            continue
-        utils.set_reg(reg_key, value)
-    pass
+    for key, value in sys_dict.items():  # iterate through the values in the ini user config
+        if key in map_dev_dict:  # check if the key is in the new device specific settings
+            new_key = map_dev_dict.get(key, None)  # get the translated key name from the map dictionary
+            if new_key is None:  # should never be none since we already checked it existed.. but just in case..
+                continue
+            def_dev_dict[new_key] = value  # write the old value to the new dictionary with the new key
+
+        elif key in map_sys_dict:  # elif check if the key is in the new system global settings
+            new_key = map_sys_dict.get(key, None)  # get the translated key name from the map dictionary
+            if new_key is None:  # should never be none since we already checked it existed.. but just in case..
+                continue
+            def_sys_dict[new_key] = value  # write the old value to the new dictionary with the new key
+
+    # now format and write the new reg keys
+    formatted_dev_dict = json.dumps(def_dev_dict)
+    formatted_sys_dict = json.dumps(def_sys_dict)
+    utils.set_reg('Sys', formatted_sys_dict)
+    utils.set_reg(f'{args.type}Sys', formatted_dev_dict)
+    # sys_out = {}
+    # for key, value in sys_dict.items():
+    #     reg_key = map_dict.get(key, None)
+    #     if reg_key is None:
+    #         logging.error(f"System Setting conversion error: '{key}' is not a valid setting!")
+    #         continue
+    #     sys_out[key] = value
+    # out_val = json.dumps(sys_out)
+    # utils.set_reg('Sys', out_val)
+    # pass
 
 def convert_settings(cfg=configfile, usr=overridefile, window=None):
     differences = []
@@ -3422,6 +3460,7 @@ def convert_settings(cfg=configfile, usr=overridefile, window=None):
             # Compare common keys with different values
             for key, value in usr_params[section].items():
                 if key in def_params[section] and def_params[section][key] != value:
+                    value = 0 if value == 'not_configured' else value
                     valuestring = str(value)
                     dif_item = config_to_dict(section, key, valuestring)
                     differences.append(dif_item)
@@ -3429,16 +3468,18 @@ def convert_settings(cfg=configfile, usr=overridefile, window=None):
             # Identify keys that exist only in the user configuration
             for key, value in usr_params[section].items():
                 if key not in def_params[section]:
+                    value = 0 if value == 'not_configured' else value
                     valuestring = str(value)
                     dif_item = config_to_dict(section, key, valuestring)
                     differences.append(dif_item)
                     differences.append(dif_item)
         else:
             # All keys in the user configuration section are new
-            # non matching sectios must be new aircraft
+            # non matching sections must be new aircraft
 
             sim = select_sim_for_conversion(window, section)
             for key, value in usr_params[section].items():
+                value = 0 if value == 'not_configured' else value
                 valuestring = str(value)
                 if key == "type":
                     dev = "any"
@@ -3449,32 +3490,6 @@ def convert_settings(cfg=configfile, usr=overridefile, window=None):
 
     xmlutils.write_converted_to_xml(differences)
 
-def convert_settings_old(cfg=configfile, usr=overridefile):
-    differences = []
-    defaultconfig = load_legacy_config(cfg)
-    userconfig = load_legacy_config(usr, raise_errors=False)
-    def_sections = defaultconfig.sections
-    usr_sections = userconfig.sections
-
-    for section,dconf in defaultconfig.items():
-        #print (f"reading {section}")
-
-        def_params = utils.sanitize_dict(defaultconfig[section])
-        if section in usr_sections:
-
-            usr_params = utils.sanitize_dict(userconfig[section])
-            for ditem in def_params:
-                #print (f"{section} - {ditem} = {def_params[ditem]}" )
-                for uitem in usr_params:
-                    if ditem == uitem:
-                        if def_params[ditem] != usr_params[uitem]:
-                            #print(f"{section} - {uitem} = {usr_params[uitem]}")
-                            valuestring = str(usr_params[uitem])
-                            dif_item = config_to_dict(section,uitem,valuestring)
-                            differences.append(dif_item)
-    xmlutils.write_converted_to_xml(differences)
-    logging.info(f'\n\nConverted {usr} for {args.type} to XML.\nYou can now remove the -o argument to use the new Settings Manager\n')
-
 
 def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
     test = False
@@ -3484,7 +3499,13 @@ def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
             return
         # perform the conversion
         convert_settings(cfg=cfg, usr=usr, window=main_window)
-        if not test: os.rename(usr,f"{usr}.legacy")
+        try:
+            os.rename(usr,f"{usr}.legacy")
+        except OSError:
+            ans = QMessageBox.warning(main_window, 'Warning', f'The legacy backup file for "{usr}" already exists, would you like to replace it?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if ans == QMessageBox.Yes:
+                os.replace(usr, f"{usr}.legacy")
+
         QMessageBox.information(main_window, "Conversion Completed", "The conversion is complete.  You may now continue to use TelemFFB.\n\nTo avoid unnecessary log messages, please remove any '-c' or '-o' arguments from your startup shortcut as they are no longer supported")
 
 
@@ -3492,7 +3513,7 @@ def init_sims():
     global dcs_telem, il2_telem, sim_connect_telem, telem_manager
     dcs_telem = NetworkThread(telem_manager, host="", port=34380)
     # dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
-    dcs_enabled = utils.read_system_settings(args.type).get('enableDCS', False)
+    dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS', False)
     if dcs_enabled or args.sim == "DCS":
         # check and install/update export lua script
         utils.install_export_lua()
@@ -3501,15 +3522,15 @@ def init_sims():
 
     il2_mgr = IL2Manager()
     # il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
-    il2_port = int(utils.read_system_settings(args.type).get('portIL2', 34385))
+    il2_port = int(utils.read_system_settings(args.device, args.type).get('portIL2', 34385))
     # il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
-    il2_path = utils.read_system_settings(args.type).get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    il2_path = utils.read_system_settings(args.device, args.type).get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
     # il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
-    il2_validate = utils.read_system_settings(args.type).get('validateIL2', True)
+    il2_validate = utils.read_system_settings(args.device, args.type).get('validateIL2', True)
     il2_telem = NetworkThread(telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
 
     # il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
-    il2_enabled = utils.read_system_settings(args.type).get('enableIL2', False)
+    il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2', False)
 
     if il2_enabled or args.sim == "IL2":
 
@@ -3524,7 +3545,7 @@ def init_sims():
     sim_connect_telem = SimConnectSock(telem_manager)
     try:
         # msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
-        msfs = utils.read_system_settings(args.type).get('enableMSFS', False)
+        msfs = utils.read_system_settings(args.device, args.type).get('enableMSFS', False)
         logging.debug(f"MSFS={msfs}")
         if msfs or args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")
@@ -3620,7 +3641,7 @@ def main():
 
     # config = get_config()
     # ll = config["system"].get("logging_level", "INFO")
-    ll = utils.read_system_settings(args.type).get('logLevel', 'INFO')
+    ll = utils.read_system_settings(args.device, args.type).get('logLevel', 'INFO')
     log_levels = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
