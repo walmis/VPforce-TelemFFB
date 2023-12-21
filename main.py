@@ -1638,7 +1638,8 @@ class MainWindow(QMainWindow):
         self.logo_stack.setStyleSheet("QGroupBox { border: none; }")
         # Align self.image_label2 with the upper left corner of self.image_label
         self.devicetype_label.move(self.vpflogo_label.pos())
-
+        if not args.child:
+            self.devicetype_label.hide()
         # Add the image labels to the layout
         logo_status_layout.addWidget(self.logo_stack, alignment=Qt.AlignVCenter | Qt.AlignLeft)
 
@@ -1975,6 +1976,12 @@ class MainWindow(QMainWindow):
         self.load_main_window_geometry()
         self.last_height = self.height()
         self.last_width = self.width()
+
+
+    def show_device_logo(self):
+        self.devicetype_label.show()
+
+
     def enable_device_logo_click(self, state):
         self.devicetype_label.setClickable(state)
         self.devicetype_label.setStyleSheet(
@@ -3537,6 +3544,7 @@ def launch_children(window):
     global _launched_joystick, _launched_pedals, _launched_collective
     if not system_settings.get('autolaunchMaster', False) or args.child:
         return
+    window.show_device_logo()
     window.enable_device_logo_click(True)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     current_title = window.windowTitle()
