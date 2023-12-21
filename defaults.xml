@@ -5325,7 +5325,7 @@
 	<classdefaults>
 		<name>afterburner_effect_enabled</name>
 		<type>JetAircraft</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
