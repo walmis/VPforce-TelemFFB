@@ -116,9 +116,10 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>8</order>
+		<order>9.2</order>
 		<name>cyclic_spring_gain</name>
 		<info>Strength of cyclic spring</info>
+		<prereq>force_trim_enabled</prereq>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<displayname>Cyclic Spring Gain</displayname>
@@ -137,7 +138,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.2</order>
+		<order>9.3</order>
 		<name>force_trim_button</name>
 		<info>Button # to hold to release spring while moving axis</info>
 		<prereq>force_trim_enabled</prereq>
@@ -149,7 +150,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.3</order>
+		<order>9.4</order>
 		<name>force_trim_reset_button</name>
 		<info>Button # to recenter spring trims</info>
 		<prereq>force_trim_enabled</prereq>
@@ -488,7 +489,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<Element1>telemffb_controls_axes</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -502,7 +502,6 @@
 		<displayname>X Axis Scale</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.joystick_x_axis_scale</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -516,7 +515,6 @@
 		<displayname>Y Axis Scale</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.joystick_y_axis_scale</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -530,7 +528,6 @@
 		<displayname>Rudder (X) Axis Scale</displayname>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.rudder_x_axis_scale</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -544,7 +541,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<Element1>telemffb_controls_axes.use_legacy_bindings</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -559,7 +555,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<Element1>telemffb_controls_axes.hands_on_deadzone</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -574,7 +569,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<Element1>telemffb_controls_axes.hands_off_deadzone</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -588,7 +582,6 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.trim_following</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -602,7 +595,6 @@
 		<displayname>X Trim Gain Physical</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.joystick_trim_follow_gain_physical_x</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -615,7 +607,6 @@
 		<displayname>X Trim Gain Virtual</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.joystick_trim_follow_gain_virtual_x</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -629,7 +620,6 @@
 		<displayname>Y Trim Gain Physical</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.joystick_trim_follow_gain_physical_y</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -643,7 +633,6 @@
 		<displayname>Y Trim Gain Virtual</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_physical_x</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -657,7 +646,6 @@
 		<displayname>Rudder Trim Gain (physical)</displayname>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_physical_x</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -670,7 +658,6 @@
 		<displayname>Rudder Trim Gain (virtual)</displayname>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.trim_following.rudder_trim_follow_gain_virtual_x</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -684,7 +671,6 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<Element1>telemffb_controls_axes.trim_following.ap_following</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -697,7 +683,6 @@
 		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>telemffb_controls_axes.trim_following.ap_following.invert_ap_x_axis</Element1>
 	</defaults>
 	<defaults><Grouping>G Force</Grouping><order>100</order><name>gforce_effect_enable</name><value>true</value><datatype>bool</datatype><displayname>G Force Effect</displayname><IL2>true</IL2><joystick>true</joystick></defaults>
 	<defaults>
@@ -1186,7 +1171,6 @@
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>aoa_effect_enabled</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
@@ -1200,7 +1184,6 @@
 		<displayname>AoA Effect Gain</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>aoa_effect_enabled.aoa_effect_gain</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
@@ -1214,7 +1197,6 @@
 		<datatype>float</datatype>
 		<displayname>AoA Effect Max Force</displayname>
 		<DCS>true</DCS>
-		<Element1>aoa_effect_enabled.max_aoa_cf_force</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>AoA Reduction</Grouping>
@@ -1227,7 +1209,6 @@
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>aoa_reduction_effect_enabled</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>AoA Reduction</Grouping>
@@ -1242,7 +1223,6 @@
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>aoa_reduction_effect_enabled.aoa_reduction_max_force</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>AoA Reduction</Grouping>
@@ -1257,7 +1237,6 @@
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>aoa_reduction_effect_enabled.critical_aoa_max</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>AoA Reduction</Grouping>
@@ -1272,7 +1251,6 @@
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<Element1>aoa_reduction_effect_enabled.critical_aoa_start</Element1>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
@@ -5713,6 +5691,20 @@
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
+		<name>cyclic_spring_gain</name>
+		<type>Helicopter</type>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>cyclic_spring_gain</name>
+		<type>HPGHelicopter</type>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
 		<name>elevator_droop_moment</name>
 		<type>GliderAircraft</type>
 		<value>0.1</value>
@@ -7048,7 +7040,7 @@
 	<classdefaults>
 		<name>aircraft_is_fbw</name>
 		<type>AllSettings</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
