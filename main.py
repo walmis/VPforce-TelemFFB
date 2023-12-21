@@ -1686,19 +1686,19 @@ class MainWindow(QMainWindow):
 
 
         cur_ac_lbl = QLabel()
-        cur_ac_lbl.setText("Current Aircraft:")
-        cur_ac_lbl.setAlignment(Qt.AlignHCenter)
-        cur_ac_lbl.setStyleSheet("""padding: 0.2px""")
+        cur_ac_lbl.setText("<b>Current Aircraft:</b>")
+        cur_ac_lbl.setAlignment(Qt.AlignLeft)
+        cur_ac_lbl.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; }")
 
         self.cur_craft = QLabel()
         self.cur_craft.setText('Unknown')
-        self.cur_craft.setStyleSheet("""padding: 0.2px""")
-        self.cur_craft.setAlignment(Qt.AlignHCenter)
+        self.cur_craft.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; }")
+        self.cur_craft.setAlignment(Qt.AlignLeft)
 
         self.cur_pattern = QLabel()
         self.cur_pattern.setText('(No Match)')
-        self.cur_pattern.setStyleSheet("""padding: 0.2px""")
-        self.cur_pattern.setAlignment(Qt.AlignHCenter)
+        self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; }")
+        self.cur_pattern.setAlignment(Qt.AlignLeft)
 
         rh_status_layout.addWidget(cur_ac_lbl)
         rh_status_layout.addWidget(self.cur_craft)
@@ -2428,7 +2428,7 @@ class MainWindow(QMainWindow):
                 self.new_craft_button.hide()
 
             self.cur_craft.setText(data['N'])
-            self.cur_pattern.setText(f"(Matched: {shown_pattern})")
+            self.cur_pattern.setText(f'Matched: <span style="font-family: Consolas, monospace;font-size: 14px">"{shown_pattern}"</span> ')
 
             if window_mode == 0:
                 self.lbl_telem_data.setText(items)
