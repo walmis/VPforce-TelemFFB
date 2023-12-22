@@ -1181,6 +1181,13 @@ class Helicopter(Aircraft):
                         send_event_to_msfs("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
                         send_event_to_msfs("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
 
+            if self.anything_has_changed("cyclic_gain", self.cyclic_spring_gain):  # check if spring gain setting has been modified in real time
+                self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+
+                self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+
             self.spring_x.cpOffset = int(self.cpO_x) + self.cyclic_physical_trim_x_offs
             self.spring_y.cpOffset = int(self.cpO_y) + self.cyclic_physical_trim_y_offs
             self.spring.effect.setCondition(self.spring_x)
