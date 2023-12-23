@@ -43,8 +43,9 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLay
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
     QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget, QGroupBox
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
-    QThread
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QIntValidator, QCursor
+    QThread, QMutex
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QIntValidator, QCursor, \
+    QTextCursor
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
@@ -1807,14 +1808,12 @@ class MainWindow(QMainWindow):
 
         self.tab_widget = QTabWidget(self)
         self.tab_widget.setTabShape(QTabWidget.Triangular)  # Set triangular tab shape
-        self.tab_widget.addTab(QWidget(), "Monitor")
-        self.tab_widget.addTab(QWidget(), "Settings")
-        self.tab_widget.addTab(QWidget(), "Hide")
+        # self.tab_widget.addTab(QWidget(), "Log")
         self.tab_widget.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        self.tab_widget.currentChanged.connect(self.switch_window_view)
+        self.tab_widget.currentChanged.connect(lambda index : self.switch_window_view(index))
 
         # Set the main window area height to 0
-        self.tab_widget.setFixedHeight(14)
+        self.tab_widget.setMinimumHeight(14)
         style_sheet = """
                     QTabBar::tab:selected {
                         background-color: #ab37c8;
@@ -1889,7 +1888,9 @@ class MainWindow(QMainWindow):
 
         self.monitor_widget.setLayout(monitor_area_layout)
         # Add the scroll area to the layout
-        layout.addWidget(self.monitor_widget)
+        self.tab_widget.addTab(self.monitor_widget, "Monitor")
+
+        # layout.addWidget(self.monitor_widget)
 
         # Create a scrollable area
         self.settings_area = NoKeyScrollArea()
@@ -1901,24 +1902,44 @@ class MainWindow(QMainWindow):
 
         # Create a widget to hold the layout
         scroll_widget = QWidget()
-        # self.settings_layout = settings_layout
-        # settings_layout = SettingsLayout()
+
         all_sliders = []
         scroll_widget.setLayout(self.settings_layout)
 
-        # Add the grid layout to the main layout
         self.settings_area.setWidget(scroll_widget)
 
-        # Set the widget as the content of the scroll area
-        layout.addWidget(self.settings_area)
-        self.settings_area.hide()
+        self.tab_widget.addTab(self.settings_area, "Settings")
 
-        #### send sliders to keypress
-        # for i in range(self.settings_layout.all_sliders.count()):
-        #     item = self.settings_area.all_sliders.itemAt(i)
-        #     if isinstance(item.widget(), NoWheelSlider):
-        #         self.settings_area.all_sliders.addSlider(item.widget())
 
+        self.log_tab_widget = QWidget(self.tab_widget)
+        self.tab_widget.addTab(self.log_tab_widget, "Log")
+
+        self.log_widget = QPlainTextEdit(self.log_tab_widget)
+        self.log_widget.setReadOnly(True)
+        self.log_widget.setFont(QFont("Courier New"))
+        self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.log_tail_thread = LogTailer(log_file)
+        self.log_tail_thread.log_updated.connect(self.update_log_widget)
+        self.log_tail_thread.start()
+
+        self.clear_button = QPushButton("Clear", self.log_tab_widget)
+        self.toggle_button = QPushButton("Pause", self.log_tab_widget)
+
+        self.clear_button.clicked.connect(self.clear_log_widget)
+        self.toggle_button.clicked.connect(self.toggle_log_tailing)
+
+        self.tab_widget.addTab(QWidget(), "Hide")
+
+        log_layout = QVBoxLayout(self.log_tab_widget)
+        log_layout.addWidget(self.log_widget)
+
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.clear_button)
+        button_layout.addWidget(self.toggle_button)
+        button_layout.setAlignment(Qt.AlignLeft)
+        log_layout.addLayout(button_layout)
+
+        self.log_tab_widget.setLayout(log_layout)
         ##############
         #  buttons
 
@@ -1980,6 +2001,23 @@ class MainWindow(QMainWindow):
         self.last_height = self.height()
         self.last_width = self.width()
 
+    def update_log_widget(self, log_line):
+        cursor = self.log_widget.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(log_line)
+        self.log_widget.setTextCursor(cursor)
+        self.log_widget.ensureCursorVisible()
+
+    def clear_log_widget(self):
+        self.log_widget.clear()
+
+    def toggle_log_tailing(self):
+        if self.log_tail_thread.is_paused():
+            self.log_tail_thread.resume()
+            self.toggle_button.setText("Pause")
+        else:
+            self.log_tail_thread.pause()
+            self.toggle_button.setText("Resume")
 
     def show_device_logo(self):
         self.devicetype_label.show()
@@ -2346,24 +2384,12 @@ class MainWindow(QMainWindow):
 
     def switch_window_view(self, index):
 
-        if index == 0:
-            if not self.hidden_active:
-                self.last_height = self.height()
-                self.last_width = self.width()
-            self.hidden_active = False
-            self.monitor_widget.show()
-            self.line_widget.show()
-            self.settings_area.hide()
-            self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-            self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        if index == 0:  # Monitor Tab
+            try:
+                self.resize(self.last_width, self.last_height)
+            except: pass
 
-            self.resize(self.last_width, self.last_height)
-        elif index == 1:
-            if not self.hidden_active:
-                self.last_height = self.height()
-                self.last_width = self.width()
-            self.hidden_active = False
-            self.monitor_widget.hide()
+        elif index == 1:  # Settings Tab
             modifiers = QApplication.keyboardModifiers()
             if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier):
                 self.cb_joystick.setVisible(True)
@@ -2377,17 +2403,23 @@ class MainWindow(QMainWindow):
                     case 'collective':
                         self.cb_collective.setChecked(True)
 
-            self.settings_area.show()
-            self.line_widget.hide()
-            self.resize(self.last_width, self.last_height)
+            try:
+                self.resize(self.last_width, self.last_height)
+            except:
+                pass
 
-        elif index == 2:
-            self.hidden_active = True
+        elif index == 2:  # Log Tab
+            try:
+                self.resize(self.last_width, self.last_height)
+            except: pass
+
+        elif index == 3:  # Hide Tab
+            # self.hidden_active = True
             self.last_height = self.height()
             self.last_width = self.width()
-            self.monitor_widget.hide()
-            self.settings_area.hide()
-            self.line_widget.show()
+            # self.monitor_widget.hide()
+            # self.settings_area.hide()
+            # self.line_widget.show()
             self.resize(0,0)
         # if button == self.telem_monitor_radio:
         #
@@ -3313,6 +3345,58 @@ class ClickLogo(QLabel):
     def leaveEvent(self, event):
         self.setCursor(Qt.ArrowCursor)
         super().leaveEvent(event)
+
+
+class LogTailer(QThread):
+    log_updated = pyqtSignal(str)
+
+    def __init__(self, log_file_path, parent=None):
+        super(LogTailer, self).__init__(parent)
+        self.log_file_path = log_file_path
+        self.pause_mutex = QMutex()
+        self.paused = False
+
+    def run(self):
+        with open(self.log_file_path, 'r') as log_file:
+            while True:
+                self.pause_mutex.lock()
+                while self.paused:
+                    self.pause_mutex.unlock()
+                    time.sleep(0.1)
+                    self.pause_mutex.lock()
+
+                where = log_file.tell()
+                line = log_file.readline()
+                if not line:
+                    time.sleep(0.1)
+                    log_file.seek(where)
+                else:
+                    self.log_updated.emit(line)
+
+                self.pause_mutex.unlock()
+
+    def pause(self):
+        self.pause_mutex.lock()
+        self.paused = True
+        self.pause_mutex.unlock()
+
+    def resume(self):
+        self.pause_mutex.lock()
+        self.paused = False
+        self.pause_mutex.unlock()
+
+    def is_paused(self):
+        return self.paused
+
+
+def send_test_message():
+    global ipc_running, ipc_thread, _child_ipc_ports, _master_instance
+    if ipc_running:
+        if _master_instance:
+            ipc_thread.send_broadcast_message("TEST MESSAGE TO ALL")
+        else:
+            ipc_thread.send_message("TEST MESSAGE")
+
 
 
 
