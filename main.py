@@ -67,6 +67,8 @@ parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSF
 parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default=None)
 parser.add_argument('--headless', action='store_true', help='Run in headless mode')
 parser.add_argument('--child', action='store_true', help='Is a child instance')
+parser.add_argument('--masterport', type=str, help='master instance IPC port', default=None)
+
 parser.add_argument('--minimize', action='store_true', help='Minimize on startup')
 
 args = parser.parse_args()
@@ -79,6 +81,8 @@ config_was_default = False
 _launched_joystick = False
 _launched_pedals = False
 _launched_collective = False
+_child_ipc_ports = []
+_master_instance = False
 
 system_settings = utils.read_system_settings(args.device, args.type)
 
@@ -677,6 +681,94 @@ class TelemManager(QObject, threading.Thread):
                     self._data = None
                     self.process_data(data)
 
+class IPCNetworkThread(QThread):
+    message_received = pyqtSignal(str)
+    exit_signal = pyqtSignal(str)
+
+    def __init__(self, host="localhost", myport=0, dstport=0, child_ports = [], master=False, child=False, keepalive_timer=1,
+                 missed_keepalive=3):
+        super().__init__()
+        self._run = True
+        self._myport = int(myport)
+        self._dstport = int(dstport)
+        self._host = host
+        self._master = master
+        self._child = child
+        self._child_ports = child_ports
+        self._keepalive_timer = keepalive_timer
+        self._missed_keepalive = missed_keepalive
+        self._last_keepalive_timestamp = time.time()
+
+        # Initialize socket
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+        self._socket.settimeout(0.1)
+        logging.info(f"Setting up IPC socket at {self._host}:{self._myport}")
+        self._socket.bind((self._host, self._myport))
+
+    def send_message(self, message):
+        encoded_data = message.encode("utf-8")
+        self._socket.sendto(encoded_data, (self._host, self._dstport))
+
+    def send_broadcast_message(self, message):
+        for port in self._child_ports:
+            encoded_data = message.encode("utf-8")
+            self._socket.sendto(encoded_data, (self._host, int(port)))
+
+    def send_keepalive(self):
+        while self._run and self._master:
+            self.send_broadcast_message("Keepalive")
+            logging.info("SENT KEEPALIVES")
+            time.sleep(self._keepalive_timer)
+
+    def receive_messages(self):
+        while self._run:
+            try:
+                data, addr = self._socket.recvfrom(4096)
+
+                msg = data.decode("utf-8")
+                if msg == 'Keepalive':
+                    if self._child:
+                        logging.info("GOT KEEPALIVE")
+                        self._last_keepalive_timestamp = time.time()
+                else:
+                    logging.info(f"GOT GENERIC MESSAGE: {msg}")
+                    self.message_received.emit(msg)
+            except OSError:
+                continue
+            except ConnectionResetError:
+                continue
+            except socket.timeout:
+                continue
+
+    def check_missed_keepalives(self):
+        while self._run and self._child:
+            time.sleep(self._keepalive_timer)
+            elapsed_time = time.time() - self._last_keepalive_timestamp
+            if elapsed_time > (self._keepalive_timer * self._missed_keepalive):
+                logging.error("KEEPALIVE TIMEOUT... exiting in 3 seconds")
+                time.sleep(3)
+                # QCoreApplication.instance().quit()
+                self.exit_signal.emit("Missed too many keepalives. Exiting.")
+                break
+
+    def run(self):
+        self.receive_thread = threading.Thread(target=self.receive_messages)
+        self.receive_thread.start()
+
+        if self._master:
+            self._send_ka_thread = threading.Thread(target=self.send_keepalive)
+            self._send_ka_thread.start()
+
+        if self._child:
+            self._check_ka_thread = threading.Thread(target=self.check_missed_keepalives)
+            self._check_ka_thread.start()
+
+    def stop(self):
+        logging.info("IPC Thread stopping")
+        self._run = False
+        self._socket.close()
+
 class NetworkThread(threading.Thread):
     def __init__(self, telemetry : TelemManager, host = "", port = 34380, telem_parser = None):
         super().__init__()
@@ -707,7 +799,9 @@ class NetworkThread(threading.Thread):
                 continue
 
     def quit(self):
+        logging.info("NetworkThread stopping")
         self._run = False
+
 
 class SimConnectSock(SimConnectManager):
     def __init__(self, telem : TelemManager):
@@ -1993,6 +2087,11 @@ class MainWindow(QMainWindow):
 
         version_row_layout.setAlignment(Qt.AlignBottom)
         layout.addLayout(version_row_layout)
+
+        self.test_button = QPushButton("SEND TEST MESSAGE")
+        self.test_button.clicked.connect(lambda: send_test_message())
+
+        layout.addWidget(self.test_button)
 
         central_widget.setLayout(layout)
 
@@ -3645,46 +3744,51 @@ def stop_sims():
     sim_connect_telem.quit()
 
 
-def launch_children(window):
-    global _launched_joystick, _launched_pedals, _launched_collective
+def launch_children():
+    global _launched_joystick, _launched_pedals, _launched_collective, _child_ipc_ports, script_dir, _device_pid, _master_instance
     if not system_settings.get('autolaunchMaster', False) or args.child:
-        return
-    window.show_device_logo()
-    window.enable_device_logo_click(True)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    current_title = window.windowTitle()
-    new_title = f"** MASTER INSTANCE ** {current_title}"
-    window.setWindowTitle(new_title)
+        return False
+
     if getattr(sys, 'frozen', False):
         app = ['VPForce-TelemFFB.exe']
     else:
         app = ['python', 'main.py']
 
+    master_port = f"6{_device_pid}"
+    _master_instance = True
     # full_path = os.path.join(script_dir, app)
     try:
         if system_settings.get('autolaunchJoystick', False) and _device_type != 'joystick':
             min = ['--minimize'] if system_settings.get('startMinJoystick', False) else []
-            vidpid = f"FFFF:{system_settings.get('pidJoystick', '2055')}"
-            command = app + ['-D', vidpid, '-t', 'joystick', '--child'] + min
+            pid = system_settings.get('pidJoystick', '2055')
+            vidpid = f"FFFF:{pid}"
+            command = app + ['-D', vidpid, '-t', 'joystick', '--child', '--masterport', master_port] + min
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
             _launched_joystick = True
+            _child_ipc_ports.append(int(f"6{pid}"))
         if system_settings.get('autolaunchPedals', False) and _device_type != 'pedals':
             min = ['--minimize'] if system_settings.get('startMinPedals', False) else []
-            vidpid = f"FFFF:{system_settings.get('pidPedals', '2055')}"
-            command = app + ['-D', vidpid, '-t', 'pedals', '--child'] + min
+            pid = system_settings.get('pidPedals', '2055')
+            vidpid = f"FFFF:{pid}"
+            command = app + ['-D', vidpid, '-t', 'pedals', '--child', '--masterport', master_port] + min
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
             _launched_pedals = True
+            _child_ipc_ports.append(int(f"6{pid}"))
         if system_settings.get('autolaunchCollective', False) and _device_type != 'collective':
             min = ['--minimize'] if system_settings.get('startMinCollective', False) else []
-            vidpid = f"FFFF:{system_settings.get('pidCollective', '2055')}"
-            command = app + ['-D', vidpid, '-t', 'collective', '--child'] + min
+            pid = system_settings.get('pidCollective', '2055')
+            vidpid = f"FFFF:{pid}"
+            command = app + ['-D', vidpid, '-t', 'collective', '--child', '--masterport', master_port] + min
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
             _launched_collective = True
+            _child_ipc_ports.append(int(f"6{pid}"))
     except Exception as e:
         logging.error(f"Error during Auto-Launch sequence: {e}")
+    return True
+
 
 def main():
     app = QApplication(sys.argv)
@@ -3736,6 +3840,21 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
+    global ipc_running, ipc_thread, is_master, _child_ipc_ports
+    ipc_running = False
+    is_master = launch_children()
+    if is_master:
+        myport = int(f"6{_device_pid}")
+        ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=_child_ipc_ports)
+        ipc_thread.start()
+        ipc_running = True
+    elif args.child:
+        myport = int(f"6{_device_pid}")
+        ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=args.masterport)
+        ipc_thread.exit_signal.connect(lambda: window.exit_application())
+        ipc_thread.start()
+        ipc_running = True
+
     window = MainWindow(settings_manager=settings_mgr)
 
     # if not headless_mode:
@@ -3757,11 +3876,20 @@ def main():
 
     init_sims()
 
-    launch_children(window)
+    if is_master:
+        window.show_device_logo()
+        window.enable_device_logo_click(True)
+        current_title = window.windowTitle()
+        new_title = f"** MASTER INSTANCE ** {current_title}"
+        window.setWindowTitle(new_title)
+
     if config_was_default:
         window.open_system_settings_dialog()
 
+
     app.exec_()
+    if ipc_running:
+        ipc_thread.stop()
     stop_sims()
     telem_manager.quit()
 
