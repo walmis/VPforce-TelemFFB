@@ -83,6 +83,7 @@ _launched_pedals = False
 _launched_collective = False
 _child_ipc_ports = []
 _master_instance = False
+_ipc_running = False
 
 system_settings = utils.read_system_settings(args.device, args.type)
 
@@ -143,6 +144,7 @@ effects_translator = utils.EffectTranslator()
 version = utils.get_version()
 min_firmware_version = 'v1.0.15'
 global dev_firmware_version, dev_serial, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
+global window, log_window
 
 _update_available = False
 _latest_version = None
@@ -718,7 +720,8 @@ class IPCNetworkThread(QThread):
     def send_keepalive(self):
         while self._run and self._master:
             self.send_broadcast_message("Keepalive")
-            logging.info("SENT KEEPALIVES")
+            ts = time.time()
+            logging.debug(f"SENT KEEPALIVES: {ts}")
             time.sleep(self._keepalive_timer)
 
     def receive_messages(self):
@@ -729,8 +732,13 @@ class IPCNetworkThread(QThread):
                 msg = data.decode("utf-8")
                 if msg == 'Keepalive':
                     if self._child:
-                        logging.info("GOT KEEPALIVE")
-                        self._last_keepalive_timestamp = time.time()
+                        ts = time.time()
+                        logging.debug(f"GOT KEEPALIVE: {ts}")
+                        self._last_keepalive_timestamp = ts
+                elif msg == 'MASTER INSTANCE QUIT':
+                    logging.info("Received QUIT signal from master instance.  Running exit/cleanup function.")
+                    self.exit_signal.emit("Received QUIT signal from master instance.  Running exit/cleanup function.")
+
                 else:
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")
                     self.message_received.emit(msg)
@@ -746,8 +754,8 @@ class IPCNetworkThread(QThread):
             time.sleep(self._keepalive_timer)
             elapsed_time = time.time() - self._last_keepalive_timestamp
             if elapsed_time > (self._keepalive_timer * self._missed_keepalive):
-                logging.error("KEEPALIVE TIMEOUT... exiting in 3 seconds")
-                time.sleep(3)
+                logging.error("KEEPALIVE TIMEOUT... exiting in 2 seconds")
+                time.sleep(2)
                 # QCoreApplication.instance().quit()
                 self.exit_signal.emit("Missed too many keepalives. Exiting.")
                 break
@@ -1450,9 +1458,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 val_entry = self.tb_pid_p.text()
             case 3:
                 val_entry = self.tb_pid_c.text()
+        if self.cb_al_enable.isChecked() and not (self.cb_al_enable_j.isChecked() or self.cb_al_enable_p.isChecked() or self.cb_al_enable_c.isChecked()):
+            QMessageBox.warning(self, "Config Error", "Auto Launching is enabled but no devices are configured for auto launch.  Please enable a device or disable auto launching")
+            return False
         if val_entry == '':
             QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the selected Master Instance')
             return False
+
 
         return True
 
@@ -1713,10 +1725,6 @@ class MainWindow(QMainWindow):
         settings_manager_action.triggered.connect(self.toggle_settings_window)
         system_menu.addAction(settings_manager_action)
 
-        log_window_action = QAction('Show/Hide Log Window', self)
-        log_window_action.triggered.connect(self.toggle_log_window)
-        system_menu.addAction(log_window_action)
-
         cfg_log_folder_action = QAction('Open Config/Log Directory',self)
         cfg_log_folder_action.triggered.connect(self.open_cfg_dir)
         system_menu.addAction(cfg_log_folder_action)
@@ -1727,7 +1735,7 @@ class MainWindow(QMainWindow):
 
         # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
         exit_app_action = QAction('Quit TelemFFB', self)
-        exit_app_action.triggered.connect(self.exit_application)
+        exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
 
 
@@ -2141,9 +2149,11 @@ class MainWindow(QMainWindow):
 
         self.clear_button = QPushButton("Clear", self.log_tab_widget)
         self.toggle_button = QPushButton("Pause", self.log_tab_widget)
+        self.open_log_button = QPushButton("Open in Window", self.log_tab_widget)
 
         self.clear_button.clicked.connect(self.clear_log_widget)
         self.toggle_button.clicked.connect(self.toggle_log_tailing)
+        self.open_log_button.clicked.connect(self.toggle_log_window)
 
         self.tab_widget.addTab(QWidget(), "Hide")
 
@@ -2153,7 +2163,8 @@ class MainWindow(QMainWindow):
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.clear_button)
         button_layout.addWidget(self.toggle_button)
-        button_layout.setAlignment(Qt.AlignLeft)
+        button_layout.addStretch()  # Add stretch to push the next button to the right
+        button_layout.addWidget(self.open_log_button)
         log_layout.addLayout(button_layout)
 
         self.log_tab_widget.setLayout(log_layout)
@@ -2335,7 +2346,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         # Perform cleanup before closing the application
-        self.exit_application()
+        exit_application()
 
     def reset_window_size(self):
         match args.type:
@@ -2378,30 +2389,7 @@ class MainWindow(QMainWindow):
         if load_tab:
             self.tab_widget.setCurrentIndex(tab)
 
-    def save_main_window_geometry(self):
-        # Capture the main window's geometry
-        device_type = args.type
-        geometry = self.saveGeometry()
-        geometry_bytes = bytes(geometry)
-        if device_type == 'joystick':
-            reg_key = 'jWindowGeometry'
-            tab_key = 'jTab'
-        elif device_type == 'pedals':
-            reg_key = 'pWindowGeometry'
-            tab_key = 'pTab'
-        elif device_type == 'collective':
-            reg_key = 'cWindowGeometry'
-            tab_key = 'cTab'
-        # Extract position and size
-        # x, y, width, height = geometry.x(), geometry.y(), geometry.width(), geometry.height()
-        # geometry_string = f"{x},{y},{width},{height}"
-        # Store the values in the registry
-        utils.set_reg(tab_key,self.tab_widget.currentIndex())
 
-        # if self.tab_widget.currentIndex() != 2:
-        utils.set_reg(reg_key, geometry_bytes)
-        # else:
-        #     pass
 
     def force_sim_aircraft(self):
         settings_mgr.current_sim = self.test_sim.currentText()
@@ -2509,10 +2497,11 @@ class MainWindow(QMainWindow):
         return pixmap
 
     def toggle_log_window(self):
-        if d.isVisible():
-            d.hide()
+        if log_window.isVisible():
+            log_window.hide()
         else:
-            d.show()
+            log_window.move(self.x(), self.y())
+            log_window.show()
 
     def toggle_settings_window(self):
         modifiers = QApplication.keyboardModifiers()
@@ -2554,10 +2543,7 @@ class MainWindow(QMainWindow):
             # Handle canceled
             pass
 
-    def exit_application(self):
-        # Perform any cleanup or save operations here
-        self.save_main_window_geometry()
-        QCoreApplication.instance().quit()
+
 
     def update_from_menu(self):
         if self.perform_update(auto=False):
@@ -3611,13 +3597,41 @@ class LogTailer(QThread):
         return self.paused
 
 
+def exit_application():
+    global window
+    # Perform any cleanup or save operations here
+    save_main_window_geometry()
+    QCoreApplication.instance().quit()
+
+def save_main_window_geometry():
+    global window
+    # Capture the main window's geometry
+    device_type = args.type
+    geometry = window.saveGeometry()
+    geometry_bytes = bytes(geometry)
+    if device_type == 'joystick':
+        reg_key = 'jWindowGeometry'
+        tab_key = 'jTab'
+    elif device_type == 'pedals':
+        reg_key = 'pWindowGeometry'
+        tab_key = 'pTab'
+    elif device_type == 'collective':
+        reg_key = 'cWindowGeometry'
+        tab_key = 'cTab'
+    # Extract position and size
+    # x, y, width, height = geometry.x(), geometry.y(), geometry.width(), geometry.height()
+    utils.set_reg(tab_key,window.tab_widget.currentIndex())
+    utils.set_reg(reg_key, geometry_bytes)
+
+
+
 def send_test_message():
-    global ipc_running, ipc_thread, _child_ipc_ports, _master_instance
-    if ipc_running:
+    global _ipc_running, _ipc_thread, _child_ipc_ports, _master_instance
+    if _ipc_running:
         if _master_instance:
-            ipc_thread.send_broadcast_message("TEST MESSAGE TO ALL")
+            _ipc_thread.send_broadcast_message("TEST MESSAGE TO ALL")
         else:
-            ipc_thread.send_message("TEST MESSAGE")
+            _ipc_thread.send_message("TEST MESSAGE")
 
 
 
@@ -3866,6 +3880,11 @@ def stop_sims():
     il2_telem.quit()
     sim_connect_telem.quit()
 
+def notify_close_children():
+    global _child_ipc_ports, _ipc_running, _ipc_thread
+    if not len(_child_ipc_ports) or not _ipc_running:
+        return
+    _ipc_thread.send_broadcast_message("MASTER INSTANCE QUIT")
 
 def launch_children():
     global _launched_joystick, _launched_pedals, _launched_collective, _child_ipc_ports, script_dir, _device_pid, _master_instance
@@ -3883,27 +3902,30 @@ def launch_children():
     try:
         if system_settings.get('autolaunchJoystick', False) and _device_type != 'joystick':
             min = ['--minimize'] if system_settings.get('startMinJoystick', False) else []
+            headless = ['--headless'] if system_settings.get('startHeadlessJoystick', False) else []
             pid = system_settings.get('pidJoystick', '2055')
             vidpid = f"FFFF:{pid}"
-            command = app + ['-D', vidpid, '-t', 'joystick', '--child', '--masterport', master_port] + min
+            command = app + ['-D', vidpid, '-t', 'joystick', '--child', '--masterport', master_port] + min + headless
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
             _launched_joystick = True
             _child_ipc_ports.append(int(f"6{pid}"))
         if system_settings.get('autolaunchPedals', False) and _device_type != 'pedals':
             min = ['--minimize'] if system_settings.get('startMinPedals', False) else []
+            headless = ['--headless'] if system_settings.get('startHeadlessPedals', False) else []
             pid = system_settings.get('pidPedals', '2055')
             vidpid = f"FFFF:{pid}"
-            command = app + ['-D', vidpid, '-t', 'pedals', '--child', '--masterport', master_port] + min
+            command = app + ['-D', vidpid, '-t', 'pedals', '--child', '--masterport', master_port] + min + headless
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
             _launched_pedals = True
             _child_ipc_ports.append(int(f"6{pid}"))
         if system_settings.get('autolaunchCollective', False) and _device_type != 'collective':
             min = ['--minimize'] if system_settings.get('startMinCollective', False) else []
+            headless = ['--headless'] if system_settings.get('startHeadlessCollective', False) else []
             pid = system_settings.get('pidCollective', '2055')
             vidpid = f"FFFF:{pid}"
-            command = app + ['-D', vidpid, '-t', 'collective', '--child', '--masterport', master_port] + min
+            command = app + ['-D', vidpid, '-t', 'collective', '--child', '--masterport', master_port] + min + headless
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
             _launched_collective = True
@@ -3916,17 +3938,17 @@ def launch_children():
 def main():
     app = QApplication(sys.argv)
     app.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
-    global d
+    global window, log_window
     global dev_firmware_version
     global dev_serial
-    d = LogWindow()
+    log_window = LogWindow()
     global settings_mgr, telem_manager, config_was_default
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
     settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
     icon_path = os.path.join(script_dir, "image/vpforceicon.png")
     settings_mgr.setWindowIcon(QIcon(icon_path))
-    sys.stdout = utils.OutLog(d.widget, sys.stdout)
-    sys.stderr = utils.OutLog(d.widget, sys.stderr)
+    sys.stdout = utils.OutLog(log_window.widget, sys.stdout)
+    sys.stderr = utils.OutLog(log_window.widget, sys.stderr)
 
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info(f"TelemFFB (version {version}) Starting")
@@ -3963,28 +3985,29 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
-    global ipc_running, ipc_thread, is_master, _child_ipc_ports
-    ipc_running = False
+    global _ipc_running, _ipc_thread, is_master, _child_ipc_ports
+    _ipc_running = False
     is_master = launch_children()
     if is_master:
         myport = int(f"6{_device_pid}")
-        ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=_child_ipc_ports)
-        ipc_thread.start()
-        ipc_running = True
+        _ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=_child_ipc_ports)
+        _ipc_thread.start()
+        _ipc_running = True
     elif args.child:
         myport = int(f"6{_device_pid}")
-        ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=args.masterport)
-        ipc_thread.exit_signal.connect(lambda: window.exit_application())
-        ipc_thread.start()
-        ipc_running = True
+        _ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=args.masterport)
+        _ipc_thread.exit_signal.connect(lambda: window.exit_application())
+        _ipc_thread.start()
+        _ipc_running = True
 
     window = MainWindow(settings_manager=settings_mgr)
 
-    # if not headless_mode:
-    if args.minimize:
-        window.showMinimized()
-    else:
-        window.show()
+    if not headless_mode:
+        if args.minimize:
+            window.showMinimized()
+        else:
+            window.show()
+
     autoconvert_config(window)
     fetch_version_thread = utils.FetchLatestVersionThread()
     fetch_version_thread.version_result_signal.connect(window.update_version_result)
@@ -4011,8 +4034,9 @@ def main():
 
 
     app.exec_()
-    if ipc_running:
-        ipc_thread.stop()
+    if _ipc_running:
+        notify_close_children()
+        _ipc_thread.stop()
     stop_sims()
     telem_manager.quit()
 
