@@ -827,11 +827,12 @@ class SimConnectSock(SimConnectManager):
         args = [str(x) for x in args]
         self._telem.submitFrame(f"Ev={event};" + ";".join(args))
 
+
 class Ui_SystemDialog(object):
     def setupUi(self, SystemDialog):
         if not SystemDialog.objectName():
             SystemDialog.setObjectName(u"SystemDialog")
-        SystemDialog.resize(591, 524)
+        SystemDialog.resize(607, 524)
         sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -841,7 +842,7 @@ class Ui_SystemDialog(object):
         SystemDialog.setMaximumSize(QSize(800, 800))
         self.line = QFrame(SystemDialog)
         self.line.setObjectName(u"line")
-        self.line.setGeometry(QRect(9, 168, 571, 16))
+        self.line.setGeometry(QRect(9, 168, 581, 16))
         font = QFont()
         font.setBold(False)
         font.setWeight(50)
@@ -968,7 +969,7 @@ class Ui_SystemDialog(object):
 
         self.line_2 = QFrame(SystemDialog)
         self.line_2.setObjectName(u"line_2")
-        self.line_2.setGeometry(QRect(10, 361, 571, 16))
+        self.line_2.setGeometry(QRect(10, 361, 581, 16))
         self.line_2.setFont(font)
         self.line_2.setLineWidth(2)
         self.line_2.setMidLineWidth(1)
@@ -1027,7 +1028,7 @@ class Ui_SystemDialog(object):
         self.lab_start_min = QLabel(SystemDialog)
         self.lab_start_min.setObjectName(u"lab_start_min")
         self.lab_start_min.setEnabled(False)
-        self.lab_start_min.setGeometry(QRect(513, 45, 49, 26))
+        self.lab_start_min.setGeometry(QRect(496, 45, 49, 26))
         self.lab_start_min.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
         self.line_3 = QFrame(SystemDialog)
         self.line_3.setObjectName(u"line_3")
@@ -1038,112 +1039,156 @@ class Ui_SystemDialog(object):
         self.line_3.setFrameShadow(QFrame.Sunken)
         self.layoutWidget4 = QWidget(SystemDialog)
         self.layoutWidget4.setObjectName(u"layoutWidget4")
-        self.layoutWidget4.setGeometry(QRect(313, 74, 262, 74))
+        self.layoutWidget4.setGeometry(QRect(313, 74, 284, 74))
         self.gridLayout_2 = QGridLayout(self.layoutWidget4)
         self.gridLayout_2.setObjectName(u"gridLayout_2")
         self.gridLayout_2.setContentsMargins(0, 0, 0, 0)
+        self.cb_min_enable_j = QCheckBox(self.layoutWidget4)
+        self.cb_min_enable_j.setObjectName(u"cb_min_enable_j")
+        self.cb_min_enable_j.setEnabled(False)
+        self.cb_min_enable_j.setMaximumSize(QSize(15, 16777215))
+        self.cb_min_enable_j.setCheckable(True)
+
+        self.gridLayout_2.addWidget(self.cb_min_enable_j, 0, 5, 1, 1)
+
+        self.horizontalSpacer_2 = QSpacerItem(22, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_2, 0, 2, 1, 1)
+
+        self.horizontalSpacer_5 = QSpacerItem(34, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_5, 2, 4, 1, 1)
+
         self.cb_al_enable_j = QCheckBox(self.layoutWidget4)
         self.cb_al_enable_j.setObjectName(u"cb_al_enable_j")
         self.cb_al_enable_j.setEnabled(False)
+        self.cb_al_enable_j.setMaximumSize(QSize(15, 16777215))
 
         self.gridLayout_2.addWidget(self.cb_al_enable_j, 0, 3, 1, 1)
 
-        self.horizontalSpacer_3 = QSpacerItem(40, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.cb_min_enable_p = QCheckBox(self.layoutWidget4)
+        self.cb_min_enable_p.setObjectName(u"cb_min_enable_p")
+        self.cb_min_enable_p.setEnabled(False)
+        self.cb_min_enable_p.setMaximumSize(QSize(15, 16777215))
+        self.cb_min_enable_p.setCheckable(True)
 
-        self.gridLayout_2.addItem(self.horizontalSpacer_3, 2, 2, 1, 1)
+        self.gridLayout_2.addWidget(self.cb_min_enable_p, 1, 5, 1, 1)
 
-        self.rb_master_c = QRadioButton(self.layoutWidget4)
+        self.cb_headless_c = QCheckBox(self.layoutWidget4)
+        self.cb_headless_c.setObjectName(u"cb_headless_c")
+        self.cb_headless_c.setEnabled(False)
+        self.cb_headless_c.setMaximumSize(QSize(15, 16777215))
+        self.cb_headless_c.setCheckable(True)
 
-        self.rb_master_c.setObjectName(u"rb_master_c")
-
-        self.gridLayout_2.addWidget(self.rb_master_c, 2, 0, 1, 1)
+        self.gridLayout_2.addWidget(self.cb_headless_c, 2, 7, 1, 1, Qt.AlignLeft)
 
         self.tb_pid_c = QLineEdit(self.layoutWidget4)
         self.tb_pid_c.setObjectName(u"tb_pid_c")
         self.tb_pid_c.setMaximumSize(QSize(50, 16777215))
 
-        self.gridLayout_2.addWidget(self.tb_pid_c, 2, 1, 1, 1)
+        self.gridLayout_2.addWidget(self.tb_pid_c, 2, 1, 1, 1, Qt.AlignLeft)
 
-        self.tb_pid_j = QLineEdit(self.layoutWidget4)
-        self.tb_pid_j.setObjectName(u"tb_pid_j")
-        self.tb_pid_j.setMaximumSize(QSize(50, 16777215))
+        self.cb_al_enable_c = QCheckBox(self.layoutWidget4)
+        self.cb_al_enable_c.setObjectName(u"cb_al_enable_c")
+        self.cb_al_enable_c.setEnabled(False)
+        self.cb_al_enable_c.setMaximumSize(QSize(15, 16777215))
 
-        self.gridLayout_2.addWidget(self.tb_pid_j, 0, 1, 1, 1)
-
-        self.tb_pid_p = QLineEdit(self.layoutWidget4)
-        self.tb_pid_p.setObjectName(u"tb_pid_p")
-        self.tb_pid_p.setMaximumSize(QSize(50, 16777215))
-
-        self.gridLayout_2.addWidget(self.tb_pid_p, 1, 1, 1, 1)
-
-        self.cb_min_enable_c = QCheckBox(self.layoutWidget4)
-        self.cb_min_enable_c.setObjectName(u"cb_min_enable_c")
-        self.cb_min_enable_c.setEnabled(False)
-
-        self.gridLayout_2.addWidget(self.cb_min_enable_c, 2, 5, 1, 1)
-
-        self.rb_master_p = QRadioButton(self.layoutWidget4)
-        self.rb_master_p.setObjectName(u"rb_master_p")
-
-        self.gridLayout_2.addWidget(self.rb_master_p, 1, 0, 1, 1)
-
-        self.cb_min_enable_j = QCheckBox(self.layoutWidget4)
-        self.cb_min_enable_j.setObjectName(u"cb_min_enable_j")
-        self.cb_min_enable_j.setEnabled(False)
-
-        self.gridLayout_2.addWidget(self.cb_min_enable_j, 0, 5, 1, 1)
-
-        self.cb_min_enable_p = QCheckBox(self.layoutWidget4)
-        self.cb_min_enable_p.setObjectName(u"cb_min_enable_p")
-        self.cb_min_enable_p.setEnabled(False)
-
-        self.gridLayout_2.addWidget(self.cb_min_enable_p, 1, 5, 1, 1)
-
-        self.cb_al_enable_p = QCheckBox(self.layoutWidget4)
-        self.cb_al_enable_p.setObjectName(u"cb_al_enable_p")
-        self.cb_al_enable_p.setEnabled(False)
-
-        self.gridLayout_2.addWidget(self.cb_al_enable_p, 1, 3, 1, 1)
+        self.gridLayout_2.addWidget(self.cb_al_enable_c, 2, 3, 1, 1)
 
         self.rb_master_j = QRadioButton(self.layoutWidget4)
         self.rb_master_j.setObjectName(u"rb_master_j")
         self.rb_master_j.setChecked(True)
 
-        self.gridLayout_2.addWidget(self.rb_master_j, 0, 0, 1, 1)
+        self.gridLayout_2.addWidget(self.rb_master_j, 0, 0, 1, 1, Qt.AlignLeft)
 
-        self.horizontalSpacer_2 = QSpacerItem(40, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_2, 0, 2, 1, 1)
-
-        self.horizontalSpacer_4 = QSpacerItem(40, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_4, 1, 2, 1, 1)
-
-        self.cb_al_enable_c = QCheckBox(self.layoutWidget4)
-        self.cb_al_enable_c.setObjectName(u"cb_al_enable_c")
-        self.cb_al_enable_c.setEnabled(False)
-
-        self.gridLayout_2.addWidget(self.cb_al_enable_c, 2, 3, 1, 1)
-
-        self.horizontalSpacer_7 = QSpacerItem(46, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.horizontalSpacer_7 = QSpacerItem(34, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
 
         self.gridLayout_2.addItem(self.horizontalSpacer_7, 0, 4, 1, 1)
 
-        self.horizontalSpacer_6 = QSpacerItem(46, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.cb_headless_p = QCheckBox(self.layoutWidget4)
+        self.cb_headless_p.setObjectName(u"cb_headless_p")
+        self.cb_headless_p.setEnabled(False)
+        self.cb_headless_p.setMaximumSize(QSize(15, 16777215))
+        self.cb_headless_p.setCheckable(True)
+
+        self.gridLayout_2.addWidget(self.cb_headless_p, 1, 7, 1, 1)
+
+        self.horizontalSpacer_3 = QSpacerItem(22, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_3, 2, 2, 1, 1)
+
+        self.rb_master_p = QRadioButton(self.layoutWidget4)
+        self.rb_master_p.setObjectName(u"rb_master_p")
+
+        self.gridLayout_2.addWidget(self.rb_master_p, 1, 0, 1, 1, Qt.AlignLeft)
+
+        self.rb_master_c = QRadioButton(self.layoutWidget4)
+        self.rb_master_c.setObjectName(u"rb_master_c")
+
+        self.gridLayout_2.addWidget(self.rb_master_c, 2, 0, 1, 1, Qt.AlignLeft)
+
+        self.tb_pid_p = QLineEdit(self.layoutWidget4)
+        self.tb_pid_p.setObjectName(u"tb_pid_p")
+        self.tb_pid_p.setMaximumSize(QSize(50, 16777215))
+
+        self.gridLayout_2.addWidget(self.tb_pid_p, 1, 1, 1, 1, Qt.AlignLeft)
+
+        self.cb_headless_j = QCheckBox(self.layoutWidget4)
+        self.cb_headless_j.setObjectName(u"cb_headless_j")
+        self.cb_headless_j.setEnabled(False)
+        self.cb_headless_j.setMaximumSize(QSize(15, 16777215))
+        self.cb_headless_j.setCheckable(True)
+
+        self.gridLayout_2.addWidget(self.cb_headless_j, 0, 7, 1, 1)
+
+        self.tb_pid_j = QLineEdit(self.layoutWidget4)
+        self.tb_pid_j.setObjectName(u"tb_pid_j")
+        self.tb_pid_j.setMaximumSize(QSize(50, 16777215))
+
+        self.gridLayout_2.addWidget(self.tb_pid_j, 0, 1, 1, 1, Qt.AlignLeft)
+
+        self.cb_min_enable_c = QCheckBox(self.layoutWidget4)
+        self.cb_min_enable_c.setObjectName(u"cb_min_enable_c")
+        self.cb_min_enable_c.setEnabled(False)
+        self.cb_min_enable_c.setMaximumSize(QSize(15, 16777215))
+        self.cb_min_enable_c.setCheckable(True)
+
+        self.gridLayout_2.addWidget(self.cb_min_enable_c, 2, 5, 1, 1)
+
+        self.horizontalSpacer_4 = QSpacerItem(22, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_4, 1, 2, 1, 1)
+
+        self.horizontalSpacer_6 = QSpacerItem(34, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
 
         self.gridLayout_2.addItem(self.horizontalSpacer_6, 1, 4, 1, 1)
 
-        self.horizontalSpacer_5 = QSpacerItem(46, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+        self.cb_al_enable_p = QCheckBox(self.layoutWidget4)
+        self.cb_al_enable_p.setObjectName(u"cb_al_enable_p")
+        self.cb_al_enable_p.setEnabled(False)
+        self.cb_al_enable_p.setMaximumSize(QSize(15, 16777215))
 
-        self.gridLayout_2.addItem(self.horizontalSpacer_5, 2, 4, 1, 1)
+        self.gridLayout_2.addWidget(self.cb_al_enable_p, 1, 3, 1, 1)
 
-        self.widget = QWidget(SystemDialog)
-        self.widget.setObjectName(u"widget")
-        self.widget.setGeometry(QRect(310, 10, 269, 22))
-        self.horizontalLayout_3 = QHBoxLayout(self.widget)
+        self.horizontalSpacer_9 = QSpacerItem(28, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_9, 0, 6, 1, 1)
+
+        self.horizontalSpacer_10 = QSpacerItem(28, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_10, 1, 6, 1, 1)
+
+        self.horizontalSpacer_11 = QSpacerItem(28, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
+
+        self.gridLayout_2.addItem(self.horizontalSpacer_11, 2, 6, 1, 1)
+
+        self.layoutWidget5 = QWidget(SystemDialog)
+        self.layoutWidget5.setObjectName(u"layoutWidget5")
+        self.layoutWidget5.setGeometry(QRect(310, 10, 269, 22))
+        self.horizontalLayout_3 = QHBoxLayout(self.layoutWidget5)
         self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
         self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
-        self.label_11 = QLabel(self.widget)
+        self.label_11 = QLabel(self.layoutWidget5)
         self.label_11.setObjectName(u"label_11")
         self.label_11.setFont(font1)
 
@@ -1153,7 +1198,7 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout_3.addItem(self.horizontalSpacer_8)
 
-        self.cb_al_enable = QCheckBox(self.widget)
+        self.cb_al_enable = QCheckBox(self.layoutWidget5)
         self.cb_al_enable.setObjectName(u"cb_al_enable")
         font2 = QFont()
         font2.setBold(False)
@@ -1163,6 +1208,11 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout_3.addWidget(self.cb_al_enable)
 
+        self.lab_start_headless = QLabel(SystemDialog)
+        self.lab_start_headless.setObjectName(u"lab_start_headless")
+        self.lab_start_headless.setEnabled(False)
+        self.lab_start_headless.setGeometry(QRect(550, 45, 49, 26))
+        self.lab_start_headless.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
 
         self.retranslateUi(SystemDialog)
 
@@ -1189,22 +1239,31 @@ class Ui_SystemDialog(object):
         self.cb_save_geometry.setText(QCoreApplication.translate("SystemDialog", u"Restore window size and position", None))
         self.cb_save_view.setText(QCoreApplication.translate("SystemDialog", u"Restore last tab view", None))
         self.label_10.setText(QCoreApplication.translate("SystemDialog", u"Rhino default = 2055", None))
-        self.label_12.setText(QCoreApplication.translate("SystemDialog", u"USB\nProduct ID", None))
-        self.label_9.setText(QCoreApplication.translate("SystemDialog", u"Master\nInstance", None))
-        self.lab_auto_launch.setText(QCoreApplication.translate("SystemDialog", u"Auto\nLaunch:", None))
-        self.lab_start_min.setText(QCoreApplication.translate("SystemDialog", u"Start\nMinimized:", None))
+        self.label_12.setText(QCoreApplication.translate("SystemDialog", u"USB\n"
+"Product ID", None))
+        self.label_9.setText(QCoreApplication.translate("SystemDialog", u"Master\n"
+"Instance", None))
+        self.lab_auto_launch.setText(QCoreApplication.translate("SystemDialog", u"Auto\n"
+"Launch:", None))
+        self.lab_start_min.setText(QCoreApplication.translate("SystemDialog", u"Start\n"
+"Minimized:", None))
+        self.cb_min_enable_j.setText("")
         self.cb_al_enable_j.setText("")
-        self.rb_master_c.setText(QCoreApplication.translate("SystemDialog", u"Collective", None))
+        self.cb_min_enable_p.setText("")
+        self.cb_headless_c.setText("")
+        self.cb_al_enable_c.setText("")
+        self.rb_master_j.setText(QCoreApplication.translate("SystemDialog", u"Joystick", None))
+        self.cb_headless_p.setText("")
+        self.rb_master_p.setText(QCoreApplication.translate("SystemDialog", u"Pedals", None))
+        self.rb_master_c.setText(QCoreApplication.translate("SystemDialog", u"Colective", None))
+        self.cb_headless_j.setText("")
         self.tb_pid_j.setText(QCoreApplication.translate("SystemDialog", u"2055", None))
         self.cb_min_enable_c.setText("")
-        self.rb_master_p.setText(QCoreApplication.translate("SystemDialog", u"Pedals", None))
-        self.cb_min_enable_j.setText("")
-        self.cb_min_enable_p.setText("")
         self.cb_al_enable_p.setText("")
-        self.rb_master_j.setText(QCoreApplication.translate("SystemDialog", u"Joystick", None))
-        self.cb_al_enable_c.setText("")
         self.label_11.setText(QCoreApplication.translate("SystemDialog", u"Launch Options:", None))
         self.cb_al_enable.setText(QCoreApplication.translate("SystemDialog", u"Enable Auto-Launch", None))
+        self.lab_start_headless.setText(QCoreApplication.translate("SystemDialog", u"Start\n"
+"Headless:", None))
     # retranslateUi
 
 
@@ -1245,6 +1304,21 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.tb_pid_p.setValidator(int_validator)
         self.tb_pid_c.setValidator(int_validator)
 
+        self.cb_min_enable_j.setObjectName('minimize_j')
+        self.cb_min_enable_j.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_min_enable_p.setObjectName('minimize_p')
+        self.cb_min_enable_p.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_min_enable_c.setObjectName('minimize_c')
+        self.cb_min_enable_c.clicked.connect(self.toggle_launchmode_cbs)
+
+        self.cb_headless_j.setObjectName('headless_j')
+        self.cb_headless_j.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_headless_p.setObjectName('headless_p')
+        self.cb_headless_p.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_headless_c.setObjectName('headless_c')
+        self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
+
+
     def reset_settings(self):
         # Load default settings and update widgets
         # default_settings = utils.get_default_sys_settings()
@@ -1256,52 +1330,61 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_al_enable_j.setVisible(False)
             self.cb_min_enable_j.setChecked(False)
             self.cb_min_enable_j.setVisible(False)
+            self.cb_headless_j.setChecked(False)
+            self.cb_headless_j.setVisible(False)
             self.cb_al_enable_c.setVisible(True)
             self.cb_min_enable_c.setVisible(True)
+            self.cb_headless_c.setVisible(True)
             self.cb_al_enable_p.setVisible(True)
             self.cb_min_enable_p.setVisible(True)
+            self.cb_headless_p.setVisible(True)
         elif button == self.rb_master_p:
             self.cb_al_enable_p.setChecked(False)
             self.cb_al_enable_p.setVisible(False)
             self.cb_min_enable_p.setChecked(False)
             self.cb_min_enable_p.setVisible(False)
+            self.cb_headless_p.setChecked(False)
+            self.cb_headless_p.setVisible(False)
             self.cb_al_enable_c.setVisible(True)
             self.cb_min_enable_c.setVisible(True)
+            self.cb_headless_c.setVisible(True)
             self.cb_al_enable_j.setVisible(True)
             self.cb_min_enable_j.setVisible(True)
-
+            self.cb_headless_j.setVisible(True)
         elif button == self.rb_master_c:
             self.cb_al_enable_c.setChecked(False)
             self.cb_al_enable_c.setVisible(False)
             self.cb_min_enable_c.setChecked(False)
             self.cb_min_enable_c.setVisible(False)
+            self.cb_headless_c.setChecked(False)
+            self.cb_headless_c.setVisible(False)
             self.cb_al_enable_j.setVisible(True)
             self.cb_min_enable_j.setVisible(True)
+            self.cb_headless_j.setVisible(True)
             self.cb_al_enable_p.setVisible(True)
             self.cb_min_enable_p.setVisible(True)
+            self.cb_headless_p.setVisible(True)
 
     def toggle_al_widgets(self):
         al_enabled = self.cb_al_enable.isChecked()
         self.lab_auto_launch.setEnabled(al_enabled)
         self.lab_start_min.setEnabled(al_enabled)
+        self.lab_start_headless.setEnabled(al_enabled)
         self.cb_al_enable_j.setEnabled(al_enabled)
         self.cb_al_enable_p.setEnabled(al_enabled)
         self.cb_al_enable_c.setEnabled(al_enabled)
         self.cb_min_enable_j.setEnabled(al_enabled)
         self.cb_min_enable_p.setEnabled(al_enabled)
         self.cb_min_enable_c.setEnabled(al_enabled)
+        self.cb_headless_j.setEnabled((al_enabled))
+        self.cb_headless_p.setEnabled((al_enabled))
+        self.cb_headless_c.setEnabled((al_enabled))
 
         if al_enabled:
             style = "QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }"
-            self.cb_al_enable.setStyleSheet(style)
-            self.cb_al_enable_j.setStyleSheet(style)
-            self.cb_al_enable_p.setStyleSheet(style)
-            self.cb_al_enable_c.setStyleSheet(style)
-            self.cb_min_enable_j.setStyleSheet(style)
-            self.cb_min_enable_p.setStyleSheet(style)
-            self.cb_min_enable_c.setStyleSheet(style)
         else:
             style = "QCheckBox::indicator:checked {image: url(image/disabledcheckbox.png); }"
+
         self.cb_al_enable.setStyleSheet(style)
         self.cb_al_enable_j.setStyleSheet(style)
         self.cb_al_enable_p.setStyleSheet(style)
@@ -1309,6 +1392,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_min_enable_j.setStyleSheet(style)
         self.cb_min_enable_p.setStyleSheet(style)
         self.cb_min_enable_c.setStyleSheet(style)
+        self.cb_headless_j.setStyleSheet(style)
+        self.cb_headless_p.setStyleSheet(style)
+        self.cb_headless_c.setStyleSheet(style)
+
     def toggle_il2_widgets(self):
         # Show/hide IL-2 related widgets based on checkbox state
         il2_enabled = self.enableIL2.isChecked()
@@ -1329,6 +1416,31 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         directory = QFileDialog.getExistingDirectory(self, "Select IL-2 Install Path", "")
         if directory:
             self.pathIL2.setText(directory)
+
+
+    def toggle_launchmode_cbs(self):
+        sender = self.sender()
+        if not sender.isChecked():
+            return
+        object_name = sender.objectName()
+        match object_name:
+            case 'headless_j':
+                self.cb_min_enable_j.setChecked(False)
+            case 'minimize_j':
+                self.cb_headless_j.setChecked(False)
+            case 'headless_p':
+                self.cb_min_enable_p.setChecked(False)
+            case 'minimize_p':
+                self.cb_headless_p.setChecked(False)
+            case 'headless_c':
+                self.cb_min_enable_c.setChecked(False)
+            case 'minimize_c':
+                self.cb_headless_c.setChecked(False)
+
+
+        print(f"{sender.objectName()} checked:{sender.isChecked()}")
+        pass
+
     def validate_settings(self):
         master = self.master_button_group.checkedId()
         match master:
@@ -1365,6 +1477,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'startMinJoystick': self.cb_min_enable_j.isChecked(),
             'startMinPedals': self.cb_min_enable_p.isChecked(),
             'startMinCollective': self.cb_min_enable_c.isChecked(),
+            'startHeadlessJoystick': self.cb_headless_j.isChecked(),
+            'startHeadlessPedals': self.cb_headless_p.isChecked(),
+            'startHeadlessCollective': self.cb_headless_c.isChecked(),
             'pidJoystick': str(self.tb_pid_j.text()),
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
@@ -1386,6 +1501,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'startMinJoystick',
             'startMinPedals',
             'startMinCollective',
+            'startHeadlessJoystick',
+            'startHeadlessPedals',
+            'startHeadlessCollective',
             'pidJoystick',
             'pidPedals',
             'pidCollective',
@@ -1469,25 +1587,30 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_min_enable_p.setChecked(settings_dict.get('startMinPedals', False))
         self.cb_min_enable_c.setChecked(settings_dict.get('startMinCollective', False))
 
+        self.cb_headless_j.setChecked(settings_dict.get('startHeadlessJoystick', False))
+        self.cb_headless_p.setChecked(settings_dict.get('startHeadlessPedals', False))
+        self.cb_headless_c.setChecked(settings_dict.get('startHeadlessCollective', False))
+
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
         self.toggle_al_widgets()
 
         #build record of auto-launch settings to see if they changed on save:
-        key_list = [
-            'autolaunchMaster',
-            'autolaunchJoystick',
-            'autolaunchPedals',
-            'autolaunchCollective',
-            'startMinJoystick',
-            'startMinPedals',
-            'startMinCollective',
-            'pidJoystick',
-            'pidPedals',
-            'pidCollective',
-        ]
-        for key in key_list:
-            self.current_al_dict[key] = settings_dict[key]
+        self.current_al_dict = {
+            'autolaunchMaster': self.cb_al_enable.isChecked(),
+            'autolaunchJoystick': self.cb_al_enable_j.isChecked(),
+            'autolaunchPedals': self.cb_al_enable_p.isChecked(),
+            'autolaunchCollective': self.cb_al_enable_c.isChecked(),
+            'startMinJoystick': self.cb_min_enable_j.isChecked(),
+            'startMinPedals': self.cb_min_enable_p.isChecked(),
+            'startMinCollective': self.cb_min_enable_c.isChecked(),
+            'startHeadlessJoystick': self.cb_headless_j.isChecked(),
+            'startHeadlessPedals': self.cb_headless_p.isChecked(),
+            'startHeadlessCollective': self.cb_headless_c.isChecked(),
+            'pidJoystick': str(self.tb_pid_j.text()),
+            'pidPedals': str(self.tb_pid_p.text()),
+            'pidCollective': str(self.tb_pid_c.text()),
+        }
 
 
 
