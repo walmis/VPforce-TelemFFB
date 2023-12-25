@@ -3996,7 +3996,7 @@ def main():
     elif args.child:
         myport = int(f"6{_device_pid}")
         _ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=args.masterport)
-        _ipc_thread.exit_signal.connect(lambda: window.exit_application())
+        _ipc_thread.exit_signal.connect(lambda: exit_application())
         _ipc_thread.start()
         _ipc_running = True
 
