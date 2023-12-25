@@ -489,6 +489,13 @@
       </property>
      </widget>
     </item>
+    <item row="14" column="8">
+     <widget class="QPushButton" name="pb_clear">
+      <property name="text">
+       <string>Clear Selection</string>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
  </widget>

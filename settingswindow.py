@@ -207,6 +207,9 @@ class Ui_SettingsWindow(object):
         self.b_usb_button = QtWidgets.QPushButton(self.centralwidget)
         self.b_usb_button.setObjectName("b_usb_button")
         self.gridLayout.addWidget(self.b_usb_button, 28, 11, 1, 1)
+        self.pb_clear = QtWidgets.QPushButton(self.centralwidget)
+        self.pb_clear.setObjectName("pb_clear")
+        self.gridLayout.addWidget(self.pb_clear, 14, 8, 1, 1)
         SettingsWindow.setCentralWidget(self.centralwidget)
 
         self.retranslateUi(SettingsWindow)
@@ -260,3 +263,4 @@ class Ui_SettingsWindow(object):
         self.tb_currentmodel.setText(_translate("SettingsWindow", "Wilga 80X"))
         self.cb_enable.setText(_translate("SettingsWindow", "Enable"))
         self.b_usb_button.setText(_translate("SettingsWindow", "PushButton"))
+        self.pb_clear.setText(_translate("SettingsWindow", "Clear Selection"))

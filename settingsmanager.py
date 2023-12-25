@@ -163,7 +163,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_class.currentIndexChanged.connect(lambda index: self.update_table_on_class_change())
         #allow changing model dropdown
         self.drp_models.currentIndexChanged.connect(lambda index: self.update_table_on_model_change())
-
+        self.pb_clear.clicked.connect(lambda: self.clear_selections())
         # create model setting button
         self.b_createusermodel.clicked.connect(self.show_user_model_dialog)
 
@@ -178,6 +178,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Initial visibility of rows based on checkbox state
         self.toggle_rows()
 
+    def clear_selections(self):
+        # self.drp_sim.clear()
+        # self.drp_models.setCurrentTest("")
+        self.drp_models.setCurrentIndex(0)
+        self.drp_class.setCurrentIndex(0)
+        self.update_table_on_sim_change()
     def currentmodel_click(self):
 
         mprint("currentmodel_click")
