@@ -84,6 +84,7 @@ _launched_collective = False
 _child_ipc_ports = []
 _master_instance = False
 _ipc_running = False
+_ipc_thread = None
 
 system_settings = utils.read_system_settings(args.device, args.type)
 
@@ -403,7 +404,7 @@ class TelemManager(QObject, threading.Thread):
     lastFrameTime: float
     numFrames: int = 0
 
-    def __init__(self, settings_manager) -> None:
+    def __init__(self, settings_manager, ipc_thread=None) -> None:
         QObject.__init__(self)
         threading.Thread.__init__(self, daemon=True)
 
@@ -416,6 +417,7 @@ class TelemManager(QObject, threading.Thread):
         self.frameTimes = []
         self.timeout = 0.2
         self.settings_manager = settings_manager
+        self.ipc_thread = ipc_thread
 
 
     def get_aircraft_config(self, aircraft_name, data_source):
@@ -686,6 +688,7 @@ class TelemManager(QObject, threading.Thread):
 class IPCNetworkThread(QThread):
     message_received = pyqtSignal(str)
     exit_signal = pyqtSignal(str)
+    restart_sim_signal = pyqtSignal(str)
 
     def __init__(self, host="localhost", myport=0, dstport=0, child_ports = [], master=False, child=False, keepalive_timer=1,
                  missed_keepalive=3):
@@ -738,6 +741,8 @@ class IPCNetworkThread(QThread):
                 elif msg == 'MASTER INSTANCE QUIT':
                     logging.info("Received QUIT signal from master instance.  Running exit/cleanup function.")
                     self.exit_signal.emit("Received QUIT signal from master instance.  Running exit/cleanup function.")
+                elif msg == 'RESTART SIMS':
+                    self.restart_sim_signal.emit('Restart Sims')
 
                 else:
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")
@@ -1538,6 +1543,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         stop_sims()
         init_sims()
+
+        if _master_instance:
+            _ipc_thread.send_broadcast_message("RESTART SIMS")
+
         self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2'], global_settings_dict)
         # adjust logging level:
         ll = self.logLevel.currentText()
@@ -3828,6 +3837,10 @@ def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
 
         QMessageBox.information(main_window, "Conversion Completed", "The conversion is complete.  You may now continue to use TelemFFB.\n\nTo avoid unnecessary log messages, please remove any '-c' or '-o' arguments from your startup shortcut as they are no longer supported")
 
+def restart_sims():
+    stop_sims()
+    init_sims()
+
 
 def init_sims():
     global dcs_telem, il2_telem, sim_connect_telem, telem_manager
@@ -3997,6 +4010,7 @@ def main():
         myport = int(f"6{_device_pid}")
         _ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=args.masterport)
         _ipc_thread.exit_signal.connect(lambda: exit_application())
+        _ipc_thread.restart_sim_signal.connect(lambda: restart_sims())
         _ipc_thread.start()
         _ipc_running = True
 
@@ -4014,7 +4028,7 @@ def main():
     fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
     fetch_version_thread.start()
 
-    telem_manager = TelemManager(settings_manager=settings_mgr)
+    telem_manager = TelemManager(settings_manager=settings_mgr, ipc_thread=_ipc_thread)
     telem_manager.start()
 
     telem_manager.telemetryReceived.connect(window.update_telemetry)
