@@ -14,8 +14,8 @@ from settingswindow import Ui_SettingsWindow
 
 import xmlutils
 
-print_debugs = False
-print_method_calls = False
+print_debugs = True
+print_method_calls = True
 
 
 def lprint(msg):
@@ -79,9 +79,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def update_device_scope(self, dev):
         self.device = dev
+        xmlutils.update_vars(dev, self.userconfig_path, self.defaults_path)
         # self.update_table_on_model_change()
         # self.clear_propmgr()
-        # self.reload_table()
+        self.reload_table()
 
     def get_current_model(self,the_sim, dbg_model_name, dbg_crafttype = None ):
         mprint(f"get_current_model {the_sim}, {dbg_model_name}, {dbg_crafttype}")
@@ -162,7 +163,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         self.b_revert.clicked.connect(self.restore_userconfig_backup)
 
-        self.l_device.setText(self.device)
         self.set_edit_mode(self.sim)
         # read models from xml files to populate dropdown
         self.setup_model_list()

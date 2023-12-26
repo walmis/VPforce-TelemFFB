@@ -2525,8 +2525,14 @@ class MainWindow(QMainWindow):
             else:
                 settings_mgr.move(self.x() + 50, self.y() + 100)
                 settings_mgr.show()
-                print (f"# toggle settings window   {settings_mgr.current_sim} {settings_mgr.current_aircraft_name}")
-                settings_mgr.currentmodel_click()
+                print (f"# toggle settings window   sim:'{settings_mgr.current_sim}' ac:'{settings_mgr.current_aircraft_name}'")
+                if settings_mgr.current_aircraft_name != '':
+                    settings_mgr.currentmodel_click()
+                else:
+                    settings_mgr.update_table_on_class_change()
+
+                if settings_mgr.current_sim == '' or settings_mgr.current_sim == 'nothing':
+                    settings_mgr.update_table_on_sim_change()
 
     def show_user_model_dialog(self):
         mprint("show_user_model_dialog")
