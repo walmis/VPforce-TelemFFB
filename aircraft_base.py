@@ -368,6 +368,10 @@ class AircraftBase(object):
             return
         if local_buffet_aoa == 0 or local_stall_aoa == 0:
             return
+        if max(telem_data.get('WeightOnWheels', 0)):
+            effects.dispose("buffeting")
+            return
+
         airflow_factor = utils.scale_clamp(tas, (0, max_airflow_speed), (0, 1.0))
         buffeting_factor = utils.scale_clamp(aoa, (local_buffet_aoa, local_stall_aoa), (0.0, 1.0))
         # todo calc frequency
