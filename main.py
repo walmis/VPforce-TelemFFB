@@ -2509,7 +2509,7 @@ class MainWindow(QMainWindow):
         if log_window.isVisible():
             log_window.hide()
         else:
-            log_window.move(self.x(), self.y())
+            log_window.move(self.x()+50, self.y()+100)
             log_window.show()
 
     def toggle_settings_window(self):
@@ -2523,6 +2523,7 @@ class MainWindow(QMainWindow):
             if settings_mgr.isVisible():
                 settings_mgr.hide()
             else:
+                settings_mgr.move(self.x() + 50, self.y() + 100)
                 settings_mgr.show()
                 print (f"# toggle settings window   {settings_mgr.current_sim} {settings_mgr.current_aircraft_name}")
                 settings_mgr.currentmodel_click()
