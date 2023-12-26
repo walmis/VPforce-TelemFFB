@@ -64,12 +64,24 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.buttonBox.rejected.connect(self.hide)
         self.clear_propmgr()
         self.backup_userconfig()
+        self.drp_device.addItem('any')
+        self.drp_device.addItem('joystick')
+        self.drp_device.addItem('pedals')
+        self.drp_device.addItem('collective')
+        self.drp_device.setCurrentText(self.device)
+        self.drp_device.currentTextChanged.connect(self.update_device_scope)
         self.init_ui()
 
     @classmethod
     def update_state_vars(cls, **kwargs):
         for key, value in kwargs.items():
             setattr(cls, key, value)
+
+    def update_device_scope(self, dev):
+        self.device = dev
+        # self.update_table_on_model_change()
+        # self.clear_propmgr()
+        # self.reload_table()
 
     def get_current_model(self,the_sim, dbg_model_name, dbg_crafttype = None ):
         mprint(f"get_current_model {the_sim}, {dbg_model_name}, {dbg_crafttype}")
