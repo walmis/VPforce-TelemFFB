@@ -3838,8 +3838,13 @@ def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
         QMessageBox.information(main_window, "Conversion Completed", "The conversion is complete.  You may now continue to use TelemFFB.\n\nTo avoid unnecessary log messages, please remove any '-c' or '-o' arguments from your startup shortcut as they are no longer supported")
 
 def restart_sims():
+    global window, _device_pid, _device_type
+    sim_list = ['DCS', 'MSFS', 'IL2']
+    sys_settings = utils.read_system_settings(args.device, _device_type)
     stop_sims()
     init_sims()
+    window.init_sim_indicators(sim_list, sys_settings)
+
 
 
 def init_sims():
