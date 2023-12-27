@@ -319,40 +319,6 @@ def config_has_changed(update=False) -> bool:
     return False
 
 
-# def get_config_xml():
-#     global _config
-#     global settings_mgr
-#     if _config: return _config
-#     # a, b, main = xmlutils.read_single_model('Global', '')
-#     main = []
-#     params = ConfigObj()
-#     params['system'] = {}
-#     for setting in main:
-#         k = setting['name']
-#         v = setting['value']
-#         if setting["grouping"] == "System":
-#             params['system'][k] = v
-#             logging.warning(f"Got Globals from Settings Manager: {k} : {v}")
-#     return params
-
-# def get_config() -> ConfigObj:
-#     global _config
-#     if _config: return _config
-#     if args.overridefile== 'None':
-#         params = get_config_xml()
-#         config_has_changed(update=True)
-#         _config = params
-#         return params
-#
-#     main = load_config(configfile)
-#     user = load_config(overridefile, raise_errors=False)
-#     if user and main:
-#         main.merge(user)
-#
-#     config_has_changed(update=True)
-#     _config = main
-#     return main
-
 
 class LogWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -452,9 +418,9 @@ class TelemManager(QObject, threading.Thread):
                     vu = v
                 if setting['value'] != '-':
                     params[k] = vu
-                    logging.warning(f"Got from Settings Manager: {k} : {vu}")
+                    logging.info(f"Got from Settings Manager: {k} : {vu}")
                 else:
-                    logging.warning(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
+                    logging.info(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
                 # print(f"SETTING:\n{setting}")
             params = utils.sanitize_dict(params)
             self.settings_manager.update_state_vars(
