@@ -1691,14 +1691,14 @@ class MainWindow(QMainWindow):
                 x_pos = 50
                 y_pos = 70
 
-        self.setGeometry(x_pos, y_pos, 400, 700)
+        self.setGeometry(x_pos, y_pos, 530, 700)
         if version:
             self.setWindowTitle(f"TelemFFB ({args.type}) ({version})")
         else:
             self.setWindowTitle(f"TelemFFB")
         global _update_available
         global _latest_version, _latest_url
-        self.resize(400, 700)
+        self.resize(530, 700)
         self.hidden_active = False
         # Create a layout for the main window
         layout = QVBoxLayout()
@@ -2364,7 +2364,7 @@ class MainWindow(QMainWindow):
                 x_pos = 50
                 y_pos = 70
 
-        self.setGeometry(x_pos, y_pos, 400, 700)
+        self.setGeometry(x_pos, y_pos, 530, 700)
 
     def load_main_window_geometry(self):
         device_type = args.type
