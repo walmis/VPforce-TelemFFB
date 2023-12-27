@@ -14,8 +14,8 @@ from settingswindow import Ui_SettingsWindow
 
 import xmlutils
 
-print_debugs = True
-print_method_calls = True
+print_debugs = False
+print_method_calls = False
 
 
 def lprint(msg):
