@@ -418,6 +418,7 @@ class TelemManager(QObject, threading.Thread):
         self.timeout = 0.2
         self.settings_manager = settings_manager
         self.ipc_thread = ipc_thread
+        self._ipc_telem = {}
 
 
     def get_aircraft_config(self, aircraft_name, data_source):
@@ -526,6 +527,12 @@ class TelemManager(QObject, threading.Thread):
                 traceback.print_exc()
                 logging.error("Error Parsing Parameter: ", repr(i))
 
+        ## Read telemetry sent via IPC channel from child instances and update local telemetry stream
+        if _master_instance:
+            self._ipc_telem = self.ipc_thread._ipc_telem
+            if self._ipc_telem != {}:
+                telem_data.update(self._ipc_telem)
+                self._ipc_telem = {}
         # print(items)
         aircraft_name = telem_data.get("N")
         data_source = telem_data.get("src", None)
@@ -610,27 +617,16 @@ class TelemManager(QObject, threading.Thread):
                     subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial], cwd=workdir, env=env)
 
                 logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
+
                 # instantiate new aircraft handler
                 self.currentAircraft = Class(aircraft_name)
-                # self.currentAircraft.apply_settings(params)
+
                 self.currentAircraft.apply_settings(params)
-                # if args.overridefile== 'None':
+
                 if settings_mgr.isVisible():
                     settings_mgr.b_getcurrentmodel.click()
-                # a,b,res = xmlutils.read_single_model(data_source, aircraft_name)
-                # self.main_window.settings_layout.build_rows(res)
-                # self.main_window.reload_button.click()
-                # self.main_window.settings_layout.reload_caller()
+
                 self.updateSettingsLayout.emit()
-
-
-                # future :
-                # pop create dialog on load where pattern is blank
-                # currently pops on aircraft change but not initial load if sim already running
-
-                # if settings_mgr.current_sim != 'Global':
-                #     if settings_mgr.current_pattern == '':
-                #         settings_mgr.b_createusermodel.click()
 
             self.currentAircraftName = aircraft_name
 
@@ -648,7 +644,12 @@ class TelemManager(QObject, threading.Thread):
 
             except:
                 print_exc()
-
+        ### Send locally generated telemetry to master here
+        if args.child:
+            ipc_telem = self.currentAircraft._ipc_telem
+            if ipc_telem != {}:
+                self.ipc_thread.send_ipc_telem(ipc_telem)
+                self.currentAircraft._ipc_telem = {}
         if args.plot:
             for item in args.plot:
                 if item in telem_data:
@@ -703,6 +704,7 @@ class IPCNetworkThread(QThread):
         self._keepalive_timer = keepalive_timer
         self._missed_keepalive = missed_keepalive
         self._last_keepalive_timestamp = time.time()
+        self._ipc_telem = {}
 
         # Initialize socket
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -710,10 +712,19 @@ class IPCNetworkThread(QThread):
         self._socket.settimeout(0.1)
         logging.info(f"Setting up IPC socket at {self._host}:{self._myport}")
         self._socket.bind((self._host, self._myport))
+        self._telem_to_send = {'l_var_a': '1.1', 'l_var_b': '2.2'}
+        self._received_telem = {'l_var_a': '1.1', 'l_var_b': '2.2'}
+
+    def send_ipc_telem(self, telem):
+        j_telem = json.dumps(telem)
+        self.send_message(j_telem)
 
     def send_message(self, message):
         encoded_data = message.encode("utf-8")
-        self._socket.sendto(encoded_data, (self._host, self._dstport))
+        try:    # socket may be closed
+            self._socket.sendto(encoded_data, (self._host, self._dstport))
+        except OSError as e:
+            logging.warning(f"Error sending IPC frame: {e}")
 
     def send_broadcast_message(self, message):
         for port in self._child_ports:
@@ -743,9 +754,15 @@ class IPCNetworkThread(QThread):
                     self.exit_signal.emit("Received QUIT signal from master instance.  Running exit/cleanup function.")
                 elif msg == 'RESTART SIMS':
                     self.restart_sim_signal.emit('Restart Sims')
-
                 else:
-                    logging.info(f"GOT GENERIC MESSAGE: {msg}")
+                    try:
+                        ipc_telem = json.loads(msg)
+                        # logging.info(f"GOT JSON PAYLOAD: {ipc_telem}")
+                        self._ipc_telem.update(ipc_telem)
+
+                    except json.JSONDecodeError:
+                        logging.info(f"GOT GENERIC MESSAGE: {msg}")
+
                     self.message_received.emit(msg)
             except OSError:
                 continue
@@ -1674,7 +1691,7 @@ class ButtonPressThread(QThread):
             self.button_pressed.emit(self.button_name, 0)
 
 class MainWindow(QMainWindow):
-    def __init__(self, settings_manager):
+    def __init__(self, ipc_thread=None):
         super().__init__()
         self.show_new_craft_button = False
         # Get the absolute path of the script's directory
@@ -1683,6 +1700,7 @@ class MainWindow(QMainWindow):
         dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
         notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         self._current_config_scope = args.type
+        self._ipc_thread = ipc_thread
         self.system_settings_dict = utils.read_system_settings(args.device, args.type)
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
         match args.type:
@@ -4026,7 +4044,7 @@ def main():
         _ipc_thread.start()
         _ipc_running = True
 
-    window = MainWindow(settings_manager=settings_mgr)
+    window = MainWindow(ipc_thread=_ipc_thread)
 
     if not headless_mode:
         if args.minimize:

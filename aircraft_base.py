@@ -71,6 +71,7 @@ class AircraftBase(object):
         self._changes = {}
         self._change_counter = {}
         self._telem_data = {}
+        self._ipc_telem = {}
         #clear any existing effects
         effects.clear()
 
