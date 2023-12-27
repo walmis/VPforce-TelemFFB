@@ -157,6 +157,12 @@ class Aircraft(AircraftBase):
     center_spring_on_pause = False
 
     use_legacy_bindings = False
+    enable_custom_x_axis = False
+    enable_custom_y_axis = False
+    custom_x_axis: str = ''
+    custom_y_axis: str = ''
+    raw_x_axis_scale: int = 16384
+    raw_y_axis_scale: int = 16384
 
 
     def __init__(self, name, **kwargs) -> None:
@@ -337,11 +343,25 @@ class Aircraft(AircraftBase):
 
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383*x_scale, 16384*x_scale)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383*y_scale, 16384*y_scale)))
 
-                send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
-                send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
+                if self.enable_custom_x_axis:
+                    x_var = self.custom_x_axis
+                    x_range = self.raw_x_axis_scale
+                else:
+                    x_var = 'AXIS_AILERONS_SET'
+                    x_range = 16384
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_ELEVATOR_SET'
+                    y_range = 16384
+
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale)))
+
+                send_event_to_msfs(x_var, pos_x_pos)
+                send_event_to_msfs(y_var, pos_y_pos)
             # update spring data
             if self.ap_following and ap_active:
                 y_coeff = 4096
@@ -404,10 +424,17 @@ class Aircraft(AircraftBase):
                 phys_x, phys_y = input_data.axisXY()
                 x_pos = phys_x - virtual_rudder_x_offs
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
-                # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
+                if self.enable_custom_x_axis:
+                    x_var = self.custom_x_axis
+                    x_range = self.raw_x_axis_scale
+                else:
+                    x_var = 'AXIS_RUDDER_SET'
+                    x_range = 16384
+
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+                send_event_to_msfs(x_var, pos_x_pos)
+
                 # update spring data
 
             if self.ap_following and ap_active:
@@ -591,11 +618,24 @@ class Aircraft(AircraftBase):
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
 
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+                if self.enable_custom_x_axis:
+                    x_var = self.custom_x_axis
+                    x_range = self.raw_x_axis_scale
+                else:
+                    x_var = 'AXIS_AILERONS_SET'
+                    x_range = 16384
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_ELEVATOR_SET'
+                    y_range = 16384
 
-                send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
-                send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale)))
+
+                send_event_to_msfs(x_var, pos_x_pos)
+                send_event_to_msfs(y_var, pos_y_pos)
 
             if telem_data["ElevDeflPct"] != 0 and not max(telem_data.get("WeightOnWheels")):  # avoid div by zero or calculating while on the ground
                 #give option to disable if desired by user
@@ -698,9 +738,17 @@ class Aircraft(AircraftBase):
 
                 x_pos = phys_x - virtual_rudder_x_offs
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
 
-                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
+                if self.enable_custom_x_axis:
+                    x_var = self.custom_x_axis
+                    x_range = self.raw_x_axis_scale
+                else:
+                    x_var = 'AXIS_RUDDER_SET'
+                    x_range = 16384
+
+                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+
+                send_event_to_msfs(x_var, pos_x_pos)
 
             self.const_force.constant(rud_force, 270).start()
             self.spring.start()
@@ -1173,16 +1221,25 @@ class Helicopter(Aircraft):
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
 
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
-
                 if self.cyclic_spring_init or not self.force_trim_enabled:
-                    if self.use_legacy_bindings:
-                        send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
-                        send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
                     else:
-                        send_event_to_msfs("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
-                        send_event_to_msfs("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
+                        x_var = 'AXIS_CYCLIC_LATERAL_SET'
+                        x_range = 16384
+                    if self.enable_custom_y_axis:
+                        y_var = self.custom_y_axis
+                        y_range = self.raw_y_axis_scale
+                    else:
+                        y_var = 'AXIS_CYCLIC_LONGITUDINAL_SET'
+                        y_range = 16384
+
+                    pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+                    pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale)))
+
+                    send_event_to_msfs(x_var, pos_x_pos)
+                    send_event_to_msfs(y_var, pos_y_pos)
 
             if self.anything_has_changed("cyclic_gain", self.cyclic_spring_gain):  # check if spring gain setting has been modified in real time
                 self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
@@ -1225,7 +1282,6 @@ class Helicopter(Aircraft):
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
-            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-12000 * x_scale, 12000 * x_scale)))
 
             self.spring = effects["pedal_ap_spring"].spring()
             self.damper = effects["pedal_damper"].damper()
@@ -1258,10 +1314,16 @@ class Helicopter(Aircraft):
                     self.spring.stop()
                 else:
                     return
-            if self.use_legacy_bindings:
-                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
+
+            if self.enable_custom_x_axis:
+                x_var = self.custom_x_axis
+                x_range = self.raw_x_axis_scale
             else:
-                send_event_to_msfs("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
+                x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
+                x_range = 16384
+
+            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+            send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
@@ -1321,9 +1383,17 @@ class Helicopter(Aircraft):
         self.spring.effect.setCondition(self.spring_y)
         self.spring.start()
 
-        pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
+        if self.enable_custom_y_axis:
+            y_var = self.custom_y_axis
+            y_range = self.raw_y_axis_scale
+        else:
+            y_var = 'AXIS_COLLECTIVE_SET'
+            y_range = 16384
+
+        pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-y_range , y_range)))
+
         if self.collective_init:
-            send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
+            send_event_to_msfs(y_var, pos_y_pos)
 
 
 
@@ -1514,7 +1584,6 @@ class HPGHelicopter(Helicopter):
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
-            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
 
             self.spring = effects["pedal_ap_spring"].spring()
             self.damper = effects["pedal_damper"].damper()
@@ -1549,10 +1618,15 @@ class HPGHelicopter(Helicopter):
                 else:
                     return
 
-            if self.use_legacy_bindings:
-                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
+            if self.enable_custom_x_axis:
+                x_var = self.custom_x_axis
+                x_range = self.raw_x_axis_scale
             else:
-                send_event_to_msfs("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
+                x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
+                x_range = 16384
+
+            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+            send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
@@ -1609,9 +1683,17 @@ class HPGHelicopter(Helicopter):
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
 
-                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_COLLECTIVE_SET'
+                    y_range = 16384
+
+                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-y_range, y_range)))
+
                 if self.collective_init:
-                    send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
+                    send_event_to_msfs(y_var, pos_y_pos)
 
 
             else:
@@ -1637,9 +1719,18 @@ class HPGHelicopter(Helicopter):
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
 
-                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_COLLECTIVE_SET'
+                    y_range = 16384
+
+                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-y_range, y_range)))
+
                 if self.collective_init:
-                    send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
+                    send_event_to_msfs(y_var, pos_y_pos)
+
             else:
                 collective_pos = telem_data.get("CollectivePos", 0)
                 self.cpO_y = round(utils.scale(collective_pos,(0, 1), (4096, -4096)))
