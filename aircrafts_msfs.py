@@ -55,6 +55,7 @@ def set_simdatum_to_msfs(simvar, value, units=None):
     except Exception as e:
         logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
 def send_event_to_msfs(event, data: int = 0 ):
+    logging.debug(f"event {event}   data {data}")
     if event.startswith('L:'):
         set_simdatum_to_msfs(event, data, units="number")
     else:
