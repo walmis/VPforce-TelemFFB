@@ -4781,6 +4781,20 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>ap_following</name>
+		<model>Pilatus PC-12.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>ap_following</name>
+		<model>Pilatus PC-12.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Pilatus PC-12.*</model>
 		<value>TurbopropAircraft</value>
