@@ -3190,7 +3190,7 @@ class SettingsLayout(QGridLayout):
 
             d_slider.blockSignals(False)
 
-        if item['datatype'] == 'list':
+        if item['datatype'] == 'list' or item['datatype'] == 'anylist' :
             dropbox = QComboBox()
             dropbox.setEditable(True)
             dropbox.lineEdit().setAlignment(QtCore.Qt.AlignHCenter)
@@ -3198,7 +3198,8 @@ class SettingsLayout(QGridLayout):
             dropbox.addItems(validvalues)
             dropbox.blockSignals(True)
             dropbox.setCurrentText(item['value'])
-            dropbox.lineEdit().setReadOnly(True)
+            if item['datatype'] == 'list':
+                dropbox.lineEdit().setReadOnly(True)
             dropbox.blockSignals(False)
             self.addWidget(dropbox, i, self.entry_col, 1, entry_colspan)
             dropbox.currentTextChanged.connect(self.dropbox_changed)
