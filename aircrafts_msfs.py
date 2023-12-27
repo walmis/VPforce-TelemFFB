@@ -54,10 +54,13 @@ def set_simdatum_to_msfs(simvar, value, units=None):
     except Exception as e:
         logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
 def send_event_to_msfs(event, data: int = 0 ):
-    try:
-        sim_connect.send_event(event, data)
-    except Exception as e:
-        logging.error(f"Error setting event {event} to MSFS: {e}")
+    if event.startswith('L:'):
+        set_simdatum_to_msfs(event, data)
+    else:
+        try:
+            sim_connect.send_event(event, data)
+        except Exception as e:
+            logging.error(f"Error setting event {event} to MSFS: {e}")
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
