@@ -2229,7 +2229,7 @@ class MainWindow(QMainWindow):
         self.test_button = QPushButton("SEND TEST MESSAGE")
         self.test_button.clicked.connect(lambda: send_test_message())
 
-        layout.addWidget(self.test_button)
+        # layout.addWidget(self.test_button)
 
         central_widget.setLayout(layout)
 
