@@ -116,6 +116,16 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
+		<order>9</order>
+		<name>force_trim_enabled</name>
+		<MSFS>true</MSFS>
+		<datatype>bool</datatype>
+		<displayname>Helicopter Force Trim</displayname>
+		<joystick>true</joystick>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
 		<order>9.2</order>
 		<name>cyclic_spring_gain</name>
 		<info>Strength of cyclic spring</info>
@@ -125,16 +135,6 @@
 		<datatype>float</datatype>
 		<displayname>Cyclic Spring Gain</displayname>
 		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<Grouping>Basic</Grouping>
-		<order>9</order>
-		<name>force_trim_enabled</name>
-		<MSFS>true</MSFS>
-		<datatype>bool</datatype>
-		<displayname>Helicopter Force Trim</displayname>
-		<joystick>true</joystick>
-		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
@@ -482,6 +482,7 @@
 		<order>90</order>
 		<name>telemffb_controls_axes</name>
 		<info>TelemFFB sends axis position to sim.  Do not assign in game or SPAD.next</info>
+		<any>true</any>
 		<MSFS>true</MSFS>
 		<value>false</value>
 		<datatype>bool</datatype>
@@ -544,7 +545,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>90.7</order>
+		<order>90.61</order>
 		<name>hands_on_deadzone</name>
 		<info>Distance required to trigger a hands-on condition</info>
 		<prereq>telemffb_controls_axes</prereq>
@@ -558,7 +559,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>90.8</order>
+		<order>90.62</order>
 		<name>hands_off_deadzone</name>
 		<info>Distance at which hands-off resumes (set lower than hands-on)</info>
 		<prereq>telemffb_controls_axes</prereq>
@@ -572,7 +573,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>91</order>
+		<order>93</order>
 		<name>trim_following</name>
 		<info>Enable physical stick movement with in-game trims</info>
 		<prereq>telemffb_controls_axes</prereq>
@@ -585,7 +586,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>91.2</order>
+		<order>93.2</order>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<info>Aileron/Cyclic Lateral physical movement scalar</info>
 		<prereq>trim_following</prereq>
@@ -598,7 +599,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>91.3</order>
+		<order>93.3</order>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<prereq>trim_following</prereq>
 		<MSFS>true</MSFS>
@@ -610,7 +611,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>91.4</order>
+		<order>93.4</order>
 		<name>joystick_trim_follow_gain_physical_y</name>
 		<info>Elevator/Cyclic Longitudinal physical movement scalar</info>
 		<prereq>trim_following</prereq>
@@ -623,7 +624,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>91.5</order>
+		<order>93.5</order>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<info>Adjust virtual y % so that trim ingame does not pitch aircraft when stick held. &lt;br&gt;&lt;br&gt; To configure, slowly apply nose down trim. if the nose goes up, raise the virtual % - if the nose goes down, lower the virtual % - you can go negative.</info>
 		<prereq>trim_following</prereq>
@@ -636,7 +637,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>91.6</order>
+		<order>93.6</order>
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<info>Rudder physical trim movement scalar</info>
 		<prereq>trim_following</prereq>
@@ -649,7 +650,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>91.7</order>
+		<order>93.7</order>
 		<name>rudder_trim_follow_gain_virtual_x</name>
 		<prereq>trim_following</prereq>
 		<MSFS>true</MSFS>
@@ -661,7 +662,95 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
+		<order>91</order>
+		<name>enable_custom_x_axis</name>
+		<info>Use a custom Simconnect Variable</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<displayname>Use a custom Simconnect X Variable</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91.2</order>
+		<name>custom_x_axis</name>
+		<info>Custom Simconnect Variable</info>
+		<prereq>enable_custom_x_axis</prereq>
+		<displayname>Custom Simconnect X Variable</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>AXIS_AILERONS_SET,AXIS_CYCLIC_LATERAL_SET</validvalues>
+		<value>AXIS_AILERONS_SET</value>
+		<datatype>anylist</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91.3</order>
+		<name>raw_x_axis_scale</name>
+		<info>Bit Range Scaling</info>
+		<prereq>enable_custom_x_axis</prereq>
+		<displayname>Bit Range X Scaling</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>1,256,4096,16384</validvalues>
+		<value>16384</value>
+		<datatype>list</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
 		<order>92</order>
+		<name>enable_custom_y_axis</name>
+		<info>Use a custom Simconnect Variable</info>
+		<prereq>telemffb_controls_axes</prereq>
+		<displayname>Use a custom Simconnect Y Variable</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>92.2</order>
+		<name>custom_y_axis</name>
+		<info>Custom Simconnect Variable</info>
+		<prereq>enable_custom_y_axis</prereq>
+		<displayname>Custom Simconnect Y Variable</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>AXIS_ELEVATOR_SET,AXIS_CYCLIC_LONGITUDINAL_SET</validvalues>
+		<value>AXIS_ELEVATOR_SET</value>
+		<datatype>anylist</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>92.3</order>
+		<name>raw_y_axis_scale</name>
+		<info>Bit Range Scaling</info>
+		<prereq>enable_custom_y_axis</prereq>
+		<displayname>Bit Range Y Scaling</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>1,256,4096,16384</validvalues>
+		<value>16384</value>
+		<datatype>list</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>95</order>
 		<name>ap_following</name>
 		<info>Enable physical stick following of autopilot movements</info>
 		<prereq>telemffb_controls_axes</prereq>
@@ -674,7 +763,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>92.2</order>
+		<order>95.2</order>
 		<name>invert_ap_x_axis</name>
 		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
 		<prereq>ap_following</prereq>
@@ -1165,7 +1254,6 @@
 		<order>710</order>
 		<name>aoa_effect_enabled</name>
 		<info>Enable or disable the dynamic Angle of Attack (AoA) based force effect</info>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<displayname>AoA Effect</displayname>
@@ -1203,7 +1291,6 @@
 		<order>720</order>
 		<name>aoa_reduction_effect_enabled</name>
 		<info>Enable or disable the AoA reduction force effect</info>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<displayname>AoA Reduction</displayname>
