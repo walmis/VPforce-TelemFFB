@@ -50,7 +50,8 @@ def read_xml_file(the_sim):
         prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
         sliderfactor_elem = defaults_elem.find('sliderfactor')
         sliderfactor = (f"{sliderfactor_elem.text}") if sliderfactor_elem is not None else "1"
-
+        device_elem = defaults_elem.find('any')
+        device_text = 'any' if device_elem is not None else device
         replaced = 'Sim Default'
 
         # Store data in a dictionary
@@ -66,7 +67,8 @@ def read_xml_file(the_sim):
             'replaced': replaced,
             'prereq': prereq,
             'info': info,
-            'sliderfactor': sliderfactor
+            'sliderfactor': sliderfactor,
+            'device_text': device_text
         }
 
         data_list.append(data_dict)
@@ -87,7 +89,7 @@ def read_anydevice_settings(the_sim):
 
     # Collect data in a list of dictionaries
     data_list = []
-    for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][write_any_device="true"]'):
+    for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][any="true"]'):
 
         name_elem = defaults_elem.find('name')
         if name_elem is not None:

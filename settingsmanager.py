@@ -315,19 +315,20 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def setup_table(self):
         mprint("setup_table")
-        self.table_widget.setColumnCount(10)
-        headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name"]
+        self.table_widget.setColumnCount(11)
+        headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name", "valid", "datatype", "unit", "state", "Device"]
         self.table_widget.setHorizontalHeaderLabels(headers)
         self.table_widget.setColumnWidth(0, 120)
         self.table_widget.setColumnWidth(1, 110)
         self.table_widget.setColumnWidth(2, 210)
-        self.table_widget.setColumnWidth(3, 119)
+        self.table_widget.setColumnWidth(3, 100)
         self.table_widget.setColumnHidden(4, True)
         self.table_widget.setColumnHidden(5, True)
         self.table_widget.setColumnHidden(6, True)
         self.table_widget.setColumnHidden(7, True)
         self.table_widget.setColumnHidden(8, True)
         self.table_widget.setColumnHidden(9, True)
+        self.table_widget.setColumnWidth(10, 70)
         # row click for property manager
         self.table_widget.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
         # this is for handling clicking the actual value cell..
@@ -398,6 +399,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             unit_item = QTableWidgetItem(data_dict['unit'])
             valid_item = QTableWidgetItem(data_dict['validvalues'])
             datatype_item = QTableWidgetItem(data_dict['datatype'])
+            device_item = QTableWidgetItem(data_dict['device_text'])
 
             # store name for use later, not shown
             name_item = QTableWidgetItem(data_dict['name'])
@@ -414,11 +416,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             value_item.setData(Qt.UserRole + 5, data_dict['validvalues'])  # Attach datatype to the item
             value_item.setData(Qt.UserRole + 6, str(state))  # Attach datatype to the item
 
-
             lprint(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
 
             # Check if replaced is an empty string and set text color accordingly
-            for item in [grouping_item, displayname_item, value_item, info_item, replaced_item]:
+            for item in [grouping_item, displayname_item, value_item, info_item, replaced_item]:  #colorizing device_item puts in in 1st column
                 match data_dict['replaced']:
                     case 'Sim Default':
                         item.setForeground(QtGui.QColor('darkblue'))
@@ -441,6 +442,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             displayname_item.setToolTip(data_dict['info'])
             info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
             replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemIsEditable)
+            device_item.setFlags(device_item.flags() & ~Qt.ItemIsEditable)
+
             if not self.allow_in_table_editing:
                 value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
 
@@ -467,6 +470,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setItem(row, 7, datatype_item)
             self.table_widget.setItem(row, 8, unit_item)
             self.table_widget.setItem(row, 9, state_item)
+            self.table_widget.setItem(row, 10, device_item)
 
 
             #self.connected_rows.add(row)
@@ -873,8 +877,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         self.table_widget.clearContents()
         # self.setup_table()
-        self.populate_table()
-        self.toggle_rows()
+        self.reload_table()
 
     def update_table_on_sim_change(self):
         mprint("update_table_on_sim_change")
