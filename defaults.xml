@@ -704,19 +704,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>93.23</order>
-		<name>joystick_trim_follow_offset_x</name>
-		<prereq>trim_following</prereq>
-		<displayname>X Trim Offset</displayname>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>-100,100</validvalues>
-		<value>0</value>
-		<datatype>negfloat</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
 		<order>93.4</order>
 		<name>joystick_trim_follow_gain_physical_y</name>
 		<info>Elevator/Cyclic Longitudinal physical movement scalar</info>
@@ -743,19 +730,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>93.43</order>
-		<name>joystick_trim_follow_offset_y</name>
-		<prereq>trim_following</prereq>
-		<displayname>Y Trim Offset</displayname>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>-100,100</validvalues>
-		<value>0</value>
-		<datatype>negfloat</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
 		<order>93.6</order>
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<info>Rudder physical trim movement scalar</info>
@@ -778,19 +752,6 @@
 		<datatype>negfloat</datatype>
 		<displayname>Rudder Trim Gain (virtual)</displayname>
 		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>93.63</order>
-		<name>rudder_trim_follow_offset_x</name>
-		<prereq>trim_following</prereq>
-		<MSFS>true</MSFS>
-		<pedals>true</pedals>
-		<sliderfactor>1</sliderfactor>
-		<value>0</value>
-		<validvalues>-100,100</validvalues>
-		<datatype>negfloat</datatype>
-		<displayname>Rudder Trim Offset</displayname>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
