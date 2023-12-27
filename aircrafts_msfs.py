@@ -51,16 +51,17 @@ except: pass
 def set_simdatum_to_msfs(simvar, value, units=None):
     try:
         sim_connect.set_simdatum(simvar, value, units=units)
+        # logging.info(f"{simvar}:{value}")
     except Exception as e:
         logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
 def send_event_to_msfs(event, data: int = 0 ):
     if event.startswith('L:'):
-        set_simdatum_to_msfs(event, data)
+        set_simdatum_to_msfs(event, data, units="number")
     else:
         try:
             sim_connect.send_event(event, data)
         except Exception as e:
-            logging.error(f"Error setting event {event} to MSFS: {e}")
+            logging.error(f"Error setting event:{event} value:{data} to MSFS: {e}")
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -360,8 +361,17 @@ class Aircraft(AircraftBase):
                     y_var = 'AXIS_ELEVATOR_SET'
                     y_range = 16384
 
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale)))
+                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+
+                if x_range != 1:
+                    pos_x_pos = -int(pos_x_pos)
+                else:
+                    pos_x_pos = round(pos_x_pos, 5)
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
 
                 send_event_to_msfs(x_var, pos_x_pos)
                 send_event_to_msfs(y_var, pos_y_pos)
@@ -435,7 +445,13 @@ class Aircraft(AircraftBase):
                     x_var = 'AXIS_RUDDER_SET'
                     x_range = 16384
 
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+
+                if x_range != 1:
+                    pos_x_pos = -int(pos_x_pos)
+                else:
+                    pos_x_pos = round(pos_x_pos, 5)
+
                 send_event_to_msfs(x_var, pos_x_pos)
 
                 # update spring data
@@ -634,8 +650,17 @@ class Aircraft(AircraftBase):
                     y_var = 'AXIS_ELEVATOR_SET'
                     y_range = 16384
 
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale)))
+                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+
+                if x_range != 1:
+                    pos_x_pos = -int(pos_x_pos)
+                else:
+                    pos_x_pos = round(pos_x_pos, 5)
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
 
                 send_event_to_msfs(x_var, pos_x_pos)
                 send_event_to_msfs(y_var, pos_y_pos)
@@ -749,7 +774,12 @@ class Aircraft(AircraftBase):
                     x_var = 'AXIS_RUDDER_SET'
                     x_range = 16384
 
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+
+                if x_range != 1:
+                    pos_x_pos = -int(pos_x_pos)
+                else:
+                    pos_x_pos = round(pos_x_pos, 5)
 
                 send_event_to_msfs(x_var, pos_x_pos)
 
@@ -1238,8 +1268,17 @@ class Helicopter(Aircraft):
                         y_var = 'AXIS_CYCLIC_LONGITUDINAL_SET'
                         y_range = 16384
 
-                    pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
-                    pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale)))
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                    pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+                    if y_range != 1:
+                        pos_y_pos = -int(pos_y_pos)
+                    else:
+                        pos_y_pos = round(pos_y_pos, 5)
 
                     send_event_to_msfs(x_var, pos_x_pos)
                     send_event_to_msfs(y_var, pos_y_pos)
@@ -1325,7 +1364,13 @@ class Helicopter(Aircraft):
                 x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
                 x_range = 16384
 
-            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+            pos_x_pos = utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+
+            if x_range != 1:
+                pos_x_pos = -int(pos_x_pos)
+            else:
+                pos_x_pos = round(pos_x_pos, 5)
+
             send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
@@ -1393,7 +1438,12 @@ class Helicopter(Aircraft):
             y_var = 'AXIS_COLLECTIVE_SET'
             y_range = 16384
 
-        pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-y_range , y_range)))
+        pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+
+        if y_range != 1:
+            pos_y_pos = -int(pos_y_pos)
+        else:
+            pos_y_pos = round(pos_y_pos, 5)
 
         if self.collective_init:
             send_event_to_msfs(y_var, pos_y_pos)
@@ -1628,7 +1678,13 @@ class HPGHelicopter(Helicopter):
                 x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
                 x_range = 16384
 
-            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale)))
+            pos_x_pos = utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+
+            if x_range != 1:
+                pos_x_pos = -int(pos_x_pos)
+            else:
+                pos_x_pos = round(pos_x_pos, 5)
+
             send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
@@ -1693,7 +1749,12 @@ class HPGHelicopter(Helicopter):
                     y_var = 'AXIS_COLLECTIVE_SET'
                     y_range = 16384
 
-                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-y_range, y_range)))
+                pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
 
                 if self.collective_init:
                     send_event_to_msfs(y_var, pos_y_pos)
@@ -1729,7 +1790,12 @@ class HPGHelicopter(Helicopter):
                     y_var = 'AXIS_COLLECTIVE_SET'
                     y_range = 16384
 
-                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-y_range, y_range)))
+                pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
 
                 if self.collective_init:
                     send_event_to_msfs(y_var, pos_y_pos)
