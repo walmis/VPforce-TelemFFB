@@ -3074,7 +3074,7 @@ class SettingsLayout(QGridLayout):
             #         olditem = self.itemAtPosition(i, self.exp_col)
             #         if olditem is not None:
             #             self.remove_widget(olditem)
-        if item['prereq'] != '':
+        if item['prereq'] != '' and item['hasbump'] != 'true' and item['order'][-2:] != '.1':
             lbl_colspan = 1
             lbl_col += 1
         self.addWidget(label, i, lbl_col, 1, lbl_colspan)
