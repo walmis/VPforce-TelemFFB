@@ -2739,7 +2739,8 @@ class MainWindow(QMainWindow):
                             my_slider.setHandleColor(vpf_purple)
                     my_slider.blockSignals(False)
 
-            self.update_sim_indicators(data.get('src'), data.get('SimPaused', 0))
+            is_paused = max(data.get('SimPaused', 0), data.get('Parked', 0))
+            self.update_sim_indicators(data.get('src'), is_paused)
 
             shown_pattern = settings_mgr.current_pattern
             if settings_mgr.current_pattern == '':
