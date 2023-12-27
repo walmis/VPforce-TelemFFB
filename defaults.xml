@@ -670,7 +670,6 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -684,8 +683,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
-		<validvalues>AXIS_AILERONS_SET,AXIS_CYCLIC_LATERAL_SET</validvalues>
+		<validvalues>AXIS_AILERONS_SET,AXIS_CYCLIC_LATERAL_SET,AXIS_RUDDER_SET</validvalues>
 		<value>AXIS_AILERONS_SET</value>
 		<datatype>anylist</datatype>
 	</defaults>
@@ -699,7 +697,6 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
 		<validvalues>1,256,4096,16384</validvalues>
 		<value>16384</value>
 		<datatype>list</datatype>
@@ -713,7 +710,6 @@
 		<displayname>Use a custom Simconnect Y Variable</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
 		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
@@ -727,9 +723,8 @@
 		<displayname>Custom Simconnect Y Variable</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
 		<collective>true</collective>
-		<validvalues>AXIS_ELEVATOR_SET,AXIS_CYCLIC_LONGITUDINAL_SET</validvalues>
+		<validvalues>AXIS_ELEVATOR_SET,AXIS_CYCLIC_LONGITUDINAL_SET,AXIS_COLLECTIVE_SET</validvalues>
 		<value>AXIS_ELEVATOR_SET</value>
 		<datatype>anylist</datatype>
 	</defaults>
@@ -742,7 +737,6 @@
 		<displayname>Bit Range Y Scaling</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
 		<collective>true</collective>
 		<validvalues>1,256,4096,16384</validvalues>
 		<value>16384</value>
