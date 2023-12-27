@@ -417,7 +417,7 @@ class TelemManager(QObject, threading.Thread):
             else:
                 the_sim = send_source
 
-            cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype)
+            cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, args.type)
             settings_mgr.current_pattern = pattern
             if cls_name == '': cls_name = 'Aircraft'
             for setting in result:
@@ -3064,7 +3064,7 @@ class SettingsLayout(QGridLayout):
         label = QLabel(f"{item['displayname']}")
         label.setToolTip(item['info'])
         label.setMinimumHeight(20)
-        # label.setMinimumWidth(150)
+        label.setMinimumWidth(20)
         # label.setMaximumWidth(150)
         if item['order'][-2:] == '.1':
             olditem = self.itemAtPosition(i, lbl_col)

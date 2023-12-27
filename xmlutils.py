@@ -23,14 +23,19 @@ def update_vars(_device, _userconfig_path, _defaults_path):
     defaults_path = _defaults_path
 
 
-def read_xml_file(the_sim):
+def read_xml_file(the_sim, instance_device=''):
     mprint(f"read_xml_file  {the_sim}")
     tree = ET.parse(defaults_path)
     root = tree.getroot()
 
+    if instance_device == '':
+        the_device = device
+    else:
+        the_device = instance_device
+
     # Collect data in a list of dictionaries
     data_list = []
-    for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{device}="true"]'):
+    for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{the_device}="true"]'):
 
         grouping = defaults_elem.find('Grouping').text
         order = defaults_elem.find('order').text
@@ -138,7 +143,7 @@ def read_models(the_sim, the_class=''):
     return sorted(all_models)
 
 
-def read_models_data(file_path, sim, full_model_name, alldevices=False):
+def read_models_data(file_path, sim, full_model_name, alldevices=False, instance_device = ''):
     mprint(f"read_models_data  {file_path}, {sim}, {full_model_name}")
     # runs on both defaults and userconfig xml files
     tree = ET.parse(file_path)
@@ -147,14 +152,19 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False):
     model_data = []
     found_pattern = ''
 
+    if instance_device == '':
+        the_device = device
+    else:
+        the_device = instance_device
+
     if alldevices:
         # Iterate through models elements
         #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{device}"]'):
         all_models = root.findall(f'.//models[sim="{sim}"]') + \
                           root.findall(f'.//models[sim="any"]')
     else:
-        all_models = root.findall(f'.//models[sim="{sim}"][device="{device}"]') + \
-                          root.findall(f'.//models[sim="any"][device="{device}"]') + \
+        all_models = root.findall(f'.//models[sim="{sim}"][device="{the_device}"]') + \
+                          root.findall(f'.//models[sim="any"][device="{the_device}"]') + \
                           root.findall(f'.//models[sim="{sim}"][device="any"]') + \
                           root.findall(f'.//models[sim="any"][device="any"]')
 
@@ -187,18 +197,21 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False):
     return model_data, found_pattern
 
 
-def read_default_class_data(the_sim, the_class):
+def read_default_class_data(the_sim, the_class, instance_device=''):
     mprint(f"read_default_class_data  sim {the_sim}, class {the_class}")
     tree = ET.parse(defaults_path)
     root = tree.getroot()
 
     class_data = []
-
+    if instance_device == '':
+        the_device = device
+    else:
+        the_device = instance_device
     # Iterate through models elements
     #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]'):
     #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]'):
-    for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]') + \
-                      root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="{device}"]') + \
+    for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{the_device}"]') + \
+                      root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="{the_device}"]') + \
                       root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
                       root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="any"]'):
 
@@ -221,7 +234,7 @@ def read_default_class_data(the_sim, the_class):
     return class_data
 
 
-def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
+def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_device = ''):
     logging.info (f"Reading from XML:  Sim: {the_sim}, Aircraft name: {aircraft_name}, Class: {input_modeltype}")
 
     time.sleep(0.1)
@@ -230,8 +243,8 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
     print_each_step = False  # for debugging
 
     # Read models data first
-    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, aircraft_name)
-    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, aircraft_name)
+    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, aircraft_name,False,instance_device)
+    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, aircraft_name,False,instance_device)
 
     model_pattern = def_model_pattern
     if usr_model_pattern != '':
@@ -257,7 +270,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
 
 
     # get default Aircraft settings for this sim and device
-    simdata = read_xml_file(the_sim)
+    simdata = read_xml_file(the_sim, instance_device)
 
     if print_counts:  lprint(f"simdata count {len(simdata)}")
 
@@ -297,7 +310,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
 
     # get userconfig sim overrides
 
-    user_default_data = read_user_sim_data(the_sim)
+    user_default_data = read_user_sim_data(the_sim, instance_device)
     if user_default_data is not None:
         # merge if there is any
         def_craft_user_default_result = update_data_with_models(default_craft_result, user_default_data, 'Sim (user)')
@@ -309,7 +322,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
 
     if model_class != "":
         # get userconfg craft specific type overrides
-        usercraftdata = read_user_class_data(the_sim, model_class)
+        usercraftdata = read_user_class_data(the_sim, model_class, instance_device)
         if usercraftdata is not None:
             # merge if there is any
             def_craft_usercraft_result = update_data_with_models(def_craft_user_default_result, usercraftdata, 'Class (user)')
@@ -341,17 +354,20 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = ''):
     return model_class, model_pattern, sorted_data
 
 
-def read_user_sim_data(the_sim):
+def read_user_sim_data(the_sim, instance_device=''):
     mprint(f"read_user_sim_data {the_sim}")
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     sim_data = []
-
+    if instance_device == '':
+        the_device = device
+    else:
+        the_device = instance_device
     # Iterate through models elements
     # for model_elem in root.findall(f'.//simSettings[sim="{the_sim}" or sim="any"][device="{device}" or device="any"]'):
-    for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{device}"]') + \
-                       root.findall(f'.//simSettings[sim="any"][device="{device}"]') + \
+    for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{the_device}"]') + \
+                       root.findall(f'.//simSettings[sim="any"][device="{the_device}"]') + \
                        root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]')  + \
                        root.findall(f'.//simSettings[sim="any"][device="any"]'):
 
@@ -373,16 +389,19 @@ def read_user_sim_data(the_sim):
 
     return sim_data
 
-def read_user_class_data(the_sim, crafttype):
+def read_user_class_data(the_sim, crafttype, instance_device=''):
     mprint(f"read_user_class_data  {the_sim}, {crafttype}")
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
 
     model_data = []
-
+    if instance_device == '':
+        the_device = device
+    else:
+        the_device = instance_device
     # Iterate through models elements
     #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]'):
-    for model_elem in root.findall(f'.//classSettings[sim="{the_sim}"][device="{device}"]'):     # + \
+    for model_elem in root.findall(f'.//classSettings[sim="{the_sim}"][device="{the_device}"]'):     # + \
                       # root.findall(f'.//classSettings[sim="any"][device="{device}"]') + \
                       # root.findall(f'.//classSettings[sim="{the_sim}"][device="any"]') + \
                       # root.findall(f'.//classSettings[sim="any"][device="any"]'):
