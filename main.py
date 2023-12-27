@@ -3177,9 +3177,12 @@ class SettingsLayout(QGridLayout):
             dropbox.setCurrentText(item['value'])
             if item['datatype'] == 'list':
                 dropbox.lineEdit().setReadOnly(True)
+                dropbox.editTextChanged.connect(self.dropbox_changed)
+            else:
+                dropbox.currentTextChanged.connect(self.dropbox_changed)
             dropbox.blockSignals(False)
             self.addWidget(dropbox, i, self.entry_col, 1, entry_colspan)
-            dropbox.currentTextChanged.connect(self.dropbox_changed)
+            # dropbox.currentTextChanged.connect(self.dropbox_changed)
 
         if item['datatype'] == 'path':
             browse_button = QPushButton()

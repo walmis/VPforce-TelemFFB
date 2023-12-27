@@ -211,7 +211,7 @@
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<Grouping>s</Grouping>
 		<order>20.4</order>
 		<name>rudder_spring_gain</name>
 		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
@@ -682,9 +682,21 @@
 		<displayname>Custom Simconnect X Variable</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<validvalues>AXIS_AILERONS_SET,AXIS_CYCLIC_LATERAL_SET,AXIS_RUDDER_SET</validvalues>
+		<validvalues>AXIS_AILERONS_SET,AXIS_CYCLIC_LATERAL_SET</validvalues>
 		<value>AXIS_AILERONS_SET</value>
+		<datatype>anylist</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>91.2</order>
+		<name>custom_x_axis</name>
+		<info>Custom Simconnect Variable</info>
+		<prereq>enable_custom_x_axis</prereq>
+		<displayname>Custom Simconnect X Variable</displayname>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<validvalues>AXIS_RUDDER_SET,ROTOR_AXIS_TAIL_ROTOR_SET</validvalues>
+		<value>AXIS_RUDDER_SET</value>
 		<datatype>anylist</datatype>
 	</defaults>
 	<defaults>
@@ -723,9 +735,21 @@
 		<displayname>Custom Simconnect Y Variable</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<collective>true</collective>
-		<validvalues>AXIS_ELEVATOR_SET,AXIS_CYCLIC_LONGITUDINAL_SET,AXIS_COLLECTIVE_SET</validvalues>
+		<validvalues>AXIS_ELEVATOR_SET,AXIS_CYCLIC_LONGITUDINAL_SET</validvalues>
 		<value>AXIS_ELEVATOR_SET</value>
+		<datatype>anylist</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>92.2</order>
+		<name>custom_y_axis</name>
+		<info>Custom Simconnect Variable</info>
+		<prereq>enable_custom_y_axis</prereq>
+		<displayname>Custom Simconnect Y Variable</displayname>
+		<MSFS>true</MSFS>
+		<collective>true</collective>
+		<validvalues>AXIS_COLLECTIVE_SET</validvalues>
+		<value>AXIS_COLLECTIVE_SET</value>
 		<datatype>anylist</datatype>
 	</defaults>
 	<defaults>
@@ -3893,7 +3917,7 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>use_legacy_bindings</name>
+		<name>enable_custom_x_axis</name>
 		<model>FlyInside B206.*</model>
 		<value>true</value>
 		<sim>MSFS</sim>
@@ -3959,7 +3983,14 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>use_legacy_bindings</name>
+		<name>force_trim_enabled</name>
+		<model>FlyInside B47.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
 		<model>FlyInside B47.*</model>
 		<value>true</value>
 		<sim>MSFS</sim>
@@ -4680,6 +4711,55 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>enable_custom_x_axis</name>
+		<model>Pilatus PC-12.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_x_axis</name>
+		<model>Pilatus PC-12.*</model>
+		<value>L:ARI_AileronInput</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>Pilatus PC-12.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_x_axis</name>
+		<model>Pilatus PC-12.*</model>
+		<value>L:ARI_RudderInput</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>raw_x_axis_scale</name>
+		<model>Pilatus PC-12.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>raw_x_axis_scale</name>
+		<model>Pilatus PC-12.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>invert_ap_x_axis</name>
+		<model>Pilatus PC-12.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>elevator_droop_moment</name>
 		<model>Pilatus PC-6.*</model>
 		<value>0.3</value>
@@ -4696,6 +4776,13 @@
 	<models>
 		<name>type</name>
 		<model>Pilatus PC-6.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Pilatus PC-12.*</model>
 		<value>TurbopropAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
