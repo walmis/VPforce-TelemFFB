@@ -4681,21 +4681,21 @@
 		</models>
 	<models>
 		<name>elevator_droop_moment</name>
-		<model>Pilatus PC-6*</model>
+		<model>Pilatus PC-6.*</model>
 		<value>0.3</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Pilatus PC-6*</model>
+		<model>Pilatus PC-6.*</model>
 		<value>0.65</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
-		<model>Pilatus PC-6*</model>
+		<model>Pilatus PC-6.*</model>
 		<value>TurbopropAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
