@@ -171,7 +171,9 @@ log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
 if not os.path.exists(log_folder):
     os.makedirs(log_folder)
 
-logname = "".join(["TelemFFB", "_", _device_vid_pid.replace(":", "-"), '_', args.type, "_xmlconfig.log"])
+date_str = datetime.now().strftime("%Y%m%d")
+
+logname = "".join(["TelemFFB", "_", _device_vid_pid.replace(":", "-"), '_', args.type, "_", date_str, ".log"])
 log_file = os.path.join(log_folder, logname)
 
 # Create a logger instance
@@ -179,7 +181,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 # Create a formatter for the log messages
-formatter = logging.Formatter('%(asctime)s.%(msecs)d - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+formatter = logging.Formatter('%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 # Create a StreamHandler to log messages to the console
 console_handler = logging.StreamHandler(sys.stdout)
@@ -187,7 +189,7 @@ console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 
 # Create a FileHandler to log messages to the log file
-file_handler = logging.FileHandler(log_file, mode='w')
+file_handler = logging.FileHandler(log_file, mode='a')
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(formatter)
 
@@ -200,6 +202,12 @@ userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB
 userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
 
 utils.create_empty_userxml_file(userconfig_path)
+
+if not args.child:
+    try:    # in case other instance tries doing at the same time
+        utils.archive_logs(log_folder)
+    except:
+        pass
 
 import aircrafts_dcs
 import aircrafts_msfs
@@ -227,8 +235,11 @@ if getattr(sys, 'frozen', False):
     appmode = 'Executable'
 else:
     appmode = 'Source'
-
-logging.info(f"TelemFFB starting up from {appmode}:  Args= {args.__dict__}")
+logging.info("**************************************")
+logging.info("**************************************")
+logging.info(f"*****    TelemFFB starting up from {appmode}:  Args= {args.__dict__}")
+logging.info("**************************************")
+logging.info("**************************************")
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
     utils.teleplot.configure(args.teleplot)

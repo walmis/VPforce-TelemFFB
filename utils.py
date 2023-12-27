@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License 
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+from datetime import datetime
 import math
 import os
 import random
@@ -313,6 +313,25 @@ class Vector:
             m11 * self.x + m21 * self.y + m31 * self.z,
             m12 * self.x + m22 * self.y + m32 * self.z
         )
+
+
+def archive_logs(directory):
+    today = datetime.today().strftime('%Y%m%d')
+
+    for filename in os.listdir(directory):
+        if filename.endswith('.log'):
+            file_date = filename[:-4][-8:]  # Extract the date part
+            if file_date != today:
+                zip_filename = f"TelemFFB_Log_Archive_{file_date}.zip"
+                readable_date = datetime.strptime(file_date, "%Y%m%d").strftime('%B %d, %Y')
+                logging.info(f"Archiving logs from {readable_date} into {zip_filename}")
+                zip_path = os.path.join(directory, zip_filename)
+
+                with zipfile.ZipFile(zip_path, 'a') as zip_file:
+                    log_file_path = os.path.join(directory, filename)
+                    zip_file.write(log_file_path, os.path.basename(log_file_path))
+                    os.remove(log_file_path)  # Remove the original log file
+
 def set_reg(name, value):
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
     try:
