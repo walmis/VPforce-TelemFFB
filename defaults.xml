@@ -532,19 +532,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>90.5</order>
-		<name>use_legacy_bindings</name>
-		<info>For helicopters that still use aileron/elevator or rudder bindings</info>
-		<prereq>telemffb_controls_axes</prereq>
-		<MSFS>true</MSFS>
-		<datatype>bool</datatype>
-		<displayname>Use Legacy Bindings</displayname>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
 		<order>90.61</order>
 		<name>hands_on_deadzone</name>
 		<info>Distance required to trigger a hands-on condition</info>
@@ -666,7 +653,7 @@
 		<name>enable_custom_x_axis</name>
 		<info>Use a custom Simconnect Variable</info>
 		<prereq>telemffb_controls_axes</prereq>
-		<displayname>Use a custom Simconnect X Variable</displayname>
+		<displayname>Custom Simconnect X Variable</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -677,9 +664,9 @@
 		<Grouping>Axis Control</Grouping>
 		<order>91.2</order>
 		<name>custom_x_axis</name>
-		<info>Custom Simconnect Variable</info>
+		<info>Custom Simconnect Variable - use "L:VARNAME" for LVARS</info>
 		<prereq>enable_custom_x_axis</prereq>
-		<displayname>Custom Simconnect X Variable</displayname>
+		<displayname>Custom Simconnect X Var Name</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<validvalues>AXIS_AILERONS_SET,AXIS_CYCLIC_LATERAL_SET</validvalues>
@@ -690,9 +677,9 @@
 		<Grouping>Axis Control</Grouping>
 		<order>91.2</order>
 		<name>custom_x_axis</name>
-		<info>Custom Simconnect Variable</info>
+		<info>Custom Simconnect Variable - use "L:VARNAME" for LVARS</info>
 		<prereq>enable_custom_x_axis</prereq>
-		<displayname>Custom Simconnect X Variable</displayname>
+		<displayname>Custom Simconnect X Var Name</displayname>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
 		<validvalues>AXIS_RUDDER_SET,ROTOR_AXIS_TAIL_ROTOR_SET</validvalues>
@@ -719,7 +706,7 @@
 		<name>enable_custom_y_axis</name>
 		<info>Use a custom Simconnect Variable</info>
 		<prereq>telemffb_controls_axes</prereq>
-		<displayname>Use a custom Simconnect Y Variable</displayname>
+		<displayname>Custom Simconnect Y Variable</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
@@ -730,9 +717,9 @@
 		<Grouping>Axis Control</Grouping>
 		<order>92.2</order>
 		<name>custom_y_axis</name>
-		<info>Custom Simconnect Variable</info>
+		<info>Custom Simconnect Variable - use "L:VARNAME" for LVARS</info>
 		<prereq>enable_custom_y_axis</prereq>
-		<displayname>Custom Simconnect Y Variable</displayname>
+		<displayname>Custom Simconnect Y Var Name</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<validvalues>AXIS_ELEVATOR_SET,AXIS_CYCLIC_LONGITUDINAL_SET</validvalues>
@@ -743,9 +730,9 @@
 		<Grouping>Axis Control</Grouping>
 		<order>92.2</order>
 		<name>custom_y_axis</name>
-		<info>Custom Simconnect Variable</info>
+		<info>Custom Simconnect Variable - use "L:VARNAME" for LVARS</info>
 		<prereq>enable_custom_y_axis</prereq>
-		<displayname>Custom Simconnect Y Variable</displayname>
+		<displayname>Custom Simconnect Y Var Name</displayname>
 		<MSFS>true</MSFS>
 		<collective>true</collective>
 		<validvalues>AXIS_COLLECTIVE_SET</validvalues>

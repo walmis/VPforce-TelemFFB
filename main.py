@@ -2817,15 +2817,8 @@ class SettingsLayout(QGridLayout):
     show_order_debug = False # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
 
-    chk_col = 1
-    exp_col = 0
-    lbl_col = 2
-    entry_col = 3
-    unit_col = 4
-    val_col = 5
-    erase_col = 6
-    fct_col = 10
-    ord_col = 11
+
+
 
     all_sliders = []
 
@@ -3009,13 +3002,25 @@ class SettingsLayout(QGridLayout):
 
     def generate_settings_row(self, item, i, rowdisabled=False):
         entry_colspan = 2
+        lbl_colspan = 2
+
+        exp_col = 0
+        chk_col = 1
+        lbl_col = 2
+        entry_col = 4
+        unit_col = 5
+        val_col = 6
+        erase_col = 7
+        fct_col = 10
+        ord_col = 11
+
         validvalues = item['validvalues'].split(',')
 
         if self.show_order_debug:
             order_lbl = QLabel()
             order_lbl.setText(item['order'])
             order_lbl.setMaximumWidth(30)
-            self.addWidget(order_lbl, i, self.ord_col)
+            self.addWidget(order_lbl, i, ord_col)
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
@@ -3030,7 +3035,9 @@ class SettingsLayout(QGridLayout):
             else:
                 checkbox.setCheckState(2)
             checkbox.blockSignals(False)
-            self.addWidget(checkbox, i, self.chk_col)
+            if item['prereq'] != '':
+                chk_col += 1
+            self.addWidget(checkbox, i, chk_col)
             checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
 
         if item['unit'] is not None and item['unit'] != '':
@@ -3048,7 +3055,7 @@ class SettingsLayout(QGridLayout):
                 unit_dropbox.setCurrentText(item['unit'])
             unit_dropbox.setObjectName(f"ud_{item['name']}")
             unit_dropbox.currentIndexChanged.connect(self.unit_dropbox_changed)
-            self.addWidget(unit_dropbox, i, self.unit_col)
+            self.addWidget(unit_dropbox, i, unit_col)
             unit_dropbox.blockSignals(False)
             unit_dropbox.setDisabled(rowdisabled)
 
@@ -3059,7 +3066,7 @@ class SettingsLayout(QGridLayout):
         # label.setMinimumWidth(150)
         # label.setMaximumWidth(150)
         if item['order'][-2:] == '.1':
-            olditem = self.itemAtPosition(i, self.lbl_col)
+            olditem = self.itemAtPosition(i, lbl_col)
             if olditem is not None:
                 self.remove_widget(olditem)
             # for p_item in self.prereq_list:
@@ -3067,8 +3074,10 @@ class SettingsLayout(QGridLayout):
             #         olditem = self.itemAtPosition(i, self.exp_col)
             #         if olditem is not None:
             #             self.remove_widget(olditem)
-
-        self.addWidget(label, i, self.lbl_col)
+        if item['prereq'] != '':
+            lbl_colspan = 1
+            lbl_col += 1
+        self.addWidget(label, i, lbl_col, 1, lbl_colspan)
 
 
         slider = NoWheelSlider()
@@ -3090,7 +3099,7 @@ class SettingsLayout(QGridLayout):
 
         expand_button = QToolButton()
         if item['name'] in self.expanded_items:
-            expand_button.setArrowType(Qt.UpArrow)
+            expand_button.setArrowType(Qt.DownArrow)
         else:
             expand_button.setArrowType(Qt.RightArrow)
         expand_button.setMaximumWidth(24)
@@ -3142,9 +3151,9 @@ class SettingsLayout(QGridLayout):
             slider.valueChanged.connect(self.slider_changed)
             slider.sliderPressed.connect(self.sldDisconnect)
             slider.sliderReleased.connect(self.sldReconnect)
-            self.addWidget(slider, i, self.entry_col, 1, entry_colspan)
-            self.addWidget(value_label, i, self.val_col)
-            self.addWidget(sliderfactor, i, self.fct_col)
+            self.addWidget(slider, i, entry_col, 1, entry_colspan)
+            self.addWidget(value_label, i, val_col)
+            self.addWidget(sliderfactor, i, fct_col)
 
             slider.blockSignals(False)
 
@@ -3162,9 +3171,9 @@ class SettingsLayout(QGridLayout):
             d_slider.valueChanged.connect(self.d_slider_changed)
             d_slider.sliderPressed.connect(self.sldDisconnect)
             d_slider.sliderReleased.connect(self.d_sldReconnect)
-            self.addWidget(d_slider, i, self.entry_col, 1, entry_colspan)
-            self.addWidget(value_label, i, self.val_col)
-            self.addWidget(sliderfactor, i, self.fct_col)
+            self.addWidget(d_slider, i, entry_col, 1, entry_colspan)
+            self.addWidget(value_label, i, val_col)
+            self.addWidget(sliderfactor, i, fct_col)
 
             d_slider.blockSignals(False)
 
@@ -3182,7 +3191,7 @@ class SettingsLayout(QGridLayout):
             else:
                 dropbox.currentTextChanged.connect(self.dropbox_changed)
             dropbox.blockSignals(False)
-            self.addWidget(dropbox, i, self.entry_col, 1, entry_colspan)
+            self.addWidget(dropbox, i, entry_col, 1, entry_colspan)
             # dropbox.currentTextChanged.connect(self.dropbox_changed)
 
         if item['datatype'] == 'path':
@@ -3199,14 +3208,16 @@ class SettingsLayout(QGridLayout):
                 browse_button.setText(button_text)
             browse_button.blockSignals(False)
             browse_button.clicked.connect(self.browse_for_config)
-            self.addWidget(browse_button, i, self.entry_col, 1, entry_colspan)
+            self.addWidget(browse_button, i, entry_col, 1, entry_colspan)
 
         if item['datatype'] == 'int' or item['datatype'] == 'anyfloat':
-            self.addWidget(line_edit, i, self.entry_col, 1, entry_colspan)
+            self.addWidget(line_edit, i, entry_col, 1, entry_colspan)
 
         if item['datatype'] == 'button':
-            self.addWidget(self.usbdevice_button, i, self.entry_col, 1, entry_colspan)
+            self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan)
 
+        if item['has_expander'] == 'true' and item['prereq'] != '':
+            exp_col += 1
         if not rowdisabled:
             # for p_item in self.prereq_list:
             #     if p_item['prereq'] == item['name'] : # and p_item['count'] > 1:
@@ -3216,13 +3227,14 @@ class SettingsLayout(QGridLayout):
 
             if item['has_expander'].lower() == 'true':
                 if item['name'] in self.expanded_items:
-                    row_count = int(item['prereq_count'])
+                    row_count = p_count
                     if item['hasbump'].lower() != 'true':
                         row_count += 1
                     expand_button.setMaximumHeight(200)
-                    self.addWidget(expand_button, i, self.exp_col, row_count, 1)
+                    # self.addWidget(expand_button, i, exp_col, row_count, 1)
+                    self.addWidget(expand_button, i, exp_col)
                 else:
-                    self.addWidget(expand_button, i, self.exp_col)
+                    self.addWidget(expand_button, i, exp_col)
 
         label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
@@ -3243,7 +3255,7 @@ class SettingsLayout(QGridLayout):
 
         if item['replaced'] == 'Model (user)':
             if item['name'] != 'type':  # dont erase type on mainwindow settings
-                self.addWidget(erase_button,i, self.erase_col)
+                self.addWidget(erase_button,i, erase_col)
                 #print(f"erase {item['name']} button set up")
 
 
@@ -3316,7 +3328,7 @@ class SettingsLayout(QGridLayout):
             print ('expanded')
 
             self.expanded_items.append(settingname)
-            self.sender().setArrowType(Qt.UpArrow)
+            self.sender().setArrowType(Qt.DownArrow)
 
             self.reload_caller()
         else:
