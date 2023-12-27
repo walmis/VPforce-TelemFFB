@@ -181,7 +181,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
 # Create a formatter for the log messages
-formatter = logging.Formatter('%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+formatter = logging.Formatter('%(asctime)s.%(msecs)03d - %(levelname)s - %(device_type)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 # Create a StreamHandler to log messages to the console
 console_handler = logging.StreamHandler(sys.stdout)
@@ -253,6 +253,7 @@ class LoggingFilter(logging.Filter):
 
     def filter(self, record):
         # Check if any of the keywords are present in the log message
+        record.device_type = _device_type
         for keyword in self.keywords:
             if keyword in record.getMessage():
                 # If any keyword is found, prevent the message from being logged
