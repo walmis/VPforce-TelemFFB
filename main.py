@@ -2231,8 +2231,8 @@ class MainWindow(QMainWindow):
         version_row_layout.setAlignment(Qt.AlignBottom)
         layout.addLayout(version_row_layout)
 
-        self.test_button = QPushButton("SEND TEST MESSAGE")
-        self.test_button.clicked.connect(lambda: send_test_message())
+        # self.test_button = QPushButton("SEND TEST MESSAGE")
+        # self.test_button.clicked.connect(lambda: send_test_message())
 
         # layout.addWidget(self.test_button)
 
@@ -2242,6 +2242,14 @@ class MainWindow(QMainWindow):
         self.load_main_window_geometry()
         self.last_height = self.height()
         self.last_width = self.width()
+
+    def test_function(self):
+        self.set_scrollbar(400)
+
+
+    def set_scrollbar(self, pos):
+        self.settings_area.verticalScrollBar().setValue(pos)
+
 
     def update_log_widget(self, log_line):
         cursor = self.log_widget.textCursor()
@@ -2987,7 +2995,9 @@ class SettingsLayout(QGridLayout):
         #print (f"{i} rows with {self.count()} widgets")
 
     def reload_caller(self):
+        pos = self.mainwindow.settings_area.verticalScrollBar().value()
         self.reload_layout(None)
+        QTimer.singleShot(150, lambda: self.mainwindow.set_scrollbar(pos))
 
     def reload_layout(self, result=None):
         self.clear_layout()
@@ -3436,6 +3446,7 @@ class NoKeyScrollArea(QScrollArea):
         super().__init__()
 
         self.sliders = []
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
 
     def addSlider(self, slider):
         self.sliders.append(slider)
