@@ -574,7 +574,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                         value = 'False'
                     else:
                         value = 'True'
-                elif datatype in ['int', 'float', 'negfloat', 'cfgfloat']:
+                elif datatype in ['int', 'd_int', 'float', 'negfloat', 'cfgfloat']:
                     # For line edit
                     value = value_item.text()
                 else:
@@ -638,7 +638,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 self.slider_float.setValue(pctval)
                 self.tb_value.setText(str(pctval) + '%')
 
-            case 'int' | 'text' | 'anyfloat' | 'button':
+            case 'int' | 'd_int' | 'text' | 'anyfloat' | 'button':
                 self.l_value.show()
                 self.tb_value.show()
 
@@ -953,7 +953,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if not self.allow_in_table_editing:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)  #
             return item
-        elif datatype == 'int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat' or datatype == 'cfgfloat' :
+        elif datatype == 'int' or datatype == 'd_int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat' or datatype == 'cfgfloat' :
             the_unit = str(unit)
             if the_unit == 'None':
                 the_unit = ''
