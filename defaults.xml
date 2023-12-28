@@ -4248,6 +4248,21 @@
 		</models>
 	<models>
 		<name>type</name>
+		<model>Kodiak 100.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Kodiak 100.*</model>
+		<value>8</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
 		<model>La-5 ser.8</model>
 		<value>PropellerAircraft</value>
 		<sim>IL2</sim>
