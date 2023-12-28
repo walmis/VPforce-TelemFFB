@@ -2830,9 +2830,6 @@ class SettingsLayout(QGridLayout):
     show_order_debug = False # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
 
-
-
-
     all_sliders = []
 
     def __init__(self, parent=None, mainwindow=None):
@@ -3174,6 +3171,32 @@ class SettingsLayout(QGridLayout):
 
             slider.blockSignals(False)
 
+        if item['datatype'] == 'cfgfloat':
+
+            # print(f"label {value_label.objectName()} for slider {slider.objectName()}")
+
+            if '%' in item['value']:
+                pctval = int(item['value'].replace('%', ''))
+            else:
+                pctval = int(float(item['value']) * 100)
+            pctval = int(round(pctval))
+            print (f"configurator value: {item['value']}   slider: {pctval}")
+            slider.blockSignals(True)
+            if validvalues is None or validvalues == '':
+                pass
+            else:
+                slider.setRange(int(validvalues[0]), int(validvalues[1]))
+            slider.setValue(pctval)
+            value_label.setText(str(pctval) + '%')
+            slider.valueChanged.connect(self.cfg_slider_changed)
+            slider.sliderPressed.connect(self.sldDisconnect)
+            slider.sliderReleased.connect(self.cfg_sldReconnect)
+            self.addWidget(slider, i, entry_col, 1, entry_colspan)
+            self.addWidget(value_label, i, val_col)
+            self.addWidget(sliderfactor, i, fct_col)
+
+            slider.blockSignals(False)
+
         if item['datatype'] == 'd_int' :
 
             d_val = int(item['value'])
@@ -3396,6 +3419,23 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
         # self.reload_caller()
 
+    def cfg_slider_changed(self):
+        setting_name = self.sender().objectName().replace('sld_', '')
+        value_label_name = 'vl_' + self.sender().objectName().replace('sld_', '')
+
+        value_label = self.mainwindow.findChild(QLabel, value_label_name)
+        value = 0
+        factor = 1.0
+        if value_label is not None:
+            value_label.setText(str(self.sender().value()) + '%')
+            value = int(self.sender().value())
+
+        value_to_save = str(round(value / 100, 4))
+        if self.show_slider_debug:
+            print(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
+        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
+        # self.reload_caller()
+
     def d_slider_changed(self):
         setting_name = self.sender().objectName().replace('dsld_', '')
         value_label_name = 'vl_' + self.sender().objectName().replace('dsld_', '')
@@ -3427,6 +3467,10 @@ class SettingsLayout(QGridLayout):
     # reconnect slider after you let go
     def sldReconnect(self):
         self.sender().valueChanged.connect(self.slider_changed)
+        self.sender().valueChanged.emit(self.sender().value())
+
+    def cfg_sldReconnect(self):
+        self.sender().valueChanged.connect(self.cfg_slider_changed)
         self.sender().valueChanged.emit(self.sender().value())
 
     def d_sldReconnect(self):

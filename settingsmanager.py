@@ -557,7 +557,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                         value = 'False'
                     else:
                         value = 'True'
-                elif datatype in ['int', 'float', 'negfloat']:
+                elif datatype in ['int', 'float', 'negfloat', 'cfgfloat']:
                     # For line edit
                     value = value_item.text()
                 else:
@@ -595,7 +595,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 self.cb_enable.setCheckState(chkvalue)
                 #self.tb_value.show()
                 self.tb_value.setText(value)
-            case 'float':
+            case 'float' | 'cfgfloat':
                 self.slider_float.setMinimum(0)
                 self.slider_float.setMaximum(100)
                 self.l_value.show()
@@ -923,7 +923,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             if not self.allow_in_table_editing:
                 item.setFlags(item.flags() & ~Qt.ItemIsEnabled)  #
             return item
-        elif datatype == 'int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat':
+        elif datatype == 'int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat' or datatype == 'cfgfloat' :
             the_unit = str(unit)
             if the_unit == 'None':
                 the_unit = ''

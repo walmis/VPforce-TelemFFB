@@ -1881,7 +1881,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>899</order>
+		<order>850</order>
 		<name>center_spring_on_pause</name>
 		<info>Force spring centering when in pause/slew mode&lt;br&gt;&lt;br&gt;When disabled, you will need to bring the axis close to center to re-establish axis control</info>
 		<MSFS>true</MSFS>
@@ -1893,11 +1893,136 @@
 		</defaults>
 	<defaults>
 		<Grouping>System</Grouping>
-		<order>902</order>
+		<order>910</order>
+		<name>config_override_enable</name>
+		<info>Change VPConfigurator Sliders</info>
+		<displayname>Override Configurator Sliders</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>910.2</order>
+		<name>config_master_gain</name>
+		<prereq>config_override_enable</prereq>
+		<displayname>Master Gain</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>cfgfloat</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>910.3</order>
+		<name>config_periodic_effects</name>
+		<prereq>config_override_enable</prereq>
+		<displayname>Periodic Effects</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>cfgfloat</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>910.4</order>
+		<name>config_spring</name>
+		<prereq>config_override_enable</prereq>
+		<displayname>Spring</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>cfgfloat</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>910.5</order>
+		<name>config_damper</name>
+		<prereq>config_override_enable</prereq>
+		<displayname>Damper</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>cfgfloat</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>910.6</order>
+		<name>config_inertia</name>
+		<prereq>config_override_enable</prereq>
+		<displayname>Inertia</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>cfgfloat</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>910.7</order>
+		<name>config_friction</name>
+		<prereq>config_override_enable</prereq>
+		<displayname>Friction</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>cfgfloat</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>910.8</order>
+		<name>config_constant</name>
+		<prereq>config_override_enable</prereq>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>cfgfloat</datatype>
+		<displayname>Constant</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>950</order>
 		<name>vpconf</name>
 		<info>Load a specific .vpconf file (created with VPForce Configurator)&lt;br&gt;&lt;br&gt;When using this function, it will remain active until set again by another sim, class, or model setting</info>
-		<value>-</value>
-		<datatype>path</datatype>
 		<displayname>Configurator File</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -1905,6 +2030,8 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<value>-</value>
+		<datatype>path</datatype>
 	</defaults>
 	<models>
 		<name>etl_effect_intensity</name>
