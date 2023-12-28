@@ -687,6 +687,7 @@ class IPCNetworkThread(QThread):
         self._missed_keepalive = missed_keepalive
         self._last_keepalive_timestamp = time.time()
         self._ipc_telem = {}
+        self._ipc_telem_effects = {}
 
         # Initialize socket
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -699,7 +700,19 @@ class IPCNetworkThread(QThread):
 
     def send_ipc_telem(self, telem):
         j_telem = json.dumps(telem)
-        self.send_message(j_telem)
+        message = f"telem:{j_telem}"
+        self.send_message(message)
+    def send_ipc_effects(self, active_effects, active_settings):
+        payload = {
+            f'{_device_type}_active_effects': active_effects,
+            f'{_device_type}_active_settings': active_settings
+        }
+
+        msg = json.dumps(payload)
+
+        msg = f'effects:{msg}'
+
+        self.send_message(msg)
 
     def send_message(self, message):
         encoded_data = message.encode("utf-8")
@@ -736,14 +749,26 @@ class IPCNetworkThread(QThread):
                     self.exit_signal.emit("Received QUIT signal from master instance.  Running exit/cleanup function.")
                 elif msg == 'RESTART SIMS':
                     self.restart_sim_signal.emit('Restart Sims')
-                else:
+                elif msg.startswith('telem:'):
+                    payload = msg.removeprefix('telem:')
                     try:
-                        ipc_telem = json.loads(msg)
+                        ipc_telem = json.loads(payload)
                         # logging.info(f"GOT JSON PAYLOAD: {ipc_telem}")
                         self._ipc_telem.update(ipc_telem)
 
                     except json.JSONDecodeError:
-                        logging.info(f"GOT GENERIC MESSAGE: {msg}")
+                        pass
+                elif msg.startswith('effects:'):
+                    payload = msg.removeprefix('effects:')
+                    try:
+                        telem_effects_dict = json.loads(payload)
+                        self._ipc_telem_effects.update(telem_effects_dict)
+                        # print(f"GOT EFFECTS:{self._ipc_telem_effects}")
+
+                    except json.JSONDecodeError:
+                        pass
+                else:
+                    logging.info(f"GOT GENERIC MESSAGE: {msg}")
 
                     self.message_received.emit(msg)
             except OSError:
@@ -2117,10 +2142,12 @@ class MainWindow(QMainWindow):
         self.lbl_effects_data.setStyleSheet("""padding: 2px""")
 
 
-        telem_lbl = QLabel('Telemetry:')
-        effect_lbl = QLabel('Active Effects:')
-        monitor_area_layout.addWidget(telem_lbl,0,0)
-        monitor_area_layout.addWidget(effect_lbl,0,1)
+        self.telem_lbl = QLabel('Telemetry:')
+        self.effect_lbl = QLabel('Active Effects:')
+        if _master_instance:
+            self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
+        monitor_area_layout.addWidget(self.telem_lbl,0,0)
+        monitor_area_layout.addWidget(self.effect_lbl,0,1)
         monitor_area_layout.addWidget(self.telem_area, 1, 0)
         monitor_area_layout.addWidget(self.effects_area,1,1)
 
@@ -2383,7 +2410,9 @@ class MainWindow(QMainWindow):
         pixmap = QPixmap(new_device_logo)
         self.devicetype_label.setPixmap(pixmap)
         self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
-        self.tab_widget.setCurrentIndex(1) #force to settings tab since that is the only one affected by this function
+        if _master_instance:
+            self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
+        # self.tab_widget.setCurrentIndex(1) #force to settings tab since that is the only one affected by this function
         self.update_settings()
 
     def test_sim_changed(self):
@@ -2736,15 +2765,26 @@ class MainWindow(QMainWindow):
                     items += f"{k}: {v}\n"
             active_effects = ""
             active_settings = []
-            for key in effects.dict.keys():
-                if effects[key].started:
-                    descr = effects_translator.get_translation(key)[0]
-                    settingname = effects_translator.get_translation(key)[1]
-                    if descr not in active_effects:
-                        active_effects = '\n'.join([active_effects, descr])
-                    if settingname not in active_settings and settingname != '':
-                        active_settings.append(settingname)
-            # window_mode = self.radio_button_group.checkedButton()
+
+            if _master_instance and self._current_config_scope != _device_type:
+                dev = self._current_config_scope
+                active_effects = self._ipc_thread._ipc_telem_effects.get(f'{dev}_active_effects', '')
+                active_settings = self._ipc_thread._ipc_telem_effects.get(f'{dev}_active_settings', [])
+            else:
+                for key in effects.dict.keys():
+                    if effects[key].started:
+                        descr = effects_translator.get_translation(key)[0]
+                        settingname = effects_translator.get_translation(key)[1]
+                        if descr not in active_effects:
+                            active_effects = '\n'.join([active_effects, descr])
+                        if settingname not in active_settings and settingname != '':
+                            active_settings.append(settingname)
+
+            if args.child:
+                child_effects = str(effects.dict.keys())
+                if len(child_effects):
+                    self._ipc_thread.send_ipc_effects(active_effects, active_settings)
+
             window_mode = self.tab_widget.currentIndex()
             # update slider colors
             pct_max_a = data.get('_pct_max_a', 0)
