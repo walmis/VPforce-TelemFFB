@@ -2702,7 +2702,7 @@ class MainWindow(QMainWindow):
                     settingname = effects_translator.get_translation(key)[1]
                     if descr not in active_effects:
                         active_effects = '\n'.join([active_effects, descr])
-                    if settingname not in active_settings:
+                    if settingname not in active_settings and settingname != '':
                         active_settings.append(settingname)
             # window_mode = self.radio_button_group.checkedButton()
             window_mode = self.tab_widget.currentIndex()
