@@ -5,7 +5,7 @@ import os
 import shutil
 from PyQt5 import QtGui, QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
-                             QVBoxLayout, QPushButton, QFileDialog)
+                             QVBoxLayout, QPushButton, QFileDialog, QMessageBox)
 from PyQt5.QtWidgets import QTableWidget, QTextEdit, QWidget, QSlider
 from datetime import datetime
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -43,6 +43,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     model_pattern = ""  # holder for current matching pattern found in config xmls
     edit_mode = '' # holder for current editing mode.
 
+    user_setting_count = 0
+
     allow_in_table_editing = False
 
     def __init__(self, datasource='', device='joystick', userconfig_path='', defaults_path=''):
@@ -58,6 +60,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.b_browse.clicked.connect(self.choose_directory)
         # self.b_usb_button.clicked.connect(self.usb_button_clicked)
         self.b_update.clicked.connect(self.update_button)
+        self.b_deleteModel.clicked.connect(self.delete_model)
         self.slider_float.valueChanged.connect(self.update_textbox)
         self.cb_enable.stateChanged.connect(self.cb_enable_setvalue)
         self.drp_valuebox.currentIndexChanged.connect(self.update_dropbox)
@@ -189,6 +192,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         # Initial visibility of rows based on checkbox state
         self.toggle_rows()
+        self.get_user_count()
 
     def clear_selections(self):
         # self.drp_sim.clear()
@@ -490,6 +494,19 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         self.table_widget.blockSignals(False)
 
+    def get_user_count(self):
+        count = 0
+        for row in range(self.table_widget.rowCount()):
+            item = self.table_widget.item(row, 0)
+
+            if item is not None and 'user' in item.text() and self.edit_mode in item.text():
+                count += 1
+
+        if count > 0 and self.edit_mode == 'Model':
+            self.b_deleteModel.setEnabled(True)
+        else:
+            self.b_deleteModel.setEnabled(False)
+
     def toggle_rows(self):
         mprint("toggle_rows")
         show_inherited = self.cb_show_inherited.isChecked()
@@ -663,6 +680,18 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def update_dropbox(self):
         mprint("update_dropbox")
         self.tb_value.setText(self.drp_valuebox.currentText())
+
+    def delete_model(self):
+        model_to_delete = self.drp_models.currentText()
+        print(f"delete model {model_to_delete}")
+        qm = QMessageBox()
+        ret = qm.question(self, 'Delete User Model Settings',
+                          f"Are you sure you want to delete your settings\nfor match pattern:\n{model_to_delete}?",
+                          qm.Yes | qm.No)
+        if ret == qm.No:
+            return
+        xmlutils.erase_entire_model_from_xml(self.sim, model_to_delete)
+        self.reload_table()
 
     # needs work....using value box for now.
     # def usb_button_clicked(self):
@@ -904,6 +933,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # self.setup_table()
         self.populate_table()
         self.toggle_rows()
+        self.get_user_count()
         self.table_widget.blockSignals(False)
 
     def create_datatype_item(self, datatype, value, unit, checkstate):
@@ -984,6 +1014,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.model_type = ''
                     self.drp_class.blockSignals(False)
                     self.drp_models.blockSignals(False)
+                    self.b_deleteModel.setEnabled(False)
                     self.b_createusermodel.setEnabled(True)
 
                 case 'Class':
@@ -994,11 +1025,13 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.model_name = ''
                     self.drp_models.blockSignals(False)
                     self.b_createusermodel.setEnabled(True)
+                    self.b_deleteModel.setEnabled(False)
 
                 case 'Model':
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
                     self.b_createusermodel.setEnabled(True)
+                    self.b_deleteModel.setEnabled(True)
 
                 case _:
                     self.drp_class.setEnabled(True)

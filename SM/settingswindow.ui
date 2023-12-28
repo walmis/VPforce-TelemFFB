@@ -486,6 +486,16 @@
       </property>
      </widget>
     </item>
+    <item row="46" column="4">
+     <widget class="QPushButton" name="b_deleteModel">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="text">
+       <string>Delete User Model</string>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
  </widget>

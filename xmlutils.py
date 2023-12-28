@@ -675,6 +675,30 @@ def erase_models_from_xml(the_sim, the_model, setting_name):
         logging.info(f"Removed <models> element with values: sim={the_sim}, device={the_device}, "
                   f"model={the_model}, name={setting_name}")
 
+def erase_entire_model_from_xml(the_sim, the_model):
+    mprint(f"erase_entire_models_from_xml  {the_sim} {the_model}")
+    # Load the existing XML file or create a new one if it doesn't exist
+    tree = ET.parse(userconfig_path)
+    root = tree.getroot()
+    the_device = device
+    write_any_device_list = read_anydevice_settings(the_sim)
+
+    elements_to_remove = []
+    for model_elem in root.findall(f'models[sim="{the_sim}"]'                                 
+                                   f'[model="{the_model}"]'):
+
+        if model_elem is not None:
+            elements_to_remove.append(model_elem)
+        else:
+            lprint ("model not found")
+
+    # Remove the elements outside the loop
+    for elem in elements_to_remove:
+        root.remove(elem)
+        # Write the modified XML back to the file
+        tree.write(userconfig_path)
+        logging.info(f"Removed all <models> elements with values: sim={the_sim} model={the_model}")
+
 
 def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
     mprint(f"erase_class_from_xml  {the_sim} {the_class}, {the_value}, {setting_name}")

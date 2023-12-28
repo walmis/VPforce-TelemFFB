@@ -209,6 +209,10 @@ class Ui_SettingsWindow(object):
         self.label_4 = QtWidgets.QLabel(self.centralwidget)
         self.label_4.setObjectName("label_4")
         self.gridLayout.addWidget(self.label_4, 10, 0, 1, 1)
+        self.b_deleteModel = QtWidgets.QPushButton(self.centralwidget)
+        self.b_deleteModel.setEnabled(False)
+        self.b_deleteModel.setObjectName("b_deleteModel")
+        self.gridLayout.addWidget(self.b_deleteModel, 46, 4, 1, 1)
         SettingsWindow.setCentralWidget(self.centralwidget)
 
         self.retranslateUi(SettingsWindow)
@@ -262,3 +266,4 @@ class Ui_SettingsWindow(object):
         self.label_6.setText(_translate("SettingsWindow", "Model"))
         self.label_5.setText(_translate("SettingsWindow", "Class"))
         self.label_4.setText(_translate("SettingsWindow", "Simulator"))
+        self.b_deleteModel.setText(_translate("SettingsWindow", "Delete User Model"))

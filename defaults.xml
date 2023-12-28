@@ -2986,6 +2986,63 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>type</name>
+		<model>Blackbird Simulations DHC-2.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Blackbird Simulations DHC-2.*</model>
+		<value>8.5</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aileron_gain</name>
+		<model>Blackbird Simulations DHC-2.*</model>
+		<value>0.15</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_gain</name>
+		<model>Blackbird Simulations DHC-2.*</model>
+		<value>0.22</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Blackbird Simulations DHC-2.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Blackbird Simulations DHC-2.*</model>
+		<value>0.68</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>rudder_gain</name>
+		<model>Blackbird Simulations DHC-2.*</model>
+		<value>0.16</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Blackbird Simulations DHC-2.*</model>
+		<value>0.63</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>aircraft_is_fbw</name>
 		<model>Boeing F/A 18.*</model>
 		<value>true</value>
