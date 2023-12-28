@@ -2995,9 +2995,11 @@ class SettingsLayout(QGridLayout):
         #print (f"{i} rows with {self.count()} widgets")
 
     def reload_caller(self):
-        pos = self.mainwindow.settings_area.verticalScrollBar().value()
+        # self.mainwindow.settings_area.setUpdatesEnabled(False)
+        # pos = self.mainwindow.settings_area.verticalScrollBar().value()
         self.reload_layout(None)
-        QTimer.singleShot(150, lambda: self.mainwindow.set_scrollbar(pos))
+        # QTimer.singleShot(150, lambda: self.mainwindow.set_scrollbar(pos))
+        # self.mainwindow.settings_area.setUpdatesEnabled(True)
 
     def reload_layout(self, result=None):
         self.clear_layout()
@@ -3286,12 +3288,12 @@ class SettingsLayout(QGridLayout):
         print(f"Checkbox {name} changed. New state: {state}")
         value = 'false' if state == 0 else 'true'
         xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,value,name)
-        self.reload_caller()
+        # self.reload_caller()
 
     def erase_setting(self, name):
         print(f"Erase {name} clicked")
         xmlutils.erase_models_from_xml(settings_mgr.current_sim, settings_mgr.current_pattern, name)
-        self.reload_caller()
+        # self.reload_caller()
 
     def browse_for_config(self):
         options = QFileDialog.Options()
@@ -3303,7 +3305,7 @@ class SettingsLayout(QGridLayout):
         if file_path:
             lprint(f"Selected File: {file_path}")
             xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,file_path,'vpconf')
-            self.reload_caller()
+            # self.reload_caller()
 
     def dropbox_changed(self):
         setting_name = self.sender().objectName().replace('db_', '')
@@ -3372,7 +3374,7 @@ class SettingsLayout(QGridLayout):
         the_button.setText(str(value))
         if str(value) != '0':
             xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
-        self.reload_caller()
+        # self.reload_caller()
 
 
     def slider_changed(self):
