@@ -1765,6 +1765,10 @@ class MainWindow(QMainWindow):
         download_action.triggered.connect(lambda: self.open_url(dl_url))
         utilities_menu.addAction(download_action)
 
+        self.reset_user_config_action = QAction('Reset User Config', self)
+        self.reset_user_config_action.triggered.connect(self.reset_user_config)
+        utilities_menu.addAction(self.reset_user_config_action)
+
         self.vpconf_action = QAction("Launch VPforce Configurator", self)
         self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf(dev_serial))
         utilities_menu.addAction(self.vpconf_action)
@@ -2250,6 +2254,34 @@ class MainWindow(QMainWindow):
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
 
+    def reset_user_config(self):
+        global userconfig_path, userconfig_rootpath
+        ans = QMessageBox.warning(self, "Caution", "Are you sure you want to proceed?  All contents of your user configuration will be erased\n\nA backup of the configuration will be generated containing the current timestamp.", QMessageBox.Ok | QMessageBox.Cancel)
+
+        if ans == QMessageBox.Ok:
+            try:
+                # Get the current timestamp
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+
+                # Create the backup file name with the timestamp
+                backup_file = os.path.join(userconfig_rootpath, ('userconfig_' + timestamp + '.bak'))
+
+                # Copy the file to the backup file
+                shutil.copy(userconfig_path, backup_file)
+
+                print(f"Backup created: {backup_file}")
+
+            except Exception as e:
+                print(f"Error creating backup: {str(e)}")
+                QMessageBox.warning(self, 'Error', f'There was an error resetting the config:\n\n{e}')
+                return
+
+            os.remove(userconfig_path)
+            utils.create_empty_userxml_file(userconfig_path)
+
+            logging.info(f"User config Reset:  Backup file created: {backup_file}")
+        else:
+            return
 
     def update_log_widget(self, log_line):
         cursor = self.log_widget.textCursor()
