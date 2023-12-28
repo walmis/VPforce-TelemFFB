@@ -153,6 +153,21 @@ _latest_url = None
 _current_version = version
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 
+class LoggingFilter(logging.Filter):
+    def __init__(self, keywords):
+        self.keywords = keywords
+
+    def filter(self, record):
+        # Check if any of the keywords are present in the log message
+        record.device_type = _device_type
+        for keyword in self.keywords:
+            if keyword in record.getMessage():
+                # If any keyword is found, prevent the message from being logged
+                return False
+        # If none of the keywords are found, allow the message to be logged
+        return True
+
+
 if args.overridefile == 'None':
     # Need to determine if user is using default config.user.ini without passing the override flag:
     if os.path.isfile(os.path.join(script_dir, 'config.user.ini')):
@@ -196,6 +211,20 @@ file_handler.setFormatter(formatter)
 # Add the handlers to the logger
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
+# Create a list of keywords to filter
+
+log_filter_strings = [
+    # "unrecognized Miscellaneous Unit in typefor(POSITION)",
+    # "Unrecognized event AXIS_CYCLIC_LATERAL_SET",
+    # "Unrecognized event AXIS_CYCLIC_LONGITUDINAL_SET",
+    # "Unrecognized event ROTOR_AXIS_TAIL_ROTOR_SET",
+    # "Unrecognized event AXIS_COLLECTIVE_SET",
+]
+
+log_filter = LoggingFilter(log_filter_strings)
+
+console_handler.addFilter(log_filter)
+file_handler.addFilter(log_filter)
 
 defaults_path = 'defaults.xml'
 userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
@@ -247,34 +276,9 @@ if args.teleplot:
 
 
 
-class LoggingFilter(logging.Filter):
-    def __init__(self, keywords):
-        self.keywords = keywords
-
-    def filter(self, record):
-        # Check if any of the keywords are present in the log message
-        record.device_type = _device_type
-        for keyword in self.keywords:
-            if keyword in record.getMessage():
-                # If any keyword is found, prevent the message from being logged
-                return False
-        # If none of the keywords are found, allow the message to be logged
-        return True
 
 
-# Create a list of keywords to filter
-log_filter_strings = [
-    # "unrecognized Miscellaneous Unit in typefor(POSITION)",
-    # "Unrecognized event AXIS_CYCLIC_LATERAL_SET",
-    # "Unrecognized event AXIS_CYCLIC_LONGITUDINAL_SET",
-    # "Unrecognized event ROTOR_AXIS_TAIL_ROTOR_SET",
-    # "Unrecognized event AXIS_COLLECTIVE_SET",
-]
 
-log_filter = LoggingFilter(log_filter_strings)
-
-console_handler.addFilter(log_filter)
-file_handler.addFilter(log_filter)
 
 
 def format_dict(data, prefix=""):
