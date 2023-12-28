@@ -143,13 +143,13 @@ class EffectTranslator:
             "spoilerbuffet2-2" : ["Spoiler Buffeting", "spoiler_buffet_intensity" ],
             "spoilermovement" : ["Spoiler Motion", "spoiler_motion_intensity" ],
             "trim_spring" : ["Trim Override Spring", "" ],
-            "uncoordinated_turn" : ["Uncoordinated Turn", "lateral_force_gain" ],
+            "control_weight" : ["Control Weight", "" ],
             "vrs_buffet" : ["Vortex Ring State Buffeting", "vrs_effect_intensity" ],
             "wnd" : ["Wind Effect", "wind_effect_max_intensity" ]
         }
 
     def get_translation(self, key):
-        return self.effect_dict.get(key, f"No Lookup: {key}")
+        return self.effect_dict.get(key, [f"No Lookup: {key}", ''])
 
 
 

@@ -717,7 +717,11 @@ class Aircraft(AircraftBase):
             cf_pitch = clamp(cf_pitch, -1.0, 1.0)
 
             # add force on lateral axis (sideways)
-            _side_accel = -telem_data["AccBody"][0] * self.lateral_force_gain
+            if self.uncoordinated_turn_effect_enabled:
+                _side_accel = -telem_data["AccBody"][0] * self.lateral_force_gain
+            else:
+                _side_accel = 0
+
             cf_roll = _side_accel
 
             cf = utils.Vector2D(cf_pitch, cf_roll)
@@ -726,12 +730,10 @@ class Aircraft(AircraftBase):
 
             mag, theta = cf.to_polar()
             
-            if self.uncoordinated_turn_effect_enabled:
-                effects['uncoordinated_turn'].constant(mag, theta*deg).start()
+            effects['control_weight'].constant(mag, theta*deg).start()
                 # print(mag, theta*deg)
                 # self.const_force.constant(mag, theta*deg).start()
-            else:
-                effects['uncoordinated_turn'].destroy()
+
             self.spring.start() # ensure spring is started
 
         elif ffb_type == 'pedals':
