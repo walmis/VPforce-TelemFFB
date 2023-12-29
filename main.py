@@ -720,6 +720,7 @@ class IPCNetworkThread(QThread):
     restart_sim_signal = pyqtSignal(str)
     show_signal = pyqtSignal()
     hide_signal = pyqtSignal()
+    child_keepalive_signal = pyqtSignal(str, str)
 
 
     def __init__(self, host="localhost", myport=0, dstport=0, child_ports = [], master=False, child=False, keepalive_timer=1, missed_keepalive=3):
@@ -732,11 +733,18 @@ class IPCNetworkThread(QThread):
         self._master = master
         self._child = child
         self._child_ports = child_ports
+        self._child_keepalive_timestamp = {}
         self._keepalive_timer = keepalive_timer
         self._missed_keepalive = missed_keepalive
         self._last_keepalive_timestamp = time.time()
         self._ipc_telem = {}
         self._ipc_telem_effects = {}
+
+        self._child_active = {
+            'joystick': False,
+            'pedals': False,
+            'collective':False
+        }
 
         # Initialize socket
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
@@ -778,12 +786,17 @@ class IPCNetworkThread(QThread):
             self._socket.sendto(encoded_data, (self._host, int(port)))
 
     def send_keepalive(self):
-        while self._run and self._master:
-            self.send_broadcast_message("Keepalive")
-            ts = time.time()
-            logging.debug(f"SENT KEEPALIVES: {ts}")
-            time.sleep(self._keepalive_timer)
-
+        while self._run:
+            if self._master:
+                self.send_broadcast_message("Keepalive")
+                ts = time.time()
+                logging.debug(f"SENT KEEPALIVES: {ts}")
+                time.sleep(self._keepalive_timer)
+            elif self._child:
+                self.send_message(f"Child Keepalive:{_device_type}")
+                ts = time.time()
+                logging.debug(f"{_device_type} SENT CHILD KEEPALIVE: {ts}")
+                time.sleep(self._keepalive_timer)
     def receive_messages(self):
         while self._run:
             try:
@@ -795,6 +808,12 @@ class IPCNetworkThread(QThread):
                         ts = time.time()
                         logging.debug(f"GOT KEEPALIVE: {ts}")
                         self._last_keepalive_timestamp = ts
+                elif msg.startswith('Child Keepalive:'):
+                    ch_dev = msg.removeprefix('Child Keepalive:')
+                    logging.debug(f"GOT KEEPALIVE FROM CHILD: '{ch_dev}'")
+                    ts = time.time()
+                    self._child_keepalive_timestamp[ch_dev] = ts
+                    pass
                 elif msg == 'MASTER INSTANCE QUIT':
                     logging.info("Received QUIT signal from master instance.  Running exit/cleanup function.")
                     self.exit_signal.emit("Received QUIT signal from master instance.  Running exit/cleanup function.")
@@ -836,15 +855,31 @@ class IPCNetworkThread(QThread):
                 continue
 
     def check_missed_keepalives(self):
-        while self._run and self._child:
-            time.sleep(self._keepalive_timer)
-            elapsed_time = time.time() - self._last_keepalive_timestamp
-            if elapsed_time > (self._keepalive_timer * self._missed_keepalive):
-                logging.error("KEEPALIVE TIMEOUT... exiting in 2 seconds")
-                time.sleep(2)
-                # QCoreApplication.instance().quit()
-                self.exit_signal.emit("Missed too many keepalives. Exiting.")
-                break
+        while self._run:
+            if self._child:
+                time.sleep(self._keepalive_timer)
+                elapsed_time = time.time() - self._last_keepalive_timestamp
+                if elapsed_time > (self._keepalive_timer * self._missed_keepalive):
+                    logging.error("KEEPALIVE TIMEOUT... exiting in 2 seconds")
+                    time.sleep(2)
+                    # QCoreApplication.instance().quit()
+                    self.exit_signal.emit("Missed too many keepalives. Exiting.")
+                    break
+            elif self._master:
+                time.sleep(self._keepalive_timer)
+                for device in self._child_keepalive_timestamp:
+                    elapsed_time = time.time() - self._child_keepalive_timestamp.get(device, time.time())
+                    if elapsed_time > (self._keepalive_timer * self._missed_keepalive):
+                        logging.info(f"{device} KEEPALIVE TIMEOUT")
+                        if self._child_active.get(device):
+                            self.child_keepalive_signal.emit(device, 'TIMEOUT')
+                            self._child_active[device] = False
+                    else:
+                        logging.debug(f"{device} KEEPALIVE ACTIVE")
+                        if not self._child_active.get(device):
+                            self.child_keepalive_signal.emit(device, 'ACTIVE')
+                            self._child_active[device] = True
+
 
     def run(self):
         self.receive_thread = threading.Thread(target=self.receive_messages)
@@ -853,8 +888,12 @@ class IPCNetworkThread(QThread):
         if self._master:
             self._send_ka_thread = threading.Thread(target=self.send_keepalive)
             self._send_ka_thread.start()
+            self._check_ka_thread = threading.Thread(target=self.check_missed_keepalives)
+            self._check_ka_thread.start()
 
         if self._child:
+            self._send_ka_thread = threading.Thread(target=self.send_keepalive)
+            self._send_ka_thread.start()
             self._check_ka_thread = threading.Thread(target=self.check_missed_keepalives)
             self._check_ka_thread.start()
 
@@ -2284,19 +2323,26 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        # show xml file info
-        # if args.overridefile!= 'None':
-        #     self.ovrd_label = QLabel()
-        #     self.ovrd_label.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
-        #     self.cfg_label.setText(f"Config File: {args.configfile}")
-        #     self.cfg_label.setToolTip("You can use a custom configuration file by passing the -c argument to TelemFFB\n\nExample: \"VPForce-TelemFFB.exe -c customconfig.ini\"")
-        #
-        #     if os.path.exists(args.overridefile):
-        #         self.ovrd_label.setText(f"User Override File: {args.overridefile}")
-        #     else:
-        #         self.ovrd_label.setText(f"User Override File: None")
-        #
-        #     self.ovrd_label.setToolTip("Rename \'config.user.ini.README\' to \'config.user.ini\' or create a new <custom_name>.user.ini file and pass the name to TelemFFB with the -o argument\n\nExample \"VPForce-TelemFFB.exe -o myconfig.user.ini\" (starting TelemFFB without the override flag will look for the default config.user.ini)")
+        if _master_instance:
+            self.instance_status_row = QHBoxLayout()
+            self.master_status_icon = StatusLabel(None, f'This Instance({ _device_type.capitalize() }):', Qt.green, 8)
+            self.joystick_status_icon = StatusLabel(None, 'Joystick:', Qt.yellow, 8)
+            self.pedals_status_icon = StatusLabel(None, 'Pedals:', Qt.yellow, 8)
+            self.collective_status_icon = StatusLabel(None, 'Collective:', Qt.yellow, 8)
+
+            self.instance_status_row.addWidget(self.master_status_icon)
+            self.instance_status_row.addWidget(self.joystick_status_icon)
+            self.instance_status_row.addWidget(self.pedals_status_icon)
+            self.instance_status_row.addWidget(self.collective_status_icon)
+            self.joystick_status_icon.hide()
+            self.pedals_status_icon.hide()
+            self.collective_status_icon.hide()
+
+            self.instance_status_row.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
+            self.instance_status_row.setSpacing(10)
+
+            layout.addLayout(self.instance_status_row)
+
 
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
@@ -2337,6 +2383,14 @@ class MainWindow(QMainWindow):
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
 
+    def update_child_status(self, device, status):
+        status_icon_name = f'{device}_status_icon'
+        status_icon = getattr(self, status_icon_name, None)
+
+        if status_icon is not None and status == 'ACTIVE':
+            status_icon.set_dot_color(Qt.green)
+        if status_icon is not None and status == 'TIMEOUT':
+            status_icon.set_dot_color(Qt.red)
 
 
     def toggle_child_windows(self, toggle):
@@ -3782,6 +3836,49 @@ class ClickLogo(QLabel):
         self.setCursor(Qt.ArrowCursor)
         super().leaveEvent(event)
 
+class StatusLabel(QWidget):
+    def __init__(self, parent=None, text='', color: QColor = Qt.yellow, size=8):
+        super(StatusLabel, self).__init__(parent)
+
+        self.label = QLabel(text)
+        self.label.setStyleSheet("QLabel { padding-right: 5px; }")
+
+        self.dot_color = color  # Default color
+        self.dot_size = size
+
+        layout = QHBoxLayout(self)
+        layout.addWidget(self.label)
+
+    def hide(self):
+        self.label.hide()
+        super().hide()
+
+    def show(self):
+        self.label.show()
+        super().show()
+
+    def set_text(self, text):
+        self.label.setText(text)
+
+    def set_dot_color(self, color: QColor):
+        self.dot_color = color
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Calculate adjusted positioning for the dot
+        dot_x = self.label.geometry().right() - 1  # 5 is an arbitrary offset for better alignment
+        dot_y = self.label.geometry().center().y() - self.dot_size // 2 +1
+
+        painter.setBrush(QColor(self.dot_color))
+        painter.drawEllipse(dot_x, dot_y, self.dot_size, self.dot_size)
+
+
+
+
+
 
 class LogTailer(QThread):
     log_updated = pyqtSignal(str)
@@ -4239,6 +4336,7 @@ def main():
     if is_master:
         myport = int(f"6{_device_pid}")
         _ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=_child_ipc_ports)
+        _ipc_thread.child_keepalive_signal.connect(lambda device, status: window.update_child_status(device, status))
         _ipc_thread.start()
         _ipc_running = True
         _launched_children = True
@@ -4280,6 +4378,12 @@ def main():
         current_title = window.windowTitle()
         new_title = f"** MASTER INSTANCE ** {current_title}"
         window.setWindowTitle(new_title)
+        if _launched_joystick:
+            window.joystick_status_icon.show()
+        if _launched_pedals:
+            window.pedals_status_icon.show()
+        if _launched_collective:
+            window.collective_status_icon.show()
 
     if config_was_default:
         window.open_system_settings_dialog()
