@@ -319,20 +319,22 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def setup_table(self):
         mprint("setup_table")
-        self.table_widget.setColumnCount(11)
-        headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name", "valid", "datatype", "unit", "state", "Device"]
+        self.table_widget.setColumnCount(12)
+        headers = ['Source', 'Grouping', 'Display Name', 'Value', 'Info', "name", "valid", "datatype", "unit", "state", "Device", "Factor"]
         self.table_widget.setHorizontalHeaderLabels(headers)
         self.table_widget.setColumnWidth(0, 120)
         self.table_widget.setColumnWidth(1, 110)
-        self.table_widget.setColumnWidth(2, 210)
-        self.table_widget.setColumnWidth(3, 100)
+        self.table_widget.setColumnWidth(2, 200)
+        self.table_widget.setColumnWidth(3, 80)
         self.table_widget.setColumnHidden(4, True)
         self.table_widget.setColumnHidden(5, True)
         self.table_widget.setColumnHidden(6, True)
         self.table_widget.setColumnHidden(7, True)
         self.table_widget.setColumnHidden(8, True)
         self.table_widget.setColumnHidden(9, True)
-        self.table_widget.setColumnWidth(10, 70)
+        self.table_widget.setColumnWidth(10, 60)
+        self.table_widget.setColumnWidth(11, 40)
+
         # row click for property manager
         self.table_widget.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
         # this is for handling clicking the actual value cell..
@@ -397,13 +399,19 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             grouping_item = QTableWidgetItem(data_dict['grouping'])
             displayname_item = QTableWidgetItem(data_dict['displayname'])
-            value_item = self.create_datatype_item(data_dict['datatype'], data_dict['value'], data_dict['unit'], checkbox.checkState())
+            if data_dict['sliderfactor'] == '' or data_dict['sliderfactor'] == '1':
+                factortext = ''
+            else:
+                factortext = data_dict['sliderfactor']
+            sliderfactor_item = QTableWidgetItem(factortext)
+            value_item = self.create_datatype_item(data_dict['datatype'], data_dict['value'], data_dict['unit'], checkbox.checkState(), data_dict['sliderfactor'])
             info_item = QTableWidgetItem(data_dict['info'])
             replaced_item = QTableWidgetItem("      " + data_dict['replaced'])
             unit_item = QTableWidgetItem(data_dict['unit'])
             valid_item = QTableWidgetItem(data_dict['validvalues'])
             datatype_item = QTableWidgetItem(data_dict['datatype'])
             device_item = QTableWidgetItem(data_dict['device_text'])
+
 
             # store name for use later, not shown
             name_item = QTableWidgetItem(data_dict['name'])
@@ -475,6 +483,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setItem(row, 8, unit_item)
             self.table_widget.setItem(row, 9, state_item)
             self.table_widget.setItem(row, 10, device_item)
+            self.table_widget.setItem(row, 11, sliderfactor_item)
 
 
             #self.connected_rows.add(row)
@@ -525,7 +534,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.l_displayname.setText("Select a Row to Edit")
         self.cb_enable.hide()
         self.t_info.setText('')
-        self.l_validvalues.hide()
+        self.l_sliderfactor.hide()
         self.l_value.hide()
         self.l_name.hide()
         self.slider_float.hide()
@@ -566,6 +575,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 unit = unit_item.text()
                 state_item = self.table_widget.item(row, 9 )
                 state = state_item.text()
+                sliderfactor_item = self.table_widget.item(row, 11)
+                if sliderfactor_item is None:
+                    sliderfactor = ''
+                else:
+                    sliderfactor = sliderfactor_item.text()
 
                 if datatype == 'bool':
                     # For a checkbox
@@ -583,11 +597,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     value = value_item.text()
 
 
-                self.populate_propmgr(name, displayname, value, unit, validvalues, datatype, info, state)
+                self.populate_propmgr(name, displayname, value, unit, validvalues, datatype, info, state, sliderfactor)
         else:
             self.clear_propmgr()
 
-    def populate_propmgr(self, name, displayname, value, unit, validvalues, datatype, info, state):
+    def populate_propmgr(self, name, displayname, value, unit, validvalues, datatype, info, state, sliderfactor):
         mprint(f"populate_propmgr  {name}, {displayname}, {value}, {unit}, {validvalues}, {datatype}, {info}, {state}")
         self.clear_propmgr()
         if state.lower() == 'false':
@@ -603,6 +617,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.tb_value.setText(value)
         self.l_name.show()
         self.b_update.show()
+
         match datatype:
             case 'bool':
                 self.cb_enable.show()
@@ -622,8 +637,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     pctval = int(value.replace('%', ''))
                 else:
                     pctval = int(float(value) * 100)
+
                 self.slider_float.setValue(pctval)
                 self.tb_value.setText(str(pctval) + '%')
+                if sliderfactor != '':
+                    self.l_sliderfactor.show()
 
             case 'negfloat':
                 self.slider_float.setMinimum(-100)
@@ -635,8 +653,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     pctval = int(value.replace('%', ''))
                 else:
                     pctval = int(float(value) * 100)
+
                 self.slider_float.setValue(pctval)
                 self.tb_value.setText(str(pctval) + '%')
+                if sliderfactor != '1':
+                    self.l_sliderfactor.show()
 
             case 'int' | 'd_int' | 'text' | 'anyfloat' | 'button':
                 self.l_value.show()
@@ -667,7 +688,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         strstate = 'false' if state == 0 else 'true'
         self.tb_value.setText(strstate)
 
-    def update_button(self,):
+    def update_button(self):
         mprint("update_button")
         self.write_values(self.l_name.text(),self.tb_value.text())
         self.reload_table()
@@ -936,7 +957,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.get_user_count()
         self.table_widget.blockSignals(False)
 
-    def create_datatype_item(self, datatype, value, unit, checkstate):
+    def create_datatype_item(self, datatype, value, unit, checkstate, sliderfactor=1):
         #mprint(f"create_datatype_item {datatype} {value} {unit}, {str(checkstate)}")
         if datatype == 'bool':
             toggle = QCheckBox()
