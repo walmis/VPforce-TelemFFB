@@ -2994,7 +2994,7 @@ class MainWindow(QMainWindow):
         is_exe = getattr(sys, 'frozen',
                          False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
         # is_exe = True
-        if is_exe and _update_available and not ignore_auto_updates:
+        if is_exe and _update_available and not ignore_auto_updates and not _child_instance:
             # vers, url = utils.fetch_latest_version()
             update_ans = QMessageBox.Yes
             if auto:
@@ -4167,6 +4167,7 @@ def convert_settings(cfg=configfile, usr=overridefile, window=None):
 
 def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
     test = False
+    if _child_instance: return
     if args.overridefile != 'None':
         ans = QMessageBox.information(main_window, "Important TelemFFB Update Notification", f"The 'ini' config file type is now deprecated.\n\nThis version of TelemFFB uses a new UI driven config model\n\nIt appears you are using a user override file ({args.overridefile}).  Would you\nlike to auto-convert that file to the new config model?\n\nIf you choose not to, you may also perform the conversion from\nthe Utilities menu\n\nProceeding will convert the config and re-name your\nexisting user config to '{os.path.basename(usr)}.legacy'", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
         if ans == QMessageBox.No:
