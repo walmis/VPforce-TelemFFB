@@ -2778,12 +2778,22 @@ class MainWindow(QMainWindow):
             else:
                 lb.setPixmap(disable_color)
 
-    def update_sim_indicators(self, source, pause):
+    def update_sim_indicators(self, source, paused=False, error=False):
         active_color = QColor(0, 255, 0)
         paused_color = QColor(0, 0, 255)
+        error_color = Qt.red
         active_icon = self.create_colored_icon(active_color, self.icon_size)
         paused_icon = self.create_paused_icon(paused_color, self.icon_size)
-        if not pause:
+        error_icon = self.create_x_icon(error_color, self.icon_size)
+        if error:
+            match source:
+                case 'DCS':
+                    self.dcs_label_icon.setPixmap(error_icon)
+                case 'IL2':
+                    self.il2_label_icon.setPixmap(error_icon)
+                case 'MSFS2020':
+                    self.msfs_label_icon.setPixmap(error_icon)
+        elif not paused:
             match source:
                 case 'DCS':
                     self.dcs_label_icon.setPixmap(active_icon)
@@ -2791,7 +2801,7 @@ class MainWindow(QMainWindow):
                     self.il2_label_icon.setPixmap(active_icon)
                 case 'MSFS2020':
                     self.msfs_label_icon.setPixmap(active_icon)
-        else:
+        elif paused:
             match source:
                 case 'DCS':
                     self.dcs_label_icon.setPixmap(paused_icon)
@@ -2950,7 +2960,11 @@ class MainWindow(QMainWindow):
                     my_slider.blockSignals(False)
 
             is_paused = max(data.get('SimPaused', 0), data.get('Parked', 0))
-            self.update_sim_indicators(data.get('src'), is_paused)
+            error_cond = data.get('error', 0)
+            if error_cond:
+                self.update_sim_indicators(data.get('src'), error=True)
+            else:
+                self.update_sim_indicators(data.get('src'), paused=is_paused)
 
             shown_pattern = settings_mgr.current_pattern
             if settings_mgr.current_pattern == '':
