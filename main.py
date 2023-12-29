@@ -120,7 +120,7 @@ else:
         _device_type = 'joystick'
         args.type = _device_type
     else:
-        _device_type = args.type
+        _device_type = str.lower(args.type)
 
     _device_pid = args.device.split(":")[1]
     _device_vid_pid = args.device
@@ -136,6 +136,21 @@ else:
 
 args.sim = str.upper(args.sim)
 args.type = str.lower(args.type)
+
+## need to determine if someone has auto-launch enabled but has started an instance with -D
+## The 'masterInstance' reg key holds the radio button index of the configured master instance
+## 1=joystick, 2=pedals, 3=collective
+index_dict = {
+    'joystick': 1,
+    'pedals': 2,
+    'collective': 3
+}
+master_index = system_settings.get('masterInstance', 1)
+if index_dict[_device_type] == master_index:
+    _master_instance = True
+else:
+    _master_instance = False
+
 
 sys.path.insert(0, '')
 # sys.path.append('/simconnect')
@@ -733,8 +748,6 @@ class IPCNetworkThread(QThread):
         except OSError as e:
             QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {_device_type} instance of TelemFFB.\n\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
             QCoreApplication.instance().quit()
-        self._telem_to_send = {'l_var_a': '1.1', 'l_var_b': '2.2'}
-        self._received_telem = {'l_var_a': '1.1', 'l_var_b': '2.2'}
 
     def send_ipc_telem(self, telem):
         j_telem = json.dumps(telem)
@@ -4122,7 +4135,7 @@ def notify_close_children():
 
 def launch_children():
     global _launched_joystick, _launched_pedals, _launched_collective, _child_ipc_ports, script_dir, _device_pid, _master_instance
-    if not system_settings.get('autolaunchMaster', False) or args.child:
+    if not system_settings.get('autolaunchMaster', False) or args.child or not _master_instance:
         return False
 
     if getattr(sys, 'frozen', False):
@@ -4131,7 +4144,6 @@ def launch_children():
         app = ['python', 'main.py']
 
     master_port = f"6{_device_pid}"
-    _master_instance = True
     # full_path = os.path.join(script_dir, app)
     try:
         if system_settings.get('autolaunchJoystick', False) and _device_type != 'joystick':
