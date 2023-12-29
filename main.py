@@ -81,10 +81,12 @@ config_was_default = False
 _launched_joystick = False
 _launched_pedals = False
 _launched_collective = False
+_launched_children = False
 _child_ipc_ports = []
 _master_instance = False
 _ipc_running = False
 _ipc_thread = None
+_child_instance = args.child
 
 system_settings = utils.read_system_settings(args.device, args.type)
 
@@ -672,10 +674,13 @@ class IPCNetworkThread(QThread):
     message_received = pyqtSignal(str)
     exit_signal = pyqtSignal(str)
     restart_sim_signal = pyqtSignal(str)
+    show_signal = pyqtSignal()
+    hide_signal = pyqtSignal()
 
-    def __init__(self, host="localhost", myport=0, dstport=0, child_ports = [], master=False, child=False, keepalive_timer=1,
-                 missed_keepalive=3):
+
+    def __init__(self, host="localhost", myport=0, dstport=0, child_ports = [], master=False, child=False, keepalive_timer=1, missed_keepalive=3):
         super().__init__()
+        global window
         self._run = True
         self._myport = int(myport)
         self._dstport = int(dstport)
@@ -690,11 +695,15 @@ class IPCNetworkThread(QThread):
         self._ipc_telem_effects = {}
 
         # Initialize socket
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
         self._socket.settimeout(0.1)
         logging.info(f"Setting up IPC socket at {self._host}:{self._myport}")
-        self._socket.bind((self._host, self._myport))
+        try:
+            self._socket.bind((self._host, self._myport))
+        except OSError as e:
+            QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {_device_type} instance of TelemFFB.\n\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
+            QCoreApplication.instance().quit()
         self._telem_to_send = {'l_var_a': '1.1', 'l_var_b': '2.2'}
         self._received_telem = {'l_var_a': '1.1', 'l_var_b': '2.2'}
 
@@ -749,6 +758,12 @@ class IPCNetworkThread(QThread):
                     self.exit_signal.emit("Received QUIT signal from master instance.  Running exit/cleanup function.")
                 elif msg == 'RESTART SIMS':
                     self.restart_sim_signal.emit('Restart Sims')
+                elif msg == 'SHOW WINDOW':
+                    logging.info("Show command received via IPC")
+                    self.show_signal.emit()
+                elif msg == 'HIDE WINDOW':
+                    logging.info("Hide command received via IPC")
+                    self.hide_signal.emit()
                 elif msg.startswith('telem:'):
                     payload = msg.removeprefix('telem:')
                     try:
@@ -1799,14 +1814,27 @@ class MainWindow(QMainWindow):
         utilities_menu.addAction(self.vpconf_action)
 
 
-
-
-
         # Add settings converter
         if args.overridefile != 'None':
             convert_settings_action = QAction('Convert user config.ini to XML', self)
             convert_settings_action.triggered.connect(lambda: autoconvert_config(self))
             utilities_menu.addAction(convert_settings_action)
+
+        if _master_instance or _child_instance:
+            self.window_menu = menubar.addMenu('Window')
+
+        if _child_instance:
+            self.hide_window_action = QAction('Hide Window')
+            self.hide_window_action.triggered.connect(hide_window)
+            self.window_menu.addAction(self.hide_window_action)
+        if _master_instance and _launched_children:
+            self.show_children_action = QAction('Show Child Instance Windows')
+            self.show_children_action.triggered.connect(lambda: self.toggle_child_windows('show'))
+            self.window_menu.addAction((self.show_children_action))
+            self.hide_children_action = QAction('Hide Child Instance Windows')
+            self.hide_children_action.triggered.connect(lambda: self.toggle_child_windows('hide'))
+            self.window_menu.addAction((self.hide_children_action))
+
 
         help_menu = menubar.addMenu('Help')
 
@@ -1839,21 +1867,7 @@ class MainWindow(QMainWindow):
         icon_path = os.path.join(script_dir, "image/vpforceicon.png")
         self.setWindowIcon(QIcon(icon_path))
 
-        # self.notes_label = QLabel()
 
-        # # self.notes_label.setOpenExternalLinks(True)
-        #
-        # label_txt = 'Release Notes'
-        # # Connect the linkActivated signal to the open_file method and pass the URL
-        # self.notes_label.linkActivated.connect(lambda url=notes_url: self.open_file(url))
-        #
-        # self.notes_label.setText(f'<a href="{notes_url}">{label_txt}</a>')
-        # self.notes_label.setAlignment(Qt.AlignRight)
-        # self.notes_label.setToolTip(notes_url)
-        #
-        # notes_row_layout.addWidget(self.notes_label)
-        # layout.addLayout(notes_row_layout)
-        # cfg = get_config()
         dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS')
         il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2')
         msfs_enabled = utils.read_system_settings(args.device, args.type).get('enableMSFS')
@@ -2280,6 +2294,16 @@ class MainWindow(QMainWindow):
 
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
+
+
+
+    def toggle_child_windows(self, toggle):
+        if toggle == 'show':
+            self._ipc_thread.send_broadcast_message("SHOW WINDOW")
+            pass
+        elif toggle == 'hide':
+            self._ipc_thread.send_broadcast_message("HIDE WINDOW")
+            pass
 
     def reset_user_config(self):
         global userconfig_path, userconfig_rootpath
@@ -3759,6 +3783,16 @@ class LogTailer(QThread):
         return self.paused
 
 
+
+
+def hide_window():
+    global window
+    try:
+        window.hide()
+    except Exception as e:
+        logging.error(f"EXCEPTION: {e}")
+
+
 def exit_application():
     global window
     # Perform any cleanup or save operations here
@@ -4156,7 +4190,7 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
-    global _ipc_running, _ipc_thread, is_master, _child_ipc_ports
+    global _ipc_running, _ipc_thread, is_master, _child_ipc_ports, _launched_children
     _ipc_running = False
     is_master = launch_children()
     if is_master:
@@ -4164,11 +4198,14 @@ def main():
         _ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=_child_ipc_ports)
         _ipc_thread.start()
         _ipc_running = True
+        _launched_children = True
     elif args.child:
         myport = int(f"6{_device_pid}")
         _ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=args.masterport)
         _ipc_thread.exit_signal.connect(lambda: exit_application())
         _ipc_thread.restart_sim_signal.connect(lambda: restart_sims())
+        _ipc_thread.show_signal.connect(lambda: window.show())
+        _ipc_thread.hide_signal.connect(lambda: window.hide())
         _ipc_thread.start()
         _ipc_running = True
 
