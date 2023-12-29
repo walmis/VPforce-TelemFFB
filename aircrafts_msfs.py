@@ -48,21 +48,7 @@ try:
 except: pass
 
 
-def set_simdatum_to_msfs(simvar, value, units=None):
-    try:
-        sim_connect.set_simdatum(simvar, value, units=units)
-        # logging.info(f"{simvar}:{value}")
-    except Exception as e:
-        logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
-def send_event_to_msfs(event, data: int = 0 ):
-    logging.debug(f"event {event}   data {data}")
-    if event.startswith('L:'):
-        set_simdatum_to_msfs(event, data, units="number")
-    else:
-        try:
-            sim_connect.send_event(event, data)
-        except Exception as e:
-            logging.error(f"Error setting event:{event} value:{data} to MSFS: {e}")
+
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -254,7 +240,23 @@ class Aircraft(AircraftBase):
         if sim_connect is None:
             sim_connect = SimConnect()
 
+    def set_simdatum_to_msfs(self, simvar, value, units=None):
+        try:
+            sim_connect.set_simdatum(simvar, value, units=units)
+        except Exception as e:
+            logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
+            self.telem_data['error'] = 1
 
+    def send_event_to_msfs(self, event, data: int = 0):
+        logging.debug(f"event {event}   data {data}")
+        if event.startswith('L:'):
+            self.set_simdatum_to_msfs(event, data, units="number")
+        else:
+            try:
+                sim_connect.send_event(event, data)
+            except Exception as e:
+                logging.error(f"Error setting event:{event} value:{data} to MSFS: {e}")
+                self.telem_data['error'] = 1
 
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
@@ -374,8 +376,8 @@ class Aircraft(AircraftBase):
                 else:
                     pos_y_pos = round(pos_y_pos, 5)
 
-                send_event_to_msfs(x_var, pos_x_pos)
-                send_event_to_msfs(y_var, pos_y_pos)
+                self.send_event_to_msfs(x_var, pos_x_pos)
+                self.send_event_to_msfs(y_var, pos_y_pos)
             # update spring data
             if self.ap_following and ap_active:
                 y_coeff = 4096
@@ -453,7 +455,7 @@ class Aircraft(AircraftBase):
                 else:
                     pos_x_pos = round(pos_x_pos, 5)
 
-                send_event_to_msfs(x_var, pos_x_pos)
+                self.send_event_to_msfs(x_var, pos_x_pos)
 
                 # update spring data
 
@@ -663,8 +665,8 @@ class Aircraft(AircraftBase):
                 else:
                     pos_y_pos = round(pos_y_pos, 5)
 
-                send_event_to_msfs(x_var, pos_x_pos)
-                send_event_to_msfs(y_var, pos_y_pos)
+                self.send_event_to_msfs(x_var, pos_x_pos)
+                self.send_event_to_msfs(y_var, pos_y_pos)
 
                 #give option to disable if desired by user
             if self.aoa_effect_enabled and telem_data["ElevDeflPct"] != 0 and not max(telem_data.get("WeightOnWheels")):
@@ -787,7 +789,7 @@ class Aircraft(AircraftBase):
                 else:
                     pos_x_pos = round(pos_x_pos, 5)
 
-                send_event_to_msfs(x_var, pos_x_pos)
+                self.send_event_to_msfs(x_var, pos_x_pos)
 
             self.const_force.constant(rud_force, 270).start()
             self.spring.start()
@@ -1180,7 +1182,7 @@ class Helicopter(Aircraft):
                     self.cyclic_center = [x, y]
 
                     logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
-                    send_event_to_msfs("ROTOR_TRIM_RESET", 0)
+                    self.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
 
                     self.cyclic_trim_release_active = 0
@@ -1207,7 +1209,7 @@ class Helicopter(Aircraft):
 
                     self.spring_x.cpOffset = self.cpO_x
                     self.spring_y.cpOffset = self.cpO_y
-                    send_event_to_msfs("ROTOR_TRIM_RESET", 0)
+                    self.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
                     logging.info("Trim Reset Pressed")
 
@@ -1286,8 +1288,8 @@ class Helicopter(Aircraft):
                     else:
                         pos_y_pos = round(pos_y_pos, 5)
 
-                    send_event_to_msfs(x_var, pos_x_pos)
-                    send_event_to_msfs(y_var, pos_y_pos)
+                    self.send_event_to_msfs(x_var, pos_x_pos)
+                    self.send_event_to_msfs(y_var, pos_y_pos)
 
             if self.anything_has_changed("cyclic_gain", self.cyclic_spring_gain):  # check if spring gain setting has been modified in real time
                 self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
@@ -1377,7 +1379,7 @@ class Helicopter(Aircraft):
             else:
                 pos_x_pos = round(pos_x_pos, 5)
 
-            send_event_to_msfs(x_var, pos_x_pos)
+            self.send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
@@ -1452,7 +1454,7 @@ class Helicopter(Aircraft):
             pos_y_pos = round(pos_y_pos, 5)
 
         if self.collective_init:
-            send_event_to_msfs(y_var, pos_y_pos)
+            self.send_event_to_msfs(y_var, pos_y_pos)
 
 
 
@@ -1602,25 +1604,25 @@ class HPGHelicopter(Helicopter):
             dev_y = hands_on_dict["y_deviation"]
             if self.send_individual_hands_on:
                 if hands_on_x:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 1, units="number")
+                    self.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 1, units="number")
                     self.hands_on_x_active = True
 
                 else:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 0, units="number")
+                    self.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 0, units="number")
                     self.hands_on_x_active = False
 
                 if hands_on_y:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 1, units="number")
+                    self.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 1, units="number")
                     self.hands_on_y_active = True
                 else:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 0, units="number")
+                    self.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 0, units="number")
                     self.hands_on_y_active = False
             else:
                 if hands_on_either:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 1, units="number")
+                    self.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 1, units="number")
                     self.hands_on_active = True
                 else:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
+                    self.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
                     self.hands_on_active = False
 
             telem_data["hands_on"] = int(hands_on_either)
@@ -1691,7 +1693,7 @@ class HPGHelicopter(Helicopter):
             else:
                 pos_x_pos = round(pos_x_pos, 5)
 
-            send_event_to_msfs(x_var, pos_x_pos)
+            self.send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
@@ -1763,7 +1765,7 @@ class HPGHelicopter(Helicopter):
                     pos_y_pos = round(pos_y_pos, 5)
 
                 if self.collective_init:
-                    send_event_to_msfs(y_var, pos_y_pos)
+                    self.send_event_to_msfs(y_var, pos_y_pos)
 
 
             else:
@@ -1804,7 +1806,7 @@ class HPGHelicopter(Helicopter):
                     pos_y_pos = round(pos_y_pos, 5)
 
                 if self.collective_init:
-                    send_event_to_msfs(y_var, pos_y_pos)
+                    self.send_event_to_msfs(y_var, pos_y_pos)
 
             else:
                 collective_pos = telem_data.get("CollectivePos", 0)
