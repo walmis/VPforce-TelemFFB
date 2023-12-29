@@ -1239,6 +1239,12 @@ class OutLog(QtCore.QObject):
         self.out = out
         self.color = QtGui.QColor(color) if color else None
         self.textReceived.connect(self.on_received, Qt.Qt.QueuedConnection)
+        self.log_paused = False
+
+    def toggle_pause(self):
+        # Toggle the pause state
+        self.log_paused = not self.log_paused
+
 
     def on_received(self, m):
         try:
@@ -1255,8 +1261,10 @@ class OutLog(QtCore.QObject):
 
     def write(self, m):
         try:
-            self.textReceived.emit(m)
-        except: pass
+            if not self.log_paused:
+                self.textReceived.emit(m)
+        except:
+            pass
         if self.out:
             self.out.write(m)
 

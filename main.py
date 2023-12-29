@@ -339,6 +339,7 @@ def config_has_changed(update=False) -> bool:
 
 
 class LogWindow(QMainWindow):
+    log_paused = False
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Log Console ({args.type})")
@@ -369,6 +370,34 @@ class LogWindow(QMainWindow):
         normal_action = QAction("Normal Logging", self)
         normal_action.triggered.connect(self.set_info_logging)
         logging_menu.addAction(normal_action)
+
+        # Create a QHBoxLayout for the buttons
+        button_layout = QHBoxLayout()
+        button_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+        self.clear_button = QPushButton('Clear', self.central_widget)
+        self.clear_button.clicked.connect(self.clear_log)
+        button_layout.addWidget(self.clear_button)
+
+        self.pause_button = QPushButton("Pause", self.central_widget)
+        self.pause_button.clicked.connect(self.toggle_pause)
+        button_layout.addWidget(self.pause_button)
+
+        # Add the button layout to the main layout
+        layout.addLayout(button_layout)
+
+    def clear_log(self):
+        self.widget.clear()
+
+    def toggle_pause(self):
+        # Implement the logic to toggle pause/unpause
+        if self.log_paused:
+            self.log_paused = False
+            self.pause_button.setText("Pause")
+        else:
+            self.log_paused = True
+            self.pause_button.setText("Resume")
+
 
     def set_debug_logging(self):
         logger.setLevel(logging.DEBUG)
@@ -4154,6 +4183,8 @@ def main():
     settings_mgr.setWindowIcon(QIcon(icon_path))
     sys.stdout = utils.OutLog(log_window.widget, sys.stdout)
     sys.stderr = utils.OutLog(log_window.widget, sys.stderr)
+
+    log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
 
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info(f"TelemFFB (version {version}) Starting")
