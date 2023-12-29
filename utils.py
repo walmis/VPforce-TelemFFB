@@ -28,7 +28,7 @@ from time import monotonic
 import logging
 import sys
 
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from PyQt5.QtWidgets import QFileDialog
 
 import winpaths
@@ -46,6 +46,15 @@ import ssl
 import io
 import xml.etree.ElementTree as ET
 
+
+class SignalEmitter(QObject):
+    error_signal = pyqtSignal(str)
+
+    def trigger_signal(self, data):
+        self.error_signal.emit(data)
+
+
+signal_emitter = SignalEmitter()
 
 class Smoother:
     def __init__(self, window_size=5):

@@ -2383,6 +2383,11 @@ class MainWindow(QMainWindow):
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
 
+    def process_error_signal(self, message):
+        ## Placeholder function to process signal generated from anywhere using utils.signal_emitter
+        pass
+
+
     def update_child_status(self, device, status):
         status_icon_name = f'{device}_status_icon'
         status_icon = getattr(self, status_icon_name, None)
@@ -4388,6 +4393,7 @@ def main():
     if config_was_default:
         window.open_system_settings_dialog()
 
+    utils.signal_emitter.error_signal.connect(window.process_error_signal)
 
     app.exec_()
     if _ipc_running:
