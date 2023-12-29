@@ -254,6 +254,7 @@ class Aircraft(AircraftBase):
         else:
             try:
                 sim_connect.send_event(event, data)
+                self.telem_data[event] = data
             except Exception as e:
                 logging.error(f"Error setting event:{event} value:{data} to MSFS: {e}")
                 self.telem_data['error'] = 1
