@@ -422,6 +422,7 @@ class Aircraft(AircraftBase):
             if vs > vne:
                 #log error if vs speed is configured greater than vne speed and exit
                 logging.error(f"Dynamic pedal forces error: Vs speed ({vs}) is configured with a larger value than Vne ({vne}) - Invalid configuration")
+                telem_data['error'] = 1
 
             vs_coeff = utils.clamp(round(self.aircraft_vs_gain*4096), 0, 4096)
             vne_coeff = utils.clamp(round(self.aircraft_vne_gain*4096), 0, 4096)
