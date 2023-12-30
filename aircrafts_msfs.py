@@ -634,6 +634,8 @@ class Aircraft(AircraftBase):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+                telem_data['phys_y'] = phys_y
 
                 x_pos = phys_x - virtual_stick_x_offs
                 y_pos = phys_y - virtual_stick_y_offs
