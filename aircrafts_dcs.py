@@ -98,7 +98,7 @@ class Aircraft(AircraftBase):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
-    pedal_spring_mode = 0    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
     elevator_droop_force = 0
     aircraft_vs_speed = 0
     aircraft_vs_gain = 0.25
@@ -393,18 +393,18 @@ class Aircraft(AircraftBase):
         ## 3=dynamic spring enabled.  Based on "pedal_spring_gain"
         if self.pedal_spring_mode == 0:
             return
-        elif self.pedal_spring_mode == 1:
+        elif self.pedal_spring_mode == 'No Spring':
             self.spring_x.positiveCoefficient = 0
             self.spring_x.negativeCoefficient = 0
 
-        elif self.pedal_spring_mode == 2:
+        elif self.pedal_spring_mode == 'Static Spring':
             spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
             self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
 
             if self.pedal_trimming_enabled:
                 self._update_pedal_trim(telem_data)
 
-        elif self.pedal_spring_mode == 3:
+        elif self.pedal_spring_mode == 'Dynamic Spring':
             tas = telem_data.get("TAS", 0)
             ac_perf = self.get_aircraft_perf(telem_data)
             if self.aircraft_vs_speed:
@@ -506,7 +506,7 @@ class PropellerAircraft(Aircraft):
 
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
-    pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
+    pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -545,7 +545,7 @@ class JetAircraft(Aircraft):
     #flaps_motion_intensity = 0.0
 
     _ab_is_playing = 0
-    pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
+    pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
     jet_engine_rumble_intensity = 0.05
     afterburner_effect_intensity = 0.2
@@ -575,7 +575,7 @@ class Helicopter(Aircraft):
     overspeed_shake_start = 70.0 # m/s
     overspeed_shake_intensity = 0.2
     heli_engine_rumble_intensity = 0.12
-    pedal_spring_mode = 1    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
+    pedal_spring_mode = 'No Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
 
     def on_telemetry(self, telem_data):

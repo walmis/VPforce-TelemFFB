@@ -409,7 +409,7 @@
 		<value>false</value>
 		<datatype>bool</datatype>
 		<info>Advanced Pedal Mode Settings - Dynamic Spring mode only.</info>
-		<displayname>Advanced Pedal Mode Settings</displayname>
+		<displayname>Advanced Pedal Mode Settings (Dynamic Mode Only)</displayname>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
 	</defaults>
@@ -457,7 +457,7 @@
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>38.5</order>
-		<name>aircraft_vs_gain</name>
+		<name>aircraft_vne_gain</name>
 		<prereq>pedal_advanced_dummy</prereq>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
@@ -6887,21 +6887,21 @@
 	<classdefaults>
 		<name>pedal_spring_mode</name>
 		<type>Helicopter</type>
-		<value>1</value>
+		<value>No Spring</value>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>pedal_spring_mode</name>
 		<type>JetAircraft</type>
-		<value>2</value>
+		<value>Static Spring</value>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>pedal_spring_mode</name>
 		<type>PropellerAircraft</type>
-		<value>3</value>
+		<value>Dynamic Spring</value>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
