@@ -1385,7 +1385,7 @@ class Ui_SystemDialog(object):
         self.label_6.setText(QCoreApplication.translate("SystemDialog", u"Sim Setup:", None))
         self.label_7.setText(QCoreApplication.translate("SystemDialog", u"Other Settings: ", None))
         self.label_8.setText(QCoreApplication.translate("SystemDialog", u"Startup  Behavior:", None))
-        self.cb_save_geometry.setText(QCoreApplication.translate("SystemDialog", u"Restore window size and position", None))
+        self.cb_save_geometry.setText(QCoreApplication.translate("SystemDialog", u"Restore window position", None))
         self.cb_save_view.setText(QCoreApplication.translate("SystemDialog", u"Restore last tab view", None))
         self.label_10.setText(QCoreApplication.translate("SystemDialog", u"Rhino default = 2055", None))
         self.label_12.setText(QCoreApplication.translate("SystemDialog", u"USB\n"
@@ -1819,6 +1819,37 @@ class MainWindow(QMainWindow):
         dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
         notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         self._current_config_scope = args.type
+        if system_settings.get('saveLastTab', 0):
+            if _device_type == 'joystick':
+                tab_key = 'jTab'
+            elif _device_type == 'pedals':
+                tab_key = 'pTab'
+            elif _device_type == 'collective':
+                tab_key = 'cTab'
+
+            tab = utils.get_reg(tab_key)
+            self.current_tab_index = tab
+        else:
+            self.current_tab_index = 0
+        self.default_tab_sizes = {
+            "0": { #monitor
+                'height': 530,
+                'width': 700,
+            },
+            "1": { #settings
+                'height': 530,
+                'width': 700,
+            },
+            "2": { #log
+                'height': 530,
+                'width': 700,
+            },
+            "3": {  # hide
+                'height': 0,
+                'width': 0,
+            }
+        }
+        self.tab_sizes = self.default_tab_sizes
         self._ipc_thread = ipc_thread
         self.system_settings_dict = utils.read_system_settings(args.device, args.type)
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
@@ -2389,8 +2420,6 @@ class MainWindow(QMainWindow):
 
         ### Load Stored Geomoetry
         self.load_main_window_geometry()
-        self.last_height = self.height()
-        self.last_width = self.width()
 
     def test_function(self):
         self.set_scrollbar(400)
@@ -2585,29 +2614,35 @@ class MainWindow(QMainWindow):
         device_type = args.type
         sys_settings = utils.read_system_settings(args.device, args.type)
         if device_type == 'joystick':
-            geometry_key = 'jWindowGeometry'
-            tab_key = 'jTab'
+            reg_key = 'jWindowData'
         elif device_type == 'pedals':
-            geometry_key = 'pWindowGeometry'
-            tab_key = 'pTab'
+            reg_key = 'pWindowData'
         elif device_type == 'collective':
-            geometry_key = 'cWindowGeometry'
-            tab_key = 'cTab'
+            reg_key = 'cWindowData'
 
-        geometry = utils.get_reg(geometry_key)
+        window_data = utils.get_reg(reg_key)
+        print(window_data)
+        if window_data is not None:
+            window_data_dict = json.loads(window_data)
+        else:
+            window_data_dict = {}
+        print(window_data_dict)
         load_geometry = sys_settings.get('saveWindow', False)
         load_tab = sys_settings.get('saveLastTab', False)
-        tab = utils.get_reg(tab_key)
-
-        if geometry is not None and load_geometry:
-            q_geometry = QByteArray(geometry)
-            self.restoreGeometry(q_geometry)
-        self.last_height = self.height()
-        self.last_width = self.width()
 
         if load_tab:
+            tab = window_data_dict.get('Tab', 0)
+            self.tab_sizes = window_data_dict.get('TabSizes', self.default_tab_sizes)
             self.tab_widget.setCurrentIndex(tab)
+            h = self.tab_sizes[str(tab)]['height']
+            w = self.tab_sizes[str(tab)]['width']
+            self.resize(w, h)
 
+        if load_geometry:
+            win_pos = window_data_dict.get('WindowPosition', {})
+            win_x = win_pos.get('x', 100)
+            win_y = win_pos.get('y', 100)
+            self.move(win_x, win_y)
 
 
     def force_sim_aircraft(self):
@@ -2827,13 +2862,21 @@ class MainWindow(QMainWindow):
                     self.msfs_label_icon.setPixmap(paused_icon)
 
     def switch_window_view(self, index):
+        previous_index = self.current_tab_index
+        # Get window geometry and store as the geometry for the previous index for later recall
+        self.tab_sizes[str(previous_index)]['height'] = self.height()
+        self.tab_sizes[str(previous_index)]['width'] = self.width()
 
         if index == 0:  # Monitor Tab
+            self.current_tab_index = 0
             try:
-                self.resize(self.last_width, self.last_height)
+                h = self.tab_sizes[str(index)]['height']
+                w = self.tab_sizes[str(index)]['width']
+                self.resize(int(w), int(h))
             except: pass
 
         elif index == 1:  # Settings Tab
+            self.current_tab_index = 1
             modifiers = QApplication.keyboardModifiers()
             if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier):
                 self.cb_joystick.setVisible(True)
@@ -2848,44 +2891,24 @@ class MainWindow(QMainWindow):
                         self.cb_collective.setChecked(True)
 
             try:
-                self.resize(self.last_width, self.last_height)
+                h = self.tab_sizes[str(index)]['height']
+                w = self.tab_sizes[str(index)]['width']
+                self.resize(int(w), int(h))
             except:
                 pass
 
         elif index == 2:  # Log Tab
+            self.current_tab_index = 2
             try:
-                self.resize(self.last_width, self.last_height)
+                h = self.tab_sizes[str(index)]['height']
+                w = self.tab_sizes[str(index)]['width']
+                self.resize(int(w), int(h))
             except: pass
 
         elif index == 3:  # Hide Tab
-            # self.hidden_active = True
-            self.last_height = self.height()
-            self.last_width = self.width()
-            # self.monitor_widget.hide()
-            # self.settings_area.hide()
-            # self.line_widget.show()
+            self.current_tab_index = 3
+
             self.resize(0,0)
-        # if button == self.telem_monitor_radio:
-        #
-        #     self.monitor_widget.show()
-        #     self.settings_area.hide()
-        #     self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        #     self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        #
-        #     self.resize(self.last_width, self.last_height)
-        #
-        # elif button == self.settings_radio:
-        #     self.monitor_widget.hide()
-        #     self.settings_area.show()
-        #
-        #     self.resize(self.last_width, self.last_height)
-        #
-        # elif button == self.hide_scroll_area:
-        #     self.last_height = self.height()
-        #     self.last_width = self.width()
-        #     self.monitor_widget.hide()
-        #     self.settings_area.hide()
-        #     self.resize(0,0)
 
     def interpolate_color(self, color1, color2, value):
         # Ensure value is between 0 and 1
@@ -3975,23 +3998,29 @@ def exit_application():
 
 def save_main_window_geometry():
     global window
-    # Capture the main window's geometry
-    device_type = args.type
-    geometry = window.saveGeometry()
-    geometry_bytes = bytes(geometry)
+    # Capture the mai n window's geometry
+    device_type = _device_type
+    cur_index = window.tab_widget.currentIndex()
+    window.tab_sizes[str(cur_index)]['width'] = window.width()
+    window.tab_sizes[str(cur_index)]['height'] = window.height()
+
+    window_dict = {
+        'WindowPosition': {
+            'x': window.pos().x(),
+            'y': window.pos().y(),
+        },
+        'Tab': window.tab_widget.currentIndex(),
+        'TabSizes': window.tab_sizes
+    }
     if device_type == 'joystick':
-        reg_key = 'jWindowGeometry'
-        tab_key = 'jTab'
+        reg_key = 'jWindowData'
     elif device_type == 'pedals':
-        reg_key = 'pWindowGeometry'
-        tab_key = 'pTab'
+        reg_key = 'pWindowData'
     elif device_type == 'collective':
-        reg_key = 'cWindowGeometry'
-        tab_key = 'cTab'
-    # Extract position and size
-    # x, y, width, height = geometry.x(), geometry.y(), geometry.width(), geometry.height()
-    utils.set_reg(tab_key,window.tab_widget.currentIndex())
-    utils.set_reg(reg_key, geometry_bytes)
+        reg_key = 'cWindowData'
+    j_window_dict = json.dumps(window_dict)
+    utils.set_reg(reg_key, j_window_dict)
+
 
 
 

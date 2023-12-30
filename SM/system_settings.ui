@@ -350,7 +350,7 @@
     <item>
      <widget class="QCheckBox" name="cb_save_geometry">
       <property name="text">
-       <string>Restore window size and position</string>
+       <string>Restore window position</string>
       </property>
      </widget>
     </item>
