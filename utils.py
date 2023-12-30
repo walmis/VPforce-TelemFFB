@@ -134,6 +134,7 @@ class EffectTranslator:
             "payload_rel" : ["Payload Release", "weapon_release_intensity" ],
             "pause_spring" : ["Pause/Slew Spring Force", "" ],
             "pedal_spring" : ["Pedal Spring", "pedal_spring_gain" ],
+            "pedal_damper" : ["Pedal Damper", "pedal_dampening_gain" ],
             "prop_rpm0-1" : ["Propeller Engine Rumble", "engine_rumble_.*" ],
             "prop_rpm0-2" : ["Propeller Engine Rumble", "engine_rumble_.*" ],
             "prop_rpm1-1" : ["Propeller Engine Rumble", "engine_rumble_.*" ],
