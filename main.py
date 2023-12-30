@@ -428,6 +428,7 @@ class TelemManager(QObject, threading.Thread):
     updateSettingsLayout = pyqtSignal()
     currentAircraft: aircrafts_dcs.Aircraft = None
     currentAircraftName: str = None
+    currentAircraftConfig: dict = {}
     timedOut: bool = True
     lastFrameTime: float
     numFrames: int = 0
@@ -480,9 +481,9 @@ class TelemManager(QObject, threading.Thread):
                     vu = v
                 if setting['value'] != '-':
                     params[k] = vu
-                    logging.info(f"Got from Settings Manager: {k} : {vu}")
+                    logging.debug(f"Got from Settings Manager: {k} : {vu}")
                 else:
-                    logging.info(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
+                    logging.debug(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
                 # print(f"SETTING:\n{setting}")
             params = utils.sanitize_dict(params)
             self.settings_manager.update_state_vars(
@@ -528,6 +529,17 @@ class TelemManager(QObject, threading.Thread):
             if self.currentAircraft:
                 self.currentAircraft.on_event(*ev)
             continue
+
+    def get_changed_params(self, params):
+        diff_dict = {}
+
+        # Check for new keys or keys with different values
+        for key, new_value in params.items():
+            if key not in self.currentAircraftConfig or self.currentAircraftConfig[key] != new_value:
+                diff_dict[key] = new_value
+        logging.debug(f"get_changed_settings: {diff_dict.items()}")
+        self.currentAircraftConfig.update(diff_dict)
+        return diff_dict
 
     def process_data(self, data):
 
@@ -582,6 +594,8 @@ class TelemManager(QObject, threading.Thread):
         if aircraft_name and aircraft_name != self.currentAircraftName:
 
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
+                logging.info(f"New aircraft loaded: resetting current aircraft config")
+                self.currentAircraftConfig = {}
 
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
 
@@ -650,6 +664,7 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraft = Class(aircraft_name)
 
                 self.currentAircraft.apply_settings(params)
+                self.currentAircraftConfig = params
 
                 if settings_mgr.isVisible():
                     settings_mgr.b_getcurrentmodel.click()
@@ -662,7 +677,8 @@ class TelemManager(QObject, threading.Thread):
             if config_has_changed():
                 logging.info("Configuration has changed, reloading")
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-                self.currentAircraft.apply_settings(params)
+                updated_params = self.get_changed_params(params)
+                self.currentAircraft.apply_settings(updated_params)
                 self.updateSettingsLayout.emit()
             try:
                 _tm = time.perf_counter()
