@@ -162,7 +162,7 @@ effects_translator = utils.EffectTranslator()
 version = utils.get_version()
 min_firmware_version = 'v1.0.15'
 global dev_firmware_version, dev_serial, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
-global window, log_window
+global window, log_window, log_folder, log_file, log_tail_window
 
 _update_available = False
 _latest_version = None
@@ -422,6 +422,67 @@ class LogWindow(QMainWindow):
         logger.setLevel(logging.INFO)
         logging.info(f"Logging level set to INFO")
 
+
+class LogTailWindow(QMainWindow):
+    def __init__(self, main_window):
+        super(LogTailWindow, self).__init__()
+
+        self.main_window = main_window
+        self.setWindowTitle(f"Log File Monitor ({args.type})")
+        # Construct the absolute path of the icon file
+        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
+        self.setWindowIcon(QIcon(icon_path))
+        self.resize(800, 500)
+        self.move(self.main_window.x() + 50, self.main_window.y() + 100)
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.log_tail_thread = self.main_window.log_tail_thread
+
+
+        # Replicate the log_tab_widget contents in the new window
+        self.log_widget = QPlainTextEdit(self.central_widget)
+        self.log_widget.setReadOnly(True)
+        self.log_widget.setFont(QFont("Courier New"))
+        self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
+
+        self.clear_button = QPushButton("Clear", self.central_widget)
+        self.toggle_button = QPushButton("Pause", self.central_widget)
+        self.close_button = QPushButton("Close Window", self.central_widget)
+        self.clear_button.clicked.connect(self.clear_log_widget)
+        self.toggle_button.clicked.connect(self.toggle_log_tailing)
+        self.close_button.clicked.connect(lambda: self.hide())
+
+        # self.open_log_button.clicked.connect(self.toggle_log_window)
+
+        # Layout for the new window
+        layout = QVBoxLayout(self.central_widget)
+        layout.addWidget(self.log_widget)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.clear_button)
+        button_layout.addWidget(self.toggle_button)
+        button_layout.addStretch()  # Add stretch to push the next button to the right
+        button_layout.addWidget(self.close_button)
+
+        layout.addLayout(button_layout)
+
+        self.log_tail_thread.log_updated.connect(self.update_log_widget)
+
+    def toggle_log_tailing(self):
+        if self.log_tail_thread.is_paused():
+            self.log_tail_thread.resume()
+            self.toggle_button.setText("Pause")
+        else:
+            self.log_tail_thread.pause()
+            self.toggle_button.setText("Resume")
+    def clear_log_widget(self):
+        self.log_widget.clear()
+
+    def update_log_widget(self, log_line):
+        cursor = self.log_widget.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(log_line)
+        self.log_widget.setTextCursor(cursor)
+        self.log_widget.ensureCursorVisible()
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
@@ -1812,6 +1873,10 @@ class ButtonPressThread(QThread):
 class MainWindow(QMainWindow):
     def __init__(self, ipc_thread=None):
         super().__init__()
+
+        global _update_available
+        global _latest_version, _latest_url, log_tail_window
+
         self.show_new_craft_button = False
         # Get the absolute path of the script's directory
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1869,8 +1934,10 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(f"TelemFFB ({args.type}) ({version})")
         else:
             self.setWindowTitle(f"TelemFFB")
-        global _update_available
-        global _latest_version, _latest_url
+        # Construct the absolute path of the icon file
+        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
+        self.setWindowIcon(QIcon(icon_path))
+
         self.resize(530, 700)
         self.hidden_active = False
         # Create a layout for the main window
@@ -1941,6 +2008,10 @@ class MainWindow(QMainWindow):
         self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf(dev_serial))
         utilities_menu.addAction(self.vpconf_action)
 
+        self.log_window_action = QAction("Open Console Log", self)
+        self.log_window_action.triggered.connect(self.toggle_log_window)
+        utilities_menu.addAction(self.log_window_action)
+
 
         # Add settings converter
         if args.overridefile != 'None':
@@ -1990,11 +2061,6 @@ class MainWindow(QMainWindow):
 
         # Set the layout of the menu frame as the main layout
         layout.addWidget(menu_frame)
-
-        # Construct the absolute path of the icon file
-        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
-        self.setWindowIcon(QIcon(icon_path))
-
 
         dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS')
         il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2')
@@ -2335,7 +2401,7 @@ class MainWindow(QMainWindow):
 
         self.clear_button.clicked.connect(self.clear_log_widget)
         self.toggle_button.clicked.connect(self.toggle_log_tailing)
-        self.open_log_button.clicked.connect(self.toggle_log_window)
+        self.open_log_button.clicked.connect(self.show_tail_log_window)
 
         self.tab_widget.addTab(QWidget(), "Hide")
 
@@ -2564,7 +2630,9 @@ class MainWindow(QMainWindow):
         self.perform_update(auto=True)
 
     def change_config_scope(self, arg):
-        # print(F"CHANGE SCOPE: {arg}")
+        global log_folder, log_file
+        current_log_ts = log_file.split('_')[-1]
+
         if arg == 1:
             xmlutils.update_vars('joystick', userconfig_path, defaults_path)
             self._current_config_scope = 'joystick'
@@ -2577,12 +2645,20 @@ class MainWindow(QMainWindow):
             xmlutils.update_vars('collective', userconfig_path, defaults_path)
             self._current_config_scope = 'collective'
             new_device_logo = os.path.join(script_dir, 'image/logo_c.png')
+
         pixmap = QPixmap(new_device_logo)
         self.devicetype_label.setPixmap(pixmap)
         self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
+
         if _master_instance:
             self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
-        # self.tab_widget.setCurrentIndex(1) #force to settings tab since that is the only one affected by this function
+
+        for file in os.listdir(log_folder):
+            if file.endswith(self._current_config_scope + '_' + current_log_ts):
+                self.log_tail_thread.change_log_file(os.path.join(log_folder, file))
+                pass
+        log_tail_window.setWindowTitle(f"Log File Monitor ({self._current_config_scope})")
+
         self.update_settings()
 
     def test_sim_changed(self):
@@ -2749,6 +2825,11 @@ class MainWindow(QMainWindow):
         painter.end()
 
         return pixmap
+
+    def show_tail_log_window(self):
+        log_tail_window.move(self.x() + 50, self.y() + 100)
+        log_tail_window.show()
+        log_tail_window.activateWindow()
 
     def toggle_log_window(self):
         if log_window.isVisible():
@@ -3948,7 +4029,7 @@ class LogTailer(QThread):
         self.paused = False
 
     def run(self):
-        with open(self.log_file_path, 'r') as log_file:
+        with open(self.log_file_path, 'r') as self.log_file:
             while True:
                 self.pause_mutex.lock()
                 while self.paused:
@@ -3956,11 +4037,11 @@ class LogTailer(QThread):
                     time.sleep(0.1)
                     self.pause_mutex.lock()
 
-                where = log_file.tell()
-                line = log_file.readline()
+                where = self.log_file.tell()
+                line = self.log_file.readline()
                 if not line:
                     time.sleep(0.1)
-                    log_file.seek(where)
+                    self.log_file.seek(where)
                 else:
                     self.log_updated.emit(line)
 
@@ -3978,6 +4059,14 @@ class LogTailer(QThread):
 
     def is_paused(self):
         return self.paused
+
+    def change_log_file(self, new_log_file_path):
+        self.pause()  # Pause the tailing while changing the log file
+        if self.log_file:
+            self.log_file.close()  # Close the current file handle
+        self.log_file_path = new_log_file_path
+        self.log_file = open(self.log_file_path, 'r')  # Open the new log file
+        self.resume()  # Resume tailing with the new log file
 
 
 
@@ -4346,7 +4435,7 @@ def launch_children():
 def main():
     app = QApplication(sys.argv)
     app.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
-    global window, log_window
+    global window, log_window, log_tail_window
     global dev_firmware_version
     global dev_serial
     log_window = LogWindow()
@@ -4417,11 +4506,14 @@ def main():
 
     window = MainWindow(ipc_thread=_ipc_thread)
 
+    log_tail_window = LogTailWindow(window)
+
     if not headless_mode:
         if args.minimize:
             window.showMinimized()
         else:
             window.show()
+
 
     autoconvert_config(window)
     fetch_version_thread = utils.FetchLatestVersionThread()
