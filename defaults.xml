@@ -211,7 +211,7 @@
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
-		<Grouping>s</Grouping>
+		<Grouping>SpringCenter</Grouping>
 		<order>20.4</order>
 		<name>rudder_spring_gain</name>
 		<prereq>aircraft_is_spring_centered</prereq>
@@ -471,7 +471,6 @@
 		<Grouping>SpringCenter</Grouping>
 		<order>39</order>
 		<name>pedal_trimming_enabled</name>
-		<value>true</value>
 		<datatype>bool</datatype>
 		<displayname>Pedal Trimming</displayname>
 		<DCS>true</DCS>
@@ -882,7 +881,6 @@
 		<Grouping>ETL</Grouping>
 		<order>230</order>
 		<name>etl_effect_enable</name>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<info>Enable Effective Translational Lift Shimmy</info>
@@ -943,7 +941,6 @@
 		<Grouping>Engine</Grouping>
 		<order>250</order>
 		<name>engine_rotor_rumble_enabled</name>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<displayname>Heli Engine/Rotor Rumble</displayname>
@@ -973,7 +970,6 @@
 		<Grouping>VRS</Grouping>
 		<order>270</order>
 		<name>vrs_effect_enable</name>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<info>Vortex Ring State effect</info>
@@ -1002,7 +998,6 @@
 		<Grouping>Engine</Grouping>
 		<order>300</order>
 		<name>afterburner_effect_enabled</name>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<validvalues>0,100</validvalues>
 		<datatype>bool</datatype>
@@ -1034,7 +1029,6 @@
 		<Grouping>Engine</Grouping>
 		<order>330</order>
 		<name>engine_prop_rumble_enabled</name>
-		<any>true</any>
 		<datatype>bool</datatype>
 		<info>Enable Propeller Rumble</info>
 		<displayname>Propeller Rumble</displayname>
@@ -1051,7 +1045,6 @@
 		<name>engine_rumble_lowrpm</name>
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<value>650</value>
-		<any>true</any>
 		<sliderfactor>100</sliderfactor>
 		<validvalues>1,15</validvalues>
 		<datatype>d_int</datatype>
@@ -1088,7 +1081,6 @@
 		<name>engine_rumble_highrpm</name>
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<value>2800</value>
-		<any>true</any>
 		<sliderfactor>100</sliderfactor>
 		<validvalues>5,60</validvalues>
 		<datatype>d_int</datatype>
@@ -1123,7 +1115,6 @@
 		<Grouping>Engine</Grouping>
 		<order>360</order>
 		<name>engine_jet_rumble_enabled</name>
-		<any>true</any>
 		<datatype>bool</datatype>
 		<displayname>Jet Engine Rumble</displayname>
 		<DCS>true</DCS>
@@ -1348,7 +1339,6 @@
 		<Grouping>Buffeting</Grouping>
 		<order>730</order>
 		<name>aoa_buffeting_enabled</name>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<displayname>AoA/Stall Buffeting</displayname>
@@ -1407,7 +1397,6 @@
 		<Grouping>Movement</Grouping>
 		<order>740</order>
 		<name>canopy_motion_effect_enabled</name>
-		<any>true</any>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<displayname>Canopy Motion</displayname>
@@ -1436,7 +1425,6 @@
 		<Grouping>Weapons</Grouping>
 		<order>750</order>
 		<name>damage_effect_enabled</name>
-		<any>true</any>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<displayname>Damage Effect</displayname>
@@ -1464,7 +1452,6 @@
 		<Grouping>G Force</Grouping>
 		<order>755</order>
 		<name>deceleration_effect_enable</name>
-		<any>true</any>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
@@ -1491,7 +1478,6 @@
 		<Grouping>Movement</Grouping>
 		<order>760</order>
 		<name>flaps_motion_effect_enabled</name>
-		<any>true</any>
 		<datatype>bool</datatype>
 		<displayname>Flaps Motion</displayname>
 		<DCS>true</DCS>
@@ -1523,7 +1509,6 @@
 		<Grouping>Buffeting</Grouping>
 		<order>770</order>
 		<name>gear_buffet_effect_enabled</name>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<value>true</value>
 		<datatype>bool</datatype>
@@ -1554,7 +1539,6 @@
 		<Grouping>Movement</Grouping>
 		<order>775</order>
 		<name>gear_motion_effect_enabled</name>
-		<any>true</any>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<displayname>Gear Motion</displayname>
@@ -1587,7 +1571,6 @@
 		<Grouping>Buffeting</Grouping>
 		<order>777</order>
 		<name>overspeed_shake_enable</name>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<displayname>Overpeed Shake </displayname>
@@ -1629,7 +1612,6 @@
 		<Grouping>Movement</Grouping>
 		<order>780</order>
 		<name>runway_rumble_enabled</name>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<value>true</value>
 		<datatype>bool</datatype>
@@ -1707,7 +1689,6 @@
 		<Grouping>Buffeting</Grouping>
 		<order>790</order>
 		<name>speedbrake_buffet_effect_enabled</name>
-		<any>true</any>
 		<datatype>bool</datatype>
 		<displayname>Speedbrake Buffet</displayname>
 		<DCS>true</DCS>
@@ -1735,7 +1716,6 @@
 		<Grouping>Movement</Grouping>
 		<order>791</order>
 		<name>speedbrake_motion_effect_enabled</name>
-		<any>true</any>
 		<datatype>bool</datatype>
 		<displayname>Speedbrake Motion</displayname>
 		<DCS>true</DCS>
@@ -1763,7 +1743,6 @@
 		<Grouping>Buffeting</Grouping>
 		<order>792</order>
 		<name>spoiler_buffet_effect_enabled</name>
-		<any>true</any>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<displayname>Spoiler Buffet</displayname>
@@ -1793,7 +1772,6 @@
 		<Grouping>Movement</Grouping>
 		<order>793</order>
 		<name>spoiler_motion_effect_enabled</name>
-		<any>true</any>
 		<datatype>bool</datatype>
 		<displayname>Spoiler Motion</displayname>
 		<DCS>true</DCS>
@@ -1845,7 +1823,6 @@
 		<Grouping>Buffeting</Grouping>
 		<order>810</order>
 		<name>wind_effect_enabled</name>
-		<any>true</any>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<displayname>Wind Effect</displayname>
@@ -6907,23 +6884,16 @@
 	</classdefaults>
 	<classdefaults>
 		<name>pedal_trimming_enabled</name>
-		<type>Helicopter</type>
-		<value>false</value>
+		<type>PropellerAircraft</type>
+		<value>true</value>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>pedal_trimming_enabled</name>
-		<type>Helicopter</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_trimming_enabled</name>
-		<type>HPGHelicopter</type>
-		<value>false</value>
-		<sim>MSFS</sim>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
