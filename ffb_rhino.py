@@ -495,9 +495,10 @@ class FFBRhino(hid.Device, QObject):
         if data:
             try:
                 return input_report_handlers[report_id].from_buffer_copy(data)
-            except KeyError:
+            except KeyError as err:
+                logging.exception(f'ERROR GETTING HID REPORT: {err}')
                 return data
-        
+
         return data
         
     def getInput(self) -> FFBReport_Input:
