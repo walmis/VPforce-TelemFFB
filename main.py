@@ -1680,7 +1680,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         stop_sims()
         init_sims()
 
-        if _master_instance:
+        if _master_instance and _launched_children:
             _ipc_thread.send_broadcast_message("RESTART SIMS")
 
         self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2'], global_settings_dict)
@@ -2339,7 +2339,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        if _master_instance:
+        if _master_instance and _launched_children:
             self.instance_status_row = QHBoxLayout()
             self.master_status_icon = StatusLabel(None, f'This Instance({ _device_type.capitalize() }):', Qt.green, 8)
             self.joystick_status_icon = StatusLabel(None, 'Joystick:', Qt.yellow, 8)
