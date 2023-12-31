@@ -3169,7 +3169,7 @@ class SettingsLayout(QGridLayout):
     prereq_list = []
     ##########
     # debug settings
-    show_slider_debug = False   # set to true for slider values shown
+    show_slider_debug = True   # set to true for slider values shown
     show_order_debug = False # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
 
@@ -3445,6 +3445,10 @@ class SettingsLayout(QGridLayout):
         d_slider.setOrientation(QtCore.Qt.Horizontal)
         d_slider.setObjectName(f"dsld_{item['name']}")
 
+        df_slider = NoWheelSlider()
+        df_slider.setOrientation(QtCore.Qt.Horizontal)
+        df_slider.setObjectName(f"dfsld_{item['name']}")
+
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
         ## unit?
@@ -3516,25 +3520,25 @@ class SettingsLayout(QGridLayout):
 
         if item['datatype'] == 'd_float':
 
-
             d_val = float(item['value'])
             factor = float(item['sliderfactor'])
-            val = int(round(d_val / factor))
+            val = float(round(d_val / factor))
             if self.show_slider_debug:
-                print(f"read value: {item['value']}   d_slider: {val}")
-            d_slider.blockSignals(True)
+                print(f"read value: {item['value']}   df_slider: {val}")
+            df_slider.blockSignals(True)
             if validvalues is None or validvalues == '':
                 pass
             else:
-                d_slider.setRange(int(validvalues[0]), int(validvalues[1]))
-            d_slider.setValue(val)
+                df_slider.setRange(int(validvalues[0]), int(validvalues[1]))
+            df_slider.setValue(round(val))
             value_label.setText(str(d_val))
-            d_slider.valueChanged.connect(self.d_slider_changed)
-            d_slider.sliderPressed.connect(self.sldDisconnect)
-            d_slider.sliderReleased.connect(self.d_sldReconnect)
-            self.addWidget(d_slider, i, entry_col, 1, entry_colspan)
+            df_slider.valueChanged.connect(self.df_slider_changed)
+            df_slider.sliderPressed.connect(self.sldDisconnect)
+            df_slider.sliderReleased.connect(self.df_sldReconnect)
+            self.addWidget(df_slider, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
+            df_slider.blockSignals(False)
 
         if item['datatype'] == 'cfgfloat':
 
@@ -3647,11 +3651,13 @@ class SettingsLayout(QGridLayout):
         label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
         d_slider.setDisabled(rowdisabled)
+        df_slider.setDisabled(rowdisabled)
         line_edit.setDisabled(rowdisabled)
         expand_button.setDisabled(rowdisabled)
 
         self.parent().parent().parent().addSlider(slider)
         self.parent().parent().parent().addSlider(d_slider)
+        self.parent().parent().parent().addSlider(df_slider)
 
         erase_button = QToolButton()
         erase_button.setObjectName(f"eb_{item['name']}")
@@ -3823,7 +3829,24 @@ class SettingsLayout(QGridLayout):
             value_to_save = str(round(value * factor))
             value_label.setText(value_to_save)
 
-
+    def df_slider_changed(self):
+        setting_name = self.sender().objectName().replace('dfsld_', '')
+        value_label_name = 'vl_' + self.sender().objectName().replace('dfsld_', '')
+        sliderfactor_name = 'sf_' + self.sender().objectName().replace('dfsld_', '')
+        unit_dropbox_name = 'ud_' + self.sender().objectName().replace('dfsld_', '')
+        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
+        unit = ''
+        if unit_dropbox is not None:
+            unit = unit_dropbox.currentText()
+        value_label = self.mainwindow.findChild(QLabel, value_label_name)
+        sliderfactor_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
+        factor = 1
+        if sliderfactor_label is not None:
+            factor = float(sliderfactor_label.text())
+        if value_label is not None:
+            value = self.sender().value()
+            value_to_save = str(round(value * factor, 2))
+            value_label.setText(value_to_save)
 
         if self.show_slider_debug:
             print(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
@@ -3845,6 +3868,10 @@ class SettingsLayout(QGridLayout):
 
     def d_sldReconnect(self):
         self.sender().valueChanged.connect(self.d_slider_changed)
+        self.sender().valueChanged.emit(self.sender().value())
+
+    def df_sldReconnect(self):
+        self.sender().valueChanged.connect(self.df_slider_changed)
         self.sender().valueChanged.emit(self.sender().value())
 
 

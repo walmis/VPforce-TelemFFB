@@ -796,8 +796,10 @@
 		<order>100.2</order>
 		<name>gforce_effect_curvature</name>
 		<prereq>gforce_effect_enable</prereq>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>10,30</validvalues>
 		<value>2.0</value>
-		<datatype>anyfloat</datatype>
+		<datatype>d_float</datatype>
 		<displayname>G Force Curvature</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -808,8 +810,10 @@
 		<order>100.3</order>
 		<name>gforce_min_gs</name>
 		<prereq>gforce_effect_enable</prereq>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>5,30</validvalues>
 		<value>1.0</value>
-		<datatype>anyfloat</datatype>
+		<datatype>d_float</datatype>
 		<displayname>Minimum Gs</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -820,8 +824,10 @@
 		<order>100.4</order>
 		<name>gforce_max_gs</name>
 		<prereq>gforce_effect_enable</prereq>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>30,120</validvalues>
 		<value>7.0</value>
-		<datatype>anyfloat</datatype>
+		<datatype>d_float</datatype>
 		<displayname>Maximum Gs</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
