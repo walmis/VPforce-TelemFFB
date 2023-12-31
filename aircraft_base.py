@@ -48,6 +48,9 @@ class AircraftBase(object):
 
     gear_motion_effect_enabled: bool = False
     gear_buffet_effect_enabled: bool = False
+    gear_buffet_freq = 10
+    gear_buffet_speed_low = 100
+    gear_buffet_speed_high = 150
     speedbrake_motion_effect_enabled: bool = False
     speedbrake_buffet_effect_enabled: bool = False
     flaps_motion_effect_enabled: bool = False
@@ -459,7 +462,7 @@ class AircraftBase(object):
 
     def _update_landing_gear(self, gearpos, tas, spd_thresh_low=100, spd_thresh_high=150):
 
-        rumble_freq = 10
+        rumble_freq = self.gear_buffet_freq
 
         if self.anything_has_changed("gear_value", gearpos, 50) and self.gear_motion_intensity > 0 and self.gear_motion_effect_enabled:
             logging.debug(f"Landing Gear Pos: {gearpos}")
@@ -469,11 +472,11 @@ class AircraftBase(object):
             effects.dispose("gearmovement")
             effects.dispose("gearmovement2")
 
-        if (tas > spd_thresh_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
+        if (tas > self.gear_buffet_speed_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
             # intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
 
-            realtime_intensity = utils.scale(tas, (spd_thresh_low, spd_thresh_high),
+            realtime_intensity = utils.scale(tas, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),
                                              (0, self.gear_buffet_intensity)) * gearpos
 
             effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, 4).start()

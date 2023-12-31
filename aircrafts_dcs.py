@@ -177,8 +177,8 @@ class Aircraft(AircraftBase):
         self._update_damage(telem_data)
         self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
         self._update_landing_gear(telem_data.get("gear_value"), telem_data.get("TAS"))
-        self._update_flaps(telem_data.get("Flaps"))
-        self._update_canopy(telem_data.get("Canopy"))
+        self._update_flaps(telem_data.get("flaps_value"))
+        self._update_canopy(telem_data.get("canopy_value"))
         self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
         self._update_jet_engine_rumble(telem_data)
         if self.is_joystick():
