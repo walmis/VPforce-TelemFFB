@@ -4652,6 +4652,7 @@ def main():
     if config_was_default:
         window.open_system_settings_dialog()
 
+    utils.signal_emitter.telem_timeout_signal.connect(window.update_sim_indicators)
     utils.signal_emitter.error_signal.connect(window.process_error_signal)
 
     app.exec_()
