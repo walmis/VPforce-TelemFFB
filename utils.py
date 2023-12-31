@@ -1306,14 +1306,17 @@ class FetchLatestVersionThread(QThread):
             file = "latest.json"
             send_url = url + file
 
-            try:
-                with urllib.request.urlopen(send_url, context=ctx,) as req:
-                    latest = json.loads(req.read().decode())
-                    latest_version = latest["version"]
-                    latest_url = url + latest["filename"]
-            except Exception as e:
-                logging.exception(f"Error checking latest version status: {url}")
-                self.error_signal.emit(str(e))
+            if 'dirty' in current_version:
+                logging.info("Running from source with locally modified files, skipping version check")
+            else:
+                try:
+                    with urllib.request.urlopen(send_url, context=ctx,) as req:
+                        latest = json.loads(req.read().decode())
+                        latest_version = latest["version"]
+                        latest_url = url + latest["filename"]
+                except Exception as e:
+                    logging.exception(f"Error checking latest version status: {url}")
+                    self.error_signal.emit(str(e))
             if getattr(sys, 'frozen', False):
                 if 'local' in current_version or 'dirty' in current_version:
                     self.version_result_signal.emit('dev', 'dev')
