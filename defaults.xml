@@ -1319,11 +1319,12 @@
 		<name>critical_aoa_max</name>
 		<prereq>aoa_reduction_effect_enabled</prereq>
 		<MSFS>true</MSFS>
+		<validvalues>0,30</validvalues>
 		<value>25</value>
 		<unit>deg</unit>
-		<datatype>int</datatype>
+		<datatype>d_int</datatype>
 		<info>AoA at which applied force maxes out</info>
-		<displayname>Critical AoA Max Speed</displayname>
+		<displayname>Critical AoA Max</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 	</defaults>
@@ -1333,11 +1334,12 @@
 		<name>critical_aoa_start</name>
 		<prereq>aoa_reduction_effect_enabled</prereq>
 		<MSFS>true</MSFS>
+		<validvalues>0,30</validvalues>
 		<value>22</value>
 		<unit>deg</unit>
-		<datatype>int</datatype>
+		<datatype>d_int</datatype>
 		<info>AoA at which to begin applying force</info>
-		<displayname>Critical AoA Start Speed</displayname>
+		<displayname>Critical AoA Start</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 	</defaults>
@@ -1374,9 +1376,10 @@
 		<order>730.3</order>
 		<name>buffet_aoa</name>
 		<prereq>aoa_buffeting_enabled</prereq>
+		<validvalues>0,30</validvalues>
 		<value>10</value>
 		<unit>deg</unit>
-		<datatype>int</datatype>
+		<datatype>d_int</datatype>
 		<info>AoA when buffeting starts</info>
 		<displayname>Buffet Onset Aoa</displayname>
 		<DCS>true</DCS>
@@ -1389,9 +1392,10 @@
 		<order>730.4</order>
 		<name>stall_aoa</name>
 		<prereq>aoa_buffeting_enabled</prereq>
+		<validvalues>0,30</validvalues>
 		<value>15</value>
 		<unit>deg</unit>
-		<datatype>int</datatype>
+		<datatype>d_int</datatype>
 		<info>Stall Angle of Attack</info>
 		<displayname>Stall AoA</displayname>
 		<DCS>true</DCS>

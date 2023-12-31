@@ -3846,6 +3846,11 @@ class SettingsLayout(QGridLayout):
             value = self.sender().value()
             value_to_save = str(round(value * factor))
             value_label.setText(value_to_save)
+        if self.show_slider_debug:
+            print(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
+        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
     def df_slider_changed(self):
         setting_name = self.sender().objectName().replace('dfsld_', '')
@@ -3865,9 +3870,8 @@ class SettingsLayout(QGridLayout):
             value = self.sender().value()
             value_to_save = str(round(value * factor, 2))
             value_label.setText(value_to_save)
-
         if self.show_slider_debug:
-            print(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
+            print(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
         if settings_mgr.sim == 'nothing':
             self.reload_caller()
