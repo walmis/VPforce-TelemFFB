@@ -28,7 +28,7 @@ import utils
 import re
 import socket
 import threading
-
+from collections import OrderedDict
 import subprocess
 
 import traceback
@@ -833,7 +833,7 @@ class IPCNetworkThread(QThread):
         try:
             self._socket.bind((self._host, self._myport))
         except OSError as e:
-            QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {_device_type} instance of TelemFFB.\n\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
+            QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {_device_type} instance of TelemFFB.\n\n{e}\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
             QCoreApplication.instance().quit()
 
     def send_ipc_telem(self, telem):
@@ -3031,7 +3031,26 @@ class MainWindow(QMainWindow):
         # Create and return the interpolated color
         return QColor(r, g, b, a)
 
-    def update_telemetry(self, data: dict):
+    def update_telemetry(self, datadict: dict):
+
+        data = OrderedDict(sorted(datadict.items()))  # Alphabetize telemetry data
+        keys = data.keys()
+        try:
+            #use ordereddict and move some telemetry to the top
+            ## Items to move to the beginning (reverse order)
+            if 'SimconnectCategory' in keys: data.move_to_end('SimconnectCategory', last=False)
+            if 'AircraftClass' in keys: data.move_to_end('AircraftClass', last=False)
+            if 'src' in keys: data.move_to_end('src', last=False)
+            if 'N' in keys: data.move_to_end('N', last=False)
+            if 'FFBType' in keys: data.move_to_end('FFBType', last=False)
+            if 'perf' in keys: data.move_to_end('perf', last=False)
+            if 'frameTimes' in keys: data.move_to_end('frameTimes', last=False)
+            if 'T' in keys: data.move_to_end('T', last=False)
+
+            ## Items to move to the end
+        except:
+            pass
+
         try:
             items = ""
             for k, v in data.items():
