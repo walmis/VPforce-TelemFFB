@@ -3178,7 +3178,7 @@ class SettingsLayout(QGridLayout):
     prereq_list = []
     ##########
     # debug settings
-    show_slider_debug = True   # set to true for slider values shown
+    show_slider_debug = False   # set to true for slider values shown
     show_order_debug = False # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
 
@@ -3694,12 +3694,14 @@ class SettingsLayout(QGridLayout):
         print(f"Checkbox {name} changed. New state: {state}")
         value = 'false' if state == 0 else 'true'
         xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,value,name)
-        # self.reload_caller()
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
     def erase_setting(self, name):
         print(f"Erase {name} clicked")
         xmlutils.erase_models_from_xml(settings_mgr.current_sim, settings_mgr.current_pattern, name)
-        # self.reload_caller()
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
     def browse_for_config(self):
         options = QFileDialog.Options()
@@ -3711,14 +3713,16 @@ class SettingsLayout(QGridLayout):
         if file_path:
             lprint(f"Selected File: {file_path}")
             xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,file_path,'vpconf')
-            # self.reload_caller()
+            if settings_mgr.sim == 'nothing':
+                self.reload_caller()
 
     def dropbox_changed(self):
         setting_name = self.sender().objectName().replace('db_', '')
         value = self.sender().currentText()
         print(f"Dropbox {setting_name} changed. New value: {value}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name)
-        # self.reload_caller()
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
     def unit_dropbox_changed(self):
         setting_name = self.sender().objectName().replace('ud_', '')
@@ -3730,7 +3734,8 @@ class SettingsLayout(QGridLayout):
             value = line_edit.text()
         print(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
-        # self.reload_caller()
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
     def line_edit_changed(self):
         setting_name = self.sender().objectName().replace('vle_', '')
@@ -3742,7 +3747,8 @@ class SettingsLayout(QGridLayout):
         value = self.sender().text()
         print(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
-        # self.reload_caller()
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
     def expander_clicked(self):
         print(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
@@ -3780,7 +3786,8 @@ class SettingsLayout(QGridLayout):
         the_button.setText(str(value))
         if str(value) != '0':
             xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
-        # self.reload_caller()
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
 
     def slider_changed(self):
@@ -3800,7 +3807,8 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             print(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
-        # self.reload_caller()
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
     def cfg_slider_changed(self):
         setting_name = self.sender().objectName().replace('sld_', '')
@@ -3817,7 +3825,8 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             print(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
-        # self.reload_caller()
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
     def d_slider_changed(self):
         setting_name = self.sender().objectName().replace('dsld_', '')
@@ -3860,7 +3869,8 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             print(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
-        # self.reload_caller()
+        if settings_mgr.sim == 'nothing':
+            self.reload_caller()
 
     # prevent slider from sending values as you drag
     def sldDisconnect(self):
