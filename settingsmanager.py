@@ -54,6 +54,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.defaults_path = defaults_path
         self.userconfig_path = userconfig_path
         self.device=device
+        self.timedOut = False
 
         self.sim = self.current_sim
         self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")

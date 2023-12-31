@@ -768,6 +768,7 @@ class TelemManager(QObject, threading.Thread):
         if self.currentAircraft and not self.timedOut:
             self.currentAircraft.on_timeout()
         self.timedOut = True
+        self.settings_manager.timedOut = True
 
     @prints_exc
     def run(self):
@@ -787,6 +788,7 @@ class TelemManager(QObject, threading.Thread):
 
                 if self._data:
                     self.timedOut = False
+                    self.settings_manager.timedOut = False
                     data = self._data
                     self._data = None
                     self.process_data(data)
@@ -3694,13 +3696,13 @@ class SettingsLayout(QGridLayout):
         print(f"Checkbox {name} changed. New state: {state}")
         value = 'false' if state == 0 else 'true'
         xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,value,name)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
     def erase_setting(self, name):
         print(f"Erase {name} clicked")
         xmlutils.erase_models_from_xml(settings_mgr.current_sim, settings_mgr.current_pattern, name)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
     def browse_for_config(self):
@@ -3713,7 +3715,7 @@ class SettingsLayout(QGridLayout):
         if file_path:
             lprint(f"Selected File: {file_path}")
             xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,file_path,'vpconf')
-            if settings_mgr.sim == 'nothing':
+            if settings_mgr.timedOut:
                 self.reload_caller()
 
     def dropbox_changed(self):
@@ -3721,7 +3723,7 @@ class SettingsLayout(QGridLayout):
         value = self.sender().currentText()
         print(f"Dropbox {setting_name} changed. New value: {value}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
     def unit_dropbox_changed(self):
@@ -3734,7 +3736,7 @@ class SettingsLayout(QGridLayout):
             value = line_edit.text()
         print(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
     def line_edit_changed(self):
@@ -3747,7 +3749,7 @@ class SettingsLayout(QGridLayout):
         value = self.sender().text()
         print(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
     def expander_clicked(self):
@@ -3786,7 +3788,7 @@ class SettingsLayout(QGridLayout):
         the_button.setText(str(value))
         if str(value) != '0':
             xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
 
@@ -3807,7 +3809,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             print(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
     def cfg_slider_changed(self):
@@ -3825,7 +3827,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             print(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
     def d_slider_changed(self):
@@ -3849,7 +3851,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             print(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
     def df_slider_changed(self):
@@ -3873,7 +3875,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             print(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
-        if settings_mgr.sim == 'nothing':
+        if settings_mgr.timedOut:
             self.reload_caller()
 
     # prevent slider from sending values as you drag
