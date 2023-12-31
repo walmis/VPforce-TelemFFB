@@ -2443,6 +2443,11 @@ class MainWindow(QMainWindow):
             self.pedals_status_icon = StatusLabel(None, 'Pedals:', Qt.yellow, 8)
             self.collective_status_icon = StatusLabel(None, 'Collective:', Qt.yellow, 8)
 
+            self.master_status_icon.clicked.connect(self.change_config_scope)
+            self.joystick_status_icon.clicked.connect(self.change_config_scope)
+            self.pedals_status_icon.clicked.connect(self.change_config_scope)
+            self.collective_status_icon.clicked.connect(self.change_config_scope)
+
             self.instance_status_row.addWidget(self.master_status_icon)
             self.instance_status_row.addWidget(self.joystick_status_icon)
             self.instance_status_row.addWidget(self.pedals_status_icon)
@@ -2644,6 +2649,10 @@ class MainWindow(QMainWindow):
     def change_config_scope(self, arg):
         global log_folder, log_file
         current_log_ts = log_file.split('_')[-1]
+
+        if 'joystick' in arg: arg = 1
+        elif 'pedals' in arg: arg = 2
+        elif 'collective' in arg: arg = 3
 
         if arg == 1:
             xmlutils.update_vars('joystick', userconfig_path, defaults_path)
@@ -4015,6 +4024,7 @@ class ClickLogo(QLabel):
         super().leaveEvent(event)
 
 class StatusLabel(QWidget):
+    clicked = pyqtSignal(str)
     def __init__(self, parent=None, text='', color: QColor = Qt.yellow, size=8):
         super(StatusLabel, self).__init__(parent)
 
@@ -4023,10 +4033,25 @@ class StatusLabel(QWidget):
 
         self.dot_color = color  # Default color
         self.dot_size = size
-
+        self.setCursor(Qt.PointingHandCursor)
+        self._clickable = True
+        self.setToolTip('Click to manage this device')
         layout = QHBoxLayout(self)
         layout.addWidget(self.label)
 
+    def enterEvent(self, event):
+        # Set the label to be blue and underlined when the mouse enters
+        self.label.setStyleSheet("QLabel { padding-right: 5px; color: blue; text-decoration: underline; }")
+
+    def leaveEvent(self, event):
+        # Set the label back to its original style when the mouse leaves
+        self.label.setStyleSheet("QLabel { padding-right: 5px; color: black; text-decoration: none; }")
+
+
+    def mousePressEvent(self, event):
+        if self._clickable:
+            dev = self.label.text().lower()
+            self.clicked.emit(dev)
     def hide(self):
         self.label.hide()
         super().hide()
