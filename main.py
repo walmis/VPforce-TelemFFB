@@ -3473,7 +3473,6 @@ class SettingsLayout(QGridLayout):
             sliderfactor.setMaximumWidth(0)
         sliderfactor.setObjectName(f"sf_{item['name']}")
 
-
         if item['datatype'] == 'float' or \
                 item['datatype'] == 'negfloat':
 
@@ -3501,6 +3500,29 @@ class SettingsLayout(QGridLayout):
             self.addWidget(sliderfactor, i, fct_col)
 
             slider.blockSignals(False)
+
+
+        if item['datatype'] == 'd_float':
+
+
+            d_val = float(item['value'])
+            factor = float(item['sliderfactor'])
+            val = int(round(d_val / factor))
+            if self.show_slider_debug:
+                print(f"read value: {item['value']}   d_slider: {val}")
+            d_slider.blockSignals(True)
+            if validvalues is None or validvalues == '':
+                pass
+            else:
+                d_slider.setRange(int(validvalues[0]), int(validvalues[1]))
+            d_slider.setValue(val)
+            value_label.setText(str(d_val))
+            d_slider.valueChanged.connect(self.d_slider_changed)
+            d_slider.sliderPressed.connect(self.sldDisconnect)
+            d_slider.sliderReleased.connect(self.d_sldReconnect)
+            self.addWidget(d_slider, i, entry_col, 1, entry_colspan)
+            self.addWidget(value_label, i, val_col)
+            self.addWidget(sliderfactor, i, fct_col)
 
         if item['datatype'] == 'cfgfloat':
 
@@ -3536,7 +3558,10 @@ class SettingsLayout(QGridLayout):
             if self.show_slider_debug:
                 print(f"read value: {item['value']}   d_slider: {val}")
             d_slider.blockSignals(True)
-            d_slider.setRange(int(validvalues[0]), int(validvalues[1]))
+            if validvalues is None or validvalues == '':
+                pass
+            else:
+                d_slider.setRange(int(validvalues[0]), int(validvalues[1]))
             d_slider.setValue(val)
             value_label.setText(str(d_val))
             d_slider.valueChanged.connect(self.d_slider_changed)
@@ -3785,6 +3810,8 @@ class SettingsLayout(QGridLayout):
             value = self.sender().value()
             value_to_save = str(round(value * factor))
             value_label.setText(value_to_save)
+
+
 
         if self.show_slider_debug:
             print(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")

@@ -659,7 +659,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 if sliderfactor != '1':
                     self.l_sliderfactor.show()
 
-            case 'int' | 'd_int' | 'text' | 'anyfloat' | 'button':
+            case 'int' | 'd_int' | 'text' | 'anyfloat' | 'd_float' | 'button':
                 self.l_value.show()
                 self.tb_value.show()
 
