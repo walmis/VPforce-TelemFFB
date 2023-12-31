@@ -777,7 +777,7 @@
 		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<joystick>true</joystick>
 	</defaults>
-	<defaults><Grouping>G Force</Grouping><order>100</order><name>gforce_effect_enable</name><value>true</value><datatype>bool</datatype><displayname>G Force Effect</displayname><IL2>true</IL2><joystick>true</joystick></defaults>
+	<defaults><Grouping>G Force</Grouping><order>100</order><name>gforce_effect_enable</name><DCS>true</DCS><datatype>bool</datatype><displayname>G Force Effect</displayname><IL2>true</IL2><joystick>true</joystick></defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
 		<order>100.1</order>
@@ -1523,13 +1523,60 @@
 		<order>770.1</order>
 		<name>gear_buffet_intensity</name>
 		<prereq>gear_buffet_effect_enabled</prereq>
-		<MSFS>true</MSFS>
-		<value>0.15</value>
-		<sliderfactor>0.4</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
 		<info>Peak intensity for gear drag buffeting effect</info>
 		<displayname>Gear Buffet</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.15</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>770.2</order>
+		<name>gear_buffet_freq</name>
+		<prereq>gear_buffet_effect_enabled</prereq>
+		<info>Frequency of buffeting effect (Hz)</info>
+		<displayname>Buffeting Frequency</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>1,20</validvalues>
+		<value>10</value>
+		<unit>hz</unit>
+		<datatype>d_int</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>770.3</order>
+		<name>gear_buffet_speed_low</name>
+		<prereq>gear_buffet_effect_enabled</prereq>
+		<info>Minimum intensity (low) speed for gear buffeting effect</info>
+		<displayname>Min Intensity Speed</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<datatype>int</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>770.4</order>
+		<name>gear_buffet_speed_high</name>
+		<prereq>gear_buffet_effect_enabled</prereq>
+		<MSFS>true</MSFS>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<datatype>int</datatype>
+		<info>Maximum intensity (high) speed for gear buffeting effect</info>
+		<displayname>Max Intensity Speed</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3076,6 +3123,13 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>flaps_motion_effect_enabled</name>
+		<model>Boeing F/A 18.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>flaps_motion_intensity</name>
 		<model>Boeing F/A 18.*</model>
 		<value>0.0</value>
@@ -3830,25 +3884,25 @@
 		<device>pedals</device>
 	</models>
 	<models>
-		<name>flaps_motion_intensity</name>
+		<name>flaps_motion_effect_enabled</name>
 		<model>F-16C_50</model>
-		<value>0.0</value>
+		<value>false</value>
 		<sim>DCS</sim>
-		<device>pedals</device>
+		<device>any</device>
 	</models>
 	<models>
 		<name>flaps_motion_intensity</name>
 		<model>F-16C_50</model>
 		<value>0.0</value>
 		<sim>DCS</sim>
-		<device>joystick</device>
+		<device>any</device>
 	</models>
 	<models>
 		<name>runway_rumble_intensity</name>
 		<model>F-16C_50</model>
 		<value>3.0</value>
 		<sim>DCS</sim>
-		<device>joystick</device>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -3911,19 +3965,19 @@
 		<device>joystick</device>
 		</models>
 	<models>
-		<name>flaps_motion_intensity</name>
+		<name>flaps_motion_effect_enabled</name>
 		<model>FA-18C_hornet</model>
-		<value>0.0</value>
+		<value>false</value>
 		<sim>DCS</sim>
-		<device>pedals</device>
+		<device>any</device>
 	</models>
 	<models>
 		<name>flaps_motion_intensity</name>
 		<model>FA-18C_hornet</model>
 		<value>0.0</value>
 		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
+		<device>any</device>
+	</models>
 	<models>
 		<name>runway_rumble_intensity</name>
 		<model>FA-18C_hornet</model>
@@ -6417,7 +6471,21 @@
 		<name>gear_motion_effect_enabled</name>
 		<type>PropellerAircraft</type>
 		<value>false</value>
-		<sim>any</sim>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gear_motion_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gear_motion_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>IL2</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
@@ -6426,6 +6494,194 @@
 		<value>true</value>
 		<sim>any</sim>
 		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gear_buffet_speed_low</name>
+		<type>JetAircraft</type>
+		<value>190</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gear_buffet_speed_high</name>
+		<type>JetAircraft</type>
+		<value>275</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gear_buffet_speed_low</name>
+		<type>TurbopropAircraft</type>
+		<value>160</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gear_buffet_speed_high</name>
+		<type>TurbopropAircraft</type>
+		<value>210</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gear_buffet_speed_low</name>
+		<type>PropellerAircraft</type>
+		<value>100</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gear_buffet_speed_high</name>
+		<type>PropellerAircraft</type>
+		<value>150</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_max_intensity</name>
+		<type>JetAircraft</type>
+		<value>0.8</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_curvature</name>
+		<type>JetAircraft</type>
+		<value>2.5</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_min_gs</name>
+		<type>JetAircraft</type>
+		<value>1.1</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_max_gs</name>
+		<type>JetAircraft</type>
+		<value>7.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_max_intensity</name>
+		<type>PropellerAircraft</type>
+		<value>0.8</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_curvature</name>
+		<type>PropellerAircraft</type>
+		<value>2.5</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_min_gs</name>
+		<type>PropellerAircraft</type>
+		<value>1.4</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_max_gs</name>
+		<type>PropellerAircraft</type>
+		<value>7.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_max_intensity</name>
+		<type>JetAircraft</type>
+		<value>0.8</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_curvature</name>
+		<type>JetAircraft</type>
+		<value>2.5</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_min_gs</name>
+		<type>JetAircraft</type>
+		<value>1.1</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_max_gs</name>
+		<type>JetAircraft</type>
+		<value>7.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_max_intensity</name>
+		<type>PropellerAircraft</type>
+		<value>0.8</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_curvature</name>
+		<type>PropellerAircraft</type>
+		<value>2.5</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_min_gs</name>
+		<type>PropellerAircraft</type>
+		<value>1.4</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_max_gs</name>
+		<type>PropellerAircraft</type>
+		<value>7.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>hands_off_deadzone</name>
