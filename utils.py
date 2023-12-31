@@ -1314,14 +1314,28 @@ class FetchLatestVersionThread(QThread):
             except Exception as e:
                 logging.exception(f"Error checking latest version status: {url}")
                 self.error_signal.emit(str(e))
+            if getattr(sys, 'frozen', False):
+                if 'local' in current_version or 'dirty' in current_version:
+                    self.version_result_signal.emit('dev', 'dev')
+                elif current_version != latest_version and latest_version is not None and latest_url is not None:
+                    logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
+                    self.version_result_signal.emit(latest_version, latest_url)
+                elif current_version == latest_version:
+                    self.version_result_signal.emit("uptodate", "uptodate")
+                else:
+                    self.version_result_signal.emit("error", "error")
+            else: #running from source
 
-            if current_version != latest_version and latest_version is not None and latest_url is not None:
-                logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
-                self.version_result_signal.emit(latest_version, latest_url)
-            elif current_version == latest_version:
-                self.version_result_signal.emit("uptodate", "uptodate")
-            else:
-                self.version_result_signal.emit("error", "error")
+                current_version = current_version.removeprefix('local-')
+                if '-dirty' in current_version:
+                    self.version_result_signal.emit('dev', 'dev')
+                elif current_version == latest_version:
+                    self.version_result_signal.emit("uptodate", "uptodate")
+                else:
+                    self.version_result_signal.emit("needsupdate", "needsupdate")
+
+
+
         except Exception as e:
             self.error_signal.emit(str(e))
 

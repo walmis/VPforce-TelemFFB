@@ -629,7 +629,7 @@ class TelemManager(QObject, threading.Thread):
                 logging.error("Error Parsing Parameter: ", repr(i))
 
         ## Read telemetry sent via IPC channel from child instances and update local telemetry stream
-        if _master_instance:
+        if _master_instance and _launched_children:
             self._ipc_telem = self.ipc_thread._ipc_telem
             if self._ipc_telem != {}:
                 telem_data.update(self._ipc_telem)
@@ -2610,6 +2610,8 @@ class MainWindow(QMainWindow):
         _latest_version = vers
         _latest_url = url
 
+        is_exe = getattr(sys, 'frozen', False)
+
         if vers == "uptodate":
             status_text = "Up To Date"
             self.update_action.setDisabled(True)
@@ -2617,6 +2619,15 @@ class MainWindow(QMainWindow):
         elif vers == "error":
             status_text = "UNKNOWN"
             self.version_label.setText(f'Version Status: {status_text}')
+        elif vers == 'dev':
+            if is_exe:
+                self.version_label.setText(f'Version Status: <b>Development Build</b>')
+            else:
+                self.version_label.setText(f'Version Status: <b>Non release - Modified Source</b>')
+
+        elif vers == 'needsupdate':
+            self.version_label.setText(f'Version Status: <b>Out of Date Source - Git pull needed</b>')
+
         else:
             # print(_update_available)
             _update_available = True
@@ -2627,6 +2638,7 @@ class MainWindow(QMainWindow):
             self.update_action.setText("Install Latest TelemFFB")
             self.version_label.setToolTip(url)
             self.version_label.setText(f'Version Status: {status_text}')
+
         self.perform_update(auto=True)
 
     def change_config_scope(self, arg):
