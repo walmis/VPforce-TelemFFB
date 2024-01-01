@@ -4628,7 +4628,25 @@ def launch_children():
 
 def main():
     app = QApplication(sys.argv)
-    app.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
+
+    app.setStyleSheet("""
+            QCheckBox::indicator:checked { image: url(image/purplecheckbox.png); }
+            QPushButton, #styledButton {
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                                  stop: 0 #ab37c8, stop: 0.4 #9a24b5,
+                                                  stop: 0.5 #8e1da8, stop: 1.0 #ab37c8);
+                border: 1px solid #6e1d6f;
+                border-radius: 5px;
+                padding: 3px;
+                margin: 1px;
+                color: white;
+            }
+            QPushButton:hover, #styledButton:hover {
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                                stop: 0 #d97ed1, stop: 0.4 #d483d4,
+                                                stop: 0.5 #d992da, stop: 1.0 #e4a9e7);
+            }
+    """)
     global window, log_window, log_tail_window
     global dev_firmware_version
     global dev_serial
