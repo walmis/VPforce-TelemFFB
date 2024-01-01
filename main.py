@@ -3464,6 +3464,7 @@ class SettingsLayout(QGridLayout):
             #         if olditem is not None:
             #             self.remove_widget(olditem)
         if item['prereq'] != '' and item['hasbump'] != 'true' and item['order'][-2:] != '.1':
+            # label.setStyleSheet("QLabel { padding-left: 20px; }")
             lbl_colspan = 1
             lbl_col += 1
         self.addWidget(label, i, lbl_col, 1, lbl_colspan)
@@ -4086,6 +4087,57 @@ class ClickLogo(QLabel):
     def leaveEvent(self, event):
         self.setCursor(Qt.ArrowCursor)
         super().leaveEvent(event)
+
+
+class InfoLabel(QWidget):
+    def __init__(self, text=None, tooltip=None, parent=None):
+        super(InfoLabel, self).__init__(parent)
+
+        # Text label
+        self.text_label = QLabel(self)
+        self.text_label.setText(text)
+        self.text_label.setMinimumWidth(self.text_label.sizeHint().height())
+
+        # Information icon
+        self.icon_label = QLabel(self)
+        icon_img = os.path.join(script_dir, "image/information.png")
+        self.pixmap = QPixmap(icon_img)
+        self.icon_label.setPixmap(self.pixmap.scaledToHeight(self.text_label.sizeHint().height()))  # Adjust the height as needed
+        self.icon_label.setVisible(False)
+
+        # Layout to align the text label and icon
+        self.layout = QHBoxLayout(self)
+        self.layout.addWidget(self.text_label, alignment=Qt.AlignLeft)
+        self.layout.addSpacing(0)
+        self.layout.addWidget(self.icon_label, alignment=Qt.AlignLeft)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.addStretch()
+
+        # Set initial size for text_label based on the size of the icon
+        # self.text_label.setFixedHeight(self.icon_label.height())
+
+        if text:
+            self.setText(text)
+        if tooltip:
+            self.setToolTip(tooltip)
+
+    def setText(self, text):
+        self.text_label.setText(text)
+        # Adjust the size of text_label based on the new text
+        # self.text_label.setFixedHeight(self.icon_label.height())
+
+    def setToolTip(self, tooltip):
+        if tooltip:
+            self.icon_label.setToolTip(tooltip)
+            self.icon_label.setVisible(True)
+        else:
+            self.icon_label.setToolTip('')
+            self.icon_label.setVisible(False)
+
+    def show_icon(self):
+        # Manually scale the pixmap to a reasonable size
+        scaled_pixmap = self.pixmap.scaledToHeight(self.text_label.sizeHint().height())  # Adjust the height as needed
+        self.icon_label.setPixmap(scaled_pixmap)
 
 class StatusLabel(QWidget):
     clicked = pyqtSignal(str)
