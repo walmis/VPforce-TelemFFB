@@ -7584,13 +7584,6 @@
 	</classdefaults>
 	<classdefaults>
 		<name>vrs_effect_enable</name>
-		<type>Helicopter</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>vrs_effect_enable</name>
 		<type>HPGHelicopter</type>
 		<value>true</value>
 		<sim>MSFS</sim>
