@@ -164,11 +164,22 @@
 		<Grouping>Basic</Grouping>
 		<order>16</order>
 		<name>trim_workaround</name>
+		<info>Apply artificial trim movement - only for aircraft that do not support native FFB trim&lt;b&gt;&lt;b&gt;(AV8B, Mig-19)</info>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<displayname>Trim Workaround</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>17</order>
+		<name>pedal_trimming_enabled</name>
+		<info>Enable pedal trimming feedback for fixed wing aircfraft</info>
+		<displayname>Pedal Trimming</displayname>
+		<DCS>true</DCS>
+		<pedals>true</pedals>
+		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
@@ -464,15 +475,6 @@
 		<datatype>float</datatype>
 		<info>Spring gain when aircraft is at Vne</info>
 		<displayname>Vne Gain</displayname>
-		<DCS>true</DCS>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>39</order>
-		<name>pedal_trimming_enabled</name>
-		<datatype>bool</datatype>
-		<displayname>Pedal Trimming</displayname>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
 	</defaults>
@@ -796,9 +798,10 @@
 		<order>100.2</order>
 		<name>gforce_effect_curvature</name>
 		<prereq>gforce_effect_enable</prereq>
+		<info>Affects the onset characteristics of the G-Force effect.  See manual for details</info>
 		<sliderfactor>0.1</sliderfactor>
 		<validvalues>10,30</validvalues>
-		<value>2.0</value>
+		<value>2.1</value>
 		<datatype>d_float</datatype>
 		<displayname>G Force Curvature</displayname>
 		<DCS>true</DCS>
@@ -811,7 +814,7 @@
 		<name>gforce_min_gs</name>
 		<prereq>gforce_effect_enable</prereq>
 		<sliderfactor>0.1</sliderfactor>
-		<validvalues>5,30</validvalues>
+		<validvalues>10,30</validvalues>
 		<value>1.0</value>
 		<datatype>d_float</datatype>
 		<displayname>Minimum Gs</displayname>
@@ -825,7 +828,7 @@
 		<name>gforce_max_gs</name>
 		<prereq>gforce_effect_enable</prereq>
 		<sliderfactor>0.1</sliderfactor>
-		<validvalues>30,120</validvalues>
+		<validvalues>40,100</validvalues>
 		<value>7.0</value>
 		<datatype>d_float</datatype>
 		<displayname>Maximum Gs</displayname>
@@ -1373,6 +1376,23 @@
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
+		<order>730.2</order>
+		<name>aoa_buffet_freq</name>
+		<prereq>aoa_buffeting_enabled</prereq>
+		<info>Frequency of buffeting effect (Hz)</info>
+		<displayname>Buffeting Frequency</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>1,20</validvalues>
+		<value>13</value>
+		<unit>hz</unit>
+		<datatype>d_int</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
 		<order>730.3</order>
 		<name>buffet_aoa</name>
 		<prereq>aoa_buffeting_enabled</prereq>
@@ -1677,7 +1697,6 @@
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
