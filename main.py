@@ -3454,7 +3454,7 @@ class SettingsLayout(QGridLayout):
             unit_dropbox.setDisabled(rowdisabled)
 
         # everything has a name, except for things that have a checkbox *and* slider
-        label = QLabel(f"{item['displayname']}")
+        label = InfoLabel(f"{item['displayname']}")
         label.setToolTip(item['info'])
         label.setMinimumHeight(20)
         label.setMinimumWidth(20)
@@ -4144,6 +4144,9 @@ class InfoLabel(QWidget):
         else:
             self.icon_label.setToolTip('')
             self.icon_label.setVisible(False)
+
+    def setTextStyleSheet(self, style_sheet):
+        self.text_label.setStyleSheet(style_sheet)
 
     def show_icon(self):
         # Manually scale the pixmap to a reasonable size
