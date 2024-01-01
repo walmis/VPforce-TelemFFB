@@ -1916,6 +1916,7 @@ class MainWindow(QMainWindow):
                 'width': 0,
             }
         }
+        self.setMinimumWidth(600)
         self.tab_sizes = self.default_tab_sizes
         self._ipc_thread = ipc_thread
         self.system_settings_dict = utils.read_system_settings(args.device, args.type)
@@ -3364,7 +3365,11 @@ class SettingsLayout(QGridLayout):
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.addItem(spacerItem, i+1, 1, 1, 1)
-        #print (f"{i} rows with {self.count()} widgets")
+        # Give entry column a high stretch factor, all others remain default 0.
+        # When window is resized, the entry column will grow to take up all the new space
+        self.setColumnStretch(4, 10)
+
+        # print (f"{i} rows with {self.count()} widgets")
 
     def reload_caller(self):
         # self.mainwindow.settings_area.setUpdatesEnabled(False)
@@ -3489,6 +3494,7 @@ class SettingsLayout(QGridLayout):
         line_edit.blockSignals(False)
         line_edit.setAlignment(Qt.AlignHCenter)
         line_edit.setObjectName(f"vle_{item['name']}")
+        line_edit.setMinimumWidth(150)
         line_edit.editingFinished.connect(self.line_edit_changed)
 
         expand_button = QToolButton()
@@ -3507,6 +3513,7 @@ class SettingsLayout(QGridLayout):
         if item['value'] == '0':
             usb_button_text = 'Click to Configure'
         self.usbdevice_button = QPushButton(usb_button_text)
+        self.usbdevice_button.setMinimumWidth(150)
         self.usbdevice_button.setObjectName(f"pb_{item['name']}")
         self.usbdevice_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
         self.usbdevice_button.clicked.connect(self.usb_button_clicked)
@@ -3624,6 +3631,7 @@ class SettingsLayout(QGridLayout):
 
         if item['datatype'] == 'list' or item['datatype'] == 'anylist' :
             dropbox = QComboBox()
+            dropbox.setMinimumWidth(150)
             dropbox.setEditable(True)
             dropbox.lineEdit().setAlignment(QtCore.Qt.AlignHCenter)
             dropbox.setObjectName(f"db_{item['name']}")
@@ -3636,30 +3644,33 @@ class SettingsLayout(QGridLayout):
             else:
                 dropbox.currentTextChanged.connect(self.dropbox_changed)
             dropbox.blockSignals(False)
-            self.addWidget(dropbox, i, entry_col, 1, entry_colspan)
+            self.addWidget(dropbox, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
             # dropbox.currentTextChanged.connect(self.dropbox_changed)
 
         if item['datatype'] == 'path':
             browse_button = QPushButton()
             browse_button.blockSignals(True)
             browse_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+            browse_button.setMinimumWidth(150)
             if item['value'] == '-':
                 browse_button.setText('Browse...')
             else:
-                button_text = item['value']
-                p_length = len(item['value'])
-                if p_length > 45:
-                    button_text = f"{button_text[:10]}...{button_text[-25:]}"
+                fname = os.path.basename(item['value'])
+                button_text = fname
+                browse_button.setToolTip(item['value'])
+                # p_length = len(item['value'])
+                # if p_length > 45:
+                #     button_text = f"{button_text[:40]}...{button_text[-25:]}"
                 browse_button.setText(button_text)
             browse_button.blockSignals(False)
             browse_button.clicked.connect(self.browse_for_config)
-            self.addWidget(browse_button, i, entry_col, 1, entry_colspan)
+            self.addWidget(browse_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
         if item['datatype'] == 'int' or item['datatype'] == 'anyfloat':
-            self.addWidget(line_edit, i, entry_col, 1, entry_colspan)
+            self.addWidget(line_edit, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
         if item['datatype'] == 'button':
-            self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan)
+            self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
         if item['has_expander'] == 'true' and item['prereq'] != '':
             exp_col += 1
