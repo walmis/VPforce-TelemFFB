@@ -2648,13 +2648,15 @@ class MainWindow(QMainWindow):
 
         self.perform_update(auto=True)
 
-    def change_config_scope(self, arg):
+    def change_config_scope(self, _arg):
         global log_folder, log_file
         current_log_ts = log_file.split('_')[-1]
-
-        if 'joystick' in arg: arg = 1
-        elif 'pedals' in arg: arg = 2
-        elif 'collective' in arg: arg = 3
+        if isinstance(_arg, str):
+                if 'joystick' in _arg: arg = 1
+                elif 'pedals' in _arg: arg = 2
+                elif 'collective' in _arg: arg = 3
+        else:
+            arg = _arg
 
         if arg == 1:
             xmlutils.update_vars('joystick', userconfig_path, defaults_path)
