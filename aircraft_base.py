@@ -26,6 +26,8 @@ fpss2gs = 1 / 32.17405
 
 
 class AircraftBase(object):
+    aoa_buffet_freq = 13
+
     damper_force: float = 0
     inertia_force: float = 0
 
@@ -338,7 +340,7 @@ class AircraftBase(object):
         airflow_factor = utils.scale_clamp(speed, (0, max_airflow_speed), (0, 1.0))
         buffeting_factor = utils.scale_clamp(aoa, (local_buffet_aoa, local_stall_aoa), (0.0, 1.0))
         # todo calc frequency
-        return (13.0, airflow_factor * buffeting_factor * self.buffeting_intensity)
+        return (self.aoa_buffet_freq, airflow_factor * buffeting_factor * self.buffeting_intensity)
 
     def _update_buffeting(self, telem_data: dict):
         if not self.buffeting_intensity or not self.aoa_buffeting_enabled:
@@ -379,7 +381,7 @@ class AircraftBase(object):
         airflow_factor = utils.scale_clamp(tas, (0, max_airflow_speed), (0, 1.0))
         buffeting_factor = utils.scale_clamp(aoa, (local_buffet_aoa, local_stall_aoa), (0.0, 1.0))
         # todo calc frequency
-        freq = 13
+        freq = self.aoa_buffet_freq
         # return (13.0, airflow_#factor * buffeting_factor * self.buffeting_intensity)
         # freq, mag = self._calc_buffeting(aoa, tas, telem_data)
         # manage periodic effect for buffeting
