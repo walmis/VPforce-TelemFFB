@@ -1079,10 +1079,6 @@ class Helicopter(Aircraft):
         super().__init__(name, **kwargs)
     def on_timeout(self):
         super().on_timeout()
-        input_data = HapticEffect.device.getInput()
-        self.last_device_x, self.last_device_y = input_data.axisXY()
-        self.last_pedal_x = self.last_device_x
-        self.last_collective_y = self.last_device_y
         self.cyclic_spring_init = 0
         self.collective_init = 0
         self.pedals_init = 0
@@ -1134,6 +1130,7 @@ class Helicopter(Aircraft):
         ffb_type = telem_data.get("FFBType", "joystick")
         ap_active = telem_data.get("APMaster", 0)
         trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
+        self.spring = effects["cyclic_spring"].spring()
 
         if ffb_type == "joystick":
             if self.force_trim_enabled:
@@ -1142,7 +1139,6 @@ class Helicopter(Aircraft):
                     logging.warning("Force trim enabled but buttons not configured")
                     telem_data['error'] = 1
                     return
-                self.spring = effects["cyclic_spring"].spring()
                 input_data = HapticEffect.device.getInput()
 
                 force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
@@ -1254,6 +1250,8 @@ class Helicopter(Aircraft):
 
                 telem_data["StickXY"] = [x, y]
                 telem_data["StickXY_offset"] = self.cyclic_center
+            else:
+                self.spring.stop()
 
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
@@ -1296,6 +1294,8 @@ class Helicopter(Aircraft):
                     self.send_event_to_msfs(x_var, pos_x_pos)
                     self.send_event_to_msfs(y_var, pos_y_pos)
 
+                self.last_device_x, self.last_device_y = phys_x, phys_y
+
             if self.anything_has_changed("cyclic_gain", self.cyclic_spring_gain):  # check if spring gain setting has been modified in real time
                 self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
                 self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
@@ -1307,8 +1307,8 @@ class Helicopter(Aircraft):
             self.spring_y.cpOffset = int(self.cpO_y) + self.cyclic_physical_trim_y_offs
             self.spring.effect.setCondition(self.spring_x)
             self.spring.effect.setCondition(self.spring_y)
-
-            self.spring.start()
+            if self.force_trim_enabled:
+                self.spring.start()
 
     def _update_cyclic_trim(self, telem_data):
         if telem_data.get("FFBType", None) != 'joystick':
@@ -1342,10 +1342,9 @@ class Helicopter(Aircraft):
             self.damper = effects["pedal_damper"].damper()
 
             pedal_pos = telem_data.get("TailRotorPedalPos")
-
+            input_data = HapticEffect.device.getInput()
+            phys_x, phys_y = input_data.axisXY()
             if not self.pedals_init:
-                input_data = HapticEffect.device.getInput()
-                phys_x, phys_y = input_data.axisXY()
 
                 self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = self.pedal_spring_coeff_x
                 if telem_data.get("SimOnGround", 1):
@@ -1369,6 +1368,8 @@ class Helicopter(Aircraft):
                     self.spring.stop()
                 else:
                     return
+
+            self.last_pedal_x = phys_x
 
             if self.enable_custom_x_axis:
                 x_var = self.custom_x_axis
@@ -1404,10 +1405,9 @@ class Helicopter(Aircraft):
         # SimVar("h145CollectiveRelease", "L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool"),
         # SimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "number"),
         # SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
+        input_data = HapticEffect.device.getInput()
+        phys_x, phys_y = input_data.axisXY()
         if not self.collective_init:
-            input_data = HapticEffect.device.getInput()
-            phys_x, phys_y = input_data.axisXY()
-
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = self.collective_spring_coeff_y
             if telem_data.get("SimOnGround", 1):
                 self.cpO_y = 4096
@@ -1430,9 +1430,7 @@ class Helicopter(Aircraft):
                 logging.info("Collective Initialized")
             else:
                 return
-
-        input_data = HapticEffect.device.getInput()
-        phys_x, phys_y = input_data.axisXY()
+        self.last_collective_y = phys_y
         self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
         # print(self.cpO_y)
         self.spring_y.cpOffset = self.cpO_y
@@ -1659,8 +1657,6 @@ class HPGHelicopter(Helicopter):
             pedal_cpO_x = round(4096*pedal_pos)
 
             if not self.pedals_init:
-                input_data = HapticEffect.device.getInput()
-                phys_x, phys_y = input_data.axisXY()
 
                 self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = self.pedal_spring_coeff_x
                 if telem_data.get("SimOnGround", 1):
@@ -1699,6 +1695,8 @@ class HPGHelicopter(Helicopter):
             else:
                 pos_x_pos = round(pos_x_pos, 5)
 
+            self.last_pedal_x = phys_x
+
             self.send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
@@ -1719,9 +1717,10 @@ class HPGHelicopter(Helicopter):
         # SimVar("h145CollectiveRelease", "L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool"),
         # SimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "number"),
         # SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
+        input_data = HapticEffect.device.getInput()
+        phys_x, phys_y = input_data.axisXY()
         if not self.collective_init:
-            input_data = HapticEffect.device.getInput()
-            phys_x, phys_y = input_data.axisXY()
+
 
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = self.collective_spring_coeff_y
             if telem_data.get("SimOnGround", 1):
@@ -1742,11 +1741,11 @@ class HPGHelicopter(Helicopter):
                 logging.info("Collective Initialized")
             else:
                 return
+        self.last_collective_y = phys_y
 
         if afcs_mode == 0:
             if collective_tr:
-                input_data = HapticEffect.device.getInput()
-                phys_x, phys_y = input_data.axisXY()
+
                 self.cpO_y = round(4096*utils.clamp(phys_y, -1, 1))
                 # print(self.cpO_y)
                 self.spring_y.cpOffset = self.cpO_y
@@ -1786,8 +1785,7 @@ class HPGHelicopter(Helicopter):
 
         else:
             if collective_tr:
-                input_data = HapticEffect.device.getInput()
-                phys_x, phys_y = input_data.axisXY()
+
                 self.cpO_y = round(4096*utils.clamp(phys_y, -1, 1))
                 # print(self.cpO_y)
                 self.spring_y.cpOffset = self.cpO_y

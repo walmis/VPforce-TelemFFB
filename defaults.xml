@@ -1937,9 +1937,10 @@
 		<order>850</order>
 		<name>center_spring_on_pause</name>
 		<MSFS>true</MSFS>
+		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
-		<info>Force spring centering when in pause/slew mode&lt;br&gt;&lt;br&gt;When disabled, you will need to bring the axis close to center to re-establish axis control</info>
+		<info>Force spring centering when in pause/slew mode</info>
 		<displayname>Center on Pause/Slew</displayname>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
