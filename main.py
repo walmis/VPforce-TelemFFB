@@ -3663,6 +3663,7 @@ class SettingsLayout(QGridLayout):
                 #     button_text = f"{button_text[:40]}...{button_text[-25:]}"
                 browse_button.setText(button_text)
             browse_button.blockSignals(False)
+            browse_button.setMaximumHeight(25)
             browse_button.clicked.connect(self.browse_for_config)
             self.addWidget(browse_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
