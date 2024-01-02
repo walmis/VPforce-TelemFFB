@@ -2022,20 +2022,20 @@ class MainWindow(QMainWindow):
             convert_settings_action.triggered.connect(lambda: autoconvert_config(self))
             utilities_menu.addAction(convert_settings_action)
 
-        if _master_instance or _child_instance:
+        if _master_instance and system_settings.get('autolaunchMaster', 0):
             self.window_menu = menubar.addMenu('Window')
-
-        if _child_instance:
-            self.hide_window_action = QAction('Hide Window')
-            self.hide_window_action.triggered.connect(hide_window)
-            self.window_menu.addAction(self.hide_window_action)
-        if _master_instance and _launched_children:
             self.show_children_action = QAction('Show Child Instance Windows')
             self.show_children_action.triggered.connect(lambda: self.toggle_child_windows('show'))
             self.window_menu.addAction((self.show_children_action))
             self.hide_children_action = QAction('Hide Child Instance Windows')
             self.hide_children_action.triggered.connect(lambda: self.toggle_child_windows('hide'))
             self.window_menu.addAction((self.hide_children_action))
+
+        if _child_instance:
+            self.window_menu = menubar.addMenu('Window')
+            self.hide_window_action = QAction('Hide Window')
+            self.hide_window_action.triggered.connect(hide_window)
+            self.window_menu.addAction(self.hide_window_action)
 
 
         help_menu = menubar.addMenu('Help')
