@@ -3277,7 +3277,7 @@ class SettingsLayout(QGridLayout):
                     if item['prereq'] == p['name']:
                         if p['value'].lower() == 'true':
                             if p['has_expander'].lower() == 'true':
-                                if p['name'] in self.expanded_items:
+                                if p['name'] in self.expanded_items and p['is_visible']=='true':
                                     iv = 'true'
                                     cond = 'item parent expanded'
                                 else:
