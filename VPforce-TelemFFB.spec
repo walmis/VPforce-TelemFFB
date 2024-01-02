@@ -113,10 +113,7 @@ import shutil
 
 shutil.copyfile('defaults.xml', '{0}/defaults.xml'.format(DISTPATH))
 shutil.copyfile('_RELEASE_NOTES.txt', '{0}/_RELEASE_NOTES.txt'.format(DISTPATH))
-if os.path.exists('{0}/export'.format(DISTPATH)):
-    shutil.rmtree('{0}/export'.format(DISTPATH))
-shutil.copytree('export', '{0}/export'.format(DISTPATH))
-if os.path.exists('{0}/updater'.format(DISTPATH)):
-	shutil.rmtree('{0}/updater'.format(DISTPATH))
-shutil.copytree('updater', '{0}/updater'.format(DISTPATH))
+
+shutil.copytree('export', '{0}/export'.format(DISTPATH), dirs_exist_ok=True)
+shutil.copytree('updater', '{0}/updater'.format(DISTPATH), dirs_exist_ok=True)
 
