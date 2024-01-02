@@ -7,8 +7,8 @@ block_cipher = None
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect'), ('updater/updater.exe', 'updater') ],
-    datas=[('export/*', 'export'), ('config.ini', '.'), ('config.user.ini.README.old', '.'), ('defaults.xml', '.'), ('simconnect/*.json', 'simconnect'),('_RELEASE_NOTES.txt', '.')],
+    binaries=[('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect')],
+    datas=[('export/*', 'export'), ('config.ini', '.'), ('config.user.ini.README.old', '.'), ('simconnect/*.json', 'simconnect')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
