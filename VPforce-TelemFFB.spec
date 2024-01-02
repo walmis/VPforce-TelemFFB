@@ -8,7 +8,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect')],
-    datas=[('export/*', 'export'), ('config.ini', '.'), ('config.user.ini.README.old', '.'), ('simconnect/*.json', 'simconnect')],
+    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('config.user.ini.README.old', '.'), ('simconnect/*.json', 'simconnect')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -111,7 +111,7 @@ exe = EXE(
 
 import shutil
 
-shutil.copyfile('defaults.xml', '{0}/defaults.xml'.format(DISTPATH))
+# shutil.copyfile('defaults.xml', '{0}/defaults.xml'.format(DISTPATH))
 shutil.copyfile('_RELEASE_NOTES.txt', '{0}/_RELEASE_NOTES.txt'.format(DISTPATH))
 
 shutil.copytree('export', '{0}/export'.format(DISTPATH), dirs_exist_ok=True)

@@ -251,21 +251,22 @@ log_filter = LoggingFilter(log_filter_strings)
 console_handler.addFilter(log_filter)
 file_handler.addFilter(log_filter)
 
-#### if you want to find defaults.xml or other files included in exe:
-#
-# def resource_path(relative_path):
-#     """ Get absolute path to resource, works for dev and for PyInstaller """
-#     try:
-#         # PyInstaller creates a temp folder and stores path in _MEIPASS
-#         base_path = sys._MEIPASS
-#     except Exception:
-#         base_path = os.path.abspath(".")
-#
-#     return os.path.join(base_path, relative_path)
-#
-# defaults_path = resource_path('defaults.xml')
 
-defaults_path = 'defaults.xml'
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.dirname(os.path.abspath("."))
+
+    return os.path.join(base_path, relative_path)
+
+
+if os.path.exists(os.path.join(os.path.dirname(os.path.abspath('defaults.xml')),'defaults.xml')):
+    defaults_path = os.path.join(os.path.dirname(os.path.abspath('defaults.xml')),'defaults.xml')
+else:
+    defaults_path = resource_path('defaults.xml')
 
 userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
 userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
@@ -2808,7 +2809,11 @@ class MainWindow(QMainWindow):
                 pass
 
     def open_cfg_dir(self):
-        os.startfile(userconfig_rootpath, 'open')
+        modifiers = QApplication.keyboardModifiers()
+        if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier):
+            os.startfile(sys._MEIPASS, 'open')
+        else:
+            os.startfile(userconfig_rootpath, 'open')
 
     def create_colored_icon(self, color, size):
         # Create a QPixmap with the specified color and size
