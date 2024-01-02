@@ -4630,8 +4630,11 @@ def launch_children():
 def main():
     app = QApplication(sys.argv)
 
-    app.setStyleSheet("""
+    app.setStyleSheet(
+        """
             QCheckBox::indicator:checked { image: url(image/purplecheckbox.png); }
+            QRadioButton::indicator:checked { image: url(image/rchecked.png);}
+            
             QPushButton, #styledButton {
                 background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                                                   stop: 0 #ab37c8, stop: 0.4 #9a24b5,
@@ -4647,7 +4650,20 @@ def main():
                                                 stop: 0 #d97ed1, stop: 0.4 #d483d4,
                                                 stop: 0.5 #d992da, stop: 1.0 #e4a9e7);
             }
-    """)
+
+            QComboBox::down-arrow {
+                image: url(image/down-down.png);
+            }
+
+            QComboBox QAbstractItemView {
+                border: 2px solid darkgray;
+                selection-background-color: #ab37c8;
+            }
+            QLineEdit {
+                selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
+            }
+        """
+    )
     global window, log_window, log_tail_window
     global dev_firmware_version
     global dev_serial
