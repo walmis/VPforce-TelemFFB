@@ -3644,7 +3644,7 @@ class SettingsLayout(QGridLayout):
             else:
                 dropbox.currentTextChanged.connect(self.dropbox_changed)
             dropbox.blockSignals(False)
-            self.addWidget(dropbox, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+            self.addWidget(dropbox, i, entry_col, 1, entry_colspan)
             # dropbox.currentTextChanged.connect(self.dropbox_changed)
 
         if item['datatype'] == 'path':
@@ -3668,7 +3668,7 @@ class SettingsLayout(QGridLayout):
             self.addWidget(browse_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
         if item['datatype'] == 'int' or item['datatype'] == 'anyfloat':
-            self.addWidget(line_edit, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+            self.addWidget(line_edit, i, entry_col, 1, entry_colspan)
 
         if item['datatype'] == 'button':
             self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
