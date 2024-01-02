@@ -251,7 +251,22 @@ log_filter = LoggingFilter(log_filter_strings)
 console_handler.addFilter(log_filter)
 file_handler.addFilter(log_filter)
 
+#### if you want to find defaults.xml or other files included in exe:
+#
+# def resource_path(relative_path):
+#     """ Get absolute path to resource, works for dev and for PyInstaller """
+#     try:
+#         # PyInstaller creates a temp folder and stores path in _MEIPASS
+#         base_path = sys._MEIPASS
+#     except Exception:
+#         base_path = os.path.abspath(".")
+#
+#     return os.path.join(base_path, relative_path)
+#
+# defaults_path = resource_path('defaults.xml')
+
 defaults_path = 'defaults.xml'
+
 userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
 userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
 
@@ -297,13 +312,6 @@ logging.info("**************************************")
 if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
     utils.teleplot.configure(args.teleplot)
-
-
-
-
-
-
-
 
 
 def format_dict(data, prefix=""):

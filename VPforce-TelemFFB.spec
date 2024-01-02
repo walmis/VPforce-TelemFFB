@@ -91,8 +91,10 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='VPforce-TelemFFB',
     icon='image/vpforceicon.ico',
     debug=False,
@@ -106,13 +108,9 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='VPforce-TelemFFB',
-)
+
+import shutil
+
+shutil.copyfile('defaults.xml', '{0}/defaults.xml'.format(DISTPATH))
+shutil.copytree('export', '{0}/export'.format(DISTPATH))
+shutil.copytree('updater', '{0}/updater'.format(DISTPATH))
