@@ -48,6 +48,8 @@ from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColo
     QTextCursor
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
+import resources
+
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
 # Add destination telemetry address argument
@@ -93,26 +95,32 @@ system_settings = utils.read_system_settings(args.device, args.type)
 if system_settings.get('wasDefault', False):
     config_was_default = True
 
-_vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
+# _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
+_vpf_logo = ":/image/vpforcelogo.png"
 if args.device is None:
     master_rb = system_settings.get('masterInstance', 1)
     match master_rb:
         case 1:
             _device_pid = system_settings.get('pidJoystick', "2055")
             _device_type = 'joystick'
-            _device_logo = os.path.join(script_dir, 'image/logo_j.png')
+            # _device_logo = os.path.join(script_dir, 'image/logo_j.png')
+            _device_logo = ':/image/logo_j.png'
         case 2:
             _device_pid = system_settings.get('pidPedals', "2055")
             _device_type = 'pedals'
-            _device_logo = os.path.join(script_dir, 'image/logo_p.png')
+            # _device_logo = os.path.join(script_dir, 'image/logo_p.png')
+            _device_logo = ':/image/logo_p.png'
         case 3:
             _device_pid = system_settings.get('pidCollective', "2055")
             _device_type = 'collective'
-            _device_logo = os.path.join(script_dir, 'image/logo_c.png')
+            # _device_logo = os.path.join(script_dir, 'image/logo_c.png')
+            _device_logo = ':/image/logo_c.png'
         case _:
             _device_pid = system_settings.get('pidJoystick', "2055")
             _device_type = 'joystick'
-            _device_logo = os.path.join(script_dir, 'image/logo_j.png')
+            # _device_logo = os.path.join(script_dir, 'image/logo_j.png')
+            _device_logo = ':/image/logo_j.png'
+
     _device_vid_pid = f"FFFF:{_device_pid}"
     args.type = _device_type
 else:
@@ -126,13 +134,13 @@ else:
     _device_vid_pid = args.device
     match str.lower(args.type):
         case 'joystick':
-            _device_logo = os.path.join(script_dir, 'image/logo_j.png')
+            _device_logo = ':/image/logo_j.png'
         case 'pedals':
-            _device_logo = os.path.join(script_dir, 'image/logo_p.png')
+            _device_logo = ':/image/logo_p.png'
         case 'collective':
-            _device_logo = os.path.join(script_dir, 'image/logo_c.png')
+            _device_logo = ':/image/logo_c.png'
         case _:
-            _device_logo = os.path.join(script_dir, 'image/logo_j.png')
+            _device_logo = ':/image/logo_j.png'
 
 args.sim = str.upper(args.sim)
 args.type = str.lower(args.type)
@@ -431,7 +439,8 @@ class LogTailWindow(QMainWindow):
         self.setWindowTitle(f"Log File Monitor ({args.type})")
         # Construct the absolute path of the icon file
         icon_path = os.path.join(script_dir, "image/vpforceicon.png")
-        self.setWindowIcon(QIcon(icon_path))
+        icon = QIcon(":/image/vpforceicon.png")
+        self.setWindowIcon(icon)
         self.resize(800, 500)
         self.move(self.main_window.x() + 50, self.main_window.y() + 100)
         self.central_widget = QWidget()
@@ -1593,9 +1602,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_c.setEnabled((al_enabled))
 
         if al_enabled:
-            style = "QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }"
+            style = "QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }"
         else:
-            style = "QCheckBox::indicator:checked {image: url(image/disabledcheckbox.png); }"
+            style = "QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }"
 
         self.cb_al_enable.setStyleSheet(style)
         self.cb_al_enable_j.setStyleSheet(style)
@@ -1619,9 +1628,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.lab_portIL2.setEnabled(il2_enabled)
         self.portIL2.setEnabled(il2_enabled)
         if il2_enabled:
-            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(image/purplecheckbox.png); }")
+            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }")
         else:
-            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(image/disabledcheckbox.png); }")
+            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }")
 
     def select_il2_directory(self):
         # Open a directory dialog and set the result in the pathIL2 QLineEdit
@@ -1939,7 +1948,9 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(f"TelemFFB")
         # Construct the absolute path of the icon file
         icon_path = os.path.join(script_dir, "image/vpforceicon.png")
-        self.setWindowIcon(QIcon(icon_path))
+        icon = QIcon(":/image/vpforceicon.png")
+
+        self.setWindowIcon(icon)
 
         self.resize(530, 700)
         self.hidden_active = False
@@ -2662,15 +2673,15 @@ class MainWindow(QMainWindow):
         if arg == 1:
             xmlutils.update_vars('joystick', userconfig_path, defaults_path)
             self._current_config_scope = 'joystick'
-            new_device_logo = os.path.join(script_dir, 'image/logo_j.png')
+            new_device_logo = ':/image/logo_j.png'
         elif arg == 2:
             xmlutils.update_vars('pedals', userconfig_path, defaults_path)
             self._current_config_scope = 'pedals'
-            new_device_logo = os.path.join(script_dir, 'image/logo_p.png')
+            new_device_logo = ':/image/logo_p.png'
         elif arg == 3:
             xmlutils.update_vars('collective', userconfig_path, defaults_path)
             self._current_config_scope = 'collective'
-            new_device_logo = os.path.join(script_dir, 'image/logo_c.png')
+            new_device_logo = ':/image/logo_c.png'
 
         pixmap = QPixmap(new_device_logo)
         self.devicetype_label.setPixmap(pixmap)
@@ -4112,7 +4123,8 @@ class InfoLabel(QWidget):
 
         # Information icon
         self.icon_label = QLabel(self)
-        icon_img = os.path.join(script_dir, "image/information.png")
+        # icon_img = os.path.join(script_dir, "image/information.png")
+        icon_img = ":/image/information.png"
         self.pixmap = QPixmap(icon_img)
         self.icon_label.setPixmap(self.pixmap.scaledToHeight(self.text_label.sizeHint().height()))  # Adjust the height as needed
         self.icon_label.setVisible(False)
@@ -4632,8 +4644,8 @@ def main():
 
     app.setStyleSheet(
         """
-            QCheckBox::indicator:checked { image: url(image/purplecheckbox.png); }
-            QRadioButton::indicator:checked { image: url(image/rchecked.png);}
+            QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
+            QRadioButton::indicator:checked { image: url(:/image/rchecked.png);}
             
             QPushButton, #styledButton {
                 background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -4652,7 +4664,7 @@ def main():
             }
 
             QComboBox::down-arrow {
-                image: url(image/down-down.png);
+                image: url(:/image/down-down.png);
             }
 
             QComboBox QAbstractItemView {
@@ -4671,7 +4683,7 @@ def main():
     global settings_mgr, telem_manager, config_was_default
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
     settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
-    icon_path = os.path.join(script_dir, "image/vpforceicon.png")
+    icon_path = ":/image/vpforceicon.png"
     settings_mgr.setWindowIcon(QIcon(icon_path))
     sys.stdout = utils.OutLog(log_window.widget, sys.stdout)
     sys.stderr = utils.OutLog(log_window.widget, sys.stderr)
