@@ -4588,7 +4588,7 @@ def init_sims():
         if msfs or args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")
             sim_connect_telem.start()
-            aircrafts_msfs.update_simconnect(sim_connect_telem)
+            aircrafts_msfs.Aircraft.set_simconnect(sim_connect_telem)
 
     except:
         logging.exception("Error loading MSFS enable flag from config file")
