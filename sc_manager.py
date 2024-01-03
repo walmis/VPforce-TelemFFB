@@ -227,6 +227,25 @@ class SimConnectManager(threading.Thread):
             0,  # number of repeats, 0 is forever
         )
     # blocks and reads telemetry
+    def set_simdatum_to_msfs(self, simvar, value, units=None):
+        try:
+            self.sc.set_simdatum(simvar, value, units=units)
+        except Exception as e:
+            logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
+            # self.telem_data['error'] = 1
+
+    def send_event_to_msfs(self, event, data: int = 0):
+        logging.debug(f"event {event}   data {data}")
+        if event.startswith('L:'):
+            self.set_simdatum_to_msfs(event, data, units="number")
+        else:
+            try:
+                self.sc.send_event(event, data)
+                # self.telem_data[event] = data
+            except Exception as e:
+                logging.error(f"Error setting event:{event} value:{data} to MSFS: {e}")
+                # self.telem_data['error'] = 1
+
     def _read_telem(self) -> bool:
         pRecv = RECV_P()
         nSize = DWORD()
