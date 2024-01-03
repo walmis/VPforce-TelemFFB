@@ -474,6 +474,8 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
     tree = ET.parse(userconfig_path)
     root = tree.getroot()
     model_elem = None
+    if the_model == '':
+        return
     if the_device == '':
         the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
