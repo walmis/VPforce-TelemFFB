@@ -316,6 +316,8 @@ class Aircraft(AircraftBase):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+                telem_data['phys_y'] = phys_y
                 x_pos = phys_x - virtual_stick_x_offs
                 y_pos = phys_y - virtual_stick_y_offs
 
@@ -409,6 +411,8 @@ class Aircraft(AircraftBase):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+
                 x_pos = phys_x - virtual_rudder_x_offs
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
@@ -744,7 +748,7 @@ class Aircraft(AircraftBase):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
-
+                telem_data['phys_x'] = phys_x
                 x_pos = phys_x - virtual_rudder_x_offs
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
@@ -1117,6 +1121,8 @@ class Helicopter(Aircraft):
                 else:
                     trim_reset_pressed = False
                 x, y = input_data.axisXY()
+                telem_data['phys_x'] = x
+                telem_data['phys_y'] = y
                 if force_trim_pressed:
                     self.spring_x.positiveCoefficient = 0
                     self.spring_x.negativeCoefficient = 0
@@ -1192,7 +1198,8 @@ class Helicopter(Aircraft):
 
                     # force_trim_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
                     phys_x, phys_y = input_data.axisXY()
-
+                    telem_data['phys_x'] = phys_x
+                    telem_data['phys_y'] = phys_y
                     self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
                     self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
 
@@ -1226,7 +1233,8 @@ class Helicopter(Aircraft):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
-
+                telem_data['phys_x'] = phys_x
+                telem_data['phys_y'] = phys_y
                 self._update_cyclic_trim(telem_data)
 
                 x_pos = phys_x - self.cyclic_virtual_trim_x_offs
@@ -1314,6 +1322,7 @@ class Helicopter(Aircraft):
             pedal_pos = telem_data.get("TailRotorPedalPos")
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
+            telem_data['phys_x'] = phys_x
             if not self.pedals_init:
 
                 self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = self.pedal_spring_coeff_x
@@ -1377,6 +1386,7 @@ class Helicopter(Aircraft):
         # SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
         input_data = HapticEffect.device.getInput()
         phys_x, phys_y = input_data.axisXY()
+        telem_data['phys_y'] = phys_y
         if not self.collective_init:
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = self.collective_spring_coeff_y
             if telem_data.get("SimOnGround", 1):
@@ -1624,6 +1634,8 @@ class HPGHelicopter(Helicopter):
         if self.telemffb_controls_axes:
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
+            telem_data['phys_x'] = phys_x
+
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
             self.spring = effects["pedal_ap_spring"].spring()
@@ -1695,6 +1707,7 @@ class HPGHelicopter(Helicopter):
         # SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
         input_data = HapticEffect.device.getInput()
         phys_x, phys_y = input_data.axisXY()
+        telem_data['phys_y'] = phys_y
         if not self.collective_init:
 
 
