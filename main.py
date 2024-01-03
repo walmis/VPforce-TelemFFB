@@ -523,6 +523,7 @@ class TelemManager(QObject, threading.Thread):
         self._dropped_frames = 0
         self.lastFrameTime = time.perf_counter()
         self.frameTimes = []
+        self.maxframeTime = 0
         self.timeout = 0.2
         self.settings_manager = settings_manager
         self.ipc_thread = ipc_thread
@@ -628,9 +629,19 @@ class TelemManager(QObject, threading.Thread):
         telem_data["FFBType"] = args.type
 
         self.frameTimes.append(int((time.perf_counter() - self.lastFrameTime)*1000))
-        if len(self.frameTimes) > 50: self.frameTimes.pop(0)
+        if len(self.frameTimes) > 500: self.frameTimes.pop(0)
+
+        if self.frameTimes[-1] > self.maxframeTime and len(self.frameTimes) > 40: # skip the first frames before counting frametime as max
+            threshold = 100
+            if self.frameTimes[-1] > threshold:
+                logging.warning(
+                    f'*!*!*!* - Frametime threshold of {threshold}ms exceeded: time = {self.frameTimes[-1]}ms')
+
+            self.maxframeTime = self.frameTimes[-1]
 
         telem_data["frameTimes"] = [self.frameTimes[-1], max(self.frameTimes)]
+        telem_data["maxFrameTime"] = f"{round(self.maxframeTime, 3)} ms"
+        telem_data["avgFrameTime"] = f"{round(sum(self.frameTimes) / len(self.frameTimes), 3):.3f} ms"
 
 
         self.lastFrameTime = time.perf_counter()
@@ -3071,6 +3082,8 @@ class MainWindow(QMainWindow):
             if 'N' in keys: data.move_to_end('N', last=False)
             if 'FFBType' in keys: data.move_to_end('FFBType', last=False)
             if 'perf' in keys: data.move_to_end('perf', last=False)
+            if 'avgFrameTime' in keys: data.move_to_end('avgFrameTime', last=False)
+            if 'maxFrameTime' in keys: data.move_to_end('maxFrameTime', last=False)
             if 'frameTimes' in keys: data.move_to_end('frameTimes', last=False)
             if 'T' in keys: data.move_to_end('T', last=False)
 
