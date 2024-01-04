@@ -2895,7 +2895,11 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         # Perform cleanup before closing the application
-        exit_application()
+        if _child_instance:
+            self.hide()
+            event.ignore()
+        else:
+            exit_application()
 
     def reset_window_size(self):
         match args.type:
