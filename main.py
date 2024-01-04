@@ -381,6 +381,7 @@ class LogWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
 
         self.widget = QPlainTextEdit(self.central_widget)
+        self.widget.setMaximumBlockCount(20000)
         self.widget.setReadOnly(True)
         self.widget.setFont(QFont("Courier New"))
 
