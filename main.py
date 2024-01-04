@@ -2822,7 +2822,7 @@ class MainWindow(QMainWindow):
 
     def open_cfg_dir(self):
         modifiers = QApplication.keyboardModifiers()
-        if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier):
+        if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier) and getattr(sys, 'frozen',False):
             os.startfile(sys._MEIPASS, 'open')
         else:
             os.startfile(userconfig_rootpath, 'open')
