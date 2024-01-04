@@ -2422,20 +2422,21 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.log_tab_widget, "Log")
 
         self.log_widget = QPlainTextEdit(self.log_tab_widget)
+        self.log_widget.setMaximumBlockCount(20)
         self.log_widget.setReadOnly(True)
         self.log_widget.setFont(QFont("Courier New"))
         self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
-        self.log_tail_thread = LogTailer(log_file)
-        self.log_tail_thread.log_updated.connect(self.update_log_widget)
-        self.log_tail_thread.start()
+        # self.log_tail_thread = LogTailer(log_file)
+        # self.log_tail_thread.log_updated.connect(self.update_log_widget)
+        # self.log_tail_thread.start()
 
         self.clear_button = QPushButton("Clear", self.log_tab_widget)
         self.toggle_button = QPushButton("Pause", self.log_tab_widget)
         self.open_log_button = QPushButton("Open in Window", self.log_tab_widget)
 
-        self.clear_button.clicked.connect(self.clear_log_widget)
-        self.toggle_button.clicked.connect(self.toggle_log_tailing)
-        self.open_log_button.clicked.connect(self.show_tail_log_window)
+        # self.clear_button.clicked.connect(self.clear_log_widget)
+        # self.toggle_button.clicked.connect(self.toggle_log_tailing)
+        # self.open_log_button.clicked.connect(self.show_tail_log_window)
 
         self.tab_widget.addTab(QWidget(), "Hide")
 
@@ -2710,11 +2711,11 @@ class MainWindow(QMainWindow):
         if _master_instance:
             self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
 
-        for file in os.listdir(log_folder):
-            if file.endswith(self._current_config_scope + '_' + current_log_ts):
-                self.log_tail_thread.change_log_file(os.path.join(log_folder, file))
-                pass
-        log_tail_window.setWindowTitle(f"Log File Monitor ({self._current_config_scope})")
+        # for file in os.listdir(log_folder):
+        #     if file.endswith(self._current_config_scope + '_' + current_log_ts):
+        #         self.log_tail_thread.change_log_file(os.path.join(log_folder, file))
+        #         pass
+        # log_tail_window.setWindowTitle(f"Log File Monitor ({self._current_config_scope})")
 
         self.update_settings()
 
@@ -4263,6 +4264,7 @@ class LogTailer(QThread):
 
     def run(self):
         with open(self.log_file_path, 'r') as self.log_file:
+            self.log_file.seek(0, os.SEEK_END)
             while True:
                 self.pause_mutex.lock()
                 while self.paused:
@@ -4299,6 +4301,7 @@ class LogTailer(QThread):
             self.log_file.close()  # Close the current file handle
         self.log_file_path = new_log_file_path
         self.log_file = open(self.log_file_path, 'r')  # Open the new log file
+        self.log_file.seek(0, os.SEEK_END)
         self.resume()  # Resume tailing with the new log file
 
 
@@ -4775,7 +4778,7 @@ def main():
 
     window = MainWindow(ipc_thread=_ipc_thread)
 
-    log_tail_window = LogTailWindow(window)
+    # log_tail_window = LogTailWindow(window)
 
     if not headless_mode:
         if args.minimize:
