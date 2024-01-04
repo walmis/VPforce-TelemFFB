@@ -237,17 +237,18 @@ class SimConnectManager(threading.Thread):
         self._events_to_send.append((event, data))
 
     def tx_simdatums_to_msfs(self):
-        for simvar, value, units in self._simdatums_to_send:
+        while self._simdatums_to_send:
+            simvar, value, units = self._simdatums_to_send.pop(0)
             try:
                 self.sc.set_simdatum(simvar, value, units=units)
             except Exception as e:
                 logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
                 # self.telem_data['error'] = 1
-        self._simdatums_to_send = []
 
 
     def tx_events_to_msfs(self):
-        for event, data in self._events_to_send:
+        while self._events_to_send:
+            event, data = self._events_to_send.pop(0)
             logging.debug(f"event {event}   data {data}")
             if event.startswith('L:'):
                 self.set_simdatum_to_msfs(event, data, units="number")
@@ -258,7 +259,6 @@ class SimConnectManager(threading.Thread):
                 except Exception as e:
                     logging.error(f"Error setting event:{event} value:{data} to MSFS: {e}")
                     # self.telem_data['error'] = 1
-        self._events_to_send = []
 
     def _read_telem(self) -> bool:
         pRecv = RECV_P()
