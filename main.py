@@ -2159,16 +2159,17 @@ class MainWindow(QMainWindow):
 
         # Create the menu bar
         menubar = self.menuBar()
-
+        self.menu = menubar
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
-        menubar.setStyleSheet("""
+        self.menu.setStyleSheet("""
             QMenuBar { background-color: #f0f0f0; } 
             QMenu::item {background-color: transparent;}
             QMenu::item:selected { color: #ffffff; background-color: "#ab37c8"; } 
         """)
         # Add the "System" menu and its sub-option
-        system_menu = menubar.addMenu('System')
+
+        system_menu = self.menu.addMenu('&System')
 
         system_settings_action = QAction('System Settings', self)
         system_settings_action.triggered.connect(self.open_system_settings_dialog)
@@ -2186,14 +2187,14 @@ class MainWindow(QMainWindow):
         reset_geometry.triggered.connect(self.reset_window_size)
         system_menu.addAction(reset_geometry)
 
-        # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
+        # self.menu.setStyleSheet("QMenu::item:selected { color: red; }")
         exit_app_action = QAction('Quit TelemFFB', self)
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
 
 
         # Create the "Utilities" menu
-        utilities_menu = menubar.addMenu('Utilities')
+        utilities_menu = self.menu.addMenu('Utilities')
 
         # Add the "Reset" action to the "Utilities" menu
         reset_action = QAction('Reset All Effects', self)
@@ -2217,9 +2218,7 @@ class MainWindow(QMainWindow):
         self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf(dev_serial))
         utilities_menu.addAction(self.vpconf_action)
 
-        self.teleplot_action = QAction("Teleplot Setup", self)
-        self.teleplot_action.triggered.connect(self.open_teleplot_setup_dialog)
-        utilities_menu.addAction(self.teleplot_action)
+
 
 
 
@@ -2231,7 +2230,7 @@ class MainWindow(QMainWindow):
             utilities_menu.addAction(convert_settings_action)
 
         if _master_instance and system_settings.get('autolaunchMaster', 0):
-            self.window_menu = menubar.addMenu('Window')
+            self.window_menu = self.menu.addMenu('Window')
             self.show_children_action = QAction('Show Child Instance Windows')
             self.show_children_action.triggered.connect(lambda: self.toggle_child_windows('show'))
             self.window_menu.addAction((self.show_children_action))
@@ -2240,12 +2239,12 @@ class MainWindow(QMainWindow):
             self.window_menu.addAction((self.hide_children_action))
 
         if _child_instance:
-            self.window_menu = menubar.addMenu('Window')
+            self.window_menu = self.menu.addMenu('Window')
             self.hide_window_action = QAction('Hide Window')
             self.hide_window_action.triggered.connect(hide_window)
             self.window_menu.addAction(self.hide_window_action)
 
-        log_menu = menubar.addMenu('Log')
+        log_menu = self.menu.addMenu('Log')
         self.log_window_action = QAction("Open Console Log", self)
         self.log_window_action.triggered.connect(self.toggle_log_window)
         log_menu.addAction(self.log_window_action)
@@ -2265,7 +2264,7 @@ class MainWindow(QMainWindow):
                 self.child_log_menu.addAction(self.collective_log_action)
 
 
-        help_menu = menubar.addMenu('Help')
+        help_menu = self.menu.addMenu('Help')
 
         notes_action = QAction('Release Notes', self)
         notes_action.triggered.connect(lambda url=notes_url: self.open_file(url))
@@ -2722,9 +2721,21 @@ class MainWindow(QMainWindow):
 
         ### Load Stored Geomoetry
         self.load_main_window_geometry()
+        shortcut = QShortcut(QKeySequence('Alt+D'), self)
+        shortcut.activated.connect(self.add_debug_menu)
 
     def test_function(self):
         self.set_scrollbar(400)
+
+    def add_debug_menu(self):
+        debug_menu = self.menu.addMenu("Debug")
+        aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
+        aircraft_picker_action.triggered.connect(lambda: self.toggle_settings_window(dbg=True))
+        debug_menu.addAction(aircraft_picker_action)
+
+        self.teleplot_action = QAction("Teleplot Setup", self)
+        self.teleplot_action.triggered.connect(self.open_teleplot_setup_dialog)
+        debug_menu.addAction(self.teleplot_action)
 
 
     def set_scrollbar(self, pos):
@@ -3107,9 +3118,9 @@ class MainWindow(QMainWindow):
             log_window.move(self.x()+50, self.y()+100)
             log_window.show()
 
-    def toggle_settings_window(self):
+    def toggle_settings_window(self, dbg=False):
         modifiers = QApplication.keyboardModifiers()
-        if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier):
+        if ((modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier)) or dbg:
             if self.test_craft_area.isVisible():
                 self.test_craft_area.hide()
             else:
