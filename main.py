@@ -43,9 +43,9 @@ from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLay
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
     QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget, QGroupBox
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
-    QThread, QMutex
+    QThread, QMutex, QRegExp
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QIntValidator, QCursor, \
-    QTextCursor
+    QTextCursor, QRegExpValidator
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 import resources
@@ -641,8 +641,8 @@ class TelemManager(QObject, threading.Thread):
             self.maxframeTime = self.frameTimes[-1]
 
         telem_data["frameTimes"] = [self.frameTimes[-1], max(self.frameTimes)]
-        telem_data["maxFrameTime"] = f"{round(self.maxframeTime, 3)} ms"
-        telem_data["avgFrameTime"] = f"{round(sum(self.frameTimes) / len(self.frameTimes), 3):.3f} ms"
+        telem_data["maxFrameTime"] = f"{round(self.maxframeTime, 3)}"
+        telem_data["avgFrameTime"] = f"{round(sum(self.frameTimes) / len(self.frameTimes), 3):.3f}"
 
 
         self.lastFrameTime = time.perf_counter()
@@ -788,7 +788,10 @@ class TelemManager(QObject, threading.Thread):
         if args.plot:
             for item in args.plot:
                 if item in telem_data:
-                    utils.teleplot.sendTelemetry(item, telem_data[item])
+                    if _child_instance or _launched_children:
+                        utils.teleplot.sendTelemetry(item, telem_data[item], instance=_device_type)
+                    else:
+                        utils.teleplot.sendTelemetry(item, telem_data[item])
 
         try: # sometime Qt object is destroyed first on exit and this may cause a runtime exception
             self.telemetryReceived.emit(telem_data)
@@ -1068,6 +1071,167 @@ class SimConnectSock(SimConnectManager):
 
         args = [str(x) for x in args]
         self._telem.submitFrame(f"Ev={event};" + ";".join(args))
+
+class Ui_TeleplotDialog(object):
+    def setupUi(self, TeleplotDialog):
+        if not TeleplotDialog.objectName():
+            TeleplotDialog.setObjectName(u"TeleplotDialog")
+        TeleplotDialog.resize(273, 381)
+        self.layoutWidget = QWidget(TeleplotDialog)
+        self.layoutWidget.setObjectName(u"layoutWidget")
+        self.layoutWidget.setGeometry(QRect(7, 10, 258, 296))
+        self.gridLayout = QGridLayout(self.layoutWidget)
+        self.gridLayout.setObjectName(u"gridLayout")
+        self.gridLayout.setContentsMargins(0, 0, 0, 0)
+        self.tb_port = QLineEdit(self.layoutWidget)
+        self.tb_port.setObjectName(u"tb_port")
+
+        self.gridLayout.addWidget(self.tb_port, 2, 0, 1, 1, Qt.AlignLeft)
+
+        self.label = QLabel(self.layoutWidget)
+        self.label.setObjectName(u"label")
+
+        self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
+
+        self.label_2 = QLabel(self.layoutWidget)
+        self.label_2.setObjectName(u"label_2")
+
+        self.gridLayout.addWidget(self.label_2, 1, 0, 1, 1)
+
+        self.tb_vars = QPlainTextEdit(self.layoutWidget)
+        self.tb_vars.setObjectName(u"tb_vars")
+
+        self.gridLayout.addWidget(self.tb_vars, 5, 0, 1, 1)
+
+        self.label_3 = QLabel(self.layoutWidget)
+        self.label_3.setObjectName(u"label_3")
+
+        self.gridLayout.addWidget(self.label_3, 3, 0, 1, 1)
+
+        self.label_4 = QLabel(self.layoutWidget)
+        self.label_4.setObjectName(u"label_4")
+
+        self.gridLayout.addWidget(self.label_4, 4, 0, 1, 1)
+
+        self.label_5 = QLabel(TeleplotDialog)
+        self.label_5.setObjectName(u"label_5")
+        self.label_5.setGeometry(QRect(7, 310, 256, 26))
+        self.widget = QWidget(TeleplotDialog)
+        self.widget.setObjectName(u"widget")
+        self.widget.setGeometry(QRect(10, 350, 251, 25))
+        self.horizontalLayout = QHBoxLayout(self.widget)
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
+        self.pb_clear = QPushButton(self.widget)
+        self.pb_clear.setObjectName(u"pb_clear")
+
+        self.horizontalLayout.addWidget(self.pb_clear, 0, Qt.AlignLeft)
+
+        self.horizontalSpacer_2 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        self.horizontalLayout.addItem(self.horizontalSpacer_2)
+
+        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+
+        self.horizontalLayout.addItem(self.horizontalSpacer)
+
+        self.buttonBox = QDialogButtonBox(self.widget)
+        self.buttonBox.setObjectName(u"buttonBox")
+        self.buttonBox.setOrientation(Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
+
+        self.horizontalLayout.addWidget(self.buttonBox, 0, Qt.AlignRight)
+
+
+        self.retranslateUi(TeleplotDialog)
+
+        QMetaObject.connectSlotsByName(TeleplotDialog)
+    # setupUi
+
+    def retranslateUi(self, TeleplotDialog):
+        TeleplotDialog.setWindowTitle(QCoreApplication.translate("TeleplotDialog", u"Teleplot Setup", None))
+        self.label.setText(QCoreApplication.translate("TeleplotDialog", u"Open a browser to teleplot.fr, record port number", None))
+        self.label_2.setText(QCoreApplication.translate("TeleplotDialog", u"Port:", None))
+        self.label_3.setText(QCoreApplication.translate("TeleplotDialog", u"Space separated list of Telemetry variables", None))
+        self.label_4.setText(QCoreApplication.translate("TeleplotDialog", u"List:", None))
+        self.label_5.setText(QCoreApplication.translate("TeleplotDialog", u"To stop sending teleplot data,\n"
+"clear the boxes and select OK", None))
+        self.pb_clear.setText(QCoreApplication.translate("TeleplotDialog", u"Clear", None))
+    # retranslateUi
+
+
+
+class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
+
+    def __init__(self, parent=None):
+        super(TeleplotSetupDialog, self).__init__(parent)
+
+        if args.teleplot is None:
+            self.telem_port = ''
+        elif isinstance(args.teleplot, str):
+            if ':' in args.teleplot:
+                self.telem_port = args.teleplot.split(':')[1]
+            else:
+                self.telem_port = args.teleplot
+
+        if args.plot is None:
+            args.plot = []
+        self.telem_vars = ' '.join(args.plot)
+
+
+        self.setupUi(self)
+        self.retranslateUi(self)
+        self.parent = parent
+        int_validator = QIntValidator()
+        self.tb_port.setValidator(int_validator)
+        self.buttonBox.accepted.connect(self.save_teleplot)
+        self.buttonBox.rejected.connect(self.close)
+        self.pb_clear.clicked.connect(self.clear_form)
+        self.tb_port.setText(self.telem_port)
+        self.tb_vars.setPlainText(str(self.telem_vars))
+
+    def save_teleplot(self):
+        if self.validate_text():
+            if self.tb_port == '':
+                args.plot = []
+                self.accept()
+            else:
+                address = f"teleplot.fr:{str(self.tb_port.text())}"
+                utils.teleplot.configure(address)
+                args.plot = self.tb_vars.toPlainText().split()
+                args.teleplot = str(self.tb_port.text())
+                self.accept()
+
+
+    def clear_form(self):
+        self.tb_port.clear()
+        self.tb_vars.clear()
+
+    def validate_text(self):
+        regex_string = r"[a-zA-Z_][a-zA-Z0-9_ ]*"
+        current_text = self.tb_vars.toPlainText()
+        validator = QRegExpValidator(QRegExp(regex_string))
+        pos = 0
+        state, valid_text, pos = validator.validate(current_text, pos)
+        if self.tb_port.text() == '':
+            if current_text == '':
+                # remove all teleplot
+                return True
+            elif current_text != '':
+                QMessageBox.warning(self, "Error", "Please enter a port number or remove the telemetry variables to stop sending")
+                return False
+
+        if current_text == '':
+            if self.tb_port.text() != '':
+                QMessageBox.warning(self, "Error", "Please enter telemetry variables to monitor or remove the port to stop sending")
+                return False
+
+        if state == QRegExpValidator.Acceptable or current_text == '':
+            return True
+        else:
+            QMessageBox.warning(self, "Error", "Please only enter valid variable characters")
+            return False
+
 
 
 class Ui_SystemDialog(object):
@@ -2043,9 +2207,11 @@ class MainWindow(QMainWindow):
         self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf(dev_serial))
         utilities_menu.addAction(self.vpconf_action)
 
-        self.log_window_action = QAction("Open Console Log", self)
-        self.log_window_action.triggered.connect(self.toggle_log_window)
-        utilities_menu.addAction(self.log_window_action)
+        self.teleplot_action = QAction("Teleplot Setup", self)
+        self.teleplot_action.triggered.connect(self.open_teleplot_setup_dialog)
+        utilities_menu.addAction(self.teleplot_action)
+
+
 
 
         # Add settings converter
@@ -2786,6 +2952,10 @@ class MainWindow(QMainWindow):
         self.settings_layout.expanded_items.clear()
         self.monitor_widget.hide()
         self.settings_layout.reload_caller()
+
+    def open_teleplot_setup_dialog(self):
+        dialog = TeleplotSetupDialog(self)
+        dialog.exec_()
 
     def open_system_settings_dialog(self):
         dialog = SystemSettingsDialog(self)
@@ -4704,6 +4874,9 @@ def main():
                 selection-background-color: #ab37c8;
             }
             QLineEdit {
+                selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
+            }
+            QPlainTextEdit {
                 selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
             }
         """

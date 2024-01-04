@@ -974,20 +974,30 @@ class Teleplot:
         self.sock = None
 
     def configure(self, address:str):
-        address = address.split(":")
-        address[1] = int(address[1])
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.connect(tuple(address))
+        try:
+            address = address.split(":")
+            address[1] = int(address[1])
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock.connect(tuple(address))
+        except:
+            pass
 
-    def sendTelemetry(self, name, value):
-        if self.sock:
-            now = time.time() * 1000
 
-            if type(value) == list:
-                msg = "\n".join([f"{name}_{i}:{now}:{value[i]}" for i in range(len(value))])
-            else:
-                msg = f"{name}:{now}:{value}"
-            self.sock.send(msg.encode())
+
+    def sendTelemetry(self, name, value, instance=None):
+        if instance is not None:
+            name = f"{instance}_{name}"
+        try:
+            if self.sock:
+                now = time.time() * 1000
+
+                if type(value) == list:
+                    msg = "\n".join([f"{name}_{i}:{now}:{value[i]}" for i in range(len(value))])
+                else:
+                    msg = f"{name}:{now}:{value}"
+                self.sock.send(msg.encode())
+        except:
+            pass
 
 teleplot = Teleplot()
 
