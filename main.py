@@ -41,11 +41,11 @@ import xmlutils
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
-    QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget, QGroupBox
+    QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget, QGroupBox, QShortcut
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
     QThread, QMutex, QRegExp
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QIntValidator, QCursor, \
-    QTextCursor, QRegExpValidator
+    QTextCursor, QRegExpValidator, QKeySequence
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 import resources
