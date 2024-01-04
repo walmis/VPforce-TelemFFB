@@ -419,6 +419,10 @@ class LogWindow(QMainWindow):
         # Add the button layout to the main layout
         layout.addLayout(button_layout)
 
+    def closeEvent(self, event):
+        self.hide()
+        event.ignore()
+
     def clear_log(self):
         self.widget.clear()
 
@@ -831,6 +835,7 @@ class IPCNetworkThread(QThread):
     exit_signal = pyqtSignal(str)
     restart_sim_signal = pyqtSignal(str)
     show_signal = pyqtSignal()
+    showlog_signal = pyqtSignal()
     hide_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
 
@@ -931,6 +936,11 @@ class IPCNetworkThread(QThread):
                     self.exit_signal.emit("Received QUIT signal from master instance.  Running exit/cleanup function.")
                 elif msg == 'RESTART SIMS':
                     self.restart_sim_signal.emit('Restart Sims')
+                elif msg.startswith('SHOW LOG:'):
+                    dev = msg.removeprefix('SHOW LOG:')
+                    if dev == _device_type:
+                        logging.info("Show log command received via IPC")
+                        self.showlog_signal.emit()
                 elif msg == 'SHOW WINDOW':
                     logging.info("Show command received via IPC")
                     self.show_signal.emit()
@@ -2235,6 +2245,25 @@ class MainWindow(QMainWindow):
             self.hide_window_action.triggered.connect(hide_window)
             self.window_menu.addAction(self.hide_window_action)
 
+        log_menu = menubar.addMenu('Log')
+        self.log_window_action = QAction("Open Console Log", self)
+        self.log_window_action.triggered.connect(self.toggle_log_window)
+        log_menu.addAction(self.log_window_action)
+        if _master_instance and system_settings.get('autolaunchMaster', 0):
+            self.child_log_menu = log_menu.addMenu('Open Child Logs')
+            if _launched_joystick:
+                self.joystick_log_action = QAction('Joystick Log')
+                self.joystick_log_action.triggered.connect(lambda: self.show_child_log('joystick'))
+                self.child_log_menu.addAction(self.joystick_log_action)
+            if _launched_pedals:
+                self.pedals_log_action = QAction('Pedals Log')
+                self.pedals_log_action.triggered.connect(lambda: self.show_child_log('pedals'))
+                self.child_log_menu.addAction(self.pedals_log_action)
+            if _launched_collective:
+                self.collective_log_action = QAction('Collective Log')
+                self.collective_log_action.triggered.connect(lambda: self.show_child_log('collective'))
+                self.child_log_menu.addAction(self.collective_log_action)
+
 
         help_menu = menubar.addMenu('Help')
 
@@ -2715,6 +2744,9 @@ class MainWindow(QMainWindow):
         if status_icon is not None and status == 'TIMEOUT':
             status_icon.set_dot_color(Qt.red)
 
+
+    def show_child_log(self, child):
+        self._ipc_thread.send_broadcast_message(f'SHOW LOG:{child}')
 
     def toggle_child_windows(self, toggle):
         if toggle == 'show':
@@ -4951,6 +4983,7 @@ def main():
         _ipc_thread.restart_sim_signal.connect(lambda: restart_sims())
         _ipc_thread.show_signal.connect(lambda: window.show())
         _ipc_thread.hide_signal.connect(lambda: window.hide())
+        _ipc_thread.showlog_signal.connect(lambda: log_window.show())
         _ipc_thread.start()
         _ipc_running = True
 
