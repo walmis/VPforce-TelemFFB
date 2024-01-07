@@ -1184,8 +1184,11 @@ class UserModelDialog(QDialog):
 
         self.models_combo_box = QComboBox()
         self.setup_models()
+        self.models_combo_box.blockSignals(True)
+
         self.models_combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
-        # self.models_combo_box.currentIndexChanged.connect(self.pattern_changed)
+        self.models_combo_box.currentIndexChanged.connect(self.pattern_changed)
+        self.models_combo_box.blockSignals(False)
 
 
         self.ok_button = QPushButton("OK")
