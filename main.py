@@ -4793,7 +4793,8 @@ def init_sims():
     dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS', False)
     if dcs_enabled or args.sim == "DCS":
         # check and install/update export lua script
-        utils.install_export_lua()
+        if not _child_instance:
+            utils.install_export_lua()
         logging.info("Starting DCS Telemetry Listener")
         dcs_telem.start()
 
@@ -4810,12 +4811,12 @@ def init_sims():
     il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2', False)
 
     if il2_enabled or args.sim == "IL2":
-
-        if il2_validate:
-            utils.analyze_il2_config(il2_path, port=il2_port)
-        else:
-            logging.warning(
-                "IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
+        if not _child_instance:
+            if il2_validate:
+                utils.analyze_il2_config(il2_path, port=il2_port)
+            else:
+                logging.warning(
+                    "IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
         logging.info("Starting IL2 Telemetry Listener")
         il2_telem.start()
 
