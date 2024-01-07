@@ -1,5 +1,5 @@
 import logging
-
+import re
 import sys
 import os
 import shutil
@@ -252,7 +252,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         result = dialog.exec_()
         if result == QtWidgets.QDialog.Accepted:
             # Handle accepted
-            new_aircraft = dialog.tb_current_aircraft.text()
+            new_aircraft = dialog.tb_current_aircraft.currentText()
             new_combo_box_value = dialog.combo_box.currentText()
             pat_to_clone = dialog.models_combo_box.currentText()
             if new_combo_box_value != '':
@@ -1098,11 +1098,30 @@ class UserModelDialog(QDialog):
         self.setup_models()
         self.models_combo_box.setCurrentText('')
         self.models_combo_box.blockSignals(False)
+        if self.combo_box.currentText() != '':
+            self.ok_button.setEnabled(True)
+        else:
+            self.ok_button.setEnabled(False)
 
     def pattern_changed(self):
         self.combo_box.blockSignals(True)
         self.combo_box.setCurrentText('')
         self.combo_box.blockSignals(False)
+        if self.models_combo_box.currentText() != '':
+            self.ok_button.setEnabled(True)
+        else:
+            self.ok_button.setEnabled(False)
+
+    def generate_regex_patterns(self,input_str):
+        words = input_str.split()
+        patterns = []
+
+        for i in range(len(words), 0, -1):
+            pattern = ' '.join(words[:i])
+            pattern += ".*"
+            patterns.append(pattern)
+
+        return patterns
 
     def setup_models(self):
         models = xmlutils.read_models(self.the_sim, self.combo_box.currentText())
@@ -1122,7 +1141,7 @@ class UserModelDialog(QDialog):
         label2 = QLabel("Name.* will match anything starting with 'Name'")
         label3 = QLabel("^Name$ will match only the exact 'Name'")
         label4 = QLabel("(The )?Name.* matches starting with 'Name' or 'The Name'" )
-        label5 = QLabel("Edit the match pattern below.")
+        label5 = QLabel("Choose or Edit the match pattern below.")
 
         label6 = QLabel("And choose the aircraft class:")
 
@@ -1138,12 +1157,20 @@ class UserModelDialog(QDialog):
                 classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter']
 
         # FOR TESTING
-        classes.append('AllSettings')
+        # classes.append('AllSettings')
 
         label_aircraft = QtWidgets.QLabel("Current Aircraft:")
-        self.tb_current_aircraft = QtWidgets.QLineEdit()
-        self.tb_current_aircraft.setText(current_aircraft)
-        self.tb_current_aircraft.setAlignment(Qt.AlignHCenter)
+
+        self.tb_current_aircraft = QComboBox()
+        self.tb_current_aircraft.blockSignals(True)
+        patterns = self.generate_regex_patterns(current_aircraft)
+        self.tb_current_aircraft.addItem(current_aircraft)
+        self.tb_current_aircraft.addItems(patterns)
+
+        self.tb_current_aircraft.setCurrentText(current_aircraft)
+        self.tb_current_aircraft.setEditable(True)
+        self.tb_current_aircraft.setStyleSheet("QComboBox::view-item { align-text: center; }")
+        self.tb_current_aircraft.blockSignals(False)
 
         self.combo_box = QComboBox()
         self.combo_box.blockSignals(True)
@@ -1161,8 +1188,9 @@ class UserModelDialog(QDialog):
         # self.models_combo_box.currentIndexChanged.connect(self.pattern_changed)
 
 
-        ok_button = QPushButton("OK")
-        ok_button.setStyleSheet("text-align:center;")
+        self.ok_button = QPushButton("OK")
+        self.ok_button.setStyleSheet("text-align:center;")
+        self.ok_button.setEnabled(False)
         cancel_button = QPushButton("Cancel")
         cancel_button.setStyleSheet("text-align:center;")
 
@@ -1180,12 +1208,12 @@ class UserModelDialog(QDialog):
         layout.addWidget(label7)
         layout.addWidget(self.models_combo_box)
 
-        layout.addWidget(ok_button)
+        layout.addWidget(self.ok_button)
         layout.addWidget(cancel_button)
 
         self.setLayout(layout)
 
-        ok_button.clicked.connect(self.accept)
+        self.ok_button.clicked.connect(self.accept)
         cancel_button.clicked.connect(self.reject)
 
 

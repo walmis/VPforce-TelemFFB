@@ -3147,7 +3147,7 @@ class MainWindow(QMainWindow):
         result = dialog.exec_()
         if result == QtWidgets.QDialog.Accepted:
             # Handle accepted
-            new_aircraft = dialog.tb_current_aircraft.text()
+            new_aircraft = dialog.tb_current_aircraft.currentText()
             if new_aircraft == current_aircraft:
                 qm = QMessageBox()
                 ret = qm.question(self, 'Create Match Pattern', "Are you sure you want to match on the\nfull aircraft name and not a search pattern?", qm.Yes | qm.No)
