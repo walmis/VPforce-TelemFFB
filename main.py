@@ -16,6 +16,7 @@
 #
 
 import glob
+import textwrap
 
 from traceback_with_variables import print_exc, prints_exc
 import argparse
@@ -1576,6 +1577,34 @@ class Ui_SystemDialog(object):
         self.lab_start_headless.setEnabled(False)
         self.lab_start_headless.setGeometry(QRect(550, 45, 49, 26))
         self.lab_start_headless.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        QWidget.setTabOrder(self.logLevel, self.telemTimeout)
+        QWidget.setTabOrder(self.telemTimeout, self.ignoreUpdate)
+        QWidget.setTabOrder(self.ignoreUpdate, self.cb_al_enable)
+        QWidget.setTabOrder(self.cb_al_enable, self.rb_master_j)
+        QWidget.setTabOrder(self.rb_master_j, self.rb_master_p)
+        QWidget.setTabOrder(self.rb_master_p, self.rb_master_c)
+        QWidget.setTabOrder(self.rb_master_c, self.tb_pid_j)
+        QWidget.setTabOrder(self.tb_pid_j, self.tb_pid_p)
+        QWidget.setTabOrder(self.tb_pid_p, self.tb_pid_c)
+        QWidget.setTabOrder(self.tb_pid_c, self.cb_al_enable_j)
+        QWidget.setTabOrder(self.cb_al_enable_j, self.cb_al_enable_p)
+        QWidget.setTabOrder(self.cb_al_enable_p, self.cb_al_enable_c)
+        QWidget.setTabOrder(self.cb_al_enable_c, self.cb_min_enable_j)
+        QWidget.setTabOrder(self.cb_min_enable_j, self.cb_min_enable_p)
+        QWidget.setTabOrder(self.cb_min_enable_p, self.cb_min_enable_c)
+        QWidget.setTabOrder(self.cb_min_enable_c, self.cb_headless_j)
+        QWidget.setTabOrder(self.cb_headless_j, self.cb_headless_p)
+        QWidget.setTabOrder(self.cb_headless_p, self.cb_headless_c)
+        QWidget.setTabOrder(self.cb_headless_c, self.enableDCS)
+        QWidget.setTabOrder(self.enableDCS, self.enableMSFS)
+        QWidget.setTabOrder(self.enableMSFS, self.enableIL2)
+        QWidget.setTabOrder(self.enableIL2, self.validateIL2)
+        QWidget.setTabOrder(self.validateIL2, self.pathIL2)
+        QWidget.setTabOrder(self.pathIL2, self.browseIL2)
+        QWidget.setTabOrder(self.browseIL2, self.portIL2)
+        QWidget.setTabOrder(self.portIL2, self.cb_save_geometry)
+        QWidget.setTabOrder(self.cb_save_geometry, self.cb_save_view)
+        QWidget.setTabOrder(self.cb_save_view, self.resetButton)
 
         self.retranslateUi(SystemDialog)
 
@@ -1628,6 +1657,7 @@ class Ui_SystemDialog(object):
         self.lab_start_headless.setText(QCoreApplication.translate("SystemDialog", u"Start\n"
 "Headless:", None))
     # retranslateUi
+
 
 
 

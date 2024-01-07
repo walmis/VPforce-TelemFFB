@@ -921,6 +921,37 @@ Headless:</string>
    </property>
   </widget>
  </widget>
+ <tabstops>
+  <tabstop>logLevel</tabstop>
+  <tabstop>telemTimeout</tabstop>
+  <tabstop>ignoreUpdate</tabstop>
+  <tabstop>cb_al_enable</tabstop>
+  <tabstop>rb_master_j</tabstop>
+  <tabstop>rb_master_p</tabstop>
+  <tabstop>rb_master_c</tabstop>
+  <tabstop>tb_pid_j</tabstop>
+  <tabstop>tb_pid_p</tabstop>
+  <tabstop>tb_pid_c</tabstop>
+  <tabstop>cb_al_enable_j</tabstop>
+  <tabstop>cb_al_enable_p</tabstop>
+  <tabstop>cb_al_enable_c</tabstop>
+  <tabstop>cb_min_enable_j</tabstop>
+  <tabstop>cb_min_enable_p</tabstop>
+  <tabstop>cb_min_enable_c</tabstop>
+  <tabstop>cb_headless_j</tabstop>
+  <tabstop>cb_headless_p</tabstop>
+  <tabstop>cb_headless_c</tabstop>
+  <tabstop>enableDCS</tabstop>
+  <tabstop>enableMSFS</tabstop>
+  <tabstop>enableIL2</tabstop>
+  <tabstop>validateIL2</tabstop>
+  <tabstop>pathIL2</tabstop>
+  <tabstop>browseIL2</tabstop>
+  <tabstop>portIL2</tabstop>
+  <tabstop>cb_save_geometry</tabstop>
+  <tabstop>cb_save_view</tabstop>
+  <tabstop>resetButton</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>
