@@ -3390,26 +3390,31 @@ class MainWindow(QMainWindow):
             ignore_auto_updates = False
         update_ans = QMessageBox.No
         proceed_ans = QMessageBox.Cancel
-        is_exe = getattr(sys, 'frozen',
-                         False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
+        try:
+            updater_execution_path = os.path.join(utils.get_script_path(), 'updater.exe')
+            if os.path.exists(updater_execution_path):
+                os.remove(updater_execution_path)
+        except Exception as e:
+            print(e)
+        is_exe = getattr(sys, 'frozen', False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
         # is_exe = True
         if is_exe and _update_available and not ignore_auto_updates and not _child_instance:
             # vers, url = utils.fetch_latest_version()
             update_ans = QMessageBox.Yes
             if auto:
-                update_ans = QMessageBox.information(None, "Update Available!!",
+                update_ans = QMessageBox.information(self, "Update Available!!",
                                                      f"A new version of TelemFFB is available ({_latest_version}).\n\nWould you like to automatically download and install it now?\n\nYou may also update later from the Utilities menu, or the\nnext time TelemFFB starts.\n\n~~ Note ~~ If you no longer wish to see this message on startup,\nyou may enable `ignore_auto_updates` in your user config.\n\nYou will still be able to update via the Utilities menu",
                                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
             if update_ans == QMessageBox.Yes:
-                proceed_ans = QMessageBox.information(None, "TelemFFB Updater",
+                proceed_ans = QMessageBox.information(self, "TelemFFB Updater",
                                                       f"TelemFFB will now exit and launch the updater.\n\nOnce the update is complete, TelemFFB will restart.\n\n~~ Please Note~~~  The primary `config.ini` file will be overwritten.  If you\nhave made changes to `config.ini`, please back up the file or move the modifications to a user config file before upgrading.\n\nPress OK to continue",
                                                       QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
 
             if proceed_ans == QMessageBox.Ok:
                 global _current_version
-                updater_source_path = os.path.join(os.path.dirname(__file__), 'updater', 'updater.exe')
-                updater_execution_path = os.path.join(os.path.dirname(__file__), 'updater.exe')
+                updater_source_path = utils.get_resource_path('updater/updater.exe', prefer_root=True, force=True)
+                updater_execution_path = os.path.join(utils.get_script_path(), 'updater.exe')
 
                 # Copy the updater executable with forced overwrite
                 shutil.copy2(updater_source_path, updater_execution_path)
@@ -3417,18 +3422,12 @@ class MainWindow(QMainWindow):
                 args_list = [f'--{k}={v}' for k, v in vars(active_args).items() if
                              v is not None and v != parser.get_default(k)]
                 call = [updater_execution_path, "--current_version", _current_version] + args_list
-                subprocess.Popen(call, cwd=os.path.dirname(__file__))
+                subprocess.Popen(call, cwd=_install_path)
                 if auto:
                     QCoreApplication.instance().quit()
                 else:
                     return True
-        else:
-            try:
-                updater_execution_path = os.path.join(os.path.dirname(__file__), 'updater.exe')
-                if os.path.exists(updater_execution_path):
-                    os.remove(updater_execution_path)
-            except Exception as e:
-                print(e)
+
         return False
 
 class SettingsLayout(QGridLayout):
