@@ -4890,7 +4890,6 @@ def launch_children():
 
 def main():
     app = QApplication(sys.argv)
-
     app.setStyleSheet(
         """
             QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
@@ -4905,6 +4904,16 @@ def main():
                 padding: 3px;
                 margin: 1px;
                 color: white;
+            }
+            QPushButton:disabled {
+                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                                  stop: 0 #cccccc, stop: 0.4 #bbbbbb,
+                                                  stop: 0.5 #C1ADC6, stop: 1.0 #cccccc);
+                color: #666666;  /* Set the text color for disabled buttons */
+                border: 1px solid #6e1d6f;
+                border-radius: 5px;
+                padding: 3px;
+                margin: 1px;
             }
             QPushButton:hover, #styledButton:hover {
                 background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
