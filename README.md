@@ -1,12 +1,13 @@
 
-# DCS/MSFS FFB Telemetry Effects (for VPforce FFB)
+# DCS/MSFS/IL-2 FFB Telemetry Effects (for VPforce FFB)
 
-This Python application takes input from DCS telemetry via UDP or MSFS Telemetry via SimConnect and generates augmented force feedback (FFB) effects for various aircrafts in DCS World or MSFS, including jets, helicopters and warbirds. 
+This Python application takes telemetry input a simulator and generates augmented force feedback (FFB) effects for various aircrafts, including jets, helicopters and warbirds. 
 
 Please note that while some effects may not be fully realistic, the main goal is to make the stick more lively and increase immersion during gameplay. 
-Also this early version is very bare-bones and community-driven development is very welcome!
+
 
 ## Features
+Note:  Not all features are listed here, not all features are supported in all simulators
 - Turbulence effects that mimic the shaking and vibrations of flying through rough air
 - Weapon release effects
 - Engine rumble effects (If actual RPM is available) 
@@ -16,10 +17,6 @@ Also this early version is very bare-bones and community-driven development is v
 - Helicopter effective translational lift (ETL) effects.
 - Helicopter overspeed shaking
 - Shows a debug window that displays the received telemetry data.
-## Work in progress / new features
-
-Many new features have been recently added including:
-
 - G-Loading - Stick force increases as the aircraft g-loading increases
 - Deceleration effect - applies forward force on stick when braking
 - Motion effects for gear / flaps / spoilers / speedbrake and canopy
@@ -28,72 +25,96 @@ Many new features have been recently added including:
 - Engine rumble for Jet Aircraft
 - Afterburner rumble
 - Engine rumble for Helicopters
-- Customizable weapons release effect direction (0-359) or random
-- AoA reduction force to simulate such features as in the F/A-18
-## Improved MSFS Support
 
-MSFS support in TelemFFB has been significantly extended.  A Majority of the effects listed above are supported (where applicable).
+## FFB Device Support
+As is, TelemFFB supports only the VPforce Rhino FFB Joystick base, or DIY devices which are using the kits (motor + control board) that are available from VPforce.
+<br>
+In addition to The Rhino joystick and DIY joystick bases, TelemFFB also offers support for DIY FFB enabled rudder pedals and DIY FFB enabled helicopter collective controls.
+### FFB Enabled Joystick (VPforce Rhino or DIY Joystick with VPforce DIY Kit)
+Full support for all of the above listed effects
+### FFB Enabled Pedals
+Pedal behavior with TelemFFB will vary based on the sim in question.  None of the supported sims have native pedal support, so everything below is implemented entirely in TelemFFB.  
+In addition to most of the haptic effects listed above, the following is also supported:
+- MSFS
+  - Auto switching between FBW (fixed spring), Dynamic spring force w/ dynamic slip based forces, and un-sprung for helicopters (configurable dampening)
+  - Rudder trim following
+  - Rudder autopilot following
+  - Nose-wheel shimmy effect
+- DCS
+  - Auto switching between pedal spring modes (mode override and spring force configuration options available per aircraft)
+    - Dynamic spring force based on individual aircraft speed envelope (Warbird default)
+    - Fixed spring (Jet default)
+    - Un-sprung with configurable dampening (Helicopter default)
+  - Rudder trim following for fixed wing aircraft
+- IL2 
+  - Nothing has been added for pedals in IL-2 as of yet
+
+### FFB Enabled Collective
+While the collective is not typically a control one would associate with requiring FFB, there are certain advantages as compared to a collective that relies on friction to stay put or provide dampening.
+- Infinitely configurable dampening, friction and inertial FFB effects to dial in the 'feel'
+- Ability to play haptic effects (such as engine rumble, ETL buffeting or gunfire) through the device
+- Ability to simulate hydraulic loss (not yet implemented)
+
+The collective control implementation in TelemFFB supports sending most of the haptic effects listed above through the collective.
+<br>
+- For MSFS, there is also a implementation that integrates tightly with the AFCS system on the HPG Airbus H145 and H160 helicopters.  The collective will follow the autopilot and interacts with the collective trim-release controls of those aircraft.
+
+## Force Feedback Support for DCS
+DCS has native FFB Joystick support.  As such, TelemFFB is primarily used for generating additional effects per the above list.  
+There are some enhancements to the DCS FFB support available within TelemFFB, such as implementing control stick trim following on several aircraft that do not support it.
+
+
+## Force Feedback Support for  MSFS
+
+MSFS does not have native FFB support.  However, TelemFFB has a custom implementation that will simulate dynamic control forces (for applicable aircraft) in addition to many of the aforementioned effects
+
+In addition to the above effects, the FFB implementation for MSFS supports:
 
 Primary Flight Controls
-- Dynamic Flight Control Spring Force (existing TelemFFB Feature)
-  - Recommend to use VPForce Configurator Stick Spring + Hardware Force Trim for Helicopters as TelemFFB
-does not yet support native force trim with MSFS.
-- FBW Flight Controls (static spring forces)
-- "Spring Centered" flight controls (such as in modern gliders)
+- Dynamic Flight Control Spring Force
+  - Configurable spring centering for aircraft with such systems that also have dynamic forces at the stick
+- 'FBW' mode where the spring forces are static
+- Force trim implementation for Helicopters
+- Special implementation to support full AFCS autopilot interaction for the HPG Airbus helicopters (H145, H160)
+- Trim following
+- Autopilot following (for fixed-wing aircraft)
 
-  
-New Effects
- - G Loading Effect
- - Deceleration Force Effect
- - Aoa/Stall Buffeting
- - Weight on Wheels (runway rumble, touchdown effects)
- - Gear Motion
- - Gear Turbulence
- - Flaps Motion
- - Speedbrake/Spoiler Motion
- - Speedbrake/Spoiler Turbulence
- - Piston engine rumble
- - Afterburner Effect (see notes in config.ini)
- - Helicopter Engine Rumble
- - Helicopter ETL Effect
-
-## Enabling support for MSFS
-
-The DCS telemetry listener is always active, however the MSFS listener must be explicitly enabled.
-
-There are 2 way to enable support for MSFS in TelemFFB
-- Edit the config file and set the `msfs_enabled` flag to "1"
-- use the '-s' command line argument `-s MSFS`
-## Executable Versions
-If you are not git-savy or simply dont want to deal with python, git, and cloning repositories and would rather just use an all-in-one executable distribution...
-
-- The main (stable) branch release version is available here:   https://github.com/walmis/VPforce-TelemFFB/releases
-- The development (possibly unstable) branch auto-builds are available here after each commit to the repository: https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A
-## Development
-
-- This framework is made to be very easy to manage FFB effect lifecycles and develop additional effects or specialize specific aircraft effects.
-Main action is going on in `aircrafts_dcs.py` or `aircrafts_msfs.py`. 
-For example to create an effect that plays a "bump" when a gun round is fired:
-```python
-        if self.has_changed("Gun") or self.has_changed("CannonShells"): 
-            effects["cm"].stop() # stop if effect was previously running
-            #start Sine effect with frequency 10Hz, preconfigured intensity, 45 deg angle and total duration of 50ms
-            effects["cm"].periodic(10, self.gun_vibration_intensity, 45, duration=50).start()
-```
-There is no need to create and manage the effect objects. All is done automatically when accessing the effects[] object.
-
-## Caveats
-
-- The initial version of this framework has a very general implementation for all DCS aircrafts. Each aircraft would need to have it's own tailored FFB effect settings and aircraft specific features.
-- When initially developing this framework with SDL2 Haptic API, I've quickly encountered a problem that two DirectInput apps cannot manage effects at the same time. So a raw solution using `hidapi` was developed. It talks directly to the `VPforce Rhino FFB` device via HID commands and manages effects without interfering with DCSs own FFB effects.
+## Force feedback support for IL-2 Sturmovik
+Similar to DCS, IL-2 has native FFB joystick support.  TelemFFB implements many of the same effects listed above for IL-2.  
+Note that there are several effects implemented in TelemFFB that are duplications of effects already supported by IL-2 (Gunfire, Stall/Drag buffeting and ground-roll).  If you chose to enable these effects in TelemFFB, it is recommended to disable the 'shake' force in the IL-2 FFB settings.
 
 ## Requirements
-- Python 3
+- Python 3.9+
 - Git (https://git-scm.com/) to download the source from Github
-- DCS World and a VPforce Rhino FFB Joystick/kit
+- DCS World, MSFS, or IL-2
+- VPforce Rhino FFB Joystick/kit, DIY Pedals or DIY Collective
 
-## Installation
+## Documentation
+- The latest stable version documentation can be found here:  https://vpforce.eu/downloads/VPforce_Rhino_Manual.pdf
+- The latest 'work in progress' documentation is available at this Google Drive link:  https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit  
+<br>
+Note that the documentation may be in-flux between 'wip' releases and may show features that are not yet released.
 
+## Installing and running (EXE distribution)
+
+### Downloading
+If you are not git-savy or simply don't want to deal with python, git, and cloning repositories and would rather just use an all-in-one executable distribution...
+
+- The stable (master) branch release version is available here:   https://github.com/walmis/VPforce-TelemFFB/releases
+
+- The development ('wip', possibly unstable) branch auto-builds are available here after each commit to the repository: https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A
+<br>
+### Installing and running
+Simply extract the zip file into a folder on your PC and run the exe
+<br>
+### Updating
+- There is no automated update for the stable version downloaded from GitHub releases page.  If a new version is released, it will require you to download the new version and install it on top of the previous version
+
+- For the 'wip' development versions, there is a built-in updater as part of TelemFFB that will look to the build server for new versions when TelemFFB starts.  The update procedure will automatically update TelemFFB in-place if you choose to.
+
+
+## Installing Running from source
+### Installation
 * Go to [releases](https://github.com/walmis/VPforce-TelemFFB/releases) page and download the latest precompiled version
 
 * To make some changes in the scripts, you can download the repository and play around with the sources:
@@ -107,7 +128,7 @@ There is no need to create and manage the effect objects. All is done automatica
 
 	4. When running the program for the first time, it will prompt you to install the export.lua script in your `user/Saved Games/DCS` folder. This script is necessary for the program to receive telemetry data from DCS World.
 
-## Updating
+### Updating
 `git pull` - pulls the latest revision
 
 If local changes conflict with remote, you can reset to the latest version:
@@ -117,7 +138,7 @@ git reset --hard origin/master
 git pull
 ```
 
-## Usage
+### Usage
 1. Run the application
 
 	`python main.py`
@@ -135,5 +156,16 @@ optional arguments:
 
 Note: If you have multiple VPForce FFB Enabled devices (Rhino, DIY Pedals, etc) it is possible to run multiple instances of TelemFFB if you specify the VID:PID when launching.  You can use the config file option to tune the effects for each peripheral in separate config files
 
-## Contributing
+## Contributing and Development
 If you're interested in contributing to the project, feel free to submit pull requests or open issues on the Github page. Your feedback and suggestions are always welcome!
+<br>
+- This framework is made to be very easy to manage FFB effect lifecycles and develop additional effects or specialize specific aircraft effects.
+Main action is going on in `aircrafts_dcs.py` or `aircrafts_msfs.py`. 
+For example to create an effect that plays a "bump" when a gun round is fired:
+```python
+        if self.has_changed("Gun") or self.has_changed("CannonShells"): 
+            effects["cm"].stop() # stop if effect was previously running
+            #start Sine effect with frequency 10Hz, preconfigured intensity, 45 deg angle and total duration of 50ms
+            effects["cm"].periodic(10, self.gun_vibration_intensity, 45, duration=50).start()
+```
+There is no need to create and manage the effect objects. All is done automatically when accessing the effects[] object.
