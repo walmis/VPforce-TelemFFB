@@ -29,6 +29,7 @@ import logging
 import sys
 
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
+from PyQt5 import QtCore, QtGui, Qt
 from PyQt5.QtWidgets import QFileDialog
 
 import winpaths
@@ -1213,7 +1214,7 @@ def install_export_lua():
         except:
             data = ""
 
-        local_telemffb = os.path.join(os.path.dirname(__file__), "export", "TelemFFB.lua")
+        local_telemffb = get_resource_path('export/TelemFFB.lua', prefer_root=True)
         def write_script():
             data = open(local_telemffb, "rb").read()
             logging.info(f"Writing to {out_path}")
@@ -1222,11 +1223,9 @@ def install_export_lua():
         export_installed = "telemffblfs" in data
 
         if export_installed and os.path.exists(out_path):
-            # if os.path.getmtime(out_path) < os.path.getmtime(local_telemffb):
-            # Use file checksum rather than timestamp to determine if contents have changed - useful when changing installed versions
+
             crc_a, crc_b = calculate_checksum(out_path), calculate_checksum(local_telemffb)
-            #logging.info(f"local path: {local_telemffb}, remote {out_path}")
-            #logging.info(f"crc_a {crc_a}, crc_b {crc_b}")
+
             if crc_a != crc_b:
                 dia = QMessageBox.question(None, "Contents of TelemFFB.lua export script have changed", f"Update export script {out_path} ?")
                 if dia == QMessageBox.StandardButton.Yes:
@@ -1242,7 +1241,7 @@ def install_export_lua():
                     f.close()
                 write_script()
 
-from PyQt5 import QtCore, QtGui, Qt
+
 
 class OutLog(QtCore.QObject):
     textReceived = QtCore.pyqtSignal(str)
@@ -1353,6 +1352,7 @@ class FetchLatestVersionThread(QThread):
         except Exception as e:
             self.error_signal.emit(str(e))
 
+
 def launch_vpconf(serial):
     vpconf_path = winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
     # serial = HapticEffect.device.serial
@@ -1366,6 +1366,8 @@ def launch_vpconf(serial):
         # logging.info(f"Loading vpconf for aircraft with: {vpconf_path} -config {params['vpconf']} -serial {serial}")
         call = [vpconf_path, "-serial", serial]
         subprocess.Popen(call, cwd=workdir, env=env)
+
+
 def get_version():
     ver = "UNKNOWN"
     try:
@@ -1380,32 +1382,6 @@ def get_version():
     except: pass
     return ver
 
-# def fetch_latest_version():
-#
-#     ctx = ssl._create_unverified_context()
-#
-#     current_version = get_version()
-#     latest_version = None
-#     latest_url = None
-#     url = "https://vpforcecontrols.com/downloads/TelemFFB/"
-#     file = "latest.json"
-#     send_url = url + file
-#
-#     try:
-#         with urllib.request.urlopen(send_url, context=ctx, timeout=5) as req:
-#             latest = json.loads(req.read().decode())
-#             latest_version = latest["version"]
-#             latest_url = url + latest["filename"]
-#     except:
-#         logging.exception(f"Error checking latest version status: {url}")
-#
-#     if current_version != latest_version and latest_version is not None and latest_url is not None:
-#         logging.debug(f"Current version: {current_version} | Latest version: {latest_version}")
-#         return latest_version, latest_url
-#     elif current_version == latest_version:
-#         return False
-#     else:
-#         return None
 
 def create_empty_userxml_file(path):
     if not os.path.isfile(path):
@@ -1420,9 +1396,51 @@ def create_empty_userxml_file(path):
     else:
         logging.info(f"XML file exists at {path}")
 
+
 def self_update(zip_uri):
     r = urllib.request.urlopen(zip_uri, context=ssl._create_unverified_context())
     r.read()
+
+def get_script_path():
+    if getattr(sys, 'frozen', False):
+        # we are running in a bundle
+        script_dir = os.path.dirname(sys.executable)
+    else:
+        # we are running in a normal Python environment
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+    return script_dir
+
+def get_resource_path(relative_path, prefer_root=False, force=False):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    if getattr(sys, 'frozen', False):
+        # we are running in a bundle
+        bundle_dir = sys._MEIPASS
+        script_dir = os.path.dirname(sys.executable)
+    else:
+        # we are running in a normal Python environment
+        bundle_dir = os.path.dirname(os.path.abspath(__file__))
+        script_dir = bundle_dir
+
+    if prefer_root:
+        # if prefer_root is true, look in 'script dir' to find the relative path
+        f_path = os.path.join(script_dir, relative_path)
+        if os.path.isfile(f_path) or force:
+            # if the file exists, return the path
+            return f_path
+        else:
+            logging.info(f"get_resource_path, root_prefer=True.  Did not find {relative_path} relative to script/exe dir.. looking in bundle dir...")
+            # fall back to bundle dir if not found it script dir, log warning if still not found
+            # note, script dir and bundle dir are same when running from source
+            f_path = os.path.join(bundle_dir, relative_path)
+            if not os.path.isfile(f_path):
+                logging.warning(f"Warning, get_resource_path, root_prefer=True, did not find file in script/exe folder or bundle folder: {f_path}")
+            return f_path
+    else:
+        f_path = os.path.join(bundle_dir, relative_path)
+        if not os.path.isfile(f_path):
+            logging.warning(f"Warning, get_resource_path did not find file in bundle folder: {f_path}")
+        return f_path
+
 
 
 

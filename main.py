@@ -75,7 +75,7 @@ parser.add_argument('--minimize', action='store_true', help='Minimize on startup
 
 args = parser.parse_args()
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
+# script_dir = os.path.dirname(os.path.abspath(__file__))
 
 headless_mode = args.headless
 
@@ -103,22 +103,18 @@ if args.device is None:
         case 1:
             _device_pid = system_settings.get('pidJoystick', "2055")
             _device_type = 'joystick'
-            # _device_logo = os.path.join(script_dir, 'image/logo_j.png')
             _device_logo = ':/image/logo_j.png'
         case 2:
             _device_pid = system_settings.get('pidPedals', "2055")
             _device_type = 'pedals'
-            # _device_logo = os.path.join(script_dir, 'image/logo_p.png')
             _device_logo = ':/image/logo_p.png'
         case 3:
             _device_pid = system_settings.get('pidCollective', "2055")
             _device_type = 'collective'
-            # _device_logo = os.path.join(script_dir, 'image/logo_c.png')
             _device_logo = ':/image/logo_c.png'
         case _:
             _device_pid = system_settings.get('pidJoystick', "2055")
             _device_type = 'joystick'
-            # _device_logo = os.path.join(script_dir, 'image/logo_j.png')
             _device_logo = ':/image/logo_j.png'
 
     _device_vid_pid = f"FFFF:{_device_pid}"
@@ -164,7 +160,6 @@ sys.path.insert(0, '')
 # sys.path.append('/simconnect')
 
 
-_config: ConfigObj
 _config_mtime = 0
 effects_translator = utils.EffectTranslator()
 version = utils.get_version()
@@ -192,18 +187,31 @@ class LoggingFilter(logging.Filter):
         # If none of the keywords are found, allow the message to be logged
         return True
 
+if getattr(sys, 'frozen', False):
+    _install_path = os.path.dirname(sys.executable)
+else:
+    _install_path = os.path.dirname(os.path.abspath(__file__))
+
+_legacy_override_file = None
+_legacy_config_file = utils.get_resource_path('config.ini') # get from bundle (if exe) or local root if source
 
 if args.overridefile == 'None':
     # Need to determine if user is using default config.user.ini without passing the override flag:
-    if os.path.isfile(os.path.join(script_dir, 'config.user.ini')):
-        # re-set the override file argument var as if user had passed it
-        args.overridefile = 'config.user.ini'
-    else:
-        pass
+    if os.path.isfile(os.path.join(_install_path, 'config.user.ini')):
+        _legacy_override_file = os.path.join(_install_path, 'config.user.ini')
+
 else:
-    if not os.path.isfile(args.overridefile):
+    if not os.path.isabs(args.overridefile):  # user passed just file name, construct absolute path from script/exe directory
+        ovd_path = utils.get_resource_path(args.overridefile, prefer_root=True, force=True)
+    else:
+        ovd_path = args.overridefile  # user passed absolute path, use that
+
+
+    if os.path.isfile(ovd_path):
+        _legacy_override_file = ovd_path
+    else:
+        _legacy_override_file = ovd_path
         logging.warning(f"Override file {args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
-        args.overridefile = 'None'
 
 
 log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
@@ -251,22 +259,9 @@ log_filter = LoggingFilter(log_filter_strings)
 console_handler.addFilter(log_filter)
 file_handler.addFilter(log_filter)
 
-
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.dirname(os.path.abspath("."))
-
-    return os.path.join(base_path, relative_path)
+defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
 
 
-if os.path.exists(os.path.join(os.path.dirname(os.path.abspath('defaults.xml')),'defaults.xml')):
-    defaults_path = os.path.join(os.path.dirname(os.path.abspath('defaults.xml')),'defaults.xml')
-else:
-    defaults_path = resource_path('defaults.xml')
 
 userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
 userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
@@ -286,20 +281,7 @@ from sc_manager import SimConnectManager
 from il2_telem import IL2Manager
 from aircraft_base import effects
 
-if os.path.basename(args.configfile) == args.configfile:
-    # just the filename is present, assume it is in the script directory
-    # print("Config File is in the script dir")
-    configfile = os.path.join(script_dir, args.configfile)
-else:
-    # assume is absolute path to file
-    # print("Config file is absolute path")
-    configfile = args.configfile
-if os.path.basename(args.overridefile) == args.overridefile:
-    # just the filename is present, assume it is in the script directory
-    overridefile = os.path.join(script_dir, args.overridefile)
-else:
-    # assume is absolute path to file
-    overridefile = args.overridefile
+
 
 if getattr(sys, 'frozen', False):
     appmode = 'Executable'
@@ -325,42 +307,9 @@ def format_dict(data, prefix=""):
     return output
 
 
-def load_legacy_config(filename, raise_errors=True) -> ConfigObj:
-    if not os.path.sep in filename:
-        #construct absolute path
-        config_path = os.path.join(os.path.dirname(__file__), filename)
-    else:
-        #filename is absolute path
-        config_path = filename
-
-    try:
-        config = ConfigObj(config_path, raise_errors=raise_errors)
-        logging.info(f"Loading Config: {config_path}")
-        if not os.path.exists(config_path):
-            logging.warning(f"Configuration file {filename} does not exist")
-            path = os.path.dirname(config_path)
-            ini_files = glob.glob(f"{path}/*.ini")
-            logging.warning(f"Possible ini files in that location are:")
-            for file in ini_files:
-                logging.warning(f"{os.path.basename(file)}")
-        return config
-    except Exception as e:
-        logging.error(f"Cannot load config {config_path}:  {e}")
-        err = ConfigObj()
-        err["EXCEPTION"] = {}
-        err["EXCEPTION"]["ERROR"] = e
-        err["system"] = {}
-        err["system"]["logging_level"] = "DEBUG"
-        err["system"]["msfs_enabled"] = 0
-        err["system"]["dcs_enabled"] = 0
-        return err
-
-
-# if update is true, update the current modified time
-
 def config_has_changed(update=False) -> bool:
+    # if update is true, update the current modified time
     global _config_mtime
-    # global _config
     # "hash" both mtimes together
     tm = int(os.path.getmtime(userconfig_path)) + int(os.path.getmtime(defaults_path))
     if _config_mtime != tm:
@@ -809,8 +758,6 @@ class TelemManager(QObject, threading.Thread):
 
     @prints_exc
     def run(self):
-        global _config
-        # self.timeout = utils.sanitize_dict(_config["system"]).get("telemetry_timeout", 200)/1000
         self.timeout = int(utils.read_system_settings(args.device, args.type).get('telemTimeout', 200))/1000
         logging.info(f"Telemetry timeout: {self.timeout}")
         while self._run:
@@ -2085,10 +2032,12 @@ class MainWindow(QMainWindow):
 
         self.show_new_craft_button = False
         # Get the absolute path of the script's directory
-        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # script_dir = os.path.dirname(os.path.abspath(__file__))
         doc_url = 'https://vpforcecontrols.com/downloads/VPforce_Rhino_Manual.pdf'
         dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
-        notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
+
+        # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
+        notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
         self._current_config_scope = args.type
         if system_settings.get('saveLastTab', 0):
             if _device_type == 'joystick':
@@ -2142,7 +2091,6 @@ class MainWindow(QMainWindow):
         else:
             self.setWindowTitle(f"TelemFFB")
         # Construct the absolute path of the icon file
-        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
         icon = QIcon(":/image/vpforceicon.png")
 
         self.setWindowIcon(icon)
@@ -5050,6 +4998,29 @@ def main():
 
     utils.signal_emitter.telem_timeout_signal.connect(window.update_sim_indicators)
     utils.signal_emitter.error_signal.connect(window.process_error_signal)
+    if getattr(sys, 'frozen', False):
+        path = os.path.dirname(sys.executable)
+    else:
+        path = os.path.dirname(os.path.abspath(__file__))
+
+    frozen = getattr(sys, 'frozen', False)
+    if frozen:
+        # we are running in a bundle
+        bundle_dir = sys._MEIPASS
+    else:
+        # we are running in a normal Python environment
+        bundle_dir = os.path.dirname(os.path.abspath(__file__))
+    log_info = f'''
+        Frozen is {frozen}
+        bundle dir is {bundle_dir}
+        sys.argv[0] is {sys.argv[0]}
+        sys.executable is {sys.executable}
+        os.getcwd is {os.getcwd()}
+        '''
+    logging.info(log_info)
+    active_args, unknown_args = parser.parse_known_args()
+    args_list = [f'--{k}={v}' for k, v in vars(active_args).items() if
+                 v is not None and v != parser.get_default(k)]
 
     app.exec_()
     if _ipc_running:
