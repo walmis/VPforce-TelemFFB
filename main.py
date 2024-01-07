@@ -133,10 +133,10 @@ if args.teleplot:
 ################
 ###  Setting _release flag to true will disable all auto-updating and 'WiP' downloads server version checking
 ###  Set the version number to version tag that will be pushed to master repository branch
-_release = False # Todo: Validate release flag!
+_release = True # Todo: Validate release flag!
 
 if _release:
-    version = "vX.X.X"
+    version = "v1.0.0"
 else:
     version = utils.get_version()
 
