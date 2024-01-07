@@ -129,7 +129,17 @@ if args.teleplot:
     logging.info(f"Using {args.teleplot} for plotting")
     utils.teleplot.configure(args.teleplot)
 
-version = utils.get_version()
+#################
+################
+###  Setting _release flag to true will disable all auto-updating and 'WiP' downloads server version checking
+###  Set the version number to version tag that will be pushed to master repository branch
+_release = False # Todo: Validate release flag!
+
+if _release:
+    version = "vX.X.X"
+else:
+    version = utils.get_version()
+
 min_firmware_version = 'v1.0.15'
 global dev_firmware_version
 dev_firmware_version = None
@@ -628,7 +638,8 @@ class MainWindow(QMainWindow):
 
         self.update_action = QAction('Update TelemFFB', self)
         self.update_action.triggered.connect(self.update_from_menu)
-        utilities_menu.addAction(self.update_action)
+        if not _release:
+            utilities_menu.addAction(self.update_action)
         self.update_action.setDisabled(True)
 
         # menubar.setStyleSheet("QMenu::item:selected { color: red; }")
@@ -803,8 +814,14 @@ class MainWindow(QMainWindow):
         self.doc_label.setText(f'<a href="{doc_url}">{label_txt}</a>')
         self.doc_label.setToolTip(doc_url)
         self.dl_label = QLabel()
-        dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
-        label_txt = 'Download Latest'
+        if _release:
+            dl_url = 'https://github.com/walmis/VPforce-TelemFFB/releases'
+            label_txt = "GitHub Releases"
+        else:
+            dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
+            label_txt = 'Download Latest'
+
+
         self.dl_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
         self.dl_label.setOpenExternalLinks(True)
         self.dl_label.setText(f'<a href="{dl_url}">{label_txt}</a>')
@@ -817,7 +834,10 @@ class MainWindow(QMainWindow):
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
 
-        status_text = "UNKNOWN"
+        if _release:
+            status_text = f"Release Version {version}"
+        else:
+            status_text = "UNKNOWN"
 
         self.version_label.setText(f'Version Status: {status_text}')
         self.version_label.setOpenExternalLinks(True)
@@ -827,7 +847,7 @@ class MainWindow(QMainWindow):
         self.firmware_label.setText(f'Rhino Firmware: {dev_firmware_version}')
 
         self.version_label.setAlignment(Qt.AlignLeft)
-        self.firmware_label.setAlignment(Qt.AlignLeft)
+        self.firmware_label.setAlignment(Qt.AlignRight)
         version_row_layout.addWidget(self.version_label)
         version_row_layout.addWidget(self.firmware_label)
 
@@ -942,6 +962,9 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
 
     def perform_update(self, auto=True):
+        if _release:
+            return False
+
         config = get_config()
         ignore_auto_updates = utils.sanitize_dict(config["system"]).get("ignore_auto_updates", 0)
         if not auto:
@@ -955,12 +978,12 @@ class MainWindow(QMainWindow):
             # vers, url = utils.fetch_latest_version()
             update_ans = QMessageBox.Yes
             if auto:
-                update_ans = QMessageBox.information(None, "Update Available!!",
+                update_ans = QMessageBox.information(self, "Update Available!!",
                                                      f"A new version of TelemFFB is available ({_latest_version}).\n\nWould you like to automatically download and install it now?\n\nYou may also update later from the Utilities menu, or the\nnext time TelemFFB starts.\n\n~~ Note ~~ If you no longer wish to see this message on startup,\nyou may enable `ignore_auto_updates` in your user config.\n\nYou will still be able to update via the Utilities menu",
                                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
             if update_ans == QMessageBox.Yes:
-                proceed_ans = QMessageBox.information(None, "TelemFFB Updater",
+                proceed_ans = QMessageBox.information(self, "TelemFFB Updater",
                                                       f"TelemFFB will now exit and launch the updater.\n\nOnce the update is complete, TelemFFB will restart.\n\n~~ Please Note~~~  The primary `config.ini` file will be overwritten.  If you\nhave made changes to `config.ini`, please back up the file or move the modifications to a user config file before upgrading.\n\nPress OK to continue",
                                                       QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
 
@@ -1035,10 +1058,11 @@ def main():
 
     window = MainWindow()
     window.show()
-    fetch_version_thread = utils.FetchLatestVersionThread()
-    fetch_version_thread.version_result_signal.connect(window.update_version_result)
-    fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
-    fetch_version_thread.start()
+    if not _release:
+        fetch_version_thread = utils.FetchLatestVersionThread()
+        fetch_version_thread.version_result_signal.connect(window.update_version_result)
+        fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
+        fetch_version_thread.start()
     telem_manager = TelemManager()
     telem_manager.start()
 
