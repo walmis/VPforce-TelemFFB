@@ -1,6 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import PyInstaller.config
 
+PyInstaller.config.CONF['distpath'] = "./dist/VPforce-TelemFFB"
+distpath = PyInstaller.config.CONF['distpath']
 block_cipher = None
 
 
@@ -8,7 +11,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect')],
-    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('config.user.ini.README.old', '.'), ('simconnect/*.json', 'simconnect')],
+    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -110,10 +113,9 @@ exe = EXE(
 )
 
 import shutil
+import os
+shutil.copyfile('_RELEASE_NOTES.txt', os.path.join(distpath, '_RELEASE_NOTES.txt'))
 
-# shutil.copyfile('defaults.xml', '{0}/defaults.xml'.format(DISTPATH))
-shutil.copyfile('_RELEASE_NOTES.txt', '{0}/_RELEASE_NOTES.txt'.format(DISTPATH))
-
-shutil.copytree('export', '{0}/export'.format(DISTPATH), dirs_exist_ok=True)
-shutil.copytree('updater', '{0}/updater'.format(DISTPATH), dirs_exist_ok=True)
+shutil.copytree('export', os.path.join(distpath, 'export'), dirs_exist_ok=True)
+shutil.copytree('updater', os.path.join(distpath, 'updater'), dirs_exist_ok=True)
 
