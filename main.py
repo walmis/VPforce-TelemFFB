@@ -2090,11 +2090,11 @@ class MainWindow(QMainWindow):
                 'height': 530,
                 'width': 700,
             },
-            "2": { #log
-                'height': 530,
-                'width': 700,
-            },
-            "3": {  # hide
+            # "2": { #log
+            #     'height': 530,
+            #     'width': 700,
+            # },
+            "2": {  # hide
                 'height': 0,
                 'width': 0,
             }
@@ -2591,21 +2591,21 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(self.settings_area, "Settings")
 
 
-        self.log_tab_widget = QWidget(self.tab_widget)
-        self.tab_widget.addTab(self.log_tab_widget, "Log")
+        # self.log_tab_widget = QWidget(self.tab_widget)
+        # self.tab_widget.addTab(self.log_tab_widget, "Log")
 
-        self.log_widget = QPlainTextEdit(self.log_tab_widget)
-        self.log_widget.setMaximumBlockCount(20)
-        self.log_widget.setReadOnly(True)
-        self.log_widget.setFont(QFont("Courier New"))
-        self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
+        # self.log_widget = QPlainTextEdit(self.log_tab_widget)
+        # self.log_widget.setMaximumBlockCount(20)
+        # self.log_widget.setReadOnly(True)
+        # self.log_widget.setFont(QFont("Courier New"))
+        # self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
         # self.log_tail_thread = LogTailer(log_file)
         # self.log_tail_thread.log_updated.connect(self.update_log_widget)
         # self.log_tail_thread.start()
 
-        self.clear_button = QPushButton("Clear", self.log_tab_widget)
-        self.toggle_button = QPushButton("Pause", self.log_tab_widget)
-        self.open_log_button = QPushButton("Open in Window", self.log_tab_widget)
+        # self.clear_button = QPushButton("Clear", self.log_tab_widget)
+        # self.toggle_button = QPushButton("Pause", self.log_tab_widget)
+        # self.open_log_button = QPushButton("Open in Window", self.log_tab_widget)
 
         # self.clear_button.clicked.connect(self.clear_log_widget)
         # self.toggle_button.clicked.connect(self.toggle_log_tailing)
@@ -2613,17 +2613,17 @@ class MainWindow(QMainWindow):
 
         self.tab_widget.addTab(QWidget(), "Hide")
 
-        log_layout = QVBoxLayout(self.log_tab_widget)
-        log_layout.addWidget(self.log_widget)
+        # log_layout = QVBoxLayout(self.log_tab_widget)
+        # log_layout.addWidget(self.log_widget)
 
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(self.clear_button)
-        button_layout.addWidget(self.toggle_button)
-        button_layout.addStretch()  # Add stretch to push the next button to the right
-        button_layout.addWidget(self.open_log_button)
-        log_layout.addLayout(button_layout)
+        # button_layout = QHBoxLayout()
+        # button_layout.addWidget(self.clear_button)
+        # button_layout.addWidget(self.toggle_button)
+        # button_layout.addStretch()  # Add stretch to push the next button to the right
+        # button_layout.addWidget(self.open_log_button)
+        # log_layout.addLayout(button_layout)
 
-        self.log_tab_widget.setLayout(log_layout)
+        # self.log_tab_widget.setLayout(log_layout)
         ##############
         #  buttons
 
@@ -3236,16 +3236,16 @@ class MainWindow(QMainWindow):
             except:
                 pass
 
-        elif index == 2:  # Log Tab
-            self.current_tab_index = 2
-            try:
-                h = self.tab_sizes[str(index)]['height']
-                w = self.tab_sizes[str(index)]['width']
-                self.resize(int(w), int(h))
-            except: pass
+        # elif index == 2:  # Log Tab
+        #     self.current_tab_index = 2
+        #     try:
+        #         h = self.tab_sizes[str(index)]['height']
+        #         w = self.tab_sizes[str(index)]['width']
+        #         self.resize(int(w), int(h))
+        #     except: pass
 
-        elif index == 3:  # Hide Tab
-            self.current_tab_index = 3
+        elif index == 2:  # Hide Tab
+            self.current_tab_index = 2
 
             self.resize(0,0)
 
