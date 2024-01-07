@@ -2202,8 +2202,8 @@ class MainWindow(QMainWindow):
 
 
         # Add settings converter
-        if args.overridefile != 'None':
-            convert_settings_action = QAction('Convert user config.ini to XML', self)
+        if _legacy_override_file is not None:
+            convert_settings_action = QAction('Convert legacy user config to XML', self)
             convert_settings_action.triggered.connect(lambda: autoconvert_config(self))
             utilities_menu.addAction(convert_settings_action)
 
@@ -4683,7 +4683,7 @@ def convert_system_settings(sys_dict):
     # utils.set_reg('Sys', out_val)
     # pass
 
-def convert_settings(cfg=configfile, usr=overridefile, window=None):
+def convert_settings(cfg=_legacy_config_file, usr=_legacy_override_file, window=None):
     differences = []
     defaultconfig = ConfigObj(cfg)
     userconfig = ConfigObj(usr, raise_errors=False)
@@ -4730,12 +4730,34 @@ def convert_settings(cfg=configfile, usr=overridefile, window=None):
     xmlutils.write_converted_to_xml(differences)
 
 
-def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
-    test = False
+def autoconvert_config(main_window, cfg=_legacy_config_file, usr=_legacy_override_file):
     if _child_instance: return
-    if args.overridefile != 'None':
-        ans = QMessageBox.information(main_window, "Important TelemFFB Update Notification", f"The 'ini' config file type is now deprecated.\n\nThis version of TelemFFB uses a new UI driven config model\n\nIt appears you are using a user override file ({args.overridefile}).  Would you\nlike to auto-convert that file to the new config model?\n\nIf you choose not to, you may also perform the conversion from\nthe Utilities menu\n\nProceeding will convert the config and re-name your\nexisting user config to '{os.path.basename(usr)}.legacy'", QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+    if usr is not None:
+        ans = QMessageBox.information(
+            main_window,
+            "Important TelemFFB Update Notification",
+            textwrap.dedent(f'''
+                The 'ini' config file type is now deprecated.
+            
+                This version of TelemFFB uses a new UI-driven config model.
+            
+                It appears you are using a user override file ({usr}).  Would you
+                like to auto-convert that file to the new config model?
+            
+                If you choose no, you may also perform the conversion from
+                the Utilities menu.
+            
+                Proceeding will convert the config and re-name your
+                existing user config to '{os.path.basename(usr)}.legacy'
+            '''),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+
         if ans == QMessageBox.No:
+            return
+        if not os.path.isfile(_legacy_override_file):
+            QMessageBox.warning(main_window, "Error", f"Legacy override file {usr} was passed at runtime for auto-conversion, but the file does not exist")
             return
         # perform the conversion
         convert_settings(cfg=cfg, usr=usr, window=main_window)
@@ -4746,7 +4768,13 @@ def autoconvert_config(main_window, cfg=configfile, usr=overridefile):
             if ans == QMessageBox.Yes:
                 os.replace(usr, f"{usr}.legacy")
 
-        QMessageBox.information(main_window, "Conversion Completed", "The conversion is complete.  You may now continue to use TelemFFB.\n\nTo avoid unnecessary log messages, please remove any '-c' or '-o' arguments from your startup shortcut as they are no longer supported")
+        QMessageBox.information(main_window, "Conversion Completed", '''
+            The conversion is complete.
+            
+            If you are utilizing multiple VPforce FFB enabled devices, please set up the auto-launch capabilities in the system settings menu.
+            
+            To avoid unnecessary log messages, please remove any '-c' or '-o' arguments from your startup shortcut as they are no longer supported'''
+                                )
 
 def restart_sims():
     global window, _device_pid, _device_type
