@@ -142,9 +142,9 @@ else:
 args.sim = str.upper(args.sim)
 args.type = str.lower(args.type)
 
-## need to determine if someone has auto-launch enabled but has started an instance with -D
-## The 'masterInstance' reg key holds the radio button index of the configured master instance
-## 1=joystick, 2=pedals, 3=collective
+# need to determine if someone has auto-launch enabled but has started an instance with -D
+# The 'masterInstance' reg key holds the radio button index of the configured master instance
+# 1=joystick, 2=pedals, 3=collective
 index_dict = {
     'joystick': 1,
     'pedals': 2,
@@ -174,6 +174,7 @@ _latest_url = None
 _current_version = version
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 
+
 class LoggingFilter(logging.Filter):
     def __init__(self, keywords):
         self.keywords = keywords
@@ -188,13 +189,14 @@ class LoggingFilter(logging.Filter):
         # If none of the keywords are found, allow the message to be logged
         return True
 
+
 if getattr(sys, 'frozen', False):
     _install_path = os.path.dirname(sys.executable)
 else:
     _install_path = os.path.dirname(os.path.abspath(__file__))
 
 _legacy_override_file = None
-_legacy_config_file = utils.get_resource_path('config.ini') # get from bundle (if exe) or local root if source
+_legacy_config_file = utils.get_resource_path('config.ini')  # get from bundle (if exe) or local root if source
 
 if args.overridefile == 'None':
     # Need to determine if user is using default config.user.ini without passing the override flag:
@@ -206,7 +208,6 @@ else:
         ovd_path = utils.get_resource_path(args.overridefile, prefer_root=True, force=True)
     else:
         ovd_path = args.overridefile  # user passed absolute path, use that
-
 
     if os.path.isfile(ovd_path):
         _legacy_override_file = ovd_path
@@ -262,8 +263,6 @@ file_handler.addFilter(log_filter)
 
 defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
 
-
-
 userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
 userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
 
@@ -281,7 +280,6 @@ import aircrafts_il2
 from sc_manager import SimConnectManager
 from il2_telem import IL2Manager
 from aircraft_base import effects
-
 
 
 if getattr(sys, 'frozen', False):
@@ -319,9 +317,9 @@ def config_has_changed(update=False) -> bool:
     return False
 
 
-
 class LogWindow(QMainWindow):
     log_paused = False
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Log Console ({args.type})")
@@ -385,7 +383,6 @@ class LogWindow(QMainWindow):
             self.log_paused = True
             self.pause_button.setText("Resume")
 
-
     def set_debug_logging(self):
         logger.setLevel(logging.DEBUG)
         logging.info(f"Logging level set to DEBUG")
@@ -410,7 +407,6 @@ class LogTailWindow(QMainWindow):
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.log_tail_thread = self.main_window.log_tail_thread
-
 
         # Replicate the log_tab_widget contents in the new window
         self.log_widget = QPlainTextEdit(self.central_widget)
@@ -447,6 +443,7 @@ class LogTailWindow(QMainWindow):
         else:
             self.log_tail_thread.pause()
             self.toggle_button.setText("Resume")
+
     def clear_log_widget(self):
         self.log_widget.clear()
 
@@ -456,6 +453,7 @@ class LogTailWindow(QMainWindow):
         cursor.insertText(log_line)
         self.log_widget.setTextCursor(cursor)
         self.log_widget.ensureCursorVisible()
+
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
@@ -483,7 +481,6 @@ class TelemManager(QObject, threading.Thread):
         self.settings_manager = settings_manager
         self.ipc_thread = ipc_thread
         self._ipc_telem = {}
-
 
     def get_aircraft_config(self, aircraft_name, data_source):
         params = {}
@@ -533,12 +530,11 @@ class TelemManager(QObject, threading.Thread):
         except Exception as e:
             logging.warning(f"Error getting settings from Settings Manager:{e}")
 
-
     def quit(self):
         self._run = False
         self.join()
 
-    def submitFrame(self, data : bytes):
+    def submitFrame(self, data: bytes):
         if type(data) == bytes:
             data = data.decode("utf-8")
 
@@ -548,7 +544,7 @@ class TelemManager(QObject, threading.Thread):
                 self._cond.notify()
             elif self._data is None:
                 self._data = data
-                self._cond.notify() # notify waiting thread of new data
+                self._cond.notify()  # notify waiting thread of new data
             else:
                 self._dropped_frames += 1
                 # log dropped frames, this is not necessarily a bad thing
@@ -586,7 +582,7 @@ class TelemManager(QObject, threading.Thread):
         self.frameTimes.append(int((time.perf_counter() - self.lastFrameTime)*1000))
         if len(self.frameTimes) > 500: self.frameTimes.pop(0)
 
-        if self.frameTimes[-1] > self.maxframeTime and len(self.frameTimes) > 40: # skip the first frames before counting frametime as max
+        if self.frameTimes[-1] > self.maxframeTime and len(self.frameTimes) > 40:  # skip the first frames before counting frametime as max
             threshold = 100
             if self.frameTimes[-1] > threshold:
                 logging.warning(
@@ -597,7 +593,6 @@ class TelemManager(QObject, threading.Thread):
         telem_data["frameTimes"] = [self.frameTimes[-1], max(self.frameTimes)]
         telem_data["maxFrameTime"] = f"{round(self.maxframeTime, 3)}"
         telem_data["avgFrameTime"] = f"{round(sum(self.frameTimes) / len(self.frameTimes), 3):.3f}"
-
 
         self.lastFrameTime = time.perf_counter()
 
@@ -612,7 +607,7 @@ class TelemManager(QObject, threading.Thread):
                 traceback.print_exc()
                 logging.error("Error Parsing Parameter: ", repr(i))
 
-        ## Read telemetry sent via IPC channel from child instances and update local telemetry stream
+        # Read telemetry sent via IPC channel from child instances and update local telemetry stream
         if _master_instance and _launched_children:
             self._ipc_telem = self.ipc_thread._ipc_telem
             if self._ipc_telem != {}:
@@ -644,7 +639,7 @@ class TelemManager(QObject, threading.Thread):
 
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
 
-                #self.settings_manager.update_current_aircraft(send_source, aircraft_name, cls_name)
+                # self.settings_manager.update_current_aircraft(send_source, aircraft_name, cls_name)
                 Class = getattr(module, cls_name, None)
                 logging.debug(f"CLASS={Class.__name__}")
 
@@ -733,7 +728,7 @@ class TelemManager(QObject, threading.Thread):
 
             except:
                 print_exc()
-        ### Send locally generated telemetry to master here
+        # Send locally generated telemetry to master here
         if args.child:
             ipc_telem = self.currentAircraft._ipc_telem
             if ipc_telem != {}:
@@ -747,7 +742,7 @@ class TelemManager(QObject, threading.Thread):
                     else:
                         utils.teleplot.sendTelemetry(item, telem_data[item])
 
-        try: # sometime Qt object is destroyed first on exit and this may cause a runtime exception
+        try:  # sometime Qt object is destroyed first on exit and this may cause a runtime exception
             self.telemetryReceived.emit(telem_data)
         except: pass
 
@@ -778,6 +773,7 @@ class TelemManager(QObject, threading.Thread):
                     self._data = None
                     self.process_data(data)
 
+
 class IPCNetworkThread(QThread):
     message_received = pyqtSignal(str)
     exit_signal = pyqtSignal(str)
@@ -787,8 +783,7 @@ class IPCNetworkThread(QThread):
     hide_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
 
-
-    def __init__(self, host="localhost", myport=0, dstport=0, child_ports = [], master=False, child=False, keepalive_timer=1, missed_keepalive=3):
+    def __init__(self, host="localhost", myport=0, dstport=0, child_ports=[], master=False, child=False, keepalive_timer=1, missed_keepalive=3):
         super().__init__()
         global window
         self._run = True
@@ -808,7 +803,7 @@ class IPCNetworkThread(QThread):
         self._child_active = {
             'joystick': False,
             'pedals': False,
-            'collective':False
+            'collective': False
         }
 
         # Initialize socket
@@ -826,6 +821,7 @@ class IPCNetworkThread(QThread):
         j_telem = json.dumps(telem)
         message = f"telem:{j_telem}"
         self.send_message(message)
+
     def send_ipc_effects(self, active_effects, active_settings):
         payload = {
             f'{_device_type}_active_effects': active_effects,
@@ -862,6 +858,7 @@ class IPCNetworkThread(QThread):
                 ts = time.time()
                 logging.debug(f"{_device_type} SENT CHILD KEEPALIVE: {ts}")
                 time.sleep(self._keepalive_timer)
+
     def receive_messages(self):
         while self._run:
             try:
@@ -950,7 +947,6 @@ class IPCNetworkThread(QThread):
                             self.child_keepalive_signal.emit(device, 'ACTIVE')
                             self._child_active[device] = True
 
-
     def run(self):
         self.receive_thread = threading.Thread(target=self.receive_messages)
         self.receive_thread.start()
@@ -972,8 +968,9 @@ class IPCNetworkThread(QThread):
         self._run = False
         self._socket.close()
 
+
 class NetworkThread(threading.Thread):
-    def __init__(self, telemetry : TelemManager, host = "", port = 34380, telem_parser = None):
+    def __init__(self, telemetry: TelemManager, host="", port=34380, telem_parser=None):
         super().__init__()
         self._run = True
         self._port = port
@@ -1007,7 +1004,7 @@ class NetworkThread(threading.Thread):
 
 
 class SimConnectSock(SimConnectManager):
-    def __init__(self, telem : TelemManager):
+    def __init__(self, telem: TelemManager):
         super().__init__()
         self._telem = telem
 
@@ -1029,6 +1026,7 @@ class SimConnectSock(SimConnectManager):
 
         args = [str(x) for x in args]
         self._telem.submitFrame(f"Ev={event};" + ";".join(args))
+
 
 class Ui_TeleplotDialog(object):
     def setupUi(self, TeleplotDialog):
@@ -1096,10 +1094,9 @@ class Ui_TeleplotDialog(object):
         self.buttonBox = QDialogButtonBox(self.widget)
         self.buttonBox.setObjectName(u"buttonBox")
         self.buttonBox.setOrientation(Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Save)
 
         self.horizontalLayout.addWidget(self.buttonBox, 0, Qt.AlignRight)
-
 
         self.retranslateUi(TeleplotDialog)
 
@@ -1112,11 +1109,9 @@ class Ui_TeleplotDialog(object):
         self.label_2.setText(QCoreApplication.translate("TeleplotDialog", u"Port:", None))
         self.label_3.setText(QCoreApplication.translate("TeleplotDialog", u"Space separated list of Telemetry variables", None))
         self.label_4.setText(QCoreApplication.translate("TeleplotDialog", u"List:", None))
-        self.label_5.setText(QCoreApplication.translate("TeleplotDialog", u"To stop sending teleplot data,\n"
-"clear the boxes and select OK", None))
+        self.label_5.setText(QCoreApplication.translate("TeleplotDialog", u"To stop sending teleplot data,\nclear the boxes and select OK", None))
         self.pb_clear.setText(QCoreApplication.translate("TeleplotDialog", u"Clear", None))
     # retranslateUi
-
 
 
 class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
@@ -1135,7 +1130,6 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
         if args.plot is None:
             args.plot = []
         self.telem_vars = ' '.join(args.plot)
-
 
         self.setupUi(self)
         self.retranslateUi(self)
@@ -1159,7 +1153,6 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
                 args.plot = self.tb_vars.toPlainText().split()
                 args.teleplot = str(self.tb_port.text())
                 self.accept()
-
 
     def clear_form(self):
         self.tb_port.clear()
@@ -1191,7 +1184,6 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
             return False
 
 
-
 class Ui_SystemDialog(object):
     def setupUi(self, SystemDialog):
         if not SystemDialog.objectName():
@@ -1219,7 +1211,7 @@ class Ui_SystemDialog(object):
         self.buttonBox.setObjectName(u"buttonBox")
         self.buttonBox.setGeometry(QRect(402, 492, 156, 23))
         self.buttonBox.setOrientation(Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Save)
         self.resetButton = QPushButton(SystemDialog)
         self.resetButton.setObjectName(u"resetButton")
         self.resetButton.setGeometry(QRect(20, 492, 101, 23))
@@ -1309,7 +1301,6 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout.addWidget(self.browseIL2)
 
-
         self.il2_sub_layout.addLayout(self.horizontalLayout, 1, 0, 1, 1)
 
         self.horizontalLayout_2 = QHBoxLayout()
@@ -1327,7 +1318,6 @@ class Ui_SystemDialog(object):
         self.horizontalSpacer = QSpacerItem(279, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
 
         self.horizontalLayout_2.addItem(self.horizontalSpacer)
-
 
         self.il2_sub_layout.addLayout(self.horizontalLayout_2, 2, 0, 1, 1)
 
@@ -1364,7 +1354,7 @@ class Ui_SystemDialog(object):
         self.label_12 = QLabel(SystemDialog)
         self.label_12.setObjectName(u"label_12")
         self.label_12.setGeometry(QRect(386, 53, 51, 26))
-        self.label_12.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        self.label_12.setAlignment(Qt.AlignLeading | Qt.AlignLeft | Qt.AlignTop)
         self.label_9 = QLabel(SystemDialog)
         self.label_9.setObjectName(u"label_9")
         self.label_9.setGeometry(QRect(313, 53, 42, 26))
@@ -1372,12 +1362,12 @@ class Ui_SystemDialog(object):
         self.lab_auto_launch.setObjectName(u"lab_auto_launch")
         self.lab_auto_launch.setEnabled(False)
         self.lab_auto_launch.setGeometry(QRect(450, 53, 38, 26))
-        self.lab_auto_launch.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        self.lab_auto_launch.setAlignment(Qt.AlignLeading | Qt.AlignLeft | Qt.AlignTop)
         self.lab_start_min = QLabel(SystemDialog)
         self.lab_start_min.setObjectName(u"lab_start_min")
         self.lab_start_min.setEnabled(False)
         self.lab_start_min.setGeometry(QRect(496, 53, 49, 26))
-        self.lab_start_min.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        self.lab_start_min.setAlignment(Qt.AlignLeading | Qt.AlignLeft | Qt.AlignTop)
         self.line_3 = QFrame(SystemDialog)
         self.line_3.setObjectName(u"line_3")
         self.line_3.setGeometry(QRect(283, 10, 20, 141))
@@ -1564,7 +1554,7 @@ class Ui_SystemDialog(object):
         self.lab_start_headless.setObjectName(u"lab_start_headless")
         self.lab_start_headless.setEnabled(False)
         self.lab_start_headless.setGeometry(QRect(550, 53, 49, 26))
-        self.lab_start_headless.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        self.lab_start_headless.setAlignment(Qt.AlignLeading | Qt.AlignLeft | Qt.AlignTop)
         self.label_3 = QLabel(SystemDialog)
         self.label_3.setObjectName(u"label_3")
         self.label_3.setGeometry(QRect(310, 30, 101, 16))
@@ -1705,9 +1695,6 @@ class Ui_SystemDialog(object):
     # retranslateUi
 
 
-
-
-
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None):
         super(SystemSettingsDialog, self).__init__(parent)
@@ -1757,7 +1744,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_p.clicked.connect(self.toggle_launchmode_cbs)
         self.cb_headless_c.setObjectName('headless_c')
         self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
-
 
     def reset_settings(self):
         # Load default settings and update widgets
@@ -1816,9 +1802,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_min_enable_j.setEnabled(al_enabled)
         self.cb_min_enable_p.setEnabled(al_enabled)
         self.cb_min_enable_c.setEnabled(al_enabled)
-        self.cb_headless_j.setEnabled((al_enabled))
-        self.cb_headless_p.setEnabled((al_enabled))
-        self.cb_headless_c.setEnabled((al_enabled))
+        self.cb_headless_j.setEnabled(al_enabled)
+        self.cb_headless_p.setEnabled(al_enabled)
+        self.cb_headless_c.setEnabled(al_enabled)
 
         if al_enabled:
             style = "QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }"
@@ -1857,7 +1843,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if directory:
             self.pathIL2.setText(directory)
 
-
     def toggle_launchmode_cbs(self):
         sender = self.sender()
         if not sender.isChecked():
@@ -1894,10 +1879,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the selected Master Instance')
             return False
 
-
         return True
-
-
 
     def save_settings(self):
         # Create a dictionary with the values of all components
@@ -2040,7 +2022,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
         self.toggle_al_widgets()
 
-        #build record of auto-launch settings to see if they changed on save:
+        # build record of auto-launch settings to see if they changed on save:
         self.current_al_dict = {
             'autolaunchMaster': self.cb_al_enable.isChecked(),
             'autolaunchJoystick': self.cb_al_enable_j.isChecked(),
@@ -2056,8 +2038,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
         }
-
-
 
 
 class ButtonPressThread(QThread):
@@ -2082,11 +2062,11 @@ class ButtonPressThread(QThread):
         while not emit_sent and time.time() - start_time < self.timeout:
             input_data = self.device.device.getInput()
             current_btns = set(input_data.getPressedButtons())
-            countdown = int(self.timeout - (time.time()- start_time))
+            countdown = int(self.timeout - (time.time() - start_time))
             self.button_obj.setText(f"Push a button! {countdown}..")
             # Check for new button press
             for btn in current_btns:
-                if not btn in initial_buttons:
+                if btn not in initial_buttons:
                     self.button_pressed.emit(self.button_name, btn)
                     emit_sent = 1
 
@@ -2096,6 +2076,7 @@ class ButtonPressThread(QThread):
         # Emit signal for timeout with value 0
         if not emit_sent:
             self.button_pressed.emit(self.button_name, 0)
+
 
 class MainWindow(QMainWindow):
     def __init__(self, ipc_thread=None):
@@ -2126,15 +2107,15 @@ class MainWindow(QMainWindow):
         else:
             self.current_tab_index = 0
         self.default_tab_sizes = {
-            "0": { #monitor
+            "0": {  # monitor
                 'height': 530,
                 'width': 700,
             },
-            "1": { #settings
+            "1": {  # settings
                 'height': 530,
                 'width': 700,
             },
-            # "2": { #log
+            # "2": {  # log
             #     'height': 530,
             #     'width': 700,
             # },
@@ -2201,7 +2182,7 @@ class MainWindow(QMainWindow):
         settings_manager_action.triggered.connect(self.toggle_settings_window)
         system_menu.addAction(settings_manager_action)
 
-        cfg_log_folder_action = QAction('Open Config/Log Directory',self)
+        cfg_log_folder_action = QAction('Open Config/Log Directory', self)
         cfg_log_folder_action.triggered.connect(self.open_cfg_dir)
         system_menu.addAction(cfg_log_folder_action)
 
@@ -2213,7 +2194,6 @@ class MainWindow(QMainWindow):
         exit_app_action = QAction('Quit TelemFFB', self)
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
-
 
         # Create the "Utilities" menu
         utilities_menu = self.menu.addMenu('Utilities')
@@ -2240,11 +2220,6 @@ class MainWindow(QMainWindow):
         self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf(dev_serial))
         utilities_menu.addAction(self.vpconf_action)
 
-
-
-
-
-
         # Add settings converter
         if _legacy_override_file is not None:
             convert_settings_action = QAction('Convert legacy user config to XML', self)
@@ -2255,10 +2230,10 @@ class MainWindow(QMainWindow):
             self.window_menu = self.menu.addMenu('Window')
             self.show_children_action = QAction('Show Child Instance Windows')
             self.show_children_action.triggered.connect(lambda: self.toggle_child_windows('show'))
-            self.window_menu.addAction((self.show_children_action))
+            self.window_menu.addAction(self.show_children_action)
             self.hide_children_action = QAction('Hide Child Instance Windows')
             self.hide_children_action.triggered.connect(lambda: self.toggle_child_windows('hide'))
-            self.window_menu.addAction((self.hide_children_action))
+            self.window_menu.addAction(self.hide_children_action)
 
         if _child_instance:
             self.window_menu = self.menu.addMenu('Window')
@@ -2284,7 +2259,6 @@ class MainWindow(QMainWindow):
                 self.collective_log_action = QAction('Collective Log')
                 self.collective_log_action.triggered.connect(lambda: self.show_child_log('collective'))
                 self.child_log_menu.addAction(self.collective_log_action)
-
 
         help_menu = self.menu.addMenu('Help')
 
@@ -2319,24 +2293,24 @@ class MainWindow(QMainWindow):
 
         self.icon_size = QSize(18, 18)
         if args.sim == "DCS" or dcs_enabled:
-            dcs_color = QColor(255,255,0)
+            dcs_color = QColor(255, 255, 0)
             dcs_icon = self.create_colored_icon(dcs_color, self.icon_size)
         else:
-            dcs_color = QColor(128,128,128)
+            dcs_color = QColor(128, 128, 128)
             dcs_icon = self.create_x_icon(dcs_color, self.icon_size)
 
         if args.sim == "MSFS" or msfs_enabled:
             msfs_color = QColor(255, 255, 0)
             msfs_icon = self.create_colored_icon(msfs_color, self.icon_size)
         else:
-            msfs_color = QColor(128,128,128)
+            msfs_color = QColor(128, 128, 128)
             msfs_icon = self.create_x_icon(msfs_color, self.icon_size)
 
         if args.sim == "IL2" or il2_enabled:
             il2_color = QColor(255, 255, 0)
             il2_icon = self.create_colored_icon(il2_color, self.icon_size)
         else:
-            il2_color = QColor(128,128,128)
+            il2_color = QColor(128, 128, 128)
             il2_icon = self.create_x_icon(il2_color, self.icon_size)
 
         # xplane_color = QColor(128,128,128)
@@ -2427,7 +2401,6 @@ class MainWindow(QMainWindow):
         ############
         # current craft
 
-
         cur_ac_lbl = QLabel()
         cur_ac_lbl.setText("<b>Current Aircraft:</b>")
         cur_ac_lbl.setAlignment(Qt.AlignLeft)
@@ -2480,7 +2453,6 @@ class MainWindow(QMainWindow):
         #####################
         #  test loading buttons, set to true for debug
 
-
         self.test_craft_area = QWidget()
         test_craft_layout = QHBoxLayout()
         test_sim_lbl = QLabel('Sim:')
@@ -2532,7 +2504,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabShape(QTabWidget.Triangular)  # Set triangular tab shape
         # self.tab_widget.addTab(QWidget(), "Log")
         self.tab_widget.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        self.tab_widget.currentChanged.connect(lambda index : self.switch_window_view(index))
+        self.tab_widget.currentChanged.connect(lambda index: self.switch_window_view(index))
 
         # Set the main window area height to 0
         self.tab_widget.setMinimumHeight(14)
@@ -2591,7 +2563,6 @@ class MainWindow(QMainWindow):
         self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.lbl_telem_data.setStyleSheet("""padding: 2px""")
 
-
         # Set the QLabel widget as the widget inside the scroll area
         self.telem_area.setWidget(self.lbl_telem_data)
 
@@ -2600,15 +2571,14 @@ class MainWindow(QMainWindow):
         self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.lbl_effects_data.setStyleSheet("""padding: 2px""")
 
-
         self.telem_lbl = QLabel('Telemetry:')
         self.effect_lbl = QLabel('Active Effects:')
         if _master_instance:
             self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
-        monitor_area_layout.addWidget(self.telem_lbl,0,0)
-        monitor_area_layout.addWidget(self.effect_lbl,0,1)
+        monitor_area_layout.addWidget(self.telem_lbl, 0, 0)
+        monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
         monitor_area_layout.addWidget(self.telem_area, 1, 0)
-        monitor_area_layout.addWidget(self.effects_area,1,1)
+        monitor_area_layout.addWidget(self.effects_area, 1, 1)
 
         self.monitor_widget.setLayout(monitor_area_layout)
         # Add the scroll area to the layout
@@ -2633,7 +2603,6 @@ class MainWindow(QMainWindow):
         self.settings_area.setWidget(scroll_widget)
 
         self.tab_widget.addTab(self.settings_area, "Settings")
-
 
         # self.log_tab_widget = QWidget(self.tab_widget)
         # self.tab_widget.addTab(self.log_tab_widget, "Log")
@@ -2713,7 +2682,6 @@ class MainWindow(QMainWindow):
 
             layout.addLayout(self.instance_status_row)
 
-
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
 
@@ -2741,7 +2709,7 @@ class MainWindow(QMainWindow):
 
         central_widget.setLayout(layout)
 
-        ### Load Stored Geomoetry
+        # Load Stored Geomoetry
         self.load_main_window_geometry()
         shortcut = QShortcut(QKeySequence('Alt+D'), self)
         shortcut.activated.connect(self.add_debug_menu)
@@ -2759,14 +2727,12 @@ class MainWindow(QMainWindow):
         self.teleplot_action.triggered.connect(self.open_teleplot_setup_dialog)
         debug_menu.addAction(self.teleplot_action)
 
-
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
 
     def process_error_signal(self, message):
-        ## Placeholder function to process signal generated from anywhere using utils.signal_emitter
+        # Placeholder function to process signal generated from anywhere using utils.signal_emitter
         pass
-
 
     def update_child_status(self, device, status):
         status_icon_name = f'{device}_status_icon'
@@ -2776,7 +2742,6 @@ class MainWindow(QMainWindow):
             status_icon.set_dot_color(Qt.green)
         if status_icon is not None and status == 'TIMEOUT':
             status_icon.set_dot_color(Qt.red)
-
 
     def show_child_log(self, child):
         self._ipc_thread.send_broadcast_message(f'SHOW LOG:{child}')
@@ -2838,7 +2803,6 @@ class MainWindow(QMainWindow):
 
     def show_device_logo(self):
         self.devicetype_label.show()
-
 
     def enable_device_logo_click(self, state):
         self.devicetype_label.setClickable(state)
@@ -2917,9 +2881,9 @@ class MainWindow(QMainWindow):
         global log_folder, log_file
         current_log_ts = log_file.split('_')[-1]
         if isinstance(_arg, str):
-                if 'joystick' in _arg: arg = 1
-                elif 'pedals' in _arg: arg = 2
-                elif 'collective' in _arg: arg = 3
+            if 'joystick' in _arg: arg = 1
+            elif 'pedals' in _arg: arg = 2
+            elif 'collective' in _arg: arg = 3
         else:
             arg = _arg
 
@@ -3014,7 +2978,6 @@ class MainWindow(QMainWindow):
             win_y = win_pos.get('y', 100)
             self.move(win_x, win_y)
 
-
     def force_sim_aircraft(self):
         settings_mgr.current_sim = self.test_sim.currentText()
         settings_mgr.current_aircraft_name = self.test_name.currentText()
@@ -3062,7 +3025,7 @@ class MainWindow(QMainWindow):
 
     def open_cfg_dir(self):
         modifiers = QApplication.keyboardModifiers()
-        if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier) and getattr(sys, 'frozen',False):
+        if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier) and getattr(sys, 'frozen', False):
             os.startfile(sys._MEIPASS, 'open')
         else:
             os.startfile(userconfig_rootpath, 'open')
@@ -3182,17 +3145,14 @@ class MainWindow(QMainWindow):
                 xmlutils.write_models_to_xml(settings_mgr.current_sim, new_aircraft, new_combo_box_value, 'type', None)
             else:
                 logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
-                xmlutils.clone_pattern(settings_mgr.current_sim,pat_to_clone,new_aircraft)
+                xmlutils.clone_pattern(settings_mgr.current_sim, pat_to_clone, new_aircraft)
         else:
             # Handle canceled
             pass
 
-
-
     def update_from_menu(self):
         if self.perform_update(auto=False):
             QCoreApplication.instance().quit()
-
 
     def init_sim_indicators(self, sims, settings_dict):
         label_icons = {
@@ -3291,7 +3251,7 @@ class MainWindow(QMainWindow):
         elif index == 2:  # Hide Tab
             self.current_tab_index = 2
 
-            self.resize(0,0)
+            self.resize(0, 0)
 
     def interpolate_color(self, color1, color2, value):
         # Ensure value is between 0 and 1
@@ -3315,8 +3275,8 @@ class MainWindow(QMainWindow):
         data = OrderedDict(sorted(datadict.items()))  # Alphabetize telemetry data
         keys = data.keys()
         try:
-            #use ordereddict and move some telemetry to the top
-            ## Items to move to the beginning (reverse order)
+            # use ordereddict and move some telemetry to the top
+            # Items to move to the beginning (reverse order)
             if 'SimconnectCategory' in keys: data.move_to_end('SimconnectCategory', last=False)
             if 'AircraftClass' in keys: data.move_to_end('AircraftClass', last=False)
             if 'src' in keys: data.move_to_end('src', last=False)
@@ -3328,7 +3288,7 @@ class MainWindow(QMainWindow):
             if 'frameTimes' in keys: data.move_to_end('frameTimes', last=False)
             if 'T' in keys: data.move_to_end('T', last=False)
 
-            ## Items to move to the end
+            # Items to move to the end
         except:
             pass
 
@@ -3373,7 +3333,7 @@ class MainWindow(QMainWindow):
             if window_mode == 1:
                 sliders = self.findChildren(NoWheelSlider)
                 for my_slider in sliders:
-                    slidername = my_slider.objectName().replace('sld_','')
+                    slidername = my_slider.objectName().replace('sld_', '')
                     my_slider.blockSignals(True)
 
                     if slidername == 'max_elevator_coeff':
@@ -3424,7 +3384,6 @@ class MainWindow(QMainWindow):
             # elif window_mode == self.effect_monitor_radio:
                 self.lbl_effects_data.setText(active_effects)
 
-
         except Exception as e:
             traceback.print_exc()
 
@@ -3474,13 +3433,14 @@ class MainWindow(QMainWindow):
 
         return False
 
+
 class SettingsLayout(QGridLayout):
     expanded_items = []
     prereq_list = []
     ##########
     # debug settings
     show_slider_debug = False   # set to true for slider values shown
-    show_order_debug = False # set to true for order numbers shown
+    show_order_debug = False    # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
 
     all_sliders = []
@@ -3489,18 +3449,13 @@ class SettingsLayout(QGridLayout):
         super(SettingsLayout, self).__init__(parent)
         result = None
         if settings_mgr.current_sim != 'nothing':
-            a,b,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
-        #a, b, result = xmlutils.read_single_model('MSFS', 'Cessna 172')
+            a, b, result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
 
         self.mainwindow = mainwindow
         if result is not None:
             self.build_rows(result)
         self.device = HapticEffect()
-        #### send sliders to keypress
-        # for i in range(self.count()):
-        #     item = self.itemAt(i)
-        #     if isinstance(item.widget(), NoWheelSlider):
-        #         self.addSlider(item.widget())
+
     def handleScrollKeyPressEvent(self, event):
         # Forward key events to each slider in the layout
         for i in range(self.count()):
@@ -3508,7 +3463,7 @@ class SettingsLayout(QGridLayout):
             if isinstance(item.widget(), NoWheelSlider()):
                 item.widget().handleKeyPressEvent(event)
 
-    def append_prereq_count (self, datalist):
+    def append_prereq_count(self, datalist):
         for item in datalist:
             item['prereq_count'] = ''
             item['has_expander'] = ''
@@ -3522,7 +3477,7 @@ class SettingsLayout(QGridLayout):
             if p_count > 1 or (p_count == 1 and item['hasbump'] != 'true'):
                 item['has_expander'] = 'true'
 
-    def has_bump(self,datalist):
+    def has_bump(self, datalist):
         for item in datalist:
             item['hasbump'] = ''
             bumped_up = item['order'][-2:] == '.1'
@@ -3531,7 +3486,7 @@ class SettingsLayout(QGridLayout):
                     if item['prereq'] == b['name']:
                         b['hasbump'] = 'true'
 
-    def add_expanded (self, datalist):
+    def add_expanded(self, datalist):
         for item in datalist:
             item['parent_expanded'] = ''
             for exp in self.expanded_items:
@@ -3540,12 +3495,12 @@ class SettingsLayout(QGridLayout):
                 else:
                     item['parent_expanded'] = 'false'
 
-    def is_visible (self,datalist):
+    def is_visible(self, datalist):
 
         for item in datalist:
             bumped_up = item['order'][-2:] == '.1'
             iv = 'false'
-            cond =''
+            cond = ''
             if item['prereq'] == '':
                 iv = 'true'
                 cond = 'no prereq needed'
@@ -3554,7 +3509,7 @@ class SettingsLayout(QGridLayout):
                     if item['prereq'] == p['name']:
                         if p['value'].lower() == 'true':
                             if p['has_expander'].lower() == 'true':
-                                if p['name'] in self.expanded_items and p['is_visible']=='true':
+                                if p['name'] in self.expanded_items and p['is_visible'] == 'true':
                                     iv = 'true'
                                     cond = 'item parent expanded'
                                 else:
@@ -3570,13 +3525,12 @@ class SettingsLayout(QGridLayout):
                                             cond = 'parent hasbump & bumped no expander par vis'
                         break
 
-
             item['is_visible'] = iv
             # for things not showing debugging:
             # if iv.lower() == 'true':
             #     print (f"{item['displayname']} visible because {cond}")
 
-    def eliminate_invisible(self,datalist):
+    def eliminate_invisible(self, datalist):
         newlist = []
         for item in datalist:
             if item['is_visible'] == 'true':
@@ -3594,7 +3548,7 @@ class SettingsLayout(QGridLayout):
 
         return newlist
 
-    def read_active_prereqs(self,datalist):
+    def read_active_prereqs(self, datalist):
         p_list = []
         for item in datalist:
             found = False
@@ -3608,7 +3562,7 @@ class SettingsLayout(QGridLayout):
                 p_list.append({'prereq': item['name'], 'value': 'False', 'count': count})
         return p_list
 
-    def build_rows(self,datalist):
+    def build_rows(self, datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         # self.prereq_list = xmlutils.read_prereqs()
         self.prereq_list = self.read_active_prereqs(sorted_data)
@@ -3618,7 +3572,7 @@ class SettingsLayout(QGridLayout):
         self.is_visible(sorted_data)
         newlist = self.eliminate_invisible(sorted_data)
 
-        def is_expanded (item):
+        def is_expanded(item):
             if item['name'] in self.expanded_items:
                 return True
             for row in sorted_data:
@@ -3632,7 +3586,7 @@ class SettingsLayout(QGridLayout):
             rowdisabled = False
             addrow = False
             is_expnd = is_expanded(item)
-            #print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
+            # print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
             if item['is_visible'].lower() == 'true':
                 i += 1
                 if bumped_up:
@@ -3658,7 +3612,7 @@ class SettingsLayout(QGridLayout):
     def reload_layout(self, result=None):
         self.clear_layout()
         if result is None:
-            cls,pat,result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
+            cls, pat, result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
             settings_mgr.current_pattern = pat
         if result is not None:
             self.build_rows(result)
@@ -3751,7 +3705,6 @@ class SettingsLayout(QGridLayout):
             lbl_col += 1
         self.addWidget(label, i, lbl_col, 1, lbl_colspan)
 
-
         slider = NoWheelSlider()
         slider.setOrientation(QtCore.Qt.Horizontal)
         slider.setObjectName(f"sld_{item['name']}")
@@ -3766,7 +3719,7 @@ class SettingsLayout(QGridLayout):
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
-        ## unit?
+        # unit?
         line_edit.setText(item['value'])
         line_edit.blockSignals(False)
         line_edit.setAlignment(Qt.AlignHCenter)
@@ -3784,7 +3737,6 @@ class SettingsLayout(QGridLayout):
         expand_button.setObjectName(f"ex_{item['name']}")
         expand_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
         expand_button.clicked.connect(self.expander_clicked)
-
 
         usb_button_text = f"Button {item['value']}"
         if item['value'] == '0':
@@ -3834,7 +3786,6 @@ class SettingsLayout(QGridLayout):
 
             slider.blockSignals(False)
 
-
         if item['datatype'] == 'd_float':
 
             d_val = float(item['value'])
@@ -3883,7 +3834,7 @@ class SettingsLayout(QGridLayout):
 
             slider.blockSignals(False)
 
-        if item['datatype'] == 'd_int' :
+        if item['datatype'] == 'd_int':
 
             d_val = int(item['value'])
             factor = float(item['sliderfactor'])
@@ -3906,7 +3857,7 @@ class SettingsLayout(QGridLayout):
 
             d_slider.blockSignals(False)
 
-        if item['datatype'] == 'list' or item['datatype'] == 'anylist' :
+        if item['datatype'] == 'list' or item['datatype'] == 'anylist':
             dropbox = QComboBox()
             dropbox.setMinimumWidth(150)
             dropbox.setEditable(True)
@@ -3991,11 +3942,10 @@ class SettingsLayout(QGridLayout):
 
         if item['replaced'] == 'Model (user)':
             if item['name'] != 'type':  # dont erase type on mainwindow settings
-                self.addWidget(erase_button,i, erase_col)
-                #print(f"erase {item['name']} button set up")
+                self.addWidget(erase_button, i, erase_col)
+                # print(f"erase {item['name']} button set up")
 
-
-        self.setRowStretch(i,0)
+        self.setRowStretch(i, 0)
 
     def remove_widget(self, olditem):
         widget = olditem.widget()
@@ -4006,7 +3956,7 @@ class SettingsLayout(QGridLayout):
     def checkbox_changed(self, name, state):
         logging.debug(f"Checkbox {name} changed. New state: {state}")
         value = 'false' if state == 0 else 'true'
-        xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,value,name)
+        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, name)
         if settings_mgr.timedOut:
             self.reload_caller()
 
@@ -4025,7 +3975,7 @@ class SettingsLayout(QGridLayout):
 
         if file_path:
             lprint(f"Selected File: {file_path}")
-            xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,file_path,'vpconf')
+            xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, file_path, 'vpconf')
             if settings_mgr.timedOut:
                 self.reload_caller()
 
@@ -4065,7 +4015,7 @@ class SettingsLayout(QGridLayout):
 
     def expander_clicked(self):
         logging.debug(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
-        settingname = self.sender().objectName().replace('ex_','')
+        settingname = self.sender().objectName().replace('ex_', '')
         if self.sender().arrowType() == Qt.RightArrow:
             # print ('expanded')
 
@@ -4101,7 +4051,6 @@ class SettingsLayout(QGridLayout):
             xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
         if settings_mgr.timedOut:
             self.reload_caller()
-
 
     def slider_changed(self):
         setting_name = self.sender().objectName().replace('sld_', '')
@@ -4211,14 +4160,14 @@ class SettingsLayout(QGridLayout):
         self.sender().valueChanged.emit(self.sender().value())
 
 
-
 class ClickableLabel(QLabel):
     def __init__(self, parent=None):
         super(ClickableLabel, self).__init__(parent)
 
     def mousePressEvent(self, event):
-        os.startfile(userconfig_rootpath,'open')
+        os.startfile(userconfig_rootpath, 'open')
         logging.debug("userpath opened")
+
 
 class NoKeyScrollArea(QScrollArea):
     def __init__(self):
@@ -4245,6 +4194,7 @@ class NoKeyScrollArea(QScrollArea):
                 slider.keyReleaseEvent(event)
             except:
                 pass
+
 
 class NoWheelSlider(QSlider):
     def __init__(self, *args, **kwargs):
@@ -4350,6 +4300,7 @@ class NoWheelSlider(QSlider):
 
 class ClickLogo(QLabel):
     clicked = pyqtSignal()
+
     def __init__(self, parent=None):
 
         super(ClickLogo, self).__init__(parent)
@@ -4432,8 +4383,10 @@ class InfoLabel(QWidget):
         scaled_pixmap = self.pixmap.scaledToHeight(self.text_label.sizeHint().height())  # Adjust the height as needed
         self.icon_label.setPixmap(scaled_pixmap)
 
+
 class StatusLabel(QWidget):
     clicked = pyqtSignal(str)
+
     def __init__(self, parent=None, text='', color: QColor = Qt.yellow, size=8):
         super(StatusLabel, self).__init__(parent)
 
@@ -4456,11 +4409,11 @@ class StatusLabel(QWidget):
         # Set the label back to its original style when the mouse leaves
         self.label.setStyleSheet("QLabel { padding-right: 5px; color: black; text-decoration: none; }")
 
-
     def mousePressEvent(self, event):
         if self._clickable:
             dev = self.label.text().lower()
             self.clicked.emit(dev)
+
     def hide(self):
         self.label.hide()
         super().hide()
@@ -4482,14 +4435,10 @@ class StatusLabel(QWidget):
 
         # Calculate adjusted positioning for the dot
         dot_x = self.label.geometry().right() - 1  # 5 is an arbitrary offset for better alignment
-        dot_y = self.label.geometry().center().y() - self.dot_size // 2 +1
+        dot_y = self.label.geometry().center().y() - self.dot_size // 2 + 1
 
         painter.setBrush(QColor(self.dot_color))
         painter.drawEllipse(dot_x, dot_y, self.dot_size, self.dot_size)
-
-
-
-
 
 
 class LogTailer(QThread):
@@ -4544,8 +4493,6 @@ class LogTailer(QThread):
         self.resume()  # Resume tailing with the new log file
 
 
-
-
 def hide_window():
     global window
     try:
@@ -4559,6 +4506,7 @@ def exit_application():
     # Perform any cleanup or save operations here
     save_main_window_geometry()
     QCoreApplication.instance().quit()
+
 
 def save_main_window_geometry():
     global window
@@ -4586,8 +4534,6 @@ def save_main_window_geometry():
     utils.set_reg(reg_key, j_window_dict)
 
 
-
-
 def send_test_message():
     global _ipc_running, _ipc_thread, _child_ipc_ports, _master_instance
     if _ipc_running:
@@ -4595,8 +4541,6 @@ def send_test_message():
             _ipc_thread.send_broadcast_message("TEST MESSAGE TO ALL")
         else:
             _ipc_thread.send_message("TEST MESSAGE")
-
-
 
 
 def select_sim_for_conversion(window, aircraft_name):
@@ -4625,7 +4569,7 @@ def select_sim_for_conversion(window, aircraft_name):
         return None
 
 
-def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
+def config_to_dict(section, name, value, isim='', device=args.type, new_ac=False):
     classes = ['PropellerAircraft', 'JetAircraft', 'TurbopropAircraft', 'Glider', 'Helicopter', 'HPGHelicopter']
     sim = ''
     cls = ''
@@ -4664,7 +4608,6 @@ def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
         model = section
         sim = 'any'
         cls = ''
-
 
     data_dict = {
         'name': name,
@@ -4726,6 +4669,7 @@ def convert_system_settings(sys_dict):
     # out_val = json.dumps(sys_out)
     # utils.set_reg('Sys', out_val)
     # pass
+
 
 def convert_settings(cfg=_legacy_config_file, usr=_legacy_override_file, window=None):
     differences = []
@@ -4806,7 +4750,7 @@ def autoconvert_config(main_window, cfg=_legacy_config_file, usr=_legacy_overrid
         # perform the conversion
         convert_settings(cfg=cfg, usr=usr, window=main_window)
         try:
-            os.rename(usr,f"{usr}.legacy")
+            os.rename(usr, f"{usr}.legacy")
         except OSError:
             ans = QMessageBox.warning(main_window, 'Warning', f'The legacy backup file for "{usr}" already exists, would you like to replace it?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if ans == QMessageBox.Yes:
@@ -4820,6 +4764,7 @@ def autoconvert_config(main_window, cfg=_legacy_config_file, usr=_legacy_overrid
             To avoid unnecessary log messages, please remove any '-c' or '-o' arguments from your startup shortcut as they are no longer supported'''
                                 )
 
+
 def restart_sims():
     global window, _device_pid, _device_type
     sim_list = ['DCS', 'MSFS', 'IL2']
@@ -4827,7 +4772,6 @@ def restart_sims():
     stop_sims()
     init_sims()
     window.init_sim_indicators(sim_list, sys_settings)
-
 
 
 def init_sims():
@@ -4884,11 +4828,13 @@ def stop_sims():
     il2_telem.quit()
     sim_connect_telem.quit()
 
+
 def notify_close_children():
     global _child_ipc_ports, _ipc_running, _ipc_thread
     if not len(_child_ipc_ports) or not _ipc_running:
         return
     _ipc_thread.send_broadcast_message("MASTER INSTANCE QUIT")
+
 
 def launch_children():
     global _launched_joystick, _launched_pedals, _launched_collective, _child_ipc_ports, script_dir, _device_pid, _master_instance
@@ -5004,11 +4950,9 @@ def main():
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info(f"TelemFFB (version {version}) Starting")
 
-
-
     vid_pid = [int(x, 16) for x in _device_vid_pid.split(":")]
     try:
-        dev = HapticEffect.open(vid_pid[0], vid_pid[1]) # try to open RHINO
+        dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
         if args.reset:
             dev.resetEffects()
         dev_firmware_version = dev.get_firmware_version()
@@ -5066,7 +5010,6 @@ def main():
             window.showMinimized()
         else:
             window.show()
-
 
     autoconvert_config(window)
     fetch_version_thread = utils.FetchLatestVersionThread()
