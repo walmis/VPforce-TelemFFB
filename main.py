@@ -1712,6 +1712,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         super(SystemSettingsDialog, self).__init__(parent)
         self.setupUi(self)
         self.retranslateUi(self)
+        self.setWindowTitle(f"System Settings ({_device_type.capitalize()})")
 
         # Add  "INFO" and "DEBUG" options to the logLevel combo box
         self.logLevel.addItems(["INFO", "DEBUG"])
