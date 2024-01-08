@@ -107,9 +107,6 @@ class Aircraft(AircraftBase):
     il2_enable_buffet = 0  # not yet impelemnted
     il2_buffeting_factor: float  = 1.0
 
-
-    ####
-    ####
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
         self.gun_is_firing = 0
@@ -151,6 +148,7 @@ class Aircraft(AircraftBase):
             self.runway_rumble_intensity = self.il2_runway_rumble_intensity
             super()._update_runway_rumble(telem_data)
         else:
+            self.runway_rumble_intensity = 0
             effects.dispose("runway0")
             effects.dispose("runway1")
     def _update_buffeting(self, telem_data: dict):
@@ -206,7 +204,7 @@ class Aircraft(AircraftBase):
         if self.il2_shake_master:
             if self.il2_enable_buffet:
                 self._update_buffeting(telem_data)
-            if self.il2_runway_rumble_intensity > 0 and self.il2_enable_runway_rumble:
+            if self.il2_enable_runway_rumble:
                 self._update_runway_rumble(telem_data)
             if self.il2_enable_weapons:
                 self._update_cm_weapons(telem_data)
