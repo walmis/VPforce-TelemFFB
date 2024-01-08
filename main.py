@@ -2738,14 +2738,17 @@ class MainWindow(QMainWindow):
         self.set_scrollbar(400)
 
     def add_debug_menu(self):
-        debug_menu = self.menu.addMenu("Debug")
+        for action in self.menu.actions():
+            if action.text() == "Debug":
+                return
+        self.debug_menu = self.menu.addMenu("Debug")
         aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
         aircraft_picker_action.triggered.connect(lambda: self.toggle_settings_window(dbg=True))
-        debug_menu.addAction(aircraft_picker_action)
+        self.debug_menu.addAction(aircraft_picker_action)
 
         self.teleplot_action = QAction("Teleplot Setup", self)
         self.teleplot_action.triggered.connect(self.open_teleplot_setup_dialog)
-        debug_menu.addAction(self.teleplot_action)
+        self.debug_menu.addAction(self.teleplot_action)
 
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
