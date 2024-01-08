@@ -120,7 +120,7 @@
 		<name>force_trim_enabled</name>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
-		<displayname>Helicopter Force Trim</displayname>
+		<displayname>Force Trim</displayname>
 		<joystick>true</joystick>
 		<collective>true</collective>
 	</defaults>
@@ -139,6 +139,29 @@
 	<defaults>
 		<Grouping>Basic</Grouping>
 		<order>9.3</order>
+		<name>elevator_force_trim</name>
+		<prereq>force_trim_enabled</prereq>
+		<info>Enable force tirm for elevator axis</info>
+		<displayname>Elevator Axis</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value></value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>9.4</order>
+		<name>aileron_force_trim</name>
+		<prereq>force_trim_enabled</prereq>
+		<info>Enable force tirm for aileron axis</info>
+		<displayname>Aileron Axis</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>9.5</order>
 		<name>force_trim_button</name>
 		<prereq>force_trim_enabled</prereq>
 		<MSFS>true</MSFS>
@@ -150,7 +173,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.4</order>
+		<order>9.6</order>
 		<name>force_trim_reset_button</name>
 		<prereq>force_trim_enabled</prereq>
 		<MSFS>true</MSFS>
@@ -925,7 +948,7 @@
 		<Grouping>Weapons</Grouping>
 		<order>124</order>
 		<name>dummy_weapon_direction</name>
-		<displayname>Effect Direction</displayname>
+		<displayname>Weapon Effects Direction</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -2023,12 +2046,6 @@
 		<order>910</order>
 		<name>config_override_enable</name>
 		<displayname>Override Configurator Sliders</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<info>Change VPConfigurator Sliders.  Currently INOP</info>
@@ -2039,12 +2056,6 @@
 		<name>config_master_gain</name>
 		<prereq>config_override_enable</prereq>
 		<displayname>Master Gain</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>cfgfloat</datatype>
@@ -2055,12 +2066,6 @@
 		<name>config_periodic_effects</name>
 		<prereq>config_override_enable</prereq>
 		<displayname>Periodic Effects</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>cfgfloat</datatype>
@@ -2071,12 +2076,6 @@
 		<name>config_spring</name>
 		<prereq>config_override_enable</prereq>
 		<displayname>Spring</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>cfgfloat</datatype>
@@ -2087,12 +2086,6 @@
 		<name>config_damper</name>
 		<prereq>config_override_enable</prereq>
 		<displayname>Damper</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>cfgfloat</datatype>
@@ -2103,12 +2096,6 @@
 		<name>config_inertia</name>
 		<prereq>config_override_enable</prereq>
 		<displayname>Inertia</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>cfgfloat</datatype>
@@ -2119,12 +2106,6 @@
 		<name>config_friction</name>
 		<prereq>config_override_enable</prereq>
 		<displayname>Friction</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>cfgfloat</datatype>
@@ -2138,12 +2119,6 @@
 		<value>0</value>
 		<datatype>cfgfloat</datatype>
 		<displayname>Constant</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>System</Grouping>
@@ -6475,7 +6450,21 @@
 	<classdefaults>
 		<name>force_trim_enabled</name>
 		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>elevator_force_trim</name>
+		<type>GliderAircraft</type>
 		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>aileron_force_trim</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
