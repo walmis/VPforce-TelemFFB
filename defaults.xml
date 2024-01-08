@@ -5864,6 +5864,27 @@
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
+		<name>max_aileron_coeff</name>
+		<type>GliderAircraft</type>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>max_elevator_coeff</name>
+		<type>GliderAircraft</type>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>max_rudder_coeff</name>
+		<type>GliderAircraft</type>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
 		<name>aileron_gain</name>
 		<type>GliderAircraft</type>
 		<value>0.1</value>
