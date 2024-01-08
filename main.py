@@ -597,7 +597,7 @@ class TelemManager(QObject, threading.Thread):
         if self.frameTimes[-1] > self.maxframeTime and len(self.frameTimes) > 40:  # skip the first frames before counting frametime as max
             threshold = 100
             if self.frameTimes[-1] > threshold:
-                logging.warning(
+                logging.debug(
                     f'*!*!*!* - Frametime threshold of {threshold}ms exceeded: time = {self.frameTimes[-1]}ms')
 
             self.maxframeTime = self.frameTimes[-1]

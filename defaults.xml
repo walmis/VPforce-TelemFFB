@@ -321,6 +321,30 @@
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
+		<Grouping>Prop</Grouping>
+		<order>33</order>
+		<name>rudder_prop_flow_ratio</name>
+		<MSFS>true</MSFS>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+		<info>Scaling of dynamic effects on rudder</info>
+		<displayname>Rudder Prop Flow</displayname>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<Grouping>Prop</Grouping>
+		<order>34</order>
+		<name>rotor_blade_count</name>
+		<any>true</any>
+		<MSFS>true</MSFS>
+		<datatype>int</datatype>
+		<displayname>Rotor Blade Count</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>35</order>
 		<name>collective_ap_spring_gain</name>
@@ -332,38 +356,15 @@
 		<collective>true</collective>
 	</defaults>
 	<defaults>
-		<Grouping>Prop</Grouping>
-		<order>35</order>
-		<name>rudder_prop_flow_ratio</name>
-		<MSFS>true</MSFS>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<info>Scaling of dynamic effects on rudder</info>
-		<displayname>Rudder Prop Flow</displayname>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
 		<Grouping>SpringCenter</Grouping>
 		<order>36</order>
 		<name>collective_dampening_gain</name>
+		<info></info>
 		<MSFS>true</MSFS>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<displayname>Collective Dampening Gain</displayname>
 		<DCS>true</DCS>
-		<collective>true</collective>
-	</defaults>
-	<defaults>
-		<Grouping>Prop</Grouping>
-		<order>36</order>
-		<name>rotor_blade_count</name>
-		<any>true</any>
-		<MSFS>true</MSFS>
-		<datatype>int</datatype>
-		<displayname>Rotor Blade Count</displayname>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
 		<collective>true</collective>
 	</defaults>
 	<defaults>
@@ -779,12 +780,13 @@
 		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<joystick>true</joystick>
 	</defaults>
-	<defaults><Grouping>G Force</Grouping><order>100</order><name>gforce_effect_enable</name><DCS>true</DCS><datatype>bool</datatype><displayname>G Force Effect</displayname><IL2>true</IL2><joystick>true</joystick></defaults>
+	<defaults><Grouping>G Force</Grouping><order>100</order><name>gforce_effect_enable</name><info>See manual for details</info><DCS>true</DCS><datatype>bool</datatype><displayname>G Force Effect</displayname><IL2>true</IL2><joystick>true</joystick></defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
 		<order>100.1</order>
 		<name>gforce_effect_max_intensity</name>
 		<prereq>gforce_effect_enable</prereq>
+		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
 		<value>1.0</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -813,6 +815,7 @@
 		<order>100.3</order>
 		<name>gforce_min_gs</name>
 		<prereq>gforce_effect_enable</prereq>
+		<info>G loading where effect will start</info>
 		<sliderfactor>0.1</sliderfactor>
 		<validvalues>10,30</validvalues>
 		<value>1.0</value>
@@ -827,6 +830,7 @@
 		<order>100.4</order>
 		<name>gforce_max_gs</name>
 		<prereq>gforce_effect_enable</prereq>
+		<info>G loading where effect will max out</info>
 		<sliderfactor>0.1</sliderfactor>
 		<validvalues>40,100</validvalues>
 		<value>7.0</value>
@@ -1242,6 +1246,7 @@
 		<order>512</order>
 		<name>il2_enable_buffet</name>
 		<prereq>il2_shake_master</prereq>
+		<info>These effects are duplicates of IL-2 native effects&lt;br&gt;&lt;br&gt;.  Recommend to disable 'shake' in IL-2 FFB settings when using these effects.</info>
 		<collective>true</collective>
 		<value>true</value>
 		<datatype>bool</datatype>
@@ -1349,6 +1354,7 @@
 		<order>710.1</order>
 		<name>max_aoa_cf_force</name>
 		<prereq>aoa_effect_enabled</prereq>
+		<joystick>true</joystick>
 		<value>0.2</value>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
