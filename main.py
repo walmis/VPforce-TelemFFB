@@ -1876,10 +1876,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self.cb_min_enable_c.setChecked(False)
             case 'minimize_c':
                 self.cb_headless_c.setChecked(False)
-
-
-        print(f"{sender.objectName()} checked:{sender.isChecked()}")
-        pass
+        logging.debug(f"{sender.objectName()} checked:{sender.isChecked()}")
 
     def validate_settings(self):
         master = self.master_button_group.checkedId()
@@ -2807,10 +2804,10 @@ class MainWindow(QMainWindow):
                 # Copy the file to the backup file
                 shutil.copy(userconfig_path, backup_file)
 
-                print(f"Backup created: {backup_file}")
+                logging.debug(f"Backup created: {backup_file}")
 
             except Exception as e:
-                print(f"Error creating backup: {str(e)}")
+                logging.error(f"Error creating backup: {str(e)}")
                 QMessageBox.warning(self, 'Error', f'There was an error resetting the config:\n\n{e}')
                 return
 
@@ -2860,8 +2857,8 @@ class MainWindow(QMainWindow):
 
     def device_logo_click_event(self):
         global _launched_pedals, _launched_collective, _launched_collective
-        print("External function executed on label click")
-        print(self._current_config_scope)
+        # print("External function executed on label click")
+        # print(self._current_config_scope)
         if self._current_config_scope == 'joystick':
             if _launched_pedals or _device_type == 'pedals':
                 self.change_config_scope(2)
@@ -2994,12 +2991,12 @@ class MainWindow(QMainWindow):
             reg_key = 'cWindowData'
 
         window_data = utils.get_reg(reg_key)
-        print(window_data)
+        # print(window_data)
         if window_data is not None:
             window_data_dict = json.loads(window_data)
         else:
             window_data_dict = {}
-        print(window_data_dict)
+        # print(window_data_dict)
         load_geometry = sys_settings.get('saveWindow', False)
         load_tab = sys_settings.get('saveLastTab', False)
 
@@ -3156,7 +3153,7 @@ class MainWindow(QMainWindow):
             else:
                 settings_mgr.move(self.x() + 50, self.y() + 100)
                 settings_mgr.show()
-                print (f"# toggle settings window   sim:'{settings_mgr.current_sim}' ac:'{settings_mgr.current_aircraft_name}'")
+                logging.debug(f"# toggle settings window   sim:'{settings_mgr.current_sim}' ac:'{settings_mgr.current_aircraft_name}'")
                 if settings_mgr.current_aircraft_name != '':
                     settings_mgr.currentmodel_click()
                 else:
@@ -3442,7 +3439,7 @@ class MainWindow(QMainWindow):
             if os.path.exists(updater_execution_path):
                 os.remove(updater_execution_path)
         except Exception as e:
-            print(e)
+            logging.error(f'Error in perform_update: {e}')
         is_exe = getattr(sys, 'frozen', False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
         # is_exe = True
         if is_exe and _update_available and not ignore_auto_updates and not _child_instance:
@@ -3820,7 +3817,7 @@ class SettingsLayout(QGridLayout):
                 pctval = int(float(item['value']) * 100)
             pctval = int(round(pctval / factor))
             if self.show_slider_debug:
-                print (f"read value: {item['value']}  factor: {item['sliderfactor']} slider: {pctval}")
+                logging.debug(f"read value: {item['value']}  factor: {item['sliderfactor']} slider: {pctval}")
             slider.blockSignals(True)
             if validvalues is None or validvalues == '':
                 pass
@@ -3869,7 +3866,7 @@ class SettingsLayout(QGridLayout):
             else:
                 pctval = int(float(item['value']) * 100)
             pctval = int(round(pctval))
-            print (f"configurator value: {item['value']}   slider: {pctval}")
+            # print (f"configurator value: {item['value']}   slider: {pctval}")
             slider.blockSignals(True)
             if validvalues is None or validvalues == '':
                 pass
@@ -4007,14 +4004,14 @@ class SettingsLayout(QGridLayout):
             self.removeWidget(widget)
 
     def checkbox_changed(self, name, state):
-        print(f"Checkbox {name} changed. New state: {state}")
+        logging.debug(f"Checkbox {name} changed. New state: {state}")
         value = 'false' if state == 0 else 'true'
         xmlutils.write_models_to_xml(settings_mgr.current_sim,settings_mgr.current_pattern,value,name)
         if settings_mgr.timedOut:
             self.reload_caller()
 
     def erase_setting(self, name):
-        print(f"Erase {name} clicked")
+        logging.debug(f"Erase {name} clicked")
         xmlutils.erase_models_from_xml(settings_mgr.current_sim, settings_mgr.current_pattern, name)
         if settings_mgr.timedOut:
             self.reload_caller()
@@ -4035,7 +4032,7 @@ class SettingsLayout(QGridLayout):
     def dropbox_changed(self):
         setting_name = self.sender().objectName().replace('db_', '')
         value = self.sender().currentText()
-        print(f"Dropbox {setting_name} changed. New value: {value}")
+        logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name)
         if settings_mgr.timedOut:
             self.reload_caller()
@@ -4048,7 +4045,7 @@ class SettingsLayout(QGridLayout):
         unit = self.sender().currentText()
         if line_edit is not None:
             value = line_edit.text()
-        print(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
+        logging.debug(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
         if settings_mgr.timedOut:
             self.reload_caller()
@@ -4061,23 +4058,23 @@ class SettingsLayout(QGridLayout):
         if unit_dropbox is not None:
             unit = unit_dropbox.currentText()
         value = self.sender().text()
-        print(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
+        logging.debug(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
         if settings_mgr.timedOut:
             self.reload_caller()
 
     def expander_clicked(self):
-        print(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
+        logging.debug(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
         settingname = self.sender().objectName().replace('ex_','')
         if self.sender().arrowType() == Qt.RightArrow:
-            print ('expanded')
+            # print ('expanded')
 
             self.expanded_items.append(settingname)
             self.sender().setArrowType(Qt.DownArrow)
 
             self.reload_caller()
         else:
-            print ('collapsed')
+            # print ('collapsed')
             new_exp_items = []
             for ex in self.expanded_items:
                 if ex != settingname:
@@ -4121,7 +4118,7 @@ class SettingsLayout(QGridLayout):
             factor = float(sliderfactor_label.text())
         value_to_save = str(round(value * factor / 100, 4))
         if self.show_slider_debug:
-            print(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
+            logging.debug(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
         if settings_mgr.timedOut:
             self.reload_caller()
@@ -4139,7 +4136,7 @@ class SettingsLayout(QGridLayout):
 
         value_to_save = str(round(value / 100, 4))
         if self.show_slider_debug:
-            print(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
+            logging.debug(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
         if settings_mgr.timedOut:
             self.reload_caller()
@@ -4163,7 +4160,7 @@ class SettingsLayout(QGridLayout):
             value_to_save = str(round(value * factor))
             value_label.setText(value_to_save)
         if self.show_slider_debug:
-            print(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
+            logging.debug(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
         if settings_mgr.timedOut:
             self.reload_caller()
@@ -4187,7 +4184,7 @@ class SettingsLayout(QGridLayout):
             value_to_save = str(round(value * factor, 2))
             value_label.setText(value_to_save)
         if self.show_slider_debug:
-            print(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
+            logging.debug(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
         if settings_mgr.timedOut:
             self.reload_caller()
@@ -4221,7 +4218,7 @@ class ClickableLabel(QLabel):
 
     def mousePressEvent(self, event):
         os.startfile(userconfig_rootpath,'open')
-        print("userpath opened")
+        logging.debug("userpath opened")
 
 class NoKeyScrollArea(QScrollArea):
     def __init__(self):
@@ -4678,7 +4675,7 @@ def config_to_dict(section,name,value, isim='', device=args.type, new_ac=False):
         'device': device,
         'new_ac': new_ac
     }
-    print(data_dict)
+    # print(data_dict)
     return data_dict
 
 
@@ -5103,29 +5100,26 @@ def main():
 
     utils.signal_emitter.telem_timeout_signal.connect(window.update_sim_indicators)
     utils.signal_emitter.error_signal.connect(window.process_error_signal)
-    if getattr(sys, 'frozen', False):
-        path = os.path.dirname(sys.executable)
-    else:
-        path = os.path.dirname(os.path.abspath(__file__))
-
-    frozen = getattr(sys, 'frozen', False)
-    if frozen:
-        # we are running in a bundle
-        bundle_dir = sys._MEIPASS
-    else:
-        # we are running in a normal Python environment
-        bundle_dir = os.path.dirname(os.path.abspath(__file__))
-    log_info = f'''
-        Frozen is {frozen}
-        bundle dir is {bundle_dir}
-        sys.argv[0] is {sys.argv[0]}
-        sys.executable is {sys.executable}
-        os.getcwd is {os.getcwd()}
-        '''
-    logging.info(log_info)
-    active_args, unknown_args = parser.parse_known_args()
-    args_list = [f'--{k}={v}' for k, v in vars(active_args).items() if
-                 v is not None and v != parser.get_default(k)]
+    # if getattr(sys, 'frozen', False):
+    #     path = os.path.dirname(sys.executable)
+    # else:
+    #     path = os.path.dirname(os.path.abspath(__file__))
+    #
+    # frozen = getattr(sys, 'frozen', False)
+    # if frozen:
+    #     # we are running in a bundle
+    #     bundle_dir = sys._MEIPASS
+    # else:
+    #     # we are running in a normal Python environment
+    #     bundle_dir = os.path.dirname(os.path.abspath(__file__))
+    # log_info = f'''
+    #     Frozen is {frozen}
+    #     bundle dir is {bundle_dir}
+    #     sys.argv[0] is {sys.argv[0]}
+    #     sys.executable is {sys.executable}
+    #     os.getcwd is {os.getcwd()}
+    #     '''
+    # logging.info(log_info)
 
     app.exec_()
     if _ipc_running:
