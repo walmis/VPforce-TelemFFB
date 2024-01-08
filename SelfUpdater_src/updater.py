@@ -17,25 +17,36 @@ import sys
 
 parser = argparse.ArgumentParser(description='TelemFFB Updater App')
 parser.add_argument('--url', help='TelemFFB Zip File URL', default=None)
-parser.add_argument('--path', help='TelemFFB install directory')
+parser.add_argument('--debugzip', help='debug argument', default=None)
+parser.add_argument('--debugpath', help='debug argument', default=None)
 parser.add_argument('--current_version', help='Version of TelemFFB currently installed', default='dummy_text')
 
 args, args_from_telemffb = parser.parse_known_args()
+if args_from_telemffb != []:
+    print(f'TelemFFB was started with args {args_from_telemffb} and passed them to updater')
+# args.debugzip = r"C:\Users\micah\PycharmProjects\SettingsMgr\dist\VPforce-TelemFFB\TFFB.zip"
 
 test = False
 g_latest_version = None
 g_latest_url = None
 g_current_version = args.current_version
 g_url_is_good = False
-
+g_application_path = None
+g_folder_contents = []
+g_executable_name = 'VPforce-TelemFFB.exe'
 if getattr(sys, 'frozen', False):
     g_application_path = os.path.dirname(sys.executable)
 elif __file__:
     g_application_path = os.path.dirname(__file__)
 
-g_executable_name = 'VPforce-TelemFFB.exe'
+if args.debugpath is not None:
+    print(f"DEBUG: g_application_path = {args.debug}")
+    g_application_path = args.debugpath
+if args.debugzip is not None:
+    print(f"DEBUG: args.debugzip = {args.debugzip}")
 
 
+g_folder_contents = os.listdir(g_application_path)
 def fetch_latest_version():
     global g_url_is_good
     ctx = ssl._create_unverified_context()
@@ -79,65 +90,104 @@ class Downloader(QThread):
         self.destination = destination
 
     def download(self):
-        response = requests.get(self.url, stream=True)
-        if response.status_code != 200:
-            QMessageBox.critical(None, "Error downloading latest version info",
-                                 f"There was an error downloading the latest version:\n\nHTTP Status Code:  {response}\n\nThe updater will now exit")
-            sys.exit(-1)
-        total_size = int(response.headers.get('content-length', 0))
-        current_size = 0
-        self.update_status_label.emit("Downloading Update:")
+        if args.debugzip is None:
+            response = requests.get(self.url, stream=True)
+            if response.status_code != 200:
+                QMessageBox.critical(None, "Error downloading latest version info",
+                                     f"There was an error downloading the latest version:\n\nHTTP Status Code:  {response}\n\nThe updater will now exit")
+                sys.exit(-1)
+            total_size = int(response.headers.get('content-length', 0))
+            current_size = 0
+            self.update_status_label.emit("Downloading Update:")
 
-        zip_path = os.path.join(self.destination, "temp.zip")
+            zip_path = os.path.join(self.destination, "temp.zip")
 
-        with open(zip_path, "wb") as zip_file:
-            for chunk in response.iter_content(chunk_size=1024):
-                if chunk:
-                    current_size += len(chunk)
-                    progress_percentage = int((current_size / total_size) * 100)
-                    self.update_progress.emit(progress_percentage)
-                    zip_file.write(chunk)
 
+            with open(zip_path, "wb") as zip_file:
+                for chunk in response.iter_content(chunk_size=1024):
+
+                    if chunk:
+                        print(f"Downloading {zip_path}......")
+                        current_size += len(chunk)
+                        progress_percentage = int((current_size / total_size) * 100)
+                        self.update_progress.emit(progress_percentage)
+                        zip_file.write(chunk)
+        else:
+            zip_path = args.debugzip
         self.update_progress.emit(100)
+        print(f"~~~~ Download Completed ~~~~")
         self.update_status_label.emit("Download Completed:")
         self.download_complete.emit()
-        self.extract()
+        self.extract(zip_path)
 
-    def extract(self):
+    def move_to_backup(self, file_list):
+
+        source_folder = g_application_path
+        backup_folder = os.path.join(source_folder, '_previous_version_backup')
+
+        if os.path.exists(backup_folder):
+            shutil.rmtree(backup_folder)
+        print("Creating Backup of previous version files")
+        # Create the backup directory if it doesn't exist
+        os.makedirs(backup_folder, exist_ok=True)
+
+        for f in file_list:
+            if f == 'updater.exe' or f == '_previous_version_backup':
+                continue
+            elif f.endswith('.ini') and f != 'config.ini':
+                shutil.copy(os.path.join(source_folder, f), os.path.join(backup_folder, f))
+            else:
+                shutil.move(os.path.join(source_folder, f), os.path.join(backup_folder, f))
+
+
+
+    def extract(self, zip_path):
         # Simulate extraction process
+        self.update_status_label.emit("Backing up current version files:")
+        self.sleep(1)
+        self.move_to_backup(g_folder_contents)
         self.update_status_label.emit("Extracting Update Files:")
         self.sleep(1)
 
+
         # Create a temporary directory inside the script's folder
         temp_dir = tempfile.mkdtemp(dir=g_application_path)
-
+        print(f"Extracting downloaded zip file to temp directory {temp_dir}")
         try:
             # Extract the contents of the zip file to the temporary directory
-            with ZipFile(os.path.join(self.destination, "temp.zip"), 'r') as zip_ref:
+            with ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(temp_dir)
-
+            print(f"~~~~ Extraction Completed ~~~~")
             # Copy and overwrite files from the temporary directory to the root directory
             for item in os.listdir(temp_dir):
                 src = os.path.join(temp_dir, item)
                 dest = os.path.join(self.destination, item)
 
-                # Rename a specific file during the copy process
-                if item == 'old_name.txt':
-                    dest = os.path.join(self.destination, 'new_name.txt')
-
+                # # Rename a specific file during the copy process
+                # if item == 'old_name.txt':
+                #     dest = os.path.join(self.destination, 'new_name.txt')
+                print(f"Copying new files.....")
+                self.update_status_label.emit("Copying Files:")
                 if os.path.isdir(src):
                     shutil.copytree(src, dest, symlinks=True, dirs_exist_ok=True)
                 else:
                     shutil.copy2(src, dest, follow_symlinks=False)
+            self.sleep(1)
 
         except Exception as e:
             print(f"Error during extraction: {e}")
         finally:
             # Clean up: remove the temporary directory
+            print("Cleaning up temporary files")
+            self.update_status_label.emit("Cleaning up temporary files:")
+            self.sleep(1)
             shutil.rmtree(temp_dir)
 
+        if args.debugzip is None:
+            os.remove(zip_path)
         self.update_status_label.emit("Update Completed!")
-        os.remove('temp.zip')
+        print(f"~~~~~ Update Completed ! ~~~~")
+        self.sleep(1)
         self.extract_complete.emit()
 
     def sleep(self, seconds):
@@ -267,13 +317,14 @@ class App(QMainWindow):
 
             full = os.path.join(g_application_path, g_executable_name)
             full = [full] + args_from_telemffb
-            print(f"FULLL:{full}")
+            # print(f"FULLL:{full}")
             # Use subprocess.Popen with the script's directory as the working directory
             subprocess.Popen(full, cwd=g_application_path, shell=False)
             if self.release_notes_checkbox.isChecked():
                 rn_path = os.path.join(g_application_path, '_RELEASE_NOTES.txt')
-                subprocess.Popen(['start', 'notepad.exe', rn_path], cwd=g_application_path, shell=True)
-
+                self.update_status_label("Re-Launching TelemFFB.....")
+                rc = subprocess.Popen(['start', 'notepad.exe', rn_path], cwd=g_application_path, shell=True)
+                rc.wait()
             sys.exit()
 
     def finish_update(self):
@@ -282,7 +333,7 @@ class App(QMainWindow):
             # Specify the path to the executable
 
             full = os.path.join(g_application_path, g_executable_name)
-            print(f"FULLL:{full}")
+            # print(f"FULLL:{full}")
             # Use subprocess.Popen with the script's directory as the working directory
             subprocess.Popen([full], cwd=g_application_path, shell=False)
 
@@ -301,6 +352,16 @@ def check_runtime():
 
 
 def main():
+    frozen = getattr(sys, 'frozen', False)
+    if frozen:
+        # we are running in a bundle
+        bundle_dir = sys._MEIPASS
+    else:
+        # we are running in a normal Python environment
+        bundle_dir = os.path.dirname(os.path.abspath(__file__))
+    log_info = f'Frozen is {frozen}\nbundle dir is {bundle_dir}\nsys.argv[0] is {sys.argv[0]}\nsys.executable is {sys.executable}\nos.getcwd is {os.getcwd()}'
+
+    print(log_info)
     global g_latest_version
     global g_latest_url
     try:
@@ -314,12 +375,14 @@ def main():
     app = QApplication([])
     window = App()
     window.show()
-    print(g_latest_version, g_latest_url)
+    # print(g_latest_version, g_latest_url)
+    # print(g_folder_contents)
+    # print(f"debugpath={args.debugpath}")
+
     check_runtime()
     app.exec_()
 
 
 if __name__ == "__main__":
-    # args.url = "https://vpforcecontrols.com/downloads/TelemFFB/VPforce-TelemFFB-wip-79e581e8.zip"
-    args.path = r"C:\Users\micah\Desktop\VPforce-TelemFFB\test"
+
     main()

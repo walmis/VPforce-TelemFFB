@@ -1,0 +1,19 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource>
+        <file>image/disabledcheckbox.png</file>
+        <file>image/down-down.png</file>
+        <file>image/information.png</file>
+        <file>image/logo_c.png</file>
+        <file>image/logo_j.png</file>
+        <file>image/logo_p.png</file>
+        <file>image/purplecheckbox.png</file>
+        <file>image/rchecked.png</file>
+        <file>image/vpforceicon.ico</file>
+        <file>image/vpforceicon.png</file>
+        <file>image/vpforcelogo.png</file>
+        <file>image/vpforcelogo.png</file>
+        <!-- Add other image files as needed -->
+    </qresource>
+</RCC>
+<!-- run 'pyrcc5.exe -o resources.py resources.qrc' to generate resources.py file for use inside TelemFFB -->

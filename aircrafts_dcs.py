@@ -41,18 +41,21 @@ class Aircraft(AircraftBase):
     deceleration_effect_enable_areyoureallysure = 0
     deceleration_max_force = 0.5
     ###
+    aoa_buffeting_enabled: bool = True
     buffeting_intensity : float = 0.2               # peak AoA buffeting intensity  0 to disable
     buffet_aoa : float          = 10.0              # AoA when buffeting starts
     stall_aoa : float           = 15.0              # Stall AoA
     wind_effect_enabled : int = 0
     wind_effect_scaling: int = 0
     wind_effect_max_intensity: int = 0
-    engine_rumble : int = 0                         # Engine Rumble - Disabled by default - set to 1 in config file to enable
-    
-    runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
 
+    runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
+    runway_rumble_enabled: bool = False
+    gunfire_effect_enabled: bool = False
     gun_vibration_intensity : float = 0.12          # peak gunfire vibration intensity, 0 to disable
+    countermeasure_effect_enabled: bool = False
     cm_vibration_intensity : float = 0.12           # peak countermeasure release vibration intensity, 0 to disable
+    weapon_release_effect_enabled: bool = False
     weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
     weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
     
@@ -62,7 +65,9 @@ class Aircraft(AircraftBase):
     spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
     spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
     
+    # gear_motion_effect_enabled: bool = True
     gear_motion_intensity : float = 0.12      # peak vibration intensity when gear is moving, 0 to disable
+    # gear_buffet_effect_enabled: bool = True
     gear_buffet_intensity : float = 0.15      # peak buffeting intensity when gear down during flight,  0 to disable
     
     flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable
@@ -93,7 +98,7 @@ class Aircraft(AircraftBase):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
-    pedal_spring_mode = 0    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
     elevator_droop_force = 0
     aircraft_vs_speed = 0
     aircraft_vs_gain = 0.25
@@ -123,7 +128,6 @@ class Aircraft(AircraftBase):
         super().__init__(name, **kwargs)
         self.spring = effects["spring"].spring()
         self.damper = effects["damper"].damper()
-        self._jet_rumble_is_playing = 0
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.damage_enable_cmd_sent = 0
@@ -173,8 +177,8 @@ class Aircraft(AircraftBase):
         self._update_damage(telem_data)
         self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
         self._update_landing_gear(telem_data.get("gear_value"), telem_data.get("TAS"))
-        self._update_flaps(telem_data.get("Flaps"))
-        self._update_canopy(telem_data.get("Canopy"))
+        self._update_flaps(telem_data.get("flaps_value"))
+        self._update_canopy(telem_data.get("canopy_value"))
         self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
         self._update_jet_engine_rumble(telem_data)
         if self.is_joystick():
@@ -267,6 +271,62 @@ class Aircraft(AircraftBase):
                 'Vs': 90 * knots,
                 'Vne': 415 * knots,
             },
+            'F-15': {
+                'Vs': 130 * knots,
+                'Vne': 800 * knots,
+            },
+            'MiG-15': {
+                'Vs': 120 * knots,
+                'Vne': 620 * knots,
+            },
+            'MiG-19': {
+                'Vs': 140 * knots,
+                'Vne': 850 * knots,
+            },
+            'F-14': {
+                'Vs': 145 * knots,
+                'Vne': 700 * knots,
+            },
+            'AV8BNA': {
+                'Vs': 80 * knots,
+                'Vne': 560 * knots,
+            },
+            'M-2000': {
+                'Vs': 120 * knots,
+                'Vne': 750 * knots,
+            },
+            'Mirage-F1': {
+                'Vs': 120 * knots,
+                'Vne': 800 * knots,
+            },
+            'JF-17': {
+                'Vs': 110 * knots,
+                'Vne': 800 * knots,
+            },
+            'MB-339': {
+                'Vs': 90 * knots,
+                'Vne': 460 * knots,
+            },
+            'A-10C': {
+                'Vs': 120 * knots,
+                'Vne': 450 * knots,
+            },
+            'AJS37': {
+                'Vs': 120 * knots,
+                'Vne': 810 * knots,
+            },
+            'F-5E': {
+                'Vs': 110 * knots,
+                'Vne': 800 * knots,
+            },
+            'FA-18C': {
+                'Vs': 135 * knots,
+                'Vne': 850 * knots,
+            },
+            'F-16': {
+                'Vs': 140 * knots,
+                'Vne': 915 * knots,
+            },
         }
 
         ac = telem_data.get("N")
@@ -333,18 +393,18 @@ class Aircraft(AircraftBase):
         ## 3=dynamic spring enabled.  Based on "pedal_spring_gain"
         if self.pedal_spring_mode == 0:
             return
-        elif self.pedal_spring_mode == 1:
+        elif self.pedal_spring_mode == 'No Spring':
             self.spring_x.positiveCoefficient = 0
             self.spring_x.negativeCoefficient = 0
 
-        elif self.pedal_spring_mode == 2:
+        elif self.pedal_spring_mode == 'Static Spring':
             spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
             self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
 
             if self.pedal_trimming_enabled:
                 self._update_pedal_trim(telem_data)
 
-        elif self.pedal_spring_mode == 3:
+        elif self.pedal_spring_mode == 'Dynamic Spring':
             tas = telem_data.get("TAS", 0)
             ac_perf = self.get_aircraft_perf(telem_data)
             if self.aircraft_vs_speed:
@@ -362,6 +422,7 @@ class Aircraft(AircraftBase):
             if vs > vne:
                 #log error if vs speed is configured greater than vne speed and exit
                 logging.error(f"Dynamic pedal forces error: Vs speed ({vs}) is configured with a larger value than Vne ({vne}) - Invalid configuration")
+                telem_data['error'] = 1
 
             vs_coeff = utils.clamp(round(self.aircraft_vs_gain*4096), 0, 4096)
             vne_coeff = utils.clamp(round(self.aircraft_vne_gain*4096), 0, 4096)
@@ -445,9 +506,7 @@ class PropellerAircraft(Aircraft):
 
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
-    rpm_scale : float = 45
-    pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
-    jet_engine_rumble_intensity = 0
+    pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -468,12 +527,15 @@ class PropellerAircraft(Aircraft):
         if self.is_joystick():
             self.override_elevator_droop(telem_data)
 
-        if self.engine_rumble or self._engine_rumble_is_playing: # if _engine_rumble_is_playing is true, check if we need to stop it
-            self._update_engine_rumble(telem_data["ActualRPM"])
+        self.update_piston_engine_rumble(telem_data)
         
         self._update_wind_effect(telem_data)
         if self.aoa_effect_enabled:
-            self._update_aoa_effect(telem_data)
+            ac_perf = self.get_aircraft_perf(telem_data)
+            vs0 = ac_perf.get('Vs0', 0)
+            vne = ac_perf.get('Vne', 0)
+            # print(f"Got Vs0={vs0}, Vne={vne}")
+            self._update_aoa_effect(telem_data, minspeed=vs0, maxspeed=vne)
         self._gforce_effect(telem_data)
 
 
@@ -483,7 +545,7 @@ class JetAircraft(Aircraft):
     #flaps_motion_intensity = 0.0
 
     _ab_is_playing = 0
-    pedal_spring_mode = 2    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
+    pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
     jet_engine_rumble_intensity = 0.05
     afterburner_effect_intensity = 0.2
@@ -496,8 +558,7 @@ class JetAircraft(Aircraft):
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
-        if self.afterburner_effect_intensity > 0:
-            self._update_ab_effect(telem_data)
+        self._update_ab_effect(telem_data)
         if self.aoa_reduction_effect_enabled:
             self._aoa_reduction_force_effect(telem_data)
         if self.gforce_effect_enable:
@@ -514,7 +575,7 @@ class Helicopter(Aircraft):
     overspeed_shake_start = 70.0 # m/s
     overspeed_shake_intensity = 0.2
     heli_engine_rumble_intensity = 0.12
-    pedal_spring_mode = 1    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
+    pedal_spring_mode = 'No Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
 
     def on_telemetry(self, telem_data):
@@ -526,5 +587,4 @@ class Helicopter(Aircraft):
         super().on_telemetry(telem_data)
 
         self._calc_etl_effect(telem_data)
-        if self.engine_rumble:
-            self._update_heli_engine_rumble(telem_data)
+        self._update_heli_engine_rumble(telem_data)

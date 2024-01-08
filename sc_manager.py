@@ -195,6 +195,8 @@ class SimConnectManager(threading.Thread):
         self._sim_started = 0
         self._sim_state = 0
         self._final_frame_sent = 0
+        self._events_to_send = []
+        self._simdatums_to_send = []
 
 
         self.subscribed_vars = []
@@ -227,10 +229,43 @@ class SimConnectManager(threading.Thread):
             0,  # number of repeats, 0 is forever
         )
     # blocks and reads telemetry
+
+    def set_simdatum_to_msfs(self, simvar, value, units=None):
+        self._simdatums_to_send.append((simvar, value, units))
+
+    def send_event_to_msfs(self, event, data: int = 0):
+        self._events_to_send.append((event, data))
+
+    def tx_simdatums_to_msfs(self):
+        while self._simdatums_to_send:
+            simvar, value, units = self._simdatums_to_send.pop(0)
+            try:
+                self.sc.set_simdatum(simvar, value, units=units)
+            except Exception as e:
+                logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
+                # self.telem_data['error'] = 1
+
+
+    def tx_events_to_msfs(self):
+        while self._events_to_send:
+            event, data = self._events_to_send.pop(0)
+            logging.debug(f"event {event}   data {data}")
+            if event.startswith('L:'):
+                self.set_simdatum_to_msfs(event, data, units="number")
+            else:
+                try:
+                    self.sc.send_event(event, data)
+                    # self.telem_data[event] = data
+                except Exception as e:
+                    logging.error(f"Error setting event:{event} value:{data} to MSFS: {e}")
+                    # self.telem_data['error'] = 1
+
     def _read_telem(self) -> bool:
         pRecv = RECV_P()
         nSize = DWORD()
         while not self._quit:
+            self.tx_events_to_msfs()  # tx any pending sim events that are queued
+            self.tx_simdatums_to_msfs()  # tx any pending simdatum sets that are queued
             try:
                 #print('Trying')
                 self.sc.GetNextDispatch(byref(pRecv), byref(nSize))

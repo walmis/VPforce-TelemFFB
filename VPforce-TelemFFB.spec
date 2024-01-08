@@ -1,14 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import PyInstaller.config
 
+PyInstaller.config.CONF['distpath'] = "./dist/VPforce-TelemFFB"
+distpath = PyInstaller.config.CONF['distpath']
 block_cipher = None
 
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect'), ('updater/updater.exe', 'updater') ],
-    datas=[('export/*', 'export'), ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('image/*', 'image'), ('config.user.ini.README', '.'), ('_RELEASE_NOTES.txt', '.')],
+    binaries=[('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect')],
+    datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -91,8 +94,10 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='VPforce-TelemFFB',
     icon='image/vpforceicon.ico',
     debug=False,
@@ -106,13 +111,11 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='VPforce-TelemFFB',
-)
+
+import shutil
+import os
+shutil.copyfile('_RELEASE_NOTES.txt', os.path.join(distpath, '_RELEASE_NOTES.txt'))
+
+shutil.copytree('export', os.path.join(distpath, 'export'), dirs_exist_ok=True)
+shutil.copytree('updater', os.path.join(distpath, 'updater'), dirs_exist_ok=True)
+

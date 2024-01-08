@@ -232,7 +232,12 @@ class FFBReport_Input(BaseStructure):
         assert(button_number > 0)
         btns = self.Button | (self.ButtonAux<<32)
         return (btns & (1<<(button_number-1))) != 0
-    
+
+    def getPressedButtons(self):
+        btns = self.Button | (self.ButtonAux << 32)
+        pressed = [i + 1 for i in range(64) if (btns & (1 << i)) != 0]
+        return pressed
+
     # get main X and Y axis in range [-1.0 .. 1.0]
     def axisXY(self):
         return (self.X/4096.0, self.Y/4096.0)
@@ -490,9 +495,10 @@ class FFBRhino(hid.Device, QObject):
         if data:
             try:
                 return input_report_handlers[report_id].from_buffer_copy(data)
-            except KeyError:
+            except KeyError as err:
+                logging.exception(f'ERROR GETTING HID REPORT: {err}')
                 return data
-        
+
         return data
         
     def getInput(self) -> FFBReport_Input:

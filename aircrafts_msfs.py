@@ -18,7 +18,6 @@
 import time
 import math
 from math import sin, cos, radians, sqrt, atan2
-from simconnect import *
 from ctypes import byref, cast, sizeof
 from time import sleep
 from pprint import pprint
@@ -30,9 +29,7 @@ from utils import clamp, HighPassFilter, Derivative, Dispenser
 
 from ffb_rhino import HapticEffect, FFBReport_SetCondition, FFBReport_Input
 from aircraft_base import AircraftBase, effects, HPFs, LPFs
-# # from WASimCommander import pyWASimCommander
-# from pyWASimCommander import *
-# wasim = pyWASimCommander()
+
 
 
 deg = 180 / math.pi
@@ -42,22 +39,6 @@ ft = 3.28084  # m to ft
 kt = 1.94384  # ms to kt
 kt2ms = 0.514444  # knots to m/s
 
-sim_connect = None
-try:
-    sim_connect = SimConnect()
-except: pass
-
-
-def set_simdatum_to_msfs(simvar, value, units=None):
-    try:
-        sim_connect.set_simdatum(simvar, value, units=units)
-    except Exception as e:
-        logging.error(f"Error sending {simvar} value {value} to MSFS: {e}")
-def send_event_to_msfs(event, data: int = 0 ):
-    try:
-        sim_connect.send_event(event, data)
-    except Exception as e:
-        logging.error(f"Error setting event {event} to MSFS: {e}")
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -67,10 +48,12 @@ class Aircraft(AircraftBase):
     stall_aoa: float = 15.0  # Stall AoA
     aoa_effect_enabled: int = 1
 
-    engine_rumble: int = 0  # Engine Rumble - Disabled by default - set to 1 in config file to enable
+    aoa_buffeting_enabled: bool = True
+    aoa_effect_gain: float = 1.0
+    uncoordinated_turn_effect_enabled: int = 1
 
     runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
-
+    runway_rumble_enabled: bool = True
     gun_vibration_intensity: float = 0.12  # peak gunfire vibration intensity, 0 to disable
     cm_vibration_intensity: float = 0.12  # peak countermeasure release vibration intensity, 0 to disable
     weapon_release_intensity: float = 0.12  # peak weapon release vibration intensity, 0 to disable
@@ -82,8 +65,10 @@ class Aircraft(AircraftBase):
     spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
     spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
 
-    gear_motion_intensity: float = 0.12  # peak vibration intensity when gear is moving, 0 to disable
-    gear_buffet_intensity: float = 0.15  # peak buffeting intensity when gear down during flight,  0 to disable
+    gear_motion_effect_enabled: bool = True
+    gear_motion_intensity: float = 0.12
+    gear_buffet_effect_enabled: bool = True
+    gear_buffet_intensity: float = 0.15     # peak buffeting intensity when gear down during flight,  0 to disable
 
     flaps_motion_intensity: float = 0.12  # peak vibration intensity when flaps are moving, 0 to disable
     flaps_buffet_intensity: float = 0.0  # peak buffeting intensity when flaps are deployed,  0 to disable
@@ -141,8 +126,8 @@ class Aircraft(AircraftBase):
 
     force_trim_enabled = 0
     cyclic_spring_gain = 1.0
-    force_trim_button = "not_configured"
-    force_trim_reset_button = "not_configured"
+    force_trim_button = 0
+    force_trim_reset_button = 0
     include_dynamic_stick_forces = True
 
     elevator_force_trim = 0
@@ -153,8 +138,17 @@ class Aircraft(AircraftBase):
     center_spring_on_pause = False
 
     use_legacy_bindings = False
+    enable_custom_x_axis = False
+    enable_custom_y_axis = False
+    custom_x_axis: str = ''
+    custom_y_axis: str = ''
+    raw_x_axis_scale: int = 16384
+    raw_y_axis_scale: int = 16384
 
-
+    @classmethod
+    def set_simconnect(cls, sc):
+        cls._simconnect = sc
+        
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
         # clear any existing effects
@@ -231,12 +225,9 @@ class Aircraft(AircraftBase):
         self.use_fbw_for_ap_follow = True
 
         self.invert_ap_x_axis = False
-
-        global sim_connect
-        if sim_connect is None:
-            sim_connect = SimConnect()
-
-
+        self.max_elevator_coeff = 0.5
+        self.max_aileron_coeff = 0.5
+        self.max_rudder_coeff = 0.5
 
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
@@ -325,16 +316,41 @@ class Aircraft(AircraftBase):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+                telem_data['phys_y'] = phys_y
                 x_pos = phys_x - virtual_stick_x_offs
                 y_pos = phys_y - virtual_stick_y_offs
 
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383*x_scale, 16384*x_scale)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383*y_scale, 16384*y_scale)))
 
-                send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
-                send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
+                if self.enable_custom_x_axis:
+                    x_var = self.custom_x_axis
+                    x_range = self.raw_x_axis_scale
+                else:
+                    x_var = 'AXIS_AILERONS_SET'
+                    x_range = 16384
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_ELEVATOR_SET'
+                    y_range = 16384
+
+                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+
+                if x_range != 1:
+                    pos_x_pos = -int(pos_x_pos)
+                else:
+                    pos_x_pos = round(pos_x_pos, 5)
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
+
+                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
             # update spring data
             if self.ap_following and ap_active:
                 y_coeff = 4096
@@ -395,12 +411,27 @@ class Aircraft(AircraftBase):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+
                 x_pos = phys_x - virtual_rudder_x_offs
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
-                # pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
 
-                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
+                if self.enable_custom_x_axis:
+                    x_var = self.custom_x_axis
+                    x_range = self.raw_x_axis_scale
+                else:
+                    x_var = 'AXIS_RUDDER_SET'
+                    x_range = 16384
+
+                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+
+                if x_range != 1:
+                    pos_x_pos = -int(pos_x_pos)
+                else:
+                    pos_x_pos = round(pos_x_pos, 5)
+
+                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+
                 # update spring data
 
             if self.ap_following and ap_active:
@@ -577,6 +608,8 @@ class Aircraft(AircraftBase):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+                telem_data['phys_y'] = phys_y
 
                 x_pos = phys_x - virtual_stick_x_offs
                 y_pos = phys_y - virtual_stick_y_offs
@@ -584,43 +617,75 @@ class Aircraft(AircraftBase):
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
 
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
+                if self.enable_custom_x_axis:
+                    x_var = self.custom_x_axis
+                    x_range = self.raw_x_axis_scale
+                else:
+                    x_var = 'AXIS_AILERONS_SET'
+                    x_range = 16384
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_ELEVATOR_SET'
+                    y_range = 16384
 
-                send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
-                send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
+                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
 
-            if telem_data["ElevDeflPct"] != 0 and not max(telem_data.get("WeightOnWheels")):  # avoid div by zero or calculating while on the ground
+                if x_range != 1:
+                    pos_x_pos = -int(pos_x_pos)
+                else:
+                    pos_x_pos = round(pos_x_pos, 5)
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
+
+                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+
                 #give option to disable if desired by user
-                if self.aoa_effect_enabled:
-                    # calculate maximum angle based on current angle and percentage
-                    tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
-                    tas = telem_data.get("TAS")  # m/s
-                    vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
-                    speed_factor = utils.scale_clamp(tas, (0, vc * 1.4), (0.0, 1.0))  # rough estimate that Vne is 1.4x Vc
-                    y_offs = _aoa / tot
-                    y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
-                    y_offs = clamp(y_offs, -1, 1)
-                    # Take speed in relation to aircraft v speeds into account when moving offset based on aoa
-                    y_offs = int(y_offs * 4096 * speed_factor)
-                    self.spring_y.cpOffset = y_offs
+            if self.aoa_effect_enabled and telem_data["ElevDeflPct"] != 0 and not max(telem_data.get("WeightOnWheels")):
+                # calculate maximum angle based on current angle and percentage
+                tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
+                tas = telem_data.get("TAS")  # m/s
+                vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
+                speed_factor = utils.scale_clamp(tas, (0, vc * 1.4), (0.0, 1.0))  # rough estimate that Vne is 1.4x Vc
+                y_offs = _aoa / tot
+                y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
+                y_offs = clamp(y_offs, -1, 1)
+                # Take speed in relation to aircraft v speeds into account when moving offset based on aoa
+                y_offs = int(y_offs * 4096 * speed_factor * self.aoa_effect_gain)
+            else:
+                y_offs = force_trim_y_offset + (phys_stick_y_offs / 4096)
+                y_offs = clamp(y_offs, -1, 1)
+                y_offs = int(y_offs * 4096)
 
+            self.spring_y.cpOffset = y_offs
             x_offs = phys_stick_x_offs
             self.spring_x.cpOffset = x_offs
 
 
                     # logging.debug(f"fto={force_trim_y_offset} | Offset={offs}")
 
-            self.spring_y.positiveCoefficient = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
-            ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, 4096)
+            max_coeff_y = int(4096*self.max_elevator_coeff)
+            ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, max_coeff_y)
+            pct_max_e = ec/max_coeff_y
+            telem_data["_pct_max_e"] = pct_max_e
+            self._ipc_telem["_pct_max_e"] = pct_max_e
             logging.debug(f"Elev Coef: {ec}")
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
-            #self.spring_y.cpOffset = 0  # -clamp(int(4096*elevator_offs), -4096, 4096)
-            ac = clamp(int(4096 * aileron_coeff), base_elev_coeff, 4096)
+
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = ec
+
+            max_coeff_x = int(4096*self.max_aileron_coeff)
+            ac = clamp(int(4096 * aileron_coeff), base_ailer_coeff, max_coeff_x)
+            pct_max_a = ac / max_coeff_x
+            telem_data["_pct_max_a"] = pct_max_a
+            self._ipc_telem["_pct_max_a"] = pct_max_a
             logging.debug(f"Ailer Coef: {ac}")
 
-            self.spring_x.positiveCoefficient = clamp(int(4096 * aileron_coeff), base_ailer_coeff, 4096)
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = ac
 
             # update spring data
             self.spring.effect.setCondition(self.spring_y)
@@ -631,7 +696,11 @@ class Aircraft(AircraftBase):
             cf_pitch = clamp(cf_pitch, -1.0, 1.0)
 
             # add force on lateral axis (sideways)
-            _side_accel = -telem_data["AccBody"][0] * self.lateral_force_gain
+            if self.uncoordinated_turn_effect_enabled:
+                _side_accel = -telem_data["AccBody"][0] * self.lateral_force_gain
+            else:
+                _side_accel = 0
+
             cf_roll = _side_accel
 
             cf = utils.Vector2D(cf_pitch, cf_roll)
@@ -640,7 +709,10 @@ class Aircraft(AircraftBase):
 
             mag, theta = cf.to_polar()
             
-            self.const_force.constant(mag, theta*deg).start()
+            effects['control_weight'].constant(mag, theta*deg).start()
+                # print(mag, theta*deg)
+                # self.const_force.constant(mag, theta*deg).start()
+
             self.spring.start() # ensure spring is started
 
         elif ffb_type == 'pedals':
@@ -658,8 +730,11 @@ class Aircraft(AircraftBase):
             else:
                 phys_rudder_x_offs = 0
                 virtual_rudder_x_offs = 0
-            x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, 4096)
-
+            max_coeff_x = int(4096*self.max_rudder_coeff)
+            x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, max_coeff_x)
+            pct_max_r = x_coeff / max_coeff_x
+            telem_data["_pct_max_r"] = pct_max_r
+            self._ipc_telem["_pct_max_r"] = pct_max_r
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
             self.spring_x.cpOffset = phys_rudder_x_offs
 
@@ -673,20 +748,26 @@ class Aircraft(AircraftBase):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
-
+                telem_data['phys_x'] = phys_x
                 x_pos = phys_x - virtual_rudder_x_offs
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
 
-                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
+                if self.enable_custom_x_axis:
+                    x_var = self.custom_x_axis
+                    x_range = self.raw_x_axis_scale
+                else:
+                    x_var = 'AXIS_RUDDER_SET'
+                    x_range = 16384
 
+                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
 
-            # if self.ap_following and ap_active:
-            #     y_coeff = 4096
-            #     x_coeff = 4096
-            # else:
-            #     y_coeff = clamp(int(4096 * self.fbw_elevator_gain), 0, 4096)
-            #     x_coeff = clamp(int(4096 * self.fbw_aileron_gain), 0, 4096)
+                if x_range != 1:
+                    pos_x_pos = -int(pos_x_pos)
+                else:
+                    pos_x_pos = round(pos_x_pos, 5)
+
+                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+
             self.const_force.constant(rud_force, 270).start()
             self.spring.start()
 
@@ -759,18 +840,12 @@ class PropellerAircraft(Aircraft):
             self.on_timeout()
             return
         super().on_telemetry(telem_data)
-        ## Engine Rumble
-        current_rpm = telem_data["PropRPM"]
-        if isinstance(current_rpm, list):
-            current_rpm = max(current_rpm)
-        if self.engine_rumble or self._engine_rumble_is_playing:
-            self._update_engine_rumble(current_rpm)
-        #self._update_aoa_effect(telem_data) # currently calculated in  _update_flight_controls
+
+        self.update_piston_engine_rumble(telem_data)
+
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=800*kt2ms, spd_thresh_hi=140*kt2ms )
-        #if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
-        #    super()._gforce_effect(telem_data)
 
 
 class JetAircraft(Aircraft):
@@ -778,7 +853,6 @@ class JetAircraft(Aircraft):
     # flaps_motion_intensity = 0.0
 
     _ab_is_playing = 0
-    _jet_rumble_is_playing = 0
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -794,8 +868,7 @@ class JetAircraft(Aircraft):
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
-        if self.engine_rumble or self._jet_rumble_is_playing:
-            self._update_jet_engine_rumble(telem_data)
+        self._update_jet_engine_rumble(telem_data)
 
         self._gforce_effect(telem_data)
         self._update_ab_effect(telem_data)
@@ -815,8 +888,7 @@ class TurbopropAircraft(PropellerAircraft):
         #     self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
         # if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
         #     super()._gforce_effect(telem_data)
-        if self.engine_rumble or self._jet_rumble_is_playing:
-            self._update_jet_engine_rumble(telem_data)
+        self._update_jet_engine_rumble(telem_data)
 
 class GliderAircraft(Aircraft):
     def _update_force_trim(self, telem_data, x_axis=True, y_axis=True):
@@ -828,15 +900,19 @@ class GliderAircraft(Aircraft):
         offs_y = 0
         if ffb_type != "joystick":
             return
-        if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
+        if self.force_trim_button == 0:
             logging.warning("Force trim enabled but buttons not configured")
+            telem_data['error'] = 1
             return
 
         # logging.debug(f"update_force_trim: x={x_axis}, y={y_axis}")
         input_data = HapticEffect.device.getInput()
 
         force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
-        trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+        if self.force_trim_reset_button > 0:
+            trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+        else:
+            trim_reset_pressed = False
         x, y = input_data.axisXY()
         if force_trim_pressed:
             if x_axis:
@@ -1033,14 +1109,20 @@ class Helicopter(Aircraft):
         if ffb_type == "joystick":
             if self.force_trim_enabled:
 
-                if self.force_trim_button == "not_configured" or self.force_trim_reset_button == "not_configured":
+                if self.force_trim_button == 0:
                     logging.warning("Force trim enabled but buttons not configured")
+                    telem_data['error'] = 1
                     return
                 input_data = HapticEffect.device.getInput()
 
                 force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
-                trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+                if self.force_trim_reset_button > 0:
+                    trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+                else:
+                    trim_reset_pressed = False
                 x, y = input_data.axisXY()
+                telem_data['phys_x'] = x
+                telem_data['phys_y'] = y
                 if force_trim_pressed:
                     self.spring_x.positiveCoefficient = 0
                     self.spring_x.negativeCoefficient = 0
@@ -1077,7 +1159,7 @@ class Helicopter(Aircraft):
                     self.cyclic_center = [x, y]
 
                     logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
-                    send_event_to_msfs("ROTOR_TRIM_RESET", 0)
+                    self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
 
                     self.cyclic_trim_release_active = 0
@@ -1104,7 +1186,7 @@ class Helicopter(Aircraft):
 
                     self.spring_x.cpOffset = self.cpO_x
                     self.spring_y.cpOffset = self.cpO_y
-                    send_event_to_msfs("ROTOR_TRIM_RESET", 0)
+                    self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
                     logging.info("Trim Reset Pressed")
 
@@ -1113,9 +1195,11 @@ class Helicopter(Aircraft):
 
                     input_data = HapticEffect.device.getInput()
 
-                    force_trim_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
-                    phys_x, phys_y = input_data.axisXY()
 
+                    # force_trim_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+                    phys_x, phys_y = input_data.axisXY()
+                    telem_data['phys_x'] = phys_x
+                    telem_data['phys_y'] = phys_y
                     self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
                     self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
 
@@ -1149,7 +1233,8 @@ class Helicopter(Aircraft):
             if self.telemffb_controls_axes:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
-
+                telem_data['phys_x'] = phys_x
+                telem_data['phys_y'] = phys_y
                 self._update_cyclic_trim(telem_data)
 
                 x_pos = phys_x - self.cyclic_virtual_trim_x_offs
@@ -1158,18 +1243,43 @@ class Helicopter(Aircraft):
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
 
-                pos_x_pos = -int(utils.scale(x_pos, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
-                pos_y_pos = -int(utils.scale(y_pos, (-1, 1), (-16383 * y_scale, 16384 * y_scale)))
-
                 if self.cyclic_spring_init or not self.force_trim_enabled:
-                    if self.use_legacy_bindings:
-                        send_event_to_msfs("AXIS_AILERONS_SET", pos_x_pos)
-                        send_event_to_msfs("AXIS_ELEVATOR_SET", pos_y_pos)
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
                     else:
-                        send_event_to_msfs("AXIS_CYCLIC_LATERAL_SET", pos_x_pos)
-                        send_event_to_msfs("AXIS_CYCLIC_LONGITUDINAL_SET", pos_y_pos)
+                        x_var = 'AXIS_CYCLIC_LATERAL_SET'
+                        x_range = 16384
+                    if self.enable_custom_y_axis:
+                        y_var = self.custom_y_axis
+                        y_range = self.raw_y_axis_scale
+                    else:
+                        y_var = 'AXIS_CYCLIC_LONGITUDINAL_SET'
+                        y_range = 16384
+
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                    pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+                    if y_range != 1:
+                        pos_y_pos = -int(pos_y_pos)
+                    else:
+                        pos_y_pos = round(pos_y_pos, 5)
+
+                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
 
                 self.last_device_x, self.last_device_y = phys_x, phys_y
+
+            if self.anything_has_changed("cyclic_gain", self.cyclic_spring_gain):  # check if spring gain setting has been modified in real time
+                self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+
+                self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
 
             self.spring_x.cpOffset = int(self.cpO_x) + self.cyclic_physical_trim_x_offs
             self.spring_y.cpOffset = int(self.cpO_y) + self.cyclic_physical_trim_y_offs
@@ -1205,7 +1315,6 @@ class Helicopter(Aircraft):
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
-            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-12000 * x_scale, 12000 * x_scale)))
 
             self.spring = effects["pedal_ap_spring"].spring()
             self.damper = effects["pedal_damper"].damper()
@@ -1213,8 +1322,8 @@ class Helicopter(Aircraft):
             pedal_pos = telem_data.get("TailRotorPedalPos")
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
+            telem_data['phys_x'] = phys_x
             if not self.pedals_init:
-
 
                 self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = self.pedal_spring_coeff_x
                 if telem_data.get("SimOnGround", 1):
@@ -1241,10 +1350,21 @@ class Helicopter(Aircraft):
 
             self.last_pedal_x = phys_x
 
-            if self.use_legacy_bindings:
-                send_event_to_msfs("AXIS_RUDDER_SET", pos_x_pos)
+            if self.enable_custom_x_axis:
+                x_var = self.custom_x_axis
+                x_range = self.raw_x_axis_scale
             else:
-                send_event_to_msfs("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
+                x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
+                x_range = 16384
+
+            pos_x_pos = utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+
+            if x_range != 1:
+                pos_x_pos = -int(pos_x_pos)
+            else:
+                pos_x_pos = round(pos_x_pos, 5)
+
+            self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
@@ -1266,6 +1386,7 @@ class Helicopter(Aircraft):
         # SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
         input_data = HapticEffect.device.getInput()
         phys_x, phys_y = input_data.axisXY()
+        telem_data['phys_y'] = phys_y
         if not self.collective_init:
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = self.collective_spring_coeff_y
             if telem_data.get("SimOnGround", 1):
@@ -1301,9 +1422,22 @@ class Helicopter(Aircraft):
         self.spring.effect.setCondition(self.spring_y)
         self.spring.start()
 
-        pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
+        if self.enable_custom_y_axis:
+            y_var = self.custom_y_axis
+            y_range = self.raw_y_axis_scale
+        else:
+            y_var = 'AXIS_COLLECTIVE_SET'
+            y_range = 16384
+
+        pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+
+        if y_range != 1:
+            pos_y_pos = -int(pos_y_pos)
+        else:
+            pos_y_pos = round(pos_y_pos, 5)
+
         if self.collective_init:
-            send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
+            self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
 
 
 
@@ -1322,6 +1456,7 @@ class HPGHelicopter(Helicopter):
     hands_on_x_active = 0
     hands_on_y_active = 0
     send_individual_hands_on = 0
+    vrs_effect_enable: bool = True
     vrs_effect_intensity = 0
 
     def __init__(self, name, **kwargs):
@@ -1386,6 +1521,7 @@ class HPGHelicopter(Helicopter):
             if not self.telemffb_controls_axes:
                 logging.error(
                     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
+                telem_data['error'] = 1
                 return
             sema_x = telem_data.get("h145SEMAx")
             sema_y = telem_data.get("h145SEMAy")
@@ -1398,7 +1534,7 @@ class HPGHelicopter(Helicopter):
             if not trim_reset:
                 sx = round(abs(sema_x_avg), 3)
                 sy = round(abs(sema_y_avg), 3)
-                if 100 > sx > 50:
+                if 100 >= sx > 50:
                     self.afcsx_step_size = 5
                 elif 49.999 > sx > 20:
                     self.afcsx_step_size = 3
@@ -1406,10 +1542,13 @@ class HPGHelicopter(Helicopter):
                     self.afcsx_step_size = 2
                 elif 9.999 > sx > 5:
                     self.afcsx_step_size = 1
-                elif 4.999 > sx > 0:
+                elif 4.999 > sx >= 0:
                     self.afcsx_step_size = 1
+                else:
+                    self.afcsx_step_size = 0
 
-                if 100 > sy > 50:
+
+                if 100 >= sy > 50:
                     self.afcsy_step_size = 5
                 elif 49.999 > sy > 20:
                     self.afcsy_step_size = 3
@@ -1417,8 +1556,11 @@ class HPGHelicopter(Helicopter):
                     self.afcsy_step_size = 2
                 elif 9.999 > sx > 5:
                     self.afcsy_step_size = 1
-                elif 4.999 > sy > 0:
+                elif 4.999 > sy >= 0:
                     self.afcsy_step_size = 1
+                else:
+                    self.afcsy_step_size = 0
+
 
                 if not (self.hands_on_x_active or self.hands_on_active):
                     if abs(sema_x_avg) > self.sema_x_max:
@@ -1452,25 +1594,25 @@ class HPGHelicopter(Helicopter):
             dev_y = hands_on_dict["y_deviation"]
             if self.send_individual_hands_on:
                 if hands_on_x:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 1, units="number")
+                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 1, units="number")
                     self.hands_on_x_active = True
 
                 else:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 0, units="number")
+                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 0, units="number")
                     self.hands_on_x_active = False
 
                 if hands_on_y:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 1, units="number")
+                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 1, units="number")
                     self.hands_on_y_active = True
                 else:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 0, units="number")
+                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 0, units="number")
                     self.hands_on_y_active = False
             else:
                 if hands_on_either:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 1, units="number")
+                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 1, units="number")
                     self.hands_on_active = True
                 else:
-                    set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
+                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
                     self.hands_on_active = False
 
             telem_data["hands_on"] = int(hands_on_either)
@@ -1492,8 +1634,9 @@ class HPGHelicopter(Helicopter):
         if self.telemffb_controls_axes:
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
+            telem_data['phys_x'] = phys_x
+
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
-            pos_x_pos = -int(utils.scale(phys_x, (-1, 1), (-16383 * x_scale, 16384 * x_scale)))
 
             self.spring = effects["pedal_ap_spring"].spring()
             self.damper = effects["pedal_damper"].damper()
@@ -1525,14 +1668,31 @@ class HPGHelicopter(Helicopter):
                     logging.info("Pedals Initialized")
                 else:
                     return
+
+            if self.enable_custom_x_axis:
+                x_var = self.custom_x_axis
+                x_range = self.raw_x_axis_scale
+            else:
+                x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
+                x_range = 16384
+
+            pos_x_pos = utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+
+            if x_range != 1:
+                pos_x_pos = -int(pos_x_pos)
+            else:
+                pos_x_pos = round(pos_x_pos, 5)
+
             self.last_pedal_x = phys_x
-            send_event_to_msfs("ROTOR_AXIS_TAIL_ROTOR_SET", pos_x_pos)
+
+            self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
             return
         if not self.telemffb_controls_axes:
             logging.error("Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
+            telem_data['error'] = 1
             return
         self.spring = effects["collective_ap_spring"].spring()
         self.damper = effects["collective_damper"].damper()
@@ -1547,7 +1707,10 @@ class HPGHelicopter(Helicopter):
         # SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
         input_data = HapticEffect.device.getInput()
         phys_x, phys_y = input_data.axisXY()
+        telem_data['phys_y'] = phys_y
         if not self.collective_init:
+
+
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = self.collective_spring_coeff_y
             if telem_data.get("SimOnGround", 1):
                 self.cpO_y = 4096
@@ -1567,11 +1730,11 @@ class HPGHelicopter(Helicopter):
                 logging.info("Collective Initialized")
             else:
                 return
-
         self.last_collective_y = phys_y
 
         if afcs_mode == 0:
             if collective_tr:
+
                 self.cpO_y = round(4096*utils.clamp(phys_y, -1, 1))
                 # print(self.cpO_y)
                 self.spring_y.cpOffset = self.cpO_y
@@ -1582,9 +1745,22 @@ class HPGHelicopter(Helicopter):
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
 
-                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_COLLECTIVE_SET'
+                    y_range = 16384
+
+                pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
+
                 if self.collective_init:
-                    send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
+                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
 
 
             else:
@@ -1598,6 +1774,7 @@ class HPGHelicopter(Helicopter):
 
         else:
             if collective_tr:
+
                 self.cpO_y = round(4096*utils.clamp(phys_y, -1, 1))
                 # print(self.cpO_y)
                 self.spring_y.cpOffset = self.cpO_y
@@ -1608,9 +1785,23 @@ class HPGHelicopter(Helicopter):
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
 
-                pos_y_pos = -int(utils.scale(phys_y, (-1, 1), (-16384, 16384)))
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_COLLECTIVE_SET'
+                    y_range = 16384
+
+                pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
+
                 if self.collective_init:
-                    send_event_to_msfs("AXIS_COLLECTIVE_SET", pos_y_pos)
+                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+
             else:
                 collective_pos = telem_data.get("CollectivePos", 0)
                 self.cpO_y = round(utils.scale(collective_pos,(0, 1), (4096, -4096)))
@@ -1619,8 +1810,6 @@ class HPGHelicopter(Helicopter):
 
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
-
-
     def _update_vrs_effect(self, telem_data):
         vrs_onset = telem_data.get("HPGVRSDatum", 0)
         vrs_certain = telem_data.get("HPGVRSIsInVRS", 0)
@@ -1636,7 +1825,7 @@ class HPGHelicopter(Helicopter):
             vrs_intensity = 0
 
 
-        if vrs_intensity:
+        if vrs_intensity and self.vrs_effect_intensity and self.vrs_effect_enable:
             effects["vrs_buffet"].periodic(10, self.vrs_effect_intensity * vrs_intensity, utils.RandomDirectionModulator).start()
         else:
             effects.dispose("vrs_buffet")
