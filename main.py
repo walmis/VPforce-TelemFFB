@@ -163,7 +163,19 @@ sys.path.insert(0, '')
 
 _config_mtime = 0
 effects_translator = utils.EffectTranslator()
-version = utils.get_version()
+
+#################
+################
+###  Setting _release flag to true will disable all auto-updating and 'WiP' downloads server version checking
+###  Set the version number to version tag that will be pushed to master repository branch
+_release = False  # Todo: Validate release flag!
+
+if _release:
+    version = "vX.X.X"
+else:
+    version = utils.get_version()
+
+
 min_firmware_version = 'v1.0.15'
 global dev_firmware_version, dev_serial, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
 global window, log_window, log_folder, log_file, log_tail_window
@@ -2089,7 +2101,11 @@ class MainWindow(QMainWindow):
         # Get the absolute path of the script's directory
         # script_dir = os.path.dirname(os.path.abspath(__file__))
         doc_url = 'https://vpforcecontrols.com/downloads/VPforce_Rhino_Manual.pdf'
-        dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
+
+        if _release:
+            dl_url = 'https://github.com/walmis/VPforce-TelemFFB/releases'
+        else:
+            dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
 
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
@@ -2205,7 +2221,8 @@ class MainWindow(QMainWindow):
 
         self.update_action = QAction('Install Latest TelemFFB', self)
         self.update_action.triggered.connect(self.update_from_menu)
-        utilities_menu.addAction(self.update_action)
+        if not _release:
+            utilities_menu.addAction(self.update_action)
         self.update_action.setDisabled(True)
 
         download_action = QAction('Download Other Versions', self)
@@ -2685,7 +2702,10 @@ class MainWindow(QMainWindow):
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
 
-        status_text = "UNKNOWN"
+        if _release:
+            status_text = f"Release Version {version}"
+        else:
+            status_text = "UNKNOWN"
 
         self.version_label.setText(f'Version Status: {status_text}')
         self.version_label.setOpenExternalLinks(True)
@@ -3388,6 +3408,9 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
 
     def perform_update(self, auto=True):
+        if _release:
+            return False
+
         ignore_auto_updates = utils.read_system_settings(args.device, args.type).get('ignoreUpdate', False)
         if not auto:
             ignore_auto_updates = False
@@ -5012,10 +5035,11 @@ def main():
             window.show()
 
     autoconvert_config(window)
-    fetch_version_thread = utils.FetchLatestVersionThread()
-    fetch_version_thread.version_result_signal.connect(window.update_version_result)
-    fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
-    fetch_version_thread.start()
+    if not _release:
+        fetch_version_thread = utils.FetchLatestVersionThread()
+        fetch_version_thread.version_result_signal.connect(window.update_version_result)
+        fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
+        fetch_version_thread.start()
 
     telem_manager = TelemManager(settings_manager=settings_mgr, ipc_thread=_ipc_thread)
     telem_manager.start()
