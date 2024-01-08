@@ -3390,7 +3390,7 @@ class MainWindow(QMainWindow):
                 self.update_sim_indicators(data.get('src'), paused=is_paused)
 
             shown_pattern = settings_mgr.current_pattern
-            if settings_mgr.current_pattern == '':
+            if settings_mgr.current_pattern == '' and data.get('N', '') != '':
                 shown_pattern = 'Using defaults'
                 self.new_craft_button.show()
             else:
