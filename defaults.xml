@@ -2455,25 +2455,39 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>type</name>
-		<model>Airbus H135.*</model>
-		<value>Helicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>use_legacy_bindings</name>
+		<name>enable_custom_x_axis</name>
 		<model>Airbus H135.*</model>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
-		<name>use_legacy_bindings</name>
+		<name>enable_custom_y_axis</name>
+		<model>Airbus H135.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
 		<model>Airbus H135.*</model>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_custom_y_axis</name>
+		<model>Airbus H135.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
+	<models>
+		<name>custom_y_axis</name>
+		<model>Airbus H135.*</model>
+		<value>AXIS_THROTTLE_SET</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
 	</models>
 	<models>
 		<name>cyclic_spring_gain</name>
