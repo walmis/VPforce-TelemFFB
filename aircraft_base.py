@@ -66,6 +66,7 @@ class AircraftBase(object):
     overspeed_effect_enable: bool = True
 
     smoother = utils.Smoother()
+    _ipc_telem = {}
 
     @property
     def telem_data(self):

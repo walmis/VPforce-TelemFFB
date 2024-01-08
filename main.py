@@ -741,7 +741,7 @@ class TelemManager(QObject, threading.Thread):
             except:
                 print_exc()
         # Send locally generated telemetry to master here
-        if args.child:
+        if args.child and self.currentAircraft:
             ipc_telem = self.currentAircraft._ipc_telem
             if ipc_telem != {}:
                 self.ipc_thread.send_ipc_telem(ipc_telem)
