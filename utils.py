@@ -58,6 +58,7 @@ class SignalEmitter(QObject):
 
 signal_emitter = SignalEmitter()
 
+
 class Smoother:
     def __init__(self, window_size=5):
         self.value_dict = {}
@@ -98,77 +99,76 @@ class Smoother:
 class EffectTranslator:
     def __init__(self):
         self.effect_dict = {
-            "ab_rumble_1_1" : ["Afterburner Rumble", "afterburner_effect_intensity"],
-            "ab_rumble_1_2" : ["Afterburner Rumble", "afterburner_effect_intensity"],
-            "ab_rumble_2_1" : ["Afterburner Rumble", "afterburner_effect_intensity"],
-            "ab_rumble_2_2" : ["Afterburner Rumble", "afterburner_effect_intensity"],
-            "aoa" : ["AoA Effect", "aoa_effect_gain"],
-            "buffeting" : ["AoA\\Stall Buffeting", "buffeting_intensity"],
+            "ab_rumble_1_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
+            "ab_rumble_1_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
+            "ab_rumble_2_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
+            "ab_rumble_2_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
+            "aoa": ["AoA Effect", "aoa_effect_gain"],
+            "buffeting": ["AoA\\Stall Buffeting", "buffeting_intensity"],
             "bombs": ["Bomb Release", "weapon_release_intensity"],
-            "canopymovement" : ["Canopy Motion", "canopy_motion_intensity"],
-            "collective_ap_spring" : ["Collective AP/Lock Spring Force", "collective_ap_spring_gain"],
-            "collective_damper" : ["Collective Dampening Force", "collective_dampening_gain"],
-            "crit_aoa" : ["AoA Reduction Force",  "aoa_reduction_max_force"],
-            "cm" : ["Countermeasure Deployment", "cm_vibration_intensity"],
-            "cyclic_spring" : ["Cyclic Spring Force", "cyclic_spring_gain"],
-            "damage" : ["Aircraft Damage Event", "damage_effect_intensity"],
-            "decel" : ["Decelleration Force", "deceleration_max_force"],
-            "dynamic_spring" : ["Dynamic Spring Force", ".*_spring_gain"],
+            "canopymovement": ["Canopy Motion", "canopy_motion_intensity"],
+            "collective_ap_spring": ["Collective AP/Lock Spring Force", "collective_ap_spring_gain"],
+            "collective_damper": ["Collective Dampening Force", "collective_dampening_gain"],
+            "crit_aoa": ["AoA Reduction Force", "aoa_reduction_max_force"],
+            "cm": ["Countermeasure Deployment", "cm_vibration_intensity"],
+            "cyclic_spring": ["Cyclic Spring Force", "cyclic_spring_gain"],
+            "damage": ["Aircraft Damage Event", "damage_effect_intensity"],
+            "decel": ["Decelleration Force", "deceleration_max_force"],
+            "dynamic_spring": ["Dynamic Spring Force", ".*_spring_gain"],
             "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
-            "etlY" : ["ETL Shaking", "etl_effect_intensity"],
-            "etlX" : ["ETL Shaking", "etl_effect_intensity"],
-            "fbw_spring" : ["Fly-by-wire Spring Force", "fbw_.*_gain"],
-            "flapsmovement" : ["Flap Motion", "flaps_motion_intensity"],
-            "gearbuffet" : ["Gear Drag Buffeting", "gear_buffet_intensity"],
-            "gearbuffet2" : ["Gear Drag Buffeting", "gear_buffet_intensity"],
-            "gearmovement" : ["Gear Motion", "gear_motion_intensity" ],
-            "gearmovement2" : ["Gear Motion", "gear_motion_intensity" ],
-            "gforce" : ["G-Force Loading", "gforce_effect_max_intensity" ],
-            "gunfire" : ["Gunfire Rumble", "gun_vibration_intensity" ],
-            "hit" : ["Aircraft Hit Event", "" ],
-            "je_rumble_1_1" : ["Jet Engine Rumble", "jet_engine_rumble_intensity" ],
-            "je_rumble_1_2" : ["Jet Engine Rumble", "jet_engine_rumble_intensity" ],
-            "je_rumble_2_1" : ["Jet Engine Rumble", "jet_engine_rumble_intensity" ],
-            "je_rumble_2_2" : ["Jet Engine Rumble", "jet_engine_rumble_intensity" ],
-            "il2_buffet": ["Buffeting", "il2_buffeting_factor" ],
-            "inertia" : ["Inertia", "" ],
-            "nw_shimmy" : ["Nosewheel Shimmy", "nosewheel_shimmy_intensity" ],
-            "payload_rel" : ["Payload Release", "weapon_release_intensity" ],
-            "pause_spring" : ["Pause/Slew Spring Force", "" ],
-            "pedal_spring" : ["Pedal Spring", "pedal_spring_gain" ],
-            "pedal_damper" : ["Pedal Damper", "pedal_dampening_gain" ],
-            "prop_rpm0-1" : ["Propeller Engine Rumble", "engine_rumble_.*" ],
-            "prop_rpm0-2" : ["Propeller Engine Rumble", "engine_rumble_.*" ],
-            "prop_rpm1-1" : ["Propeller Engine Rumble", "engine_rumble_.*" ],
-            "prop_rpm1-2" : ["Propeller Engine Rumble", "engine_rumble_.*" ],
-            "rockets" : ["Rocket Fire", "il2_weapon_release_intensity" ],
-            "rotor_rpm0-1" : ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity" ],
-            "rotor_rpm1-1" : ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity" ],
-            "runway0" : ["Runway Rumble", "runway_rumble_intensity" ],
-            "runway1" : ["Runway Rumble", "runway_rumble_intensity" ],
-            "speedbrakebuffet": ["Speedbrake Buffeting", "speedbrake_buffet_intensity" ],
-            "speedbrakebuffet2": ["Speedbrake Buffeting", "speedbrake_buffet_intensity" ],
-            "speedbrakemovement" : ["Speedbrake Motion", "speedbrake_motion_intensity" ],
-            "spoilerbuffet1-1" : ["Spoiler Buffeting", "spoiler_buffet_intensity" ],
-            "spoilerbuffet1-2" : ["Spoiler Buffeting", "spoiler_buffet_intensity" ],
-            "spoilerbuffet2-1" : ["Spoiler Buffeting", "spoiler_buffet_intensity" ],
-            "spoilerbuffet2-2" : ["Spoiler Buffeting", "spoiler_buffet_intensity" ],
-            "spoilermovement" : ["Spoiler Motion", "spoiler_motion_intensity" ],
-            "trim_spring" : ["Trim Override Spring", "" ],
-            "control_weight" : ["Control Weight", "" ],
-            "vrs_buffet" : ["Vortex Ring State Buffeting", "vrs_effect_intensity" ],
-            "wnd" : ["Wind Effect", "wind_effect_max_intensity" ]
+            "etlY": ["ETL Shaking", "etl_effect_intensity"],
+            "etlX": ["ETL Shaking", "etl_effect_intensity"],
+            "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
+            "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
+            "gearbuffet": ["Gear Drag Buffeting", "gear_buffet_intensity"],
+            "gearbuffet2": ["Gear Drag Buffeting", "gear_buffet_intensity"],
+            "gearmovement": ["Gear Motion", "gear_motion_intensity"],
+            "gearmovement2": ["Gear Motion", "gear_motion_intensity"],
+            "gforce": ["G-Force Loading", "gforce_effect_max_intensity"],
+            "gunfire": ["Gunfire Rumble", "gun_vibration_intensity"],
+            "hit": ["Aircraft Hit Event", ""],
+            "je_rumble_1_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
+            "je_rumble_1_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
+            "je_rumble_2_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
+            "je_rumble_2_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
+            "il2_buffet": ["Buffeting", "il2_buffeting_factor"],
+            "inertia": ["Inertia", ""],
+            "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
+            "payload_rel": ["Payload Release", "weapon_release_intensity"],
+            "pause_spring": ["Pause/Slew Spring Force", ""],
+            "pedal_spring": ["Pedal Spring", "pedal_spring_gain"],
+            "pedal_damper": ["Pedal Damper", "pedal_dampening_gain"],
+            "prop_rpm0-1": ["Propeller Engine Rumble", "engine_rumble_.*"],
+            "prop_rpm0-2": ["Propeller Engine Rumble", "engine_rumble_.*"],
+            "prop_rpm1-1": ["Propeller Engine Rumble", "engine_rumble_.*"],
+            "prop_rpm1-2": ["Propeller Engine Rumble", "engine_rumble_.*"],
+            "rockets": ["Rocket Fire", "il2_weapon_release_intensity"],
+            "rotor_rpm0-1": ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity"],
+            "rotor_rpm1-1": ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity"],
+            "runway0": ["Runway Rumble", "runway_rumble_intensity"],
+            "runway1": ["Runway Rumble", "runway_rumble_intensity"],
+            "speedbrakebuffet": ["Speedbrake Buffeting", "speedbrake_buffet_intensity"],
+            "speedbrakebuffet2": ["Speedbrake Buffeting", "speedbrake_buffet_intensity"],
+            "speedbrakemovement": ["Speedbrake Motion", "speedbrake_motion_intensity"],
+            "spoilerbuffet1-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
+            "spoilerbuffet1-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
+            "spoilerbuffet2-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
+            "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
+            "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
+            "trim_spring": ["Trim Override Spring", ""],
+            "control_weight": ["Control Weight", ""],
+            "vrs_buffet": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
+            "wnd": ["Wind Effect", "wind_effect_max_intensity"]
         }
 
     def get_translation(self, key):
         return self.effect_dict.get(key, [f"No Lookup: {key}", ''])
 
 
-
-
 class Destroyable:
     def destroy():
         raise NotImplementedError
+
 
 class Vector2D:
     def __init__(self, x, y):
@@ -204,18 +204,19 @@ class Vector2D:
 
     def cross(self, other):
         return self.x * other.y - self.y * other.x
-    
+
     def to_polar(self):
         r = self.magnitude()
         theta_radians = math.atan2(self.y, self.x)
         return r, theta_radians
-    
+
     def normalize(self):
         magnitude = self.magnitude()
         if magnitude == 0:
             raise ValueError("Cannot normalize a zero-length vector.")
         return Vector2D(self.x / magnitude, self.y / magnitude)
-    
+
+
 class Vector:
     def __init__(self, x, y=None, z=None):
         if isinstance(x, list):
@@ -224,82 +225,82 @@ class Vector:
             self.x = x
             self.y = y
             self.z = z
-    
+
     def __eq__(self, p):
         return self.x == p.x and self.y == p.y and self.z == p.z
-    
+
     def __add__(self, p):
         return Vector(self.x + p.x, self.y + p.y, self.z + p.z)
-    
+
     def __sub__(self, p):
         return Vector(self.x - p.x, self.y - p.y, self.z - p.z)
-    
+
     def __unm__(self):
         return Vector(-self.x, -self.y, -self.z)
-    
+
     def __mul__(self, s):
         if isinstance(s, Vector):
             return self.x * s.x + self.y * s.y + self.z * s.z
         elif isinstance(s, (int, float)):
             return Vector(self.x * s, self.y * s, self.z * s)
-    
+
     def __div__(self, s):
         if isinstance(s, (int, float)):
             return Vector(self.x / s, self.y / s, self.z / s)
-    
+
     def __concat__(self, p):
         return self.x * p.x + self.y * p.y + self.z * p.z
-    
+
     def __pow__(self, p):
         return Vector(
             self.y * p.z - self.z * p.y,
             self.z * p.x - self.x * p.z,
             self.x * p.y - self.y * p.x
         )
-    
+
     def ort(self):
         l = self.length()
         if l > 0:
             return Vector(self.x / l, self.y / l, self.z / l)
         else:
             return self
-    
+
     def normalize(self):
         l = self.length()
         if l > 0:
             self.x /= l
             self.y /= l
             self.z /= l
-    
+
     def set(self, xx, yy, zz):
         self.x = xx
         self.y = yy
         self.z = zz
-    
+
     def translate(self, dx, dy, dz):
         return Vector(self.x + dx, self.y + dy, self.z + dz)
-    
+
     def __str__(self):
         return f'({self.x},{self.y},{self.z})'
-    
+
     def length(self):
         return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
-    
+
     def rotZ(self, ang):
         sina = math.sin(ang)
         cosa = math.cos(ang)
         return Vector(self.x * cosa - self.y * sina, self.x * sina + self.y * cosa, self.z)
-    
+
     def rotX(self, ang):
         sina = math.sin(ang)
         cosa = math.cos(ang)
         return Vector(self.x, self.y * cosa - self.z * sina, self.y * sina + self.z * cosa)
-    
+
     def rotY(self, ang):
         sina = math.sin(ang)
         cosa = math.cos(ang)
         return Vector(self.z * sina + self.x * cosa, self.y, self.z * cosa - self.x * sina)
-    
+
     def rotAxis(self, axis, ang):
         ax = axis.ort()
         cosa = math.cos(ang)
@@ -344,6 +345,7 @@ def archive_logs(directory):
                     zip_file.write(log_file_path, os.path.basename(log_file_path))
                     os.remove(log_file_path)  # Remove the original log file
 
+
 def set_reg(name, value):
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
     try:
@@ -369,6 +371,7 @@ def set_reg(name, value):
         return True
     except WindowsError:
         return False
+
 
 def get_reg(name):
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
@@ -432,13 +435,12 @@ def get_default_sys_settings(device_id, device_type, cmb=False):
         'startMinJoystick': False,
         'startMinPedals': False,
         'startMinCollective': False,
-        'startHeadlessJoystick':False,
-        'startHeadlessPedals':False,
-        'startHeadlessCollective':False,
+        'startHeadlessJoystick': False,
+        'startHeadlessPedals': False,
+        'startHeadlessCollective': False,
         'pidJoystick': pid_j,
         'pidPedals': pid_p,
         'pidCollective': pid_c,
-
 
     }
 
@@ -499,6 +501,7 @@ def create_support_bundle(userconfig_rootpath):
             # Clean up the temporary folder
             shutil.rmtree(temp_folder)
 
+
 def read_all_system_settings():
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
 
@@ -542,13 +545,13 @@ def read_system_settings(pid, tp):
     g_key = 'Sys'
     i_key = f'{tp}Sys'
     try:
-        #try to create the path key in case it doesn't exist
+        # try to create the path key in case it doesn't exist
         winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
         registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0,
                                       winreg.KEY_READ | winreg.KEY_WRITE)
         # for key, default_value in def_sys_dict.items():
         try:
-            #try to read the global system settings key
+            # try to read the global system settings key
             value, _ = winreg.QueryValueEx(registry_key, g_key)
             g_settings_dict = json.loads(value)
         except OSError:
@@ -558,7 +561,7 @@ def read_system_settings(pid, tp):
             g_settings_dict = def_global_sys_dict
             was_default = True
         try:
-            #try to read the instance system settings key
+            # try to read the instance system settings key
             value, _ = winreg.QueryValueEx(registry_key, i_key)
             i_settings_dict = json.loads(value)
         except OSError:
@@ -576,10 +579,13 @@ def read_system_settings(pid, tp):
     if was_default:
         settings_dict['wasDefault'] = True
     return settings_dict
-def mix(a, b, val):
-    return a*(1-val) + b*(val)
 
-def to_number(v : str):
+
+def mix(a, b, val):
+    return a * (1 - val) + b * (val)
+
+
+def to_number(v: str):
     """Try to convert string to number
     If unable, return the original string
     """
@@ -597,24 +603,24 @@ def to_number(v : str):
             return False
 
         scale = 1
-        if v.lower().endswith("%") or v.startswith("%"): # handle percent strings
+        if v.lower().endswith("%") or v.startswith("%"):  # handle percent strings
             scale = 0.01
             v = v.strip("%")
-        if v.lower().endswith("kt"): # handle unit conversion: kt->ms
+        if v.lower().endswith("kt"):  # handle unit conversion: kt->ms
             scale = 0.51444
             v = v.strip("kt")
-        if v.lower().endswith("kph"): # handle unit conversion: kph->ms
-            scale = 1/3.6
+        if v.lower().endswith("kph"):  # handle unit conversion: kph->ms
+            scale = 1 / 3.6
             v = v.strip("kph")
-        if v.lower().endswith("m/s"): # handle unit conversion: kph->ms
+        if v.lower().endswith("m/s"):  # handle unit conversion: kph->ms
             scale = 1
             v = v.strip("m/s")
-        if v.lower().endswith("mph"): # handle unit conversion: mph->ms
+        if v.lower().endswith("mph"):  # handle unit conversion: mph->ms
             scale = 0.44704
             v = v.strip("mph")
-        if v.lower().endswith("deg"): # just strip out degrees suffix
+        if v.lower().endswith("deg"):  # just strip out degrees suffix
             v = v.strip("deg")
-        if v.lower().endswith("ms"): # strip out milliseconds suffix
+        if v.lower().endswith("ms"):  # strip out milliseconds suffix
             v = v.strip("ms")
         if v.lower().endswith("hz"):  # strip out hertz suffix
             v = v.strip("hz")
@@ -636,17 +642,19 @@ def to_number(v : str):
             return round(float(v) * scale, 4)
         else:
             return int(v) * scale
-        
+
     except ValueError:
-        #return v
+        # return v
         return orig_v
-    
+
+
 def sanitize_dict(d):
     out = {}
-    for k,v in d.items():
+    for k, v in d.items():
         out[k] = to_number(v)
     return out
-        
+
+
 def _flatten_dict_gen(d, parent_key, sep):
     for k, v in d.items():
         new_key = parent_key + sep + k if parent_key else k
@@ -654,6 +662,7 @@ def _flatten_dict_gen(d, parent_key, sep):
             yield from flatten_dict(v, new_key, sep=sep).items()
         else:
             yield new_key, v
+
 
 def flatten_dict(d, parent_key: str = '', sep: str = '_'):
     return dict(_flatten_dict_gen(d, parent_key, sep))
@@ -678,6 +687,7 @@ def insert_dict_item(original_dict, new_key, new_value, insert_key, before=True)
 
     return updated_dict
 
+
 def get_random_within_range(item, input_number, range_start, range_end, decimal_places=2, time_period=None):
     """ Return a random number between range_start and range_end with a precision level of decimal_places
         if time_period (in seconds) is given, the function will return the same random number during any given
@@ -700,22 +710,25 @@ def get_random_within_range(item, input_number, range_start, range_end, decimal_
 
     return random_number
 
+
 def sock_readable(s) -> bool:
-    r,_,_ = select.select([s], [],[], 0)
+    r, _, _ = select.select([s], [], [], 0)
     return s in r
+
 
 def clamp(n, minn, maxn):
     return sorted((minn, n, maxn))[1]
+
 
 def clamp_minmax(n, max):
     return clamp(n, -max, max)
 
 
-def scale(val, src : tuple, dst : tuple, return_round=False, return_int=False):
+def scale(val, src: tuple, dst: tuple, return_round=False, return_int=False):
     """
     Scale the given value from the scale of src to the scale of dst.
-    """   
-    result =  (val - src[0]) * (dst[1] - dst[0]) / (src[1] - src[0]) + dst[0]
+    """
+    result = (val - src[0]) * (dst[1] - dst[0]) / (src[1] - src[0]) + dst[0]
     if return_round:
         return round(result)
     elif return_int:
@@ -724,14 +737,15 @@ def scale(val, src : tuple, dst : tuple, return_round=False, return_int=False):
         return result
 
 
-
-def scale_clamp(val, src : tuple, dst : tuple,return_round=False, return_int=False ):
+def scale_clamp(val, src: tuple, dst: tuple, return_round=False, return_int=False):
     """
     Scale the given value from the scale of src to the scale of dst. 
     and clamp the result to dst
-    """   
-    v = scale(val, src, dst,return_round=return_round, return_int=return_int)
+    """
+    v = scale(val, src, dst, return_round=return_round, return_int=return_int)
     return clamp(v, dst[0], dst[1])
+
+
 def non_linear_scaling(x, min_val, max_val, curvature=1):
     # Scale the input value to a value between 0 and 1 within the given range
     scaled_value = (x - min_val) / (max_val - min_val)
@@ -745,6 +759,8 @@ def non_linear_scaling(x, min_val, max_val, curvature=1):
         result = scaled_value
 
     return result
+
+
 def gaussian_scaling(x, min_val, max_val, peak_percentage=0.5, curve_width=1.0):
     # Calculate the midpoint of the range and the distance between the min and max values
     midpoint = (min_val + max_val) / 2
@@ -784,7 +800,6 @@ def sine_point_in_time(amplitude, period_ms, phase_offset_deg=0):
     return value
 
 
-
 def pressure_from_altitude(altitude_m):
     """Calculate pressure at specified altitude
 
@@ -796,12 +811,15 @@ def pressure_from_altitude(altitude_m):
     """
     return 101.3 * ((288 - 0.0065 * altitude_m) / 288) ** 5.256
 
+
 def calculate_checksum(file_path):
     crc = zlib.crc32(open(file_path, 'rb').read())
     return crc
 
+
 def average(l):
-    return sum(l)/float(len(l))
+    return sum(l) / float(len(l))
+
 
 class LowPassFilter:
     def __init__(self, cutoff_freq_hz, init_val=0.0, **kwargs):
@@ -809,20 +827,23 @@ class LowPassFilter:
         self.alpha = 0.0
         self.x_filt = init_val
         self.last_update = time.perf_counter()
-        
+
     def __call__(self, x):
         return self.update(x)
+
     def update(self, x):
         now = time.perf_counter()
         dt = now - self.last_update
-        if dt > 1: self.x_filt = x # initialize filter
+        if dt > 1: self.x_filt = x  # initialize filter
         self.last_update = now
         self.alpha = dt / (1.0 / self.cutoff_freq_hz + dt)
         self.x_filt = self.alpha * x + (1.0 - self.alpha) * self.x_filt
         return self.x_filt
+
     @property
     def value(self):
         return self.x_filt
+
 
 class HighPassFilter:
     def __init__(self, cutoff_freq_hz, init_val=0.0, **kwargs):
@@ -831,15 +852,15 @@ class HighPassFilter:
         self.last_update = 0
         self.last_input = init_val
         self.value = init_val
-    
+
     def __call__(self, x):
         return self.update(x)
-        
+
     def update(self, x):
         now = time.perf_counter()
         dt = now - self.last_update
-        if dt > 1: 
-            self.last_input = x # initialize filter
+        if dt > 1:
+            self.last_input = x  # initialize filter
             self.value = x
 
         self.last_update = now
@@ -848,10 +869,11 @@ class HighPassFilter:
         self.value = alpha * (self.value + x - self.last_input)
         self.last_input = x
         return self.value
-    
+
     def reset(self):
         self.last_update = 0
-    
+
+
 class Derivative:
     def __init__(self, filter_hz=None) -> None:
         self.prev_update = 0
@@ -871,9 +893,10 @@ class Derivative:
         val = dx / dt
         if self.lpf:
             val = self.lpf.update(val)
-        self.value = val   
-            
+        self.value = val
+
         return self.value
+
     def dampen_value(self, var, name, derivative_hz=5, derivative_k=0.1):
         # Check if derivative information is already stored, and initialize if not
         derivative_data = self.derivative_dict.get(name, None)
@@ -900,21 +923,23 @@ class Derivative:
 class DirectionModulator:
     pass
 
+
 class RandomDirectionModulator(DirectionModulator):
-    def __init__(self, period = 0.1, *args, **kwargs):
+    def __init__(self, period=0.1, *args, **kwargs):
         self.prev_upd = time.perf_counter()
         self.value = 0
         self.period = period
 
     def update(self):
         now = time.perf_counter()
-        #dt = now - self.prev_upd
+        # dt = now - self.prev_upd
         if now - self.prev_upd > self.period:
             self.prev_upd = now
             random.seed()
             self.value = random.randint(0, 360)
 
         return self.value
+
 
 class Dispenser:
     def __init__(self, cls) -> None:
@@ -931,7 +956,7 @@ class Dispenser:
 
     def remove(self, name):
         self.dispose(name)
-    
+
     def __contains__(self, name):
         return name in self.dict
 
@@ -969,12 +994,11 @@ class Dispenser:
             func(i)
 
 
-
 class Teleplot:
     def __init__(self):
         self.sock = None
 
-    def configure(self, address:str):
+    def configure(self, address: str):
         try:
             address = address.split(":")
             address[1] = int(address[1])
@@ -982,8 +1006,6 @@ class Teleplot:
             self.sock.connect(tuple(address))
         except:
             pass
-
-
 
     def sendTelemetry(self, name, value, instance=None):
         if instance is not None:
@@ -1000,17 +1022,18 @@ class Teleplot:
         except:
             pass
 
+
 teleplot = Teleplot()
 
 from PyQt5.QtWidgets import QMessageBox
 
 
 def analyze_il2_config(path, port=34385):
-
     config_data = defaultdict(dict)
     file_path = os.path.join(path, "data\\startup.cfg")
     if not os.path.exists(file_path):
-        QMessageBox.warning(None, "TelemFFB IL-2 Config Check", f"Unable to find Il-2 configuration file at: {path}\n\nPlease verify the installed path and update the TelemFFB configuration file")
+        QMessageBox.warning(None, "TelemFFB IL-2 Config Check",
+                            f"Unable to find Il-2 configuration file at: {path}\n\nPlease verify the installed path and update the TelemFFB configuration file")
         return
     current_section = None
     ref_addr = '127.255.255.255'
@@ -1052,20 +1075,20 @@ def analyze_il2_config(path, port=34385):
     telem_match = 0
     telem_exists = 0
     if not "telemetrydevice" in config_data:
-        #no telemetry config exists in current config, so add our own canned config
+        # no telemetry config exists in current config, so add our own canned config
         telem_proposed = telemetry_reference
     else:
-        #there is an existing telemetry config
+        # there is an existing telemetry config
         telem_match = 1
         telem_exists = 1
         ignore_port = False
         telem_config = config_data["telemetrydevice"]
         telem_proposed = {}
-        for k, v in telem_config.items(): # strip out any quotes
+        for k, v in telem_config.items():  # strip out any quotes
             telem_proposed[k] = v.strip("\'\"")
             telem_config[k] = v.strip("\'\"")
 
-        for k, v in telem_proposed.items():    # see if it matches our reference
+        for k, v in telem_proposed.items():  # see if it matches our reference
             ref_v = telemetry_reference.get(k, 'null')
             if v != ref_v:
                 if k == 'addr':
@@ -1086,7 +1109,7 @@ def analyze_il2_config(path, port=34385):
                         telem_match = 0
                 if k == 'decimation':
                     if telem_proposed[k] != ref_decimation:
-                        #we must set decimation to 1 for proper effect behavior
+                        # we must set decimation to 1 for proper effect behavior
                         telem_proposed = insert_dict_item(telem_proposed, 'decimation', f'1', 'enable', before=True)
                         telem_match = 0
                 if k == 'enable':
@@ -1110,7 +1133,6 @@ def analyze_il2_config(path, port=34385):
             motion_proposed[k] = v.strip("\'\"")
             motion_config[k] = v.strip("\'\"")
 
-
         for k, v in motion_proposed.items():  # see if it matches our reference
             ref_v = motion_reference.get(k, 'null')
             if v != ref_v:
@@ -1122,7 +1144,8 @@ def analyze_il2_config(path, port=34385):
                             motion_proposed["addr1"] = ref_addr1
                         else:
                             # insert our addr1 value after the existing addr value
-                            motion_proposed = insert_dict_item(motion_proposed, 'addr1', ref_addr1, 'addr', before=False)
+                            motion_proposed = insert_dict_item(motion_proposed, 'addr1', ref_addr1, 'addr',
+                                                               before=False)
                             # since we are adding ourselves as a secondary receiver, we can ignore the existing port value
                         motion_match = 0
                     ignore_port = True
@@ -1175,11 +1198,13 @@ def analyze_il2_config(path, port=34385):
             try:
                 write_il2_config(file_path, config_data)
             except Exception as e:
-                QMessageBox.warning(None, "Config Update Error", f"There was an error writing to the Il-2 Config file:\n{e}")
+                QMessageBox.warning(None, "Config Update Error",
+                                    f"There was an error writing to the Il-2 Config file:\n{e}")
         elif ans == QMessageBox.No:
             print(f"Answer: NO")
 
         # return config_data, telem_match, motion_match
+
 
 def write_il2_config(file_path, config_data):
     with open(file_path, 'w') as config_file:
@@ -1192,6 +1217,7 @@ def write_il2_config(file_path, config_data):
                 else:
                     config_file.write(f"\t{key} = {value}\n")
             config_file.write("[END]\n\n")
+
 
 def install_export_lua():
     saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
@@ -1215,6 +1241,7 @@ def install_export_lua():
             data = ""
 
         local_telemffb = get_resource_path('export/TelemFFB.lua', prefer_root=True)
+
         def write_script():
             data = open(local_telemffb, "rb").read()
             logging.info(f"Writing to {out_path}")
@@ -1227,7 +1254,8 @@ def install_export_lua():
             crc_a, crc_b = calculate_checksum(out_path), calculate_checksum(local_telemffb)
 
             if crc_a != crc_b:
-                dia = QMessageBox.question(None, "Contents of TelemFFB.lua export script have changed", f"Update export script {out_path} ?")
+                dia = QMessageBox.question(None, "Contents of TelemFFB.lua export script have changed",
+                                           f"Update export script {out_path} ?")
                 if dia == QMessageBox.StandardButton.Yes:
                     write_script()
         else:
@@ -1240,7 +1268,6 @@ def install_export_lua():
                     f.write("\n" + line)
                     f.close()
                 write_script()
-
 
 
 class OutLog(QtCore.QObject):
@@ -1265,7 +1292,6 @@ class OutLog(QtCore.QObject):
         # Toggle the pause state
         self.log_paused = not self.log_paused
 
-
     def on_received(self, m):
         try:
             if self.color:
@@ -1273,11 +1299,12 @@ class OutLog(QtCore.QObject):
                 self.edit.setTextColor(self.color)
 
             self.edit.moveCursor(QtGui.QTextCursor.End)
-            self.edit.insertPlainText( m )
+            self.edit.insertPlainText(m)
 
             if self.color:
                 self.edit.setTextColor(tc)
-        except: pass
+        except:
+            pass
 
     def write(self, m):
         try:
@@ -1288,13 +1315,14 @@ class OutLog(QtCore.QObject):
         if self.out:
             self.out.write(m)
 
-    def flush(self): pass
+    def flush(self):
+        pass
 
 
 def winreg_get(path, key):
     try:
         registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0,
-                                       winreg.KEY_READ)
+                                      winreg.KEY_READ)
         value, regtype = winreg.QueryValueEx(registry_key, key)
         winreg.CloseKey(registry_key)
         return value
@@ -1305,6 +1333,7 @@ def winreg_get(path, key):
 class FetchLatestVersionThread(QThread):
     version_result_signal = pyqtSignal(str, str)
     error_signal = pyqtSignal(str)
+
     def run(self):
         try:
             ctx = ssl._create_unverified_context()
@@ -1320,7 +1349,7 @@ class FetchLatestVersionThread(QThread):
                 logging.info("Running from source with locally modified files, skipping version check")
             else:
                 try:
-                    with urllib.request.urlopen(send_url, context=ctx,) as req:
+                    with urllib.request.urlopen(send_url, context=ctx, ) as req:
                         latest = json.loads(req.read().decode())
                         latest_version = latest["version"]
                         latest_url = url + latest["filename"]
@@ -1337,7 +1366,7 @@ class FetchLatestVersionThread(QThread):
                     self.version_result_signal.emit("uptodate", "uptodate")
                 else:
                     self.version_result_signal.emit("error", "error")
-            else: #running from source
+            else:  # running from source
 
                 current_version = current_version.removeprefix('local-')
                 if '-dirty' in current_version:
@@ -1374,12 +1403,14 @@ def get_version():
         import version
         ver = version.VERSION
         return ver
-    except: pass
+    except:
+        pass
 
     try:
         ver = subprocess.check_output(['git', 'describe', '--always', '--abbrev=8', '--dirty']).decode('ascii').strip()
         ver = f"local-{ver}"
-    except: pass
+    except:
+        pass
     return ver
 
 
@@ -1401,6 +1432,7 @@ def self_update(zip_uri):
     r = urllib.request.urlopen(zip_uri, context=ssl._create_unverified_context())
     r.read()
 
+
 def get_script_path():
     if getattr(sys, 'frozen', False):
         # we are running in a bundle
@@ -1409,6 +1441,7 @@ def get_script_path():
         # we are running in a normal Python environment
         script_dir = os.path.dirname(os.path.abspath(__file__))
     return script_dir
+
 
 def get_resource_path(relative_path, prefer_root=False, force=False):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -1428,12 +1461,14 @@ def get_resource_path(relative_path, prefer_root=False, force=False):
             # if the file exists, return the path
             return f_path
         else:
-            logging.info(f"get_resource_path, root_prefer=True.  Did not find {relative_path} relative to script/exe dir.. looking in bundle dir...")
+            logging.info(
+                f"get_resource_path, root_prefer=True.  Did not find {relative_path} relative to script/exe dir.. looking in bundle dir...")
             # fall back to bundle dir if not found it script dir, log warning if still not found
             # note, script dir and bundle dir are same when running from source
             f_path = os.path.join(bundle_dir, relative_path)
             if not os.path.isfile(f_path):
-                logging.warning(f"Warning, get_resource_path, root_prefer=True, did not find file in script/exe folder or bundle folder: {f_path}")
+                logging.warning(
+                    f"Warning, get_resource_path, root_prefer=True, did not find file in script/exe folder or bundle folder: {f_path}")
             return f_path
     else:
         f_path = os.path.join(bundle_dir, relative_path)
@@ -1442,12 +1477,10 @@ def get_resource_path(relative_path, prefer_root=False, force=False):
         return f_path
 
 
-
-
 if __name__ == "__main__":
-    #test install
-    #from PyQt5.QtWidgets import QApplication
-    #app = QApplication(sys.argv)
-    #install_export_lua()
+    # test install
+    # from PyQt5.QtWidgets import QApplication
+    # app = QApplication(sys.argv)
+    # install_export_lua()
     uri = "https://vpforcecontrols.com/downloads/TelemFFB/VPforce-TelemFFB-wip-2e79e046.zip"
     self_update(uri)
