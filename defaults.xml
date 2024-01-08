@@ -838,8 +838,23 @@
 		</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
-		<order>120.2</order>
+		<order>121</order>
+		<name>countermeasure_effect_enabled</name>
+		<displayname>Countermeasures</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>true</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Weapons</Grouping>
+		<order>121.1</order>
 		<name>cm_vibration_intensity</name>
+		<prereq>countermeasure_effect_enabled</prereq>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<value>0.2</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -850,8 +865,23 @@
 	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
-		<order>120.3</order>
+		<order>122</order>
+		<name>gunfire_effect_enabled</name>
+		<displayname>Gunfire</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>true</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Weapons</Grouping>
+		<order>122.1</order>
 		<name>gun_vibration_intensity</name>
+		<prereq>gunfire_effect_enabled</prereq>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<value>0.2</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -862,27 +892,55 @@
 	</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
-		<order>120.4</order>
+		<order>123</order>
+		<name>weapon_release_effect_enabled</name>
+		<displayname>Weapons Release</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>true</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Weapons</Grouping>
+		<order>123.1</order>
 		<name>weapon_release_intensity</name>
+		<prereq>weapon_release_effect_enabled</prereq>
+		<collective>true</collective>
 		<value>0.2</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<info>Peak intensity for weapons release effect</info>
 		<displayname>Weapon Release</displayname>
 		<DCS>true</DCS>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		</defaults>
 	<defaults>
 		<Grouping>Weapons</Grouping>
-		<order>120.5</order>
+		<order>124</order>
+		<name>dummy_weapon_direction</name>
+		<displayname>Effect Direction</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Weapons</Grouping>
+		<order>124.1</order>
 		<name>weapon_effect_direction</name>
+		<prereq>dummy_weapon_direction</prereq>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<validvalues>-1,359</validvalues>
 		<value>-1</value>
 		<datatype>d_int</datatype>
 		<info>Direction of applied force for weapons effects&lt;br&gt;&lt;br&gt;Rrange 0-359 or set to -1 for random</info>
-		<displayname>Weapon Effect Direction</displayname>
+		<displayname>Weapon Effects Direction</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 	</defaults>
@@ -1171,6 +1229,7 @@
 		<Grouping>Buffeting</Grouping>
 		<order>500</order>
 		<name>il2_shake_master</name>
+		<collective>true</collective>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<displayname>IL2 Shake Master</displayname>
@@ -1183,6 +1242,7 @@
 		<order>512</order>
 		<name>il2_enable_buffet</name>
 		<prereq>il2_shake_master</prereq>
+		<collective>true</collective>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<displayname>Buffeting</displayname>
@@ -1195,6 +1255,7 @@
 		<order>512.1</order>
 		<name>il2_buffeting_factor</name>
 		<prereq>il2_enable_buffet</prereq>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues><IL2>true</IL2><joystick>true</joystick>
 		<value>1.0</value>
 		<datatype>float</datatype>
@@ -1207,6 +1268,7 @@
 		<order>513</order>
 		<name>il2_enable_runway_rumble</name>
 		<prereq>il2_shake_master</prereq>
+		<collective>true</collective>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<displayname>Runway Rumble</displayname>
@@ -1219,8 +1281,9 @@
 		<order>513.1</order>
 		<name>il2_runway_rumble_intensity</name>
 		<prereq>il2_enable_runway_rumble</prereq>
+		<collective>true</collective>
 		<value>0.12</value>
-		<sliderfactor>0.4</sliderfactor>
+		<sliderfactor>0.6</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<displayname>Runway Rumble</displayname>
@@ -1233,6 +1296,8 @@
 		<order>514</order>
 		<name>il2_enable_weapons</name>
 		<prereq>il2_shake_master</prereq>
+		<collective>true</collective>
+		<sliderfactor></sliderfactor>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<displayname>Weapon Effects</displayname>
@@ -1245,8 +1310,9 @@
 		<order>514.1</order>
 		<name>il2_weapon_release_intensity</name>
 		<prereq>il2_enable_weapons</prereq>
-		<value>0.2</value>
-		<sliderfactor>0.5</sliderfactor>
+		<collective>true</collective>
+		<value>0.3</value>
+		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<displayname>Weapon Effects</displayname>
@@ -1455,6 +1521,7 @@
 		<Grouping>Weapons</Grouping>
 		<order>750</order>
 		<name>damage_effect_enabled</name>
+		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<displayname>Damage Effect</displayname>
@@ -1468,6 +1535,7 @@
 		<order>750.1</order>
 		<name>damage_effect_intensity</name>
 		<prereq>damage_effect_enabled</prereq>
+		<collective>true</collective>
 		<value>0.4</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -1713,7 +1781,6 @@
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
 		</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
