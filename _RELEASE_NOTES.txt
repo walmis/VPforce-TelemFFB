@@ -1,4 +1,21 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+
+############################################
+##  January 8, 2024
+############################################
+# Big TelemFFB Update!
+- Completely UI driven config (**no more ini files!**)
+ - Only valid/applicable settings are shown when modifying a sim/aircraft category/aircraft (**no more guessing**)
+ - Live effect management for active aircraft right from the TelemFFB window
+ - Manage any sim / aircraft category / specific aircraft default settings through the settings manager interface
+ - Simple, wizard-based creation of settings for new aircraft (either 'new' or 'clone from existing')
+- Easy operation for multiple FFB devices (i.e. joystick plus pedals and/or collective)
+ - Built in Auto-launch setup for multiple devices (**no more need for command line arguments!**)
+ - Dynamically manage unique config for any device from single master window
+- Automatic management of user settings override for all sims and FFB devices
+- Automated, built-in,  legacy user override file (.ini) conversion
+- much more!
+
 ############################################
 ##  January 2, 2024
 ############################################
