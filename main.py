@@ -2296,7 +2296,7 @@ class MainWindow(QMainWindow):
         help_menu = self.menu.addMenu('Help')
 
         notes_action = QAction('Release Notes', self)
-        notes_action.triggered.connect(lambda url=notes_url: self.open_file(url))
+        notes_action.triggered.connect(lambda : self.open_file(notes_url))
         help_menu.addAction(notes_action)
 
         docs_action = QAction('Documentation', self)
