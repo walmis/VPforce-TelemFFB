@@ -4732,7 +4732,12 @@ def convert_settings(cfg=_legacy_config_file, usr=_legacy_override_file, window=
     userconfig = ConfigObj(usr, raise_errors=False)
 
     def_params = {section: utils.sanitize_dict(defaultconfig[section]) for section in defaultconfig}
-    usr_params = {section: utils.sanitize_dict(userconfig[section]) for section in userconfig}
+    try:
+        usr_params = {section: utils.sanitize_dict(userconfig[section]) for section in userconfig}
+    except:
+        QMessageBox.warning(window, "Conversion Error",
+                            "There was an error converting the config.  Please inspect the .ini config for syntax issues.\n\nMake sure all settings fall under a [section] and there are no spaces in any setting name")
+        return False
     sys = userconfig.get('system', None)
     for section in usr_params:
         if section == 'system':
@@ -4771,7 +4776,7 @@ def convert_settings(cfg=_legacy_config_file, usr=_legacy_override_file, window=
                 differences.append(dif_item)
 
     xmlutils.write_converted_to_xml(differences)
-
+    return True
 
 def autoconvert_config(main_window, cfg=_legacy_config_file, usr=_legacy_override_file):
     if _child_instance: return
@@ -4803,7 +4808,8 @@ def autoconvert_config(main_window, cfg=_legacy_config_file, usr=_legacy_overrid
             QMessageBox.warning(main_window, "Error", f"Legacy override file {usr} was passed at runtime for auto-conversion, but the file does not exist")
             return
         # perform the conversion
-        convert_settings(cfg=cfg, usr=usr, window=main_window)
+        if not convert_settings(cfg=cfg, usr=usr, window=main_window):
+            return False
         try:
             os.rename(usr, f"{usr}.legacy")
         except OSError:
