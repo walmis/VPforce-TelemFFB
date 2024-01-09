@@ -189,7 +189,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Manual Link
         bookmarked_section =  "https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit#bookmark=id.og67qrvv8gt7"
         # <a href="https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y">Read TelemFFB manual for settings details</a>
-        self.l_manual.setText(f'<a href="{bookmarked_section}">Read TelemFFB manual for instructions</a>')
+        self.l_manual.setText(f'<a href="{bookmarked_section}">Read manual for details</a>')
 
         # Initial visibility of rows based on checkbox state
         self.toggle_rows()
@@ -272,7 +272,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def setup_sim_list(self):
         mprint("setup_class_list")
         self.drp_sim.blockSignals(True)
-        sims = ['DCS', 'IL2', 'MSFS', 'XPlane']
+        sims = ['DCS', 'IL2', 'MSFS']
         self.drp_sim.clear()
         self.drp_sim.addItems(sims)
         self.drp_sim.setCurrentText(self.sim)
@@ -318,6 +318,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_models.setCurrentText(self.model_pattern)
         self.drp_models.blockSignals(False)
 
+    def catch_doubleclick(self):
+        self.reload_table()
+
     def setup_table(self):
         mprint("setup_table")
         self.table_widget.setColumnCount(12)
@@ -335,6 +338,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.table_widget.setColumnHidden(9, True)
         self.table_widget.setColumnWidth(10, 60)
         self.table_widget.setColumnWidth(11, 40)
+        self.table_widget.cellDoubleClicked.connect(self.catch_doubleclick)
 
         # row click for property manager
         self.table_widget.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
@@ -559,12 +563,15 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 #for col in range(self.table_widget.columnCount()):
 
                 source_item = self.table_widget.item(row, 0)
+                if source_item is None:
+                    return
                 source = source_item.text()
                 displayname_item = self.table_widget.item(row, 2, )
                 displayname = displayname_item.text()
                 value_item = self.table_widget.item(row, 3 )
 
                 info_item = self.table_widget.item(row, 4 )
+
                 info = info_item.text()
                 name_item = self.table_widget.item(row, 5 )
                 name = name_item.text()

@@ -499,7 +499,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
         if the_model != '':
             tree.write(userconfig_path)
         logging.info(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
-                     f"value={the_value}, model={the_model}, name={setting_name}")
+                     f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}")
 
     else:
         # Check if an identical <models> element already exists; if so, skip
@@ -523,19 +523,27 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
         else:
             # Create child elements with the specified content
             models = ET.SubElement(root, "models")
-            for tag, value in [("name", setting_name),
-                               ("model", the_model),
-                               ("value", the_value),
-                               ("unit", unit),
-                               ("sim", the_sim),
-                               ("device", the_device)]:
-                ET.SubElement(models, tag).text = value
+            if unit is None or unit == '':
+                for tag, value in [("name", setting_name),
+                                   ("model", the_model),
+                                   ("value", the_value),
+                                   ("sim", the_sim),
+                                   ("device", the_device)]:
+                    ET.SubElement(models, tag).text = value
+            else:
+                for tag, value in [("name", setting_name),
+                                   ("model", the_model),
+                                   ("value", the_value),
+                                   ("unit", unit),
+                                   ("sim", the_sim),
+                                   ("device", the_device)]:
+                    ET.SubElement(models, tag).text = value
 
             # Write the modified XML back to the file
             tree = ET.ElementTree(root)
             tree.write(userconfig_path)
             logging.info(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
-                         f"value={the_value}, model={the_model}, name={setting_name}")
+                         f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}")
 
 
 def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
@@ -625,6 +633,8 @@ def clone_pattern(the_sim, old_pattern, new_pattern):
     for item in user_model_data:
         model_data.append(item)
     for item in model_data:
+        if item['unit'] is None:
+            item['unit'] = ''
         write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'], item['device'])
 
 

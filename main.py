@@ -164,6 +164,8 @@ sys.path.insert(0, '')
 
 
 _config_mtime = 0
+_future_config_update_time = time.time()
+_pending_config_update = False
 effects_translator = utils.EffectTranslator()
 
 #################
@@ -322,11 +324,19 @@ def format_dict(data, prefix=""):
 
 def config_has_changed(update=False) -> bool:
     # if update is true, update the current modified time
-    global _config_mtime
+    global _config_mtime, _future_config_update_time, _pending_config_update
     # "hash" both mtimes together
     tm = int(os.path.getmtime(userconfig_path)) + int(os.path.getmtime(defaults_path))
+    time_now = time.time()
+    update_delay = 0.4
     if _config_mtime != tm:
+        _future_config_update_time = time_now + update_delay
+        _pending_config_update = True
         _config_mtime = tm
+        logging.info(f'Config changed: Waiting {update_delay} seconds to read changes')
+    if _pending_config_update and time_now >= _future_config_update_time:
+        _pending_config_update = False
+        logging.info(f'Config changed: {update_delay} second timer expired, reading changes')
         return True
     return False
 
