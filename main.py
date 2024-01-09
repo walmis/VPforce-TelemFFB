@@ -2753,6 +2753,19 @@ class MainWindow(QMainWindow):
     def test_function(self):
         self.set_scrollbar(400)
 
+    def refresh_telem_status(self, dcs, il2, msfs):
+        dcs_status = "Enabled" if dcs else "Disabled"
+        il2_status = "Enabled" if il2 else "Disabled"
+        msfs_status = "Enabled" if msfs else "Disabled"
+
+        self.lbl_telem_data.setText(
+            f"Waiting for data...\n\n"
+            f"DCS Enabled: {dcs_status}\n"
+            f"IL2 Enabled: {il2_status}\n"
+            f"MSFS Enabled: {msfs_status}\n\n"
+            "Enable or Disable in System -> System Settings"
+        )
+
     def add_debug_menu(self):
         for action in self.menu.actions():
             if action.text() == "Debug":
@@ -4851,9 +4864,10 @@ def init_sims():
         il2_telem.start()
 
     sim_connect_telem = SimConnectSock(telem_manager)
+    msfs = utils.read_system_settings(args.device, args.type).get('enableMSFS', False)
+
     try:
         # msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
-        msfs = utils.read_system_settings(args.device, args.type).get('enableMSFS', False)
         logging.debug(f"MSFS={msfs}")
         if msfs or args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")
@@ -4863,6 +4877,11 @@ def init_sims():
     except:
         logging.exception("Error loading MSFS enable flag from config file")
 
+    dcs_status = "Enabled" if dcs_enabled else "Disabled"
+    il2_status = "Enabled" if il2_enabled else "Disabled"
+    msfs_status = "Enabled" if msfs else "Disabled"
+
+    window.refresh_telem_status(dcs_enabled, il2_enabled, msfs)
 
 def stop_sims():
     global dcs_telem, il2_telem, sim_connect_telem
