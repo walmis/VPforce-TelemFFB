@@ -77,6 +77,8 @@ parser.add_argument('--minimize', action='store_true', help='Minimize on startup
 args = parser.parse_args()
 
 # script_dir = os.path.dirname(os.path.abspath(__file__))
+QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
+QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True) #use highdpi icons
 
 headless_mode = args.headless
 
