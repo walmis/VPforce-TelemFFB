@@ -1893,6 +1893,19 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if val_entry == '':
             QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the selected Master Instance')
             return False
+        if self.cb_al_enable_c.isChecked() and self.tb_pid_c.text() == '':
+            r = self.tb_pid_c.text()
+            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the collective device or disable auto-launch')
+            return False
+        if self.cb_al_enable_j.isChecked() and self.tb_pid_j.text() == '':
+            r = self.tb_pid_j.text()
+            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the joystick device or disable auto-launch')
+            return False
+        if self.cb_al_enable_p.isChecked() and self.tb_pid_p.text() == '':
+            r = self.tb_pid_p.text()
+            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the pedals device or disable auto-launch')
+            return False
+
 
         return True
 
