@@ -26,7 +26,7 @@
    <string>TelemFFB Settings Manager</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0,0,0,0,0,0,0,0,0,0,0">
+   <layout class="QGridLayout" name="gridLayout" columnstretch="0,0,0,0,0,0,0,0,0,0,0,0,0">
     <item row="26" column="12">
      <widget class="QLabel" name="l_sliderfactor">
       <property name="enabled">
@@ -367,22 +367,6 @@
       </item>
      </widget>
     </item>
-    <item row="47" column="6">
-     <widget class="QLabel" name="l_manual">
-      <property name="text">
-       <string>&lt;a href=&quot;https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y&quot;&gt;Read TelemFFB manual for settings details&lt;/a&gt;</string>
-      </property>
-      <property name="textFormat">
-       <enum>Qt::RichText</enum>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-      <property name="openExternalLinks">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
     <item row="36" column="12">
      <widget class="Line" name="line_4">
       <property name="orientation">
@@ -515,6 +499,22 @@
       </property>
       <property name="text">
        <string>Delete User Model</string>
+      </property>
+     </widget>
+    </item>
+    <item row="47" column="6">
+     <widget class="QLabel" name="l_manual">
+      <property name="text">
+       <string>&lt;a href=&quot;https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y&quot;&gt;Read manual for details&lt;/a&gt;</string>
+      </property>
+      <property name="textFormat">
+       <enum>Qt::RichText</enum>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="openExternalLinks">
+       <bool>true</bool>
       </property>
      </widget>
     </item>
