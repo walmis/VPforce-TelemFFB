@@ -4991,8 +4991,11 @@ def main():
 
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info(f"TelemFFB (version {version}) Starting")
+    try:
+        vid_pid = [int(x, 16) for x in _device_vid_pid.split(":")]
+    except:
+        pass
 
-    vid_pid = [int(x, 16) for x in _device_vid_pid.split(":")]
     try:
         dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
         if args.reset:
