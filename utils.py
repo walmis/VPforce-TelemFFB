@@ -30,7 +30,7 @@ import sys
 
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from PyQt5 import QtCore, QtGui, Qt
-from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 import winpaths
 import winreg
@@ -1025,14 +1025,14 @@ class Teleplot:
 
 teleplot = Teleplot()
 
-from PyQt5.QtWidgets import QMessageBox
 
 
-def analyze_il2_config(path, port=34385):
+
+def analyze_il2_config(path, port=34385, window=None):
     config_data = defaultdict(dict)
     file_path = os.path.join(path, "data\\startup.cfg")
     if not os.path.exists(file_path):
-        QMessageBox.warning(None, "TelemFFB IL-2 Config Check",
+        QMessageBox.warning(window, "TelemFFB IL-2 Config Check",
                             f"Unable to find Il-2 configuration file at: {path}\n\nPlease verify the installed path and update the TelemFFB configuration file")
         return
     current_section = None
@@ -1166,7 +1166,7 @@ def analyze_il2_config(path, port=34385):
     if telem_match and motion_match:
         return
     else:
-        telem_message = QMessageBox()
+        telem_message = QMessageBox(parent=window)
         telem_message.setIcon(QMessageBox.Question)
         telem_message.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         telem_message.setWindowTitle("TelemFFB IL-2 Config")
@@ -1198,7 +1198,7 @@ def analyze_il2_config(path, port=34385):
             try:
                 write_il2_config(file_path, config_data)
             except Exception as e:
-                QMessageBox.warning(None, "Config Update Error",
+                QMessageBox.warning(window, "Config Update Error",
                                     f"There was an error writing to the Il-2 Config file:\n{e}")
         elif ans == QMessageBox.No:
             print(f"Answer: NO")
@@ -1219,7 +1219,7 @@ def write_il2_config(file_path, config_data):
             config_file.write("[END]\n\n")
 
 
-def install_export_lua():
+def install_export_lua(window):
     saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
     logging.info(f"Found Saved Games directory: {saved_games}")
 
@@ -1254,12 +1254,12 @@ def install_export_lua():
             crc_a, crc_b = calculate_checksum(out_path), calculate_checksum(local_telemffb)
 
             if crc_a != crc_b:
-                dia = QMessageBox.question(None, "Contents of TelemFFB.lua export script have changed",
+                dia = QMessageBox.question(window, "Contents of TelemFFB.lua export script have changed",
                                            f"Update export script {out_path} ?")
                 if dia == QMessageBox.StandardButton.Yes:
                     write_script()
         else:
-            dia = QMessageBox.question(None, "Confirm", f"Install export script into {path}?")
+            dia = QMessageBox.question(window, "Confirm", f"Install export script into {path}?")
             if dia == QMessageBox.StandardButton.Yes:
                 if not export_installed:
                     logging.info("Updating export.lua")
