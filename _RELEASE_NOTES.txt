@@ -14,7 +14,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
  - Dynamically manage unique config for any device from single master window
 - Automatic management of user settings override for all sims and FFB devices
 - Automated, built-in,  legacy user override file (.ini) conversion
-- much more!
+- much more!!
 
 ############################################
 ##  January 2, 2024
