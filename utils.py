@@ -1382,18 +1382,22 @@ class FetchLatestVersionThread(QThread):
             self.error_signal.emit(str(e))
 
 
-def launch_vpconf(serial):
+def launch_vpconf(serial=None):
     vpconf_path = winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
     # serial = HapticEffect.device.serial
 
-    if vpconf_path and serial is not None:
+    if vpconf_path:
         logging.info(f"Found VPforce Configurator at {vpconf_path}")
         logging.info(f"Launching VPforce Configurator....")
         workdir = os.path.dirname(vpconf_path)
         env = {}
         env["PATH"] = os.environ["PATH"]
         # logging.info(f"Loading vpconf for aircraft with: {vpconf_path} -config {params['vpconf']} -serial {serial}")
-        call = [vpconf_path, "-serial", serial]
+        if serial is not None:
+            # in case ability to pass serial to configurator command line is added
+            call = [vpconf_path, "-serial", serial]
+        else:
+            call = vpconf_path
         subprocess.Popen(call, cwd=workdir, env=env)
 
 

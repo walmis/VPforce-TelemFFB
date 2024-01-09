@@ -181,13 +181,14 @@ else:
 
 
 min_firmware_version = 'v1.0.15'
-global dev_firmware_version, dev_serial, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
+global dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
 global window, log_window, log_folder, log_file, log_tail_window
 
 _update_available = False
 _latest_version = None
 _latest_url = None
 _current_version = version
+dev_serial = None
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 
 
