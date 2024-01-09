@@ -77,6 +77,8 @@ parser.add_argument('--minimize', action='store_true', help='Minimize on startup
 args = parser.parse_args()
 
 # script_dir = os.path.dirname(os.path.abspath(__file__))
+QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
+QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True) #use highdpi icons
 
 headless_mode = args.headless
 
@@ -1891,6 +1893,19 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if val_entry == '':
             QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the selected Master Instance')
             return False
+        if self.cb_al_enable_c.isChecked() and self.tb_pid_c.text() == '':
+            r = self.tb_pid_c.text()
+            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the collective device or disable auto-launch')
+            return False
+        if self.cb_al_enable_j.isChecked() and self.tb_pid_j.text() == '':
+            r = self.tb_pid_j.text()
+            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the joystick device or disable auto-launch')
+            return False
+        if self.cb_al_enable_p.isChecked() and self.tb_pid_p.text() == '':
+            r = self.tb_pid_p.text()
+            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the pedals device or disable auto-launch')
+            return False
+
 
         return True
 
@@ -4976,8 +4991,11 @@ def main():
 
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info(f"TelemFFB (version {version}) Starting")
+    try:
+        vid_pid = [int(x, 16) for x in _device_vid_pid.split(":")]
+    except:
+        pass
 
-    vid_pid = [int(x, 16) for x in _device_vid_pid.split(":")]
     try:
         dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
         if args.reset:

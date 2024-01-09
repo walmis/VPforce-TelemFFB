@@ -2,7 +2,7 @@
 
 import PyInstaller.config
 
-PyInstaller.config.CONF['distpath'] = "./dist/VPforce-TelemFFB"
+PyInstaller.config.CONF['distpath'] = "./dist/windows/VPforce-TelemFFB"
 distpath = PyInstaller.config.CONF['distpath']
 block_cipher = None
 
