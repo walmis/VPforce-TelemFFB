@@ -99,6 +99,7 @@ class Aircraft(AircraftBase):
     critical_aoa_max = 25
 
     pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    elevator_droop_enabled = False
     elevator_droop_force = 0
     aircraft_vs_speed = 0
     aircraft_vs_gain = 0.25

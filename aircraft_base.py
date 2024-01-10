@@ -44,7 +44,7 @@ class AircraftBase(object):
     gforce_effect_enable : bool = False
 
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
-
+    elevator_droop_enabled: bool = False
     elevator_droop_force: float = 0.0
     aircraft_is_fbw: bool = False
 
@@ -594,7 +594,11 @@ class AircraftBase(object):
     ########################################
 
     def override_elevator_droop(self, telem_data):
-        if not self.is_joystick(): return
+        if not self.is_joystick():
+            return
+        if not self.elevator_droop_enabled or not self.elevator_droop_force:
+            effects.dispose('elev_droop')
+            return
 
         if telem_data['TAS'] < 20 * knots:
             force = utils.scale_clamp(telem_data['TAS'], (20 * knots, 0), (0, self.elevator_droop_force))

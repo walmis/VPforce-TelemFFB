@@ -972,6 +972,31 @@
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
+		<Grouping>Dynamic</Grouping>
+		<order>125</order>
+		<name>elevator_droop_enabled</name>
+		<info>Simulate Elevator droop at low speeds &lt;20Kt</info>
+		<displayname>Elevator Droop</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic</Grouping>
+		<order>125.1</order>
+		<name>elevator_droop_force</name>
+		<prereq>elevator_droop_enabled</prereq>
+		<info>Simulate Elevator droop at low speeds &lt;20Kt</info>
+		<displayname>Elevator Droop</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<sliderfactor>0.5</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.1</value>
+		<unit></unit>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>ETL</Grouping>
 		<order>230</order>
 		<name>etl_effect_enable</name>
@@ -6194,6 +6219,13 @@
 		<type>HPGHelicopter</type>
 		<value>0.8</value>
 		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>elevator_droop_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
