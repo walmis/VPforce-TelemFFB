@@ -2377,7 +2377,7 @@ class MainWindow(QMainWindow):
         status_layout.addWidget(self.msfs_label_icon, 0, 4)
         status_layout.addWidget(msfs_label, 0, 5)
         status_layout.setAlignment(Qt.AlignRight)
-
+        self.init_sim_indicators(['DCS', 'IL2', 'MSFS'], system_settings)
         # self.xplane_label_icon = QLabel("", self)
         # xplane_icon = self.create_colored_icon(xplane_color, self.icon_size)
         # self.xplane_label_icon.setPixmap(xplane_icon)
@@ -3182,47 +3182,44 @@ class MainWindow(QMainWindow):
         }
         enable_color = QColor(255, 255, 0)
         disable_color = QColor(128, 128, 128)
-        enable_color = self.create_colored_icon(enable_color, self.icon_size)
-        disable_color = self.create_x_icon(disable_color, self.icon_size)
+        enable_icon = self.create_colored_icon(enable_color, self.icon_size)
+        disable_icon = self.create_x_icon(disable_color, self.icon_size)
         for sim in sims:
             state = settings_dict.get(f"enable{sim}")
             lb = label_icons[sim]
             if state:
-                lb.setPixmap(enable_color)
+                lb.setPixmap(enable_icon)
+                lb.setToolTip("Sim is enabled, no telemetry yet received")
+
             else:
-                lb.setPixmap(disable_color)
+                lb.setPixmap(disable_icon)
+                lb.setToolTip("Sim is disabled")
 
     def update_sim_indicators(self, source, paused=False, error=False):
+        label_icons = {
+            'DCS': self.dcs_label_icon,
+            'IL2': self.il2_label_icon,
+            'MSFS2020': self.msfs_label_icon,
+        }
         active_color = QColor(0, 255, 0)
         paused_color = QColor(0, 0, 255)
         error_color = Qt.red
         active_icon = self.create_colored_icon(active_color, self.icon_size)
+        active_tooltip = "Sim is running, receiving telemetry"
         paused_icon = self.create_paused_icon(paused_color, self.icon_size)
+        paused_tooltip = "Telemetry stopped or sim is paused"
         error_icon = self.create_x_icon(error_color, self.icon_size)
+        error_tooltip = "Error condition: check log"
+        lb = label_icons[source]
         if error:
-            match source:
-                case 'DCS':
-                    self.dcs_label_icon.setPixmap(error_icon)
-                case 'IL2':
-                    self.il2_label_icon.setPixmap(error_icon)
-                case 'MSFS2020':
-                    self.msfs_label_icon.setPixmap(error_icon)
+            lb.setPixmap(error_icon)
+            lb.setToolTip(error_tooltip)
         elif not paused:
-            match source:
-                case 'DCS':
-                    self.dcs_label_icon.setPixmap(active_icon)
-                case 'IL2':
-                    self.il2_label_icon.setPixmap(active_icon)
-                case 'MSFS2020':
-                    self.msfs_label_icon.setPixmap(active_icon)
+            lb.setPixmap(active_icon)
+            lb.setToolTip(active_tooltip)
         elif paused:
-            match source:
-                case 'DCS':
-                    self.dcs_label_icon.setPixmap(paused_icon)
-                case 'IL2':
-                    self.il2_label_icon.setPixmap(paused_icon)
-                case 'MSFS2020':
-                    self.msfs_label_icon.setPixmap(paused_icon)
+            lb.setPixmap(paused_icon)
+            lb.setToolTip(paused_tooltip)
 
     def switch_window_view(self, index):
         previous_index = self.current_tab_index
