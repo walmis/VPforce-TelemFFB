@@ -428,16 +428,6 @@
       </property>
      </widget>
     </item>
-    <item row="15" column="10">
-     <widget class="QLabel" name="label_2">
-      <property name="text">
-       <string>Current Device:</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-      </property>
-     </widget>
-    </item>
     <item row="37" column="4">
      <widget class="QPushButton" name="b_createusermodel">
       <property name="text">
@@ -515,6 +505,16 @@
       </property>
       <property name="openExternalLinks">
        <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="15" column="9" colspan="2">
+     <widget class="QLabel" name="label_2">
+      <property name="text">
+       <string>Device Scope:</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
       </property>
      </widget>
     </item>
