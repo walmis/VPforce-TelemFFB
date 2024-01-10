@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>607</width>
-    <height>524</height>
+    <width>620</width>
+    <height>515</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -18,14 +18,14 @@
   </property>
   <property name="minimumSize">
    <size>
-    <width>490</width>
-    <height>355</height>
+    <width>620</width>
+    <height>515</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
-    <width>800</width>
-    <height>800</height>
+    <width>620</width>
+    <height>515</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -59,8 +59,8 @@
   <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">
     <rect>
-     <x>402</x>
-     <y>484</y>
+     <x>430</x>
+     <y>481</y>
      <width>156</width>
      <height>23</height>
     </rect>
@@ -75,9 +75,9 @@
   <widget class="QPushButton" name="resetButton">
    <property name="geometry">
     <rect>
-     <x>20</x>
-     <y>484</y>
-     <width>101</width>
+     <x>21</x>
+     <y>481</y>
+     <width>121</width>
      <height>23</height>
     </rect>
    </property>
