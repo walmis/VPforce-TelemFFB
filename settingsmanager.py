@@ -835,6 +835,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         myclass = self.drp_class.currentText()
         mymodel = self.drp_models.currentText()
 
+        scroll_pos = self.table_widget.verticalScrollBar().value()  # Capture current scrollbar position
+
         self.table_widget.blockSignals(True)
         if state:
 
@@ -854,10 +856,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 case 'Model':
                     lprint(f"Override - {self.sim}.{mymodel}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
                     xmlutils.write_models_to_xml(self.sim, mymodel,data_dict['value'],data_dict['name'])
-
-                    # self.drp_models.setCurrentText('')
-                    # self.drp_models.setCurrentText(mymodel)
-        # make value editable & reset view
 
             self.reload_table()
             self.table_widget.selectRow(row)
@@ -887,7 +885,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.reload_table()
             self.clear_propmgr()
         self.table_widget.blockSignals(False)
-
+        self.table_widget.verticalScrollBar().setValue(scroll_pos)  # recall previous scrollbar position
 
 
     def update_table_on_model_change(self):
