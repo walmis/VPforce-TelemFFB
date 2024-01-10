@@ -4035,10 +4035,18 @@ class SettingsLayout(QGridLayout):
 
     def browse_for_config(self):
         options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
+        # options |= QFileDialog.DontUseNativeDialog
+        calling_button = self.sender()
+        starting_dir = os.getcwd()
+        if calling_button:
+            tooltip_text = calling_button.toolTip()
+            print(f"Tooltip text of the calling button: {tooltip_text}")
+            if os.path.isfile(tooltip_text):
+                # Use the existing file path as the starting point
+                starting_dir = os.path.dirname(tooltip_text)
 
         # Open the file browser dialog
-        file_path, _ = QFileDialog.getOpenFileName(self.mainwindow, "Choose File", "", "vpconf Files (*.vpconf);;All Files (*)", options=options)
+        file_path, _ = QFileDialog.getOpenFileName(self.mainwindow, "Choose File", starting_dir, "vpconf Files (*.vpconf)", options=options)
 
         if file_path:
             lprint(f"Selected File: {file_path}")

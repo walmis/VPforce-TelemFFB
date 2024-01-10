@@ -742,16 +742,25 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
 
     def choose_directory(self):
-        mprint("choose_directory")
+        current_text = self.tb_value.text()
+        # options |= QFileDialog.DontUseNativeDialog
+
+        if current_text and os.path.isfile(current_text):
+            # Use the existing file path as the starting point
+            starting_dir = os.path.dirname(current_text)
+        else:
+            # Use the current working directory as the starting point
+            starting_dir = os.getcwd()
+
         options = QFileDialog.Options()
-        options |= QFileDialog.ShowDirsOnly | QFileDialog.DontUseNativeDialog
 
-        # Open the directory browser dialog
-        directory = QFileDialog.getExistingDirectory(self, "Choose Directory", options=options)
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Choose File", starting_dir,
+            "vpconf Files (*.vpconf)", options=options
+        )
 
-        if directory:
-            lprint(f"Selected Directory: {directory}")
-            self.tb_value.setText(directory)
+        if file_path:
+            self.tb_value.setText(file_path)
 
     def handle_item_change(self,  item):
         mprint(f"handle_item_change {item}")
