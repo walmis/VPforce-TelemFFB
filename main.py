@@ -1770,6 +1770,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_p.clicked.connect(self.toggle_launchmode_cbs)
         self.cb_headless_c.setObjectName('headless_c')
         self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
     def reset_settings(self):
         # Load default settings and update widgets
