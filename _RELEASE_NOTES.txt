@@ -1,4 +1,18 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+############################################
+##  January 9, 2024
+############################################
+# General fixes
+- patched several issues raised on github
+- fixed missing elevator droop effect for DCS
+- increased max setting range for runway rumble effect
+- fixed new aircraft clone from existing issue
+- fixed file access issue with repetitive successive config write/reloads
+- fixed issue with selecting vpconf profile from Settings Manager interface
+- better handle malformed user configs during legacy config conversion
+## previous version...
+- enable PyQT high DPI scaling to avoid mangled UI with high resolution/window scale values
+- disallow invalid auto-launch setup configurations
 
 ############################################
 ##  January 8, 2024
