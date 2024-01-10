@@ -1826,8 +1826,8 @@
 		<name>runway_rumble_intensity</name>
 		<prereq>runway_rumble_enabled</prereq>
 		<MSFS>true</MSFS>
-		<value>0.2</value>
-		<sliderfactor>0.4</sliderfactor>
+		<value>0.9</value>
+		<sliderfactor>4.0</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<info>Peak runway rumble intensity</info>
