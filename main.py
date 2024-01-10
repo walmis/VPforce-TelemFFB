@@ -3477,6 +3477,7 @@ class SettingsLayout(QGridLayout):
         if result is not None:
             self.build_rows(result)
         self.device = HapticEffect()
+        self.setColumnMinimumWidth(7, 20)
 
     def handleScrollKeyPressEvent(self, event):
         # Forward key events to each slider in the layout
@@ -3958,14 +3959,18 @@ class SettingsLayout(QGridLayout):
         erase_button.setObjectName(f"eb_{item['name']}")
         pixmapi = QStyle.SP_DockWidgetCloseButton
         icon = erase_button.style().standardIcon(pixmapi)
-        erase_button.setIcon(icon)
 
         erase_button.clicked.connect(lambda _, name=item['name']: self.erase_setting(name))
-
+        erase_button.setIcon(QIcon())
+        erase_button.setStyleSheet(":disabled { background-color: transparent;}")
+        erase_button.setToolTip("")
+        self.addWidget(erase_button, i, erase_col)
+        erase_button.setEnabled(False)
         if item['replaced'] == 'Model (user)':
             if item['name'] != 'type':  # dont erase type on mainwindow settings
-                self.addWidget(erase_button, i, erase_col)
-                # print(f"erase {item['name']} button set up")
+                erase_button.setIcon(icon)
+                erase_button.setEnabled(True)
+                erase_button.setToolTip("Reset to Default")
 
         self.setRowStretch(i, 0)
 
