@@ -3450,7 +3450,9 @@ class MainWindow(QMainWindow):
                 call = [updater_execution_path, "--current_version", _current_version] + args_list
                 subprocess.Popen(call, cwd=_install_path)
                 if auto:
-                    QCoreApplication.instance().quit()
+                    for child_widget in self.findChildren(QMessageBox):
+                        child_widget.reject()
+                    QTimer.singleShot(250, lambda: exit_application())
                 else:
                     return True
 
