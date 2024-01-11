@@ -188,7 +188,6 @@
 		<order>16</order>
 		<name>trim_workaround</name>
 		<info>Apply artificial trim movement - only for aircraft that do not support native FFB trim&lt;b&gt;&lt;b&gt;(AV8B, Mig-19)</info>
-		<value>false</value>
 		<datatype>bool</datatype>
 		<displayname>Trim Workaround</displayname>
 		<DCS>true</DCS>
@@ -7635,6 +7634,20 @@
 		<value>false</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_workaround</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_workaround</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>type</name>
