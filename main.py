@@ -3805,7 +3805,7 @@ class SettingsLayout(QGridLayout):
             slider.sliderPressed.connect(self.sldDisconnect)
             slider.sliderReleased.connect(self.sldReconnect)
             self.addWidget(slider, i, entry_col, 1, entry_colspan)
-            self.addWidget(value_label, i, val_col)
+            self.addWidget(value_label, i, val_col, alignment=Qt.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
 
             slider.blockSignals(False)
