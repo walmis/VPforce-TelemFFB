@@ -3771,7 +3771,7 @@ class SettingsLayout(QGridLayout):
         self.usbdevice_button.clicked.connect(self.usb_button_clicked)
 
         value_label = QLabel()
-        value_label.setAlignment(Qt.AlignHCenter)
+        value_label.setAlignment(Qt.AlignVCenter)
         value_label.setMaximumWidth(50)
         value_label.setObjectName(f"vl_{item['name']}")
         sliderfactor = QLabel(f"{item['sliderfactor']}")
@@ -3962,14 +3962,18 @@ class SettingsLayout(QGridLayout):
 
         erase_button.clicked.connect(lambda _, name=item['name']: self.erase_setting(name))
         erase_button.setIcon(QIcon())
-        erase_button.setStyleSheet(":disabled { background-color: transparent;}")
+
         erase_button.setToolTip("")
         self.addWidget(erase_button, i, erase_col)
-        erase_button.setEnabled(False)
+        sp_retain = erase_button.sizePolicy()
+        sp_retain.setRetainSizeWhenHidden(True)
+        erase_button.setSizePolicy(sp_retain)
+
+        erase_button.setVisible(False)
         if item['replaced'] == 'Model (user)':
             if item['name'] != 'type':  # dont erase type on mainwindow settings
                 erase_button.setIcon(icon)
-                erase_button.setEnabled(True)
+                erase_button.setVisible(True)
                 erase_button.setToolTip("Reset to Default")
 
         self.setRowStretch(i, 0)
