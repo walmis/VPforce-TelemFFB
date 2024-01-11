@@ -805,24 +805,10 @@ class AircraftBase(object):
             effects.dispose("overspeedY")
             return
         if blade_ct is None:
-            if "UH-1H" in mod:
-                blade_ct = 2
-            elif "KA-50" in mod:
-                blade_ct = 3
-            elif "Mi-8MT" in mod:
-                blade_ct = 5
-            elif "Mi-24P" in mod:
-                blade_ct = 5
-            elif "AH-64" in mod:
-                blade_ct = 4
-                rotor = 245  # Apache does not have exportable data related to Rotor RPM
-            elif "UH-60L" in mod:
-                blade_ct = 4
-            elif "SA342" in mod:
-                blade_ct = 3
-            else:
-                blade_ct = 2
-                rotor = 250
+            blade_ct = 2
+            rotor = 250
+        if "AH-64" in mod:
+            rotor = 245  # Apache does not have exportable data related to Rotor RPM
 
         self.etl_shake_frequency = (rotor / 75) * blade_ct
         self.overspeed_shake_frequency = self.etl_shake_frequency * 0.75
@@ -868,24 +854,11 @@ class AircraftBase(object):
         #     return
 
         if blade_ct is None:
-            if "UH-1H" in mod:
-                blade_ct = 2
-            elif "KA-50" in mod:
-                blade_ct = 2
-            elif "Mi-8MT" in mod:
-                blade_ct = 5
-            elif "Mi-24P" in mod:
-                blade_ct = 5
-            elif "AH-64" in mod:
-                blade_ct = 2
-                rrpm = 245
-            elif "UH-60L" in mod:
-                blade_ct = 4
-            elif "SA342" in mod:
-                blade_ct = 2
-            else:
-                blade_ct = 2
-                rrpm = 250
+            blade_ct = 2
+            rrpm = 250
+        if "AH-64" in mod:
+            rrpm = 245  # Apache does not have exportable data related to Rotor RPM
+
         logging.debug(f"Engine Rumble: Blade_Ct={blade_ct}, RPM={rrpm}")
         frequency = float(rrpm) / 45 * blade_ct
 

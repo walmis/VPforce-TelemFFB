@@ -37,6 +37,7 @@ class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
     ####
     #### Beta effects - set to 1 to enable
+    rotor_blade_count = 2
     deceleration_effect_enable = 0
     deceleration_effect_enable_areyoureallysure = 0
     deceleration_max_force = 0.5
@@ -587,5 +588,5 @@ class Helicopter(Aircraft):
         telem_data["AircraftClass"] = "Helicopter"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
-        self._calc_etl_effect(telem_data)
-        self._update_heli_engine_rumble(telem_data)
+        self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
+        self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
