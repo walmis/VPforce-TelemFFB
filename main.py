@@ -3649,6 +3649,7 @@ class SettingsLayout(QGridLayout):
                 widget.deleteLater()
 
     def generate_settings_row(self, item, i, rowdisabled=False):
+        self.setRowMinimumHeight(i, 25)
         entry_colspan = 2
         lbl_colspan = 2
 
