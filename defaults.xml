@@ -2459,6 +2459,13 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>rotor_blade_count</name>
+		<model>AH-64D_BLK_II</model>
+		<value>4</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>AH-64D_BLK_II</model>
 		<value>Helicopter</value>
@@ -4572,6 +4579,13 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>rotor_blade_count</name>
+		<model>Ka-50</model>
+		<value>3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Ka-50</model>
 		<value>Helicopter</value>
@@ -4689,12 +4703,26 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>rotor_blade_count</name>
+		<model>Mi-24P</model>
+		<value>3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Mi-24P</model>
 		<value>Helicopter</value>
 		<sim>DCS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>Mi-8MT</model>
+		<value>5</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>type</name>
 		<model>Mi-8MT</model>
@@ -5333,6 +5361,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>rotor_blade_count</name>
+		<model>SA342.*</model>
+		<value>3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>SA342.*</model>
 		<value>Helicopter</value>
@@ -5667,6 +5702,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>rotor_blade_count</name>
+		<model>UH-1H</model>
+		<value>2</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>UH-1H</model>
 		<value>Helicopter</value>
@@ -5709,6 +5751,13 @@
 		<unit></unit>
 		<sim>DCS</sim>
 		<device>joystick</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>UH-60L</model>
+		<value>4</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
