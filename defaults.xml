@@ -360,7 +360,8 @@
 		<name>rotor_blade_count</name>
 		<any>true</any>
 		<MSFS>true</MSFS>
-		<datatype>int</datatype>
+		<validvalues>2,3,4,5,6,7,8</validvalues>
+		<datatype>list</datatype>
 		<displayname>Rotor Blade Count</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
