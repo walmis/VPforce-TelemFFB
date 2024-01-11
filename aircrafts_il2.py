@@ -67,6 +67,7 @@ class Aircraft(AircraftBase):
 
 
     runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
+    runway_rumble_enabled: bool = False
     il2_runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
 
     gun_vibration_intensity : float = 0.12          # peak gunfire vibration intensity, 0 to disable
@@ -100,6 +101,7 @@ class Aircraft(AircraftBase):
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
 
     gun_is_firing = 0
+    damage_effect_enabled: bool = False
     damage_effect_intensity: float = 0
     il2_shake_master = 0
     il2_enable_weapons = 0
@@ -159,6 +161,11 @@ class Aircraft(AircraftBase):
         else:
             effects.dispose("il2_buffet")
     def _update_damage(self, telem_data):
+        if not self.damage_effect_enabled or not self.damage_effect_intensity:
+            effects.dispose("hit")
+            effects.dispose("damage")
+            return
+
         hit = telem_data.get("Hits")
         damage = telem_data.get("Damage")
         hit_freq = 5
