@@ -3788,10 +3788,12 @@ class SettingsLayout(QGridLayout):
             # print(f"label {value_label.objectName()} for slider {slider.objectName()}")
             factor = float(item['sliderfactor'])
             if '%' in item['value']:
-                pctval = int(item['value'].replace('%', ''))
+                floatval = float(item['value'].replace('%', ''))
+                val = floatval / 100
             else:
-                pctval = int(float(item['value']) * 100)
-            pctval = int(round(pctval / factor))
+                val = float(item['value'])
+
+            pctval = int((val / factor) * 100)
             if self.show_slider_debug:
                 logging.debug(f"read value: {item['value']}  factor: {item['sliderfactor']} slider: {pctval}")
             slider.blockSignals(True)
@@ -3801,6 +3803,7 @@ class SettingsLayout(QGridLayout):
                 slider.setRange(int(validvalues[0]), int(validvalues[1]))
             slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
+            # value_label.setToolTip(f"Actual Value: %{int(val * 100)}")
             slider.valueChanged.connect(self.slider_changed)
             slider.sliderPressed.connect(self.sldDisconnect)
             slider.sliderReleased.connect(self.sldReconnect)
