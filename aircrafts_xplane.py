@@ -776,20 +776,20 @@ class Aircraft(AircraftBase):
 
     def on_telemetry(self, telem_data):
         pass
-        # if telem_data.get("STOP",0):
-        #     self.on_timeout()
-        #     return
-        # effects["pause_spring"].spring().stop()
+        if telem_data.get("STOP",0):
+            self.on_timeout()
+            return
+        effects["pause_spring"].spring().stop()
         # if telem_data["Parked"]: # Aircraft is parked, do nothing
         #     return
         #
-        # super().on_telemetry(telem_data)
+        super().on_telemetry(telem_data)
         #
-        # ### Generic Aircraft Class Telemetry Handler
-        # if not "AircraftClass" in telem_data:
-        #     telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
-        #
-        # self._update_runway_rumble(telem_data)
+        ### Generic Aircraft Class Telemetry Handler
+        if not "AircraftClass" in telem_data:
+            telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
+
+        self._update_runway_rumble(telem_data)
         # self._update_buffeting(telem_data)
         # self._update_flight_controls(telem_data)
         # self._decel_effect(telem_data)

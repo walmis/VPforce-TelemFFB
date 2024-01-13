@@ -21,6 +21,7 @@ SOCKET udpSocket;
 struct sockaddr_in serverAddr;
 
 /* Data refs we will record. */
+static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");
 static XPLMDataRef gGs_axil = XPLMFindDataRef("sim/flightmodel/forces/g_axil");
 static XPLMDataRef gGs_nrml = XPLMFindDataRef("sim/flightmodel/forces/g_nrml"); // "G's"
 static XPLMDataRef gGs_side = XPLMFindDataRef("sim/flightmodel/forces/g_side");
@@ -64,13 +65,14 @@ void CollectTelemetryData()
     // Add the aircraft name to telemetryData
     telemetryData["src"] = "XPLANE";
     telemetryData["N"] = aircraftName;
+    telemetryData["STOP"] = std::to_string(XPLMGetDatai(gPaused));
     // Collect relevant data and populate the telemetryData map
     telemetryData["T"] = FloatToString(XPLMGetElapsedTime(), 3);
     telemetryData["G"] = FloatToString(XPLMGetDataf(gGs_nrml), 3);
     telemetryData["Gz"] = FloatToString(XPLMGetDataf(gGs_axil), 3);
     telemetryData["Gx"] = FloatToString(XPLMGetDataf(gGs_side), 3);
 
-    telemetryData["TAS"] = FloatToString(XPLMGetDataf(gTAS) * kt_2_mps, 3);
+    telemetryData["TAS"] = FloatToString(XPLMGetDataf(gTAS), 3);
     telemetryData["AirDensity"] = FloatToString(XPLMGetDataf(gAirDensity), 3);
     telemetryData["AoA"] = FloatToString(XPLMGetDataf(gAoA), 3);
 
@@ -83,22 +85,22 @@ void CollectTelemetryData()
     XPLMGetDatavf(gWoW, wow_array, 0, 9);
 
     std::ostringstream wow;
-    wow << "[";
 
     // Set precision for floating-point values
     wow << std::fixed << std::setprecision(3);
 
     for (int i = 0; i < 5; ++i) {
         wow << wow_array[i];
-        if (i < 9) {
-            wow << ", ";
+        if (i < 4) {
+            wow << "~";  // Add tilde separator between values, except for the last one
         }
     }
-    wow << "]";
+
+    std::string wowString = wow.str();
 
     telemetryData["WeightOnWheels"] = wow.str();
 
-    telemetryData["AccBody"] = "[" + FloatToString(XPLMGetDataf(gAccLocal_x), 3) + ", " + FloatToString(XPLMGetDataf(gAccLocal_y), 3) + ", " + FloatToString(XPLMGetDataf(gAccLocal_z), 3) + "]";
+    telemetryData["AccBody"] =  FloatToString(XPLMGetDataf(gAccLocal_x), 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_y), 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_z), 3);
 
     telemetryData["Latitude"] = FloatToString(XPLMGetDataf(gPlaneLat), 3);
     telemetryData["Longitude"] = FloatToString(XPLMGetDataf(gPlaneLon), 3);
