@@ -294,6 +294,7 @@ if not args.child:
 import aircrafts_dcs
 import aircrafts_msfs
 import aircrafts_il2
+import aircrafts_xplane
 from sc_manager import SimConnectManager
 from il2_telem import IL2Manager
 from aircraft_base import effects
@@ -653,6 +654,8 @@ class TelemManager(QObject, threading.Thread):
             # 5 = Turboprop
         elif data_source == "IL2":
             module = aircrafts_il2
+        elif data_source == 'XPLANE':
+            module = aircrafts_xplane
         else:
             module = aircrafts_dcs
 
@@ -2376,8 +2379,22 @@ class MainWindow(QMainWindow):
         msfs_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         status_layout.addWidget(self.msfs_label_icon, 0, 4)
         status_layout.addWidget(msfs_label, 0, 5)
+
+        self.xplane_label_icon = QLabel("", self)
+        self.xplane_label_icon.setPixmap(dcs_icon)
+        self.xplane_label_icon.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        dcs_label = QLabel("X-Plane", self)
+        dcs_label.setStyleSheet("""padding: 2px""")
+        dcs_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        status_layout.addWidget(self.xplane_label_icon, 0, 6)
+        status_layout.addWidget(dcs_label, 0, 7)
+
+
         status_layout.setAlignment(Qt.AlignRight)
-        self.init_sim_indicators(['DCS', 'IL2', 'MSFS'], system_settings)
+        self.init_sim_indicators(['DCS', 'IL2', 'MSFS', 'XPLANE'], system_settings)
+
+
+
         # self.xplane_label_icon = QLabel("", self)
         # xplane_icon = self.create_colored_icon(xplane_color, self.icon_size)
         # self.xplane_label_icon.setPixmap(xplane_icon)
@@ -3179,6 +3196,8 @@ class MainWindow(QMainWindow):
             'DCS': self.dcs_label_icon,
             'IL2': self.il2_label_icon,
             'MSFS': self.msfs_label_icon,
+            'XPLANE': self.xplane_label_icon,
+
         }
         enable_color = QColor(255, 255, 0)
         disable_color = QColor(128, 128, 128)
@@ -3200,6 +3219,7 @@ class MainWindow(QMainWindow):
             'DCS': self.dcs_label_icon,
             'IL2': self.il2_label_icon,
             'MSFS2020': self.msfs_label_icon,
+            'XPLANE': self.xplane_label_icon,
         }
         active_color = QColor(0, 255, 0)
         paused_color = QColor(0, 0, 255)
@@ -4821,7 +4841,15 @@ def restart_sims():
 
 
 def init_sims():
-    global dcs_telem, il2_telem, sim_connect_telem, telem_manager
+    global dcs_telem, il2_telem, sim_connect_telem, telem_manager, xplane_telem
+    xplane_enabled = True
+
+    xplane_telem = NetworkThread(telem_manager, host='', port=34390)
+    # xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE', False)
+    if xplane_enabled or args.sim == 'XPLANE':
+        logging.info("Starting XPlane Telemetry Listener")
+        xplane_telem.start()
+
     dcs_telem = NetworkThread(telem_manager, host="", port=34380)
     # dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
     dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS', False)
@@ -4875,7 +4903,8 @@ def init_sims():
     window.refresh_telem_status(dcs_enabled, il2_enabled, msfs)
 
 def stop_sims():
-    global dcs_telem, il2_telem, sim_connect_telem
+    global dcs_telem, il2_telem, sim_connect_telem, xplane_telem
+    xplane_telem.quit()
     dcs_telem.quit()
     il2_telem.quit()
     sim_connect_telem.quit()
