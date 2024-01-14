@@ -10,10 +10,13 @@ import xml.dom.minidom
 print_debugs = False
 print_method_calls = False
 
-
 device = ''
 userconfig_path = ''
 defaults_path = ''
+
+def write_userconfig_xml(tree : ET.ElementTree):
+    ET.indent(tree, " ")
+    tree.write(userconfig_path, "utf-8")
 
 
 def update_vars(_device, _userconfig_path, _defaults_path):
@@ -497,7 +500,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
             if child_elem.tag == 'unit':
                 child_elem.text = str(unit)
         if the_model != '':
-            tree.write(userconfig_path)
+            write_userconfig_xml(tree)
         logging.info(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}")
 
@@ -541,7 +544,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
 
             # Write the modified XML back to the file
             tree = ET.ElementTree(root)
-            tree.write(userconfig_path)
+            write_userconfig_xml(tree)
             logging.info(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
                          f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}")
 
@@ -566,7 +569,7 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
         for child_elem in class_elem:
             if child_elem.tag == 'value':
                 child_elem.text = str(the_value)
-        tree.write(userconfig_path)
+        write_userconfig_xml(tree)
         logging.info(f"Updated <classSettings> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}, model={the_class}, name={setting_name}")
 
@@ -583,7 +586,7 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
 
         # Write the modified XML back to the file
         tree = ET.ElementTree(root)
-        tree.write(userconfig_path)
+        write_userconfig_xml(tree)
         logging.info(f"Added <classSettings> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}{unit}, type={the_class}, name={setting_name}")
 
@@ -607,7 +610,8 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
         for child_elem in sim_elem:
             if child_elem.tag == 'value':
                 child_elem.text = str(the_value)
-        tree.write(userconfig_path)
+
+        write_userconfig_xml(tree)
         logging.info(f"Updated <simSettings> element with values: sim={the_sim}, device={the_device}, "
                      f"value={the_value}, name={setting_name}")
 
@@ -623,7 +627,7 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
 
         # Write the modified XML back to the file
         tree = ET.ElementTree(root)
-        tree.write(userconfig_path)
+        write_userconfig_xml(tree)
         logging.info(
             f"Added <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}{unit}, name={setting_name}")
 
@@ -683,7 +687,7 @@ def erase_models_from_xml(the_sim, the_model, setting_name):
     for elem in elements_to_remove:
         root.remove(elem)
         # Write the modified XML back to the file
-        tree.write(userconfig_path)
+        write_userconfig_xml(tree)
         logging.info(f"Removed <models> element with values: sim={the_sim}, device={the_device}, "
                   f"model={the_model}, name={setting_name}")
 
@@ -708,7 +712,7 @@ def erase_entire_model_from_xml(the_sim, the_model):
     for elem in elements_to_remove:
         root.remove(elem)
         # Write the modified XML back to the file
-        tree.write(userconfig_path)
+        write_userconfig_xml(tree)
         logging.info(f"Removed all <models> elements with values: sim={the_sim} model={the_model}")
 
 
@@ -737,7 +741,7 @@ def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
     for elem in elements_to_remove:
         root.remove(elem)
         # Write the modified XML back to the file
-        tree.write(userconfig_path)
+        write_userconfig_xml(tree)
         logging.info(f"Removed <classSettings> element with values: sim={the_sim}, device={the_device}, "
                   f"value={the_value}, type={the_class}, name={setting_name}")
 
@@ -766,7 +770,7 @@ def erase_sim_from_xml(the_sim, the_value, setting_name):
     for elem in elements_to_remove:
         root.remove(elem)
         # Write the modified XML back to the file
-        tree.write(userconfig_path)
+        write_userconfig_xml(tree)
         logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}, name={setting_name}")
 
 
