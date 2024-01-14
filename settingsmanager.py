@@ -5,7 +5,7 @@ import os
 import shutil
 from PyQt5 import QtGui, QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
-                             QVBoxLayout, QPushButton, QFileDialog, QMessageBox)
+                             QVBoxLayout, QPushButton, QFileDialog, QMessageBox, QHeaderView)
 from PyQt5.QtWidgets import QTableWidget, QTextEdit, QWidget, QSlider
 from datetime import datetime
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -152,7 +152,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         mprint(f"init_ui")
 
         # xmlutils.create_empty_userxml_file()  # Now handled by TelemFFB on startup
-
+        self.table_widget.horizontalHeader().setStretchLastSection(True) 
+        self.table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.tb_currentmodel.setText(self.model_name)
 
         self.get_current_model('', '')
