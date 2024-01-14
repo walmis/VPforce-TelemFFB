@@ -1,5 +1,24 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
+##  January 14, 2024
+############################################
+#General
+- Changing vpconf file now supports hot-changing
+- Fix null character making its way into a/c ascii name in IL2 decoder
+- Fix decel effect missing from MSFS settings
+
+############################################
+##  January 12, 2024
+############################################
+# General fixes
+- fix settings slider snapping to wrong % value after settings change
+- fix GitHub issues 21, 22, 23, 27
+ - #23 - fix shifting of settings tab layout when changing settings
+ - #21, #22 - add tooltips to status icons and setting revert button
+ - #27 - fix SM interface returning to top after changing setting
+- other ui/operation/settings enhancement/cleanup
+
+############################################
 ##  January 9, 2024
 ############################################
 # General fixes
