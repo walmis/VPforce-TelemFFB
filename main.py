@@ -713,15 +713,8 @@ class TelemManager(QObject, threading.Thread):
                         logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
                         Class = module.Aircraft
 
-                vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
-                if vpconf_path and "vpconf" in params:
-                    logging.info(f"Found VPforce Configurator at {vpconf_path}")
-                    serial = HapticEffect.device.serial
-                    workdir = os.path.dirname(vpconf_path)
-                    env = {}
-                    env["PATH"] = os.environ["PATH"]
-                    logging.info(f"Loading vpconf for aircraft with: {vpconf_path} -config {params['vpconf']} -serial {serial}")
-                    subprocess.call([vpconf_path, "-config", params["vpconf"], "-serial", serial], cwd=workdir, env=env)
+                if "vpconf" in params:
+                    utils.set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
 
                 logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
 
@@ -744,6 +737,8 @@ class TelemManager(QObject, threading.Thread):
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
                 updated_params = self.get_changed_params(params)
                 self.currentAircraft.apply_settings(updated_params)
+                if "vpconf" in updated_params:
+                    utils.set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
                 self.updateSettingsLayout.emit()
             try:
                 _tm = time.perf_counter()
