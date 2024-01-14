@@ -413,7 +413,7 @@ class IL2Manager():
                 name_data = data.get_data(name_length)
                 # print(f"NAMEDATA={name_data}")
                 name_hex = name_data.hex().upper()
-                aircraft_name = name_data.decode('ascii').strip()
+                aircraft_name = name_data.decode('ascii').rstrip('\x00')
                 # print(f"ACNAME={aircraft_name}")
                 # aircraft_name = ''.join(c for c in aircraft_name if ord(c) <= 127)
                 if aircraft_name != self.ac_name:
