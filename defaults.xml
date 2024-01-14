@@ -1695,12 +1695,14 @@
 		<Grouping>G Force</Grouping>
 		<order>755</order>
 		<name>deceleration_effect_enable</name>
+		<MSFS>true</MSFS>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		<displayname>Deceleration Effect</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -1708,6 +1710,7 @@
 		<order>755.1</order>
 		<name>deceleration_max_force</name>
 		<prereq>deceleration_effect_enable</prereq>
+		<MSFS>true</MSFS>
 		<value>0.6</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -1715,6 +1718,7 @@
 		<displayname>Deceleration Max Force</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		</defaults>
 	<defaults>

@@ -303,6 +303,8 @@ class AircraftBase(object):
             y_gs = telem_data.get("ACCs")[0]
         elif self._sim_is("MSFS2020"):
             y_gs = telem_data.get("AccBody")[2]
+        elif self._sim_is_xplane():
+            y_gs = -telem_data.get("Gaxil")
         if not self.anything_has_changed("decel", y_gs):
             return
         if not sum(telem_data.get("WeightOnWheels")):
@@ -657,7 +659,7 @@ class AircraftBase(object):
         
         if type(rpm) == list:
             rpm = max(rpm)
-        print(rpm)
+
         frequency = float(rpm) / 60
 
         # frequency = 20

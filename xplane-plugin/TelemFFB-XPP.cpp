@@ -96,8 +96,8 @@ void CollectTelemetryData()
     telemetryData["SimPaused"] = std::to_string(XPLMGetDatai(gPaused));
     telemetryData["T"] = FloatToString(XPLMGetElapsedTime(), 3);
     telemetryData["G"] = FloatToString(XPLMGetDataf(gGs_nrml), 3);
-    telemetryData["Gz"] = FloatToString(XPLMGetDataf(gGs_axil), 3);
-    telemetryData["Gx"] = FloatToString(XPLMGetDataf(gGs_side), 3);
+    telemetryData["Gaxil"] = FloatToString(XPLMGetDataf(gGs_axil), 3);
+    telemetryData["Gside"] = FloatToString(XPLMGetDataf(gGs_side), 3);
 
     telemetryData["TAS"] = FloatToString(XPLMGetDataf(gTAS), 3);
     telemetryData["AirDensity"] = FloatToString(XPLMGetDataf(gAirDensity), 3);
