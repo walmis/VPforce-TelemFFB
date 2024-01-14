@@ -1604,6 +1604,7 @@
 		<Grouping>G Force</Grouping>
 		<order>755</order>
 		<name>deceleration_effect_enable</name>
+		<MSFS>true</MSFS>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
@@ -1617,6 +1618,7 @@
 		<order>755.1</order>
 		<name>deceleration_max_force</name>
 		<prereq>deceleration_effect_enable</prereq>
+		<MSFS>true</MSFS>
 		<value>0.6</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
