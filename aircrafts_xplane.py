@@ -790,7 +790,7 @@ class Aircraft(AircraftBase):
             telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
 
         self._update_runway_rumble(telem_data)
-        # self._update_buffeting(telem_data)
+        self._update_buffeting(telem_data)
         # self._update_flight_controls(telem_data)
         # self._decel_effect(telem_data)
         #
@@ -834,16 +834,16 @@ class PropellerAircraft(Aircraft):
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         pass
-        # ### Propeller Aircraft Class Telemetry Handler
-        # if telem_data.get("N") == None:
-        #     return
-        # telem_data["AircraftClass"] = "PropellerAircraft"  # inject aircraft class into telemetry
-        # if telem_data.get("STOP",0):
-        #     self.on_timeout()
-        #     return
-        # super().on_telemetry(telem_data)
-        #
-        # self.update_piston_engine_rumble(telem_data)
+        ### Propeller Aircraft Class Telemetry Handler
+        if telem_data.get("N") == None:
+            return
+        telem_data["AircraftClass"] = "PropellerAircraft"  # inject aircraft class into telemetry
+        if telem_data.get("STOP",0):
+            self.on_timeout()
+            return
+        super().on_telemetry(telem_data)
+
+        self.update_piston_engine_rumble(telem_data)
         #
         # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
         #     sp = max(telem_data.get("Spoilers", 0))

@@ -2476,7 +2476,7 @@ class MainWindow(QMainWindow):
         test_sim_lbl = QLabel('Sim:')
         test_sim_lbl.setMaximumWidth(30)
         test_sim_lbl.setAlignment(Qt.AlignRight)
-        sims = ['', 'DCS', 'IL2', 'MSFS']
+        sims = ['', 'DCS', 'IL2', 'MSFS', 'XPLANE']
         self.test_sim = QComboBox()
         self.test_sim.setMaximumWidth(60)
         self.test_sim.addItems(sims)

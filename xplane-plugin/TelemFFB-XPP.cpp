@@ -5,6 +5,7 @@
 #include <sstream>
 #include <cstdarg>
 #include <string>
+#include <vector>
 #include <map>
 #include <cstring>
 #include <winsock2.h>
@@ -31,22 +32,49 @@ static XPLMDataRef gAccLocal_z = XPLMFindDataRef("sim/flightmodel/position/local
 static XPLMDataRef gTAS = XPLMFindDataRef("sim/flightmodel/position/true_airspeed");
 static XPLMDataRef gAirDensity = XPLMFindDataRef("sim/weather/rho");
 static XPLMDataRef gAoA = XPLMFindDataRef("sim/flightmodel/position/alpha");
+static XPLMDataRef gWarnAlpha = XPLMFindDataRef("sim/aircraft/overflow/acf_stall_warn_alpha");
+static XPLMDataRef gSlip = XPLMFindDataRef("sim/flightmodel/position/beta");
 static XPLMDataRef gWoW = XPLMFindDataRef("sim/flightmodel2/gear/tire_vertical_deflection_mtr");
-static XPLMDataRef gPlaneLat = XPLMFindDataRef("sim/flightmodel/position/latitude");
-static XPLMDataRef gPlaneLon = XPLMFindDataRef("sim/flightmodel/position/longitude");
-static XPLMDataRef gPlaneEl = XPLMFindDataRef("sim/flightmodel/position/elevation");
+static XPLMDataRef gEngRPM = XPLMFindDataRef("sim/flightmodel/engine/ENGN_tacrad");
+static XPLMDataRef gPropRPM = XPLMFindDataRef("sim/flightmodel/engine/POINT_tacrad");
+static XPLMDataRef gVne = XPLMFindDataRef("sim/aircraft/view/acf_Vne");
+static XPLMDataRef gVso = XPLMFindDataRef("sim/aircraft/view/acf_Vso");
 
 std::map<std::string, std::string> telemetryData;
 
 static float MyFlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void* inRefcon);
 
-const float kt_2_mps = 0.514444; // convert knots to meters per second
+const float kt_2_mps = 0.51444; // convert knots to meters per second
+const float radps_2_rpm = 9.5493; // convert rad/sec to rev/min
 
-std::string FloatToString(float value, int precision)
-{
+std::string FloatToString(float value, int precision, float conversionFactor = 1.0) {
+    value *= conversionFactor; // Apply the conversion factor
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(precision) << value;
     return stream.str();
+}
+
+// Function to convert an array of floats to a formatted string with an optional conversion factor
+std::string FloatArrayToString(XPLMDataRef dataRef, int offset, int size, float conversionFactor = 1.0) {
+    // Use std::vector for dynamic memory allocation
+    std::vector<float> dataArray(size);
+
+    // Retrieve the entire array of values
+    XPLMGetDatavf(dataRef, dataArray.data(), offset, size);
+
+    std::ostringstream formattedString;
+
+    // Set precision for floating-point values
+    formattedString << std::fixed << std::setprecision(3);
+
+    for (int i = 0; i < size; ++i) {
+        formattedString << dataArray[i] * conversionFactor; // Apply the conversion factor
+        if (i < size - 1) {
+            formattedString << "~";  // Add tilde separator between values, except for the last one
+        }
+    }
+
+    return formattedString.str();
 }
 
 void CollectTelemetryData()
@@ -62,11 +90,10 @@ void CollectTelemetryData()
         *lastDot = '\0';
     }
 
-    // Add the aircraft name to telemetryData
     telemetryData["src"] = "XPLANE";
     telemetryData["N"] = aircraftName;
     telemetryData["STOP"] = std::to_string(XPLMGetDatai(gPaused));
-    // Collect relevant data and populate the telemetryData map
+    telemetryData["SimPaused"] = std::to_string(XPLMGetDatai(gPaused));
     telemetryData["T"] = FloatToString(XPLMGetElapsedTime(), 3);
     telemetryData["G"] = FloatToString(XPLMGetDataf(gGs_nrml), 3);
     telemetryData["Gz"] = FloatToString(XPLMGetDataf(gGs_axil), 3);
@@ -75,36 +102,16 @@ void CollectTelemetryData()
     telemetryData["TAS"] = FloatToString(XPLMGetDataf(gTAS), 3);
     telemetryData["AirDensity"] = FloatToString(XPLMGetDataf(gAirDensity), 3);
     telemetryData["AoA"] = FloatToString(XPLMGetDataf(gAoA), 3);
+    telemetryData["WarnAlpha"] = FloatToString(XPLMGetDataf(gWarnAlpha), 3);
+    telemetryData["SideSlip"] = FloatToString(XPLMGetDataf(gSlip), 3);
+    telemetryData["Vne"] = FloatToString(XPLMGetDataf(gVne) * kt_2_mps, 3);
+    telemetryData["Vso"] = FloatToString(XPLMGetDataf(gVso) * kt_2_mps, 3);
 
-    int numGear;
-    numGear = XPLMGetDatavf(gWoW, NULL, 0, 0);
-    telemetryData["NumGear"] = std::to_string(numGear);
-
-    float wow_array[10];
-    // Retrieve the entire array of values
-    XPLMGetDatavf(gWoW, wow_array, 0, 9);
-
-    std::ostringstream wow;
-
-    // Set precision for floating-point values
-    wow << std::fixed << std::setprecision(3);
-
-    for (int i = 0; i < 5; ++i) {
-        wow << wow_array[i];
-        if (i < 4) {
-            wow << "~";  // Add tilde separator between values, except for the last one
-        }
-    }
-
-    std::string wowString = wow.str();
-
-    telemetryData["WeightOnWheels"] = wow.str();
+    telemetryData["WeightOnWheels"] = FloatArrayToString(gWoW, 0, 4);
+    telemetryData["EngRPM"] = FloatArrayToString(gEngRPM, 0, 4, radps_2_rpm);
+    telemetryData["PropRPM"] = FloatArrayToString(gPropRPM, 0, 4, radps_2_rpm);
 
     telemetryData["AccBody"] =  FloatToString(XPLMGetDataf(gAccLocal_x), 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_y), 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_z), 3);
-
-    telemetryData["Latitude"] = FloatToString(XPLMGetDataf(gPlaneLat), 3);
-    telemetryData["Longitude"] = FloatToString(XPLMGetDataf(gPlaneLon), 3);
-    telemetryData["Elevation"] = FloatToString(XPLMGetDataf(gPlaneEl), 3);
 
 
 }

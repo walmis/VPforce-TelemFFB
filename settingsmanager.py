@@ -272,7 +272,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def setup_sim_list(self):
         mprint("setup_class_list")
         self.drp_sim.blockSignals(True)
-        sims = ['DCS', 'IL2', 'MSFS']
+        sims = ['DCS', 'IL2', 'MSFS', 'XPLANE']
         self.drp_sim.clear()
         self.drp_sim.addItems(sims)
         self.drp_sim.setCurrentText(self.sim)
@@ -303,6 +303,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             case 'MSFS':
                 for enable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                    lprint(f"enable {enable}")
+                    self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
+
+            case 'XPLANE':
+                for disable in {'HPGHelicopter'}:
+                    lprint(f"disable {disable}")
+                    self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
+                for enable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter'}:
                     lprint(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
@@ -1032,7 +1040,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         if mode != oldmode:
             match mode:
-                case 'MSFS' | 'IL2' | 'DCS':
+                case 'MSFS' | 'IL2' | 'DCS' | 'XPLANE':
                     mode = 'Sim'
 
             self.l_mode.setText(mode)
@@ -1169,6 +1177,8 @@ class UserModelDialog(QDialog):
                 classes = ["PropellerAircraft", "JetAircraft"]
             case 'MSFS':
                 classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter']
+            case 'XPLANE':
+                classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter']
 
         # FOR TESTING
         # classes.append('AllSettings')

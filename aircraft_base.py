@@ -158,6 +158,12 @@ class AircraftBase(object):
         else:
             return 0
 
+    def _sim_is_xplane(self):
+        if self._telem_data.get('src') == "XPLANE":
+            return True
+        else:
+            return False
+
     def _sim_is_dcs(self, *unused):
         if self._telem_data.get("src") == "DCS":
             return 1
@@ -331,6 +337,9 @@ class AircraftBase(object):
         if self._sim_is_msfs():
             local_stall_aoa = telem_data.get("StallAoA", 0)   # Get stall AoA telemetry from MSFS
             local_buffet_aoa = local_stall_aoa * (stall_buffet_threshold_percent/100)
+        elif self._sim_is_xplane():
+            local_buffet_aoa = telem_data.get("WarnAlpha", 0)
+            local_stall_aoa = local_buffet_aoa * 1.25
         else:
             local_stall_aoa = self.stall_aoa
             local_buffet_aoa = self.buffet_aoa
@@ -638,7 +647,7 @@ class AircraftBase(object):
 
         if self._sim_is('DCS'):
             rpm = telem_data.get("ActualRPM", 0.0)
-        elif self._sim_is('MSFS2020'):
+        elif self._sim_is('MSFS2020') or self._sim_is_xplane():
             rpm = telem_data.get("PropRPM", 0.0)
         elif self._sim_is('IL2'):
             rpm = telem_data.get("RPM", 0.0)
@@ -648,7 +657,7 @@ class AircraftBase(object):
         
         if type(rpm) == list:
             rpm = max(rpm)
-
+        print(rpm)
         frequency = float(rpm) / 60
 
         # frequency = 20
