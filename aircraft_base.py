@@ -769,7 +769,10 @@ class AircraftBase(object):
         precision = 2
         effect_index = 4
         phase_offset = 120
-        jet_eng_rpm = telem_data.get("EngRPM", 0)
+        if self._sim_is_xplane():
+            jet_eng_rpm = telem_data.get("EngPCT", 0)
+        else:
+            jet_eng_rpm = telem_data.get("EngRPM", 0)
         if type(jet_eng_rpm) == list:
             jet_eng_rpm = max(jet_eng_rpm)
        
@@ -807,7 +810,11 @@ class AircraftBase(object):
         if mod == "UH-60L":
             # UH60 always shows positive value for tailwheel
             WoW = telem_data.get("WeightOnWheels")[0] + telem_data.get("WeightOnWheels")[2]
-        rotor = telem_data.get("RotorRPM", 0)
+
+        if self._sim_is_xplane():
+            rotor = telem_data.get("PropRPM", 0)[0]
+        else:
+            rotor = telem_data.get("RotorRPM", 0)
         if WoW > 0:
             # logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
             effects.dispose("etlX")
@@ -850,8 +857,10 @@ class AircraftBase(object):
             effects.dispose("rotor_rpm0-1")
             effects.dispose("rotor_rpm1-1")
             return
-        
-        rrpm = telem_data.get("RotorRPM")
+        if self._sim_is_xplane():
+            rrpm = telem_data.get("PropRPM", 0)[0]
+        else:
+            rrpm = telem_data.get("RotorRPM")
         mod = telem_data.get("N")
         tas = telem_data.get("TAS", 0)
         eng_rpm = telem_data.get("EngRPM", 0)

@@ -480,19 +480,24 @@ class Aircraft(AircraftBase):
             ailer_base_gain = self.aileron_spring_gain
             rudder_base_gain = self.rudder_spring_gain
             logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{ailer_base_gain}:{elev_base_gain}, rudder base gain to {rudder_base_gain}")
-        
-        incidence_vec = utils.Vector(telem_data["VelWorld"])
-        wind_vec = utils.Vector(telem_data["AmbWind"])
-        incidence_vec = incidence_vec - wind_vec
-        # Rotate the vector from world frame into body frame
-        incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
-        incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
-        incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
+        if telem_data['src'] == "XPLANE":
+            incidence_vec = utils.Vector(telem_data["VelAcf"])
+        else:
+            incidence_vec = utils.Vector(telem_data["VelWorld"])
+            wind_vec = utils.Vector(telem_data["AmbWind"])
+            incidence_vec = incidence_vec - wind_vec
+            # Rotate the vector from world frame into body frame
+            incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
+            incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
+            incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
+
+
         force_trim_x_offset = self.force_trim_x_offset
         force_trim_y_offset = self.force_trim_y_offset
 
         _airspeed = incidence_vec.z
         telem_data["TAS"] = _airspeed
+        telem_data['TAS3'] = _airspeed
 
         base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
         base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
@@ -505,18 +510,25 @@ class Aircraft(AircraftBase):
         # print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
 
         slip_angle = atan2(incidence_vec.x, incidence_vec.z)
+        telem_data["rawSideSlip"] = telem_data["SideSlip"]
         telem_data["SideSlip"] = slip_angle*deg # overwrite sideslip with our calculated version (including wind)
         g_force = telem_data["G"] # this includes earths gravity
 
         _aoa = -atan2(incidence_vec.y, incidence_vec.z)*deg
+        telem_data["rawAoA"] = telem_data["AoA"]
         telem_data["AoA"] = _aoa
 
         # calculate air flow velocity exiting the prop
         # based on https://www.grc.nasa.gov/www/k-12/airplane/propth.html
-        _prop_thrust1 = telem_data.get('PropThrust1', 0)
-        if _prop_thrust1 < 0:
+        _prop_thrust = telem_data.get('PropThrust', 0)
+        if isinstance(_prop_thrust, list):
+            _prop_thrust = max(_prop_thrust)
+
+        if _prop_thrust < 0:
             _prop_thrust1 = 0
-        _prop_air_vel = sqrt(2 * _prop_thrust1 / (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
+        _prop_air_vel = sqrt(2 * _prop_thrust / (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
+
+        telem_data['_prop_thrust'] = _prop_thrust
 
         if abs(incidence_vec.y) > 0.5 or _prop_air_vel > 1: # avoid edge cases
             _elevator_aoa = atan2(-incidence_vec.y, _prop_air_vel) * deg

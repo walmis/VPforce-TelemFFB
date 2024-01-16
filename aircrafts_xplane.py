@@ -480,19 +480,27 @@ class Aircraft(AircraftBase):
             ailer_base_gain = self.aileron_spring_gain
             rudder_base_gain = self.rudder_spring_gain
             logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{ailer_base_gain}:{elev_base_gain}, rudder base gain to {rudder_base_gain}")
-        
-        incidence_vec = utils.Vector(telem_data["VelWorld"])
-        wind_vec = utils.Vector(telem_data["AmbWind"])
-        incidence_vec = incidence_vec - wind_vec
-        # Rotate the vector from world frame into body frame
-        incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
-        incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
-        incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
+        if telem_data['src'] == "XPLANE":
+            incidence_vec = utils.Vector(telem_data["VelAcf"])
+            incidence_vec.x = -incidence_vec.x
+            incidence_vec.y = -incidence_vec.y
+            incidence_vec.z = -incidence_vec.z
+        else:
+            incidence_vec = utils.Vector(telem_data["VelWorld"])
+            wind_vec = utils.Vector(telem_data["AmbWind"])
+            incidence_vec = incidence_vec - wind_vec
+            # Rotate the vector from world frame into body frame
+            incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
+            incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
+            incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
+
+
         force_trim_x_offset = self.force_trim_x_offset
         force_trim_y_offset = self.force_trim_y_offset
 
         _airspeed = incidence_vec.z
         telem_data["TAS"] = _airspeed
+        telem_data['TAS3'] = _airspeed
 
         base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
         base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
@@ -503,20 +511,32 @@ class Aircraft(AircraftBase):
         rudder_angle = telem_data["RudderDefl"] * rad  # + trim?
 
         # print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
+        if telem_data['src'] == 'XPLANE':
+            slip_angle = telem_data['SideSlip']
+        else:
 
-        slip_angle = atan2(incidence_vec.x, incidence_vec.z)
-        telem_data["SideSlip"] = slip_angle*deg # overwrite sideslip with our calculated version (including wind)
+            slip_angle = atan2(incidence_vec.x, incidence_vec.z)
+            telem_data["SideSlip"] = slip_angle*deg # overwrite sideslip with our calculated version (including wind)
+
         g_force = telem_data["G"] # this includes earths gravity
 
-        _aoa = -atan2(incidence_vec.y, incidence_vec.z)*deg
+        if telem_data['src'] == 'XPLANE2':
+            _aoa = telem_data['AoA']
+        else:
+            _aoa = -atan2(incidence_vec.y, incidence_vec.z)*deg
         telem_data["AoA"] = _aoa
 
         # calculate air flow velocity exiting the prop
         # based on https://www.grc.nasa.gov/www/k-12/airplane/propth.html
-        _prop_thrust1 = telem_data.get('PropThrust1', 0)
-        if _prop_thrust1 < 0:
+        _prop_thrust = telem_data.get('PropThrust', 0)
+        if isinstance(_prop_thrust, list):
+            _prop_thrust = max(_prop_thrust)
+
+        if _prop_thrust < 0:
             _prop_thrust1 = 0
-        _prop_air_vel = sqrt(2 * _prop_thrust1 / (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
+        _prop_air_vel = sqrt(2 * _prop_thrust / (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
+
+        telem_data['_prop_thrust'] = _prop_thrust
 
         if abs(incidence_vec.y) > 0.5 or _prop_air_vel > 1: # avoid edge cases
             _elevator_aoa = atan2(-incidence_vec.y, _prop_air_vel) * deg
@@ -675,6 +695,7 @@ class Aircraft(AircraftBase):
             telem_data["_pct_max_e"] = pct_max_e
             self._ipc_telem["_pct_max_e"] = pct_max_e
             logging.debug(f"Elev Coef: {ec}")
+            telem_data['_ec'] = ec
 
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = ec
 
@@ -775,7 +796,6 @@ class Aircraft(AircraftBase):
         logging.info(f"on_event {event} {args}")
 
     def on_telemetry(self, telem_data):
-        pass
         if telem_data.get("STOP",0):
             self.on_timeout()
             return
@@ -833,7 +853,6 @@ class PropellerAircraft(Aircraft):
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
-        pass
         ### Propeller Aircraft Class Telemetry Handler
         if telem_data.get("N") == None:
             return
@@ -1064,22 +1083,22 @@ class Helicopter(Aircraft):
 
     def on_telemetry(self, telem_data):
         pass
-        # self.speedbrake_motion_intensity = 0.0
-        # if telem_data.get("N") == None:
-        #     return
-        # telem_data["AircraftClass"] = "Helicopter"  # inject aircraft class into telemetry
-        # if telem_data.get("STOP",0):
-        #     self.on_timeout()
-        #     return
-        # super().on_telemetry(telem_data)
+        self.speedbrake_motion_intensity = 0.0
+        if telem_data.get("N") == None:
+            return
+        telem_data["AircraftClass"] = "Helicopter"  # inject aircraft class into telemetry
+        if telem_data.get("STOP",0):
+            self.on_timeout()
+            return
+        super().on_telemetry(telem_data)
         #
-        # self._update_heli_controls(telem_data)
+        self._update_heli_controls(telem_data)
         # self._update_collective(telem_data)
         # # self._update_cyclic_trim(telem_data)
         # self._update_pedals(telem_data)
-        # self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
-        # self._update_jet_engine_rumble(telem_data)
-        # self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
+        self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
+        self._update_jet_engine_rumble(telem_data)
+        self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val):
         current_time_ms = time.time() * 1000  # Convert current time to milliseconds
@@ -1165,7 +1184,8 @@ class Helicopter(Aircraft):
                     self.cyclic_center = [x, y]
 
                     logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
-                    self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
+                    if telem_data['src'] == "MSFS2020":
+                        self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
 
                     self.cyclic_trim_release_active = 0
@@ -1192,7 +1212,8 @@ class Helicopter(Aircraft):
 
                     self.spring_x.cpOffset = self.cpO_x
                     self.spring_y.cpOffset = self.cpO_y
-                    self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
+                    if telem_data['src'] == "MSFS2020":
+                        self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
                     logging.info("Trim Reset Pressed")
 

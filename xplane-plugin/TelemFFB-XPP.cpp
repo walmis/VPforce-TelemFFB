@@ -18,25 +18,35 @@
 
 
 /* UDP socket variables */
-SOCKET udpSocket;
+SOCKET udpSocket_rx;
 struct sockaddr_in serverAddr;
 
 /* Data refs we will record. */
 static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");
+static XPLMDataRef gOnGround = XPLMFindDataRef("sim/flightmodel/failures/onground_all");
 static XPLMDataRef gGs_axil = XPLMFindDataRef("sim/flightmodel/forces/g_axil");
 static XPLMDataRef gGs_nrml = XPLMFindDataRef("sim/flightmodel/forces/g_nrml"); // "G's"
 static XPLMDataRef gGs_side = XPLMFindDataRef("sim/flightmodel/forces/g_side");
 static XPLMDataRef gAccLocal_x = XPLMFindDataRef("sim/flightmodel/position/local_ax");
 static XPLMDataRef gAccLocal_y = XPLMFindDataRef("sim/flightmodel/position/local_ay");
 static XPLMDataRef gAccLocal_z = XPLMFindDataRef("sim/flightmodel/position/local_az");
+static XPLMDataRef gVelAcf_x = XPLMFindDataRef("sim/flightmodel/forces/vx_acf_axis");
+static XPLMDataRef gVelAcf_y = XPLMFindDataRef("sim/flightmodel/forces/vy_acf_axis");
+static XPLMDataRef gVelAcf_z = XPLMFindDataRef("sim/flightmodel/forces/vz_acf_axis");
 static XPLMDataRef gTAS = XPLMFindDataRef("sim/flightmodel/position/true_airspeed");
 static XPLMDataRef gAirDensity = XPLMFindDataRef("sim/weather/rho");
+static XPLMDataRef gDynPress = XPLMFindDataRef("sim/flightmodel/misc/Qstatic");
+static XPLMDataRef gPropThrust = XPLMFindDataRef("sim/flightmodel/engine/POINT_thrust");
+
 static XPLMDataRef gAoA = XPLMFindDataRef("sim/flightmodel/position/alpha");
 static XPLMDataRef gWarnAlpha = XPLMFindDataRef("sim/aircraft/overflow/acf_stall_warn_alpha");
 static XPLMDataRef gSlip = XPLMFindDataRef("sim/flightmodel/position/beta");
 static XPLMDataRef gWoW = XPLMFindDataRef("sim/flightmodel2/gear/tire_vertical_deflection_mtr");
 static XPLMDataRef gEngRPM = XPLMFindDataRef("sim/flightmodel/engine/ENGN_tacrad");
+static XPLMDataRef gEngPCT = XPLMFindDataRef("sim/flightmodel/engine/ENGN_N1_");
 static XPLMDataRef gPropRPM = XPLMFindDataRef("sim/flightmodel/engine/POINT_tacrad");
+static XPLMDataRef gRudDefl_l = XPLMFindDataRef("sim/flightmodel/controls/ldruddef");
+static XPLMDataRef gRudDefl_r = XPLMFindDataRef("sim/flightmodel/controls/rdruddef");
 static XPLMDataRef gVne = XPLMFindDataRef("sim/aircraft/view/acf_Vne");
 static XPLMDataRef gVso = XPLMFindDataRef("sim/aircraft/view/acf_Vso");
 
@@ -46,6 +56,7 @@ static float MyFlightLoopCallback(float inElapsedSinceLastCall, float inElapsedT
 
 const float kt_2_mps = 0.51444; // convert knots to meters per second
 const float radps_2_rpm = 9.5493; // convert rad/sec to rev/min
+const float fps_2_g = 0.031081; // convert feet per second to g
 
 std::string FloatToString(float value, int precision, float conversionFactor = 1.0) {
     value *= conversionFactor; // Apply the conversion factor
@@ -94,6 +105,7 @@ void CollectTelemetryData()
     telemetryData["N"] = aircraftName;
     telemetryData["STOP"] = std::to_string(XPLMGetDatai(gPaused));
     telemetryData["SimPaused"] = std::to_string(XPLMGetDatai(gPaused));
+    telemetryData["SimOnGround"] = std::to_string(XPLMGetDatai(gOnGround));
     telemetryData["T"] = FloatToString(XPLMGetElapsedTime(), 3);
     telemetryData["G"] = FloatToString(XPLMGetDataf(gGs_nrml), 3);
     telemetryData["Gaxil"] = FloatToString(XPLMGetDataf(gGs_axil), 3);
@@ -101,6 +113,7 @@ void CollectTelemetryData()
 
     telemetryData["TAS"] = FloatToString(XPLMGetDataf(gTAS), 3);
     telemetryData["AirDensity"] = FloatToString(XPLMGetDataf(gAirDensity), 3);
+    telemetryData["DynPressure"] = FloatToString(XPLMGetDataf(gDynPress), 3);
     telemetryData["AoA"] = FloatToString(XPLMGetDataf(gAoA), 3);
     telemetryData["WarnAlpha"] = FloatToString(XPLMGetDataf(gWarnAlpha), 3);
     telemetryData["SideSlip"] = FloatToString(XPLMGetDataf(gSlip), 3);
@@ -109,9 +122,15 @@ void CollectTelemetryData()
 
     telemetryData["WeightOnWheels"] = FloatArrayToString(gWoW, 0, 4);
     telemetryData["EngRPM"] = FloatArrayToString(gEngRPM, 0, 4, radps_2_rpm);
+    telemetryData["EngPCT"] = FloatArrayToString(gEngPCT, 0, 4);
     telemetryData["PropRPM"] = FloatArrayToString(gPropRPM, 0, 4, radps_2_rpm);
+    telemetryData["PropThrust"] = FloatArrayToString(gPropThrust, 0, 4);
+    telemetryData["RudderDefl"] = FloatToString(XPLMGetDataf(gRudDefl_l), 3);
+    telemetryData["RudderDefl_l"] = FloatToString(XPLMGetDataf(gRudDefl_l), 3);
+    telemetryData["RudderDefl_r"] = FloatToString(XPLMGetDataf(gRudDefl_r), 3);
 
-    telemetryData["AccBody"] =  FloatToString(XPLMGetDataf(gAccLocal_x), 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_y), 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_z), 3);
+    telemetryData["AccBody"] =  FloatToString(XPLMGetDataf(gAccLocal_x) * fps_2_g, 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_y) * fps_2_g, 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_z) * fps_2_g, 3);
+    telemetryData["VelAcf"] =  FloatToString(XPLMGetDataf(gVelAcf_x), 3) + "~" + FloatToString(XPLMGetDataf(gVelAcf_y), 3) + "~" + FloatToString(XPLMGetDataf(gVelAcf_z), 3);
 
 
 }
@@ -128,7 +147,7 @@ void FormatAndSendTelemetryData()
     }
 
     // Send the data over the UDP socket
-    sendto(udpSocket, dataString.c_str(), dataString.length(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+    sendto(udpSocket_rx, dataString.c_str(), dataString.length(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
 }
 
 
@@ -154,9 +173,9 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc)
     }
 
     // Create a UDP socket
-    udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    udpSocket_rx = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
-    if (udpSocket == INVALID_SOCKET)
+    if (udpSocket_rx == INVALID_SOCKET)
     {
         XPLMDebugString("Failed to create UDP socket\n");
         WSACleanup();
@@ -186,7 +205,7 @@ PLUGIN_API void XPluginStop(void)
     XPLMUnregisterFlightLoopCallback(MyFlightLoopCallback, NULL);
 
     // Close the UDP socket
-    closesocket(udpSocket);
+    closesocket(udpSocket_rx);
     WSACleanup();
 }
 
