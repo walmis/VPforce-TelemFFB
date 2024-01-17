@@ -9,6 +9,7 @@
 #include <map>
 #include <cstring>
 #include <winsock2.h>
+#define XPLM300 1
 #include "XPLMProcessing.h"
 #include "XPLMDataAccess.h"
 #include "XPLMUtilities.h"
