@@ -667,8 +667,13 @@ class Aircraft(AircraftBase):
                 # calculate maximum angle based on current angle and percentage
                 tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
                 tas = telem_data.get("TAS")  # m/s
-                vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
-                speed_factor = utils.scale_clamp(tas, (0, vc * 1.4), (0.0, 1.0))  # rough estimate that Vne is 1.4x Vc
+                if telem_data['src'] == 'XPLANE':
+                    vne = telem_data.get('Vne')
+                    vs0 = telem_data.get('Vso')
+                else:
+                    vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
+                    vne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
+                speed_factor = utils.scale_clamp(tas, (0, vne), (0.0, 1.0))
                 y_offs = _aoa / tot
                 y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
                 y_offs = clamp(y_offs, -1, 1)
@@ -758,8 +763,13 @@ class Aircraft(AircraftBase):
 
             self.spring.effect.setCondition(self.spring_x)
             tas = telem_data.get("TAS")
-            vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
-            speed_factor = utils.scale_clamp(tas, (0, vc * 1.4), (0.0, 1.0))  # rough estimate that Vne is 1.4x Vc
+            if telem_data['src'] == 'XPLANE':
+                vne = telem_data.get('Vne')
+                vs0 = telem_data.get('Vso')
+            else:
+                vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
+                vne = vc * 1.4   # rough estimate that Vne is 1.4x Vc
+            speed_factor = utils.scale_clamp(tas, (0, vne), (0.0, 1.0))
             rud_force = rud_force * speed_factor
             # telem_data["RudForce"] = rud_force * speed_factor
 
