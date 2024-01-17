@@ -1,11 +1,11 @@
 ﻿  TelemFFB-XPP.cpp
-C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(57,24): warning C4305: 'initializing': truncation from 'double' to 'float'
-C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(58,27): warning C4305: 'initializing': truncation from 'double' to 'float'
-C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(59,23): warning C4305: 'initializing': truncation from 'double' to 'float'
-C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(150,63): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(56,24): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(57,27): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(58,23): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(149,63): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(157,5): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
 C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(158,5): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
 C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(159,5): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
-C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(160,5): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
-C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(189,34): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(188,34): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
      Creating library .\Debug\64\TimedProcessing.lib and object .\Debug\64\TimedProcessing.exp
   TelemFFB-XPP.vcxproj -> C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\Debug\plugins\TelemFFB-XPP\64\win.xpl

@@ -22,33 +22,32 @@ SOCKET udpSocket_rx;
 struct sockaddr_in serverAddr;
 
 /* Data refs we will record. */
-static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");
-static XPLMDataRef gOnGround = XPLMFindDataRef("sim/flightmodel/failures/onground_all");
-static XPLMDataRef gGs_axil = XPLMFindDataRef("sim/flightmodel/forces/g_axil");
-static XPLMDataRef gGs_nrml = XPLMFindDataRef("sim/flightmodel/forces/g_nrml"); // "G's"
-static XPLMDataRef gGs_side = XPLMFindDataRef("sim/flightmodel/forces/g_side");
-static XPLMDataRef gAccLocal_x = XPLMFindDataRef("sim/flightmodel/position/local_ax");
-static XPLMDataRef gAccLocal_y = XPLMFindDataRef("sim/flightmodel/position/local_ay");
-static XPLMDataRef gAccLocal_z = XPLMFindDataRef("sim/flightmodel/position/local_az");
-static XPLMDataRef gVelAcf_x = XPLMFindDataRef("sim/flightmodel/forces/vx_acf_axis");
-static XPLMDataRef gVelAcf_y = XPLMFindDataRef("sim/flightmodel/forces/vy_acf_axis");
-static XPLMDataRef gVelAcf_z = XPLMFindDataRef("sim/flightmodel/forces/vz_acf_axis");
-static XPLMDataRef gTAS = XPLMFindDataRef("sim/flightmodel/position/true_airspeed");
-static XPLMDataRef gAirDensity = XPLMFindDataRef("sim/weather/rho");
-static XPLMDataRef gDynPress = XPLMFindDataRef("sim/flightmodel/misc/Qstatic");
-static XPLMDataRef gPropThrust = XPLMFindDataRef("sim/flightmodel/engine/POINT_thrust");
-
-static XPLMDataRef gAoA = XPLMFindDataRef("sim/flightmodel/position/alpha");
-static XPLMDataRef gWarnAlpha = XPLMFindDataRef("sim/aircraft/overflow/acf_stall_warn_alpha");
-static XPLMDataRef gSlip = XPLMFindDataRef("sim/flightmodel/position/beta");
-static XPLMDataRef gWoW = XPLMFindDataRef("sim/flightmodel2/gear/tire_vertical_deflection_mtr");
-static XPLMDataRef gEngRPM = XPLMFindDataRef("sim/flightmodel/engine/ENGN_tacrad");
-static XPLMDataRef gEngPCT = XPLMFindDataRef("sim/flightmodel/engine/ENGN_N1_");
-static XPLMDataRef gPropRPM = XPLMFindDataRef("sim/flightmodel/engine/POINT_tacrad");
-static XPLMDataRef gRudDefl_l = XPLMFindDataRef("sim/flightmodel/controls/ldruddef");
-static XPLMDataRef gRudDefl_r = XPLMFindDataRef("sim/flightmodel/controls/rdruddef");
-static XPLMDataRef gVne = XPLMFindDataRef("sim/aircraft/view/acf_Vne");
-static XPLMDataRef gVso = XPLMFindDataRef("sim/aircraft/view/acf_Vso");
+static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");                                        // boolean • int • v6.60+
+static XPLMDataRef gOnGround = XPLMFindDataRef("sim/flightmodel/failures/onground_all");                // int • v6.60+
+static XPLMDataRef gGs_axil = XPLMFindDataRef("sim/flightmodel/forces/g_axil");                         // Gs • float • v6.60+
+static XPLMDataRef gGs_nrml = XPLMFindDataRef("sim/flightmodel/forces/g_nrml");                         // Gs • float • v6.60+
+static XPLMDataRef gGs_side = XPLMFindDataRef("sim/flightmodel/forces/g_side");                         // Gs • float • v6.60+
+static XPLMDataRef gAccLocal_x = XPLMFindDataRef("sim/flightmodel/position/local_ax");                  // mtr/sec2 • float • v6.60+
+static XPLMDataRef gAccLocal_y = XPLMFindDataRef("sim/flightmodel/position/local_ay");                  // mtr/sec2 • float • v6.60+
+static XPLMDataRef gAccLocal_z = XPLMFindDataRef("sim/flightmodel/position/local_az");                  // mtr/sec2 • float • v6.60+
+static XPLMDataRef gVelAcf_x = XPLMFindDataRef("sim/flightmodel/forces/vx_acf_axis");                   // m/s • float • v6.60+
+static XPLMDataRef gVelAcf_y = XPLMFindDataRef("sim/flightmodel/forces/vy_acf_axis");                   // m/s • float • v6.60+
+static XPLMDataRef gVelAcf_z = XPLMFindDataRef("sim/flightmodel/forces/vz_acf_axis");                   // m/s • float • v6.60+
+static XPLMDataRef gTAS = XPLMFindDataRef("sim/flightmodel/position/true_airspeed");                    // m/s • float • v6.60+
+static XPLMDataRef gAirDensity = XPLMFindDataRef("sim/weather/rho");                                    // kg/cu m float • v6.60+
+static XPLMDataRef gDynPress = XPLMFindDataRef("sim/flightmodel/misc/Qstatic");                         // psf • float • v6.60+
+static XPLMDataRef gPropThrust = XPLMFindDataRef("sim/flightmodel/engine/POINT_thrust");                // newtons • float[16] • v6.60+
+static XPLMDataRef gAoA = XPLMFindDataRef("sim/flightmodel/position/alpha");                            // degrees • float • v6.60+
+static XPLMDataRef gWarnAlpha = XPLMFindDataRef("sim/aircraft/overflow/acf_stall_warn_alpha");          // degrees • float • v6.60+
+static XPLMDataRef gSlip = XPLMFindDataRef("sim/flightmodel/position/beta");                            // degrees • float • v6.60+
+static XPLMDataRef gWoW = XPLMFindDataRef("sim/flightmodel2/gear/tire_vertical_deflection_mtr");        // meters • float[gear] • v9.00+
+static XPLMDataRef gEngRPM = XPLMFindDataRef("sim/flightmodel/engine/ENGN_tacrad");                     // rad/sec • float[16] • v6.60+
+static XPLMDataRef gEngPCT = XPLMFindDataRef("sim/flightmodel/engine/ENGN_N1_");                        // percent • float[16] • v6.60+
+static XPLMDataRef gPropRPM = XPLMFindDataRef("sim/flightmodel/engine/POINT_tacrad");                   // rad/sec • float[16] • v6.60+
+static XPLMDataRef gRudDefl_l = XPLMFindDataRef("sim/flightmodel/controls/ldruddef");                   // degrees • float • v6.60+
+static XPLMDataRef gRudDefl_r = XPLMFindDataRef("sim/flightmodel/controls/rdruddef");                   // degrees • float • v6.60+
+static XPLMDataRef gVne = XPLMFindDataRef("sim/aircraft/view/acf_Vne");                                 // kias • float • v6.60+
+static XPLMDataRef gVso = XPLMFindDataRef("sim/aircraft/view/acf_Vso");                                 // kias • float • v6.60+
 
 std::map<std::string, std::string> telemetryData;
 
@@ -130,7 +129,7 @@ void CollectTelemetryData()
     telemetryData["RudderDefl_r"] = FloatToString(XPLMGetDataf(gRudDefl_r), 3);
 
     telemetryData["AccBody"] =  FloatToString(XPLMGetDataf(gAccLocal_x) * fps_2_g, 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_y) * fps_2_g, 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_z) * fps_2_g, 3);
-    telemetryData["VelAcf"] =  FloatToString(XPLMGetDataf(gVelAcf_x), 3) + "~" + FloatToString(XPLMGetDataf(gVelAcf_y), 3) + "~" + FloatToString(XPLMGetDataf(gVelAcf_z), 3);
+    telemetryData["VelAcf"] =  FloatToString(XPLMGetDataf(gVelAcf_x), 3) + "~" + FloatToString(XPLMGetDataf(gVelAcf_y), 3) + "~" + FloatToString(-XPLMGetDataf(gVelAcf_z), 3);
 
 
 }

@@ -482,9 +482,6 @@ class Aircraft(AircraftBase):
             logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{ailer_base_gain}:{elev_base_gain}, rudder base gain to {rudder_base_gain}")
         if telem_data['src'] == "XPLANE":
             incidence_vec = utils.Vector(telem_data["VelAcf"])
-            incidence_vec.x = -incidence_vec.x
-            incidence_vec.y = -incidence_vec.y
-            incidence_vec.z = -incidence_vec.z
         else:
             incidence_vec = utils.Vector(telem_data["VelWorld"])
             wind_vec = utils.Vector(telem_data["AmbWind"])
@@ -511,19 +508,19 @@ class Aircraft(AircraftBase):
         rudder_angle = telem_data["RudderDefl"] * rad  # + trim?
 
         # print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
-        if telem_data['src'] == 'XPLANE':
-            slip_angle = telem_data['SideSlip']
-        else:
+        # if telem_data['src'] == 'XPLANE':
+        #     slip_angle = telem_data['SideSlip']
+        # else:
 
-            slip_angle = atan2(incidence_vec.x, incidence_vec.z)
-            telem_data["SideSlip"] = slip_angle*deg # overwrite sideslip with our calculated version (including wind)
+        slip_angle = atan2(incidence_vec.x, incidence_vec.z)
+        telem_data["SideSlip"] = slip_angle*deg # overwrite sideslip with our calculated version (including wind)
 
         g_force = telem_data["G"] # this includes earths gravity
 
-        if telem_data['src'] == 'XPLANE2':
-            _aoa = telem_data['AoA']
-        else:
-            _aoa = -atan2(incidence_vec.y, incidence_vec.z)*deg
+        # if telem_data['src'] == 'XPLANE2':
+        #     _aoa = telem_data['AoA']
+        # else:
+        _aoa = -atan2(incidence_vec.y, incidence_vec.z)*deg
         telem_data["AoA"] = _aoa
 
         # calculate air flow velocity exiting the prop
@@ -811,7 +808,7 @@ class Aircraft(AircraftBase):
 
         self._update_runway_rumble(telem_data)
         self._update_buffeting(telem_data)
-        # self._update_flight_controls(telem_data)
+        self._update_flight_controls(telem_data)
         self._decel_effect(telem_data)
         #
         # if self.flaps_motion_intensity > 0:

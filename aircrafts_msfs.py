@@ -497,7 +497,6 @@ class Aircraft(AircraftBase):
 
         _airspeed = incidence_vec.z
         telem_data["TAS"] = _airspeed
-        telem_data['TAS3'] = _airspeed
 
         base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
         base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
@@ -787,6 +786,7 @@ class Aircraft(AircraftBase):
         logging.info(f"on_event {event} {args}")
 
     def on_telemetry(self, telem_data):
+        telem_data['TAS_raw'] = telem_data.get('TAS')
         if telem_data.get("STOP",0):
             self.on_timeout()
             return
