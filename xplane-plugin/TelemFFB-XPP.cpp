@@ -25,6 +25,9 @@ struct sockaddr_in serverAddr;
 /* Data refs we will record. */
 static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");                                        // boolean • int • v6.60+
 static XPLMDataRef gOnGround = XPLMFindDataRef("sim/flightmodel/failures/onground_all");                // int • v6.60+
+static XPLMDataRef gRetractable = XPLMFindDataRef("sim/aircraft/gear/acf_gear_retract");                // boolean • int • v6.60+
+static XPLMDataRef gFlaps = XPLMFindDataRef("sim/cockpit2/controls/flap_system_deploy_ratio");          // [0..1] • float • v6.60
+static XPLMDataRef gGear = XPLMFindDataRef("sim/flightmodel2/gear/deploy_ratio");                       // ratio • float[gear] • v9.00 +
 static XPLMDataRef gGs_axil = XPLMFindDataRef("sim/flightmodel/forces/g_axil");                         // Gs • float • v6.60+
 static XPLMDataRef gGs_nrml = XPLMFindDataRef("sim/flightmodel/forces/g_nrml");                         // Gs • float • v6.60+
 static XPLMDataRef gGs_side = XPLMFindDataRef("sim/flightmodel/forces/g_side");                         // Gs • float • v6.60+
@@ -106,6 +109,7 @@ void CollectTelemetryData()
     telemetryData["STOP"] = std::to_string(XPLMGetDatai(gPaused));
     telemetryData["SimPaused"] = std::to_string(XPLMGetDatai(gPaused));
     telemetryData["SimOnGround"] = std::to_string(XPLMGetDatai(gOnGround));
+    telemetryData["RetractableGear"] = std::to_string(XPLMGetDatai(gRetractable));
     telemetryData["T"] = FloatToString(XPLMGetElapsedTime(), 3);
     telemetryData["G"] = FloatToString(XPLMGetDataf(gGs_nrml), 3);
     telemetryData["Gaxil"] = FloatToString(XPLMGetDataf(gGs_axil), 3);
@@ -131,6 +135,8 @@ void CollectTelemetryData()
 
     telemetryData["AccBody"] =  FloatToString(XPLMGetDataf(gAccLocal_x) * fps_2_g, 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_y) * fps_2_g, 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_z) * fps_2_g, 3);
     telemetryData["VelAcf"] =  FloatToString(XPLMGetDataf(gVelAcf_x), 3) + "~" + FloatToString(XPLMGetDataf(gVelAcf_y), 3) + "~" + FloatToString(-XPLMGetDataf(gVelAcf_z), 3);
+    telemetryData["Flaps"] = FloatToString(XPLMGetDataf(gFlaps), 3);
+    telemetryData["Gear"] = FloatArrayToString(gGear,0, 3);
 
 
 }

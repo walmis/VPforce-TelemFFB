@@ -1464,7 +1464,6 @@
 		<info>Enable or disable the dynamic Angle of Attack (AoA) based force effect</info>
 		<displayname>AoA Effect</displayname>
 		<DCS>true</DCS>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -1478,7 +1477,6 @@
 		<datatype>float</datatype>
 		<info>Amount of calculated AOA effect to apply</info>
 		<displayname>AoA Effect Gain</displayname>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>

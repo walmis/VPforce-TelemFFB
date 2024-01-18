@@ -663,7 +663,7 @@ class Aircraft(AircraftBase):
                 self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
 
                 #give option to disable if desired by user
-            if self.aoa_effect_enabled and telem_data["ElevDeflPct"] != 0 and not max(telem_data.get("WeightOnWheels")):
+            if self.aoa_effect_enabled and telem_data.get("ElevDeflPct", 0) != 0 and not max(telem_data.get("WeightOnWheels")):
                 # calculate maximum angle based on current angle and percentage
                 tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
                 tas = telem_data.get("TAS")  # m/s
@@ -807,9 +807,9 @@ class Aircraft(AircraftBase):
             self.on_timeout()
             return
         effects["pause_spring"].spring().stop()
-        # if telem_data["Parked"]: # Aircraft is parked, do nothing
-        #     return
-        #
+        if telem_data.get('Parked', 0): # MSFS in Hangar
+            return
+
         super().on_telemetry(telem_data)
         #
         ### Generic Aircraft Class Telemetry Handler
@@ -821,16 +821,19 @@ class Aircraft(AircraftBase):
         self._update_flight_controls(telem_data)
         self._decel_effect(telem_data)
         #
-        # if self.flaps_motion_intensity > 0:
-        #     flps = max(telem_data.get("Flaps", 0))
-        #     self._update_flaps(flps)
-        # retracts = telem_data.get("RetractableGear", 0)
-        # if isinstance(retracts, list):
-        #     retracts = max(retracts)
-        # if (self.gear_motion_intensity > 0) and (retracts):
-        #     gear = max(telem_data.get("Gear", 0))
-        #     self._update_landing_gear(gear, telem_data.get("TAS"), spd_thresh_low=130 * kt2ms, spd_thresh_high=200 * kt2ms)
-        #
+        if self.flaps_motion_intensity > 0:
+            flps = telem_data.get("Flaps", 0)
+            if isinstance(flps, list):
+                flps = max(flps)
+
+            self._update_flaps(flps)
+        retracts = telem_data.get("RetractableGear", 0)
+        if isinstance(retracts, list):
+            retracts = max(retracts)
+        if (self.gear_motion_intensity > 0) and (retracts):
+            gear = max(telem_data.get("Gear", 0))
+            self._update_landing_gear(gear, telem_data.get("TAS"), spd_thresh_low=130 * kt2ms, spd_thresh_high=200 * kt2ms)
+
         # self._decel_effect(telem_data)
         #
         # self._aoa_reduction_force_effect(telem_data)
@@ -885,14 +888,14 @@ class JetAircraft(Aircraft):
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         pass
-        # ## Jet Aircraft Telemetry Manager
-        # if telem_data.get("N") == None:
-        #     return
-        # telem_data["AircraftClass"] = "JetAircraft"  # inject aircraft class into telemetry
-        # if telem_data.get("STOP",0):
-        #     self.on_timeout()
-        #     return
-        # super().on_telemetry(telem_data)
+        ## Jet Aircraft Telemetry Manager
+        if telem_data.get("N") == None:
+            return
+        telem_data["AircraftClass"] = "JetAircraft"  # inject aircraft class into telemetry
+        if telem_data.get("STOP",0):
+            self.on_timeout()
+            return
+        super().on_telemetry(telem_data)
         #
         # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
         #     sp = max(telem_data.get("Spoilers", 0))
