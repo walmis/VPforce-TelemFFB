@@ -9,6 +9,7 @@
 #include <map>
 #include <cstring>
 #include <winsock2.h>
+#include <thread>
 #define XPLM300 1
 #include "XPLMProcessing.h"
 #include "XPLMDataAccess.h"
@@ -19,8 +20,11 @@
 
 
 /* UDP socket variables */
+SOCKET udpSocket_tx;
+struct sockaddr_in serverAddr_tx;
 SOCKET udpSocket_rx;
-struct sockaddr_in serverAddr;
+struct sockaddr_in serverAddr_rx;
+bool gTerminateReceiveThread = false;
 
 /* Data refs we will record. */
 static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");                                        // boolean • int • v6.60+
@@ -52,6 +56,22 @@ static XPLMDataRef gRudDefl_l = XPLMFindDataRef("sim/flightmodel/controls/ldrudd
 static XPLMDataRef gRudDefl_r = XPLMFindDataRef("sim/flightmodel/controls/rdruddef");                   // degrees • float • v6.60+
 static XPLMDataRef gVne = XPLMFindDataRef("sim/aircraft/view/acf_Vne");                                 // kias • float • v6.60+
 static XPLMDataRef gVso = XPLMFindDataRef("sim/aircraft/view/acf_Vso");                                 // kias • float • v6.60+
+static XPLMDataRef gVfe = XPLMFindDataRef("sim/aircraft/view/acf_Vfe");                                 // kias • float • v6.60+
+static XPLMDataRef gVle = XPLMFindDataRef("sim/aircraft/overflow/acf_Vle");                             // kias  float • v6.60 +
+
+
+static XPLMDataRef gCollectiveOvd = XPLMFindDataRef("sim/operation/override/override_prop_pitch");
+static XPLMDataRef gRollOvd = XPLMFindDataRef("sim/operation/override/override_joystick_roll");
+static XPLMDataRef gPitchOvd = XPLMFindDataRef("sim/operation/override/override_joystick_pitch");
+static XPLMDataRef gYawOvd = XPLMFindDataRef("sim/operation/override/override_joystick_heading");
+
+static XPLMDataRef gRollCenter = XPLMFindDataRef("sim/joystick/joystick_roll_center");
+
+static XPLMDataRef gCollectiveRatio = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_ratio_all");
+static XPLMDataRef gRollRatio = XPLMFindDataRef("sim/joystick/yoke_roll_ratio");
+static XPLMDataRef gPitchRatio = XPLMFindDataRef("sim/joystick/yoke_pitch_ratio");
+static XPLMDataRef gYawRatio = XPLMFindDataRef("sim/joystick/yoke_heading_ratio");
+
 
 std::map<std::string, std::string> telemetryData;
 
@@ -123,6 +143,8 @@ void CollectTelemetryData()
     telemetryData["SideSlip"] = FloatToString(XPLMGetDataf(gSlip), 3);
     telemetryData["Vne"] = FloatToString(XPLMGetDataf(gVne) * kt_2_mps, 3);
     telemetryData["Vso"] = FloatToString(XPLMGetDataf(gVso) * kt_2_mps, 3);
+    telemetryData["Vfe"] = FloatToString(XPLMGetDataf(gVfe) * kt_2_mps, 3);
+    telemetryData["Vle"] = FloatToString(XPLMGetDataf(gVle) * kt_2_mps, 3);
 
     telemetryData["WeightOnWheels"] = FloatArrayToString(gWoW, 0, 4);
     telemetryData["EngRPM"] = FloatArrayToString(gEngRPM, 0, 4, radps_2_rpm);
@@ -153,10 +175,29 @@ void FormatAndSendTelemetryData()
     }
 
     // Send the data over the UDP socket
-    sendto(udpSocket_rx, dataString.c_str(), dataString.length(), 0, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+    sendto(udpSocket_tx, dataString.c_str(), dataString.length(), 0, (struct sockaddr*)&serverAddr_tx, sizeof(serverAddr_tx));
 }
 
+void ReceiveAndProcessMessages() {
+    char buffer[1024];
+    int recvlen;
+    struct sockaddr_in senderAddr;
+    int senderAddrSize = sizeof(senderAddr);
 
+    recvlen = recvfrom(udpSocket_rx, buffer, sizeof(buffer), 0, (struct sockaddr*)&senderAddr, &senderAddrSize);
+    if (recvlen > 0) {
+        // Process the received message (you can parse and handle the message here)
+        buffer[recvlen] = 0; // Null-terminate the received data
+        // Call your message processing function here with 'buffer'
+    }
+}
+
+void ReceiveThread() {
+    while (!gTerminateReceiveThread) {
+        ReceiveAndProcessMessages();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+}
 
 PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc)
 {
@@ -179,9 +220,9 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc)
     }
 
     // Create a UDP socket
-    udpSocket_rx = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    udpSocket_tx = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
-    if (udpSocket_rx == INVALID_SOCKET)
+    if (udpSocket_tx == INVALID_SOCKET)
     {
         XPLMDebugString("Failed to create UDP socket\n");
         WSACleanup();
@@ -189,10 +230,28 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc)
     }
 
     // Set up server address information
-    memset(&serverAddr, 0, sizeof(serverAddr));
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(34390); // Set the desired port number
-    serverAddr.sin_addr.s_addr = inet_addr("127.255.255.255"); // Send to localhost (127.0.0.1)
+    memset(&serverAddr_tx, 0, sizeof(serverAddr_tx));
+    serverAddr_tx.sin_family = AF_INET;
+    serverAddr_tx.sin_port = htons(34390); // Set the desired port number
+    serverAddr_tx.sin_addr.s_addr = inet_addr("127.255.255.255"); // Send to localhost (127.0.0.1)
+
+
+    udpSocket_rx = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+
+    if (udpSocket_rx == INVALID_SOCKET)
+    {
+        XPLMDebugString("Failed to create receive UDP socket\n");
+        WSACleanup();
+        return 0;
+    }
+
+    // Set up server address information for the receive socket
+    memset(&serverAddr_rx, 0, sizeof(serverAddr_rx));
+    serverAddr_rx.sin_family = AF_INET;
+    serverAddr_rx.sin_port = htons(34391);  // Set the desired port number for receiving
+    serverAddr_rx.sin_addr.s_addr = inet_addr("127.0.0.1");
+    bind(udpSocket_rx, (struct sockaddr*)&serverAddr_rx, sizeof(serverAddr_rx));
+
 
     /* Register our callback for once a second.  Positive intervals
      * are in seconds, negative are the negative of sim frames.  Zero
@@ -202,6 +261,10 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc)
         -1,                  /* Interval */
         NULL);                /* refcon not used. */
 
+    std::thread receiveThread(ReceiveThread);
+    receiveThread.detach();  // Detach the thread to allow it to run independently
+
+
     return 1;
 }
 
@@ -210,7 +273,10 @@ PLUGIN_API void XPluginStop(void)
     /* Unregister the callback */
     XPLMUnregisterFlightLoopCallback(MyFlightLoopCallback, NULL);
 
+    gTerminateReceiveThread = true;
+
     // Close the UDP socket
+    closesocket(udpSocket_tx);
     closesocket(udpSocket_rx);
     WSACleanup();
 }
@@ -238,6 +304,8 @@ float MyFlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinc
 
     // Format and send telemetry data
     FormatAndSendTelemetryData();
+
+ 
 
     // Return -1 to indicate we want to be called on next opportunity
     return -1;

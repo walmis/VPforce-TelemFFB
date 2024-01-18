@@ -474,7 +474,11 @@ class AircraftBase(object):
         else:
             effects.dispose("canopymovement")
 
-    def _update_landing_gear(self, gearpos, tas, spd_thresh_low=100, spd_thresh_high=150):
+    def _update_landing_gear(self, gearpos, tas):
+        if self._sim_is_xplane():
+            self.gear_buffet_speed_low = 0.9 * self.telem_data.get("Vle", 10000) #set stupid high in case of telemetry failure
+            self.gear_buffet_speed_high = self.gear_buffet_speed_low * 1.3
+
 
         rumble_freq = self.gear_buffet_freq
 
@@ -490,9 +494,8 @@ class AircraftBase(object):
             # calculate insensity based on deployment percentage
             # intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
 
-            realtime_intensity = utils.scale(tas, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),
-                                             (0, self.gear_buffet_intensity)) * gearpos
-
+            realtime_intensity = utils.scale(tas, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),(0, self.gear_buffet_intensity)) * gearpos
+            print(f"INTENSITY: {realtime_intensity}")
             effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, 4).start()
             effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, 4).start()
             logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
