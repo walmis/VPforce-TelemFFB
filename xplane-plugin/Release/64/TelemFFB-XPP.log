@@ -1,0 +1,8 @@
+﻿  TelemFFB-XPP.cpp
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(60,24): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(61,27): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(62,23): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(156,63): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\TelemFFB-XPP.cpp(195,34): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+     Creating library .\Release\64\TimedProcessing.lib and object .\Release\64\TimedProcessing.exp
+  TelemFFB-XPP.vcxproj -> C:\Users\micah\PycharmProjects\XPlane\xplane-plugin\Release\plugins\TelemFFB-XPP\64\win.xpl
