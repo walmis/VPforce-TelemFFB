@@ -813,7 +813,7 @@ class Aircraft(AircraftBase):
             retracts = max(retracts)
         if (self.gear_motion_intensity > 0) and (retracts):
             gear = max(telem_data.get("Gear", 0))
-            self._update_landing_gear(gear, telem_data.get("TAS"), spd_thresh_low=130 * kt2ms, spd_thresh_high=200 * kt2ms)
+            self._update_landing_gear(gear, telem_data.get("TAS"))
 
         self._decel_effect(telem_data)
 

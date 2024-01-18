@@ -2,3 +2,4 @@ dist
 build
 __pycache__
 /xplane-plugin/.vs/
+/xplane-plugin/Debug/

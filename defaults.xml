@@ -1811,7 +1811,6 @@
 		<displayname>Min Intensity Speed</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -1829,7 +1828,6 @@
 		<info>Maximum intensity (high) speed for gear buffeting effect</info>
 		<displayname>Max Intensity Speed</displayname>
 		<DCS>true</DCS>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
