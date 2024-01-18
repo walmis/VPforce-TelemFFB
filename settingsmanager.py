@@ -1208,7 +1208,8 @@ class UserModelDialog(QDialog):
 
         self.ok_button = QPushButton("OK")
         self.ok_button.setStyleSheet("text-align:center;")
-        self.ok_button.setEnabled(False)
+        if self.combo_box.currentText() == '':
+            self.ok_button.setEnabled(False)
         cancel_button = QPushButton("Cancel")
         cancel_button.setStyleSheet("text-align:center;")
 
