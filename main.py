@@ -181,7 +181,7 @@ else:
 
 
 min_firmware_version = 'v1.0.15'
-global dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager
+global dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager, xplane_telem
 global window, log_window, log_folder, log_file, log_tail_window
 
 _update_available = False
@@ -1211,14 +1211,14 @@ class Ui_SystemDialog(object):
     def setupUi(self, SystemDialog):
         if not SystemDialog.objectName():
             SystemDialog.setObjectName(u"SystemDialog")
-        SystemDialog.resize(620, 515)
+        SystemDialog.resize(620, 600)
         sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(SystemDialog.sizePolicy().hasHeightForWidth())
         SystemDialog.setSizePolicy(sizePolicy)
         SystemDialog.setMinimumSize(QSize(620, 515))
-        SystemDialog.setMaximumSize(QSize(620, 515))
+        SystemDialog.setMaximumSize(QSize(620, 600))
         self.line = QFrame(SystemDialog)
         self.line.setObjectName(u"line")
         self.line.setGeometry(QRect(9, 168, 581, 16))
@@ -1232,12 +1232,12 @@ class Ui_SystemDialog(object):
         self.line.setFrameShadow(QFrame.Sunken)
         self.buttonBox = QDialogButtonBox(SystemDialog)
         self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setGeometry(QRect(430, 481, 156, 23))
+        self.buttonBox.setGeometry(QRect(430, 567, 156, 23))
         self.buttonBox.setOrientation(Qt.Horizontal)
         self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
         self.resetButton = QPushButton(SystemDialog)
         self.resetButton.setObjectName(u"resetButton")
-        self.resetButton.setGeometry(QRect(21, 481, 121, 23))
+        self.resetButton.setGeometry(QRect(21, 567, 121, 23))
         self.layoutWidget = QWidget(SystemDialog)
         self.layoutWidget.setObjectName(u"layoutWidget")
         self.layoutWidget.setGeometry(QRect(20, 31, 258, 71))
@@ -1271,39 +1271,18 @@ class Ui_SystemDialog(object):
 
         self.layoutWidget1 = QWidget(SystemDialog)
         self.layoutWidget1.setObjectName(u"layoutWidget1")
-        self.layoutWidget1.setGeometry(QRect(16, 204, 170, 65))
-        self.verticalLayout = QVBoxLayout(self.layoutWidget1)
-        self.verticalLayout.setObjectName(u"verticalLayout")
-        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
-        self.enableDCS = QCheckBox(self.layoutWidget1)
-        self.enableDCS.setObjectName(u"enableDCS")
-
-        self.verticalLayout.addWidget(self.enableDCS)
-
-        self.enableMSFS = QCheckBox(self.layoutWidget1)
-        self.enableMSFS.setObjectName(u"enableMSFS")
-
-        self.verticalLayout.addWidget(self.enableMSFS)
-
-        self.enableIL2 = QCheckBox(self.layoutWidget1)
-        self.enableIL2.setObjectName(u"enableIL2")
-
-        self.verticalLayout.addWidget(self.enableIL2)
-
-        self.layoutWidget2 = QWidget(SystemDialog)
-        self.layoutWidget2.setObjectName(u"layoutWidget2")
-        self.layoutWidget2.setGeometry(QRect(30, 275, 452, 75))
-        self.il2_sub_layout = QGridLayout(self.layoutWidget2)
+        self.layoutWidget1.setGeometry(QRect(30, 356, 452, 75))
+        self.il2_sub_layout = QGridLayout(self.layoutWidget1)
         self.il2_sub_layout.setObjectName(u"il2_sub_layout")
         self.il2_sub_layout.setContentsMargins(0, 0, 0, 0)
-        self.validateIL2 = QCheckBox(self.layoutWidget2)
+        self.validateIL2 = QCheckBox(self.layoutWidget1)
         self.validateIL2.setObjectName(u"validateIL2")
 
         self.il2_sub_layout.addWidget(self.validateIL2, 0, 0, 1, 1)
 
         self.horizontalLayout = QHBoxLayout()
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.lab_pathIL2 = QLabel(self.layoutWidget2)
+        self.lab_pathIL2 = QLabel(self.layoutWidget1)
         self.lab_pathIL2.setObjectName(u"lab_pathIL2")
         sizePolicy1 = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         sizePolicy1.setHorizontalStretch(0)
@@ -1314,12 +1293,12 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout.addWidget(self.lab_pathIL2)
 
-        self.pathIL2 = QLineEdit(self.layoutWidget2)
+        self.pathIL2 = QLineEdit(self.layoutWidget1)
         self.pathIL2.setObjectName(u"pathIL2")
 
         self.horizontalLayout.addWidget(self.pathIL2)
 
-        self.browseIL2 = QToolButton(self.layoutWidget2)
+        self.browseIL2 = QToolButton(self.layoutWidget1)
         self.browseIL2.setObjectName(u"browseIL2")
 
         self.horizontalLayout.addWidget(self.browseIL2)
@@ -1329,12 +1308,12 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
-        self.lab_portIL2 = QLabel(self.layoutWidget2)
+        self.lab_portIL2 = QLabel(self.layoutWidget1)
         self.lab_portIL2.setObjectName(u"lab_portIL2")
 
         self.horizontalLayout_2.addWidget(self.lab_portIL2)
 
-        self.portIL2 = QLineEdit(self.layoutWidget2)
+        self.portIL2 = QLineEdit(self.layoutWidget1)
         self.portIL2.setObjectName(u"portIL2")
 
         self.horizontalLayout_2.addWidget(self.portIL2)
@@ -1348,7 +1327,7 @@ class Ui_SystemDialog(object):
 
         self.line_2 = QFrame(SystemDialog)
         self.line_2.setObjectName(u"line_2")
-        self.line_2.setGeometry(QRect(10, 361, 581, 16))
+        self.line_2.setGeometry(QRect(10, 447, 581, 16))
         self.line_2.setFont(font)
         self.line_2.setLineWidth(2)
         self.line_2.setMidLineWidth(1)
@@ -1368,23 +1347,23 @@ class Ui_SystemDialog(object):
         self.label_6.setFont(font1)
         self.label_7 = QLabel(SystemDialog)
         self.label_7.setObjectName(u"label_7")
-        self.label_7.setGeometry(QRect(20, 374, 91, 16))
+        self.label_7.setGeometry(QRect(20, 460, 91, 16))
         self.label_7.setFont(font1)
         self.label_8 = QLabel(SystemDialog)
         self.label_8.setObjectName(u"label_8")
-        self.label_8.setGeometry(QRect(30, 394, 101, 16))
-        self.layoutWidget3 = QWidget(SystemDialog)
-        self.layoutWidget3.setObjectName(u"layoutWidget3")
-        self.layoutWidget3.setGeometry(QRect(36, 414, 184, 42))
-        self.verticalLayout_2 = QVBoxLayout(self.layoutWidget3)
+        self.label_8.setGeometry(QRect(30, 480, 101, 16))
+        self.layoutWidget2 = QWidget(SystemDialog)
+        self.layoutWidget2.setObjectName(u"layoutWidget2")
+        self.layoutWidget2.setGeometry(QRect(36, 500, 184, 42))
+        self.verticalLayout_2 = QVBoxLayout(self.layoutWidget2)
         self.verticalLayout_2.setObjectName(u"verticalLayout_2")
         self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
-        self.cb_save_geometry = QCheckBox(self.layoutWidget3)
+        self.cb_save_geometry = QCheckBox(self.layoutWidget2)
         self.cb_save_geometry.setObjectName(u"cb_save_geometry")
 
         self.verticalLayout_2.addWidget(self.cb_save_geometry)
 
-        self.cb_save_view = QCheckBox(self.layoutWidget3)
+        self.cb_save_view = QCheckBox(self.layoutWidget2)
         self.cb_save_view.setObjectName(u"cb_save_view")
 
         self.verticalLayout_2.addWidget(self.cb_save_view)
@@ -1416,13 +1395,13 @@ class Ui_SystemDialog(object):
         self.line_3.setLineWidth(2)
         self.line_3.setFrameShape(QFrame.VLine)
         self.line_3.setFrameShadow(QFrame.Sunken)
-        self.layoutWidget4 = QWidget(SystemDialog)
-        self.layoutWidget4.setObjectName(u"layoutWidget4")
-        self.layoutWidget4.setGeometry(QRect(313, 74, 284, 74))
-        self.gridLayout_2 = QGridLayout(self.layoutWidget4)
+        self.layoutWidget3 = QWidget(SystemDialog)
+        self.layoutWidget3.setObjectName(u"layoutWidget3")
+        self.layoutWidget3.setGeometry(QRect(313, 74, 284, 74))
+        self.gridLayout_2 = QGridLayout(self.layoutWidget3)
         self.gridLayout_2.setObjectName(u"gridLayout_2")
         self.gridLayout_2.setContentsMargins(0, 0, 0, 0)
-        self.cb_min_enable_j = QCheckBox(self.layoutWidget4)
+        self.cb_min_enable_j = QCheckBox(self.layoutWidget3)
         self.cb_min_enable_j.setObjectName(u"cb_min_enable_j")
         self.cb_min_enable_j.setEnabled(False)
         self.cb_min_enable_j.setMaximumSize(QSize(15, 16777215))
@@ -1438,14 +1417,14 @@ class Ui_SystemDialog(object):
 
         self.gridLayout_2.addItem(self.horizontalSpacer_5, 2, 4, 1, 1)
 
-        self.cb_al_enable_j = QCheckBox(self.layoutWidget4)
+        self.cb_al_enable_j = QCheckBox(self.layoutWidget3)
         self.cb_al_enable_j.setObjectName(u"cb_al_enable_j")
         self.cb_al_enable_j.setEnabled(False)
         self.cb_al_enable_j.setMaximumSize(QSize(15, 16777215))
 
         self.gridLayout_2.addWidget(self.cb_al_enable_j, 0, 3, 1, 1)
 
-        self.cb_min_enable_p = QCheckBox(self.layoutWidget4)
+        self.cb_min_enable_p = QCheckBox(self.layoutWidget3)
         self.cb_min_enable_p.setObjectName(u"cb_min_enable_p")
         self.cb_min_enable_p.setEnabled(False)
         self.cb_min_enable_p.setMaximumSize(QSize(15, 16777215))
@@ -1453,7 +1432,7 @@ class Ui_SystemDialog(object):
 
         self.gridLayout_2.addWidget(self.cb_min_enable_p, 1, 5, 1, 1)
 
-        self.cb_headless_c = QCheckBox(self.layoutWidget4)
+        self.cb_headless_c = QCheckBox(self.layoutWidget3)
         self.cb_headless_c.setObjectName(u"cb_headless_c")
         self.cb_headless_c.setEnabled(False)
         self.cb_headless_c.setMaximumSize(QSize(15, 16777215))
@@ -1461,20 +1440,20 @@ class Ui_SystemDialog(object):
 
         self.gridLayout_2.addWidget(self.cb_headless_c, 2, 7, 1, 1, Qt.AlignLeft)
 
-        self.tb_pid_c = QLineEdit(self.layoutWidget4)
+        self.tb_pid_c = QLineEdit(self.layoutWidget3)
         self.tb_pid_c.setObjectName(u"tb_pid_c")
         self.tb_pid_c.setMaximumSize(QSize(50, 16777215))
 
         self.gridLayout_2.addWidget(self.tb_pid_c, 2, 1, 1, 1, Qt.AlignLeft)
 
-        self.cb_al_enable_c = QCheckBox(self.layoutWidget4)
+        self.cb_al_enable_c = QCheckBox(self.layoutWidget3)
         self.cb_al_enable_c.setObjectName(u"cb_al_enable_c")
         self.cb_al_enable_c.setEnabled(False)
         self.cb_al_enable_c.setMaximumSize(QSize(15, 16777215))
 
         self.gridLayout_2.addWidget(self.cb_al_enable_c, 2, 3, 1, 1)
 
-        self.rb_master_j = QRadioButton(self.layoutWidget4)
+        self.rb_master_j = QRadioButton(self.layoutWidget3)
         self.rb_master_j.setObjectName(u"rb_master_j")
         self.rb_master_j.setChecked(True)
 
@@ -1484,7 +1463,7 @@ class Ui_SystemDialog(object):
 
         self.gridLayout_2.addItem(self.horizontalSpacer_7, 0, 4, 1, 1)
 
-        self.cb_headless_p = QCheckBox(self.layoutWidget4)
+        self.cb_headless_p = QCheckBox(self.layoutWidget3)
         self.cb_headless_p.setObjectName(u"cb_headless_p")
         self.cb_headless_p.setEnabled(False)
         self.cb_headless_p.setMaximumSize(QSize(15, 16777215))
@@ -1496,23 +1475,23 @@ class Ui_SystemDialog(object):
 
         self.gridLayout_2.addItem(self.horizontalSpacer_3, 2, 2, 1, 1)
 
-        self.rb_master_p = QRadioButton(self.layoutWidget4)
+        self.rb_master_p = QRadioButton(self.layoutWidget3)
         self.rb_master_p.setObjectName(u"rb_master_p")
 
         self.gridLayout_2.addWidget(self.rb_master_p, 1, 0, 1, 1, Qt.AlignLeft)
 
-        self.rb_master_c = QRadioButton(self.layoutWidget4)
+        self.rb_master_c = QRadioButton(self.layoutWidget3)
         self.rb_master_c.setObjectName(u"rb_master_c")
 
         self.gridLayout_2.addWidget(self.rb_master_c, 2, 0, 1, 1, Qt.AlignLeft)
 
-        self.tb_pid_p = QLineEdit(self.layoutWidget4)
+        self.tb_pid_p = QLineEdit(self.layoutWidget3)
         self.tb_pid_p.setObjectName(u"tb_pid_p")
         self.tb_pid_p.setMaximumSize(QSize(50, 16777215))
 
         self.gridLayout_2.addWidget(self.tb_pid_p, 1, 1, 1, 1, Qt.AlignLeft)
 
-        self.cb_headless_j = QCheckBox(self.layoutWidget4)
+        self.cb_headless_j = QCheckBox(self.layoutWidget3)
         self.cb_headless_j.setObjectName(u"cb_headless_j")
         self.cb_headless_j.setEnabled(False)
         self.cb_headless_j.setMaximumSize(QSize(15, 16777215))
@@ -1520,13 +1499,13 @@ class Ui_SystemDialog(object):
 
         self.gridLayout_2.addWidget(self.cb_headless_j, 0, 7, 1, 1)
 
-        self.tb_pid_j = QLineEdit(self.layoutWidget4)
+        self.tb_pid_j = QLineEdit(self.layoutWidget3)
         self.tb_pid_j.setObjectName(u"tb_pid_j")
         self.tb_pid_j.setMaximumSize(QSize(50, 16777215))
 
         self.gridLayout_2.addWidget(self.tb_pid_j, 0, 1, 1, 1, Qt.AlignLeft)
 
-        self.cb_min_enable_c = QCheckBox(self.layoutWidget4)
+        self.cb_min_enable_c = QCheckBox(self.layoutWidget3)
         self.cb_min_enable_c.setObjectName(u"cb_min_enable_c")
         self.cb_min_enable_c.setEnabled(False)
         self.cb_min_enable_c.setMaximumSize(QSize(15, 16777215))
@@ -1542,7 +1521,7 @@ class Ui_SystemDialog(object):
 
         self.gridLayout_2.addItem(self.horizontalSpacer_6, 1, 4, 1, 1)
 
-        self.cb_al_enable_p = QCheckBox(self.layoutWidget4)
+        self.cb_al_enable_p = QCheckBox(self.layoutWidget3)
         self.cb_al_enable_p.setObjectName(u"cb_al_enable_p")
         self.cb_al_enable_p.setEnabled(False)
         self.cb_al_enable_p.setMaximumSize(QSize(15, 16777215))
@@ -1561,13 +1540,13 @@ class Ui_SystemDialog(object):
 
         self.gridLayout_2.addItem(self.horizontalSpacer_11, 2, 6, 1, 1)
 
-        self.layoutWidget5 = QWidget(SystemDialog)
-        self.layoutWidget5.setObjectName(u"layoutWidget5")
-        self.layoutWidget5.setGeometry(QRect(310, 10, 269, 22))
-        self.horizontalLayout_3 = QHBoxLayout(self.layoutWidget5)
+        self.layoutWidget4 = QWidget(SystemDialog)
+        self.layoutWidget4.setObjectName(u"layoutWidget4")
+        self.layoutWidget4.setGeometry(QRect(310, 10, 269, 22))
+        self.horizontalLayout_3 = QHBoxLayout(self.layoutWidget4)
         self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
         self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
-        self.label_11 = QLabel(self.layoutWidget5)
+        self.label_11 = QLabel(self.layoutWidget4)
         self.label_11.setObjectName(u"label_11")
         self.label_11.setFont(font1)
 
@@ -1577,7 +1556,7 @@ class Ui_SystemDialog(object):
 
         self.horizontalLayout_3.addItem(self.horizontalSpacer_8)
 
-        self.cb_al_enable = QCheckBox(self.layoutWidget5)
+        self.cb_al_enable = QCheckBox(self.layoutWidget4)
         self.cb_al_enable.setObjectName(u"cb_al_enable")
         font2 = QFont()
         font2.setBold(False)
@@ -1592,6 +1571,47 @@ class Ui_SystemDialog(object):
         self.lab_start_headless.setEnabled(False)
         self.lab_start_headless.setGeometry(QRect(550, 45, 49, 26))
         self.lab_start_headless.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
+        self.widget = QWidget(SystemDialog)
+        self.widget.setObjectName(u"widget")
+        self.widget.setGeometry(QRect(30, 276, 270, 45))
+        self.gridLayout_3 = QGridLayout(self.widget)
+        self.gridLayout_3.setObjectName(u"gridLayout_3")
+        self.gridLayout_3.setContentsMargins(0, 0, 0, 0)
+        self.validateXPLANE = QCheckBox(self.widget)
+        self.validateXPLANE.setObjectName(u"validateXPLANE")
+
+        self.gridLayout_3.addWidget(self.validateXPLANE, 0, 0, 1, 2)
+
+        self.pathXPLANE = QLineEdit(self.widget)
+        self.pathXPLANE.setObjectName(u"pathXPLANE")
+
+        self.gridLayout_3.addWidget(self.pathXPLANE, 1, 1, 1, 1)
+
+        self.browseXPLANE = QToolButton(self.widget)
+        self.browseXPLANE.setObjectName(u"browseXPLANE")
+
+        self.gridLayout_3.addWidget(self.browseXPLANE, 1, 2, 1, 1)
+
+        self.lab_pathXPLANE = QLabel(self.widget)
+        self.lab_pathXPLANE.setObjectName(u"lab_pathXPLANE")
+        sizePolicy1.setHeightForWidth(self.lab_pathXPLANE.sizePolicy().hasHeightForWidth())
+        self.lab_pathXPLANE.setSizePolicy(sizePolicy1)
+        self.lab_pathXPLANE.setMinimumSize(QSize(98, 0))
+
+        self.gridLayout_3.addWidget(self.lab_pathXPLANE, 1, 0, 1, 1)
+
+        self.enableXPLANE = QCheckBox(SystemDialog)
+        self.enableXPLANE.setObjectName(u"enableXPLANE")
+        self.enableXPLANE.setGeometry(QRect(17, 251, 135, 17))
+        self.enableDCS = QCheckBox(SystemDialog)
+        self.enableDCS.setObjectName(u"enableDCS")
+        self.enableDCS.setGeometry(QRect(17, 205, 150, 17))
+        self.enableIL2 = QCheckBox(SystemDialog)
+        self.enableIL2.setObjectName(u"enableIL2")
+        self.enableIL2.setGeometry(QRect(17, 330, 168, 17))
+        self.enableMSFS = QCheckBox(SystemDialog)
+        self.enableMSFS.setObjectName(u"enableMSFS")
+        self.enableMSFS.setGeometry(QRect(17, 228, 152, 17))
         QWidget.setTabOrder(self.logLevel, self.telemTimeout)
         QWidget.setTabOrder(self.telemTimeout, self.ignoreUpdate)
         QWidget.setTabOrder(self.ignoreUpdate, self.cb_al_enable)
@@ -1612,7 +1632,11 @@ class Ui_SystemDialog(object):
         QWidget.setTabOrder(self.cb_headless_p, self.cb_headless_c)
         QWidget.setTabOrder(self.cb_headless_c, self.enableDCS)
         QWidget.setTabOrder(self.enableDCS, self.enableMSFS)
-        QWidget.setTabOrder(self.enableMSFS, self.enableIL2)
+        QWidget.setTabOrder(self.enableMSFS, self.enableXPLANE)
+        QWidget.setTabOrder(self.enableXPLANE, self.validateXPLANE)
+        QWidget.setTabOrder(self.validateXPLANE, self.pathXPLANE)
+        QWidget.setTabOrder(self.pathXPLANE, self.browseXPLANE)
+        QWidget.setTabOrder(self.browseXPLANE, self.enableIL2)
         QWidget.setTabOrder(self.enableIL2, self.validateIL2)
         QWidget.setTabOrder(self.validateIL2, self.pathIL2)
         QWidget.setTabOrder(self.pathIL2, self.browseIL2)
@@ -1632,9 +1656,6 @@ class Ui_SystemDialog(object):
         self.label.setText(QCoreApplication.translate("SystemDialog", u"System Logging Level:", None))
         self.label_2.setText(QCoreApplication.translate("SystemDialog", u"Telemetry Timeout (ms):", None))
         self.ignoreUpdate.setText(QCoreApplication.translate("SystemDialog", u"Disable Update Prompt on Startup", None))
-        self.enableDCS.setText(QCoreApplication.translate("SystemDialog", u"Enable DCS World Support", None))
-        self.enableMSFS.setText(QCoreApplication.translate("SystemDialog", u"Enable MSFS 2020 Support", None))
-        self.enableIL2.setText(QCoreApplication.translate("SystemDialog", u"Enable IL-2 Sturmovik Support", None))
         self.validateIL2.setText(QCoreApplication.translate("SystemDialog", u"Auto IL-2 Telemetry setup", None))
         self.lab_pathIL2.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Install Path:", None))
         self.browseIL2.setText(QCoreApplication.translate("SystemDialog", u"...", None))
@@ -1671,6 +1692,13 @@ class Ui_SystemDialog(object):
         self.cb_al_enable.setText(QCoreApplication.translate("SystemDialog", u"Enable Auto-Launch", None))
         self.lab_start_headless.setText(QCoreApplication.translate("SystemDialog", u"Start\n"
 "Headless:", None))
+        self.validateXPLANE.setText(QCoreApplication.translate("SystemDialog", u"Auto X-Plane setup", None))
+        self.browseXPLANE.setText(QCoreApplication.translate("SystemDialog", u"...", None))
+        self.lab_pathXPLANE.setText(QCoreApplication.translate("SystemDialog", u"X-Plane Install Path:", None))
+        self.enableXPLANE.setText(QCoreApplication.translate("SystemDialog", u"Enable X-Plane Support", None))
+        self.enableDCS.setText(QCoreApplication.translate("SystemDialog", u"Enable DCS World Support", None))
+        self.enableIL2.setText(QCoreApplication.translate("SystemDialog", u"Enable IL-2 Sturmovik Support", None))
+        self.enableMSFS.setText(QCoreApplication.translate("SystemDialog", u"Enable MSFS 2020 Support", None))
     # retranslateUi
 
 
@@ -1689,8 +1717,17 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.addButton(self.rb_master_p, id=2)
         self.master_button_group.addButton(self.rb_master_c, id=3)
 
+        # Add tooltips
+        self.validateIL2.setToolTip('If enabled, TelemFFB will automatically set up the required configuration in IL2 to support telemetry export')
+        self.pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
+        self.lab_pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
+        self.validateXPLANE.setToolTip('If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes')
+        self.lab_pathXPLANE.setToolTip('The root path where X-Plane is installed')
+        self.pathXPLANE.setToolTip('The root path where X-Plane is installed')
         # Connect signals to slots
         self.enableIL2.stateChanged.connect(self.toggle_il2_widgets)
+        self.enableXPLANE.stateChanged.connect(self.toggle_xplane_widgets)
+        self.browseXPLANE.clicked.connect(self.select_xplane_directory)
         self.browseIL2.clicked.connect(self.select_il2_directory)
         self.buttonBox.accepted.connect(self.save_settings)
         self.resetButton.clicked.connect(self.reset_settings)
@@ -1700,6 +1737,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         # Set initial state
         self.toggle_il2_widgets()
+        self.toggle_xplane_widgets()
         self.toggle_al_widgets()
         self.parent_window = parent
         # Load settings from the registry and update widget states
@@ -1803,6 +1841,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_p.setStyleSheet(style)
         self.cb_headless_c.setStyleSheet(style)
 
+    def toggle_xplane_widgets(self):
+        xplane_enabled = self.enableXPLANE.isChecked()
+        self.validateXPLANE.setEnabled(xplane_enabled)
+        self.lab_pathXPLANE.setEnabled(xplane_enabled)
+        self.pathXPLANE.setEnabled(xplane_enabled)
+        self.browseXPLANE.setEnabled(xplane_enabled)
+        if xplane_enabled:
+            self.validateXPLANE.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }")
+        else:
+            self.validateXPLANE.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }")
     def toggle_il2_widgets(self):
         # Show/hide IL-2 related widgets based on checkbox state
         il2_enabled = self.enableIL2.isChecked()
@@ -1817,6 +1865,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }")
         else:
             self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }")
+
+    def select_xplane_directory(self):
+        # Open a directory dialog and set the result in the pathIL2 QLineEdit
+        directory = QFileDialog.getExistingDirectory(self, "Select X-Plane Install Path", "")
+        if directory:
+            self.pathXPLANE.setText(directory)
 
     def select_il2_directory(self):
         # Open a directory dialog and set the result in the pathIL2 QLineEdit
@@ -1871,7 +1925,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             r = self.tb_pid_p.text()
             QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the pedals device or disable auto-launch')
             return False
-
+        if self.validateXPLANE.isChecked():
+            pth = os.path.join(self.pathXPLANE.text(), 'resources')
+            if not os.path.isdir(pth):
+                QMessageBox.warning(self, "Config Error", 'Please enter the root X-Plane install path or disable auto X-plane setup')
+                return False
 
         return True
 
@@ -1882,6 +1940,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         global_settings_dict = {
             "enableDCS": self.enableDCS.isChecked(),
             "enableMSFS": self.enableMSFS.isChecked(),
+            "enableXPLANE": self.enableXPLANE.isChecked(),
+            "validateXPLANE": self.validateXPLANE.isChecked(),
+            "pathXPLANE": self.pathXPLANE.text(),
             "enableIL2": self.enableIL2.isChecked(),
             "validateIL2": self.validateIL2.isChecked(),
             "pathIL2": self.pathIL2.text(),
@@ -1947,7 +2008,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if _master_instance and _launched_children:
             _ipc_thread.send_broadcast_message("RESTART SIMS")
 
-        self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2'], global_settings_dict)
+        self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2', 'XPLANE'], global_settings_dict)
         # adjust logging level:
         ll = self.logLevel.currentText()
         if ll == "INFO":
@@ -1978,6 +2039,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableDCS.setChecked(settings_dict.get('enableDCS', False))
 
         self.enableMSFS.setChecked(settings_dict.get('enableMSFS', False))
+
+        self.enableXPLANE.setChecked(settings_dict.get('enableXPLANE', False))
+        self.toggle_xplane_widgets()
+
+        self.validateXPLANE.setChecked(settings_dict.get('validateXPLANE', False))
+
+        self.pathXPLANE.setText(settings_dict.get('pathXPLANE', ''))
 
         self.enableIL2.setChecked(settings_dict.get('enableIL2', False))
         self.toggle_il2_widgets()
@@ -2289,6 +2357,7 @@ class MainWindow(QMainWindow):
         dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS')
         il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2')
         msfs_enabled = utils.read_system_settings(args.device, args.type).get('enableMSFS')
+        xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE')
 
         self.icon_size = QSize(18, 18)
         if args.sim == "DCS" or dcs_enabled:
@@ -2312,8 +2381,13 @@ class MainWindow(QMainWindow):
             il2_color = QColor(128, 128, 128)
             il2_icon = self.create_x_icon(il2_color, self.icon_size)
 
-        # xplane_color = QColor(128,128,128)
-        # condor_color = QColor(128, 128, 128)
+        if args.sim == "XPLANE" or xplane_enabled:
+            xplane_color = QColor(255, 255, 0)
+            xplane_icon = self.create_colored_icon(xplane_color, self.icon_size)
+        else:
+            xplane_color = QColor(128, 128, 128)
+            xplane_icon = self.create_x_icon(xplane_color, self.icon_size)
+
 
         logo_status_layout = QHBoxLayout()
 
@@ -2558,17 +2632,20 @@ class MainWindow(QMainWindow):
         dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS')
         il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2')
         msfs_enabled = utils.read_system_settings(args.device, args.type).get('enableMSFS')
+        xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE')
 
         # Convert True/False to "enabled" or "disabled"
         dcs_status = "Enabled" if dcs_enabled else "Disabled"
         il2_status = "Enabled" if il2_enabled else "Disabled"
         msfs_status = "Enabled" if msfs_enabled else "Disabled"
+        xplane_status = "Enabled" if xplane_enabled else "Disabled"
 
         self.lbl_telem_data = QLabel(
             f"Waiting for data...\n\n"
             f"DCS Enabled: {dcs_status}\n"
             f"IL2 Enabled: {il2_status}\n"
-            f"MSFS Enabled: {msfs_status}\n\n"
+            f"MSFS Enabled: {msfs_status}\n"
+            f"X-Plane Enabled: {xplane_status}\n\n"
             "Enable or Disable in System -> System Settings"
         )
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -2733,16 +2810,18 @@ class MainWindow(QMainWindow):
     def test_function(self):
         self.set_scrollbar(400)
 
-    def refresh_telem_status(self, dcs, il2, msfs):
+    def refresh_telem_status(self, dcs, il2, msfs, xplane):
         dcs_status = "Enabled" if dcs else "Disabled"
         il2_status = "Enabled" if il2 else "Disabled"
         msfs_status = "Enabled" if msfs else "Disabled"
+        xplane_status = "Enabled" if xplane else "Disabled"
 
         self.lbl_telem_data.setText(
             f"Waiting for data...\n\n"
             f"DCS Enabled: {dcs_status}\n"
             f"IL2 Enabled: {il2_status}\n"
-            f"MSFS Enabled: {msfs_status}\n\n"
+            f"MSFS Enabled: {msfs_status}\n"
+            f"X-Plane Enabled: {xplane_status}\n\n"
             "Enable or Disable in System -> System Settings"
         )
 
@@ -4831,7 +4910,7 @@ def autoconvert_config(main_window, cfg=_legacy_config_file, usr=_legacy_overrid
 
 def restart_sims():
     global window, _device_pid, _device_type
-    sim_list = ['DCS', 'MSFS', 'IL2']
+    sim_list = ['DCS', 'MSFS', 'IL2', 'XPLANE']
     sys_settings = utils.read_system_settings(args.device, _device_type)
     stop_sims()
     init_sims()
@@ -4840,11 +4919,15 @@ def restart_sims():
 
 def init_sims():
     global dcs_telem, il2_telem, sim_connect_telem, telem_manager, xplane_telem
-    xplane_enabled = True
+
+    xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE', False)
 
     xplane_telem = NetworkThread(telem_manager, host='', port=34390)
     # xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE', False)
     if xplane_enabled or args.sim == 'XPLANE':
+        if not _child_instance and utils.read_system_settings(args.device, args.type).get('validateXPLANE', False):
+            xplane_path = utils.read_system_settings(args.device, args.type).get('pathXPLANE', '')
+            utils.install_xplane_plugin(xplane_path, window)
         logging.info("Starting XPlane Telemetry Listener")
         xplane_telem.start()
 
@@ -4898,7 +4981,7 @@ def init_sims():
     il2_status = "Enabled" if il2_enabled else "Disabled"
     msfs_status = "Enabled" if msfs else "Disabled"
 
-    window.refresh_telem_status(dcs_enabled, il2_enabled, msfs)
+    window.refresh_telem_status(dcs_enabled, il2_enabled, msfs, xplane_enabled)
 
 def stop_sims():
     global dcs_telem, il2_telem, sim_connect_telem, xplane_telem

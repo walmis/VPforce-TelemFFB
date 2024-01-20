@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License 
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+import socket
 import time
 import math
 from math import sin, cos, radians, sqrt, atan2
@@ -229,6 +229,8 @@ class Aircraft(AircraftBase):
         self.max_aileron_coeff = 0.5
         self.max_rudder_coeff = 0.5
 
+        self.xplane_axis_override_active = False
+
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
         freq = 8
@@ -248,13 +250,17 @@ class Aircraft(AircraftBase):
 
     def _update_fbw_flight_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
-        ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_msfs():
+            ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_xplane():
+            ap_active = telem_data.get("APServos", 0)
+
         self.spring = effects['fbw_spring'].spring()
         if ffb_type == "joystick":
 
             if self.trim_following:
                 if not self.telemffb_controls_axes:
-                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION TO MSFS! Forcing to enable!")
+                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION! Forcing to enable!")
                     self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
                 elev_trim = telem_data.get("ElevTrimPct", 0)
 
@@ -284,11 +290,17 @@ class Aircraft(AircraftBase):
                 if self.ap_following and ap_active:
                     input_data = HapticEffect.device.getInput()
                     phys_x, phys_y = input_data.axisXY()
-                    aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
-                    elevator_pos = telem_data.get("ElevDeflPct", 0)
-                    aileron_pos = aileron_pos[0]
+                    if self._sim_is_msfs():
+                        aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+                        elevator_pos = telem_data.get("ElevDeflPct", 0)
+                        aileron_pos = aileron_pos[0]
+                        aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
 
-                    aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+                    if self._sim_is_xplane():
+                        aileron_pos = telem_data.get("APRollServo", 0)
+                        elevator_pos = telem_data.get("APPitchServo", 0)
+
+
                     # derivative_hz = 5  # derivative lpf filter -3db Hz
                     # derivative_k = 0.1  # derivative gain value, or damping ratio
                     #
@@ -323,34 +335,39 @@ class Aircraft(AircraftBase):
 
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+                if self._sim_is_xplane():
+                    pos_x_pos = x_pos * x_scale
+                    pos_y_pos = y_pos * y_scale
+                    self.send_xp_command(f'AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}')
 
-                if self.enable_custom_x_axis:
-                    x_var = self.custom_x_axis
-                    x_range = self.raw_x_axis_scale
-                else:
-                    x_var = 'AXIS_AILERONS_SET'
-                    x_range = 16384
-                if self.enable_custom_y_axis:
-                    y_var = self.custom_y_axis
-                    y_range = self.raw_y_axis_scale
-                else:
-                    y_var = 'AXIS_ELEVATOR_SET'
-                    y_range = 16384
+                if self._sim_is_msfs():
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
+                    else:
+                        x_var = 'AXIS_AILERONS_SET'
+                        x_range = 16384
+                    if self.enable_custom_y_axis:
+                        y_var = self.custom_y_axis
+                        y_range = self.raw_y_axis_scale
+                    else:
+                        y_var = 'AXIS_ELEVATOR_SET'
+                        y_range = 16384
 
-                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
-                pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                    pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
 
-                if x_range != 1:
-                    pos_x_pos = -int(pos_x_pos)
-                else:
-                    pos_x_pos = round(pos_x_pos, 5)
-                if y_range != 1:
-                    pos_y_pos = -int(pos_y_pos)
-                else:
-                    pos_y_pos = round(pos_y_pos, 5)
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+                    if y_range != 1:
+                        pos_y_pos = -int(pos_y_pos)
+                    else:
+                        pos_y_pos = round(pos_y_pos, 5)
 
-                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-                self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
             # update spring data
             if self.ap_following and ap_active:
                 y_coeff = 4096
@@ -372,7 +389,7 @@ class Aircraft(AircraftBase):
         elif ffb_type == "pedals":
             if self.trim_following:
                 if not self.telemffb_controls_axes:
-                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION TO MSFS! Forcing to enable!")
+                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION! Forcing to enable!")
                     self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
                 rudder_trim = telem_data.get("RudderTrimPct", 0)
 
@@ -385,7 +402,11 @@ class Aircraft(AircraftBase):
                     input_data = HapticEffect.device.getInput()
                     # print("I am here")
                     phys_x, phys_y = input_data.axisXY()
-                    rudder_pos = telem_data.get("RudderDeflPct", 0)
+                    if self._sim_is_msfs():
+                        rudder_pos = telem_data.get("RudderDeflPct", 0)
+                    if self._sim_is_xplane():
+                        rudder_pos = telem_data.get("APYawServo", 0)
+
                     rudder_pos = self.dampener.dampen_value(rudder_pos, '_rudder_pos', derivative_hz=5, derivative_k=0.15)
                     # derivative_hz = 5  # derivative lpf filter -3db Hz
                     # derivative_k = 0.1  # derivative gain value, or damping ratio
@@ -416,21 +437,26 @@ class Aircraft(AircraftBase):
                 x_pos = phys_x - virtual_rudder_x_offs
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
-                if self.enable_custom_x_axis:
-                    x_var = self.custom_x_axis
-                    x_range = self.raw_x_axis_scale
-                else:
-                    x_var = 'AXIS_RUDDER_SET'
-                    x_range = 16384
+                if self._sim_is_xplane():
+                    pos_x_pos = x_pos * x_scale
+                    self.send_xp_command(f'AXIS:px={round(pos_x_pos, 5)} ')
 
-                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                if self._sim_is_msfs():
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
+                    else:
+                        x_var = 'AXIS_RUDDER_SET'
+                        x_range = 16384
 
-                if x_range != 1:
-                    pos_x_pos = -int(pos_x_pos)
-                else:
-                    pos_x_pos = round(pos_x_pos, 5)
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
 
-                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+
+                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
                 # update spring data
 
@@ -452,7 +478,11 @@ class Aircraft(AircraftBase):
         # https://wiki.flightgear.org/Force_feedback
         # https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
         self.spring = effects["dynamic_spring"].spring()
-        ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_msfs():
+            ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_xplane():
+            ap_active = telem_data.get("APServos", 0)
+
 
         elev_base_gain = 0
         ailer_base_gain = 0
@@ -608,10 +638,13 @@ class Aircraft(AircraftBase):
 
 
                 if self.ap_following and ap_active:
-                    aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+                    if self._sim_is_msfs():
+                        aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+                        aileron_pos = aileron_pos[0]
+                        aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+                    if self._sim_is_xplane():
+                        aileron_pos = telem_data.get("APRollServo", 0)
 
-                    aileron_pos = aileron_pos[0]
-                    aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
 
                     phys_stick_x_offs = int(aileron_pos * 4096)
                 else:
@@ -633,34 +666,39 @@ class Aircraft(AircraftBase):
 
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+                if self._sim_is_xplane():
+                    pos_x_pos = x_pos * x_scale
+                    pos_y_pos = y_pos * y_scale
+                    self.send_xp_command(f'AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}')
 
-                if self.enable_custom_x_axis:
-                    x_var = self.custom_x_axis
-                    x_range = self.raw_x_axis_scale
-                else:
-                    x_var = 'AXIS_AILERONS_SET'
-                    x_range = 16384
-                if self.enable_custom_y_axis:
-                    y_var = self.custom_y_axis
-                    y_range = self.raw_y_axis_scale
-                else:
-                    y_var = 'AXIS_ELEVATOR_SET'
-                    y_range = 16384
+                if self._sim_is_msfs():
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
+                    else:
+                        x_var = 'AXIS_AILERONS_SET'
+                        x_range = 16384
+                    if self.enable_custom_y_axis:
+                        y_var = self.custom_y_axis
+                        y_range = self.raw_y_axis_scale
+                    else:
+                        y_var = 'AXIS_ELEVATOR_SET'
+                        y_range = 16384
 
-                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
-                pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                    pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
 
-                if x_range != 1:
-                    pos_x_pos = -int(pos_x_pos)
-                else:
-                    pos_x_pos = round(pos_x_pos, 5)
-                if y_range != 1:
-                    pos_y_pos = -int(pos_y_pos)
-                else:
-                    pos_y_pos = round(pos_y_pos, 5)
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+                    if y_range != 1:
+                        pos_y_pos = -int(pos_y_pos)
+                    else:
+                        pos_y_pos = round(pos_y_pos, 5)
 
-                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-                self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
 
                 #give option to disable if desired by user
             if self.aoa_effect_enabled and telem_data.get("ElevDeflPct", 0) != 0 and not max(telem_data.get("WeightOnWheels")):
@@ -742,7 +780,7 @@ class Aircraft(AircraftBase):
             if self.trim_following:
                 if not self.telemffb_controls_axes:
                     logging.warning(
-                        "TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION TO MSFS! Forcing to enable!")
+                        "TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION! Forcing to enable!")
                     self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
                 rudder_trim = telem_data.get("RudderTrimPct", 0)
 
@@ -780,24 +818,50 @@ class Aircraft(AircraftBase):
                 x_pos = phys_x - virtual_rudder_x_offs
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
-                if self.enable_custom_x_axis:
-                    x_var = self.custom_x_axis
-                    x_range = self.raw_x_axis_scale
-                else:
-                    x_var = 'AXIS_RUDDER_SET'
-                    x_range = 16384
+                if self._sim_is_xplane():
+                    pos_x_pos = x_pos * x_scale
+                    self.send_xp_command(f'AXIS:px={round(pos_x_pos, 5)}')
 
-                pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                if self._sim_is_msfs():
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
+                    else:
+                        x_var = 'AXIS_RUDDER_SET'
+                        x_range = 16384
 
-                if x_range != 1:
-                    pos_x_pos = -int(pos_x_pos)
-                else:
-                    pos_x_pos = round(pos_x_pos, 5)
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
 
-                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+
+                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
             self.const_force.constant(rud_force, 270).start()
             self.spring.start()
+
+    def send_xp_command(self, cmd):
+        if not getattr(self, "_socket", None):
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+        self.toggle_xp_control()
+        self._socket.sendto(bytes(cmd, "utf-8"), ("127.0.0.1", 34391))
+
+    def toggle_xp_control(self):
+        if not getattr(self, "_socket", None):
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+        if self.telemffb_controls_axes and not self.xplane_axis_override_active:
+            sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=true"
+            self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+            logging.info(f"Sending to XPLANE: >>{sendstr}<<")
+            self.xplane_axis_override_active = True
+        elif self.xplane_axis_override_active and not self.telemffb_controls_axes:
+            sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=false"
+
+            self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+            logging.info(f"Sending to XPLANE: >>{sendstr}<<")
+            self.xplane_axis_override_active = False
 
     def on_event(self, event, *args):
         logging.info(f"on_event {event} {args}")
@@ -809,6 +873,9 @@ class Aircraft(AircraftBase):
         effects["pause_spring"].spring().stop()
         if telem_data.get('Parked', 0): # MSFS in Hangar
             return
+
+        if self._sim_is_xplane():
+            self.toggle_xp_control()
 
         super().on_telemetry(telem_data)
         #
@@ -909,13 +976,13 @@ class TurbopropAircraft(PropellerAircraft):
 
     def on_telemetry(self, telem_data):
         pass
-        # if telem_data.get("N") == None:
-        #     return
-        # telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
-        # if telem_data.get("STOP",0):
-        #     self.on_timeout()
-        #     return
-        # super().on_telemetry(telem_data)
+        if telem_data.get("N") == None:
+            return
+        telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
+        if telem_data.get("STOP",0):
+            self.on_timeout()
+            return
+        super().on_telemetry(telem_data)
         # # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
         # #     sp = max(telem_data.get("Spoilers", 0))
         # #     self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
@@ -1025,13 +1092,13 @@ class GliderAircraft(Aircraft):
         self.force_trim_y_offset = self.stick_center[1]
     def on_telemetry(self, telem_data):
         pass
-        # if telem_data.get("N") == None:
-        #     return
-        # telem_data["AircraftClass"] = "GliderAircraft"  # inject aircraft class into telemetry
-        # if telem_data.get("STOP",0):
-        #     self.on_timeout()
-        #     return
-        # super().on_telemetry(telem_data)
+        if telem_data.get("N") == None:
+            return
+        telem_data["AircraftClass"] = "GliderAircraft"  # inject aircraft class into telemetry
+        if telem_data.get("STOP",0):
+            self.on_timeout()
+            return
+        super().on_telemetry(telem_data)
         # if self.force_trim_enabled:
         #     self._update_force_trim(telem_data, x_axis=self.aileron_force_trim, y_axis=self.elevator_force_trim)
         # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
@@ -1103,9 +1170,9 @@ class Helicopter(Aircraft):
         super().on_telemetry(telem_data)
         #
         self._update_heli_controls(telem_data)
-        # self._update_collective(telem_data)
+        self._update_collective(telem_data)
         # # self._update_cyclic_trim(telem_data)
-        # self._update_pedals(telem_data)
+        self._update_pedals(telem_data)
         self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
         self._update_jet_engine_rumble(telem_data)
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
@@ -1137,7 +1204,11 @@ class Helicopter(Aircraft):
 
     def _update_heli_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
-        ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_msfs():
+            ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_xplane():
+            ap_active = telem_data.get("APServos", 0)
+
         trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
         self.spring = effects["cyclic_spring"].spring()
 
@@ -1194,7 +1265,7 @@ class Helicopter(Aircraft):
                     self.cyclic_center = [x, y]
 
                     logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
-                    if telem_data['src'] == "MSFS2020":
+                    if self._sim_is_msfs():
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
 
@@ -1222,7 +1293,7 @@ class Helicopter(Aircraft):
 
                     self.spring_x.cpOffset = self.cpO_x
                     self.spring_y.cpOffset = self.cpO_y
-                    if telem_data['src'] == "MSFS2020":
+                    if self._sim_is_msfs():
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
                     logging.info("Trim Reset Pressed")
@@ -1280,34 +1351,40 @@ class Helicopter(Aircraft):
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
 
+                if self._sim_is_xplane():
+                    pos_x_pos = x_pos * x_scale
+                    pos_y_pos = y_pos * y_scale
+                    self.send_xp_command(f'AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}')
+
                 if self.cyclic_spring_init or not self.force_trim_enabled:
-                    if self.enable_custom_x_axis:
-                        x_var = self.custom_x_axis
-                        x_range = self.raw_x_axis_scale
-                    else:
-                        x_var = 'AXIS_CYCLIC_LATERAL_SET'
-                        x_range = 16384
-                    if self.enable_custom_y_axis:
-                        y_var = self.custom_y_axis
-                        y_range = self.raw_y_axis_scale
-                    else:
-                        y_var = 'AXIS_CYCLIC_LONGITUDINAL_SET'
-                        y_range = 16384
+                    if self._sim_is_msfs():
+                        if self.enable_custom_x_axis:
+                            x_var = self.custom_x_axis
+                            x_range = self.raw_x_axis_scale
+                        else:
+                            x_var = 'AXIS_CYCLIC_LATERAL_SET'
+                            x_range = 16384
+                        if self.enable_custom_y_axis:
+                            y_var = self.custom_y_axis
+                            y_range = self.raw_y_axis_scale
+                        else:
+                            y_var = 'AXIS_CYCLIC_LONGITUDINAL_SET'
+                            y_range = 16384
 
-                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
-                    pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+                        pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                        pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
 
-                    if x_range != 1:
-                        pos_x_pos = -int(pos_x_pos)
-                    else:
-                        pos_x_pos = round(pos_x_pos, 5)
-                    if y_range != 1:
-                        pos_y_pos = -int(pos_y_pos)
-                    else:
-                        pos_y_pos = round(pos_y_pos, 5)
+                        if x_range != 1:
+                            pos_x_pos = -int(pos_x_pos)
+                        else:
+                            pos_x_pos = round(pos_x_pos, 5)
+                        if y_range != 1:
+                            pos_y_pos = -int(pos_y_pos)
+                        else:
+                            pos_y_pos = round(pos_y_pos, 5)
 
-                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                        self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                        self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
 
                 self.last_device_x, self.last_device_y = phys_x, phys_y
 
@@ -1387,21 +1464,25 @@ class Helicopter(Aircraft):
 
             self.last_pedal_x = phys_x
 
-            if self.enable_custom_x_axis:
-                x_var = self.custom_x_axis
-                x_range = self.raw_x_axis_scale
-            else:
-                x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
-                x_range = 16384
+            if self._sim_is_xplane():
+                pos_x_pos = phys_x * x_scale
+                self.send_xp_command(f'AXIS:px={round(pos_x_pos, 5)}')
+            if self._sim_is_msfs():
+                if self.enable_custom_x_axis:
+                    x_var = self.custom_x_axis
+                    x_range = self.raw_x_axis_scale
+                else:
+                    x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
+                    x_range = 16384
 
-            pos_x_pos = utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                pos_x_pos = utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale))
 
-            if x_range != 1:
-                pos_x_pos = -int(pos_x_pos)
-            else:
-                pos_x_pos = round(pos_x_pos, 5)
+                if x_range != 1:
+                    pos_x_pos = -int(pos_x_pos)
+                else:
+                    pos_x_pos = round(pos_x_pos, 5)
 
-            self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
@@ -1459,22 +1540,28 @@ class Helicopter(Aircraft):
         self.spring.effect.setCondition(self.spring_y)
         self.spring.start()
 
-        if self.enable_custom_y_axis:
-            y_var = self.custom_y_axis
-            y_range = self.raw_y_axis_scale
-        else:
-            y_var = 'AXIS_COLLECTIVE_SET'
-            y_range = 16384
+        if self._sim_is_xplane():
+            pos_y_pos = utils.scale(phys_y, (-1, 1), (1, 0))
+            if self.collective_init:
+                self.send_xp_command(f'AXIS:cy={round(pos_y_pos, 5)}')
 
-        pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+        if self._sim_is_msfs():
+            if self.enable_custom_y_axis:
+                y_var = self.custom_y_axis
+                y_range = self.raw_y_axis_scale
+            else:
+                y_var = 'AXIS_COLLECTIVE_SET'
+                y_range = 16384
 
-        if y_range != 1:
-            pos_y_pos = -int(pos_y_pos)
-        else:
-            pos_y_pos = round(pos_y_pos, 5)
+            pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
 
-        if self.collective_init:
-            self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+            if y_range != 1:
+                pos_y_pos = -int(pos_y_pos)
+            else:
+                pos_y_pos = round(pos_y_pos, 5)
+
+            if self.collective_init:
+                self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
 
 
 

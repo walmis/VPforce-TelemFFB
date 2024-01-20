@@ -10,6 +10,10 @@
 #include <cstring>
 #include <winsock2.h>
 #include <thread>
+#include <mutex>
+#include <fstream>
+#include <chrono>
+#include <Windows.h>
 #define XPLM300 1
 #include "XPLMProcessing.h"
 #include "XPLMDataAccess.h"
@@ -26,7 +30,14 @@ SOCKET udpSocket_rx;
 struct sockaddr_in serverAddr_rx;
 bool gTerminateReceiveThread = false;
 
+std::mutex axisDataMutex;
+std::mutex logMutex;
+
+
+std::ofstream debugLogFile;
+
 /* Data refs we will record. */
+static XPLMDataRef gAircraftDescr = XPLMFindDataRef("sim/aircraft/view/acf_ui_name");                   // string bytes[260]
 static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");                                        // boolean • int • v6.60+
 static XPLMDataRef gOnGround = XPLMFindDataRef("sim/flightmodel/failures/onground_all");                // int • v6.60+
 static XPLMDataRef gRetractable = XPLMFindDataRef("sim/aircraft/gear/acf_gear_retract");                // boolean • int • v6.60+
@@ -66,20 +77,85 @@ static XPLMDataRef gPitchOvd = XPLMFindDataRef("sim/operation/override/override_
 static XPLMDataRef gYawOvd = XPLMFindDataRef("sim/operation/override/override_joystick_heading");
 
 static XPLMDataRef gRollCenter = XPLMFindDataRef("sim/joystick/joystick_roll_center");
+static XPLMDataRef gPitchCenter = XPLMFindDataRef("sim/joystick/joystick_pitch_center");
+static XPLMDataRef gYawCenter = XPLMFindDataRef("sim/joystick/joystick_heading_center");
 
 static XPLMDataRef gCollectiveRatio = XPLMFindDataRef("sim/cockpit2/engine/actuators/prop_ratio_all");
 static XPLMDataRef gRollRatio = XPLMFindDataRef("sim/joystick/yoke_roll_ratio");
 static XPLMDataRef gPitchRatio = XPLMFindDataRef("sim/joystick/yoke_pitch_ratio");
 static XPLMDataRef gYawRatio = XPLMFindDataRef("sim/joystick/yoke_heading_ratio");
 
+static XPLMDataRef gElevTrim = XPLMFindDataRef("sim/flightmodel2/controls/elevator_trim");
+static XPLMDataRef gAilerTrim = XPLMFindDataRef("sim/flightmodel2/controls/aileron_trim");
+
+static XPLMDataRef gAPMode = XPLMFindDataRef("sim/cockpit/autopilot/autopilot_mode");
+static XPLMDataRef gAPServos = XPLMFindDataRef("sim/cockpit2/autopilot/servos_on");
+static XPLMDataRef gYawServo = XPLMFindDataRef("sim/joystick/servo_heading_ratio");
+static XPLMDataRef gPitchServo = XPLMFindDataRef("sim/joystick/servo_pitch_ratio");
+static XPLMDataRef gRollServo = XPLMFindDataRef("sim/joystick/servo_roll_ratio");
+
+
+
+
 
 std::map<std::string, std::string> telemetryData;
+std::map<std::string, float> axisDataMap = { {"jx", 0.0}, {"jy", 0.0}, {"px", 0.0}, {"cy", 0.0} };
+
+bool overrideJoystick = false;
+bool overridePedals = false;
+bool overrideCollective = false;
+
+static bool DEBUG = true;
+
 
 static float MyFlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void* inRefcon);
 
-const float kt_2_mps = 0.51444; // convert knots to meters per second
-const float radps_2_rpm = 9.5493; // convert rad/sec to rev/min
-const float fps_2_g = 0.031081; // convert feet per second to g
+const float kt_2_mps = 0.51444f; // convert knots to meters per second
+const float radps_2_rpm = 9.5493f; // convert rad/sec to rev/min
+const float fps_2_g = 0.031081f; // convert feet per second to g
+
+void InitializeDebugLog() {
+    if (DEBUG) {
+        debugLogFile.open("TelemFFB_DebugLog.txt", std::ios::out);
+    }
+}
+
+// Function to get a timestamp string
+// Function to get a timestamp string with millisecond resolution
+std::string GetTimestamp() {
+    SYSTEMTIME systemTime;
+    GetSystemTime(&systemTime);
+
+    FILETIME fileTime;
+    SystemTimeToFileTime(&systemTime, &fileTime);
+
+    ULARGE_INTEGER uli;
+    uli.LowPart = fileTime.dwLowDateTime;
+    uli.HighPart = fileTime.dwHighDateTime;
+
+    auto milliseconds = uli.QuadPart % 10000000 / 10000;  // Convert 100-nanoseconds to milliseconds
+
+    std::ostringstream oss;
+    oss << std::setfill('0') << std::setw(3) << milliseconds;
+
+    return
+        std::to_string(systemTime.wMonth) + ":" +
+        std::to_string(systemTime.wDay) + ":" +
+        std::to_string(systemTime.wHour) + ":" +
+        std::to_string(systemTime.wMinute) + ":" +
+        std::to_string(systemTime.wSecond) + "." +
+        oss.str() + " - ";
+}
+
+// Function to write a log message with timestamp to the debug log
+void DebugLog(const std::string& message) {
+    std::lock_guard<std::mutex> lock(logMutex);  // Lock the mutex
+
+    if (debugLogFile.is_open()) {
+        debugLogFile << GetTimestamp() << message << std::endl;
+        debugLogFile.flush();
+    }
+}
 
 std::string FloatToString(float value, int precision, float conversionFactor = 1.0) {
     value *= conversionFactor; // Apply the conversion factor
@@ -114,15 +190,17 @@ std::string FloatArrayToString(XPLMDataRef dataRef, int offset, int size, float 
 void CollectTelemetryData()
 {
     // Get the aircraft name
-    char aircraftName[256];
-    char aircraftPath[256];
-    XPLMGetNthAircraftModel(0, aircraftName, aircraftPath);
-
+    char aircraftName[250];
+/*    char aircraftName[256];
+    char aircraftPath[256]*/;
+    //XPLMGetNthAircraftModel(0, aircraftName, aircraftPath);
+    XPLMGetDatab(gAircraftDescr, aircraftName, 0, 250);
+    //DebugLog("Aircraft: " + aircraftDescr);
     // Strip the file extension from the aircraft name
-    char* lastDot = strrchr(aircraftName, '.');
+    /*char* lastDot = strrchr(aircraftName, '.');
     if (lastDot != nullptr) {
         *lastDot = '\0';
-    }
+    }*/
 
     telemetryData["src"] = "XPLANE";
     telemetryData["N"] = aircraftName;
@@ -160,7 +238,13 @@ void CollectTelemetryData()
     telemetryData["Flaps"] = FloatToString(XPLMGetDataf(gFlaps), 3);
     telemetryData["Gear"] = FloatArrayToString(gGear,0, 3);
 
-
+    telemetryData["APMode"] = std::to_string(XPLMGetDatai(gAPMode));
+    telemetryData["APServos"] = std::to_string(XPLMGetDatai(gAPServos));
+    telemetryData["APYawServo"] = FloatToString(XPLMGetDataf(gYawServo), 3);
+    telemetryData["APPitchServo"] = FloatToString(XPLMGetDataf(gPitchServo), 3);
+    telemetryData["APRollServo"] = FloatToString(XPLMGetDataf(gRollServo), 3);
+    telemetryData["ElevTrimPct"] = FloatToString(XPLMGetDataf(gElevTrim), 3);
+    telemetryData["AileronTrimPct"] = FloatToString(XPLMGetDataf(gAilerTrim), 3);
 }
 
 
@@ -178,7 +262,69 @@ void FormatAndSendTelemetryData()
     sendto(udpSocket_tx, dataString.c_str(), dataString.length(), 0, (struct sockaddr*)&serverAddr_tx, sizeof(serverAddr_tx));
 }
 
-void ReceiveAndProcessMessages() {
+void ProcessReceivedData(const std::string& dataType, const std::string& payload) {
+    // Handle different data types here
+    if (dataType == "AXIS") {
+        // Parse and update AXIS data map
+        std::istringstream iss(payload);
+        std::string token;
+        while (std::getline(iss, token, ',')) {
+            size_t equalsPos = token.find('=');
+            if (equalsPos != std::string::npos) {
+                std::string key = token.substr(0, equalsPos);
+                float value = std::stof(token.substr(equalsPos + 1));
+                axisDataMap[key] = value;
+            }
+        }
+
+        // Perform actions based on AXIS data
+        // ...
+    }
+    else if (dataType == "OVERRIDE") {
+        // Parse the payload for keyword and value
+        DebugLog("Inside the Override block");
+        std::istringstream iss(payload);
+        std::string keyValuePair;
+
+        // Assuming payload is in the form "keyword=value"
+        if (std::getline(iss, keyValuePair, '=')) {
+            std::string keyword = keyValuePair;
+            bool overrideValue;
+            iss >> std::boolalpha >> overrideValue;
+            DebugLog("Received Keyword: " + keyword);
+            DebugLog("Stream Content: " + payload);
+            DebugLog("Parsed overrideValue: " + std::to_string(overrideValue));
+            // Handle "OVERRIDE" data type based on keywords
+            if (keyword == "joystick") {
+                //DebugLog("Inside the joystick block");
+
+                XPLMSetDatai(gRollOvd, overrideValue ? 1 : 0);
+                XPLMSetDatai(gPitchOvd, overrideValue ? 1 : 0);
+
+                overrideJoystick = overrideValue;
+            }
+            else if (keyword == "pedals") {
+                XPLMSetDatai(gYawOvd, overrideValue ? 1 : 0);
+                overridePedals = overrideValue;
+
+            }
+            else if (keyword == "collective") {
+                XPLMSetDatai(gCollectiveOvd, overrideValue ? 1 : 0);
+                overrideCollective = overrideValue;
+            }
+            else {
+                // Unknown or unsupported keyword
+                // Handle accordingly or log a warning
+            }
+        }
+    }
+    else {
+        // Unknown or unsupported data type
+        // Handle accordingly or log a warning
+    }
+}
+
+void ReceiveData() {
     char buffer[1024];
     int recvlen;
     struct sockaddr_in senderAddr;
@@ -186,21 +332,61 @@ void ReceiveAndProcessMessages() {
 
     recvlen = recvfrom(udpSocket_rx, buffer, sizeof(buffer), 0, (struct sockaddr*)&senderAddr, &senderAddrSize);
     if (recvlen > 0) {
-        // Process the received message (you can parse and handle the message here)
+        // Process the received message
         buffer[recvlen] = 0; // Null-terminate the received data
-        // Call your message processing function here with 'buffer'
+
+        // Parse the received data for data type and payload
+        std::istringstream iss(buffer);
+        std::string dataType;
+        std::getline(iss, dataType, ':');  // Extract data type
+        std::string payload;
+        std::getline(iss, payload);  // Extract payload
+
+        {
+            std::lock_guard<std::mutex> lock(axisDataMutex);
+
+            // Call the processing function with the parsed data
+            ProcessReceivedData(dataType, payload);
+
+            //DebugLog("Received Data - Type: " + dataType + ", Payload: " + payload);
+        }
     }
 }
 
 void ReceiveThread() {
     while (!gTerminateReceiveThread) {
-        ReceiveAndProcessMessages();
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        ReceiveData();
+        //std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+}
+
+void SendAxisPosition() {
+    std::lock_guard<std::mutex> lock(axisDataMutex);
+    if (overrideJoystick) {
+        float jx = axisDataMap["jx"];
+        float jy = axisDataMap["jy"];
+ 
+        XPLMSetDataf(gRollRatio, jx);
+        XPLMSetDataf(gPitchRatio, jy);
+        //DebugLog("Send Axis: x=" + FloatToString(jx, 4) + ", y=" + FloatToString(jy, 4));
+    }
+    if (overridePedals) {
+        float px = axisDataMap["px"];
+ 
+        XPLMSetDataf(gYawRatio, px);
+    }
+    if (overrideCollective) {
+        float cy = axisDataMap["cy"];
+        
+        XPLMSetDataf(gCollectiveRatio, cy);
     }
 }
 
 PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc)
 {
+    if (DEBUG) {
+        InitializeDebugLog();
+    }
 
     strcpy(outName, "TelemFFB-XPP");
     strcpy(outSig, "vpforce.telemffb.xpplugin");
@@ -264,7 +450,8 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc)
     std::thread receiveThread(ReceiveThread);
     receiveThread.detach();  // Detach the thread to allow it to run independently
 
-
+    //XPLMSetDatai(gRollOvd, 1);
+    //XPLMSetDatai(gPitchOvd, 1);
     return 1;
 }
 
@@ -298,6 +485,7 @@ PLUGIN_API void XPluginReceiveMessage(XPLMPluginID inFromWho, int inMessage, voi
 
 float MyFlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinceLastFlightLoop, int inCounter, void* inRefcon)
 {
+    SendAxisPosition();
 
     // Collect telemetry data
     CollectTelemetryData();
@@ -305,7 +493,7 @@ float MyFlightLoopCallback(float inElapsedSinceLastCall, float inElapsedTimeSinc
     // Format and send telemetry data
     FormatAndSendTelemetryData();
 
- 
+
 
     // Return -1 to indicate we want to be called on next opportunity
     return -1;
