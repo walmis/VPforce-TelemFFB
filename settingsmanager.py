@@ -1101,6 +1101,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if self.sim == 'IL2' and craft == 'HPGHelicopter': return True
         if self.sim == 'IL2' and craft == 'Helicopter': return True
         if self.sim == 'IL2' and craft == 'TurbopropAircraft': return True
+        if self.sim == 'XPLANE' and craft == 'HPGHelicopter': return True
 
         return False
 
