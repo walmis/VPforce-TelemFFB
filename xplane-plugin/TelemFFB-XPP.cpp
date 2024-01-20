@@ -87,6 +87,7 @@ static XPLMDataRef gYawRatio = XPLMFindDataRef("sim/joystick/yoke_heading_ratio"
 
 static XPLMDataRef gElevTrim = XPLMFindDataRef("sim/flightmodel2/controls/elevator_trim");
 static XPLMDataRef gAilerTrim = XPLMFindDataRef("sim/flightmodel2/controls/aileron_trim");
+static XPLMDataRef gRudderTrim = XPLMFindDataRef("sim/flightmodel2/controls/rudder_trim");
 
 static XPLMDataRef gAPMode = XPLMFindDataRef("sim/cockpit/autopilot/autopilot_mode");
 static XPLMDataRef gAPServos = XPLMFindDataRef("sim/cockpit2/autopilot/servos_on");
@@ -245,6 +246,7 @@ void CollectTelemetryData()
     telemetryData["APRollServo"] = FloatToString(XPLMGetDataf(gRollServo), 3);
     telemetryData["ElevTrimPct"] = FloatToString(XPLMGetDataf(gElevTrim), 3);
     telemetryData["AileronTrimPct"] = FloatToString(XPLMGetDataf(gAilerTrim), 3);
+    telemetryData["RudderTrimPct"] = FloatToString(XPLMGetDataf(gRudderTrim), 3);
 }
 
 
