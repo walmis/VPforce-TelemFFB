@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>620</width>
-    <height>515</height>
+    <height>600</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -25,7 +25,7 @@
   <property name="maximumSize">
    <size>
     <width>620</width>
-    <height>515</height>
+    <height>600</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -60,7 +60,7 @@
    <property name="geometry">
     <rect>
      <x>430</x>
-     <y>481</y>
+     <y>567</y>
      <width>156</width>
      <height>23</height>
     </rect>
@@ -76,7 +76,7 @@
    <property name="geometry">
     <rect>
      <x>21</x>
-     <y>481</y>
+     <y>567</y>
      <width>121</width>
      <height>23</height>
     </rect>
@@ -127,41 +127,8 @@
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>16</x>
-     <y>204</y>
-     <width>170</width>
-     <height>65</height>
-    </rect>
-   </property>
-   <layout class="QVBoxLayout" name="verticalLayout">
-    <item>
-     <widget class="QCheckBox" name="enableDCS">
-      <property name="text">
-       <string>Enable DCS World Support</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QCheckBox" name="enableMSFS">
-      <property name="text">
-       <string>Enable MSFS 2020 Support</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QCheckBox" name="enableIL2">
-      <property name="text">
-       <string>Enable IL-2 Sturmovik Support</string>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
-  <widget class="QWidget" name="layoutWidget">
-   <property name="geometry">
-    <rect>
      <x>30</x>
-     <y>275</y>
+     <y>356</y>
      <width>452</width>
      <height>75</height>
     </rect>
@@ -243,7 +210,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>361</y>
+     <y>447</y>
      <width>581</width>
      <height>16</height>
     </rect>
@@ -308,7 +275,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>374</y>
+     <y>460</y>
      <width>91</width>
      <height>16</height>
     </rect>
@@ -328,7 +295,7 @@
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>394</y>
+     <y>480</y>
      <width>101</width>
      <height>16</height>
     </rect>
@@ -341,7 +308,7 @@
    <property name="geometry">
     <rect>
      <x>36</x>
-     <y>414</y>
+     <y>500</y>
      <width>184</width>
      <height>42</height>
     </rect>
@@ -920,6 +887,106 @@ Headless:</string>
     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
    </property>
   </widget>
+  <widget class="QWidget" name="">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>276</y>
+     <width>270</width>
+     <height>45</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout_3">
+    <item row="0" column="0" colspan="2">
+     <widget class="QCheckBox" name="validateXPLANE">
+      <property name="text">
+       <string>Auto X-Plane setup</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QLineEdit" name="pathXPLANE"/>
+    </item>
+    <item row="1" column="2">
+     <widget class="QToolButton" name="browseXPLANE">
+      <property name="text">
+       <string>...</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QLabel" name="lab_pathXPLANE">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>98</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>X-Plane Install Path:</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QCheckBox" name="enableXPLANE">
+   <property name="geometry">
+    <rect>
+     <x>17</x>
+     <y>251</y>
+     <width>135</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Enable X-Plane Support</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="enableDCS">
+   <property name="geometry">
+    <rect>
+     <x>17</x>
+     <y>205</y>
+     <width>150</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Enable DCS World Support</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="enableIL2">
+   <property name="geometry">
+    <rect>
+     <x>17</x>
+     <y>330</y>
+     <width>168</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Enable IL-2 Sturmovik Support</string>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="enableMSFS">
+   <property name="geometry">
+    <rect>
+     <x>17</x>
+     <y>228</y>
+     <width>152</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Enable MSFS 2020 Support</string>
+   </property>
+  </widget>
  </widget>
  <tabstops>
   <tabstop>logLevel</tabstop>
@@ -943,6 +1010,10 @@ Headless:</string>
   <tabstop>cb_headless_c</tabstop>
   <tabstop>enableDCS</tabstop>
   <tabstop>enableMSFS</tabstop>
+  <tabstop>enableXPLANE</tabstop>
+  <tabstop>validateXPLANE</tabstop>
+  <tabstop>pathXPLANE</tabstop>
+  <tabstop>browseXPLANE</tabstop>
   <tabstop>enableIL2</tabstop>
   <tabstop>validateIL2</tabstop>
   <tabstop>pathIL2</tabstop>
