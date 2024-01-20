@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License 
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import hashlib
 from datetime import datetime
 import math
 import os
@@ -423,6 +424,9 @@ def get_default_sys_settings(device_id, device_type, cmb=False):
         'ignoreUpdate': False,
         'enableDCS': False,
         'enableMSFS': False,
+        'enableXPLANE': False,
+        'validateXPLANE': False,
+        'pathXPLANE': '',
         'enableIL2': False,
         'validateIL2': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
@@ -1205,6 +1209,13 @@ def analyze_il2_config(path, port=34385, window=None):
 
         # return config_data, telem_match, motion_match
 
+def calculate_crc(file_path):
+    # Calculate CRC for a file
+    crc = hashlib.md5()
+    with open(file_path, 'rb') as file:
+        for chunk in iter(lambda: file.read(4096), b''):
+            crc.update(chunk)
+    return crc.hexdigest()
 
 def write_il2_config(file_path, config_data):
     with open(file_path, 'w') as config_file:
@@ -1217,6 +1228,42 @@ def write_il2_config(file_path, config_data):
                 else:
                     config_file.write(f"\t{key} = {value}\n")
             config_file.write("[END]\n\n")
+
+
+def install_xplane_plugin(path, window):
+    src_path = get_resource_path('xplane-plugin/TelemFFB-XPP/64/win.xpl', prefer_root=True)
+    dst_path = os.path.join(path, 'resources', 'plugins', 'TelemFFB-XPP', '64', 'win.xpl')
+
+    ans = QMessageBox.No
+    if not os.path.exists(dst_path):
+        ans = QMessageBox.question(window, "X-Plane Plugin Installer", "X-plane plugin is not installed, install now?\n\nNote: X-Plane must not be running for this operation to succeed")
+    else:
+        src_crc = calculate_crc(src_path)
+        dst_crc = calculate_crc(dst_path)
+        if not src_crc == dst_crc:
+            ans = QMessageBox.question(window, "X-Plane Plugin Installer", "X-plane plugin is out of date, update now?\n\nNote: X-Plane must not be running for this operation to succeed")
+        else:
+            return True
+
+    if ans == QMessageBox.Yes:
+        tryloop = True
+        while tryloop:
+            try:
+                if not os.path.exists(os.path.dirname(dst_path)):
+                    os.makedirs(os.path.dirname(dst_path))
+                print(os.path.isdir(os.path.dirname(dst_path)))
+                shutil.copy(src_path, dst_path)
+                tryloop = False
+                return True
+            except Exception as e:
+                print(f"ERROR:{e}")
+                retry = QMessageBox.warning(window, "X-Plane Plugin Error", "There was an error copying the file.  Please ensure X-Plane is not running.\n\nWould you like to re-try?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if retry == QMessageBox.No:
+                    tryloop = False
+                    return False
+    else:
+        return False
+    return True
 
 
 def install_export_lua(window):
