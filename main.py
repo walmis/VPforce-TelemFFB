@@ -737,8 +737,17 @@ class TelemManager(QObject, threading.Thread):
                 params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
                 updated_params = self.get_changed_params(params)
                 self.currentAircraft.apply_settings(updated_params)
+
                 if "vpconf" in updated_params:
                     utils.set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+
+                if "type" in updated_params:
+                    # if user changed type or if new aircraft dialog changed type, update aircraft class
+                    Class = getattr(module, cls_name, None)
+                    self.currentAircraft = Class(aircraft_name)
+                    self.currentAircraft.apply_settings(params)
+                    self.currentAircraftConfig = params
+
                 self.updateSettingsLayout.emit()
             try:
                 _tm = time.perf_counter()
