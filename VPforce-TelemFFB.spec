@@ -10,7 +10,7 @@ block_cipher = None
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect')],
+    binaries=[('xplane-plugin/TelemFFB-XPP/64/win.xpl', 'xplane-plugin/TelemFFB-XPP/64'), ('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect')],
     datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.')],
     hiddenimports=[],
     hookspath=[],
@@ -115,7 +115,8 @@ exe = EXE(
 import shutil
 import os
 shutil.copyfile('_RELEASE_NOTES.txt', os.path.join(distpath, '_RELEASE_NOTES.txt'))
-
+os.makedirs(os.path.join(distpath, 'xplane-plugin/TelemFFB-XPP/64'), exist_ok=True)
+shutil.copyfile('xplane-plugin/TelemFFB-XPP/64/win.xpl', os.path.join(distpath, 'xplane-plugin/TelemFFB-XPP/64/win.xpl'))
 shutil.copytree('export', os.path.join(distpath, 'export'), dirs_exist_ok=True)
 shutil.copytree('updater', os.path.join(distpath, 'updater'), dirs_exist_ok=True)
 
