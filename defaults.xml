@@ -610,10 +610,7 @@
 		<datatype>float</datatype>
 		<info>Distance required to trigger a hands-on condition</info>
 		<displayname>Hands On Deadzone</displayname>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -625,10 +622,7 @@
 		<datatype>float</datatype>
 		<info>Distance at which hands-off resumes (set lower than hands-on)</info>
 		<displayname>Hands Off Deadzone</displayname>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -642,7 +636,6 @@
 		<value>false</value>
 		<datatype>bool</datatype>
 		<info>Use a custom Simconnect Variable</info>
-		<XPLANE>true</XPLANE>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -656,7 +649,6 @@
 		<value>AXIS_AILERONS_SET</value>
 		<datatype>anylist</datatype>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
-		<XPLANE>true</XPLANE>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -670,7 +662,6 @@
 		<value>AXIS_RUDDER_SET</value>
 		<datatype>anylist</datatype>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
-		<XPLANE>true</XPLANE>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -685,7 +676,6 @@
 		<value>16384</value>
 		<datatype>list</datatype>
 		<info>Bit Range Scaling</info>
-		<XPLANE>true</XPLANE>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -699,7 +689,6 @@
 		<value>false</value>
 		<datatype>bool</datatype>
 		<info>Use a custom Simconnect Variable</info>
-		<XPLANE>true</XPLANE>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -713,7 +702,6 @@
 		<value>AXIS_ELEVATOR_SET</value>
 		<datatype>anylist</datatype>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
-		<XPLANE>true</XPLANE>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -727,7 +715,6 @@
 		<value>AXIS_COLLECTIVE_SET</value>
 		<datatype>anylist</datatype>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
-		<XPLANE>true</XPLANE>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -742,7 +729,6 @@
 		<value>16384</value>
 		<datatype>list</datatype>
 		<info>Bit Range Scaling</info>
-		<XPLANE>true</XPLANE>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
