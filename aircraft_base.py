@@ -730,12 +730,9 @@ class AircraftBase(object):
         modulation_neg = 1
         frequency2 = frequency + median_modulation
         precision = 2
-        try:
-            afterburner_pos = max(telem_data.get("Afterburner")[0], telem_data.get("Afterburner")[1])
-        except Exception as e:
-            logging.error(f"Error getting afterburner position: {e}")
-            return
-        logging.debug(f"Afterburner = {afterburner_pos}")
+        afterburner_pos = telem_data.get("Afterburner", 0)
+        if isinstance(afterburner_pos, list):
+            afterburner_pos = max(afterburner_pos)
 
         r1_modulation = utils.sine_point_in_time(modulation_pos, 15000)
         r2_modulation = utils.sine_point_in_time(modulation_neg, 15000)
@@ -815,9 +812,13 @@ class AircraftBase(object):
             WoW = telem_data.get("WeightOnWheels")[0] + telem_data.get("WeightOnWheels")[2]
 
         if self._sim_is_xplane():
-            rotor = telem_data.get("PropRPM", 0)[0]
+            rotor = telem_data.get("PropRPM", 0)
+            if isinstance(rotor, list):
+                rotor = rotor[0]
         else:
             rotor = telem_data.get("RotorRPM", 0)
+            if isinstance(rotor, list):
+                rotor = max(rotor)
         if WoW > 0:
             # logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
             effects.dispose("etlX")
@@ -861,13 +862,17 @@ class AircraftBase(object):
             effects.dispose("rotor_rpm1-1")
             return
         if self._sim_is_xplane():
-            rrpm = telem_data.get("PropRPM", 0)[0]
+            rrpm = telem_data.get("PropRPM", 0)
+            if isinstance(rrpm, list):
+                rrpm = rrpm[0]
         else:
             rrpm = telem_data.get("RotorRPM")
+            if isinstance(rrpm, list):
+                rrpm = max(rrpm)
         mod = telem_data.get("N")
         tas = telem_data.get("TAS", 0)
         eng_rpm = telem_data.get("EngRPM", 0)
-        if type(eng_rpm) == list:
+        if isinstance(eng_rpm, list):
             eng_rpm = max(eng_rpm)
 
         # rotor = telem_data.get("RotorRPM")

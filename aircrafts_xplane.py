@@ -148,7 +148,7 @@ class Aircraft(AircraftBase):
     @classmethod
     def set_simconnect(cls, sc):
         cls._simconnect = sc
-        
+
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
         # clear any existing effects
@@ -258,10 +258,8 @@ class Aircraft(AircraftBase):
         self.spring = effects['fbw_spring'].spring()
         if ffb_type == "joystick":
 
-            if self.trim_following:
-                if not self.telemffb_controls_axes:
-                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION! Forcing to enable!")
-                    self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
+            if self.trim_following and self.telemffb_controls_axes:
+
                 elev_trim = telem_data.get("ElevTrimPct", 0)
 
                 # derivative_hz = 5  # derivative lpf filter -3db Hz
@@ -387,10 +385,8 @@ class Aircraft(AircraftBase):
             self.spring.effect.setCondition(self.spring_x)
 
         elif ffb_type == "pedals":
-            if self.trim_following:
-                if not self.telemffb_controls_axes:
-                    logging.warning("TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION! Forcing to enable!")
-                    self.telemffb_controls_axes = True      # Force sending of axis via simconnect if trim following is enabled
+            if self.trim_following and self.telemffb_controls_axes:
+
                 rudder_trim = telem_data.get("RudderTrimPct", 0)
 
                 rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
@@ -488,7 +484,7 @@ class Aircraft(AircraftBase):
         ailer_base_gain = 0
         rudder_base_gain = 0
         ffb_type = telem_data.get("FFBType", "joystick")
-        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
+        if self.aircraft_is_fbw or telem_data.get("ACisFBW", 0):
             logging.debug ("FBW Setting enabled, running fbw_flight_controls")
             self._update_fbw_flight_controls(telem_data)
             return
@@ -560,7 +556,8 @@ class Aircraft(AircraftBase):
             _prop_thrust = max(_prop_thrust)
 
         if _prop_thrust < 0:
-            _prop_thrust1 = 0
+            _prop_thrust = 0
+
         _prop_air_vel = sqrt(2 * _prop_thrust / (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
 
         telem_data['_prop_thrust'] = _prop_thrust
@@ -621,8 +618,8 @@ class Aircraft(AircraftBase):
 
         if ffb_type == 'joystick':
 
-            if self.trim_following:
-                self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
+            if self.trim_following and self.telemffb_controls_axes:
+
                 elev_trim = telem_data.get("ElevTrimPct", 0)
                 aileron_trim = telem_data.get("AileronTrimPct", 0)
 
@@ -777,11 +774,8 @@ class Aircraft(AircraftBase):
             self.spring.start() # ensure spring is started
 
         elif ffb_type == 'pedals':
-            if self.trim_following:
-                if not self.telemffb_controls_axes:
-                    logging.warning(
-                        "TRIM FOLLOWING ENABLED BUT TELEMFFB IS NOT CONFIGURED TO SEND AXIS POSITION! Forcing to enable!")
-                    self.telemffb_controls_axes = True  # Force sending of axis via simconnect if trim following is enabled
+            if self.trim_following and self.telemffb_controls_axes:
+
                 rudder_trim = telem_data.get("RudderTrimPct", 0)
 
                 rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
@@ -849,8 +843,22 @@ class Aircraft(AircraftBase):
         self._socket.sendto(bytes(cmd, "utf-8"), ("127.0.0.1", 34391))
 
     def toggle_xp_control(self):
+        if self.telem_data.get('FFBType', '') == 'collective':
+            # issues with axis override for collectve
+            return
+
         if not getattr(self, "_socket", None):
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+
+        if self.telem_data.get('FFBType', '') == 'collective' and self.telem_data.get("AircraftClass", '') != "Helicopter":
+            # we don't want to send the "prop pitch" override (collective) to XPLANE if we are not in a helo
+            if self.telem_data.get("cOvrd", 1):
+                sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=false"
+                self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+                logging.info(f"Sending to XPLANE: >>{sendstr}<<")
+                self.xplane_axis_override_active = False
+            return
+
         if self.telemffb_controls_axes and not self.xplane_axis_override_active:
             sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=true"
             self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
@@ -858,10 +866,11 @@ class Aircraft(AircraftBase):
             self.xplane_axis_override_active = True
         elif self.xplane_axis_override_active and not self.telemffb_controls_axes:
             sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=false"
-
             self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
             logging.info(f"Sending to XPLANE: >>{sendstr}<<")
             self.xplane_axis_override_active = False
+    def find_xp_gear_orientation(self, x, y, z):
+        pass
 
     def on_event(self, event, *args):
         logging.info(f"on_event {event} {args}")
@@ -887,6 +896,8 @@ class Aircraft(AircraftBase):
         self._update_buffeting(telem_data)
         self._update_flight_controls(telem_data)
         self._decel_effect(telem_data)
+        if self._sim_is_xplane():
+            self._update_canopy(telem_data.get("CanopyPos", 0))
         #
         if self.flaps_motion_intensity > 0:
             flps = telem_data.get("Flaps", 0)
@@ -901,9 +912,7 @@ class Aircraft(AircraftBase):
             gear = max(telem_data.get("Gear", 0))
             self._update_landing_gear(gear, telem_data.get("TAS"))
 
-        # self._decel_effect(telem_data)
-        #
-        # self._aoa_reduction_force_effect(telem_data)
+        self._aoa_reduction_force_effect(telem_data)
         # if self.nosewheel_shimmy and telem_data.get("FFBType") == "pedals" and not telem_data.get("IsTaildragger", 0):
         #     self._update_nosewheel_shimmy(telem_data)
 
@@ -934,16 +943,20 @@ class PropellerAircraft(Aircraft):
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "PropellerAircraft"  # inject aircraft class into telemetry
-        if telem_data.get("STOP",0):
+        if telem_data.get("STOP", 0):
             self.on_timeout()
             return
         super().on_telemetry(telem_data)
 
         self.update_piston_engine_rumble(telem_data)
-        #
-        # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-        #     sp = max(telem_data.get("Spoilers", 0))
-        #     self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=800*kt2ms, spd_thresh_hi=140*kt2ms )
+        if self._sim_is_msfs():
+            if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
+                sp = max(telem_data.get("Spoilers", 0))
+                self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=80*kt2ms, spd_thresh_hi=140*kt2ms )
+        if self._sim_is_xplane():
+            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("TAS"), spd_thresh=80 * kt2ms)
+        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
+            self._gforce_effect(telem_data)
 
 
 class JetAircraft(Aircraft):
@@ -964,13 +977,16 @@ class JetAircraft(Aircraft):
             return
         super().on_telemetry(telem_data)
         #
-        # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-        #     sp = max(telem_data.get("Spoilers", 0))
-        #     self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
-        # self._update_jet_engine_rumble(telem_data)
-        #
-        # self._gforce_effect(telem_data)
-        # self._update_ab_effect(telem_data)
+        if self._sim_is_xplane():
+            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("TAS"), spd_thresh=150*kt2ms)
+        if self._sim_is_msfs():
+            if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
+                sp = max(telem_data.get("Spoilers", 0))
+                self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
+        self._update_jet_engine_rumble(telem_data)
+        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
+            self._gforce_effect(telem_data)
+        self._update_ab_effect(telem_data)
 
 class TurbopropAircraft(PropellerAircraft):
 
@@ -983,12 +999,15 @@ class TurbopropAircraft(PropellerAircraft):
             self.on_timeout()
             return
         super().on_telemetry(telem_data)
-        # # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-        # #     sp = max(telem_data.get("Spoilers", 0))
-        # #     self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
-        # # if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
-        # #     super()._gforce_effect(telem_data)
-        # self._update_jet_engine_rumble(telem_data)
+        if self._sim_is_xplane():
+            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("TAS"), spd_thresh=120*kt2ms)
+        if self._sim_is_msfs():
+            if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
+                sp = max(telem_data.get("Spoilers", 0))
+                self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
+        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
+            self._gforce_effect(telem_data)
+        self._update_jet_engine_rumble(telem_data)
 
 class GliderAircraft(Aircraft):
     def _update_force_trim(self, telem_data, x_axis=True, y_axis=True):
@@ -1099,13 +1118,18 @@ class GliderAircraft(Aircraft):
             self.on_timeout()
             return
         super().on_telemetry(telem_data)
-        # if self.force_trim_enabled:
-        #     self._update_force_trim(telem_data, x_axis=self.aileron_force_trim, y_axis=self.elevator_force_trim)
-        # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-        #     sp = max(telem_data.get("Spoilers", 0))
-        #     self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
-        # if self.gforce_effect_enable and self.gforce_effect_enable_areyoureallysure:
-        #     super()._gforce_effect(telem_data)
+        if self.force_trim_enabled:
+            self._update_force_trim(telem_data, x_axis=self.aileron_force_trim, y_axis=self.elevator_force_trim)
+        if self._sim_is_msfs():
+            sp = max(telem_data.get("Spoilers", 0))
+        if self._sim_is_xplane():
+            sp = telem_data.get("SpeedbrakePos", 0)
+            if isinstance(sp, list):
+                sp = max(sp)
+        if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
+            self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
+        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
+            self._gforce_effect(telem_data)
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""

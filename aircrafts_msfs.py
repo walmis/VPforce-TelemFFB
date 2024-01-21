@@ -857,7 +857,7 @@ class PropellerAircraft(Aircraft):
 
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             sp = max(telem_data.get("Spoilers", 0))
-            self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=800*kt2ms, spd_thresh_hi=140*kt2ms )
+            self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=80*kt2ms, spd_thresh_hi=140*kt2ms )
 
 
 class JetAircraft(Aircraft):
