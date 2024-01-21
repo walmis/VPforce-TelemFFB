@@ -2504,12 +2504,12 @@ class MainWindow(QMainWindow):
 
         self.cur_craft = QLabel()
         self.cur_craft.setText('Unknown')
-        self.cur_craft.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; }")
+        self.cur_craft.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Courier New; }")
         self.cur_craft.setAlignment(Qt.AlignLeft)
 
         self.cur_pattern = QLabel()
         self.cur_pattern.setText('(No Match)')
-        self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; }")
+        self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Courier New; }")
         self.cur_pattern.setAlignment(Qt.AlignLeft)
 
         rh_status_layout.addWidget(cur_ac_lbl)
@@ -2651,16 +2651,19 @@ class MainWindow(QMainWindow):
 
         self.lbl_telem_data = QLabel(
             f"Waiting for data...\n\n"
-            f"DCS Enabled: {dcs_status}\n"
-            f"IL2 Enabled: {il2_status}\n"
-            f"MSFS Enabled: {msfs_status}\n"
-            f"X-Plane Enabled: {xplane_status}\n\n"
+            f"DCS     : {dcs_status}\n"
+            f"IL2     : {il2_status}\n"
+            f"MSFS    : {msfs_status}\n"
+            f"X-Plane : {xplane_status}\n\n"
             "Enable or Disable in System -> System Settings"
         )
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.lbl_telem_data.setWordWrap(True)
+        self.lbl_telem_data.setWordWrap(False)
         self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        self.lbl_telem_data.setStyleSheet("""padding: 2px""")
+        self.lbl_telem_data.setStyleSheet("""
+            padding: 2px;
+            font-family: Courier New;
+        """)
 
         # Set the QLabel widget as the widget inside the scroll area
         self.telem_area.setWidget(self.lbl_telem_data)
@@ -2668,7 +2671,10 @@ class MainWindow(QMainWindow):
         self.lbl_effects_data = QLabel()
         self.effects_area.setWidget(self.lbl_effects_data)
         self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        self.lbl_effects_data.setStyleSheet("""padding: 2px""")
+        self.lbl_effects_data.setStyleSheet("""
+            padding: 2px;
+            font-family: Courier New;
+        """)
 
         self.telem_lbl = QLabel('Telemetry:')
         self.effect_lbl = QLabel('Active Effects:')
@@ -2827,10 +2833,10 @@ class MainWindow(QMainWindow):
 
         self.lbl_telem_data.setText(
             f"Waiting for data...\n\n"
-            f"DCS Enabled: {dcs_status}\n"
-            f"IL2 Enabled: {il2_status}\n"
-            f"MSFS Enabled: {msfs_status}\n"
-            f"X-Plane Enabled: {xplane_status}\n\n"
+            f"DCS     : {dcs_status}\n"
+            f"IL2     : {il2_status}\n"
+            f"MSFS    : {msfs_status}\n"
+            f"X-Plane : {xplane_status}\n\n"
             "Enable or Disable in System -> System Settings"
         )
 
