@@ -1622,6 +1622,7 @@
 		<Grouping>Movement</Grouping>
 		<order>740</order>
 		<name>canopy_motion_effect_enabled</name>
+		<XPLANE>true</XPLANE>
 		<value>true</value>
 		<datatype>bool</datatype>
 		<displayname>Canopy Motion</displayname>
@@ -1635,6 +1636,7 @@
 		<order>740.1</order>
 		<name>canopy_motion_intensity</name>
 		<prereq>canopy_motion_effect_enabled</prereq>
+		<XPLANE>true</XPLANE>
 		<value>0.12</value>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -1981,6 +1983,7 @@
 		<Grouping>Buffeting</Grouping>
 		<order>790</order>
 		<name>speedbrake_buffet_effect_enabled</name>
+		<XPLANE>true</XPLANE>
 		<datatype>bool</datatype>
 		<displayname>Speedbrake Buffet</displayname>
 		<DCS>true</DCS>
@@ -1993,6 +1996,7 @@
 		<order>790.1</order>
 		<name>speedbrake_buffet_intensity</name>
 		<prereq>speedbrake_buffet_effect_enabled</prereq>
+		<XPLANE>true</XPLANE>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -2008,6 +2012,7 @@
 		<Grouping>Movement</Grouping>
 		<order>791</order>
 		<name>speedbrake_motion_effect_enabled</name>
+		<XPLANE>true</XPLANE>
 		<datatype>bool</datatype>
 		<displayname>Speedbrake Motion</displayname>
 		<DCS>true</DCS>
@@ -2020,6 +2025,7 @@
 		<order>791.1</order>
 		<name>speedbrake_motion_intensity</name>
 		<prereq>speedbrake_motion_effect_enabled</prereq>
+		<XPLANE>true</XPLANE>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -2066,6 +2072,7 @@
 		<Grouping>Movement</Grouping>
 		<order>793</order>
 		<name>spoiler_motion_effect_enabled</name>
+		<XPLANE>true</XPLANE>
 		<datatype>bool</datatype>
 		<displayname>Spoiler Motion</displayname>
 		<DCS>true</DCS>
@@ -2078,6 +2085,7 @@
 		<order>793.1</order>
 		<name>spoiler_motion_intensity</name>
 		<prereq>spoiler_motion_effect_enabled</prereq>
+		<XPLANE>true</XPLANE>
 		<value>0.15</value>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -7555,6 +7563,34 @@
 	<classdefaults>
 		<name>spoiler_motion_effect_enabled</name>
 		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>speedbrake_buffet_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>speedbrake_buffet_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>speedbrake_motion_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>speedbrake_motion_effect_enabled</name>
+		<type>PropellerAircraft</type>
 		<value>false</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
