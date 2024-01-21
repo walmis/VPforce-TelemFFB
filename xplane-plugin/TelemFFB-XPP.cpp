@@ -14,7 +14,6 @@
 #include <fstream>
 #include <chrono>
 #include <Windows.h>
-#define XPLM300 1
 #include "XPLMProcessing.h"
 #include "XPLMDataAccess.h"
 #include "XPLMUtilities.h"
@@ -37,7 +36,9 @@ std::mutex logMutex;
 std::ofstream debugLogFile;
 
 /* Data refs we will record. */
-static XPLMDataRef gAircraftDescr = XPLMFindDataRef("sim/aircraft/view/acf_ui_name");                   // string bytes[260]
+
+
+static XPLMDataRef gAircraftDescr;
 static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");                                        // boolean • int • v6.60+
 static XPLMDataRef gOnGround = XPLMFindDataRef("sim/flightmodel/failures/onground_all");                // int • v6.60+
 static XPLMDataRef gRetractable = XPLMFindDataRef("sim/aircraft/gear/acf_gear_retract");                // boolean • int • v6.60+
@@ -60,8 +61,10 @@ static XPLMDataRef gAoA = XPLMFindDataRef("sim/flightmodel/position/alpha");    
 static XPLMDataRef gWarnAlpha = XPLMFindDataRef("sim/aircraft/overflow/acf_stall_warn_alpha");          // degrees • float • v6.60+
 static XPLMDataRef gSlip = XPLMFindDataRef("sim/flightmodel/position/beta");                            // degrees • float • v6.60+
 static XPLMDataRef gWoW = XPLMFindDataRef("sim/flightmodel2/gear/tire_vertical_deflection_mtr");        // meters • float[gear] • v9.00+
+static XPLMDataRef gNumEngines = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");                // int • v6.60+
 static XPLMDataRef gEngRPM = XPLMFindDataRef("sim/flightmodel/engine/ENGN_tacrad");                     // rad/sec • float[16] • v6.60+
 static XPLMDataRef gEngPCT = XPLMFindDataRef("sim/flightmodel/engine/ENGN_N1_");                        // percent • float[16] • v6.60+
+static XPLMDataRef gAfterburner = XPLMFindDataRef("sim/flightmodel2/engines/afterburner_ratio");        // ratio • float[engine] • v9.00+
 static XPLMDataRef gPropRPM = XPLMFindDataRef("sim/flightmodel/engine/POINT_tacrad");                   // rad/sec • float[16] • v6.60+
 static XPLMDataRef gRudDefl_l = XPLMFindDataRef("sim/flightmodel/controls/ldruddef");                   // degrees • float • v6.60+
 static XPLMDataRef gRudDefl_r = XPLMFindDataRef("sim/flightmodel/controls/rdruddef");                   // degrees • float • v6.60+
@@ -95,6 +98,13 @@ static XPLMDataRef gYawServo = XPLMFindDataRef("sim/joystick/servo_heading_ratio
 static XPLMDataRef gPitchServo = XPLMFindDataRef("sim/joystick/servo_pitch_ratio");
 static XPLMDataRef gRollServo = XPLMFindDataRef("sim/joystick/servo_roll_ratio");
 
+static XPLMDataRef gCanopyPos = XPLMFindDataRef("sim/flightmodel/controls/canopy_ratio");
+static XPLMDataRef gSpeedbrakePos = XPLMFindDataRef("sim/flightmodel2/controls/speedbrake_ratio");
+
+static XPLMDataRef gGearXNode = XPLMFindDataRef("sim/aircraft/parts/acf_gear_xnodef");
+static XPLMDataRef gGearYNode = XPLMFindDataRef("sim/aircraft/parts/acf_gear_ynodef");
+static XPLMDataRef gGearZNode = XPLMFindDataRef("sim/aircraft/parts/acf_gear_znodef");
+
 
 
 
@@ -114,6 +124,7 @@ static float MyFlightLoopCallback(float inElapsedSinceLastCall, float inElapsedT
 const float kt_2_mps = 0.51444f; // convert knots to meters per second
 const float radps_2_rpm = 9.5493f; // convert rad/sec to rev/min
 const float fps_2_g = 0.031081f; // convert feet per second to g
+const float no_convert = 1.0; // dummy value for no conversion factor
 
 void InitializeDebugLog() {
     if (DEBUG) {
@@ -166,12 +177,23 @@ std::string FloatToString(float value, int precision, float conversionFactor = 1
 }
 
 // Function to convert an array of floats to a formatted string with an optional conversion factor
-std::string FloatArrayToString(XPLMDataRef dataRef, int offset, int size, float conversionFactor = 1.0) {
+// If fixed size is passed, that many elements (including trailiing zero vaues) will be returned
+// Otherwise, the size is calculated, result formatted and any trailing 0 values are trimmed from the result
+std::string FloatArrayToString(XPLMDataRef dataRef, float conversionFactor = 1.0, int fixed_size = -1) {
+    // Determine the size of the array
+    int size = XPLMGetDatavf(dataRef, nullptr, 0, 0);
+
+    // Override the size if limit_size is provided and is less than the dynamically determined size
+    if (fixed_size > 0 && fixed_size <= size) {
+        size = fixed_size;
+    }
+
+
     // Use std::vector for dynamic memory allocation
     std::vector<float> dataArray(size);
 
     // Retrieve the entire array of values
-    XPLMGetDatavf(dataRef, dataArray.data(), offset, size);
+    XPLMGetDatavf(dataRef, dataArray.data(), 0, size);
 
     std::ostringstream formattedString;
 
@@ -184,24 +206,29 @@ std::string FloatArrayToString(XPLMDataRef dataRef, int offset, int size, float 
             formattedString << "~";  // Add tilde separator between values, except for the last one
         }
     }
+    
+    if (fixed_size > 0) {
+        // if fixed size was passed, return whole formatted string, including trailing 0.000 values
+        return formattedString.str();
+    }
 
-    return formattedString.str();
+    // Trim instances of "~0" from the right side of the string
+    std::string result = formattedString.str();
+    size_t pos = result.find_last_not_of("~0.000");
+    if (pos != std::string::npos) {
+        result = result.substr(0, pos + 1);
+    }
+
+    return result;
 }
 
 void CollectTelemetryData()
 {
     // Get the aircraft name
     char aircraftName[250];
-/*    char aircraftName[256];
-    char aircraftPath[256]*/;
-    //XPLMGetNthAircraftModel(0, aircraftName, aircraftPath);
     XPLMGetDatab(gAircraftDescr, aircraftName, 0, 250);
-    //DebugLog("Aircraft: " + aircraftDescr);
-    // Strip the file extension from the aircraft name
-    /*char* lastDot = strrchr(aircraftName, '.');
-    if (lastDot != nullptr) {
-        *lastDot = '\0';
-    }*/
+
+    int numEngines = XPLMGetDatai(gNumEngines);
 
     telemetryData["src"] = "XPLANE";
     telemetryData["N"] = aircraftName;
@@ -209,6 +236,7 @@ void CollectTelemetryData()
     telemetryData["SimPaused"] = std::to_string(XPLMGetDatai(gPaused));
     telemetryData["SimOnGround"] = std::to_string(XPLMGetDatai(gOnGround));
     telemetryData["RetractableGear"] = std::to_string(XPLMGetDatai(gRetractable));
+    telemetryData["NumberEngines"] = std::to_string(numEngines);
     telemetryData["T"] = FloatToString(XPLMGetElapsedTime(), 3);
     telemetryData["G"] = FloatToString(XPLMGetDataf(gGs_nrml), 3);
     telemetryData["Gaxil"] = FloatToString(XPLMGetDataf(gGs_axil), 3);
@@ -225,11 +253,14 @@ void CollectTelemetryData()
     telemetryData["Vfe"] = FloatToString(XPLMGetDataf(gVfe) * kt_2_mps, 3);
     telemetryData["Vle"] = FloatToString(XPLMGetDataf(gVle) * kt_2_mps, 3);
 
-    telemetryData["WeightOnWheels"] = FloatArrayToString(gWoW, 0, 4);
-    telemetryData["EngRPM"] = FloatArrayToString(gEngRPM, 0, 4, radps_2_rpm);
-    telemetryData["EngPCT"] = FloatArrayToString(gEngPCT, 0, 4);
-    telemetryData["PropRPM"] = FloatArrayToString(gPropRPM, 0, 4, radps_2_rpm);
-    telemetryData["PropThrust"] = FloatArrayToString(gPropThrust, 0, 4);
+    telemetryData["WeightOnWheels"] = FloatArrayToString(gWoW, no_convert, 3);
+    telemetryData["EngRPM"] = FloatArrayToString(gEngRPM, radps_2_rpm, numEngines);
+    telemetryData["EngPCT"] = FloatArrayToString(gEngPCT, no_convert, numEngines);
+    telemetryData["PropRPM"] = FloatArrayToString(gPropRPM, radps_2_rpm, numEngines);
+    telemetryData["PropThrust"] = FloatArrayToString(gPropThrust,no_convert, numEngines);
+    telemetryData["Afterburner"] = FloatArrayToString(gAfterburner,no_convert, numEngines);
+
+
     telemetryData["RudderDefl"] = FloatToString(XPLMGetDataf(gRudDefl_l), 3);
     telemetryData["RudderDefl_l"] = FloatToString(XPLMGetDataf(gRudDefl_l), 3);
     telemetryData["RudderDefl_r"] = FloatToString(XPLMGetDataf(gRudDefl_r), 3);
@@ -237,7 +268,7 @@ void CollectTelemetryData()
     telemetryData["AccBody"] =  FloatToString(XPLMGetDataf(gAccLocal_x) * fps_2_g, 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_y) * fps_2_g, 3) + "~" + FloatToString(XPLMGetDataf(gAccLocal_z) * fps_2_g, 3);
     telemetryData["VelAcf"] =  FloatToString(XPLMGetDataf(gVelAcf_x), 3) + "~" + FloatToString(XPLMGetDataf(gVelAcf_y), 3) + "~" + FloatToString(-XPLMGetDataf(gVelAcf_z), 3);
     telemetryData["Flaps"] = FloatToString(XPLMGetDataf(gFlaps), 3);
-    telemetryData["Gear"] = FloatArrayToString(gGear,0, 3);
+    telemetryData["Gear"] = FloatArrayToString(gGear, no_convert, 3);
 
     telemetryData["APMode"] = std::to_string(XPLMGetDatai(gAPMode));
     telemetryData["APServos"] = std::to_string(XPLMGetDatai(gAPServos));
@@ -247,6 +278,16 @@ void CollectTelemetryData()
     telemetryData["ElevTrimPct"] = FloatToString(XPLMGetDataf(gElevTrim), 3);
     telemetryData["AileronTrimPct"] = FloatToString(XPLMGetDataf(gAilerTrim), 3);
     telemetryData["RudderTrimPct"] = FloatToString(XPLMGetDataf(gRudderTrim), 3);
+
+    telemetryData["CanopyPos"] = FloatToString(XPLMGetDataf(gCanopyPos), 3);
+    telemetryData["SpeedbrakePos"] = FloatToString(XPLMGetDataf(gSpeedbrakePos), 3);
+    telemetryData["GearXNode"] = FloatArrayToString(gGearXNode);
+    telemetryData["GearYNode"] = FloatArrayToString(gGearYNode);
+    telemetryData["GearZNode"] = FloatArrayToString(gGearZNode);
+
+    telemetryData["cOvrd"] = std::to_string(overrideCollective);
+    telemetryData["jOvrd"] = std::to_string(overrideJoystick);
+    telemetryData["pOvrd"] = std::to_string(overridePedals);
 }
 
 
@@ -379,10 +420,26 @@ void SendAxisPosition() {
     }
     if (overrideCollective) {
         float cy = axisDataMap["cy"];
-        
         XPLMSetDataf(gCollectiveRatio, cy);
     }
 }
+
+bool IsXPlane12OrNewer() {
+    // Get the X-Plane version as an integer
+    static XPLMDataRef gXplaneVers = XPLMFindDataRef("sim/version/xplane_internal_version");
+    int XPVersion = XPLMGetDatai(gXplaneVers);
+
+    // Convert the version to a string
+    std::string versionString = std::to_string(XPVersion);
+
+    // Extract the first two characters
+    std::string firstTwoDigits = versionString.substr(0, 2);
+
+    // Check if the first two digits are '12'
+    return firstTwoDigits == "12";
+}
+
+
 
 PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc)
 {
@@ -394,6 +451,12 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc)
     strcpy(outSig, "vpforce.telemffb.xpplugin");
     strcpy(outDesc, "Collect and send Telemetry for FFB processing");
 
+    if (IsXPlane12OrNewer()) {
+        gAircraftDescr = XPLMFindDataRef("sim/aircraft/view/acf_ui_name");                   // string bytes[250]
+    }
+    else {
+        gAircraftDescr = XPLMFindDataRef("sim/aircraft/view/acf_descrip");                   // string bytes[250]
+    }
 
     /* Find the data refs we want to record. */
 
