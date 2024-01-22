@@ -420,9 +420,10 @@ class FFBRhino(hid.Device, QObject):
             devs = FFBRhino.enumerate(pid)
             if serial:
                 devs = list(filter(lambda x: x.serial_number == serial, devs))
+            if path:
+                devs = list(filter(lambda x: x.path == path, devs))
             if not len(devs):
                 raise hid.HIDException('unable to open device')
-            path = devs[0].path
             self.info = devs[0]
 
         self._in_reports = {}
