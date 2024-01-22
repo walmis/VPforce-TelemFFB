@@ -64,8 +64,10 @@ function getDamage(draw_vars)
 end
 function enableGetDamage(flag)
   if flag == 1 then
+    log.info("TELEMFFB Enabling Damage model retrieval")
     calc_damage = 1
   elseif flag == 0 then
+    log.info("TELEMFFB Disabling Damage model retrieval")
     calc_damage = 0
 
   end
@@ -1118,6 +1120,8 @@ local f_telemFFB = {
 do
   local SimLuaExportStart = LuaExportStart
   LuaExportStart = function()
+    log.info("TELEMFFB Export Script starting...")
+
     f_telemFFB:Start()
     if SimLuaExportStart then
       SimLuaExportStart()
@@ -1140,6 +1144,7 @@ end
 do
   local SimLuaExportStop = LuaExportStop
   LuaExportStop = function()
+    log.info("TELEMFFB Export Script stopping...")
     f_telemFFB:Stop()
     if SimLuaExportStop then
       SimLuaExportStop()
