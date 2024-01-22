@@ -292,9 +292,9 @@ if not args.child:
         pass
 
 import aircrafts_dcs
-import aircrafts_msfs
+import aircrafts_msfs_xp
 import aircrafts_il2
-import aircrafts_xplane
+import aircrafts_msfs_xp
 from sc_manager import SimConnectManager
 from il2_telem import IL2Manager
 from aircraft_base import effects
@@ -643,7 +643,7 @@ class TelemManager(QObject, threading.Thread):
         aircraft_name = telem_data.get("N")
         data_source = telem_data.get("src", None)
         if data_source == "MSFS2020":
-            module = aircrafts_msfs
+            module = aircrafts_msfs_xp
             sc_aircraft_type = telem_data.get("SimconnectCategory", None)
             sc_engine_type = telem_data.get("EngineType", 4)
             # 0 = Piston
@@ -655,7 +655,7 @@ class TelemManager(QObject, threading.Thread):
         elif data_source == "IL2":
             module = aircrafts_il2
         elif data_source == 'XPLANE':
-            module = aircrafts_xplane
+            module = aircrafts_msfs_xp
         else:
             module = aircrafts_dcs
 
@@ -4987,7 +4987,7 @@ def init_sims():
         if msfs or args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")
             sim_connect_telem.start()
-            aircrafts_msfs.Aircraft.set_simconnect(sim_connect_telem)
+            aircrafts_msfs_xp.Aircraft.set_simconnect(sim_connect_telem)
 
     except:
         logging.exception("Error loading MSFS enable flag from config file")
