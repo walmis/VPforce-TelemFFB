@@ -2102,7 +2102,6 @@
 		<order>800</order>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<MSFS>true</MSFS>
-		<value>false</value>
 		<datatype>bool</datatype>
 		<info>Simulate lateral acceleration effect on stick in uncoordinated turns</info>
 		<displayname>Simulated Lateral Force</displayname>
@@ -8953,6 +8952,34 @@
 		<value>TurbopropAircraft</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>uncoordinated_turn_effect_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>False</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>uncoordinated_turn_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>False</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>uncoordinated_turn_effect_enabled</name>
+		<type>TurbopropAircraft</type>
+		<value>False</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>uncoordinated_turn_effect_enabled</name>
+		<type>GliderAircraft</type>
+		<value>False</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</classdefaults>
 <classdefaults>
 		<name>use_legacy_bindings</name>
