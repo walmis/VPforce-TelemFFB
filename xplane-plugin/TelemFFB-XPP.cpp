@@ -37,6 +37,21 @@ std::ofstream debugLogFile;
 
 /* Data refs we will record. */
 
+char gAircraftName[250];
+char gPrevAircraftName[250];
+
+int gActiveNumGear = 3;
+int gActiveRetractable;
+float gActiveWarnAlpha;
+int gActiveNumEngines;
+float gActiveVne;
+float gActiveVso;
+float gActiveVfe;
+float gActiveVle;
+float gActiveGearXNode;
+float gActiveGearYNode;
+float gActiveGearZNode;
+
 
 static XPLMDataRef gAircraftDescr;
 static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");                                        // boolean • int • v6.60+
@@ -183,7 +198,8 @@ std::string FloatArrayToString(XPLMDataRef dataRef, float conversionFactor = 1.0
     // Determine the size of the array
     int size = XPLMGetDatavf(dataRef, nullptr, 0, 0);
 
-    // Override the size if limit_size is provided and is less than the dynamically determined size
+    // Override the size if fixed_size is provided and is less than the dynamically determined size
+    // This is needed for some datarefs where values may be zero but are needed (eng rpm for example) and we don't want those values stripped of after formatting
     if (fixed_size > 0 && fixed_size <= size) {
         size = fixed_size;
     }
@@ -221,22 +237,41 @@ std::string FloatArrayToString(XPLMDataRef dataRef, float conversionFactor = 1.0
 
     return result;
 }
+void GetACDetails(const std::string& aircraftName) {
+    // Stuff we only need to get once when the aircraft is loaded
+    DebugLog("Aircraft Changed to: " + aircraftName + " - getting new aircraft details...");
+    int gActiveNumEngines = XPLMGetDatai(gNumEngines);
+    telemetryData["RetractableGear"] = std::to_string(XPLMGetDatai(gRetractable));
+    telemetryData["NumberEngines"] = std::to_string(gActiveNumEngines);
+    telemetryData["WarnAlpha"] = FloatToString(XPLMGetDataf(gWarnAlpha), 3);
+    telemetryData["Vne"] = FloatToString(XPLMGetDataf(gVne) * kt_2_mps, 3);
+    telemetryData["Vso"] = FloatToString(XPLMGetDataf(gVso) * kt_2_mps, 3);
+    telemetryData["Vfe"] = FloatToString(XPLMGetDataf(gVfe) * kt_2_mps, 3);
+    telemetryData["Vle"] = FloatToString(XPLMGetDataf(gVle) * kt_2_mps, 3);
+
+    telemetryData["GearXNode"] = FloatArrayToString(gGearXNode);
+    telemetryData["GearYNode"] = FloatArrayToString(gGearYNode);
+    telemetryData["GearZNode"] = FloatArrayToString(gGearZNode);
+
+}
 
 void CollectTelemetryData()
 {
     // Get the aircraft name
-    char aircraftName[250];
-    XPLMGetDatab(gAircraftDescr, aircraftName, 0, 250);
+    XPLMGetDatab(gAircraftDescr, gAircraftName, 0, 250);
 
-    int numEngines = XPLMGetDatai(gNumEngines);
+    // Check if the aircraft name has changed
+    if (std::strcmp(gAircraftName, gPrevAircraftName) != 0) {
+        GetACDetails(gAircraftName);
+        std::strcpy(gPrevAircraftName, gAircraftName);
+    }
 
     telemetryData["src"] = "XPLANE";
-    telemetryData["N"] = aircraftName;
+    telemetryData["N"] = gAircraftName;
     telemetryData["STOP"] = std::to_string(XPLMGetDatai(gPaused));
     telemetryData["SimPaused"] = std::to_string(XPLMGetDatai(gPaused));
     telemetryData["SimOnGround"] = std::to_string(XPLMGetDatai(gOnGround));
-    telemetryData["RetractableGear"] = std::to_string(XPLMGetDatai(gRetractable));
-    telemetryData["NumberEngines"] = std::to_string(numEngines);
+
     telemetryData["T"] = FloatToString(XPLMGetElapsedTime(), 3);
     telemetryData["G"] = FloatToString(XPLMGetDataf(gGs_nrml), 3);
     telemetryData["Gaxil"] = FloatToString(XPLMGetDataf(gGs_axil), 3);
@@ -246,19 +281,16 @@ void CollectTelemetryData()
     telemetryData["AirDensity"] = FloatToString(XPLMGetDataf(gAirDensity), 3);
     telemetryData["DynPressure"] = FloatToString(XPLMGetDataf(gDynPress), 3);
     telemetryData["AoA"] = FloatToString(XPLMGetDataf(gAoA), 3);
-    telemetryData["WarnAlpha"] = FloatToString(XPLMGetDataf(gWarnAlpha), 3);
+
     telemetryData["SideSlip"] = FloatToString(XPLMGetDataf(gSlip), 3);
-    telemetryData["Vne"] = FloatToString(XPLMGetDataf(gVne) * kt_2_mps, 3);
-    telemetryData["Vso"] = FloatToString(XPLMGetDataf(gVso) * kt_2_mps, 3);
-    telemetryData["Vfe"] = FloatToString(XPLMGetDataf(gVfe) * kt_2_mps, 3);
-    telemetryData["Vle"] = FloatToString(XPLMGetDataf(gVle) * kt_2_mps, 3);
+
 
     telemetryData["WeightOnWheels"] = FloatArrayToString(gWoW, no_convert, 3);
-    telemetryData["EngRPM"] = FloatArrayToString(gEngRPM, radps_2_rpm, numEngines);
-    telemetryData["EngPCT"] = FloatArrayToString(gEngPCT, no_convert, numEngines);
-    telemetryData["PropRPM"] = FloatArrayToString(gPropRPM, radps_2_rpm, numEngines);
-    telemetryData["PropThrust"] = FloatArrayToString(gPropThrust,no_convert, numEngines);
-    telemetryData["Afterburner"] = FloatArrayToString(gAfterburner,no_convert, numEngines);
+    telemetryData["EngRPM"] = FloatArrayToString(gEngRPM, radps_2_rpm, gActiveNumEngines);
+    telemetryData["EngPCT"] = FloatArrayToString(gEngPCT, no_convert, gActiveNumEngines);
+    telemetryData["PropRPM"] = FloatArrayToString(gPropRPM, radps_2_rpm, gActiveNumEngines);
+    telemetryData["PropThrust"] = FloatArrayToString(gPropThrust,no_convert, gActiveNumEngines);
+    telemetryData["Afterburner"] = FloatArrayToString(gAfterburner,no_convert, gActiveNumEngines);
 
 
     telemetryData["RudderDefl"] = FloatToString(XPLMGetDataf(gRudDefl_l), 3);
@@ -281,9 +313,7 @@ void CollectTelemetryData()
 
     telemetryData["CanopyPos"] = FloatToString(XPLMGetDataf(gCanopyPos), 3);
     telemetryData["SpeedbrakePos"] = FloatToString(XPLMGetDataf(gSpeedbrakePos), 3);
-    telemetryData["GearXNode"] = FloatArrayToString(gGearXNode);
-    telemetryData["GearYNode"] = FloatArrayToString(gGearYNode);
-    telemetryData["GearZNode"] = FloatArrayToString(gGearZNode);
+
 
     telemetryData["cOvrd"] = std::to_string(overrideCollective);
     telemetryData["jOvrd"] = std::to_string(overrideJoystick);
