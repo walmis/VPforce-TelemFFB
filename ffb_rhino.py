@@ -32,6 +32,7 @@ import weakref
 import inspect
 import usb1
 from PyQt5.QtCore import QObject, QTimerEvent
+from dataclasses import dataclass
 
 try:
     hidapi_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')
@@ -395,19 +396,63 @@ class FFBEffectHandle:
 
         return self
 
+@dataclass
+class DeviceInfo:
+    interface_number: int
+    manufacturer_string: str
+    path: str
+    product_id: int
+    product_string: str
+    release_number: int
+    serial_number: str
+    usage: int
+    usage_page: int
+    vendor_id: int
 
-           
 class FFBRhino(hid.Device, QObject):
-    def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None) -> None:
+    def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> None:
+
         self.vid = vid
         self.pid = pid
+        self.info : DeviceInfo = None
+
+        if not path:
+            devs = FFBRhino.enumerate(pid)
+            if serial:
+                devs = list(filter(lambda x: x.serial_number == serial, devs))
+            if path:
+                devs = list(filter(lambda x: x.path == path, devs))
+            if not len(devs):
+                raise hid.HIDException('unable to open device')
+            self.info = devs[0]
+
         self._in_reports = {}
         self._effectHandles : List[FFBEffectHandle] = []
         
-        hid.Device.__init__(self, vid, pid, serial)
+        hid.Device.__init__(self, path=self.info.path)
         QObject.__init__(self)
         self.nonblocking = True
         self.startTimer(1) # start Qt timer to read HID reports every 1ms
+
+    @staticmethod
+    def enumerate(pid=0) -> List[DeviceInfo]:
+        devs = hid.enumerate(vid=0xffff, pid=pid)
+        devs = [DeviceInfo(**dev) for dev in devs]
+        # returns a list of valid VPforce devices
+        #[{'interface_number': 0,
+        # 'manufacturer_string': 'VPforce',
+        # 'path': b'\\\\?\\HID#VID_FFFF&PID_2055&MI_00#9&3450694a&0&0000#{4d1e55b2-f16f'
+        #         b'-11cf-88cb-001111000030}',
+        # 'product_id': 8277,
+        # 'product_string': 'Rhino FFB Joystick',
+        # 'release_number': 516,
+        # 'serial_number': '3359534E0400004C61001600',
+        # 'usage': 4,
+        # 'usage_page': 1,
+        # 'vendor_id': 65535}]
+        return list(filter(lambda x: x.interface_number == 0 and x.usage == 4, devs))
+
+
 
     # runs on mainThread
     def timerEvent(self, a0: QTimerEvent) -> None:
@@ -517,10 +562,14 @@ class HapticEffect(Destroyable):
     def __repr__(self):
         return f"HapticEffect({self.effect})"
 
+    # Open defaut Rhino device, specific devices can be specified using serial or path arguments
+    # path example: \\\\?\\HID#VID_FFFF&PID_2055&MI_00#9&3450694a&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+    # path can be obtained using FFBRhino.enumerate function
     @classmethod
-    def open(cls, vid = 0xFFFF, pid=0x2055, serial=None) -> FFBRhino:
+    def open(cls, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> FFBRhino:
         logging.info(f"Open Rhino HID {vid:04X}:{pid:04X}")
-        cls.device = FFBRhino(vid, pid, serial)
+        cls.device = FFBRhino(vid, pid, serial, path)
+        logging.info(f"Successfully opened HID '{cls.device.info.path.decode('utf-8')}'")
 
         return cls.device
     
@@ -631,6 +680,14 @@ class HapticEffect(Destroyable):
 if __name__ == "__main__":
     import utils
     import random
+
+    devs = FFBRhino.enumerate()
+    print()
+    for dev in devs:
+        print(f"Found {dev['product_string']} with serial {dev['serial_number']}")
+        print(f"-- path {dev['path']}")
+        print()
+    exit()
 
     d = FFBRhino(0xffff, 0x2055)
     d.resetEffects()

@@ -33,7 +33,7 @@ from collections import OrderedDict
 import subprocess
 
 import traceback
-from ffb_rhino import HapticEffect
+from ffb_rhino import HapticEffect, FFBRhino
 from configobj import ConfigObj
 
 from settingsmanager import *
@@ -5130,6 +5130,18 @@ def main():
         vid_pid = [int(x, 16) for x in _device_vid_pid.split(":")]
     except:
         pass
+
+    devs = FFBRhino.enumerate()
+    logging.info("Available Rhino Devices:")
+    logging.info("-------")
+    for dev in devs:
+
+        logging.info(f"* {dev.vendor_id:04X}:{dev.product_id:04X} - {dev.product_string} - {dev.serial_number}")
+        logging.info(f"* Path:{dev.path}")
+        logging.info(f"*")
+
+    logging.info("-------")
+
 
     try:
         dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
