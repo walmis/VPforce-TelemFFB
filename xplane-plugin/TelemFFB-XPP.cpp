@@ -216,7 +216,7 @@ std::string FloatArrayToString(XPLMDataRef dataRef, float conversionFactor = 1.0
     // Set precision for floating-point values
     formattedString << std::fixed << std::setprecision(3);
 
-    for (int i = 0; i < size; ++i) {
+     for (int i = 0; i < size; ++i) {
         formattedString << dataArray[i] * conversionFactor; // Apply the conversion factor
         if (i < size - 1) {
             formattedString << "~";  // Add tilde separator between values, except for the last one
@@ -240,7 +240,7 @@ std::string FloatArrayToString(XPLMDataRef dataRef, float conversionFactor = 1.0
 void GetACDetails(const std::string& aircraftName) {
     // Stuff we only need to get once when the aircraft is loaded
     DebugLog("Aircraft Changed to: " + aircraftName + " - getting new aircraft details...");
-    int gActiveNumEngines = XPLMGetDatai(gNumEngines);
+    gActiveNumEngines = XPLMGetDatai(gNumEngines);
     telemetryData["RetractableGear"] = std::to_string(XPLMGetDatai(gRetractable));
     telemetryData["NumberEngines"] = std::to_string(gActiveNumEngines);
     telemetryData["WarnAlpha"] = FloatToString(XPLMGetDataf(gWarnAlpha), 3);
