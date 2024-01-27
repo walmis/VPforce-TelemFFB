@@ -1,5 +1,13 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
+##  January 27, 2024
+############################################
+# General
+# Bug Fixes
+- real time update aircraft class in telem manager when creating new aircraft config (previously required restart TelemFFB)
+- remove invalid settings from helicopter configs
+- Fix issue with aircraft name pattern matching in DCS export script
+############################################
 ##  January 14, 2024
 ############################################
 #General
