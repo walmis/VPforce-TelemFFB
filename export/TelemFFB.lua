@@ -399,7 +399,7 @@ local f_telemFFB = {
               deadPilot
             )
 
-          elseif obj.Name == "Ka-50" then
+          elseif string.find(obj.Name, "Ka-50", 0, true) then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- calculate gauge percentage reading from gauge deflection value
             local mainRotorPercent = scale(MainPanel:get_argument_value(52), 0.000, 1.000, 0, 1.100)
@@ -653,7 +653,7 @@ local f_telemFFB = {
               actualRPM
               )
 
-          elseif string.find(obj.Name, "P-47") then
+          elseif string.find(obj.Name, "P-47", 0, true) then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- Calculate Engine RPM from redline value and engine.RPM value
             local engine_redline_reference = 2700
@@ -673,7 +673,7 @@ local f_telemFFB = {
               actualRPM
               )
 
-          elseif string.find(obj.Name, "I-16") then
+          elseif string.find(obj.Name, "I-16", 0, true) then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- Calculate Engine RPM from redline value and engine.RPM value
             local engine_redline_reference = 2200
@@ -690,7 +690,7 @@ local f_telemFFB = {
               actualRPM
             )
 
-            elseif string.find(obj.Name, "MosquitoFBMkVI") then
+            elseif string.find(obj.Name, "MosquitoFBMkVI", 0, true) then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- Calculate Engine RPM from redline value and engine.RPM value
             local engine_redline_reference = 3000
@@ -845,7 +845,7 @@ local f_telemFFB = {
               self.recv_data
             )
 
-          elseif string.find(obj.Name, "F-14") then
+          elseif string.find(obj.Name, "F-14", 0, true) then
                 -------------------------------------------------------------------------------------------------------------------------------------------------------
               --local sensor_data = obj.get_base_data()
               --log.info("TELEMFFB FOUND AIRCRAFT: "..obj.Name)
@@ -899,61 +899,61 @@ local f_telemFFB = {
                 additionalData,
                 f14_DLC_Spoiler
                 )
-          elseif string.find(obj.Name, "F-18") then
+          elseif string.find(obj.Name, "F-18", 0, true) then
             damage_vars = {
               65,135,136,137,146,148,149,150,152,152,153,154,156,157,158,160,166,183,213,214,215,216,217,220,222,223,
               224,225,226,227,230,232,233,235,241,242,242,244,245,245,247,248,265,266,267,298,299
             }
 
-          elseif string.find(obj.Name, "F-16") then
+          elseif string.find(obj.Name, "F-16", 0, true) then
              damage_vars = {
               65,135,136,137,146,148,152,152,153,154,156,157,158,160,183,185,213,214,215,216,220,223,224,225,226,230,
               237,238,239,240,241,242,243,247,298,299
             }
-          elseif string.find(obj.Name, "F-15ESE") then
+          elseif string.find(obj.Name, "F-15ESE", 0, true) then
             damage_vars = {
               65,134,136,137,146,148,149,150,152,153,154,157,158,160,161,162,163,166,167,168,169,183,213,214,215,216,
               217,223,224,225,226,227,238,240,241,243,244,246,247,248,253,255,259,265,266,267,268,298,299,428,428,
               428,428
             }
-          elseif string.find(obj.Name, "F-5") then
+          elseif string.find(obj.Name, "F-5", 0, true) then
             damage_vars = {
               65,134,135,136,146,148,152,153,154,156,157,158,159,160,161,162,163,166,167,168,169,183,185,213,214,215,
               216,217,220,223,224,225,226,227,230,238,240,242,247,265,266,267,270,272,296,297,298,299
             }
-          elseif string.find(obj.Name, "F-86") then
+          elseif string.find(obj.Name, "F-86", 0, true) then
             damage_vars = {
               65,147,148,149,150,152,153,154,156,157,158,183,185,213,214,215,216,217,223,224,225,226,227,233,234,235,
               236,237,238,239,240,241,242,243,247,308,309,310,311,312,313,314,315
             }
-          elseif string.find(obj.Name, "C-101") then
+          elseif string.find(obj.Name, "C-101", 0, true) then
             damage_vars = {
               65,110,134,135,136,146,150,151,167,221,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,
               239,241,242,243,244,249,250,252,253,254,255,256,257,261,262,263,264,265,267,269,270,271,273,400,401,402
             }
-          elseif string.find(obj.Name, "MiG-15") then
+          elseif string.find(obj.Name, "MiG-15", 0, true) then
             damage_vars = {
               65,134,135,136,146,148,149,150,152,153,154,156,157,158,167,183,185,213,214,215,216,217,223,224,225,226,
               227,234,236,238,239,241,242,247,248,265,266,267
             }
-          elseif string.find(obj.Name, "Mirage-F1") then
+          elseif string.find(obj.Name, "Mirage-F1", 0, true) then
             damage_vars = {
               65,82,134,135,136,144,145,146,147,148,150,151,152,153,154,155,156,157,158,170,171,180,181,183,185,213,
               214,214,215,216,217,218,219,220,221,222,223,224,224,225,226,227,230,231,232,237,238,239,240,244,245,
               246,248,249,250,251,265,266,267,271,296,297,298,299,400,401
             }
-          elseif string.find(obj.Name, "JF-17") then
+          elseif string.find(obj.Name, "JF-17", 0, true) then
             damage_vars = {
               65,82,134,135,136,147,148,149,150,151,152,153,154,155,156,157,158,159,160,162,166,168,183,185,187,189,
               213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,237,238,239,240,241,
               242,243,246,247,265,266,267,271,296,298,299,300,301,302,303
             }
-          elseif string.find(obj.Name, "MB-339") then
+          elseif string.find(obj.Name, "MB-339", 0, true) then
             damage_vars = {
               65,134,135,136,146,148,149,150,152,153,154,156,157,158,159,183,213,214,215,216,217,223,224,225,226,227,
               233,235,237,238,239,240,242,246,248,265,266,267,297,298,299,663,664
             }
-          elseif string.find(obj.Name, "AJS37") then
+          elseif string.find(obj.Name, "AJS37", 0, true) then
             damage_vars = {
               65,134,135,136,148,153,154,159,216,223,225,226,227,242,246,248,271,700,701,800,801,997,998,999
             }
