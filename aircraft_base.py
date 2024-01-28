@@ -787,6 +787,7 @@ class AircraftBase(object):
         r1_modulation = utils.sine_point_in_time(2, 30000)
         r2_modulation = utils.sine_point_in_time(2, 22500, phase_offset_deg=0)
         intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
+        intensity = utils.clamp(intensity, 0, 1)
         rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
         rt_freq2 = round(rt_freq + median_modulation, 4)
         effects["je_rumble_1_1"].periodic(rt_freq, intensity, 0, effect_index).start()
