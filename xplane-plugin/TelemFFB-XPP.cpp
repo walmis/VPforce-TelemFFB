@@ -1,3 +1,4 @@
+#define NOMINMAX
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
@@ -14,6 +15,7 @@
 #include <fstream>
 #include <chrono>
 #include <Windows.h>
+#include <algorithm>
 #include "XPLMProcessing.h"
 #include "XPLMDataAccess.h"
 #include "XPLMUtilities.h"
@@ -54,39 +56,39 @@ float gActiveGearZNode;
 
 
 static XPLMDataRef gAircraftDescr;
-static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");                                        // boolean • int • v6.60+
-static XPLMDataRef gOnGround = XPLMFindDataRef("sim/flightmodel/failures/onground_all");                // int • v6.60+
-static XPLMDataRef gRetractable = XPLMFindDataRef("sim/aircraft/gear/acf_gear_retract");                // boolean • int • v6.60+
-static XPLMDataRef gFlaps = XPLMFindDataRef("sim/cockpit2/controls/flap_system_deploy_ratio");          // [0..1] • float • v6.60
-static XPLMDataRef gGear = XPLMFindDataRef("sim/flightmodel2/gear/deploy_ratio");                       // ratio • float[gear] • v9.00 +
-static XPLMDataRef gGs_axil = XPLMFindDataRef("sim/flightmodel/forces/g_axil");                         // Gs • float • v6.60+
-static XPLMDataRef gGs_nrml = XPLMFindDataRef("sim/flightmodel/forces/g_nrml");                         // Gs • float • v6.60+
-static XPLMDataRef gGs_side = XPLMFindDataRef("sim/flightmodel/forces/g_side");                         // Gs • float • v6.60+
-static XPLMDataRef gAccLocal_x = XPLMFindDataRef("sim/flightmodel/position/local_ax");                  // mtr/sec2 • float • v6.60+
-static XPLMDataRef gAccLocal_y = XPLMFindDataRef("sim/flightmodel/position/local_ay");                  // mtr/sec2 • float • v6.60+
-static XPLMDataRef gAccLocal_z = XPLMFindDataRef("sim/flightmodel/position/local_az");                  // mtr/sec2 • float • v6.60+
-static XPLMDataRef gVelAcf_x = XPLMFindDataRef("sim/flightmodel/forces/vx_acf_axis");                   // m/s • float • v6.60+
-static XPLMDataRef gVelAcf_y = XPLMFindDataRef("sim/flightmodel/forces/vy_acf_axis");                   // m/s • float • v6.60+
-static XPLMDataRef gVelAcf_z = XPLMFindDataRef("sim/flightmodel/forces/vz_acf_axis");                   // m/s • float • v6.60+
-static XPLMDataRef gTAS = XPLMFindDataRef("sim/flightmodel/position/true_airspeed");                    // m/s • float • v6.60+
-static XPLMDataRef gAirDensity = XPLMFindDataRef("sim/weather/rho");                                    // kg/cu m float • v6.60+
-static XPLMDataRef gDynPress = XPLMFindDataRef("sim/flightmodel/misc/Qstatic");                         // psf • float • v6.60+
-static XPLMDataRef gPropThrust = XPLMFindDataRef("sim/flightmodel/engine/POINT_thrust");                // newtons • float[16] • v6.60+
-static XPLMDataRef gAoA = XPLMFindDataRef("sim/flightmodel/position/alpha");                            // degrees • float • v6.60+
-static XPLMDataRef gWarnAlpha = XPLMFindDataRef("sim/aircraft/overflow/acf_stall_warn_alpha");          // degrees • float • v6.60+
-static XPLMDataRef gSlip = XPLMFindDataRef("sim/flightmodel/position/beta");                            // degrees • float • v6.60+
-static XPLMDataRef gWoW = XPLMFindDataRef("sim/flightmodel2/gear/tire_vertical_deflection_mtr");        // meters • float[gear] • v9.00+
-static XPLMDataRef gNumEngines = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");                // int • v6.60+
-static XPLMDataRef gEngRPM = XPLMFindDataRef("sim/flightmodel/engine/ENGN_tacrad");                     // rad/sec • float[16] • v6.60+
-static XPLMDataRef gEngPCT = XPLMFindDataRef("sim/flightmodel/engine/ENGN_N1_");                        // percent • float[16] • v6.60+
-static XPLMDataRef gAfterburner = XPLMFindDataRef("sim/flightmodel2/engines/afterburner_ratio");        // ratio • float[engine] • v9.00+
-static XPLMDataRef gPropRPM = XPLMFindDataRef("sim/flightmodel/engine/POINT_tacrad");                   // rad/sec • float[16] • v6.60+
-static XPLMDataRef gRudDefl_l = XPLMFindDataRef("sim/flightmodel/controls/ldruddef");                   // degrees • float • v6.60+
-static XPLMDataRef gRudDefl_r = XPLMFindDataRef("sim/flightmodel/controls/rdruddef");                   // degrees • float • v6.60+
-static XPLMDataRef gVne = XPLMFindDataRef("sim/aircraft/view/acf_Vne");                                 // kias • float • v6.60+
-static XPLMDataRef gVso = XPLMFindDataRef("sim/aircraft/view/acf_Vso");                                 // kias • float • v6.60+
-static XPLMDataRef gVfe = XPLMFindDataRef("sim/aircraft/view/acf_Vfe");                                 // kias • float • v6.60+
-static XPLMDataRef gVle = XPLMFindDataRef("sim/aircraft/overflow/acf_Vle");                             // kias  float • v6.60 +
+static XPLMDataRef gPaused = XPLMFindDataRef("sim/time/paused");                                        // boolean ï¿½ int ï¿½ v6.60+
+static XPLMDataRef gOnGround = XPLMFindDataRef("sim/flightmodel/failures/onground_all");                // int ï¿½ v6.60+
+static XPLMDataRef gRetractable = XPLMFindDataRef("sim/aircraft/gear/acf_gear_retract");                // boolean ï¿½ int ï¿½ v6.60+
+static XPLMDataRef gFlaps = XPLMFindDataRef("sim/cockpit2/controls/flap_system_deploy_ratio");          // [0..1] ï¿½ float ï¿½ v6.60
+static XPLMDataRef gGear = XPLMFindDataRef("sim/flightmodel2/gear/deploy_ratio");                       // ratio ï¿½ float[gear] ï¿½ v9.00 +
+static XPLMDataRef gGs_axil = XPLMFindDataRef("sim/flightmodel/forces/g_axil");                         // Gs ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gGs_nrml = XPLMFindDataRef("sim/flightmodel/forces/g_nrml");                         // Gs ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gGs_side = XPLMFindDataRef("sim/flightmodel/forces/g_side");                         // Gs ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gAccLocal_x = XPLMFindDataRef("sim/flightmodel/position/local_ax");                  // mtr/sec2 ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gAccLocal_y = XPLMFindDataRef("sim/flightmodel/position/local_ay");                  // mtr/sec2 ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gAccLocal_z = XPLMFindDataRef("sim/flightmodel/position/local_az");                  // mtr/sec2 ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gVelAcf_x = XPLMFindDataRef("sim/flightmodel/forces/vx_acf_axis");                   // m/s ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gVelAcf_y = XPLMFindDataRef("sim/flightmodel/forces/vy_acf_axis");                   // m/s ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gVelAcf_z = XPLMFindDataRef("sim/flightmodel/forces/vz_acf_axis");                   // m/s ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gTAS = XPLMFindDataRef("sim/flightmodel/position/true_airspeed");                    // m/s ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gAirDensity = XPLMFindDataRef("sim/weather/rho");                                    // kg/cu m float ï¿½ v6.60+
+static XPLMDataRef gDynPress = XPLMFindDataRef("sim/flightmodel/misc/Qstatic");                         // psf ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gPropThrust = XPLMFindDataRef("sim/flightmodel/engine/POINT_thrust");                // newtons ï¿½ float[16] ï¿½ v6.60+
+static XPLMDataRef gAoA = XPLMFindDataRef("sim/flightmodel/position/alpha");                            // degrees ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gWarnAlpha = XPLMFindDataRef("sim/aircraft/overflow/acf_stall_warn_alpha");          // degrees ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gSlip = XPLMFindDataRef("sim/flightmodel/position/beta");                            // degrees ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gWoW = XPLMFindDataRef("sim/flightmodel2/gear/tire_vertical_deflection_mtr");        // meters ï¿½ float[gear] ï¿½ v9.00+
+static XPLMDataRef gNumEngines = XPLMFindDataRef("sim/aircraft/engine/acf_num_engines");                // int ï¿½ v6.60+
+static XPLMDataRef gEngRPM = XPLMFindDataRef("sim/flightmodel/engine/ENGN_tacrad");                     // rad/sec ï¿½ float[16] ï¿½ v6.60+
+static XPLMDataRef gEngPCT = XPLMFindDataRef("sim/flightmodel/engine/ENGN_N1_");                        // percent ï¿½ float[16] ï¿½ v6.60+
+static XPLMDataRef gAfterburner = XPLMFindDataRef("sim/flightmodel2/engines/afterburner_ratio");        // ratio ï¿½ float[engine] ï¿½ v9.00+
+static XPLMDataRef gPropRPM = XPLMFindDataRef("sim/flightmodel/engine/POINT_tacrad");                   // rad/sec ï¿½ float[16] ï¿½ v6.60+
+static XPLMDataRef gRudDefl_l = XPLMFindDataRef("sim/flightmodel/controls/ldruddef");                   // degrees ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gRudDefl_r = XPLMFindDataRef("sim/flightmodel/controls/rdruddef");                   // degrees ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gVne = XPLMFindDataRef("sim/aircraft/view/acf_Vne");                                 // kias ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gVso = XPLMFindDataRef("sim/aircraft/view/acf_Vso");                                 // kias ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gVfe = XPLMFindDataRef("sim/aircraft/view/acf_Vfe");                                 // kias ï¿½ float ï¿½ v6.60+
+static XPLMDataRef gVle = XPLMFindDataRef("sim/aircraft/overflow/acf_Vle");                             // kias  float ï¿½ v6.60 +
 
 
 static XPLMDataRef gCollectiveOvd = XPLMFindDataRef("sim/operation/override/override_prop_pitch");
@@ -194,7 +196,7 @@ std::string FloatToString(float value, int precision, float conversionFactor = 1
 // Function to convert an array of floats to a formatted string with an optional conversion factor
 // If fixed size is passed, that many elements (including trailiing zero vaues) will be returned
 // Otherwise, the size is calculated, result formatted and any trailing 0 values are trimmed from the result
-std::string FloatArrayToString(XPLMDataRef dataRef, float conversionFactor = 1.0, int fixed_size = -1) {
+std::string FloatArrayToString(XPLMDataRef dataRef, float conversionFactor = 1.0, int fixed_size = -1, int precision = 3) {
     // Determine the size of the array
     int size = XPLMGetDatavf(dataRef, nullptr, 0, 0);
 
@@ -214,15 +216,23 @@ std::string FloatArrayToString(XPLMDataRef dataRef, float conversionFactor = 1.0
     std::ostringstream formattedString;
 
     // Set precision for floating-point values
-    formattedString << std::fixed << std::setprecision(3);
+    formattedString << std::fixed << std::setprecision(precision);
 
-     for (int i = 0; i < size; ++i) {
-        formattedString << dataArray[i] * conversionFactor; // Apply the conversion factor
+    for (int i = 0; i < size; ++i) {
+        // Convert each value with specified precision before applying conversion factor
+        float value = dataArray[i] * conversionFactor;
+
+        formattedString << std::setprecision(precision) << value;
+
+        //if (dataRef == gPropRPM) {
+        //    DebugLog("PropRPM:" + formattedString.str());
+        //}
+
         if (i < size - 1) {
             formattedString << "~";  // Add tilde separator between values, except for the last one
         }
     }
-    
+
     if (fixed_size > 0) {
         // if fixed size was passed, return whole formatted string, including trailing 0.000 values
         return formattedString.str();
@@ -237,21 +247,51 @@ std::string FloatArrayToString(XPLMDataRef dataRef, float conversionFactor = 1.0
 
     return result;
 }
+
+
+int GetNumGear() {
+    // Use std::vector for dynamic memory allocation
+    int size = 10;
+    std::vector<float> arrayX(size);
+    std::vector<float> arrayY(size);
+    std::vector<float> arrayZ(size);
+
+    // Retrieve the entire arrays of values
+    XPLMGetDatavf(gGearXNode, arrayX.data(), 0, size);
+    XPLMGetDatavf(gGearYNode, arrayY.data(), 0, size);
+    XPLMGetDatavf(gGearZNode, arrayZ.data(), 0, size);
+
+    int maxNonZero = 0;
+
+    for (int i = 0; i < size; ++i) {
+        int nonZeroCount = std::count_if(arrayX.begin() + i, arrayX.begin() + i + 1, [](float value) { return value != 0.0f; }) +
+            std::count_if(arrayY.begin() + i, arrayY.begin() + i + 1, [](float value) { return value != 0.0f; }) +
+            std::count_if(arrayZ.begin() + i, arrayZ.begin() + i + 1, [](float value) { return value != 0.0f; });
+
+        maxNonZero = std::max(maxNonZero, nonZeroCount);
+    }
+
+    return maxNonZero;
+}
+
 void GetACDetails(const std::string& aircraftName) {
     // Stuff we only need to get once when the aircraft is loaded
     DebugLog("Aircraft Changed to: " + aircraftName + " - getting new aircraft details...");
     gActiveNumEngines = XPLMGetDatai(gNumEngines);
+    gActiveNumGear = GetNumGear();
+
     telemetryData["RetractableGear"] = std::to_string(XPLMGetDatai(gRetractable));
     telemetryData["NumberEngines"] = std::to_string(gActiveNumEngines);
+    telemetryData["NumberGear"] = std::to_string(gActiveNumGear);
     telemetryData["WarnAlpha"] = FloatToString(XPLMGetDataf(gWarnAlpha), 3);
     telemetryData["Vne"] = FloatToString(XPLMGetDataf(gVne) * kt_2_mps, 3);
     telemetryData["Vso"] = FloatToString(XPLMGetDataf(gVso) * kt_2_mps, 3);
     telemetryData["Vfe"] = FloatToString(XPLMGetDataf(gVfe) * kt_2_mps, 3);
     telemetryData["Vle"] = FloatToString(XPLMGetDataf(gVle) * kt_2_mps, 3);
 
-    telemetryData["GearXNode"] = FloatArrayToString(gGearXNode);
-    telemetryData["GearYNode"] = FloatArrayToString(gGearYNode);
-    telemetryData["GearZNode"] = FloatArrayToString(gGearZNode);
+    telemetryData["GearXNode"] = FloatArrayToString(gGearXNode, no_convert, gActiveNumGear);
+    telemetryData["GearYNode"] = FloatArrayToString(gGearYNode, no_convert, gActiveNumGear);
+    telemetryData["GearZNode"] = FloatArrayToString(gGearZNode, no_convert, gActiveNumGear);
 
 }
 
@@ -286,11 +326,11 @@ void CollectTelemetryData()
 
 
     telemetryData["WeightOnWheels"] = FloatArrayToString(gWoW, no_convert, 3);
-    telemetryData["EngRPM"] = FloatArrayToString(gEngRPM, radps_2_rpm, gActiveNumEngines);
-    telemetryData["EngPCT"] = FloatArrayToString(gEngPCT, no_convert, gActiveNumEngines);
-    telemetryData["PropRPM"] = FloatArrayToString(gPropRPM, radps_2_rpm, gActiveNumEngines);
-    telemetryData["PropThrust"] = FloatArrayToString(gPropThrust,no_convert, gActiveNumEngines);
-    telemetryData["Afterburner"] = FloatArrayToString(gAfterburner,no_convert, gActiveNumEngines);
+    telemetryData["EngRPM"] = FloatArrayToString(gEngRPM, radps_2_rpm, gActiveNumEngines, 2);
+    telemetryData["EngPCT"] = FloatArrayToString(gEngPCT, no_convert, gActiveNumEngines, 3);
+    telemetryData["PropRPM"] = FloatArrayToString(gPropRPM, radps_2_rpm, gActiveNumEngines, 2);
+    telemetryData["PropThrust"] = FloatArrayToString(gPropThrust,no_convert, gActiveNumEngines, 2);
+    telemetryData["Afterburner"] = FloatArrayToString(gAfterburner,no_convert, gActiveNumEngines, 2);
 
 
     telemetryData["RudderDefl"] = FloatToString(XPLMGetDataf(gRudDefl_l), 3);
