@@ -6010,6 +6010,146 @@
 		<sim>IL2</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>type</name>
+		<model>Beechcraft Baron (B)?58.*</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Beechcraft King Air C90B.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cessna Citation X.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cessna Skyhawk.*</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cirrus SR-22.*</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cirrus Vision SF50.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Lancair Evolution.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>.*Piper PA-18 Super Cub</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Stinson L5 Sentinel.*</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Van's RV-10.*</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Schleicher ASK 21.*</model>
+		<value>GliderAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Robinson R22 Beta II.*</model>
+		<value>Helicopter</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Sikorsky S(-)?76C.*</model>
+		<value>Helicopter</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>Sikorsky S(-)?76C.*</model>
+		<value>4</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-14 Tomcat.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-4 Phantom II.*</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Aero-Works Aerolite 103.*</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cessna 172 SP Skyhawk.*</model>
+		<value>PropellerAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cirrus personal jet</model>
+		<value>JetAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>King Air C90.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</models>
 	<classdefaults>
 		<name>engine_jet_rumble_enabled</name>
 		<type>JetAircraft</type>
