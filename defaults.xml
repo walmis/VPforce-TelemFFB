@@ -551,12 +551,25 @@
 		<MSFS>true</MSFS>
 		<value>false</value>
 		<datatype>bool</datatype>
-		<info>TelemFFB sends axis position to sim.  Do not assign in game or SPAD.next</info>
+		<info>TelemFFB sends axis position to sim&lt;br&gt;&lt;br&gt;Required for Trim/AP Following&lt;br&gt;&lt;br&gt;** Do not assign in game or SPAD.next **</info>
+		<displayname>Axis Control</displayname>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90</order>
+		<name>telemffb_controls_axes</name>
+		<any>true</any>
+		<info>TelemFFB sends axis position to sim&lt;br&gt;&lt;br&gt;Required for Trim/AP Following</info>
 		<displayname>Axis Control</displayname>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<value>true</value>
+		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
