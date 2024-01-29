@@ -276,7 +276,7 @@ int GetNumGear() {
 
 void GetACDetails(const std::string& aircraftName) {
     // Stuff we only need to get once when the aircraft is loaded
-    DebugLog("Aircraft Changed to: " + aircraftName + " - getting new aircraft details...");
+    DebugLog("Aircraft Changed to: >" + aircraftName + "< - getting new aircraft details...");
     gActiveNumEngines = XPLMGetDatai(gNumEngines);
     gActiveNumGear = GetNumGear();
 
@@ -299,6 +299,12 @@ void CollectTelemetryData()
 {
     // Get the aircraft name
     XPLMGetDatab(gAircraftDescr, gAircraftName, 0, 250);
+
+    if (strlen(gAircraftName) == 0) {
+        //If the aircraft description is blank.. use the aircraft model file name
+        char aircraftPath[256];
+        XPLMGetNthAircraftModel(0, gAircraftName, aircraftPath);
+    }
 
     // Check if the aircraft name has changed
     if (std::strcmp(gAircraftName, gPrevAircraftName) != 0) {
