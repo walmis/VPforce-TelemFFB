@@ -6088,6 +6088,20 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>joystick_trim_follow_gain_physical_x</name>
+		<model>Schleicher ASK 21.*</model>
+		<value>0.0</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_x</name>
+		<model>Schleicher ASK 21.*</model>
+		<value>0.0</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Robinson R22 Beta II.*</model>
 		<value>Helicopter</value>
