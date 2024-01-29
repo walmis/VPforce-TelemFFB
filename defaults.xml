@@ -1040,6 +1040,7 @@
 		<info>Simulate Elevator droop at low speeds &lt;20Kt</info>
 		<displayname>Elevator Droop</displayname>
 		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1051,6 +1052,7 @@
 		<info>Simulate Elevator droop at low speeds &lt;20Kt</info>
 		<displayname>Elevator Droop</displayname>
 		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -6224,6 +6226,27 @@
 		<type>PropellerAircraft</type>
 		<value>true</value>
 		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>elevator_droop_enabled</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>elevator_droop_enabled</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>elevator_droop_enabled</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>IL2</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
