@@ -79,6 +79,12 @@ Primary Flight Controls
 - Trim following
 - Autopilot following (for fixed-wing aircraft)
 
+## Force Feedback support for X-Plane 11/12
+
+As with MSFS, X-Plane does not support FFB natively.  Using the same effects library in TelemFFB, a plugin has been developed to export the necessary telemetry from X-Plane to enable all of the same effects listed in the MSFS section.  
+
+TelemFFB will automatically install the export plugin when you configure and enable X-Plane in the TelemFFB Settings
+
 ## Force feedback support for IL-2 Sturmovik
 Similar to DCS, IL-2 has native FFB joystick support.  TelemFFB implements many of the same effects listed above for IL-2.  
 Note that there are several effects implemented in TelemFFB that are duplications of effects already supported by IL-2 (Gunfire, Stall/Drag buffeting and ground-roll).  If you chose to enable these effects in TelemFFB, it is recommended to disable the 'shake' force in the IL-2 FFB settings.
