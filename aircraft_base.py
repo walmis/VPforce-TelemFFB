@@ -663,6 +663,13 @@ class AircraftBase(object):
         if type(rpm) == list:
             rpm = max(rpm)
 
+        if rpm < 5:
+            effects.dispose("prop_rpm0-1")
+            effects.dispose("prop_rpm0-2")
+            effects.dispose("prop_rpm1-1")
+            effects.dispose("prop_rpm1-2")
+            return
+
         frequency = float(rpm) / 60
 
         # frequency = 20
@@ -877,10 +884,10 @@ class AircraftBase(object):
             eng_rpm = max(eng_rpm)
 
         # rotor = telem_data.get("RotorRPM")
-        # if self._sim_is_msfs() and rrpm < 10:
-        #     #MSFS sends telemetry when aircraft is sitting in hangar with the rotor spinning very slowly....
-        #     #fixed by pause handling long time ago
-        #     return
+        if rrpm < 5:
+            effects.dispose("rotor_rpm0-1")
+            effects.dispose("rotor_rpm1-1")
+            return
 
         if blade_ct is None:
             blade_ct = 2
