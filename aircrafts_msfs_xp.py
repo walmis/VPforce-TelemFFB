@@ -532,6 +532,8 @@ class Aircraft(AircraftBase):
         #logging.info(f"Base Elev/Ailer coeff = {base_elev_coeff}/{base_ailer_coeff}")
 
         rudder_angle = telem_data["RudderDefl"] * rad  # + trim?
+        if self._sim_is_xplane():
+            rudder_angle = -rudder_angle
 
         # print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
 
