@@ -749,7 +749,6 @@
 		<name>trim_following</name>
 		<prereq>telemffb_controls_axes</prereq>
 		<MSFS>true</MSFS>
-		<sliderfactor></sliderfactor>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<info>Enable physical stick movement with in-game trims</info>
@@ -7786,23 +7785,30 @@
 	<classdefaults>
 		<name>trim_following</name>
 		<type>GliderAircraft</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
 		<type>GliderAircraft</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
 		<type>Helicopter</type>
-		<value>true</value>
+		<value>false</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
@@ -9057,6 +9063,13 @@
 		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
