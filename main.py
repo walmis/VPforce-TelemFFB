@@ -5126,7 +5126,7 @@ def main():
             timestamp = datetime.now().strftime('%Y%m%d_%H%M')
 
             # Create the backup file name with the timestamp
-            backup_file = os.path.join(userconfig_rootpath, ('userconfig_' + timestamp + '.bak'))
+            backup_file = os.path.join(userconfig_rootpath, ('userconfig_' + os.environ['USERNAME'] + "_" + timestamp + '_corrupted.bak'))
 
             # Copy the file to the backup file
             shutil.copy(userconfig_path, backup_file)
@@ -5138,6 +5138,7 @@ def main():
 
             logging.info(f"User config Reset:  Backup file created: {backup_file}")
             settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+            QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
         else:
             QCoreApplication.instance().quit()
             return
