@@ -942,6 +942,9 @@ class IPCNetworkThread(QThread):
 
                     except json.JSONDecodeError:
                         pass
+                elif msg.startswith("LOADCONFIG:"):
+                    path = msg.removeprefix("LOADCONFIG:")
+                    load_custom_userconfig(path)
                 else:
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")
 
@@ -2853,6 +2856,11 @@ class MainWindow(QMainWindow):
         self.teleplot_action.triggered.connect(self.open_teleplot_setup_dialog)
         self.debug_menu.addAction(self.teleplot_action)
 
+        if _master_instance:
+            self.custom_userconfig_action = QAction("Load Custom User Config", self)
+            self.custom_userconfig_action.triggered.connect(lambda: load_custom_userconfig())
+            self.debug_menu.addAction(self.custom_userconfig_action)
+
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
 
@@ -4644,6 +4652,25 @@ class LogTailer(QThread):
         self.log_file.seek(0, os.SEEK_END)
         self.resume()  # Resume tailing with the new log file
 
+
+def load_custom_userconfig(new_path=''):
+    global userconfig_rootpath, userconfig_path, settings_mgr, defaults_path, window
+    print(f"newpath=>{new_path}<")
+    if new_path == '':
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)", options=options)
+        if file_path == '':
+            return
+        userconfig_rootpath = os.path.basename(file_path)
+        userconfig_path = file_path
+    else:
+        userconfig_rootpath = os.path.basename(new_path)
+        userconfig_path = new_path
+    xmlutils.update_vars(_device_type, _userconfig_path=userconfig_path, _defaults_path=defaults_path)
+    settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+    logging.info(f"Custom Configuration was loaded via debug menu: {userconfig_path}")
+    if _master_instance and _launched_children:
+        _ipc_thread.send_broadcast_message(f"LOADCONFIG:{userconfig_path}")
 
 def hide_window():
     global window
