@@ -1425,8 +1425,13 @@ class Helicopter(Aircraft):
             return
         if not self.trim_following:
             return
-        cyclic_x_trim = telem_data.get("CyclicTrimX", 0)
-        cyclic_y_trim = telem_data.get("CyclicTrimY", 0)
+        if self._sim_is_msfs():
+            cyclic_x_trim = telem_data.get("CyclicTrimX", 0)
+            cyclic_y_trim = telem_data.get("CyclicTrimY", 0)
+        if self._sim_is_xplane():
+            cyclic_x_trim = telem_data.get("AileronTrimPct", 0)
+            cyclic_y_trim = telem_data.get("ElevTrimPct", 0)
+
 
         cyclic_x_trim = clamp(cyclic_x_trim * self.joystick_trim_follow_gain_physical_x * self.joystick_x_axis_scale, -1, 1)
         cyclic_y_trim = clamp(cyclic_y_trim * self.joystick_trim_follow_gain_physical_y * self.joystick_y_axis_scale, -1, 1)
