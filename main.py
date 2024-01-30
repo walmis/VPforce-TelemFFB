@@ -5116,7 +5116,32 @@ def main():
     log_window = LogWindow()
     global settings_mgr, telem_manager, config_was_default
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
-    settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+    try:
+        settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+    except Exception as e:
+        logging.error(f"Error Reading user config file..")
+        ans = QMessageBox.question(None, "User Config Error", "There was an error reading the userconfig.  The file is likely corrupted.\n\nDo you want to back-up the existing config and create a new default (empty) config?\n\nIf you chose No, TelemFFB will exit.")
+        if ans == QMessageBox.Yes:
+            # Get the current timestamp
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+
+            # Create the backup file name with the timestamp
+            backup_file = os.path.join(userconfig_rootpath, ('userconfig_' + timestamp + '.bak'))
+
+            # Copy the file to the backup file
+            shutil.copy(userconfig_path, backup_file)
+
+            logging.debug(f"Backup created: {backup_file}")
+
+            os.remove(userconfig_path)
+            utils.create_empty_userxml_file(userconfig_path)
+
+            logging.info(f"User config Reset:  Backup file created: {backup_file}")
+            settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+        else:
+            QCoreApplication.instance().quit()
+            return
+
     icon_path = ":/image/vpforceicon.png"
     settings_mgr.setWindowIcon(QIcon(icon_path))
     sys.stdout = utils.OutLog(log_window.widget, sys.stdout)
