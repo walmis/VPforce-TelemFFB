@@ -648,7 +648,7 @@
 		<pedals>true</pedals>
 		<value>false</value>
 		<datatype>bool</datatype>
-		<info>Use a custom Simconnect Variable</info>
+		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -701,7 +701,7 @@
 		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
-		<info>Use a custom Simconnect Variable</info>
+		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -7589,28 +7589,28 @@
 	<classdefaults>
 		<name>rudder_gain</name>
 		<type>GliderAircraft</type>
-		<value>0.3</value>
+		<value>.2</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>rudder_gain</name>
 		<type>JetAircraft</type>
-		<value>0.3</value>
+		<value>.18</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>rudder_gain</name>
 		<type>PropellerAircraft</type>
-		<value>0.3</value>
+		<value>.2</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>rudder_gain</name>
 		<type>TurbopropAircraft</type>
-		<value>0.3</value>
+		<value>.12</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
