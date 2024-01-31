@@ -296,7 +296,9 @@ class Aircraft(AircraftBase):
 
                     if self._sim_is_xplane():
                         aileron_pos = telem_data.get("APRollServo", 0)
+                        aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
                         elevator_pos = telem_data.get("APPitchServo", 0)
+                        phys_stick_y_offs = int(elevator_pos*4096)
 
 
                     # derivative_hz = 5  # derivative lpf filter -3db Hz
@@ -484,6 +486,9 @@ class Aircraft(AircraftBase):
         ailer_base_gain = 0
         rudder_base_gain = 0
         ffb_type = telem_data.get("FFBType", "joystick")
+        if ffb_type == "collective":
+            return
+
         if self.aircraft_is_fbw or telem_data.get("ACisFBW", 0):
             logging.debug ("FBW Setting enabled, running fbw_flight_controls")
             self._update_fbw_flight_controls(telem_data)
