@@ -6714,7 +6714,7 @@
 	</classdefaults>
 	<classdefaults>
 		<name>trim_workaround</name>
-		<type>PropellerAircraft</type>
+		<type>JetAircraft</type>
 		<value>false</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
