@@ -495,7 +495,6 @@ class AircraftBase(object):
             # intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
 
             realtime_intensity = utils.scale(tas, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),(0, self.gear_buffet_intensity)) * gearpos
-            print(f"INTENSITY: {realtime_intensity}")
             effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, 4).start()
             effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, 4).start()
             logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
