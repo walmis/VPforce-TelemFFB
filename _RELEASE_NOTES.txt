@@ -1,4 +1,26 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+
+############################################
+##  February 2, 2024
+############################################
+#General
+- Several bug fixes
+#IL2
+- Add missing elevator droop effect setting to UI interface
+#DCS
+- Add missing 'trim workaround' setting to UI interface
+#X-Plane
+- Add support for X-Plane 11/12 (earlier versions not tested but may work)
+- New X-Plane plugin to support telemetry export is installed automatically by TelemFFB when you enable via system settings
+- Support is based on the same TelemFFB effects library that MSFS uses
+    - Dynamic Control Forces
+    - Helicopter Force Trim
+    - Trim following \**
+    - Autopilot following (fixed wing only) \**
+    - DIY FFB Pedal support
+    - DIY Collective support
+    ** Unlike MSFS, you **do not** need to unbind your axes in X-Plane
+
 ############################################
 ##  January 27, 2024
 ############################################
