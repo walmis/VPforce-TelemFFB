@@ -846,6 +846,7 @@ class AircraftBase(object):
 
         if (tas >= self.etl_start_speed and tas <= self.etl_stop_speed) and self.etl_effect_intensity and self.etl_effect_enable:
             shake = self.etl_effect_intensity * utils.gaussian_scaling(tas, self.etl_start_speed, self.etl_stop_speed, peak_percentage=0.5, curve_width=.7)
+            shake = utils.clamp(shake, 0.0, 1.0)
             effects["etlY"].periodic(self.etl_shake_frequency, shake, 0).start()
             effects["etlX"].periodic(self.etl_shake_frequency + 4, shake, 90).start()
             logging.debug(f"Playing ETL shake (freq = {self.etl_shake_frequency}, intens= {shake})")
@@ -855,6 +856,7 @@ class AircraftBase(object):
 
         if tas >= self.overspeed_shake_start:
             shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start, self.overspeed_shake_start + 15, curvature=.7)
+            shake = utils.clamp(shake, 0.0, 1.0)
             effects["overspeedY"].periodic(self.overspeed_shake_frequency, shake, 0).start()
             effects["overspeedX"].periodic(self.overspeed_shake_frequency + 4, shake, 90).start()
             logging.debug(f"Overspeed shake (freq = {self.etl_shake_frequency}, intens= {shake}) ")
