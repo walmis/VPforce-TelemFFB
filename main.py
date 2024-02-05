@@ -95,8 +95,7 @@ _child_instance = args.child
 
 system_settings = utils.read_system_settings(args.device, args.type)
 
-if system_settings.get('wasDefault', False):
-    config_was_default = True
+
 
 # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
 _vpf_logo = ":/image/vpforcelogo.png"
@@ -120,6 +119,7 @@ if args.device is None:
             _device_type = 'joystick'
             _device_logo = ':/image/logo_j.png'
 
+    system_settings = utils.read_system_settings(args.device, _device_type)
     _device_vid_pid = f"FFFF:{_device_pid}"
     args.type = _device_type
 else:
@@ -140,6 +140,9 @@ else:
             _device_logo = ':/image/logo_c.png'
         case _:
             _device_logo = ':/image/logo_j.png'
+
+if system_settings.get('wasDefault', False):
+    config_was_default = True
 
 args.sim = str.upper(args.sim)
 args.type = str.lower(args.type)
@@ -717,7 +720,7 @@ class TelemManager(QObject, threading.Thread):
                         Class = module.Aircraft
 
                 if "vpconf" in params:
-                    utils.set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                    set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
 
                 logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
 
@@ -742,7 +745,7 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraft.apply_settings(updated_params)
 
                 if "vpconf" in updated_params:
-                    utils.set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                    set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
 
                 if "type" in updated_params:
                     # if user changed type or if new aircraft dialog changed type, update aircraft class
@@ -1223,14 +1226,14 @@ class Ui_SystemDialog(object):
     def setupUi(self, SystemDialog):
         if not SystemDialog.objectName():
             SystemDialog.setObjectName(u"SystemDialog")
-        SystemDialog.resize(620, 600)
+        SystemDialog.resize(620, 620)
         sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(SystemDialog.sizePolicy().hasHeightForWidth())
         SystemDialog.setSizePolicy(sizePolicy)
         SystemDialog.setMinimumSize(QSize(620, 515))
-        SystemDialog.setMaximumSize(QSize(620, 600))
+        SystemDialog.setMaximumSize(QSize(620, 620))
         self.line = QFrame(SystemDialog)
         self.line.setObjectName(u"line")
         self.line.setGeometry(QRect(9, 168, 581, 16))
@@ -1244,12 +1247,12 @@ class Ui_SystemDialog(object):
         self.line.setFrameShadow(QFrame.Sunken)
         self.buttonBox = QDialogButtonBox(SystemDialog)
         self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setGeometry(QRect(430, 567, 156, 23))
+        self.buttonBox.setGeometry(QRect(430, 580, 156, 23))
         self.buttonBox.setOrientation(Qt.Horizontal)
         self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
         self.resetButton = QPushButton(SystemDialog)
         self.resetButton.setObjectName(u"resetButton")
-        self.resetButton.setGeometry(QRect(21, 567, 121, 23))
+        self.resetButton.setGeometry(QRect(21, 580, 121, 23))
         self.layoutWidget = QWidget(SystemDialog)
         self.layoutWidget.setObjectName(u"layoutWidget")
         self.layoutWidget.setGeometry(QRect(20, 31, 258, 71))
@@ -1583,28 +1586,28 @@ class Ui_SystemDialog(object):
         self.lab_start_headless.setEnabled(False)
         self.lab_start_headless.setGeometry(QRect(550, 45, 49, 26))
         self.lab_start_headless.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
-        self.widget = QWidget(SystemDialog)
-        self.widget.setObjectName(u"widget")
-        self.widget.setGeometry(QRect(30, 276, 270, 45))
-        self.gridLayout_3 = QGridLayout(self.widget)
+        self.layoutWidget5 = QWidget(SystemDialog)
+        self.layoutWidget5.setObjectName(u"layoutWidget5")
+        self.layoutWidget5.setGeometry(QRect(30, 276, 270, 45))
+        self.gridLayout_3 = QGridLayout(self.layoutWidget5)
         self.gridLayout_3.setObjectName(u"gridLayout_3")
         self.gridLayout_3.setContentsMargins(0, 0, 0, 0)
-        self.validateXPLANE = QCheckBox(self.widget)
+        self.validateXPLANE = QCheckBox(self.layoutWidget5)
         self.validateXPLANE.setObjectName(u"validateXPLANE")
 
         self.gridLayout_3.addWidget(self.validateXPLANE, 0, 0, 1, 2)
 
-        self.pathXPLANE = QLineEdit(self.widget)
+        self.pathXPLANE = QLineEdit(self.layoutWidget5)
         self.pathXPLANE.setObjectName(u"pathXPLANE")
 
         self.gridLayout_3.addWidget(self.pathXPLANE, 1, 1, 1, 1)
 
-        self.browseXPLANE = QToolButton(self.widget)
+        self.browseXPLANE = QToolButton(self.layoutWidget5)
         self.browseXPLANE.setObjectName(u"browseXPLANE")
 
         self.gridLayout_3.addWidget(self.browseXPLANE, 1, 2, 1, 1)
 
-        self.lab_pathXPLANE = QLabel(self.widget)
+        self.lab_pathXPLANE = QLabel(self.layoutWidget5)
         self.lab_pathXPLANE.setObjectName(u"lab_pathXPLANE")
         sizePolicy1.setHeightForWidth(self.lab_pathXPLANE.sizePolicy().hasHeightForWidth())
         self.lab_pathXPLANE.setSizePolicy(sizePolicy1)
@@ -1624,6 +1627,49 @@ class Ui_SystemDialog(object):
         self.enableMSFS = QCheckBox(SystemDialog)
         self.enableMSFS.setObjectName(u"enableMSFS")
         self.enableMSFS.setGeometry(QRect(17, 228, 152, 17))
+        self.label_13 = QLabel(SystemDialog)
+        self.label_13.setObjectName(u"label_13")
+        self.label_13.setGeometry(QRect(210, 478, 151, 20))
+        self.widget = QWidget(SystemDialog)
+        self.widget.setObjectName(u"widget")
+        self.widget.setGeometry(QRect(222, 500, 371, 48))
+        self.gridLayout_4 = QGridLayout(self.widget)
+        self.gridLayout_4.setObjectName(u"gridLayout_4")
+        self.gridLayout_4.setContentsMargins(0, 0, 0, 0)
+        self.enableVPConfStartup = QCheckBox(self.widget)
+        self.enableVPConfStartup.setObjectName(u"enableVPConfStartup")
+
+        self.gridLayout_4.addWidget(self.enableVPConfStartup, 0, 0, 1, 1)
+
+        self.pathVPConfStartup = QLineEdit(self.widget)
+        self.pathVPConfStartup.setObjectName(u"pathVPConfStartup")
+        self.pathVPConfStartup.setEnabled(False)
+
+        self.gridLayout_4.addWidget(self.pathVPConfStartup, 0, 1, 1, 1)
+
+        self.browseVPConfStartup = QToolButton(self.widget)
+        self.browseVPConfStartup.setObjectName(u"browseVPConfStartup")
+        self.browseVPConfStartup.setEnabled(False)
+
+        self.gridLayout_4.addWidget(self.browseVPConfStartup, 0, 2, 1, 1)
+
+        self.enableVPConfExit = QCheckBox(self.widget)
+        self.enableVPConfExit.setObjectName(u"enableVPConfExit")
+
+        self.gridLayout_4.addWidget(self.enableVPConfExit, 1, 0, 1, 1, Qt.AlignLeft)
+
+        self.pathVPConfExit = QLineEdit(self.widget)
+        self.pathVPConfExit.setObjectName(u"pathVPConfExit")
+        self.pathVPConfExit.setEnabled(False)
+
+        self.gridLayout_4.addWidget(self.pathVPConfExit, 1, 1, 1, 1)
+
+        self.browseVPConfExit = QToolButton(self.widget)
+        self.browseVPConfExit.setObjectName(u"browseVPConfExit")
+        self.browseVPConfExit.setEnabled(False)
+
+        self.gridLayout_4.addWidget(self.browseVPConfExit, 1, 2, 1, 1, Qt.AlignRight)
+
         QWidget.setTabOrder(self.logLevel, self.telemTimeout)
         QWidget.setTabOrder(self.telemTimeout, self.ignoreUpdate)
         QWidget.setTabOrder(self.ignoreUpdate, self.cb_al_enable)
@@ -1711,7 +1757,14 @@ class Ui_SystemDialog(object):
         self.enableDCS.setText(QCoreApplication.translate("SystemDialog", u"Enable DCS World Support", None))
         self.enableIL2.setText(QCoreApplication.translate("SystemDialog", u"Enable IL-2 Sturmovik Support", None))
         self.enableMSFS.setText(QCoreApplication.translate("SystemDialog", u"Enable MSFS 2020 Support", None))
+        self.label_13.setText(QCoreApplication.translate("SystemDialog", u"VPforce Configurator Profiles:", None))
+        self.enableVPConfStartup.setText(QCoreApplication.translate("SystemDialog", u"Load on Startup:", None))
+        self.browseVPConfStartup.setText(QCoreApplication.translate("SystemDialog", u"...", None))
+        self.enableVPConfExit.setText(QCoreApplication.translate("SystemDialog", u"Load on Exit:", None))
+        self.browseVPConfExit.setText(QCoreApplication.translate("SystemDialog", u"...", None))
     # retranslateUi
+
+
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
@@ -1736,6 +1789,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.validateXPLANE.setToolTip('If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes')
         self.lab_pathXPLANE.setToolTip('The root path where X-Plane is installed')
         self.pathXPLANE.setToolTip('The root path where X-Plane is installed')
+        self.enableVPConfStartup.setToolTip('Select VPforce Configurator profile to load when TelemFFB Starts')
+        self.enableVPConfExit.setToolTip('Select VPforce Configurator profile to load when TelemFFB Exits')
+
         # Connect signals to slots
         self.enableIL2.stateChanged.connect(self.toggle_il2_widgets)
         self.enableXPLANE.stateChanged.connect(self.toggle_xplane_widgets)
@@ -1745,6 +1801,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.resetButton.clicked.connect(self.reset_settings)
         self.master_button_group.buttonClicked.connect(lambda button: self.change_master_widgets(button))
         self.cb_al_enable.stateChanged.connect(self.toggle_al_widgets)
+        self.enableVPConfStartup.stateChanged.connect(self.toggle_vpconf_startup)
+        self.enableVPConfExit.stateChanged.connect(self.toggle_vpconf_exit)
+        self.browseVPConfStartup.clicked.connect(lambda: self.browse_vpconf('startup'))
+        self.browseVPConfExit.clicked.connect(lambda: self.browse_vpconf('exit'))
         self.buttonBox.rejected.connect(self.close)
 
         # Set initial state
@@ -1821,6 +1881,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_al_enable_p.setVisible(True)
             self.cb_min_enable_p.setVisible(True)
             self.cb_headless_p.setVisible(True)
+
+    def toggle_vpconf_startup(self):
+        vpconf_startup_enabled = self.enableVPConfStartup.isChecked()
+        self.pathVPConfStartup.setEnabled(vpconf_startup_enabled)
+        self.browseVPConfStartup.setEnabled(vpconf_startup_enabled)
+
+    def toggle_vpconf_exit(self):
+        vpconf_exit_enabled = self.enableVPConfExit.isChecked()
+        self.pathVPConfExit.setEnabled(vpconf_exit_enabled)
+        self.browseVPConfExit.setEnabled(vpconf_exit_enabled)
 
     def toggle_al_widgets(self):
         al_enabled = self.cb_al_enable.isChecked()
@@ -1942,10 +2012,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if not os.path.isdir(pth):
                 QMessageBox.warning(self, "Config Error", 'Please enter the root X-Plane install path or disable auto X-plane setup')
                 return False
-
+        if self.enableVPConfStartup.isChecked():
+            if not os.path.isfile(self.pathVPConfStartup.text()):
+                QMessageBox.warning(self, "Config Error", "Please select a valid 'on Startup' VPforce Configurator file")
+                return False
+            if not validate_vpconf_profile(self.pathVPConfStartup.text()):
+                return False
+        if self.enableVPConfExit.isChecked():
+            if not os.path.isfile(self.pathVPConfExit.text()):
+                QMessageBox.warning(self, "Config Error", "Please select a valid 'on Exit' VPforce Configurator file")
+                return False
+            if not validate_vpconf_profile(self.pathVPConfExit.text()):
+                return False
         return True
 
     def save_settings(self):
+        global system_settings
         # Create a dictionary with the values of all components
         tp = args.type
 
@@ -1981,6 +2063,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "ignoreUpdate": self.ignoreUpdate.isChecked(),
             "saveWindow": self.cb_save_geometry.isChecked(),
             "saveLastTab": self.cb_save_view.isChecked(),
+            "enableVPConfStartup": self.enableVPConfStartup.isChecked(),
+            "pathVPConfStartup": self.pathVPConfStartup.text(),
+            "enableVPConfExit": self.enableVPConfExit.isChecked(),
+            "pathVPConfExit": self.pathVPConfExit.text(),
         }
 
         key_list = [
@@ -2027,6 +2113,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             logger.setLevel(logging.INFO)
         elif ll == "DEBUG":
             logger.setLevel(logging.DEBUG)
+
+        system_settings = utils.read_system_settings(args.device, _device_type)
         self.accept()
 
     def load_settings(self, default=False):
@@ -2094,6 +2182,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
+
+        self.enableVPConfStartup.setChecked(settings_dict.get('enableVPConfStartup', False))
+        self.pathVPConfStartup.setText(settings_dict.get('pathVPConfStartup', ''))
+        self.enableVPConfExit.setChecked(settings_dict.get('enableVPConfExit', False))
+        self.pathVPConfExit.setText(settings_dict.get('pathVPConfExit', ''))
+
         self.toggle_al_widgets()
 
         # build record of auto-launch settings to see if they changed on save:
@@ -2112,6 +2206,29 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
         }
+
+    def browse_vpconf(self, mode):
+        options = QFileDialog.Options()
+        # options |= QFileDialog.DontUseNativeDialog
+        calling_button = self.sender()
+        starting_dir = os.getcwd()
+        if mode == 'startup':
+            lbl = self.pathVPConfStartup
+        elif mode == 'exit':
+            lbl = self.pathVPConfExit
+        else:
+            return
+
+        cur_path = lbl.text()
+        if os.path.exists(cur_path):
+            starting_dir = os.path.dirname(cur_path)
+
+        # Open the file browser dialog
+        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose {mode} vpconf profile for {_device_type} ", starting_dir, "vpconf Files (*.vpconf)", options=options)
+
+        if file_path:
+            if validate_vpconf_profile(file_path):
+                lbl.setText(file_path)
 
 
 class ButtonPressThread(QThread):
@@ -4134,10 +4251,15 @@ class SettingsLayout(QGridLayout):
         file_path, _ = QFileDialog.getOpenFileName(self.mainwindow, "Choose File", starting_dir, "vpconf Files (*.vpconf)", options=options)
 
         if file_path:
-            lprint(f"Selected File: {file_path}")
-            xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, file_path, 'vpconf')
-            if settings_mgr.timedOut:
-                self.reload_caller()
+            cfg_scope = xmlutils.device
+            key = "pid" + cfg_scope.capitalize()
+            pid = system_settings.get(key, '')
+
+            if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
+                lprint(f"Selected File: {file_path}")
+                xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, file_path, 'vpconf')
+                if settings_mgr.timedOut:
+                    self.reload_caller()
 
     def dropbox_changed(self):
         setting_name = self.sender().objectName().replace('db_', '')
@@ -4653,6 +4775,55 @@ class LogTailer(QThread):
         self.resume()  # Resume tailing with the new log file
 
 
+def validate_vpconf_profile(file, pid=_device_pid, dev_type=_device_type, silent=False):
+    try:
+        with open(file, 'r') as f:
+            config_data = json.load(f)
+    except:
+        if not silent:
+            QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+        return False
+    cfg_pid = config_data.get('config', {}).get('usb_pid', 'unknown')
+    if cfg_pid == 'unknown':
+        if not silent:
+            QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+        return False
+    cfg_pid = format(cfg_pid, 'x')
+    cfg_serial = config_data.get('serial_number', 'unknown')
+    cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
+    if cfg_serial == 'unknown':
+        return False
+    if cfg_pid == pid:
+        return True
+    else:
+        if not silent:
+            QMessageBox.warning(window, "Wrong Device", f"The VPforce Configurator file you selected does not match the device you are trying to assign it to\n\nFile={file}\n\nThis instance is currently configuring:\n{dev_type}\npid= {pid}\n\nThe chosen profile is for\npid= {cfg_pid}\nname= {cfg_device_name}\nserial= {cfg_serial}")
+        return False
+
+
+def set_vpconf_profile(config, serial):
+    vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
+    # serial = HapticEffect.device.serial
+
+    if vpconf_path:
+        logging.info(f"Found VPforce Configurator at {vpconf_path}")
+        workdir = os.path.dirname(vpconf_path)
+        env = {}
+        env["PATH"] = os.environ["PATH"]
+        if not os.path.isfile(config):
+            logging.error(f"Error loading VPforce Configurator Profile: ({config}) - The file does not exist! ")
+            return
+
+        if not validate_vpconf_profile(config, silent=True):
+            logging.error(f"VPForce Config Error: ({config}) - The file failed validation!  Check the PID is correct for the device")
+            return
+
+        logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config} -serial {serial}")
+
+        subprocess.call([vpconf_path, "-config", config, "-serial", serial], cwd=workdir, env=env)
+    else:
+        logging.error("Unable to find VPforce Configurator installation location")
+
 def load_custom_userconfig(new_path=''):
     global userconfig_rootpath, userconfig_path, settings_mgr, defaults_path, window
     print(f"newpath=>{new_path}<")
@@ -4667,7 +4838,7 @@ def load_custom_userconfig(new_path=''):
         userconfig_rootpath = os.path.basename(new_path)
         userconfig_path = new_path
     xmlutils.update_vars(_device_type, _userconfig_path=userconfig_path, _defaults_path=defaults_path)
-    settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+    settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path, system_settings=system_settings)
     logging.info(f"Custom Configuration was loaded via debug menu: {userconfig_path}")
     if _master_instance and _launched_children:
         _ipc_thread.send_broadcast_message(f"LOADCONFIG:{userconfig_path}")
@@ -5144,7 +5315,7 @@ def main():
     global settings_mgr, telem_manager, config_was_default
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
     try:
-        settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+        settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path, system_settings=system_settings)
     except Exception as e:
         logging.error(f"Error Reading user config file..")
         ans = QMessageBox.question(None, "User Config Error", "There was an error reading the userconfig.  The file is likely corrupted.\n\nDo you want to back-up the existing config and create a new default (empty) config?\n\nIf you chose No, TelemFFB will exit.")
@@ -5164,7 +5335,7 @@ def main():
             utils.create_empty_userxml_file(userconfig_path)
 
             logging.info(f"User config Reset:  Backup file created: {backup_file}")
-            settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+            settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path, system_settings=system_settings)
             QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
         else:
             QCoreApplication.instance().quit()
@@ -5289,33 +5460,17 @@ def main():
 
     utils.signal_emitter.telem_timeout_signal.connect(window.update_sim_indicators)
     utils.signal_emitter.error_signal.connect(window.process_error_signal)
-    # if getattr(sys, 'frozen', False):
-    #     path = os.path.dirname(sys.executable)
-    # else:
-    #     path = os.path.dirname(os.path.abspath(__file__))
-    #
-    # frozen = getattr(sys, 'frozen', False)
-    # if frozen:
-    #     # we are running in a bundle
-    #     bundle_dir = sys._MEIPASS
-    # else:
-    #     # we are running in a normal Python environment
-    #     bundle_dir = os.path.dirname(os.path.abspath(__file__))
-    # log_info = f'''
-    #     Frozen is {frozen}
-    #     bundle dir is {bundle_dir}
-    #     sys.argv[0] is {sys.argv[0]}
-    #     sys.executable is {sys.executable}
-    #     os.getcwd is {os.getcwd()}
-    #     '''
-    # logging.info(log_info)
 
+    if system_settings.get('enableVPConfStartup', False):
+        set_vpconf_profile(system_settings.get('pathVPConfStartup', ''), dev_serial)
     app.exec_()
     if _ipc_running:
         notify_close_children()
         _ipc_thread.stop()
     stop_sims()
     telem_manager.quit()
+    if system_settings.get('enableVPConfExit', False):
+        set_vpconf_profile(system_settings.get('pathVPConfExit', ''), dev_serial)
 
 
 if __name__ == "__main__":
