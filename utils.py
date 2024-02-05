@@ -418,6 +418,10 @@ def get_default_sys_settings(device_id, device_type, cmb=False):
         'telemTimeout': 200,
         'saveWindow': False,
         'saveLastTab': False,
+        'enableVPConfStartup': False,
+        'pathVPConfStartup': '',
+        'enableVPConfExit': False,
+        'pathVPConfExit': '',
     }
 
     globl_sys_dict = {
@@ -1446,21 +1450,6 @@ def launch_vpconf(serial=None):
         else:
             call = vpconf_path
         subprocess.Popen(call, cwd=workdir, env=env)
-
-
-def set_vpconf_profile(config, serial):
-    vpconf_path = winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
-    # serial = HapticEffect.device.serial
-
-    if vpconf_path:
-        logging.info(f"Found VPforce Configurator at {vpconf_path}")
-        workdir = os.path.dirname(vpconf_path)
-        env = {}
-        env["PATH"] = os.environ["PATH"]
-        logging.info(f"set_vpconf_profile - Loading vpconf for aircraft with: {vpconf_path} -config {config} -serial {serial}")
-        subprocess.call([vpconf_path, "-config", config, "-serial", serial], cwd=workdir, env=env)
-    else:
-        logging.error("Unable to find VPforce Configurator installation location")
 
 
 def get_version():
