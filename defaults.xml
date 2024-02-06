@@ -161,7 +161,7 @@
 	<defaults>
 		<Grouping>FFB</Grouping>
 		<order>6</order>
-		<name>enable_interia_ovd</name>
+		<name>enable_inertia_ovd</name>
 		<displayname>Inertia Override</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -173,7 +173,7 @@
 		<Grouping>FFB</Grouping>
 		<order>6.1</order>
 		<name>inertia_force</name>
-		<prereq>enable_interia_ovd</prereq>
+		<prereq>enable_inertia_ovd</prereq>
 		<displayname>Inertia</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
