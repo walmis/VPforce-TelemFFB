@@ -135,9 +135,21 @@
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<Grouping>FFB</Grouping>
 		<order>5</order>
+		<name>enable_damper_ovd</name>
+		<displayname>Damper Override</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB</Grouping>
+		<order>5.1</order>
 		<name>damper_force</name>
+		<prereq>enable_damper_ovd</prereq>
 		<displayname>Damper</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -147,9 +159,21 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<Grouping>FFB</Grouping>
 		<order>6</order>
+		<name>enable_interia_ovd</name>
+		<displayname>Inertia Override</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB</Grouping>
+		<order>6.1</order>
 		<name>inertia_force</name>
+		<prereq>enable_interia_ovd</prereq>
 		<displayname>Inertia</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -159,9 +183,21 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<Grouping>FFB</Grouping>
 		<order>7</order>
+		<name>enable_friction_ovd</name>
+		<displayname>Friction Override</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB</Grouping>
+		<order>7.1</order>
 		<name>friction_force</name>
+		<prereq>enable_friction_ovd</prereq>
 		<displayname>Friction</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>

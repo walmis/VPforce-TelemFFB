@@ -28,8 +28,11 @@ fpss2gs = 1 / 32.17405
 class AircraftBase(object):
     aoa_buffet_freq = 13
 
+    enable_damper_ovd: bool = False
     damper_force: float = 0
+    enable_inertia_ovd: bool = False
     inertia_force: float = 0
+    enable_friction_ovd: bool = False
     friction_force: float = 0
 
     engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
@@ -589,19 +592,19 @@ class AircraftBase(object):
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
     def _update_ffb_forces(self, telem_data):
-        if self.damper_force:
+        if self.enable_damper_ovd:
             force = utils.clamp(self.damper_force, 0.0, 1.0)
             effects["damper"].damper(int(4096*force), int(4096*force)).start()
         else:
             effects["damper"].destroy()
 
-        if self.inertia_force:
+        if self.enable_inertia_ovd:
             force = utils.clamp(self.inertia_force, 0.0, 1.0)
             effects["inertia"].inertia(int(4096*force), int(4096*force)).start()
         else:
             effects["inertia"].destroy()
 
-        if self.friction_force:
+        if self.enable_friction_ovd:
             force = utils.clamp(self.friction_force, 0.0, 1.0)
             effects["friction"].friction(int(4096*force), int(4096*force)).start()
         else:
