@@ -30,6 +30,7 @@ class AircraftBase(object):
 
     damper_force: float = 0
     inertia_force: float = 0
+    friction_force: float = 0
 
     engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
     engine_prop_rumble_enabled: bool = True  # Engine Rumble - Piston specific - based on Prop RPM
@@ -590,15 +591,22 @@ class AircraftBase(object):
     def _update_ffb_forces(self, telem_data):
         if self.damper_force:
             force = utils.clamp(self.damper_force, 0.0, 1.0)
-            effects["damper"].damper(4096*force, 4096*force).start()
+            effects["damper"].damper(int(4096*force), int(4096*force)).start()
         else:
             effects["damper"].destroy()
 
         if self.inertia_force:
             force = utils.clamp(self.inertia_force, 0.0, 1.0)
-            effects["inertia"].damper(4096*force, 4096*force).start()
+            effects["inertia"].inertia(int(4096*force), int(4096*force)).start()
         else:
             effects["inertia"].destroy()
+
+        if self.friction_force:
+            force = utils.clamp(self.friction_force, 0.0, 1.0)
+            effects["friction"].friction(int(4096*force), int(4096*force)).start()
+        else:
+            effects["friction"].destroy()
+
 
     ########################################
     ######                            ######

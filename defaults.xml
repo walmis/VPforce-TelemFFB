@@ -136,6 +136,42 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
+		<order>5</order>
+		<name>damper_force</name>
+		<displayname>Damper</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>6</order>
+		<name>inertia_force</name>
+		<displayname>Inertia</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>7</order>
+		<name>friction_force</name>
+		<displayname>Friction</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
 		<order>9</order>
 		<name>force_trim_enabled</name>
 		<MSFS>true</MSFS>
