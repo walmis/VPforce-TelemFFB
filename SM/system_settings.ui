@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>620</width>
-    <height>620</height>
+    <height>650</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -19,13 +19,13 @@
   <property name="minimumSize">
    <size>
     <width>620</width>
-    <height>515</height>
+    <height>650</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>620</width>
-    <height>620</height>
+    <height>650</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -60,7 +60,7 @@
    <property name="geometry">
     <rect>
      <x>430</x>
-     <y>580</y>
+     <y>610</y>
      <width>156</width>
      <height>23</height>
     </rect>
@@ -76,7 +76,7 @@
    <property name="geometry">
     <rect>
      <x>21</x>
-     <y>580</y>
+     <y>610</y>
      <width>121</width>
      <height>23</height>
     </rect>
@@ -231,13 +231,13 @@
     <enum>Qt::Horizontal</enum>
    </property>
   </widget>
-  <widget class="QLabel" name="label_5">
+  <widget class="QLabel" name="labelSystem">
    <property name="geometry">
     <rect>
      <x>20</x>
      <y>10</y>
-     <width>47</width>
-     <height>13</height>
+     <width>141</width>
+     <height>16</height>
     </rect>
    </property>
    <property name="font">
@@ -251,12 +251,12 @@
     <string>System:</string>
    </property>
   </widget>
-  <widget class="QLabel" name="label_6">
+  <widget class="QLabel" name="labelSim">
    <property name="geometry">
     <rect>
      <x>20</x>
      <y>184</y>
-     <width>71</width>
+     <width>151</width>
      <height>16</height>
     </rect>
    </property>
@@ -271,12 +271,12 @@
     <string>Sim Setup:</string>
    </property>
   </widget>
-  <widget class="QLabel" name="label_7">
+  <widget class="QLabel" name="labelOther">
    <property name="geometry">
     <rect>
      <x>20</x>
      <y>460</y>
-     <width>91</width>
+     <width>181</width>
      <height>16</height>
     </rect>
    </property>
@@ -816,13 +816,13 @@ Minimized:</string>
     <rect>
      <x>310</x>
      <y>10</y>
-     <width>269</width>
+     <width>307</width>
      <height>22</height>
     </rect>
    </property>
    <layout class="QHBoxLayout" name="horizontalLayout_3">
     <item>
-     <widget class="QLabel" name="label_11">
+     <widget class="QLabel" name="labelLaunch">
       <property name="font">
        <font>
         <weight>75</weight>
@@ -834,22 +834,6 @@ Minimized:</string>
        <string>Launch Options:</string>
       </property>
      </widget>
-    </item>
-    <item>
-     <spacer name="horizontalSpacer_8">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <property name="sizeType">
-       <enum>QSizePolicy::Fixed</enum>
-      </property>
-      <property name="sizeHint" stdset="0">
-       <size>
-        <width>37</width>
-        <height>20</height>
-       </size>
-      </property>
-     </spacer>
     </item>
     <item>
      <widget class="QCheckBox" name="cb_al_enable">
@@ -1000,7 +984,7 @@ Headless:</string>
     <string>VPforce Configurator Profiles:</string>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>222</x>
@@ -1059,6 +1043,19 @@ Headless:</string>
      </widget>
     </item>
    </layout>
+  </widget>
+  <widget class="QPushButton" name="buttonChildSettings">
+   <property name="geometry">
+    <rect>
+     <x>21</x>
+     <y>570</y>
+     <width>171</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Open Child Instance Settings</string>
+   </property>
   </widget>
  </widget>
  <tabstops>

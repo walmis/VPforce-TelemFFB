@@ -119,7 +119,6 @@ if args.device is None:
             _device_type = 'joystick'
             _device_logo = ':/image/logo_j.png'
 
-    system_settings = utils.read_system_settings(args.device, _device_type)
     _device_vid_pid = f"FFFF:{_device_pid}"
     args.type = _device_type
 else:
@@ -140,6 +139,8 @@ else:
             _device_logo = ':/image/logo_c.png'
         case _:
             _device_logo = ':/image/logo_j.png'
+
+system_settings = utils.read_system_settings(args.device, _device_type)
 
 if system_settings.get('wasDefault', False):
     config_was_default = True
@@ -816,6 +817,7 @@ class IPCNetworkThread(QThread):
     show_signal = pyqtSignal()
     showlog_signal = pyqtSignal()
     hide_signal = pyqtSignal()
+    show_settings_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
 
     def __init__(self, host="localhost", myport=0, dstport=0, child_ports=[], master=False, child=False, keepalive_timer=1, missed_keepalive=3):
@@ -927,6 +929,9 @@ class IPCNetworkThread(QThread):
                 elif msg == 'HIDE WINDOW':
                     logging.info("Hide command received via IPC")
                     self.hide_signal.emit()
+                elif msg == "SHOW SETTINGS":
+                    logging.info("Show system settings command received via IPC")
+                    self.show_settings_signal.emit()
                 elif msg.startswith('telem:'):
                     payload = msg.removeprefix('telem:')
                     try:
@@ -1226,14 +1231,14 @@ class Ui_SystemDialog(object):
     def setupUi(self, SystemDialog):
         if not SystemDialog.objectName():
             SystemDialog.setObjectName(u"SystemDialog")
-        SystemDialog.resize(620, 620)
+        SystemDialog.resize(620, 650)
         sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(SystemDialog.sizePolicy().hasHeightForWidth())
         SystemDialog.setSizePolicy(sizePolicy)
-        SystemDialog.setMinimumSize(QSize(620, 515))
-        SystemDialog.setMaximumSize(QSize(620, 620))
+        SystemDialog.setMinimumSize(QSize(620, 650))
+        SystemDialog.setMaximumSize(QSize(620, 650))
         self.line = QFrame(SystemDialog)
         self.line.setObjectName(u"line")
         self.line.setGeometry(QRect(9, 168, 581, 16))
@@ -1247,12 +1252,12 @@ class Ui_SystemDialog(object):
         self.line.setFrameShadow(QFrame.Sunken)
         self.buttonBox = QDialogButtonBox(SystemDialog)
         self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setGeometry(QRect(430, 580, 156, 23))
+        self.buttonBox.setGeometry(QRect(430, 610, 156, 23))
         self.buttonBox.setOrientation(Qt.Horizontal)
         self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
         self.resetButton = QPushButton(SystemDialog)
         self.resetButton.setObjectName(u"resetButton")
-        self.resetButton.setGeometry(QRect(21, 580, 121, 23))
+        self.resetButton.setGeometry(QRect(21, 610, 121, 23))
         self.layoutWidget = QWidget(SystemDialog)
         self.layoutWidget.setObjectName(u"layoutWidget")
         self.layoutWidget.setGeometry(QRect(20, 31, 258, 71))
@@ -1348,22 +1353,22 @@ class Ui_SystemDialog(object):
         self.line_2.setMidLineWidth(1)
         self.line_2.setFrameShape(QFrame.HLine)
         self.line_2.setFrameShadow(QFrame.Sunken)
-        self.label_5 = QLabel(SystemDialog)
-        self.label_5.setObjectName(u"label_5")
-        self.label_5.setGeometry(QRect(20, 10, 47, 13))
+        self.labelSystem = QLabel(SystemDialog)
+        self.labelSystem.setObjectName(u"labelSystem")
+        self.labelSystem.setGeometry(QRect(20, 10, 141, 16))
         font1 = QFont()
         font1.setBold(True)
         font1.setUnderline(True)
         font1.setWeight(75)
-        self.label_5.setFont(font1)
-        self.label_6 = QLabel(SystemDialog)
-        self.label_6.setObjectName(u"label_6")
-        self.label_6.setGeometry(QRect(20, 184, 71, 16))
-        self.label_6.setFont(font1)
-        self.label_7 = QLabel(SystemDialog)
-        self.label_7.setObjectName(u"label_7")
-        self.label_7.setGeometry(QRect(20, 460, 91, 16))
-        self.label_7.setFont(font1)
+        self.labelSystem.setFont(font1)
+        self.labelSim = QLabel(SystemDialog)
+        self.labelSim.setObjectName(u"labelSim")
+        self.labelSim.setGeometry(QRect(20, 184, 151, 16))
+        self.labelSim.setFont(font1)
+        self.labelOther = QLabel(SystemDialog)
+        self.labelOther.setObjectName(u"labelOther")
+        self.labelOther.setGeometry(QRect(20, 460, 181, 16))
+        self.labelOther.setFont(font1)
         self.label_8 = QLabel(SystemDialog)
         self.label_8.setObjectName(u"label_8")
         self.label_8.setGeometry(QRect(30, 480, 101, 16))
@@ -1557,19 +1562,15 @@ class Ui_SystemDialog(object):
 
         self.layoutWidget4 = QWidget(SystemDialog)
         self.layoutWidget4.setObjectName(u"layoutWidget4")
-        self.layoutWidget4.setGeometry(QRect(310, 10, 269, 22))
+        self.layoutWidget4.setGeometry(QRect(310, 10, 307, 22))
         self.horizontalLayout_3 = QHBoxLayout(self.layoutWidget4)
         self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
         self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
-        self.label_11 = QLabel(self.layoutWidget4)
-        self.label_11.setObjectName(u"label_11")
-        self.label_11.setFont(font1)
+        self.labelLaunch = QLabel(self.layoutWidget4)
+        self.labelLaunch.setObjectName(u"labelLaunch")
+        self.labelLaunch.setFont(font1)
 
-        self.horizontalLayout_3.addWidget(self.label_11)
-
-        self.horizontalSpacer_8 = QSpacerItem(37, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.horizontalLayout_3.addItem(self.horizontalSpacer_8)
+        self.horizontalLayout_3.addWidget(self.labelLaunch)
 
         self.cb_al_enable = QCheckBox(self.layoutWidget4)
         self.cb_al_enable.setObjectName(u"cb_al_enable")
@@ -1630,46 +1631,49 @@ class Ui_SystemDialog(object):
         self.label_13 = QLabel(SystemDialog)
         self.label_13.setObjectName(u"label_13")
         self.label_13.setGeometry(QRect(210, 478, 151, 20))
-        self.widget = QWidget(SystemDialog)
-        self.widget.setObjectName(u"widget")
-        self.widget.setGeometry(QRect(222, 500, 371, 48))
-        self.gridLayout_4 = QGridLayout(self.widget)
+        self.layoutWidget6 = QWidget(SystemDialog)
+        self.layoutWidget6.setObjectName(u"layoutWidget6")
+        self.layoutWidget6.setGeometry(QRect(222, 500, 371, 48))
+        self.gridLayout_4 = QGridLayout(self.layoutWidget6)
         self.gridLayout_4.setObjectName(u"gridLayout_4")
         self.gridLayout_4.setContentsMargins(0, 0, 0, 0)
-        self.enableVPConfStartup = QCheckBox(self.widget)
+        self.enableVPConfStartup = QCheckBox(self.layoutWidget6)
         self.enableVPConfStartup.setObjectName(u"enableVPConfStartup")
 
         self.gridLayout_4.addWidget(self.enableVPConfStartup, 0, 0, 1, 1)
 
-        self.pathVPConfStartup = QLineEdit(self.widget)
+        self.pathVPConfStartup = QLineEdit(self.layoutWidget6)
         self.pathVPConfStartup.setObjectName(u"pathVPConfStartup")
         self.pathVPConfStartup.setEnabled(False)
 
         self.gridLayout_4.addWidget(self.pathVPConfStartup, 0, 1, 1, 1)
 
-        self.browseVPConfStartup = QToolButton(self.widget)
+        self.browseVPConfStartup = QToolButton(self.layoutWidget6)
         self.browseVPConfStartup.setObjectName(u"browseVPConfStartup")
         self.browseVPConfStartup.setEnabled(False)
 
         self.gridLayout_4.addWidget(self.browseVPConfStartup, 0, 2, 1, 1)
 
-        self.enableVPConfExit = QCheckBox(self.widget)
+        self.enableVPConfExit = QCheckBox(self.layoutWidget6)
         self.enableVPConfExit.setObjectName(u"enableVPConfExit")
 
         self.gridLayout_4.addWidget(self.enableVPConfExit, 1, 0, 1, 1, Qt.AlignLeft)
 
-        self.pathVPConfExit = QLineEdit(self.widget)
+        self.pathVPConfExit = QLineEdit(self.layoutWidget6)
         self.pathVPConfExit.setObjectName(u"pathVPConfExit")
         self.pathVPConfExit.setEnabled(False)
 
         self.gridLayout_4.addWidget(self.pathVPConfExit, 1, 1, 1, 1)
 
-        self.browseVPConfExit = QToolButton(self.widget)
+        self.browseVPConfExit = QToolButton(self.layoutWidget6)
         self.browseVPConfExit.setObjectName(u"browseVPConfExit")
         self.browseVPConfExit.setEnabled(False)
 
         self.gridLayout_4.addWidget(self.browseVPConfExit, 1, 2, 1, 1, Qt.AlignRight)
 
+        self.buttonChildSettings = QPushButton(SystemDialog)
+        self.buttonChildSettings.setObjectName(u"buttonChildSettings")
+        self.buttonChildSettings.setGeometry(QRect(21, 570, 171, 23))
         QWidget.setTabOrder(self.logLevel, self.telemTimeout)
         QWidget.setTabOrder(self.telemTimeout, self.ignoreUpdate)
         QWidget.setTabOrder(self.ignoreUpdate, self.cb_al_enable)
@@ -1718,9 +1722,9 @@ class Ui_SystemDialog(object):
         self.lab_pathIL2.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Install Path:", None))
         self.browseIL2.setText(QCoreApplication.translate("SystemDialog", u"...", None))
         self.lab_portIL2.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Telemetry Port:", None))
-        self.label_5.setText(QCoreApplication.translate("SystemDialog", u"System:", None))
-        self.label_6.setText(QCoreApplication.translate("SystemDialog", u"Sim Setup:", None))
-        self.label_7.setText(QCoreApplication.translate("SystemDialog", u"Other Settings: ", None))
+        self.labelSystem.setText(QCoreApplication.translate("SystemDialog", u"System:", None))
+        self.labelSim.setText(QCoreApplication.translate("SystemDialog", u"Sim Setup:", None))
+        self.labelOther.setText(QCoreApplication.translate("SystemDialog", u"Other Settings: ", None))
         self.label_8.setText(QCoreApplication.translate("SystemDialog", u"Startup  Behavior:", None))
         self.cb_save_geometry.setText(QCoreApplication.translate("SystemDialog", u"Restore window position", None))
         self.cb_save_view.setText(QCoreApplication.translate("SystemDialog", u"Restore last tab view", None))
@@ -1746,7 +1750,7 @@ class Ui_SystemDialog(object):
         self.tb_pid_j.setText(QCoreApplication.translate("SystemDialog", u"2055", None))
         self.cb_min_enable_c.setText("")
         self.cb_al_enable_p.setText("")
-        self.label_11.setText(QCoreApplication.translate("SystemDialog", u"Launch Options:", None))
+        self.labelLaunch.setText(QCoreApplication.translate("SystemDialog", u"Launch Options:", None))
         self.cb_al_enable.setText(QCoreApplication.translate("SystemDialog", u"Enable Auto-Launch", None))
         self.lab_start_headless.setText(QCoreApplication.translate("SystemDialog", u"Start\n"
 "Headless:", None))
@@ -1762,6 +1766,7 @@ class Ui_SystemDialog(object):
         self.browseVPConfStartup.setText(QCoreApplication.translate("SystemDialog", u"...", None))
         self.enableVPConfExit.setText(QCoreApplication.translate("SystemDialog", u"Load on Exit:", None))
         self.browseVPConfExit.setText(QCoreApplication.translate("SystemDialog", u"...", None))
+        self.buttonChildSettings.setText(QCoreApplication.translate("SystemDialog", u"Open Child Instance Settings", None))
     # retranslateUi
 
 
@@ -1773,6 +1778,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.setupUi(self)
         self.retranslateUi(self)
         self.setWindowTitle(f"System Settings ({_device_type.capitalize()})")
+
 
         # Add  "INFO" and "DEBUG" options to the logLevel combo box
         self.logLevel.addItems(["INFO", "DEBUG"])
@@ -1807,6 +1813,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseVPConfExit.clicked.connect(lambda: self.browse_vpconf('exit'))
         self.buttonBox.rejected.connect(self.close)
 
+        self.buttonChildSettings.setEnabled(False)
+        self.buttonChildSettings.setVisible(False)
+
         # Set initial state
         self.toggle_il2_widgets()
         self.toggle_xplane_widgets()
@@ -1835,6 +1844,29 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_c.setObjectName('headless_c')
         self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+
+        if (_master_instance and _launched_children) or _child_instance:
+            self.labelSystem.setText("System (Per Instance):")
+            self.labelLaunch.setText("Launch Options (Global):")
+            self.labelSim.setText("Sim Setup (Global):")
+            self.labelOther.setText("Other Settings (Per Instance):")
+
+        if _master_instance and _launched_children:
+            self.buttonChildSettings.setVisible(True)
+            self.buttonChildSettings.setEnabled(True)
+            self.buttonChildSettings.clicked.connect(self.launch_child_settings_windows)
+
+
+
+    def closeEvent(self, event):
+        self.hide()
+        event.ignore()
+
+    def accept(self):
+        self.hide()
+
+    def launch_child_settings_windows(self):
+        window.show_child_settings()
 
     def reset_settings(self):
         # Load default settings and update widgets
@@ -2997,6 +3029,9 @@ class MainWindow(QMainWindow):
     def show_child_log(self, child):
         self._ipc_thread.send_broadcast_message(f'SHOW LOG:{child}')
 
+    def show_child_settings(self):
+        self._ipc_thread.send_broadcast_message("SHOW SETTINGS")
+
     def toggle_child_windows(self, toggle):
         if toggle == 'show':
             self._ipc_thread.send_broadcast_message("SHOW WINDOW")
@@ -3242,7 +3277,10 @@ class MainWindow(QMainWindow):
 
     def open_system_settings_dialog(self):
         dialog = SystemSettingsDialog(self)
-        dialog.exec_()
+        dialog.raise_()
+        dialog.activateWindow()
+        dialog.show()
+        # dialog.exec_()
 
     def update_settings(self):
         self.settings_layout.reload_caller()
@@ -5414,6 +5452,7 @@ def main():
         _ipc_thread.show_signal.connect(lambda: window.show())
         _ipc_thread.hide_signal.connect(lambda: window.hide())
         _ipc_thread.showlog_signal.connect(lambda: log_window.show())
+        _ipc_thread.show_settings_signal.connect(lambda: window.open_system_settings_dialog())
         _ipc_thread.start()
         _ipc_running = True
 
