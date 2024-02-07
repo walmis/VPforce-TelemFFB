@@ -372,6 +372,16 @@ class SimConnectManager(threading.Thread):
                 time.sleep(10)
                 pass
 
+    def get_var_name(self,k):
+        for sv in (self.sim_vars):
+            if isinstance(sv, SimVarArray):
+                for sv in sv.vars:
+                    if sv.name == k:
+                        return sv.var
+            else:
+                if sv.name == k:
+                    return sv.var
+
 # run test
 if __name__ == "__main__":
     class SimConnectTest(SimConnectManager):

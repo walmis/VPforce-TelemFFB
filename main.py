@@ -2302,6 +2302,7 @@ class ButtonPressThread(QThread):
 
 
 class MainWindow(QMainWindow):
+    debug_menu_visible = False
     def __init__(self, ipc_thread=None):
         super().__init__()
 
@@ -2993,6 +2994,8 @@ class MainWindow(QMainWindow):
         )
 
     def add_debug_menu(self):
+        # debug mode
+        self.debug_menu_visible = True
         for action in self.menu.actions():
             if action.text() == "Debug":
                 return
@@ -3582,8 +3585,16 @@ class MainWindow(QMainWindow):
             pass
 
         try:
+
             items = ""
             for k, v in data.items():
+                # check for msfs and debug mode (alt-d pressed), change to simvar name
+                if self.debug_menu_visible:
+                    if data["src"] == "MSFS2020":
+                        simvarnames = SimConnectManager()
+                        s = simvarnames.get_var_name(k)
+                        if not s is None:
+                            k = s
                 if type(v) == float:
                     items += f"{k}: {v:.3f}\n"
                 else:
