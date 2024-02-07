@@ -237,6 +237,7 @@ class SimConnectManager(threading.Thread):
         self._simdatums_to_send.append((simvar, value, units))
 
     def send_event_to_msfs(self, event, data: int = 0):
+        if event == "DO_NOT_SEND": return
         self._events_to_send.append((event, data))
 
     def tx_simdatums_to_msfs(self):

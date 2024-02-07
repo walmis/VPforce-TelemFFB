@@ -770,7 +770,7 @@
 		<displayname>Custom Simconnect X Var Name</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<validvalues>AXIS_AILERONS_SET,AXIS_CYCLIC_LATERAL_SET</validvalues>
+		<validvalues>AXIS_AILERONS_SET,AXIS_CYCLIC_LATERAL_SET,DO_NOT_SEND</validvalues>
 		<value>AXIS_AILERONS_SET</value>
 		<datatype>anylist</datatype>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
@@ -783,7 +783,7 @@
 		<displayname>Custom Simconnect X Var Name</displayname>
 		<MSFS>true</MSFS>
 		<pedals>true</pedals>
-		<validvalues>AXIS_RUDDER_SET,ROTOR_AXIS_TAIL_ROTOR_SET</validvalues>
+		<validvalues>AXIS_RUDDER_SET,ROTOR_AXIS_TAIL_ROTOR_SET,DO_NOT_SEND</validvalues>
 		<value>AXIS_RUDDER_SET</value>
 		<datatype>anylist</datatype>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
@@ -823,7 +823,7 @@
 		<displayname>Custom Simconnect Y Var Name</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<validvalues>AXIS_ELEVATOR_SET,AXIS_CYCLIC_LONGITUDINAL_SET</validvalues>
+		<validvalues>AXIS_ELEVATOR_SET,AXIS_CYCLIC_LONGITUDINAL_SET,DO_NOT_SEND</validvalues>
 		<value>AXIS_ELEVATOR_SET</value>
 		<datatype>anylist</datatype>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
@@ -836,7 +836,7 @@
 		<displayname>Custom Simconnect Y Var Name</displayname>
 		<MSFS>true</MSFS>
 		<collective>true</collective>
-		<validvalues>AXIS_COLLECTIVE_SET</validvalues>
+		<validvalues>AXIS_COLLECTIVE_SET,DO_NOT_SEND</validvalues>
 		<value>AXIS_COLLECTIVE_SET</value>
 		<datatype>anylist</datatype>
 		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
