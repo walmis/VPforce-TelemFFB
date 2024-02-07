@@ -205,8 +205,8 @@ class Aircraft(AircraftBase):
         self.damage_enable_cmd_sent = 0
         self.collective_init = 0
         self.pedals_init = 0
-        self.spring.stop()
-        self.damper.stop()
+        # self.spring.stop()
+        # self.damper.stop()
 
 
     def send_commands(self, cmds):

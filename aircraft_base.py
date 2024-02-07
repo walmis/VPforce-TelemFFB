@@ -932,9 +932,10 @@ class AircraftBase(object):
         # effects.foreach(lambda e: e.stop())
         for key in effects.dict.keys():
             if self.keep_forces_on_pause:
-                if key == 'damper': continue
-                if key == 'inertia': continue
-                if key == 'friction': continue
+                if 'damper' in key: continue
+                if 'inertia' in key: continue
+                if 'friction' in key: continue
+                if 'spring' in key: continue
             effects[key].stop()
         utils.signal_emitter.telem_timeout_signal.emit(self._telem_data['src'], True)
 
