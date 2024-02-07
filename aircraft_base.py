@@ -28,6 +28,7 @@ fpss2gs = 1 / 32.17405
 class AircraftBase(object):
     aoa_buffet_freq = 13
 
+    keep_forces_on_pause: bool = True
     enable_damper_ovd: bool = False
     damper_force: float = 0
     enable_inertia_ovd: bool = False
@@ -928,7 +929,13 @@ class AircraftBase(object):
 
     def on_timeout(self):  # override me
         # logging.info("Telemetry Timeout, stopping effects")
-        effects.foreach(lambda e: e.stop())
+        # effects.foreach(lambda e: e.stop())
+        for key in effects.dict.keys():
+            if self.keep_forces_on_pause:
+                if key == 'damper': continue
+                if key == 'inertia': continue
+                if key == 'friction': continue
+            effects[key].stop()
         utils.signal_emitter.telem_timeout_signal.emit(self._telem_data['src'], True)
 
     def on_telemetry(self, data): 

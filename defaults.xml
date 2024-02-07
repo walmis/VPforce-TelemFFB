@@ -136,8 +136,35 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB</Grouping>
-		<order>5</order>
+		<order>6</order>
+		<name>center_spring_on_pause</name>
+		<info>Force spring centering when in pause/slew mode</info>
+		<displayname>Center on Pause/Slew</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB</Grouping>
+		<order>7</order>
+		<name>keep_forces_on_pause</name>
+		<info>Keep damper/inertia/friction force active during pause</info>
+		<displayname>Keep Forces on Pause/Slew</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>true</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB</Grouping>
+		<order>8</order>
 		<name>enable_damper_ovd</name>
+		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Damper Override</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -147,9 +174,10 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB</Grouping>
-		<order>5.1</order>
+		<order>8.1</order>
 		<name>damper_force</name>
 		<prereq>enable_damper_ovd</prereq>
+		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Damper</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -160,8 +188,9 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB</Grouping>
-		<order>6</order>
+		<order>9</order>
 		<name>enable_inertia_ovd</name>
+		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Inertia Override</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -171,9 +200,10 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB</Grouping>
-		<order>6.1</order>
+		<order>9.1</order>
 		<name>inertia_force</name>
 		<prereq>enable_inertia_ovd</prereq>
+		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Inertia</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -184,8 +214,9 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB</Grouping>
-		<order>7</order>
+		<order>10</order>
 		<name>enable_friction_ovd</name>
+		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Friction Override</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -195,9 +226,10 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB</Grouping>
-		<order>7.1</order>
+		<order>10.1</order>
 		<name>friction_force</name>
 		<prereq>enable_friction_ovd</prereq>
+		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Friction</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -208,7 +240,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9</order>
+		<order>15</order>
 		<name>force_trim_enabled</name>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
@@ -219,7 +251,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.2</order>
+		<order>15.2</order>
 		<name>cyclic_spring_gain</name>
 		<prereq>force_trim_enabled</prereq>
 		<MSFS>true</MSFS>
@@ -232,7 +264,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.3</order>
+		<order>15.3</order>
 		<name>elevator_force_trim</name>
 		<prereq>force_trim_enabled</prereq>
 		<info>Enable force tirm for elevator axis</info>
@@ -245,7 +277,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.4</order>
+		<order>15.4</order>
 		<name>aileron_force_trim</name>
 		<prereq>force_trim_enabled</prereq>
 		<info>Enable force tirm for aileron axis</info>
@@ -257,7 +289,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.5</order>
+		<order>15.5</order>
 		<name>force_trim_button</name>
 		<prereq>force_trim_enabled</prereq>
 		<MSFS>true</MSFS>
@@ -270,7 +302,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
-		<order>9.6</order>
+		<order>15.6</order>
 		<name>force_trim_reset_button</name>
 		<prereq>force_trim_enabled</prereq>
 		<MSFS>true</MSFS>
@@ -2244,20 +2276,6 @@
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 	</defaults>
-	<defaults>
-		<Grouping>Basic</Grouping>
-		<order>850</order>
-		<name>center_spring_on_pause</name>
-		<MSFS>true</MSFS>
-		<collective>true</collective>
-		<value>false</value>
-		<datatype>bool</datatype>
-		<info>Force spring centering when in pause/slew mode</info>
-		<displayname>Center on Pause/Slew</displayname>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		</defaults>
 	<defaults>
 		<Grouping>System</Grouping>
 		<order>910</order>
