@@ -36,6 +36,12 @@ class AircraftBase(object):
     enable_friction_ovd: bool = False
     friction_force: float = 0
 
+    enable_hydraulic_loss_effect: bool = False
+    hydraulic_loss_threshold: float = 0.95
+    hydraulic_loss_damper: float = 1
+    hydraulic_loss_inertia: float = 1
+    hydraulic_loss_friction: float = 1
+
     engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
     engine_prop_rumble_enabled: bool = True  # Engine Rumble - Piston specific - based on Prop RPM
     engine_rotor_rumble_enabled: bool = False  # Engine Rumble - Helicopter specific - based on Rotor RPM
@@ -591,6 +597,38 @@ class AircraftBase(object):
             return
         logging.debug(f"Adding wind effect intensity:{v}")
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
+
+    def _update_hydraulic_loss_effect(self, telem_data):
+        if not self.enable_hydraulic_loss_effect:
+            return False
+        if not self.enable_damper_ovd or not self.enable_inertia_ovd or not self.enable_friction_ovd:
+            logging.warning("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
+            self.telem_data["error"] = 1
+            return False
+        hydraulic_factor = telem_data.get('HydSys', 1)
+        if hydraulic_factor > self.hydraulic_loss_threshold:
+            effects["hyd_loss_damper"].destroy()
+            effects["hyd_loss_inertia"].destroy()
+            effects["hyd_loss_friction"].destroy()
+            return False
+
+        effects["damper"].destroy()
+        effects["inertia"].destroy()
+        effects["friction"].destroy()
+
+        damper = utils.scale(hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_damper, self.damper_force))
+        inertia = utils.scale(hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_inertia, self.inertia_force))
+        friction = utils.scale(hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_friction, self.friction_force))
+
+        damper = utils.clamp(damper, 0, 1)
+        inertia = utils.clamp(inertia, 0, 1)
+        friction = utils.clamp(friction, 0, 1)
+        effects["hyd_loss_damper"].damper(int(4096 * damper), int(4096 * damper)).start()
+        effects["hyd_loss_inertia"].inertia(int(4096 * inertia), int(4096 * inertia)).start()
+        effects["hyd_loss_friction"].friction(int(4096 * friction), int(4096 * friction)).start()
+        return True
+
+
 
     def _update_ffb_forces(self, telem_data):
         if self.enable_damper_ovd:

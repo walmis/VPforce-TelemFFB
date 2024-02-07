@@ -893,7 +893,8 @@ class Aircraft(AircraftBase):
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
 
-        self._update_ffb_forces(telem_data)
+        hyd_loss = self._update_hydraulic_loss_effect(telem_data)
+        if not hyd_loss: self._update_ffb_forces(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_buffeting(telem_data)
         self._update_flight_controls(telem_data)

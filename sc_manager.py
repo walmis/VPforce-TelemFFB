@@ -182,6 +182,11 @@ class SimConnectManager(threading.Thread):
         SimVar("TailRotorPedalPos", "TAIL ROTOR BLADE PITCH PCT", "percent over 100"),
         SimVar("HPGVRSDatum", "L:DEBUG_VRS2_DATUM", "enum"),
         SimVar("HPGVRSIsInVRS", "L:DEBUG_VRS2_IS_IN_VRS", "enum"),
+        SimVarArray("HydPress", "HYDRAULIC PRESSURE", "psi", min=1, max=2),
+        SimVarArray("HydResPct", "HYDRAULIC RESERVOIR PERCENT", "Percent Over 100", min=1, max=2),
+        SimVar("HydSwitch", "HYDRAULIC SWITCH", "bool"),
+        SimVar("HydSys", "HYDRAULIC SYSTEM INTEGRITY", "Percent Over 100"),
+
     ]
     
     def __init__(self):

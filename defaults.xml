@@ -154,6 +154,7 @@
 		<name>keep_forces_on_pause</name>
 		<info>Keep damper/inertia/friction force active during pause</info>
 		<displayname>Keep Forces on Pause/Slew</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -166,6 +167,7 @@
 		<name>enable_damper_ovd</name>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Damper Override</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -179,6 +181,7 @@
 		<prereq>enable_damper_ovd</prereq>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Damper</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -192,6 +195,7 @@
 		<name>enable_inertia_ovd</name>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Inertia Override</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -205,6 +209,7 @@
 		<prereq>enable_inertia_ovd</prereq>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Inertia</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -218,6 +223,7 @@
 		<name>enable_friction_ovd</name>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Friction Override</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -231,6 +237,7 @@
 		<prereq>enable_friction_ovd</prereq>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Friction</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -242,6 +249,7 @@
 		<Grouping>Basic</Grouping>
 		<order>15</order>
 		<name>force_trim_enabled</name>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<displayname>Force Trim</displayname>
@@ -967,6 +975,74 @@
 		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
 		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>97</order>
+		<name>enable_hydraulic_loss_effect</name>
+		<info>Simulate high damper forces when hydraulic pressure is low/0&lt;br&gt;** REQUIRES damper/inertia/friction overrides to be enabled **</info>
+		<displayname>Hydraulic Loss Effect</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>97.2</order>
+		<name>hydraulic_loss_threshold</name>
+		<prereq>enable_hydraulic_loss_effect</prereq>
+		<info>"Hydraulic System Integrity" (HydSys in monitor)  value to consider "low".  Forces will start increasing below this value</info>
+		<displayname>Hydraulic System Threshold</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.95</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>97.3</order>
+		<name>hydraulic_loss_damper</name>
+		<prereq>enable_hydraulic_loss_effect</prereq>
+		<info>Damper force when hydraulic system pressure reaches 0</info>
+		<displayname>Damper</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>1.0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>97.4</order>
+		<name>hydraulic_loss_inertia</name>
+		<prereq>enable_hydraulic_loss_effect</prereq>
+		<info>Inertia  force when hydraulic system pressure reaches 0</info>
+		<displayname>Inertia</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>1.0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>97.5</order>
+		<name>hydraulic_loss_friction</name>
+		<prereq>enable_hydraulic_loss_effect</prereq>
+		<info>Friction  force when hydraulic system pressure reaches 0</info>
+		<displayname>Friction</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>1.0</value>
+		<datatype>float</datatype>
 	</defaults>
 	<defaults><Grouping>G Force</Grouping><order>100</order><name>gforce_effect_enable</name><info>See manual for details</info><DCS>true</DCS><datatype>bool</datatype><displayname>G Force Effect</displayname><IL2>true</IL2><joystick>true</joystick></defaults>
 	<defaults>
