@@ -205,6 +205,7 @@ class Aircraft(AircraftBase):
         self.force_trim_y_offset = 0
 
         self.telemffb_controls_axes = False
+        self.local_disable_axis_control = False
 
         self.trim_following = False
         self.joystick_x_axis_scale = 1.0
@@ -258,7 +259,7 @@ class Aircraft(AircraftBase):
         self.spring = effects['fbw_spring'].spring()
         if ffb_type == "joystick":
 
-            if self.trim_following and self.telemffb_controls_axes:
+            if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
 
                 elev_trim = telem_data.get("ElevTrimPct", 0)
 
@@ -325,7 +326,7 @@ class Aircraft(AircraftBase):
                 phys_stick_y_offs = 0
                 virtual_stick_y_offs = 0
 
-            if self.telemffb_controls_axes:
+            if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
@@ -387,7 +388,7 @@ class Aircraft(AircraftBase):
             self.spring.effect.setCondition(self.spring_x)
 
         elif ffb_type == "pedals":
-            if self.trim_following and self.telemffb_controls_axes:
+            if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
 
                 rudder_trim = telem_data.get("RudderTrimPct", 0)
 
@@ -427,7 +428,7 @@ class Aircraft(AircraftBase):
                 phys_rudder_x_offs = 0
                 virtual_rudder_x_offs = 0
 
-            if self.telemffb_controls_axes:
+            if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
@@ -619,7 +620,7 @@ class Aircraft(AircraftBase):
 
         if ffb_type == 'joystick':
 
-            if self.trim_following and self.telemffb_controls_axes:
+            if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
 
                 elev_trim = telem_data.get("ElevTrimPct", 0)
                 aileron_trim = telem_data.get("AileronTrimPct", 0)
@@ -653,7 +654,7 @@ class Aircraft(AircraftBase):
                 phys_stick_y_offs = 0
                 virtual_stick_y_offs = 0
 
-            if self.telemffb_controls_axes:
+            if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
@@ -775,7 +776,7 @@ class Aircraft(AircraftBase):
             self.spring.start() # ensure spring is started
 
         elif ffb_type == 'pedals':
-            if self.trim_following and self.telemffb_controls_axes:
+            if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
 
                 rudder_trim = telem_data.get("RudderTrimPct", 0)
 
@@ -806,7 +807,7 @@ class Aircraft(AircraftBase):
             rud_force = rud_force * speed_factor
             # telem_data["RudForce"] = rud_force * speed_factor
 
-            if self.telemffb_controls_axes:
+            if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
@@ -860,7 +861,7 @@ class Aircraft(AircraftBase):
                 self.xplane_axis_override_active = False
             return
 
-        if self.telemffb_controls_axes and not self.xplane_axis_override_active:
+        if self.telemffb_controls_axes and not self.local_disable_axis_control and not self.xplane_axis_override_active:
             sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=true"
             self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
             logging.info(f"Sending to XPLANE: >>{sendstr}<<")
@@ -1365,7 +1366,7 @@ class Helicopter(Aircraft):
             else:
                 self.spring.stop()
 
-            if self.telemffb_controls_axes:
+            if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.getInput()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
@@ -1457,7 +1458,7 @@ class Helicopter(Aircraft):
         if telem_data.get("FFBType") != 'pedals':
             return
 
-        if self.telemffb_controls_axes:
+        if self.telemffb_controls_axes and not self.local_disable_axis_control:
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
@@ -1519,7 +1520,7 @@ class Helicopter(Aircraft):
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
             return
-        if not self.telemffb_controls_axes:
+        if not self.telemffb_controls_axes and not self.local_disable_axis_control:
             # logging.error(
             #     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
             return
@@ -1674,7 +1675,7 @@ class HPGHelicopter(Helicopter):
         trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
 
         if ffb_type == "joystick":
-            if not self.telemffb_controls_axes:
+            if not self.telemffb_controls_axes and not self.local_disable_axis_control:
                 logging.error(
                     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
                 telem_data['error'] = 1
@@ -1787,7 +1788,7 @@ class HPGHelicopter(Helicopter):
         if telem_data.get("FFBType") != 'pedals':
             return
 
-        if self.telemffb_controls_axes:
+        if self.telemffb_controls_axes and not self.local_disable_axis_control:
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
             telem_data['phys_x'] = phys_x
@@ -1846,7 +1847,7 @@ class HPGHelicopter(Helicopter):
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
             return
-        if not self.telemffb_controls_axes:
+        if not self.telemffb_controls_axes and not self.local_disable_axis_control:
             logging.error("Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
             telem_data['error'] = 1
             return

@@ -686,6 +686,21 @@
 	<defaults>
 		<Grouping>Axis Control</Grouping>
 		<order>90.2</order>
+		<name>local_disable_axis_control</name>
+		<prereq>telemffb_controls_axes</prereq>
+		<info>Disable axis control for this device</info>
+		<displayname>Disable for this device</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90.3</order>
 		<name>joystick_x_axis_scale</name>
 		<prereq>telemffb_controls_axes</prereq>
 		<MSFS>true</MSFS>
@@ -699,7 +714,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>90.3</order>
+		<order>90.4</order>
 		<name>joystick_y_axis_scale</name>
 		<prereq>telemffb_controls_axes</prereq>
 		<MSFS>true</MSFS>
@@ -713,7 +728,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>90.4</order>
+		<order>90.5</order>
 		<name>rudder_x_axis_scale</name>
 		<prereq>telemffb_controls_axes</prereq>
 		<MSFS>true</MSFS>
