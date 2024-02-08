@@ -116,8 +116,8 @@ class Aircraft(AircraftBase):
     last_pedal_x = 0
     pedal_trimming_enabled = False
     pedal_spring_gain = 1.0
-    pedal_dampening_gain = 0.5
-    collective_dampening_gain = 0.5
+    pedal_dampening_gain = 0
+    collective_dampening_gain = 0
     collective_init = 0
     collective_spring_coeff_y = 0
     last_collective_y = 0
@@ -129,7 +129,7 @@ class Aircraft(AircraftBase):
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
         self.spring = effects["spring"].spring()
-        self.damper = effects["damper"].damper()
+        # self.damper = effects["damper"].damper()
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.damage_enable_cmd_sent = 0
@@ -345,7 +345,7 @@ class Aircraft(AircraftBase):
         if not self.is_collective(): return
 
         self.spring = effects["collective_ap_spring"].spring()
-        self.damper = effects["collective_damper"].damper()
+        # self.damper = effects["collective_damper"].damper()
         if not self.collective_init:
             input_data = HapticEffect.device.getInput()
             phys_x, phys_y = input_data.axisXY()
@@ -363,7 +363,7 @@ class Aircraft(AircraftBase):
             self.spring_y.cpOffset = self.cpO_y
 
             self.spring.effect.setCondition(self.spring_y)
-            self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
+            # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
             self.spring.start(override=True)
             # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
             if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
@@ -378,7 +378,7 @@ class Aircraft(AircraftBase):
         self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
         self.spring_y.cpOffset = self.cpO_y
 
-        self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
+        # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
         self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
 
         self.spring.effect.setCondition(self.spring_y)
@@ -439,7 +439,7 @@ class Aircraft(AircraftBase):
             # return
         self.spring = effects["pedal_spring"].spring()
         damper_coeff = round(utils.clamp((self.pedal_dampening_gain * 4096), 0, 4096))
-        self.damper = effects["pedal_damper"].damper(coef_x=damper_coeff).start()
+        # self.damper = effects["pedal_damper"].damper(coef_x=damper_coeff).start()
 
         self.spring.effect.setCondition(self.spring_x)
         self.spring.start(override=True)

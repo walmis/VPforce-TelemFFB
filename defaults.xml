@@ -155,9 +155,12 @@
 		<info>Keep damper/inertia/friction force active during pause</info>
 		<displayname>Keep Forces on Pause/Slew</displayname>
 		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -168,9 +171,12 @@
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Damper Override</displayname>
 		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -182,9 +188,12 @@
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Damper</displayname>
 		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
@@ -196,9 +205,12 @@
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Inertia Override</displayname>
 		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -210,9 +222,12 @@
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Inertia</displayname>
 		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
@@ -224,9 +239,12 @@
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Friction Override</displayname>
 		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -238,9 +256,12 @@
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Friction</displayname>
 		<DCS>true</DCS>
+		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
@@ -534,14 +555,9 @@
 		<Grouping>SpringCenter</Grouping>
 		<order>36</order>
 		<name>collective_dampening_gain</name>
-		<info></info>
-		<MSFS>true</MSFS>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<displayname>Collective Dampening Gain</displayname>
-		<DCS>true</DCS>
-		<XPLANE>true</XPLANE>
-		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
@@ -586,8 +602,6 @@
 		<datatype>float</datatype>
 		<info>Percent of damper setting in VPForce Configurator</info>
 		<displayname>Pedal Dampening Gain</displayname>
-		<DCS>true</DCS>
-		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
@@ -998,8 +1012,9 @@
 		<info>Simulate high damper forces when hydraulic pressure is low/0&lt;br&gt;** REQUIRES damper/inertia/friction overrides to be enabled **</info>
 		<displayname>Hydraulic Loss Effect</displayname>
 		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1011,8 +1026,9 @@
 		<info>"Hydraulic System Integrity" (HydSys in monitor)  value to consider "low".  Forces will start increasing below this value</info>
 		<displayname>Hydraulic System Threshold</displayname>
 		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0.95</value>
 		<datatype>float</datatype>
@@ -1025,8 +1041,9 @@
 		<info>Damper force when hydraulic system pressure reaches 0</info>
 		<displayname>Damper</displayname>
 		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
 		<datatype>float</datatype>
@@ -1039,8 +1056,9 @@
 		<info>Inertia  force when hydraulic system pressure reaches 0</info>
 		<displayname>Inertia</displayname>
 		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
 		<datatype>float</datatype>
@@ -1053,8 +1071,9 @@
 		<info>Friction  force when hydraulic system pressure reaches 0</info>
 		<displayname>Friction</displayname>
 		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
 		<datatype>float</datatype>
@@ -6540,13 +6559,6 @@
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
-		<name>collective_dampening_gain</name>
-		<type>Helicopter</type>
-		<value>0.4</value>
-		<sim>DCS</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
 		<name>critical_aoa_max</name>
 		<type>JetAircraft</type>
 		<value>25</value>
@@ -6738,27 +6750,6 @@
 		<value>80</value>
 		<sim>DCS</sim>
 		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>Helicopter</type>
-		<value>0.1</value>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>JetAircraft</type>
-		<value>0.5</value>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>PropellerAircraft</type>
-		<value>0.6</value>
-		<sim>DCS</sim>
-		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>pedal_spring_gain</name>
@@ -7205,20 +7196,6 @@
 		<name>collective_ap_spring_gain</name>
 		<type>HPGHelicopter</type>
 		<value>1.0</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
-		<name>collective_dampening_gain</name>
-		<type>Helicopter</type>
-		<value>0.4</value>
-		<sim>MSFS</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
-		<name>collective_dampening_gain</name>
-		<type>HPGHelicopter</type>
-		<value>0.4</value>
 		<sim>MSFS</sim>
 		<device>collective</device>
 	</classdefaults>
@@ -7908,34 +7885,6 @@
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>HPGHelicopter</type>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>Helicopter</type>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>JetAircraft</type>
-		<value>0.5</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>PropellerAircraft</type>
-		<value>0.6</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
 		<name>pedal_spring_gain</name>
 		<type>HPGHelicopter</type>
 		<value>0.1</value>
@@ -8526,13 +8475,6 @@
 		<device>collective</device>
 	</classdefaults>
 	<classdefaults>
-		<name>collective_dampening_gain</name>
-		<type>Helicopter</type>
-		<value>0.4</value>
-		<sim>XPLANE</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
 		<name>critical_aoa_max</name>
 		<type>JetAircraft</type>
 		<value>25</value>
@@ -9053,27 +8995,6 @@
 		<value>80</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>Helicopter</type>
-		<value>0.1</value>
-		<sim>XPLANE</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>JetAircraft</type>
-		<value>0.5</value>
-		<sim>XPLANE</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>PropellerAircraft</type>
-		<value>0.6</value>
-		<sim>XPLANE</sim>
-		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>pedal_spring_gain</name>
@@ -9603,13 +9524,6 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
-		<name>collective_dampening_gain</name>
-		<type>AllSettings</type>
-		<value>0.5</value>
-		<sim>any</sim>
-		<device>any</device>
-		</classdefaults>
-	<classdefaults>
 		<name>critical_aoa_max</name>
 		<type>AllSettings</type>
 		<value>25</value>
@@ -10082,13 +9996,6 @@
 		<name>overspeed_shake_start</name>
 		<type>AllSettings</type>
 		<value>60</value>
-		<sim>any</sim>
-		<device>any</device>
-		</classdefaults>
-	<classdefaults>
-		<name>pedal_dampening_gain</name>
-		<type>AllSettings</type>
-		<value>0.5</value>
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>

@@ -1161,7 +1161,7 @@ class Helicopter(Aircraft):
     last_pedal_x = 0
     collective_init = 0
     collective_ap_spring_gain = 1
-    collective_dampening_gain = 1
+    collective_dampening_gain = 0
     collective_spring_coeff_y = 0
     pedals_init = 0
     pedal_spring_gain = 1
@@ -1464,7 +1464,7 @@ class Helicopter(Aircraft):
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
             self.spring = effects["pedal_ap_spring"].spring()
-            self.damper = effects["pedal_damper"].damper()
+            # self.damper = effects["pedal_damper"].damper()
 
             pedal_pos = telem_data.get("TailRotorPedalPos")
             input_data = HapticEffect.device.getInput()
@@ -1484,7 +1484,7 @@ class Helicopter(Aircraft):
                 self.spring_x.cpOffset = self.cpO_x
 
                 self.spring.effect.setCondition(self.spring_x)
-                self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
+                # self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
                 self.spring.start()
                 logging.debug(f"self.cpO_x:{self.cpO_x}, phys_x:{phys_x}")
                 if self.cpO_x / 4096 - 0.1 < phys_x < self.cpO_x / 4096 + 0.1:
@@ -1525,7 +1525,7 @@ class Helicopter(Aircraft):
             #     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
             return
         self.spring = effects["collective_ap_spring"].spring()
-        self.damper = effects["collective_damper"].damper()
+        # self.damper = effects["collective_damper"].damper()
         # collective_tr = telem_data.get("h145CollectiveRelease", 0)
         # afcs_mode = telem_data.get("h145CollectiveAfcsMode", 0)
         collective_pos = telem_data.get("CollectivePos", 0)
@@ -1552,7 +1552,7 @@ class Helicopter(Aircraft):
             self.spring_y.cpOffset = self.cpO_y
 
             self.spring.effect.setCondition(self.spring_y)
-            self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
+            # self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
             self.spring.start()
             # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
             if self.cpO_y/4096 - 0.1 < phys_y < self.cpO_y/4096 + 0.1:
@@ -1566,7 +1566,7 @@ class Helicopter(Aircraft):
         # print(self.cpO_y)
         self.spring_y.cpOffset = self.cpO_y
 
-        self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
+        # self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
         self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(
             self.collective_spring_coeff_y / 2)
 
@@ -1605,7 +1605,7 @@ class HPGHelicopter(Helicopter):
     afcs_step_size = 2
     collective_init = 0
     collective_ap_spring_gain = 1
-    collective_dampening_gain = 1
+    collective_dampening_gain = 0
     collective_spring_coeff_y = 0
     hands_on_deadzone = 0.1
     hands_off_deadzone = 0.02
@@ -1796,7 +1796,7 @@ class HPGHelicopter(Helicopter):
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
             self.spring = effects["pedal_ap_spring"].spring()
-            self.damper = effects["pedal_damper"].damper()
+            # self.damper = effects["pedal_damper"].damper()
 
             pedal_pos = telem_data.get("TailRotorPedalPos")
             pedal_cpO_x = round(4096*pedal_pos)
@@ -1816,7 +1816,7 @@ class HPGHelicopter(Helicopter):
                 self.spring_x.cpOffset = self.cpO_x
 
                 self.spring.effect.setCondition(self.spring_x)
-                self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
+                # self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
                 self.spring.start()
                 logging.debug(f"self.cpO_x:{self.cpO_x}, phys_x:{phys_x}")
                 if self.cpO_x / 4096 - 0.1 < phys_x < self.cpO_x / 4096 + 0.1:
