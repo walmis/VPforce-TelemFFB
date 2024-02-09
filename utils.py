@@ -114,7 +114,7 @@ class EffectTranslator:
             "cm": ["Countermeasure Deployment", "cm_vibration_intensity"],
             "cyclic_spring": ["Cyclic Spring Force", "cyclic_spring_gain"],
             "damage": ["Aircraft Damage Event", "damage_effect_intensity"],
-            "damper": ["Damper Override", ""],
+            "damper": ["Damper Override", "damper_force"],
             "decel": ["Decelleration Force", "deceleration_max_force"],
             "dynamic_spring": ["Dynamic Spring Force", ".*_spring_gain"],
             "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
@@ -122,7 +122,7 @@ class EffectTranslator:
             "etlX": ["ETL Shaking", "etl_effect_intensity"],
             "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
             "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
-            "friction": ["Friction Override", ""],
+            "friction": ["Friction Override", "friction_force"],
             "gearbuffet": ["Gear Drag Buffeting", "gear_buffet_intensity"],
             "gearbuffet2": ["Gear Drag Buffeting", "gear_buffet_intensity"],
             "gearmovement": ["Gear Motion", "gear_motion_intensity"],
@@ -135,7 +135,7 @@ class EffectTranslator:
             "je_rumble_2_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
             "je_rumble_2_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
             "il2_buffet": ["Buffeting", "il2_buffeting_factor"],
-            "inertia": ["Inertia Override", ""],
+            "inertia": ["Inertia Override", "inertia_force"],
             "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
             "payload_rel": ["Payload Release", "weapon_release_intensity"],
             "pause_spring": ["Pause/Slew Spring Force", ""],
@@ -161,7 +161,10 @@ class EffectTranslator:
             "trim_spring": ["Trim Override Spring", ""],
             "control_weight": ["Control Weight", ""],
             "vrs_buffet": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
-            "wnd": ["Wind Effect", "wind_effect_max_intensity"]
+            "wnd": ["Wind Effect", "wind_effect_max_intensity"],
+            "hyd_loss_damper": ["Hydraulic Loss Damper", "hydraulic_loss_damper"],
+            "hyd_loss_inertia": ["Hydraulic Loss Inertia", "hydraulic_loss_inertia"],
+            "hyd_loss_friction": ["Hydraulic Loss Friction", "hydraulic_loss_friction"],
         }
 
     def get_translation(self, key):
