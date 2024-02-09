@@ -1011,6 +1011,7 @@
 		<name>enable_hydraulic_loss_effect</name>
 		<info>Simulate high damper forces when hydraulic pressure is low/0&lt;br&gt;** REQUIRES damper/inertia/friction overrides to be enabled **</info>
 		<displayname>Hydraulic Loss Effect</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -1025,6 +1026,7 @@
 		<prereq>enable_hydraulic_loss_effect</prereq>
 		<info>"Hydraulic System Integrity" (HydSys in monitor)  value to consider "low".  Forces will start increasing below this value</info>
 		<displayname>Hydraulic System Threshold</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -1040,6 +1042,7 @@
 		<prereq>enable_hydraulic_loss_effect</prereq>
 		<info>Damper force when hydraulic system pressure reaches 0</info>
 		<displayname>Damper</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -1055,6 +1058,7 @@
 		<prereq>enable_hydraulic_loss_effect</prereq>
 		<info>Inertia  force when hydraulic system pressure reaches 0</info>
 		<displayname>Inertia</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -1070,6 +1074,7 @@
 		<prereq>enable_hydraulic_loss_effect</prereq>
 		<info>Friction  force when hydraulic system pressure reaches 0</info>
 		<displayname>Friction</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -4900,6 +4905,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>hydraulic_loss_threshold</name>
+		<model>Ka-50</model>
+		<value>0.7</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Ka-50</model>
 		<value>Helicopter</value>
@@ -5024,6 +5036,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>hydraulic_loss_threshold</name>
+		<model>Mi-24P</model>
+		<value>0.7</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Mi-24P</model>
 		<value>Helicopter</value>
@@ -5044,6 +5063,13 @@
 		<sim>DCS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>hydraulic_loss_threshold</name>
+		<model>Mi-8MT</model>
+		<value>0.4</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
 		<model>MiG-15.*</model>
@@ -5682,6 +5708,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>hydraulic_loss_threshold</name>
+		<model>Mi-24P</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>SA342.*</model>
 		<value>Helicopter</value>
@@ -6029,6 +6062,13 @@
 		<sim>DCS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>hydraulic_loss_threshold</name>
+		<model>UH-1H</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>weapon_release_intensity</name>
 		<model>UH-1H</model>

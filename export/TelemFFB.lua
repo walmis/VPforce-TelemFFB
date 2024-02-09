@@ -207,8 +207,14 @@ local f_telemFFB = {
           local drawFlapsPos2 = LoGetAircraftDrawArgumentValue(10)
           local drawSpeedBrake = LoGetAircraftDrawArgumentValue(21)
           local drawRefuelBoom = LoGetAircraftDrawArgumentValue(22)
+          local engine = LoGetEngineInfo()
+
+          local MCP = LoGetMCPState()
+          local hydraulicPressureSim = string.format("%.3f~%.3f", engine.HydraulicPressure.left, engine.HydraulicPressure.right)
+
           local damage = "not enabled"
           local damage_vars = "not supported"
+          local hydraulicPressure = "n/a"
 
           local AB = string.format("%.2f~%.2f", LoGetAircraftDrawArgumentValue(28), LoGetAircraftDrawArgumentValue(29))
 
@@ -320,6 +326,10 @@ local f_telemFFB = {
               149,150,151,152,153,154,155,156,157,158,160,161,166,167,188,189,215,225,234,236,243,247,251,252,252,
               297,452,663,664,665,1100
             }
+
+            hydraulicPressure = string.format("%.3f~%.3f", MainPanel:get_argument_value(404), MainPanel:get_argument_value(405))
+
+
             local PanelShake =
               string.format(
               "%.2f~%.2f~%.2f",
@@ -347,6 +357,13 @@ local f_telemFFB = {
               81,142,146,152,153,154,157,158,159,163,167,169,233,235,244,255,256,257,258,265,297,298,429,430,431,432,
               433,434,435,436,453,454,455,456,457,458,459,460,461,462,465,466,530,898,899
             }
+
+            local hyd_state = MainPanel:get_argument_value(104)
+            if hyd_state == 0 then
+              hydraulicPressure = "true"
+            else
+              hydraulicPressure = "false"
+            end
 
             local mainRotorRPM = MainPanel:get_argument_value(123) * 360
             local PanelShake =
@@ -411,6 +428,8 @@ local f_telemFFB = {
               233,235,241,244,247,249,250,265,266,267,296,297,298,299,301,302,302,303,304,305
             }
 
+            hydraulicPressure = string.format("%.3f~%.3f", MainPanel:get_argument_value(471), MainPanel:get_argument_value(472))
+
             local GunTrigger = MainPanel:get_argument_value(615)
             local APUoilP = MainPanel:get_argument_value(168)
             local APUvalve = MainPanel:get_argument_value(162)
@@ -435,6 +454,8 @@ local f_telemFFB = {
               225,233,234,235,236,242,243,245,246,265,266,267,296,297,298,299,300,301,302,303,303,459,460,
               461,462
             }
+            hydraulicPressure = string.format("%.3f~%.3f", MainPanel:get_argument_value(23), MainPanel:get_argument_value(24))
+
             mech["speedbrakes"]["value"] = 0.0
 
             -- Mi-24  sends to TelemFFB
@@ -467,6 +488,14 @@ local f_telemFFB = {
               145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,
               175,177,178,179,180,181,204,205
             }
+
+            local hyd_state = MainPanel:get_argument_value(11)
+            if hyd_state == 0 then
+              hydraulicPressure = "true"
+            else
+              hydraulicPressure = "false"
+            end
+
             local StatusString =
               RAltimeterOnOff .. "~" .. RAltimeterFlagPanne .. "~" .. RAltimeterFlagMA .. "~" .. RAltimeterTest
             -- Gazelle  sends to SimShaker
@@ -1000,7 +1029,6 @@ local f_telemFFB = {
               }
 
             end
-            local engine = LoGetEngineInfo()
 
             local LandingGearState = LoGetMechInfo().gear.value
             local SpeedBrakePos = LoGetMechInfo().speedbrakes.value
@@ -1012,6 +1040,7 @@ local f_telemFFB = {
             local MCP = LoGetMCPState()
 
             local engineRPM = string.format("%.0f~%.0f", LoGetEngineInfo().RPM.left, LoGetEngineInfo().RPM.right)
+
             local MCPState =
               tostring(MCP.LeftEngineFailure) .. "~" .. tostring(MCP.RightEngineFailure) .. "~" .. tostring(MCP.HydraulicsFailure) ..
                       "~" .. tostring(MCP.ACSFailure) .. "~" .. tostring(MCP.AutopilotFailure) .. "~" .. tostring(MCP.MasterWarning) ..
@@ -1043,6 +1072,8 @@ local f_telemFFB = {
             {"src", "%s", "DCS"},
             {"SelfData", "%s", myselfData},
             {"EngRPM", "%s", engineRPM},
+            {"HydSys", "%s", hydraulicPressure},
+            {"HydPress", "%s", hydraulicPressureSim},
             {"ACCs", "%s", AccelerationUnits},
             {"Gun", "%s", CannonShells},
             {"Wind", "%s", windVelocityVectors},

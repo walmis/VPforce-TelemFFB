@@ -1205,30 +1205,30 @@ class Helicopter(Aircraft):
         self._update_jet_engine_rumble(telem_data)
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
 
-    def step_value_over_time(self, key, value, timeframe_ms, dst_val):
-        current_time_ms = time.time() * 1000  # Convert current time to milliseconds
-
-        if key not in self.stepper_dict:
-            self.stepper_dict[key] = {'value': value, 'dst_val': dst_val, 'start_time': current_time_ms, 'timeframe': timeframe_ms}
-
-        data = self.stepper_dict[key]
-
-        if data['value'] == data['dst_val']:
-            del self.stepper_dict[key]
-            return data['value']
-
-        elapsed_time_ms = current_time_ms - data['start_time']
-
-        if elapsed_time_ms >= timeframe_ms:
-            data['value'] = data['dst_val']
-            return data['dst_val']
-
-        remaining_time_ms = timeframe_ms - elapsed_time_ms
-        step_size = (data['dst_val'] - value) / remaining_time_ms
-
-        data['value'] = round(value + step_size * elapsed_time_ms)
-        # print(f"value out = {data['value']}")
-        return data['value']
+    # def step_value_over_time(self, key, value, timeframe_ms, dst_val):
+    #     current_time_ms = time.time() * 1000  # Convert current time to milliseconds
+    #
+    #     if key not in self.stepper_dict:
+    #         self.stepper_dict[key] = {'value': value, 'dst_val': dst_val, 'start_time': current_time_ms, 'timeframe': timeframe_ms}
+    #
+    #     data = self.stepper_dict[key]
+    #
+    #     if data['value'] == data['dst_val']:
+    #         del self.stepper_dict[key]
+    #         return data['value']
+    #
+    #     elapsed_time_ms = current_time_ms - data['start_time']
+    #
+    #     if elapsed_time_ms >= timeframe_ms:
+    #         data['value'] = data['dst_val']
+    #         return data['dst_val']
+    #
+    #     remaining_time_ms = timeframe_ms - elapsed_time_ms
+    #     step_size = (data['dst_val'] - value) / remaining_time_ms
+    #
+    #     data['value'] = round(value + step_size * elapsed_time_ms)
+    #     # print(f"value out = {data['value']}")
+    #     return data['value']
 
     def _update_heli_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
