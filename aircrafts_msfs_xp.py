@@ -1059,7 +1059,7 @@ class GliderAircraft(Aircraft):
 
             self.stick_center = [x,y]
 
-            logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
+            logging.debug(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
 
             self.force_trim_release_active = 1
 
@@ -1083,7 +1083,7 @@ class GliderAircraft(Aircraft):
             # self.spring.start()
             self.stick_center = [x,y]
 
-            logging.info(f"Force Trim Engaged :{offs_x}:{offs_y}")
+            logging.debug(f"Force Trim Engaged :{offs_x}:{offs_y}")
 
             self.force_trim_release_active = 0
 
@@ -1272,7 +1272,7 @@ class Helicopter(Aircraft):
 
                     self.cyclic_center = [x, y]
 
-                    logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
+                    logging.debug(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
 
                     self.cyclic_trim_release_active = 1
 
@@ -1292,7 +1292,7 @@ class Helicopter(Aircraft):
 
                     self.cyclic_center = [x, y]
 
-                    logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
+                    logging.debug(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
                     if self._sim_is_msfs():
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
