@@ -158,6 +158,7 @@ class EffectTranslator:
             "spoilerbuffet2-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
             "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
             "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
+            "stick_shaker" : ["Stick Shaker","stick_shaker_intensity"],
             "trim_spring": ["Trim Override Spring", ""],
             "control_weight": ["Control Weight", ""],
             "vrs_buffet": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
