@@ -39,6 +39,11 @@ ft = 3.28084  # m to ft
 kt = 1.94384  # ms to kt
 kt2ms = 0.514444  # knots to m/s
 
+EFFECT_SQUARE = 3
+EFFECT_SINE = 4
+EFFECT_TRIANGLE = 5
+EFFECT_SAWTOOTHUP = 6
+EFFECT_SAWTOOTHDOWN = 7
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -219,6 +224,8 @@ class Aircraft(AircraftBase):
         self.rudder_trim_follow_gain_physical_x = 1.0
         self.rudder_trim_follow_gain_virtual_x = 0.2
 
+        self.enable_stick_shaker = 0
+        self.stick_shaker_intensity = 0
 
 
         self.ap_following = True
@@ -837,6 +844,20 @@ class Aircraft(AircraftBase):
 
             self.const_force.constant(rud_force, 270).start()
             self.spring.start()
+    def _update_stick_shaker(self, telem_data):
+        if not self._sim_is_msfs():
+            return
+
+        if not self.enable_stick_shaker:
+            effects['stick_shaker'].destroy()
+            return
+
+        stall = telem_data.get('StallWarning', 0)
+        if stall:
+            effects['stick_shaker'].periodic(14, self.stick_shaker_intensity, 0, EFFECT_SQUARE).start()
+        else:
+            effects['stick_shaker'].destroy()
+
 
     def send_xp_command(self, cmd):
         if not getattr(self, "_socket", None):
@@ -896,6 +917,7 @@ class Aircraft(AircraftBase):
 
         hyd_loss = self._update_hydraulic_loss_effect(telem_data)
         if not hyd_loss: self._update_ffb_forces(telem_data)
+        self._update_stick_shaker(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_buffeting(telem_data)
         self._update_flight_controls(telem_data)

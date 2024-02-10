@@ -1674,6 +1674,30 @@
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>705</order>
+		<name>enable_stick_shaker</name>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>Stick Shaker</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value></value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>705.1</order>
+		<name>stick_shaker_intensity</name>
+		<prereq>enable_stick_shaker</prereq>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>Stick Shaker Intensity</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.12</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>710</order>
 		<name>aoa_effect_enabled</name>
@@ -2632,6 +2656,13 @@
 		<value>2.0</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_threshold</name>
+		<model>A-10C.*</model>
+		<value>0.7</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -7357,6 +7388,27 @@
 		<name>elevator_spring_gain</name>
 		<type>TurbopropAircraft</type>
 		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>enable_stick_shaker</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>enable_stick_shaker</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>enable_stick_shaker</name>
+		<type>JetAircraft</type>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
