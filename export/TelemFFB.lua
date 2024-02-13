@@ -747,6 +747,10 @@ local f_telemFFB = {
               65,81,134,135,136,144,146,147,148,150,153,154,161,167,213,214,215,216,217,219,223,224,225,226,227,229,
               233,235,237,239,241,244,247,248,249,266,267
             }
+
+            hydraulicPressure = string.format("%.3f~%.3f", MainPanel:get_argument_value(647), MainPanel:get_argument_value(648))
+
+
             stringToSend =
               string.format(
               "Flaps=%.2f;Canopy=%.2f;APU=%.2f",
@@ -764,6 +768,10 @@ local f_telemFFB = {
               65,81,134,135,136,144,146,147,148,150,153,154,161,167,213,214,215,216,217,219,223,224,225,226,227,229,
               233,235,237,239,241,244,247,248,249,266,267
             }
+
+            hydraulicPressure = string.format("%.3f~%.3f", MainPanel:get_argument_value(647), MainPanel:get_argument_value(648))
+
+
             stringToSend =
               string.format(
               "Flaps=%.2f;Canopy=%.2f;APU=%.2f",
@@ -858,6 +866,20 @@ local f_telemFFB = {
             local stickY = MainPanel:get_argument_value(701)
             local stickX = MainPanel:get_argument_value(702)
 
+            local hp1_1 = math.floor(MainPanel:get_argument_value(553) * 10) / 10
+            local hp1_2 = math.floor(MainPanel:get_argument_value(554) * 10) / 100
+            local hp1_3 = math.floor(MainPanel:get_argument_value(555) * 10) / 1000
+            local hp1 = hp1_1 + hp1_2 + hp1_3
+
+
+            local hp2_1 =  math.floor(MainPanel:get_argument_value(556) * 10) / 10
+            local hp2_2 =  math.floor(MainPanel:get_argument_value(557) * 10) / 100
+            local hp2_3 =  math.floor(MainPanel:get_argument_value(558) * 10) / 1000
+            local hp2 = hp2_1 + hp2_2 + hp2_3
+
+            hydraulicPressure = string.format("%.3f~%.3f", hp1, hp2)
+
+
             -- local flt = GetDevice(28)
             -- local sflt = (dump(flt) .. dump(getmetatable(flt)) )
             -- if flt ~= nil then
@@ -894,6 +916,10 @@ local f_telemFFB = {
                 562,563,564,565,566,567,568,569,570,571,574,575,576,577,578,586,587,588,589,590,591,592,593,594,
                 595,596,597
               }
+
+            hydraulicPressure = string.format("%.3f", MainPanel:get_argument_value(1063))
+
+
               if getEngineRightRPM then
                 REngine_RPM = sensor_data.getEngineRightRPM()
               end
