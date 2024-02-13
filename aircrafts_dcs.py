@@ -99,24 +99,15 @@ class Aircraft(AircraftBase):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
-    pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
     elevator_droop_enabled = False
     elevator_droop_force = 0
-    aircraft_vs_speed = 0
-    aircraft_vs_gain = 0.25
-    aircraft_vne_speed = 0
-    aircraft_vne_gain = 1.0
+
     trim_workaround = False
     damage_effect_enabled = 0
     damage_effect_intensity: float = 0.0
 
     aoa_effect_enabled = 1
-    pedals_init = 0
-    pedal_spring_coeff_x = 0
-    last_pedal_x = 0
-    pedal_trimming_enabled = False
-    pedal_spring_gain = 1.0
-    pedal_dampening_gain = 0
+
     collective_dampening_gain = 0
     collective_init = 0
     collective_spring_coeff_y = 0
@@ -187,9 +178,9 @@ class Aircraft(AircraftBase):
         if self.is_joystick():
             self._update_stick_position(telem_data)
         if self.is_pedals():
-            self.override_pedal_spring(telem_data)
+            self._override_pedal_spring(telem_data)
         if self.is_collective():
-            self.override_collective_spring(telem_data)
+            self._override_collective_spring(telem_data)
 
 
     def on_event(self, event, *args):
@@ -232,117 +223,117 @@ class Aircraft(AircraftBase):
             logging.debug(f"Damage effect: dir={random_dir}, amp={random_amp}")
         elif not self.anything_has_changed("damage", damage, delta_ms=50):
             effects.dispose("damage")
-    def get_aircraft_perf(self, telem_data):
-        perf_dict = {
-            'default': {
-                'Vs': 87 * knots,
-                'Vne': 438 * knots,
-            },
-            'TF-51D': {
-                'Vs': 87*knots,
-                'Vne': 438*knots,
-            },
-            'P-51D': {
-                'Vs': 87 * knots,
-                'Vne': 438 * knots,
-            },
-            'P-47D': {
-                'Vs': 94 * knots,
-                'Vne': 425 * knots,
-            },
-            'Spitfire': {
-                'Vs': 70 * knots,
-                'Vne': 390 * knots,
-            },
-            'FW-190A8': {
-                'Vs': 118 * knots,
-                'Vne': 370 * knots,
-            },
-            'FW-190D9': {
-                'Vs': 103 * knots,
-                'Vne': 370 * knots,
-            },
-            'Bf-109K-4': {
-                'Vs': 65 * knots,
-                'Vne': 470 * knots,
-            },
-            'I-16': {
-                'Vs': 45 * knots,
-                'Vne': 340 * knots,
-            },
-            'Mosquito': {
-                'Vs': 90 * knots,
-                'Vne': 415 * knots,
-            },
-            'F-15': {
-                'Vs': 130 * knots,
-                'Vne': 800 * knots,
-            },
-            'MiG-15': {
-                'Vs': 120 * knots,
-                'Vne': 620 * knots,
-            },
-            'MiG-19': {
-                'Vs': 140 * knots,
-                'Vne': 850 * knots,
-            },
-            'F-14': {
-                'Vs': 145 * knots,
-                'Vne': 700 * knots,
-            },
-            'AV8BNA': {
-                'Vs': 80 * knots,
-                'Vne': 560 * knots,
-            },
-            'M-2000': {
-                'Vs': 120 * knots,
-                'Vne': 750 * knots,
-            },
-            'Mirage-F1': {
-                'Vs': 120 * knots,
-                'Vne': 800 * knots,
-            },
-            'JF-17': {
-                'Vs': 110 * knots,
-                'Vne': 800 * knots,
-            },
-            'MB-339': {
-                'Vs': 90 * knots,
-                'Vne': 460 * knots,
-            },
-            'A-10C': {
-                'Vs': 120 * knots,
-                'Vne': 450 * knots,
-            },
-            'AJS37': {
-                'Vs': 120 * knots,
-                'Vne': 810 * knots,
-            },
-            'F-5E': {
-                'Vs': 110 * knots,
-                'Vne': 800 * knots,
-            },
-            'FA-18C': {
-                'Vs': 135 * knots,
-                'Vne': 850 * knots,
-            },
-            'F-16': {
-                'Vs': 140 * knots,
-                'Vne': 915 * knots,
-            },
-        }
+    # def get_aircraft_perf(self, telem_data):
+    #     perf_dict = {
+    #         'default': {
+    #             'Vs': 87 * knots,
+    #             'Vne': 438 * knots,
+    #         },
+    #         'TF-51D': {
+    #             'Vs': 87*knots,
+    #             'Vne': 438*knots,
+    #         },
+    #         'P-51D': {
+    #             'Vs': 87 * knots,
+    #             'Vne': 438 * knots,
+    #         },
+    #         'P-47D': {
+    #             'Vs': 94 * knots,
+    #             'Vne': 425 * knots,
+    #         },
+    #         'Spitfire': {
+    #             'Vs': 70 * knots,
+    #             'Vne': 390 * knots,
+    #         },
+    #         'FW-190A8': {
+    #             'Vs': 118 * knots,
+    #             'Vne': 370 * knots,
+    #         },
+    #         'FW-190D9': {
+    #             'Vs': 103 * knots,
+    #             'Vne': 370 * knots,
+    #         },
+    #         'Bf-109K-4': {
+    #             'Vs': 65 * knots,
+    #             'Vne': 470 * knots,
+    #         },
+    #         'I-16': {
+    #             'Vs': 45 * knots,
+    #             'Vne': 340 * knots,
+    #         },
+    #         'Mosquito': {
+    #             'Vs': 90 * knots,
+    #             'Vne': 415 * knots,
+    #         },
+    #         'F-15': {
+    #             'Vs': 130 * knots,
+    #             'Vne': 800 * knots,
+    #         },
+    #         'MiG-15': {
+    #             'Vs': 120 * knots,
+    #             'Vne': 620 * knots,
+    #         },
+    #         'MiG-19': {
+    #             'Vs': 140 * knots,
+    #             'Vne': 850 * knots,
+    #         },
+    #         'F-14': {
+    #             'Vs': 145 * knots,
+    #             'Vne': 700 * knots,
+    #         },
+    #         'AV8BNA': {
+    #             'Vs': 80 * knots,
+    #             'Vne': 560 * knots,
+    #         },
+    #         'M-2000': {
+    #             'Vs': 120 * knots,
+    #             'Vne': 750 * knots,
+    #         },
+    #         'Mirage-F1': {
+    #             'Vs': 120 * knots,
+    #             'Vne': 800 * knots,
+    #         },
+    #         'JF-17': {
+    #             'Vs': 110 * knots,
+    #             'Vne': 800 * knots,
+    #         },
+    #         'MB-339': {
+    #             'Vs': 90 * knots,
+    #             'Vne': 460 * knots,
+    #         },
+    #         'A-10C': {
+    #             'Vs': 120 * knots,
+    #             'Vne': 450 * knots,
+    #         },
+    #         'AJS37': {
+    #             'Vs': 120 * knots,
+    #             'Vne': 810 * knots,
+    #         },
+    #         'F-5E': {
+    #             'Vs': 110 * knots,
+    #             'Vne': 800 * knots,
+    #         },
+    #         'FA-18C': {
+    #             'Vs': 135 * knots,
+    #             'Vne': 850 * knots,
+    #         },
+    #         'F-16': {
+    #             'Vs': 140 * knots,
+    #             'Vne': 915 * knots,
+    #         },
+    #     }
+    #
+    #     ac = telem_data.get("N")
+    #     for aircraft, values in perf_dict.items():
+    #         # print(f"Checking >{aircraft}< against >{ac}<")
+    #         if aircraft in ac:
+    #             # logging.info(f"Found aircraft performance data for {ac} in entry {aircraft}")
+    #             return values
+    #
+    #     # logging.info(f"No aircraft performance data found for {ac} - using default")
+    #     return perf_dict.get('default')
 
-        ac = telem_data.get("N")
-        for aircraft, values in perf_dict.items():
-            # print(f"Checking >{aircraft}< against >{ac}<")
-            if aircraft in ac:
-                # logging.info(f"Found aircraft performance data for {ac} in entry {aircraft}")
-                return values
-
-        # logging.info(f"No aircraft performance data found for {ac} - using default")
-        return perf_dict.get('default')
-
-    def override_collective_spring(self, telem_data):
+    def _override_collective_spring(self, telem_data):
         if not self.is_collective(): return
 
         self.spring = effects["collective_ap_spring"].spring()
@@ -385,65 +376,7 @@ class Aircraft(AircraftBase):
         self.spring.effect.setCondition(self.spring_y)
         self.spring.start(override=True)
 
-    def override_pedal_spring(self, telem_data):
-        if not self.is_pedals(): return
 
-        input_data = HapticEffect.device.getInput()
-        phys_x, phys_y = input_data.axisXY()
-        ## 0=DCS Default
-        ## 1=spring disabled
-        ## 2=static spring enabled using "pedal_spring_gain" spring setting
-        ## 3=dynamic spring enabled.  Based on "pedal_spring_gain"
-        if self.pedal_spring_mode == 0:
-            return
-        elif self.pedal_spring_mode == 'No Spring':
-            self.spring_x.positiveCoefficient = 0
-            self.spring_x.negativeCoefficient = 0
-
-        elif self.pedal_spring_mode == 'Static Spring':
-            spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
-            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
-
-            if self.pedal_trimming_enabled:
-                self._update_pedal_trim(telem_data)
-
-        elif self.pedal_spring_mode == 'Dynamic Spring':
-            tas = telem_data.get("TAS", 0)
-            ac_perf = self.get_aircraft_perf(telem_data)
-            if self.aircraft_vs_speed:
-                #If user has added the speeds to their config, use that value
-                vs = self.aircraft_vs_speed
-            else:
-                #Otherwise, use the value from the internal table
-                vs = ac_perf['Vs']
-
-            if self.aircraft_vne_speed:
-                vne = self.aircraft_vne_speed
-            else:
-                vne = ac_perf['Vne']
-
-            if vs > vne:
-                #log error if vs speed is configured greater than vne speed and exit
-                logging.error(f"Dynamic pedal forces error: Vs speed ({vs}) is configured with a larger value than Vne ({vne}) - Invalid configuration")
-                telem_data['error'] = 1
-
-            vs_coeff = utils.clamp(round(self.aircraft_vs_gain*4096), 0, 4096)
-            vne_coeff = utils.clamp(round(self.aircraft_vne_gain*4096), 0, 4096)
-            spr_coeff = utils.scale(tas, (vs, vne), (vs_coeff, vne_coeff))
-            spr_coeff = round(spr_coeff * self.pedal_spring_gain)
-            spr_coeff = utils.clamp(spr_coeff, 0, 4096)
-            # print(f"coeff={spr_coeff}")
-            self.spring_x.positiveCoefficient = spr_coeff
-            self.spring_x.negativeCoefficient = spr_coeff
-            if self.pedal_trimming_enabled:
-                self._update_pedal_trim(telem_data)
-            # return
-        self.spring = effects["pedal_spring"].spring()
-        damper_coeff = round(utils.clamp((self.pedal_dampening_gain * 4096), 0, 4096))
-        # self.damper = effects["pedal_damper"].damper(coef_x=damper_coeff).start()
-
-        self.spring.effect.setCondition(self.spring_x)
-        self.spring.start(override=True)
 
     def _update_pedal_trim(self, telem_data):
         if not self.is_pedals(): return
@@ -509,7 +442,8 @@ class PropellerAircraft(Aircraft):
 
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
-    pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
+    # pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
+
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -534,9 +468,9 @@ class PropellerAircraft(Aircraft):
         
         self._update_wind_effect(telem_data)
         if self.aoa_effect_enabled:
-            ac_perf = self.get_aircraft_perf(telem_data)
-            vs0 = ac_perf.get('Vs0', 0)
-            vne = ac_perf.get('Vne', 0)
+            # ac_perf = self.get_aircraft_perf(telem_data)
+            vs0 = self.aircraft_vs_speed
+            vne = self.aircraft_vne_speed
             # print(f"Got Vs0={vs0}, Vne={vne}")
             self._update_aoa_effect(telem_data, minspeed=vs0, maxspeed=vne)
         self._gforce_effect(telem_data)

@@ -113,6 +113,10 @@ class Aircraft(AircraftBase):
         super().__init__(name, **kwargs)
         self.gun_is_firing = 0
         #clear any existing effects
+        self.spring = effects["spring"].spring()
+        # self.damper = effects["damper"].damper()
+        self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         for e in effects.values(): e.destroy()
         effects.clear()
         self._focus_last_value = 1
@@ -221,6 +225,8 @@ class Aircraft(AircraftBase):
             self._update_landing_gear(telem_data.get("GearPos"), 0)
         if self.flaps_motion_intensity > 0:
             self._update_flaps(telem_data.get("Flaps"))
+        if self.is_pedals():
+            self._override_pedal_spring(telem_data)
 
         # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
         #     self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
