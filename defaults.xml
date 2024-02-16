@@ -8975,15 +8975,33 @@
 	</classdefaults>
 	<classdefaults>
 		<name>overspeed_shake_start</name>
+		<type>PropellerAircraft</type>
+		<value>130</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_start</name>
+		<type>TurbopropAircraft</type>
+		<value>130</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_start</name>
 		<type>Helicopter</type>
-		<value>80</value>
+		<value>130</value>
+		<unit>kt</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>overspeed_shake_start</name>
 		<type>HPGHelicopter</type>
-		<value>80</value>
+		<value>155</value>
+		<unit>kt</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
@@ -8991,6 +9009,48 @@
 		<name>overspeed_shake_start</name>
 		<type>Helicopter</type>
 		<value>80</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_enable</name>
+		<type>Helicopter</type>
+		<value>True</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_enable</name>
+		<type>PropellerAircraft</type>
+		<value>True</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_enable</name>
+		<type>TurbopropAircraft</type>
+		<value>True</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_enable</name>
+		<type>Helicopter</type>
+		<value>True</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_enable</name>
+		<type>HPGHelicopter</type>
+		<value>True</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_enable</name>
+		<type>Helicopter</type>
+		<value>True</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
 	</classdefaults>
