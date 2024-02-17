@@ -2317,7 +2317,7 @@ class MainWindow(QMainWindow):
         if _release:
             dl_url = 'https://github.com/walmis/VPforce-TelemFFB/releases'
         else:
-            dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
+            dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=D'
 
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
