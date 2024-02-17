@@ -8887,84 +8887,49 @@
 		<type>Helicopter</type>
 		<value>0.2</value>
 		<sim>DCS</sim>
-		<device>collective</device>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>overspeed_shake_intensity</name>
-		<type>Helicopter</type>
+		<type>PropellerAircraft</type>
 		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
+		<sim>MSFS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>overspeed_shake_intensity</name>
-		<type>Helicopter</type>
+		<type>JetAircraft</type>
 		<value>0.2</value>
-		<sim>DCS</sim>
-		<device>pedals</device>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_intensity</name>
+		<type>TurbopropAircraft</type>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>overspeed_shake_intensity</name>
 		<type>Helicopter</type>
 		<value>0.2</value>
 		<sim>MSFS</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
-		<name>overspeed_shake_intensity</name>
-		<type>Helicopter</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>overspeed_shake_intensity</name>
-		<type>Helicopter</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>overspeed_shake_intensity</name>
 		<type>HPGHelicopter</type>
 		<value>0.2</value>
 		<sim>MSFS</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
-		<name>overspeed_shake_intensity</name>
-		<type>HPGHelicopter</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>overspeed_shake_intensity</name>
-		<type>HPGHelicopter</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>overspeed_shake_intensity</name>
 		<type>Helicopter</type>
 		<value>0.2</value>
 		<sim>XPLANE</sim>
-		<device>collective</device>
-	</classdefaults>
-	<classdefaults>
-		<name>overspeed_shake_intensity</name>
-		<type>Helicopter</type>
-		<value>0.2</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>overspeed_shake_intensity</name>
-		<type>Helicopter</type>
-		<value>0.2</value>
-		<sim>XPLANE</sim>
-		<device>pedals</device>
+		<device>any</device>
 	</classdefaults>
 	<classdefaults>
 		<name>overspeed_shake_start</name>
@@ -8984,7 +8949,7 @@
 	<classdefaults>
 		<name>overspeed_shake_start</name>
 		<type>TurbopropAircraft</type>
-		<value>130</value>
+		<value>170</value>
 		<unit>kt</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
@@ -8992,7 +8957,7 @@
 	<classdefaults>
 		<name>overspeed_shake_start</name>
 		<type>Helicopter</type>
-		<value>130</value>
+		<value>120</value>
 		<unit>kt</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
@@ -9029,6 +8994,13 @@
 	<classdefaults>
 		<name>overspeed_shake_enable</name>
 		<type>TurbopropAircraft</type>
+		<value>True</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_enable</name>
+		<type>JetAircraft</type>
 		<value>True</value>
 		<sim>MSFS</sim>
 		<device>any</device>
