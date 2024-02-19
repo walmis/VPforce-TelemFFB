@@ -70,6 +70,9 @@ HID_REPORT_ID_CREATE_EFFECT = 5
 HID_REPORT_ID_PID_BLOCK_LOAD = 6
 HID_REPORT_ID_PID_POOL_REPORT = 7
 
+HID_REPORT_FEATURE_ID_GET_GAINS = 0x56
+HID_REPORT_FEATURE_ID_SET_GAIN = 0x57
+
 EFFECT_CONSTANT = 1
 EFFECT_RAMP = 2
 EFFECT_SQUARE = 3
@@ -258,6 +261,43 @@ class FFBReport_PIDStatus_Input(BaseStructure):
                 ]
     _defaults_ = {}
 
+class FFBReport_Get_Gains_Feature_Data(BaseStructure):
+    _pack_ = 1
+    _fields_ = [("reportId", ctypes.c_uint8), 
+                ("master_gain",     ctypes.c_uint8),
+                ("periodic_gain",   ctypes.c_uint8),
+                ("spring_gain",     ctypes.c_uint8),
+                ("damper_gain",     ctypes.c_uint8),
+                ("inertia_gain",    ctypes.c_uint8),      
+                ("friction_gain",   ctypes.c_uint8),
+                ("constant_gain",   ctypes.c_uint8),
+                ]
+    master_gain : int
+    periodic_gain : int
+    spring_gain : int
+    damper_gain : int
+    inertia_gain : int
+    friction_gain : int
+    constant_gain : int
+    _defaults_ = {}
+
+FFB_GAIN_MASTER = 1
+FFB_GAIN_PERIODIC = 2
+FFB_GAIN_SPRING = 3
+FFB_GAIN_DAMPER = 4
+FFB_GAIN_INERTIA = 5
+FFB_GAIN_FRICTION = 6
+FFB_GAIN_CONSTANT = 7
+class FFBReport_Set_Gain_Feature_Data_t(BaseStructure):
+    _pack_ = 1
+    _fields_ = [("reportId", ctypes.c_uint8), 
+                ("gain_id",     ctypes.c_uint8), # gain slider ID
+                ("gain_value",   ctypes.c_uint8), # in percent 0-100
+                ]
+    reportId: int
+    gain_id: int
+    gain_value: int
+    _defaults_ = {}
 
 input_report_handlers = {
     HID_REPORT_ID_INPUT: FFBReport_Input,
@@ -452,7 +492,20 @@ class FFBRhino(hid.Device, QObject):
         # 'vendor_id': 65535}]
         return list(filter(lambda x: x.interface_number == 0 and x.usage == 4, devs))
 
-
+    # Get global effect slider values as seen in VPConfigurator
+    def getGains(self) -> FFBReport_Get_Gains_Feature_Data:
+        d = self.get_feature_report(HID_REPORT_FEATURE_ID_GET_GAINS, ctypes.sizeof(FFBReport_Get_Gains_Feature_Data))
+        data = FFBReport_Get_Gains_Feature_Data.from_buffer_copy(d)
+        return data
+    
+    # Set global effect class gain, same as in VPConfigurator sliders
+    def setGain(self, slider_id, value):
+        assert(value >= 0 and value <= 100)
+        data = FFBReport_Set_Gain_Feature_Data_t()
+        data.reportId = HID_REPORT_FEATURE_ID_SET_GAIN
+        data.gain_id = slider_id
+        data.gain_value = value
+        self.send_feature_report(bytes(data))
 
     # runs on mainThread
     def timerEvent(self, a0: QTimerEvent) -> None:
@@ -684,16 +737,30 @@ if __name__ == "__main__":
     devs = FFBRhino.enumerate()
     print()
     for dev in devs:
-        print(f"Found {dev['product_string']} with serial {dev['serial_number']}")
-        print(f"-- path {dev['path']}")
+        print(f"Found {dev.product_string} with serial {dev.serial_number}")
+        print(f"-- path {dev.path}")
         print()
-    exit()
+
+    print(hid.enumerate(vid=0xffff))
+
 
     d = FFBRhino(0xffff, 0x2055)
-    d.resetEffects()
-    print(d.get_firmware_version())
+
+    print("Example getGains()")
+    gains = d.getGains()
+    print("Result:", gains)
+    print(f"Master Gain: {gains.master_gain}")
+    print(f"Periodic Gain: {gains.periodic_gain}")
+    
+    print("Set constant gain to 90")
+    d.setGain(FFB_GAIN_CONSTANT, 90)
+    gains = d.getGains()
+    print(f"Constant Gain(Should be 90): {gains.constant_gain}")
+    d.setGain(FFB_GAIN_CONSTANT, 100)
+
+
     exit()
-    #HapticEffect.open()
+
 
     #c = d.createEffect(EFFECT_CONSTANT)
     #c.setConstantForce(0.05, 90)
