@@ -997,7 +997,7 @@ class AircraftBase(object):
             effects.dispose("etlX")
             effects.dispose("etlY")
 
-        if tas >= self.overspeed_shake_start:
+        if tas >= self.overspeed_shake_start and self.overspeed_effect_enable:
             shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start, self.overspeed_shake_start + 15, curvature=.7)
             shake = utils.clamp(shake, 0.0, 1.0)
             effects["overspeedY"].periodic(self.overspeed_shake_frequency, shake, 0).start()
