@@ -25,6 +25,8 @@ import logging
 import sys
 import time
 import os
+
+import ffb_rhino
 import utils
 import re
 import socket
@@ -34,6 +36,8 @@ import subprocess
 
 import traceback
 from ffb_rhino import HapticEffect, FFBRhino
+from ffb_rhino import FFB_GAIN_CONSTANT, FFB_GAIN_FRICTION, FFB_GAIN_DAMPER, FFB_GAIN_SPRING, FFB_GAIN_INERTIA, FFB_GAIN_PERIODIC, FFB_GAIN_MASTER
+
 from configobj import ConfigObj
 
 from settingsmanager import *
@@ -50,6 +54,7 @@ from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColo
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 from system_settings import Ui_SystemDialog
+from configurator import Ui_ConfiguratorDialog
 from custom_widgets import *
 import resources
 
@@ -187,7 +192,8 @@ else:
 
 
 min_firmware_version = 'v1.0.15'
-global dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager, xplane_telem
+global dev, dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager, xplane_telem
+global startup_configurator_gains
 global window, log_window, log_folder, log_file, log_tail_window
 
 _update_available = False
@@ -1725,6 +1731,139 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if validate_vpconf_profile(file_path):
                 lbl.setText(file_path)
 
+class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
+    global dev
+    cb_states = {'cb_MasterGain': 0,'cb_Spring': 0, 'cb_Periodic': 0, 'cb_Damper': 0, 'cb_Inertia': 0, 'cb_Friction': 0, 'cb_Constant': 0}
+
+    def __init__(self, parent=None):
+        super(ConfiguratorDialog, self).__init__(parent)
+        global startup_configurator_gains
+
+        self.setupUi(self)
+        self.retranslateUi(self)
+        self.setWindowTitle(f"Configurator Gain Override ({_device_type.capitalize()})")
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        # self.cb_MasterGain.clicked
+        self.sl_MasterGain.valueChanged.connect(self.update_labels)
+        self.sl_MasterGain.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Periodic.valueChanged.connect(self.update_labels)
+        self.sl_Periodic.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Spring.valueChanged.connect(self.update_labels)
+        self.sl_Spring.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Damper.valueChanged.connect(self.update_labels)
+        self.sl_Damper.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Inertia.valueChanged.connect(self.update_labels)
+        self.sl_Inertia.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Friction.valueChanged.connect(self.update_labels)
+        self.sl_Friction.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Constant.valueChanged.connect(self.update_labels)
+        self.sl_Constant.valueChanged.connect(self.set_gain_value)
+
+        self.cb_MasterGain.stateChanged.connect(self.cb_toggle)
+        self.cb_Periodic.stateChanged.connect(self.cb_toggle)
+        self.cb_Spring.stateChanged.connect(self.cb_toggle)
+        self.cb_Damper.stateChanged.connect(self.cb_toggle)
+        self.cb_Inertia.stateChanged.connect(self.cb_toggle)
+        self.cb_Friction.stateChanged.connect(self.cb_toggle)
+        self.cb_Constant.stateChanged.connect(self.cb_toggle)
+
+        self.cb_MasterGain.setChecked(self.cb_states['cb_MasterGain'])
+        self.cb_Periodic.setCheckState(self.cb_states['cb_Periodic'])
+        self.cb_Spring.setCheckState(self.cb_states['cb_Spring'])
+        self.cb_Damper.setCheckState(self.cb_states['cb_Damper'])
+        self.cb_Inertia.setCheckState(self.cb_states['cb_Inertia'])
+        self.cb_Friction.setCheckState(self.cb_states['cb_Friction'])
+        self.cb_Constant.setCheckState(self.cb_states['cb_Constant'])
+
+        self.pb_Revert.clicked.connect(self.revert_gains)
+
+        self.pb_Finish.clicked.connect(self.close)
+
+        self.starting_gains = dev.getGains()
+        self.read_gains()
+
+
+    def cb_toggle(self, state):
+        sender = self.sender()
+        sender_str = sender.objectName()
+        self.cb_states[sender_str] = state
+
+        if state: return
+        match sender_str:
+            case 'cb_MasterGain':
+                dev.setGain(FFB_GAIN_MASTER, int(startup_configurator_gains.master_gain))
+            case 'cb_Periodic':
+                dev.setGain(FFB_GAIN_PERIODIC, startup_configurator_gains.periodic_gain)
+            case 'cb_Spring':
+                dev.setGain(FFB_GAIN_SPRING, startup_configurator_gains.spring_gain)
+            case 'cb_Damper':
+                dev.setGain(FFB_GAIN_DAMPER, startup_configurator_gains.damper_gain)
+            case 'cb_Inertia':
+                dev.setGain(FFB_GAIN_INERTIA, startup_configurator_gains.inertia_gain)
+            case 'cb_Friction':
+                dev.setGain(FFB_GAIN_FRICTION, startup_configurator_gains.friction_gain)
+            case 'sl_Constant':
+                dev.setGain(FFB_GAIN_CONSTANT, startup_configurator_gains.constant_gain)
+        self.read_gains()
+
+
+
+    def revert_gains(self):
+        dev.setGain(FFB_GAIN_MASTER, self.starting_gains.master_gain)
+        dev.setGain(FFB_GAIN_PERIODIC, self.starting_gains.periodic_gain)
+        dev.setGain(FFB_GAIN_SPRING, self.starting_gains.spring_gain)
+        dev.setGain(FFB_GAIN_DAMPER, self.starting_gains.damper_gain)
+        dev.setGain(FFB_GAIN_INERTIA, self.starting_gains.inertia_gain)
+        dev.setGain(FFB_GAIN_FRICTION, self.starting_gains.friction_gain)
+        dev.setGain(FFB_GAIN_CONSTANT, self.starting_gains.constant_gain)
+        self.read_gains()
+
+    def set_gain_value(self, value):
+        sender = self.sender()
+        sender_str = sender.objectName()
+        match sender_str:
+            case 'sl_MasterGain':
+                dev.setGain(FFB_GAIN_MASTER, int(value))
+            case 'sl_Periodic':
+                dev.setGain(FFB_GAIN_PERIODIC, int(value))
+            case 'sl_Spring':
+                dev.setGain(FFB_GAIN_SPRING, int(value))
+            case 'sl_Damper':
+                dev.setGain(FFB_GAIN_DAMPER, int(value))
+            case 'sl_Inertia':
+                dev.setGain(FFB_GAIN_INERTIA, int(value))
+            case 'sl_Friction':
+                dev.setGain(FFB_GAIN_FRICTION, int(value))
+            case 'sl_Constant':
+                dev.setGain(FFB_GAIN_CONSTANT, int(value))
+
+
+    def read_gains(self):
+        gains = dev.getGains()
+        self.sl_MasterGain.setValue(gains.master_gain)
+        self.sl_Periodic.setValue(gains.periodic_gain)
+        self.sl_Spring.setValue(gains.spring_gain)
+        self.sl_Damper.setValue(gains.damper_gain)
+        self.sl_Inertia.setValue(gains.inertia_gain)
+        self.sl_Friction.setValue(gains.friction_gain)
+        self.sl_Constant.setValue(gains.constant_gain)
+        # self.update_labels()
+        print(gains)
+
+    def update_labels(self):
+        self.lab_MasterGainValue.setText(f"%{self.sl_MasterGain.value()}")
+        self.lab_PeriodicValue.setText(f"%{self.sl_Periodic.value()}")
+        self.lab_SpringValue.setText(f"%{self.sl_Spring.value()}")
+        self.lab_DamperValue.setText(f"%{self.sl_Damper.value()}")
+        self.lab_InertiaValue.setText(f"%{self.sl_Inertia.value()}")
+        self.lab_FrictionValue.setText(f"%{self.sl_Friction.value()}")
+        self.lab_ConstantValue.setText(f"%{self.sl_Constant.value()}")
 
 class ButtonPressThread(QThread):
     button_pressed = pyqtSignal(str, int)
@@ -1885,6 +2024,11 @@ class MainWindow(QMainWindow):
         exit_app_action = QAction('Quit TelemFFB', self)
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
+
+        configurator_menu = self.menu.addMenu('Configurator')
+        configurator_settings_action = QAction('Configurator Gain Override', self)
+        configurator_settings_action.triggered.connect(self.open_configurator_dialog)
+        configurator_menu.addAction(configurator_settings_action)
 
         # Create the "Utilities" menu
         utilities_menu = self.menu.addMenu('Utilities')
@@ -2740,6 +2884,12 @@ class MainWindow(QMainWindow):
     def open_teleplot_setup_dialog(self):
         dialog = TeleplotSetupDialog(self)
         dialog.exec_()
+
+    def open_configurator_dialog(self):
+        dialog = ConfiguratorDialog(self)
+        dialog.raise_()
+        dialog.activateWindow()
+        dialog.show()
 
     def open_system_settings_dialog(self):
         dialog = SystemSettingsDialog(self)
@@ -4538,11 +4688,27 @@ def main():
             QPlainTextEdit {
                 selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
             }
+            QSlider::handle:horizontal {
+                background: #ab37c8; /* Set the handle color */
+                border: 1px solid #565a5e;
+                width: 16px;  /* Adjusted handle width */
+                height: 20px;  /* Adjusted handle height */
+                border-radius: 5px;  /* Adjusted border radius */
+                margin-top: -5px;  /* Negative margin to overlap with groove */
+                margin-bottom: -5px;  /* Negative margin to overlap with groove */
+                margin-left: -1px;  /* Adjusted left margin */
+                margin-right: -1px;  /* Adjusted right margin */
+            }
+            QSlider::handle:horizontal:disabled {
+                background: #888888; /* Set the color of the handle when disabled */
+            }
         """
     )
     global window, log_window, log_tail_window
     global dev_firmware_version
     global dev_serial
+    global dev
+    global startup_configurator_gains
     log_window = LogWindow()
     global settings_mgr, telem_manager, config_was_default
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
@@ -4611,6 +4777,9 @@ def main():
             devver = re.sub(r'\D', '', dev_firmware_version)
             if devver < minver:
                 QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
+
+        gain_values = dev.getGains()
+        print(gain_values)
     except Exception as e:
         QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {_device_vid_pid} for device: {_device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
         dev_firmware_version = 'ERROR'
@@ -4697,7 +4866,11 @@ def main():
 
     if system_settings.get('enableVPConfStartup', False):
         set_vpconf_profile(system_settings.get('pathVPConfStartup', ''), dev_serial)
+
+    startup_configurator_gains = dev.getGains()
+
     app.exec_()
+
     if _ipc_running:
         notify_close_children()
         _ipc_thread.stop()
