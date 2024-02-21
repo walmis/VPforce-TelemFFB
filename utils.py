@@ -52,6 +52,7 @@ import xml.etree.ElementTree as ET
 class SignalEmitter(QObject):
     error_signal = pyqtSignal(str)
     telem_timeout_signal = pyqtSignal(str, bool)
+    msfs_quit_signal = pyqtSignal()
 
     def trigger_signal(self, data):
         self.error_signal.emit(data)

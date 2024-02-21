@@ -1068,6 +1068,8 @@ class SimConnectSock(SimConnectManager):
         if event == "Open":
             # Reset all FFB effects on device, ensure we have a clean start
             HapticEffect.device.resetEffects()
+        if event == "Quit":
+            utils.signal_emitter.msfs_quit_signal.emit()
 
         args = [str(x) for x in args]
         self._telem.submitFrame(f"Ev={event};" + ";".join(args))
@@ -4691,6 +4693,7 @@ def main():
 
     utils.signal_emitter.telem_timeout_signal.connect(window.update_sim_indicators)
     utils.signal_emitter.error_signal.connect(window.process_error_signal)
+    utils.signal_emitter.msfs_quit_signal.connect(restart_sims)
 
     if system_settings.get('enableVPConfStartup', False):
         set_vpconf_profile(system_settings.get('pathVPConfStartup', ''), dev_serial)
