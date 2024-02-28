@@ -790,6 +790,30 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
+		<order>90.71</order>
+		<name>feet_on_deadzone</name>
+		<prereq>telemffb_controls_axes</prereq>
+		<info>Distance required to trigger a feet-on condition</info>
+		<displayname>Feet On Deadzone</displayname>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>90.72</order>
+		<name>feet_off_deadzone</name>
+		<prereq>telemffb_controls_axes</prereq>
+		<info>Distance at which feet-off resumes (set lower than hands-on)</info>
+		<displayname>Feet Off Deadzone</displayname>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
 		<order>91</order>
 		<name>enable_custom_x_axis</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1619,7 +1643,7 @@
 		<name>il2_buffeting_factor</name>
 		<prereq>il2_enable_buffet</prereq>
 		<collective>true</collective>
-		<validvalues>0,100</validvalues><IL2>true</IL2><joystick>true</joystick>
+		<validvalues>0,500</validvalues><IL2>true</IL2><joystick>true</joystick>
 		<value>1.0</value>
 		<datatype>float</datatype>
 		<info>common setting for all buffeting (stall, gear, etc)  - IL2 limitation</info>
@@ -2428,8 +2452,8 @@
 	<defaults>
 		<Grouping>System</Grouping>
 		<order>910</order>
-		<name>config_override_enable</name>
-		<displayname>Override Configurator Sliders</displayname>
+		<name>dumy_config_override_enable</name>
+		<displayname>Override Configurator Gain</displayname>
 		<value>false</value>
 		<datatype>bool</datatype>
 		<info>Change VPConfigurator Sliders.  Currently INOP</info>
@@ -2438,7 +2462,7 @@
 		<Grouping>System</Grouping>
 		<order>910.2</order>
 		<name>config_master_gain</name>
-		<prereq>config_override_enable</prereq>
+		<prereq>dumy_config_override_enable</prereq>
 		<displayname>Master Gain</displayname>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2448,7 +2472,7 @@
 		<Grouping>System</Grouping>
 		<order>910.3</order>
 		<name>config_periodic_effects</name>
-		<prereq>config_override_enable</prereq>
+		<prereq>dumy_config_override_enable</prereq>
 		<displayname>Periodic Effects</displayname>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2458,7 +2482,7 @@
 		<Grouping>System</Grouping>
 		<order>910.4</order>
 		<name>config_spring</name>
-		<prereq>config_override_enable</prereq>
+		<prereq>dumy_config_override_enable</prereq>
 		<displayname>Spring</displayname>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2468,7 +2492,7 @@
 		<Grouping>System</Grouping>
 		<order>910.5</order>
 		<name>config_damper</name>
-		<prereq>config_override_enable</prereq>
+		<prereq>dumy_config_override_enable</prereq>
 		<displayname>Damper</displayname>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2478,7 +2502,7 @@
 		<Grouping>System</Grouping>
 		<order>910.6</order>
 		<name>config_inertia</name>
-		<prereq>config_override_enable</prereq>
+		<prereq>dumy_config_override_enable</prereq>
 		<displayname>Inertia</displayname>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2488,7 +2512,7 @@
 		<Grouping>System</Grouping>
 		<order>910.7</order>
 		<name>config_friction</name>
-		<prereq>config_override_enable</prereq>
+		<prereq>dumy_config_override_enable</prereq>
 		<displayname>Friction</displayname>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2498,7 +2522,7 @@
 		<Grouping>System</Grouping>
 		<order>910.8</order>
 		<name>config_constant</name>
-		<prereq>config_override_enable</prereq>
+		<prereq>dumy_config_override_enable</prereq>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>cfgfloat</datatype>
@@ -2816,6 +2840,13 @@
 		<value>3.0</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_threshold</name>
+		<model>F-15ESE</model>
+		<value>0.45</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -8461,6 +8492,20 @@
 		<value>0.1</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>feet_off_deadzone</name>
+		<type>HPGHelicopter</type>
+		<value>0.03</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>feet_on_deadzone</name>
+		<type>HPGHelicopter</type>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>invert_ap_x_axis</name>

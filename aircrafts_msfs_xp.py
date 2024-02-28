@@ -1297,6 +1297,8 @@ class Helicopter(Aircraft):
                     logging.debug(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
 
                     self.cyclic_trim_release_active = 1
+                    if self._sim_is_msfs():
+                        self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 1)
 
                 elif not force_trim_pressed and self.cyclic_trim_release_active:
                     self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
@@ -1624,6 +1626,7 @@ class Helicopter(Aircraft):
 class HPGHelicopter(Helicopter):
     sema_x_max = 5
     sema_y_max = 5
+    sema_yaw_max = 5
     afcs_step_size = 2
     collective_init = 0
     collective_ap_spring_gain = 1
@@ -1631,9 +1634,12 @@ class HPGHelicopter(Helicopter):
     collective_spring_coeff_y = 0
     hands_on_deadzone = 0.1
     hands_off_deadzone = 0.02
+    feet_on_deadzone = 0.05
+    feet_off_deadzone = 0.03
     hands_on_active = 0
     hands_on_x_active = 0
     hands_on_y_active = 0
+    feet_on_active = 0
     send_individual_hands_on = 0
     vrs_effect_enable: bool = True
     vrs_effect_intensity = 0
@@ -1647,15 +1653,46 @@ class HPGHelicopter(Helicopter):
         self.hands_on_active = 0
         self.hands_on_x_active = 0
         self.hands_on_y_active = 0
+        self.feet_on_active = 0
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
+        if telem_data.get("STOP",0):
+            self.on_timeout()
+            return
         self._update_vrs_effect(telem_data)
 
     def on_timeout(self):
         super().on_timeout()
         self.collective_init = 0
         self.pedals_init = 0
+
+    def check_feet_on(self, percent):
+        input_data = HapticEffect.device.getInput()
+        phys_x, phys_y = input_data.axisXY()
+
+        # Convert phys input to +/-4096
+        phys_x = round(phys_x * 4096)
+
+        ref_x = self.cpO_x
+
+        # Calculate the threshold values based on the input percentage
+        threshold = 4096 * percent
+
+        # Calculate the deviation percentages in decimal form
+        deviation_x = abs(phys_x - ref_x) / 4096
+
+        # Check if either phys_x or phys_y exceeds the threshold
+        x_exceeds_threshold = abs(phys_x - ref_x) > threshold
+
+        result = {
+            "result": x_exceeds_threshold,
+            "deviation": deviation_x,
+        }
+
+        return result
+
+
 
     def check_hands_on(self, percent):
         input_data = HapticEffect.device.getInput()
@@ -1713,13 +1750,13 @@ class HPGHelicopter(Helicopter):
             if not trim_reset:
                 sx = round(abs(sema_x_avg), 3)
                 sy = round(abs(sema_y_avg), 3)
-                if 100 >= sx > 50:
+                if 100 >= sx >= 50:
                     self.afcsx_step_size = 5
-                elif 49.999 > sx > 20:
+                elif 49.999 > sx >= 20:
                     self.afcsx_step_size = 3
-                elif 19.999 > sx > 10:
+                elif 19.999 > sx >= 10:
                     self.afcsx_step_size = 2
-                elif 9.999 > sx > 5:
+                elif 9.999 > sx >= 5:
                     self.afcsx_step_size = 1
                 elif 4.999 > sx >= 0:
                     self.afcsx_step_size = 1
@@ -1727,13 +1764,13 @@ class HPGHelicopter(Helicopter):
                     self.afcsx_step_size = 0
 
 
-                if 100 >= sy > 50:
+                if 100 >= sy >= 50:
                     self.afcsy_step_size = 5
-                elif 49.999 > sy > 20:
+                elif 49.999 > sy >= 20:
                     self.afcsy_step_size = 3
-                elif 19.999 > sy > 10:
+                elif 19.999 > sy >= 10:
                     self.afcsy_step_size = 2
-                elif 9.999 > sx > 5:
+                elif 9.999 > sx >= 5:
                     self.afcsy_step_size = 1
                 elif 4.999 > sy >= 0:
                     self.afcsy_step_size = 1
@@ -1805,6 +1842,7 @@ class HPGHelicopter(Helicopter):
     def _update_cyclic_trim(self, telem_data):
         # Trimming is handled by the AFCS integration - override parent class function
         pass
+
     def _update_pedals(self, telem_data):
 
         if telem_data.get("FFBType") != 'pedals':
@@ -1815,13 +1853,25 @@ class HPGHelicopter(Helicopter):
             phys_x, phys_y = input_data.axisXY()
             telem_data['phys_x'] = phys_x
 
+
+            if telem_data.get('hpgFeetOnPedals', 0):
+                feet_on_dict = self.check_feet_on(self.feet_off_deadzone)
+            else:
+                feet_on_dict = self.check_feet_on(self.feet_on_deadzone)
+            feet_on_pedals = feet_on_dict['result']
+            dev_x = feet_on_dict['deviation']
+
+            if feet_on_pedals:
+                self._simconnect.set_simdatum_to_msfs("L:FFB_FEET_ON_PEDALS", 1, units="number")
+                self.feet_on_active = True
+
+            else:
+                self._simconnect.set_simdatum_to_msfs("L:FFB_FEET_ON_PEDALS", 0, units="number")
+                self.feet_on_active = False
+
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
             self.spring = effects["pedal_ap_spring"].spring()
-            # self.damper = effects["pedal_damper"].damper()
-
-            pedal_pos = telem_data.get("TailRotorPedalPos")
-            pedal_cpO_x = round(4096*pedal_pos)
 
             if not self.pedals_init:
 
@@ -1847,6 +1897,42 @@ class HPGHelicopter(Helicopter):
                     logging.info("Pedals Initialized")
                 else:
                     return
+
+
+            sema_yaw = telem_data.get("h145SEMAyaw", 0)
+
+            # sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
+            # sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
+
+            sx = round(abs(sema_yaw), 3)
+            if 100 >= sx >= 50:
+                self.afcsx_step_size = 6
+            elif 49.999 > sx >= 20:
+                self.afcsx_step_size = 4
+            elif 19.999 > sx >= 10:
+                self.afcsx_step_size = 3
+            elif 9.999 > sx >= 5:
+                self.afcsx_step_size = 1
+            elif 4.999 > sx >= 0:
+                self.afcsx_step_size = 1
+            else:
+                self.afcsx_step_size = 0
+
+            telem_data['_sx'] = sx
+            telem_data['_afcsx_step_size'] = self.afcsx_step_size
+            if not (self.feet_on_active):
+                # print("doing it")
+                if abs(sema_yaw) > self.sema_yaw_max:
+                    # print(f"sema_x:{sema_x}")
+                    if sema_yaw > self.sema_yaw_max:
+                        self.cpO_x -= self.afcsx_step_size
+                    elif sema_yaw < -self.sema_yaw_max:
+                        self.cpO_x += self.afcsx_step_size
+            telem_data['_cp0_x'] = self.cpO_x
+
+            self.spring_x.cpOffset = int(self.cpO_x)
+            self.spring.effect.setCondition(self.spring_x)
+            self.spring.start()
 
             if self.enable_custom_x_axis:
                 x_var = self.custom_x_axis
@@ -1945,7 +2031,7 @@ class HPGHelicopter(Helicopter):
             else:
                 self.spring_y.cpOffset = self.cpO_y
 
-                self.damper.damper(coef_y=4096).start()
+                self.damper.damper(coef_y=0).start()
                 self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(self.collective_spring_coeff_y / 2)
 
                 self.spring.effect.setCondition(self.spring_y)
@@ -1985,7 +2071,7 @@ class HPGHelicopter(Helicopter):
                 collective_pos = telem_data.get("CollectivePos", 0)
                 self.cpO_y = round(utils.scale(collective_pos,(0, 1), (4096, -4096)))
                 self.spring_y.cpOffset = self.cpO_y
-                self.damper.damper(coef_y=256).start()
+                self.damper.damper(coef_y=0).start()
 
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()

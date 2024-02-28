@@ -833,6 +833,8 @@ def calculate_checksum(file_path):
 
 
 def average(l):
+    if not l:
+        return 0
     return sum(l) / float(len(l))
 
 
