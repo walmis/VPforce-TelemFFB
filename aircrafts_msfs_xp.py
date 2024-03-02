@@ -134,6 +134,7 @@ class Aircraft(AircraftBase):
     force_trim_button = 0
     force_trim_reset_button = 0
     include_dynamic_stick_forces = True
+    trim_release_spring_gain = 0
 
     elevator_force_trim = 0
     aileron_force_trim = 0
@@ -201,6 +202,7 @@ class Aircraft(AircraftBase):
         self.cyclic_spring_init = 0
         self.cyclic_center = [0, 0]  # x, y
         self.collective_spring_init = 0
+        self.trim_release_spring_gain = 0
 
         self.force_trim_release_active = 0
         self.force_trim_spring_init = 0
@@ -1280,11 +1282,12 @@ class Helicopter(Aircraft):
                 telem_data['phys_x'] = x
                 telem_data['phys_y'] = y
                 if force_trim_pressed:
-                    self.spring_x.positiveCoefficient = 0
-                    self.spring_x.negativeCoefficient = 0
+                    gain = int(self.trim_release_spring_gain * 4096)
+                    self.spring_x.positiveCoefficient = gain
+                    self.spring_x.negativeCoefficient = gain
 
-                    self.spring_y.positiveCoefficient = 0
-                    self.spring_y.negativeCoefficient = 0
+                    self.spring_y.positiveCoefficient = gain
+                    self.spring_y.negativeCoefficient = gain
 
                     self.cpO_x = round(x * 4096)
                     self.spring_x.cpOffset = self.cpO_x
@@ -1294,7 +1297,7 @@ class Helicopter(Aircraft):
 
                     self.cyclic_center = [x, y]
 
-                    logging.debug(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}")
+                    logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}, gain:{gain}")
 
                     self.cyclic_trim_release_active = 1
                     if self._sim_is_msfs():
