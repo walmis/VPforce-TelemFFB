@@ -954,11 +954,16 @@ local f_telemFFB = {
                 additionalData,
                 f14_DLC_Spoiler
                 )
-          elseif string.find(obj.Name, "F-18", 0, true) then
+          elseif string.find(obj.Name, "FA-18", 0, true) then
             damage_vars = {
               65,135,136,137,146,148,149,150,152,152,153,154,156,157,158,160,166,183,213,214,215,216,217,220,222,223,
               224,225,226,227,230,232,233,235,241,242,242,244,245,245,247,248,265,266,267,298,299
             }
+            local lr = mech.controlsurfaces.rudder.left
+            local rr = mech.controlsurfaces.rudder.right
+            local ar = (lr + rr) / 2
+            mech["controlsurfaces"]["rudder"]["right"] = ar
+
 
           elseif string.find(obj.Name, "F-16", 0, true) then
              damage_vars = {
