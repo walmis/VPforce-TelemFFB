@@ -976,6 +976,8 @@ local f_telemFFB = {
               217,223,224,225,226,227,238,240,241,243,244,246,247,248,253,255,259,265,266,267,268,298,299,428,428,
               428,428
             }
+            hydraulicPressure = string.format("%.3f~%.3f", MainPanel:get_argument_value(389), MainPanel:get_argument_value(390))
+
           elseif string.find(obj.Name, "F-5", 0, true) then
             damage_vars = {
               65,134,135,136,146,148,152,153,154,156,157,158,159,160,161,162,163,166,167,168,169,183,185,213,214,215,
