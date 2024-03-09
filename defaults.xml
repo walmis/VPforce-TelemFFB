@@ -344,6 +344,20 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
+		<order>15.7</order>
+		<name>trim_release_spring_gain</name>
+		<prereq>force_trim_enabled</prereq>
+		<info>Spring gain while trim release is pressed&lt;br&gt;&lt;br&gt; Acts as dampening force when trim release is depressed</info>
+		<displayname>Trim Release Damper</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
 		<order>16</order>
 		<name>trim_workaround</name>
 		<info>Apply artificial trim movement - only for aircraft that do not support native FFB trim&lt;b&gt;&lt;b&gt;(AV8B, Mig-19)</info>
