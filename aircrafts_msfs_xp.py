@@ -1181,6 +1181,8 @@ class Helicopter(Aircraft):
     trim_reset_complete = 1
     last_device_x = 0
     last_device_y = 0
+    last_pos_y_pos = 0
+    last_pos_x_pos = 0
     last_collective_y = 1
     last_pedal_x = 0
     collective_init = 0
@@ -1372,6 +1374,8 @@ class Helicopter(Aircraft):
                     if telem_data.get("SimOnGround", 1):
                         self.cpO_x = 0
                         self.cpO_y = 0
+                        self.last_pos_x_pos = 0
+                        self.last_pos_y_pos = 0
                     else:
                         self.cpO_x = round(self.last_device_x * 4096)
                         self.cpO_y = round(self.last_device_y * 4096)
@@ -1381,11 +1385,23 @@ class Helicopter(Aircraft):
                     self.spring.effect.setCondition(self.spring_x)
                     self.spring.effect.setCondition(self.spring_y)
                     self.spring.start()
-                    if (self.cpO_x/4096 - 0.2 < phys_x < self.cpO_x/4096 + 0.2) and (self.cpO_y/4096 - 0.2 < phys_y < self.cpO_y/4096 + 0.2):
+                    if (self.cpO_x/4096 - 0.15 < phys_x < self.cpO_x/4096 + 0.15) and (self.cpO_y/4096 - 0.15 < phys_y < self.cpO_y/4096 + 0.15):
                         #dont start sending position until physical stick has centered
                         self.cyclic_spring_init = 1
                         logging.info("Cyclic Spring Initialized")
                     else:
+                        if self._sim_is_msfs():
+                            if self.enable_custom_x_axis:
+                                x_var = self.custom_x_axis
+                            else:
+                                x_var = 'AXIS_CYCLIC_LATERAL_SET'
+                            if self.enable_custom_y_axis:
+                                y_var = self.custom_y_axis
+                            else:
+                                y_var = 'AXIS_CYCLIC_LONGITUDINAL_SET'
+
+                            self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
+                            self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
                         return
 
                 telem_data["StickXY"] = [x, y]
@@ -1440,6 +1456,8 @@ class Helicopter(Aircraft):
 
                         self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
                         self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                        self.last_pos_x_pos = pos_x_pos
+                        self.last_pos_y_pos = pos_y_pos
 
                 self.last_device_x, self.last_device_y = phys_x, phys_y
 
@@ -1502,6 +1520,7 @@ class Helicopter(Aircraft):
                 self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = self.pedal_spring_coeff_x
                 if telem_data.get("SimOnGround", 1):
                     self.cpO_x = 0
+                    self.last_pos_x_pos = 0
                 else:
                     # print(f"last_colelctive_y={self.last_collective_y}")
                     self.cpO_x = round(4096 * self.last_pedal_x)
@@ -1520,6 +1539,13 @@ class Helicopter(Aircraft):
                     logging.info("Pedals Initialized")
                     self.spring.stop()
                 else:
+                    if self._sim_is_msfs():
+                        if self.enable_custom_x_axis:
+                            x_var = self.custom_x_axis
+                        else:
+                            x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
+
+                        self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
                     return
 
             self.last_pedal_x = phys_x
@@ -1543,6 +1569,7 @@ class Helicopter(Aircraft):
                     pos_x_pos = round(pos_x_pos, 5)
 
                 self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                self.last_pos_x_pos = pos_x_pos
 
     def _update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
@@ -1567,8 +1594,20 @@ class Helicopter(Aircraft):
         telem_data['phys_y'] = phys_y
         if not self.collective_init:
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = self.collective_spring_coeff_y
+            if self._sim_is_msfs():
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_COLLECTIVE_SET'
+                    y_range = 16384
             if telem_data.get("SimOnGround", 1):
                 self.cpO_y = 4096
+                if self._sim_is_msfs():
+                    if y_range != 1:
+                        self.last_pos_y_pos = -y_range * 1
+                    else:
+                        self.last_pos_y_pos = 1
             else:
                 # print(f"last_colelctive_y={self.last_collective_y}")
                 self.cpO_y = round(4096 * self.last_collective_y)
@@ -1587,6 +1626,9 @@ class Helicopter(Aircraft):
                 self.collective_init = 1
                 logging.info("Collective Initialized")
             else:
+                if self._sim_is_msfs():
+                    self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
+
                 return
         self.last_collective_y = phys_y
         self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
@@ -1622,6 +1664,7 @@ class Helicopter(Aircraft):
 
             if self.collective_init:
                 self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                self.last_pos_y_pos = pos_y_pos
 
 
 
