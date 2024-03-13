@@ -1657,8 +1657,8 @@
 		<name>il2_buffeting_factor</name>
 		<prereq>il2_enable_buffet</prereq>
 		<collective>true</collective>
-		<validvalues>0,500</validvalues><IL2>true</IL2><joystick>true</joystick>
-		<value>1.0</value>
+		<validvalues>0,250</validvalues><IL2>true</IL2><joystick>true</joystick>
+		<value>.4</value>
 		<datatype>float</datatype>
 		<info>common setting for all buffeting (stall, gear, etc)  - IL2 limitation</info>
 		<displayname>Buffeting</displayname>

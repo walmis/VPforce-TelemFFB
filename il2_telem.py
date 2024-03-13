@@ -260,7 +260,7 @@ class IL2Manager():
         self.telem_data['WeightOnWheels'] = list(self.state.landing_gear_pressure)
         self.telem_data['ACCs'] = self.state.acceleration_Gs
         self.telem_data['BuffetFrequency'] = self.state.stall_buffet_frequency
-        self.telem_data['BuffetAmplitude'] = self.state.stall_buffet_amplitude
+        self.telem_data['BuffetAmplitude'] = self.state.stall_buffet_amplitude * 10  # multiply by factor of 10 to make usable in 0-1.0 range
         self.telem_data['Flaps'] = self.state.flaps_position
         self.telem_data['Speedbrakes'] = self.state.air_brake_position
         self.telem_data["GunData"] = self.gun_data

@@ -136,6 +136,7 @@ class EffectTranslator:
             "je_rumble_2_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
             "je_rumble_2_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
             "il2_buffet": ["Buffeting", "il2_buffeting_factor"],
+            "il2_buffet2": ["Buffeting", "il2_buffeting_factor"],
             "inertia": ["Inertia Override", "inertia_force"],
             "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
             "payload_rel": ["Payload Release", "weapon_release_intensity"],
