@@ -240,6 +240,8 @@ local f_telemFFB = {
             end
           end
 
+          local vertical_speed = LoGetVerticalVelocity()
+
           local wind = LoGetVectorWindVelocity()
           local wind_vec = Vector(wind.x, wind.y, wind.z)
 
@@ -1111,6 +1113,7 @@ local f_telemFFB = {
             {"Gun", "%s", CannonShells},
             {"Wind", "%s", windVelocityVectors},
             {"VlctVectors", "%s", velocityVectors},
+            {"VerticalSpeed", "%s", vertical_speed},
             {"altASL", "%.2f", altAsl},
             {"altAgl", "%.2f", altAgl},
             {"AoA", "%.2f", aoa},
