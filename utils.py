@@ -165,9 +165,9 @@ class EffectTranslator:
             "control_weight": ["Control Weight", ""],
             "vrs_buffet": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
             "wnd": ["Wind Effect", "wind_effect_max_intensity"],
-            "hyd_loss_damper": ["Hydraulic Loss Damper", "hydraulic_loss_damper"],
-            "hyd_loss_inertia": ["Hydraulic Loss Inertia", "hydraulic_loss_inertia"],
-            "hyd_loss_friction": ["Hydraulic Loss Friction", "hydraulic_loss_friction"],
+            "hyd_loss_damper": ["Low Hydraulic Damper", "hydraulic_loss_damper"],
+            "hyd_loss_inertia": ["Low Hydraulic Inertia", "hydraulic_loss_inertia"],
+            "hyd_loss_friction": ["Low Hydraulic Friction", "hydraulic_loss_friction"],
         }
 
     def get_translation(self, key):

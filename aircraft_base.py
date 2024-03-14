@@ -107,6 +107,7 @@ class AircraftBase(object):
         self._change_counter = {}
         self._telem_data = {}
         self._ipc_telem = {}
+        self.hydraulic_factor = 0.000
         #clear any existing effects
         effects.clear()
 
@@ -672,15 +673,18 @@ class AircraftBase(object):
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
     def _update_hydraulic_loss_effect(self, telem_data):
+
+        telem_data['_hyd_factor'] = self.hydraulic_factor
+
         if not self.enable_hydraulic_loss_effect:
             return False
+        hydraulic_sys = telem_data.get('HydSys', "n/a")
+        hydraulic_pressure = telem_data.get('HydPress', 1)
+
         if not self.enable_damper_ovd or not self.enable_inertia_ovd or not self.enable_friction_ovd:
             logging.warning("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
             self.telem_data["error"] = 1
             return False
-
-        hydraulic_sys = telem_data.get('HydSys', 1)
-        hydraulic_pressure = telem_data.get('HydPress', 1)
 
         if hydraulic_sys == 'n/a':
             return False
@@ -689,7 +693,72 @@ class AircraftBase(object):
             hydraulic_pressure = max(hydraulic_pressure)
 
         if isinstance(hydraulic_sys, list):
+            self.hydraulic_factor = max(hydraulic_sys)
+
+        elif isinstance(hydraulic_sys, bool):
+            if self._sim_is_dcs() and hydraulic_sys == True and hydraulic_pressure == 0:
+                hydraulic_sys = False
+
+            if hydraulic_sys == True:
+                self.hydraulic_factor = self.step_value_over_time('hyd_factor', self.hydraulic_factor, 2500, 1, floatpoint=True)
+            elif hydraulic_sys == False:
+                self.hydraulic_factor = self.step_value_over_time('hyd_factor', self.hydraulic_factor, 2500, 0, floatpoint=True)
+
+            # hydraulic_factor = int(hydraulic_sys)
+            telem_data['_hydraulic_factor_test'] = self.hydraulic_factor
+        else:
+            self.hydraulic_factor = hydraulic_sys
+
+        if self.hydraulic_factor >= self.hydraulic_loss_threshold:
+            effects["hyd_loss_damper"].destroy()
+            effects["hyd_loss_inertia"].destroy()
+            effects["hyd_loss_friction"].destroy()
+            self.damper_coeff = int(self.damper_force * 4096)
+            self.inertia_coeff = int(self.inertia_force * 4096)
+            self.friction_coeff = int(self.friction_force * 4096)
+            return False
+
+        damper = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_damper, self.damper_force))
+        inertia = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_inertia, self.inertia_force))
+        friction = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_friction, self.friction_force))
+
+        self.damper_coeff = utils.clamp(int(damper * 4096), 0, 4096)
+        self.inertia_coeff = utils.clamp(int(inertia * 4096), 0, 4096)
+        self.friction_coeff = utils.clamp(int(friction * 4096), 0, 4096)
+
+        effects["damper"].destroy()
+        effects["inertia"].destroy()
+        effects["friction"].destroy()
+
+        if not effects["hyd_loss_damper"].started or self.anything_has_changed('_hyd_loss_damper', self.damper_coeff):
+            effects["hyd_loss_damper"].damper(self.damper_coeff, self.damper_coeff).start()
+        if not effects["hyd_loss_inertia"].started or self.anything_has_changed('_hyd_loss_inertia', self.inertia_coeff):
+            effects["hyd_loss_inertia"].inertia(self.inertia_coeff, self.inertia_coeff).start()
+        if not effects["hyd_loss_friction"].started or self.anything_has_changed('_hyd_loss_friction', self.friction_coeff):
+            effects["hyd_loss_friction"].friction(self.friction_coeff, self.friction_coeff).start()
+
+        return True
+    def _old_update_hydraulic_loss_effect(self, telem_data):
+        if not self.enable_hydraulic_loss_effect:
+            return False
+        hydraulic_sys = telem_data.get('HydSys', "n/a")
+        hydraulic_pressure = telem_data.get('HydPress', 1)
+
+        if hydraulic_sys == 'n/a':
+            return False
+        if not self.enable_damper_ovd or not self.enable_inertia_ovd or not self.enable_friction_ovd:
+            logging.warning("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
+            self.telem_data["error"] = 1
+            return False
+
+
+
+        if isinstance(hydraulic_pressure, list):
+            hydraulic_pressure = max(hydraulic_pressure)
+
+        if isinstance(hydraulic_sys, list):
             hydraulic_factor = max(hydraulic_sys)
+
         elif isinstance(hydraulic_sys, bool):
             if self._sim_is_dcs() and hydraulic_sys == True and hydraulic_pressure == 0:
                 hydraulic_sys = False
@@ -698,18 +767,13 @@ class AircraftBase(object):
             hydraulic_factor = hydraulic_sys
 
 
-
-        if not self.damper_coeff: self.damper_coeff = int(self.damper_force * 4096)
-        if not self.inertia_coeff: self.inertia_coeff = int(self.inertia_force * 4096)
-        if not self.friction_coeff: self.friction_coeff = int(self.friction_force * 4096)
-
         if isinstance(hydraulic_sys, bool):
             if hydraulic_factor == False:
                 self.damper_coeff = self.step_value_over_time('hyd_loss_damper', self.damper_coeff, 5000, int(self.hydraulic_loss_damper * 4096))
                 self.inertia_coeff = self.step_value_over_time('hyd_loss_inertia', self.inertia_coeff, 5000, int(self.hydraulic_loss_inertia * 4096))
                 self.friction_coeff = self.step_value_over_time('hyd_loss_friction', self.friction_coeff, 5000, int(self.hydraulic_loss_friction * 4096))
             else:
-                if self.damper_coeff > int(self.damper_force * 4096) or self.inertia_coeff > int(self.inertia_force * 4096) or self.friction_coeff > int(self.friction_force * 4096):
+                if (not effects['damper'].started or not effects['inertia'].started or not effects['friction'].started) and (self.damper_coeff > int(self.damper_force * 4096) or self.inertia_coeff > int(self.inertia_force * 4096) or self.friction_coeff > int(self.friction_force * 4096)):
                     self.damper_coeff = self.step_value_over_time('hyd_loss_damper', self.damper_coeff, 10000, int(self.damper_force * 4096))
                     self.inertia_coeff = self.step_value_over_time('hyd_loss_inertia', self.inertia_coeff, 10000, int(self.inertia_force * 4096))
                     self.friction_coeff = self.step_value_over_time('hyd_loss_friction', self.friction_coeff, 10000, int(self.friction_force * 4096))
@@ -745,32 +809,42 @@ class AircraftBase(object):
         effects["inertia"].destroy()
         effects["friction"].destroy()
 
-        effects["hyd_loss_damper"].damper(self.damper_coeff, self.damper_coeff).start()
-        effects["hyd_loss_inertia"].inertia(self.inertia_coeff, self.inertia_coeff).start()
-        effects["hyd_loss_friction"].friction(self.friction_coeff, self.friction_coeff).start()
+        if not effects["hyd_loss_damper"].started or self.anything_has_changed('_hyd_loss_damper', self.damper_coeff):
+            effects["hyd_loss_damper"].damper(self.damper_coeff, self.damper_coeff).start()
+        if not effects["hyd_loss_inertia"].started or self.anything_has_changed('_hyd_loss_inertia', self.inertia_coeff):
+            effects["hyd_loss_inertia"].inertia(self.inertia_coeff, self.inertia_coeff).start()
+        if not effects["hyd_loss_friction"].started or self.anything_has_changed('_hyd_loss_friction', self.friction_coeff):
+            effects["hyd_loss_friction"].friction(self.friction_coeff, self.friction_coeff).start()
 
         return True
 
 
 
     def _update_ffb_forces(self, telem_data):
+
         if self.enable_damper_ovd:
-            force = utils.clamp(self.damper_force, 0.0, 1.0)
-            effects["damper"].damper(int(4096*force), int(4096*force)).start()
+            if self.anything_has_changed('damper_value', self.damper_force) or not effects['damper'].started:
+                force = utils.clamp(self.damper_force, 0.0, 1.0)
+                effects["damper"].damper(int(4096*force), int(4096*force)).start()
         else:
-            effects["damper"].destroy()
+            if effects['damper'].started:
+                effects["damper"].destroy()
 
         if self.enable_inertia_ovd:
-            force = utils.clamp(self.inertia_force, 0.0, 1.0)
-            effects["inertia"].inertia(int(4096*force), int(4096*force)).start()
+            if self.anything_has_changed('inertia_value', self.inertia_force) or not effects['inertia'].started:
+                force = utils.clamp(self.inertia_force, 0.0, 1.0)
+                effects["inertia"].inertia(int(4096*force), int(4096*force)).start()
         else:
-            effects["inertia"].destroy()
+            if effects['inertia'].started:
+                effects["inertia"].destroy()
 
         if self.enable_friction_ovd:
-            force = utils.clamp(self.friction_force, 0.0, 1.0)
-            effects["friction"].friction(int(4096*force), int(4096*force)).start()
+            if self.anything_has_changed('friction_value', self.friction_force) or not effects['friction'].started:
+                force = utils.clamp(self.friction_force, 0.0, 1.0)
+                effects["friction"].friction(int(4096*force), int(4096*force)).start()
         else:
-            effects["friction"].destroy()
+            if effects['friction'].started:
+                effects["friction"].destroy()
 
 
     ########################################

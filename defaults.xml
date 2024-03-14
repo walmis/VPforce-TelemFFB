@@ -1058,7 +1058,7 @@
 		<order>97</order>
 		<name>enable_hydraulic_loss_effect</name>
 		<info>Simulate high damper forces when hydraulic pressure is low/0&lt;br&gt;** REQUIRES damper/inertia/friction overrides to be enabled **</info>
-		<displayname>Low Hydraulic Pressure Effect</displayname>
+		<displayname>Low Hydraulic Pressure Effect ( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -1112,7 +1112,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<validvalues>0,100</validvalues>
-		<value>0.3</value>
+		<value>0.0</value>
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>

@@ -1329,8 +1329,8 @@ class Helicopter(Aircraft):
                     self.cyclic_trim_release_active = 0
 
                 elif trim_reset_pressed or not self.trim_reset_complete:
-                    self.cpO_x = self.step_value_over_time("center_x", self.cpO_x, 2500, 0)
-                    self.cpO_y = self.step_value_over_time("center_y", self.cpO_y, 2500, 0)
+                    self.cpO_x = self.step_value_over_time("center_x", self.cpO_x, 1000, 0)
+                    self.cpO_y = self.step_value_over_time("center_y", self.cpO_y, 1000, 0)
 
                     if self.cpO_x == 0 and self.cpO_y == 0:
                         self.trim_reset_complete = 1
