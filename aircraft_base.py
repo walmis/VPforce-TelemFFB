@@ -110,28 +110,58 @@ class AircraftBase(object):
         #clear any existing effects
         effects.clear()
 
-    def step_value_over_time(self, key, value, timeframe_ms, dst_val):
-        current_time_ms = time.time() * 1000  # Convert current time to milliseconds
+    def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
+        current_time_ms = time.perf_counter() * 1000  # Start time for the current step
+        # current_time_end = current_time_start  # End time for the current step (initially the same as start time)
 
         if key not in self.stepper_dict:
-            self.stepper_dict[key] = {'value': value, 'dst_val': dst_val, 'start_time': current_time_ms, 'timeframe': timeframe_ms}
+            self.stepper_dict[key] = {
+                'value': value,
+                'dst_val': dst_val,
+                'start_time': current_time_ms,
+                'end_time': current_time_ms + timeframe_ms,
+                'timeframe': timeframe_ms,
+                'last_iteration_ms': current_time_ms
+            }
+            return value
+        else:
+            # if it already exists, but the dst_value has changed, the condition probably changed before the timer expired, so reset the key to new condition
+            if self.stepper_dict[key]['dst_val'] != dst_val:
+                self.stepper_dict[key] = {
+                    'value': value,
+                    'dst_val': dst_val,
+                    'start_time': current_time_ms,
+                    'end_time': current_time_ms + timeframe_ms,
+                    'timeframe': timeframe_ms,
+                    'last_iteration_ms': current_time_ms
+                }
+                return value
 
         data = self.stepper_dict[key]
+
+        iteration_ms = current_time_ms - data['last_iteration_ms']
+
+        data['last_iteration_ms'] = current_time_ms
+
+        delta_to_go = data['dst_val'] - data['value']
+        time_to_go = data['end_time'] - current_time_ms
+
+        step_size = (iteration_ms / time_to_go) * delta_to_go
 
         if data['value'] == data['dst_val']:
             del self.stepper_dict[key]
             return data['value']
 
-        elapsed_time_ms = current_time_ms - data['start_time']
+        elapsed_time_ms = (current_time_ms - data['start_time'])
 
         if elapsed_time_ms >= timeframe_ms:
             data['value'] = data['dst_val']
             return data['dst_val']
 
-        remaining_time_ms = timeframe_ms - elapsed_time_ms
-        step_size = (data['dst_val'] - value) / remaining_time_ms
-
-        data['value'] = round(value + step_size * elapsed_time_ms)
+        val = value + step_size
+        if not floatpoint:
+            val = round(val)
+        data['value'] = val
         # print(f"value out = {data['value']}")
         return data['value']
 
