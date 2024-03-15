@@ -1904,7 +1904,7 @@ class ButtonPressThread(QThread):
 
 
 class MainWindow(QMainWindow):
-    debug_menu_visible = False
+    show_simvars = False
     def __init__(self, ipc_thread=None):
         super().__init__()
 
@@ -2602,7 +2602,6 @@ class MainWindow(QMainWindow):
 
     def add_debug_menu(self):
         # debug mode
-        self.debug_menu_visible = True
         for action in self.menu.actions():
             if action.text() == "Debug":
                 return
@@ -2615,6 +2614,10 @@ class MainWindow(QMainWindow):
         self.teleplot_action.triggered.connect(self.open_teleplot_setup_dialog)
         self.debug_menu.addAction(self.teleplot_action)
 
+        self.show_simvar_action = QAction("Show simvar in telem window", self)
+        self.show_simvar_action.triggered.connect(self.toggle_simvar_telemetry)
+        self.show_simvar_action.setCheckable(True)
+        self.debug_menu.addAction(self.show_simvar_action)
         if _master_instance:
             self.custom_userconfig_action = QAction("Load Custom User Config", self)
             self.custom_userconfig_action.triggered.connect(lambda: load_custom_userconfig())
@@ -3202,7 +3205,7 @@ class MainWindow(QMainWindow):
             items = ""
             for k, v in data.items():
                 # check for msfs and debug mode (alt-d pressed), change to simvar name
-                if self.debug_menu_visible:
+                if self.show_simvars:
                     if data["src"] == "MSFS2020":
                         simvarnames = SimConnectManager()
                         s = simvarnames.get_var_name(k)
@@ -3350,7 +3353,14 @@ class MainWindow(QMainWindow):
                     return True
 
         return False
+    def toggle_simvar_telemetry(self):
+        if self.show_simvars:
+            self.show_simvars = False
+            self.show_simvar_action.setChecked(False)
 
+        else:
+            self.show_simvars = True
+            self.show_simvar_action.setChecked(True)
 
 class SettingsLayout(QGridLayout):
     expanded_items = []
