@@ -2025,10 +2025,7 @@ class MainWindow(QMainWindow):
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
 
-        configurator_menu = self.menu.addMenu('Configurator')
-        configurator_settings_action = QAction('Configurator Gain Override', self)
-        configurator_settings_action.triggered.connect(self.open_configurator_dialog)
-        configurator_menu.addAction(configurator_settings_action)
+
 
         # Create the "Utilities" menu
         utilities_menu = self.menu.addMenu('Utilities')
@@ -2618,6 +2615,11 @@ class MainWindow(QMainWindow):
         self.show_simvar_action.triggered.connect(self.toggle_simvar_telemetry)
         self.show_simvar_action.setCheckable(True)
         self.debug_menu.addAction(self.show_simvar_action)
+
+        self.configurator_settings_action = QAction('Configurator Gain Override', self)
+        self.configurator_settings_action.triggered.connect(self.open_configurator_dialog)
+        self.debug_menu.addAction(self.configurator_settings_action)
+
         if _master_instance:
             self.custom_userconfig_action = QAction("Load Custom User Config", self)
             self.custom_userconfig_action.triggered.connect(lambda: load_custom_userconfig())
