@@ -24,6 +24,11 @@ kmh = 1.0 / 3.6
 deg = math.pi / 180
 fpss2gs = 1 / 32.17405
 
+EFFECT_SQUARE = 3
+EFFECT_SINE = 4
+EFFECT_TRIANGLE = 5
+EFFECT_SAWTOOTHUP = 6
+EFFECT_SAWTOOTHDOWN = 7
 
 class AircraftBase(object):
     aoa_buffet_freq = 13
@@ -79,6 +84,11 @@ class AircraftBase(object):
 
     etl_effect_enable: bool = True
     overspeed_effect_enable: bool = True
+    vrs_effect_enable: bool = False
+    vrs_effect_intensity: float = 0.0
+    vrs_threshold_speed: float = 0.0
+    vrs_vs_onset: float = 0
+    vrs_vs_max: float = 0
 
     pedal_spring_mode = 'Static Spring'  ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
     aircraft_vs_speed = 87
@@ -1111,6 +1121,34 @@ class AircraftBase(object):
             effects.dispose("overspeedX")
             effects.dispose("overspeedY")
 
+    def _update_vrs_effect(self, telem_data):
+        vs = telem_data.get("VerticalSpeed", 0)
+        if self._sim_is_dcs():
+            spd = abs(telem_data.get("VlctVectors")[0])
+        else:
+            spd = abs(telem_data.get('TAS', 0))
+        wow = max(telem_data.get("WeightOnWheels", 1))
+        # print(f"tas:{tas}, vs:{vs}, wow:{wow}")
+        if not self.vrs_effect_enable or wow or spd > self.vrs_threshold_speed or vs > 0:
+            # print("I'm out")
+            effects.dispose("vrs_buffet")
+            effects.dispose("vrs_buffet2")
+            return
+
+        if abs(vs) >= self.vrs_vs_onset:
+            vs_factor = utils.scale(abs(vs), (self.vrs_vs_onset, self.vrs_vs_max), (0.0, self.vrs_effect_intensity))
+            if spd == 0:
+                spd_factor = 1
+            else:
+                spd_factor = utils.scale(spd, (spd*1.2, spd), (0,1))
+
+            intensity = utils.clamp(vs_factor * spd_factor, 0, 1)
+
+            effects["vrs_buffet"].periodic(10, intensity, utils.RandomDirectionModulator).start()
+            effects['vrs_buffet2'].periodic(12, intensity, utils.RandomDirectionModulator).start()
+        else:
+            effects.dispose("vrs_buffet")
+            effects.dispose("vrs_buffet2")
 
     def _update_heli_engine_rumble(self, telem_data, blade_ct=None):
         if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:

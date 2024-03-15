@@ -1230,6 +1230,7 @@ class Helicopter(Aircraft):
         self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
         self._update_jet_engine_rumble(telem_data)
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
+        self._update_vrs_effect(telem_data)
 
     # def step_value_over_time(self, key, value, timeframe_ms, dst_val):
     #     current_time_ms = time.time() * 1000  # Convert current time to milliseconds
@@ -1706,7 +1707,7 @@ class HPGHelicopter(Helicopter):
         if telem_data.get("STOP",0):
             self.on_timeout()
             return
-        self._update_vrs_effect(telem_data)
+        # self._update_vrs_effect(telem_data)
 
     def on_timeout(self):
         super().on_timeout()

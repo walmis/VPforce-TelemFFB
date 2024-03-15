@@ -1425,11 +1425,12 @@
 		<Grouping>VRS</Grouping>
 		<order>270</order>
 		<name>vrs_effect_enable</name>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
+		<unit>false</unit>
 		<datatype>bool</datatype>
-		<info>Vortex Ring State effect</info>
+		<info>Vortex Ring State Effect</info>
 		<displayname>VRS Effect</displayname>
-		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -1439,17 +1440,65 @@
 		<order>270.1</order>
 		<name>vrs_effect_intensity</name>
 		<prereq>vrs_effect_enable</prereq>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<value>0.12</value>
 		<sliderfactor>0.5</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<info>Max intensity of VRS effect</info>
-		<displayname>VRS Effect</displayname>
-		<XPLANE>true</XPLANE>
+		<displayname>VRS Max Intensity</displayname>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<Grouping>VRS</Grouping>
+		<order>270.3</order>
+		<name>vrs_threshold_speed</name>
+		<prereq>vrs_effect_enable</prereq>
+		<info>Airspeed above which VRS will not occur</info>
+		<displayname>VRS Airspeed Threshold</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<unit>kt</unit>
+		<datatype>int</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>VRS</Grouping>
+		<order>270.4</order>
+		<name>vrs_vs_onset</name>
+		<prereq>vrs_effect_enable</prereq>
+		<info>Vertical Speed where VRS effect rumble will start</info>
+		<displayname>VRS Onset Vertical Speed </displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>m/s,fpm</validvalues>
+		<unit>fpm</unit>
+		<datatype>int</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>VRS</Grouping>
+		<order>270.5</order>
+		<name>vrs_vs_max</name>
+		<prereq>vrs_effect_enable</prereq>
+		<info>Vertical Speed where VRS effect rumble will max out</info>
+		<displayname>VRS Full Vertical Speed </displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>m/s,fpm</validvalues>
+		<unit>fpm</unit>
+		<datatype>int</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>Engine</Grouping>
@@ -10190,8 +10239,53 @@
 	</classdefaults>
 	<classdefaults>
 		<name>vrs_effect_enable</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_effect_intensity</name>
+		<type>Helicopter</type>
+		<value>0.12</value>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_threshold_speed</name>
+		<type>Helicopter</type>
+		<value>20</value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_vs_onset</name>
+		<type>Helicopter</type>
+		<value>350</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_vs_max</name>
+		<type>Helicopter</type>
+		<value>500</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_effect_enable</name>
 		<type>HPGHelicopter</type>
 		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_effect_intensity</name>
+		<type>HPGHelicopter</type>
+		<value>0.12</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>

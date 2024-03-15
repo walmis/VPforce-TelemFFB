@@ -525,3 +525,4 @@ class Helicopter(Aircraft):
 
         self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
+        self._update_vrs_effect(telem_data)
