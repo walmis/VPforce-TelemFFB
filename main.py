@@ -4877,9 +4877,15 @@ def main():
     utils.signal_emitter.msfs_quit_signal.connect(restart_sims)
 
     if system_settings.get('enableVPConfStartup', False):
-        set_vpconf_profile(system_settings.get('pathVPConfStartup', ''), dev_serial)
+        try:
+            set_vpconf_profile(system_settings.get('pathVPConfStartup', ''), dev_serial)
+        except:
+            logging.error("Unable to set VPConfigurator startup profile")
 
-    startup_configurator_gains = dev.getGains()
+    try:
+        startup_configurator_gains = dev.getGains()
+    except:
+        logging.error("Unable to get configurator slider values from device")
 
     app.exec_()
 
@@ -4889,7 +4895,10 @@ def main():
     stop_sims()
     telem_manager.quit()
     if system_settings.get('enableVPConfExit', False):
-        set_vpconf_profile(system_settings.get('pathVPConfExit', ''), dev_serial)
+        try:
+            set_vpconf_profile(system_settings.get('pathVPConfExit', ''), dev_serial)
+        except:
+            logging.error("Unable to set VPConfigurator exit profile")
 
 
 if __name__ == "__main__":

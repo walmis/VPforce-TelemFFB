@@ -2,6 +2,11 @@ This is not an exhaustive change log (see github for that).  This file only outl
 ############################################
 ##  March 15, 2024
 ############################################
+# Hotpatch - Fix issue with older rhino firmware and 'GetGain' call to Rhino API
+
+############################################
+##  March 15, 2024
+############################################
 ## Fixes:
 - ALL | Helicopter Overspeed shake was missing from settings UI
 - IL2 | Increased intensity setting range and boosted read values for buffeting "Shaker" effect
