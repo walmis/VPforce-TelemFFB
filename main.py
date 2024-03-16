@@ -4716,11 +4716,12 @@ def main():
             }
         """
     )
+    # TODO: Avoid globals
     global window, log_window, log_tail_window
     global dev_firmware_version
     global dev_serial
     global dev
-    global startup_configurator_gains
+
     log_window = LogWindow()
     global settings_mgr, telem_manager, config_was_default
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
@@ -4790,8 +4791,6 @@ def main():
             if devver < minver:
                 QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
 
-        gain_values = dev.getGains()
-        print(gain_values)
     except Exception as e:
         QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {_device_vid_pid} for device: {_device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
         dev_firmware_version = 'ERROR'
@@ -4876,16 +4875,21 @@ def main():
     utils.signal_emitter.error_signal.connect(window.process_error_signal)
     utils.signal_emitter.msfs_quit_signal.connect(restart_sims)
 
-    if system_settings.get('enableVPConfStartup', False):
-        try:
-            set_vpconf_profile(system_settings.get('pathVPConfStartup', ''), dev_serial)
-        except:
-            logging.error("Unable to set VPConfigurator startup profile")
+    # do some init in the background not blocking the main window first appearance
+    def init_async():
+        global startup_configurator_gains # TODO: avoid globals
+        if system_settings.get('enableVPConfStartup', False):
+            try:
+                set_vpconf_profile(system_settings.get('pathVPConfStartup', ''), dev_serial)
+            except:
+                logging.error("Unable to set VPConfigurator startup profile")
 
-    try:
-        startup_configurator_gains = dev.getGains()
-    except:
-        logging.error("Unable to get configurator slider values from device")
+        try:
+            startup_configurator_gains = dev.getGains()
+        except:
+            logging.error("Unable to get configurator slider values from device")
+
+    threading.Thread(target=init_async, daemon=True).start()
 
     app.exec_()
 
