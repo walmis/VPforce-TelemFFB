@@ -1,6 +1,49 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  March 15, 2024
+############################################
+# Hotpatch - Fix issue with older rhino firmware and 'GetGain' call to Rhino API
+
+############################################
+##  March 15, 2024
+############################################
+## Fixes:
+- ALL | Helicopter Overspeed shake was missing from settings UI
+- IL2 | Increased intensity setting range and boosted read values for buffeting "Shaker" effect
+- DCS | Fixed F/A-18 flaps deployment causing pedal trim offset
+- MSFS | Fixed axis snapping to 0,0 during cyclic position initialization after un-pausing
+## Enhancements:
+- MSFS | Disable individual device axis sending when global "Axis Control" is enabled for MSFS
+- MSFS | Add "Don't Send" option in custom simvar config for axis control in MSFS
+- MSFS/X-Plane | Configurable dampening force when force trim release button is held
+- IL2 | Dynamic pedal forces now supported
+## New Effects:
+- **Generic 'Stick Shaker' effect** (MSFS)
+- ***Beta*** **Pedal AFCS integration for HPG H145/H160**
+ - Requires latest dev builds from the HPG discord
+- ***Experimental*** **VRS effect for helicopters**
+ - Define the airspeed threshold below which VRS can occur
+ - Define the "onset" and "full" vertical descent rates where VRS will occur if under the airspeed threshold
+ - Define the max intensity of the rumble effect.  Effect will start low at the onset v/s rate and linearly increase in intensity up to max at the "full" v/s rate
+- **Configurable damper/friction/inertia effect override sliders**
+ - Ability to enable and configure damper/friction/inertia for any given aircraft profile.  Sliders max is bound by active configurator profile settings
+- ***Experimental*** **Low Hydraulics effect**
+ - In concert with the above damper/friction/inertia overrides, you can define heavier settings to emulate low or loss of hydraulic pressure
+ - See sections the manual for details..  ***seriously***... you need to RTFM before you play with this effect
+ - Supported Sims/Aircraft:
+   - MSFS - TelemFFB reads the "Hydraulic System" simvar, so theoretically any aircraft where that data is representative of a low/failure condition is supported.
+   - DCS - Unique pressure gauge and/or warning light data must be tracked on a per-aircraft basis.  Limited aircraft are supported currently
+     - Supported:
+       - UH-1, SA342, Mi-8, Mi-24, KA-50
+       - A-10C, AV-8B, F-14, F15ESE
+## New App Features:
+- **Startup/Shutdown Configurator Profiles**
+ - Ability to select configurator profiles that will load when TelemFFB starts or exits (Configured in the system settings dialog)
+- **Configurator Profile compatibility checking**
+ - Validates the PID for the chosen profile matches the device you are selecting it for.  Validation is done when selecting profile and at time of push
+
+############################################
 ##  February 2, 2024
 ############################################
 #General

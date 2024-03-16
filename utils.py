@@ -52,6 +52,7 @@ import xml.etree.ElementTree as ET
 class SignalEmitter(QObject):
     error_signal = pyqtSignal(str)
     telem_timeout_signal = pyqtSignal(str, bool)
+    msfs_quit_signal = pyqtSignal()
 
     def trigger_signal(self, data):
         self.error_signal.emit(data)
@@ -114,6 +115,7 @@ class EffectTranslator:
             "cm": ["Countermeasure Deployment", "cm_vibration_intensity"],
             "cyclic_spring": ["Cyclic Spring Force", "cyclic_spring_gain"],
             "damage": ["Aircraft Damage Event", "damage_effect_intensity"],
+            "damper": ["Damper Override", "damper_force"],
             "decel": ["Decelleration Force", "deceleration_max_force"],
             "dynamic_spring": ["Dynamic Spring Force", ".*_spring_gain"],
             "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
@@ -121,6 +123,7 @@ class EffectTranslator:
             "etlX": ["ETL Shaking", "etl_effect_intensity"],
             "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
             "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
+            "friction": ["Friction Override", "friction_force"],
             "gearbuffet": ["Gear Drag Buffeting", "gear_buffet_intensity"],
             "gearbuffet2": ["Gear Drag Buffeting", "gear_buffet_intensity"],
             "gearmovement": ["Gear Motion", "gear_motion_intensity"],
@@ -133,7 +136,8 @@ class EffectTranslator:
             "je_rumble_2_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
             "je_rumble_2_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
             "il2_buffet": ["Buffeting", "il2_buffeting_factor"],
-            "inertia": ["Inertia", ""],
+            "il2_buffet2": ["Buffeting", "il2_buffeting_factor"],
+            "inertia": ["Inertia Override", "inertia_force"],
             "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
             "payload_rel": ["Payload Release", "weapon_release_intensity"],
             "pause_spring": ["Pause/Slew Spring Force", ""],
@@ -156,10 +160,15 @@ class EffectTranslator:
             "spoilerbuffet2-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
             "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
             "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
+            "stick_shaker" : ["Stick Shaker","stick_shaker_intensity"],
             "trim_spring": ["Trim Override Spring", ""],
             "control_weight": ["Control Weight", ""],
             "vrs_buffet": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
-            "wnd": ["Wind Effect", "wind_effect_max_intensity"]
+            "vrs_buffet2": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
+            "wnd": ["Wind Effect", "wind_effect_max_intensity"],
+            "hyd_loss_damper": ["Low Hydraulic Damper", "hydraulic_loss_damper"],
+            "hyd_loss_inertia": ["Low Hydraulic Inertia", "hydraulic_loss_inertia"],
+            "hyd_loss_friction": ["Low Hydraulic Friction", "hydraulic_loss_friction"],
         }
 
     def get_translation(self, key):
@@ -418,6 +427,10 @@ def get_default_sys_settings(device_id, device_type, cmb=False):
         'telemTimeout': 200,
         'saveWindow': False,
         'saveLastTab': False,
+        'enableVPConfStartup': False,
+        'pathVPConfStartup': '',
+        'enableVPConfExit': False,
+        'pathVPConfExit': '',
     }
 
     globl_sys_dict = {
@@ -616,6 +629,9 @@ def to_number(v: str):
         if v.lower().endswith("kph"):  # handle unit conversion: kph->ms
             scale = 1 / 3.6
             v = v.strip("kph")
+        if v.lower().endswith("fpm"):  # handle unit conversion: fpm->ms
+            scale = 0.00508
+            v = v.strip("fpm")
         if v.lower().endswith("m/s"):  # handle unit conversion: kph->ms
             scale = 1
             v = v.strip("m/s")
@@ -822,6 +838,8 @@ def calculate_checksum(file_path):
 
 
 def average(l):
+    if not l:
+        return 0
     return sum(l) / float(len(l))
 
 
@@ -1446,21 +1464,6 @@ def launch_vpconf(serial=None):
         else:
             call = vpconf_path
         subprocess.Popen(call, cwd=workdir, env=env)
-
-
-def set_vpconf_profile(config, serial):
-    vpconf_path = winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
-    # serial = HapticEffect.device.serial
-
-    if vpconf_path:
-        logging.info(f"Found VPforce Configurator at {vpconf_path}")
-        workdir = os.path.dirname(vpconf_path)
-        env = {}
-        env["PATH"] = os.environ["PATH"]
-        logging.info(f"set_vpconf_profile - Loading vpconf for aircraft with: {vpconf_path} -config {config} -serial {serial}")
-        subprocess.call([vpconf_path, "-config", config, "-serial", serial], cwd=workdir, env=env)
-    else:
-        logging.error("Unable to find VPforce Configurator installation location")
 
 
 def get_version():

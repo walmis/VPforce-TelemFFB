@@ -3,6 +3,8 @@ import re
 import sys
 import os
 import shutil
+import json
+import utils
 from PyQt5 import QtGui, QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
                              QVBoxLayout, QPushButton, QFileDialog, QMessageBox, QHeaderView)
@@ -47,19 +49,19 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     allow_in_table_editing = False
 
-    def __init__(self, datasource='', device='joystick', userconfig_path='', defaults_path=''):
+    def __init__(self, datasource='', device='joystick', userconfig_path='', defaults_path='', system_settings={}):
         mprint(f"__init__ {datasource}, {device}")
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
         self.defaults_path = defaults_path
         self.userconfig_path = userconfig_path
-        self.device=device
+        self.device = device
+        self.system_settings = system_settings
         self.timedOut = False
 
         self.sim = self.current_sim
         self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")
-        self.b_browse.clicked.connect(self.choose_directory)
-        # self.b_usb_button.clicked.connect(self.usb_button_clicked)
+        self.b_browse.clicked.connect(self.browse_vpconf_file)
         self.b_update.clicked.connect(self.update_button)
         self.b_deleteModel.clicked.connect(self.delete_model)
         self.slider_float.valueChanged.connect(self.update_textbox)
@@ -80,6 +82,29 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def update_state_vars(cls, **kwargs):
         for key, value in kwargs.items():
             setattr(cls, key, value)
+
+    def validate_vpconf_profile(self, file, pid, dev_type):
+
+        try:
+            with open(file, 'r') as f:
+                config_data = json.load(f)
+        except json.JSONDecodeError:
+            QMessageBox.warning(self, "Error", "The VPforce Configurator file you selected appears to be invalid")
+            return False
+        cfg_pid = config_data.get('config', {}).get('usb_pid', 'unknown')
+        if cfg_pid == 'unknown':
+            QMessageBox.warning(self, "Error", "The VPforce Configurator file you selected appears to be invalid")
+            return False
+        cfg_pid = format(cfg_pid, 'x')
+        cfg_serial = config_data.get('serial_number', 'unknown')
+        cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
+        if cfg_serial == 'unknown':
+            return False
+        if cfg_pid == pid:
+            return True
+        else:
+            QMessageBox.warning(self, "Wrong Device", f"The VPforce Configurator file you selected does not match the device you are trying to assign it to\n\nThis instance is currently configuring:\n{dev_type}\npid= {pid}\n\nThe chosen profile is for\npid= {cfg_pid}\nname= {cfg_device_name}\nserial= {cfg_serial}")
+            return False
 
     def update_device_scope(self, dev):
         self.device = dev
@@ -749,8 +774,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     #         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
     #     self.reload_caller()
 
-
-    def choose_directory(self):
+    def browse_vpconf_file(self):
         current_text = self.tb_value.text()
         # options |= QFileDialog.DontUseNativeDialog
 
@@ -769,7 +793,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         )
 
         if file_path:
-            self.tb_value.setText(file_path)
+            key = 'pid' + self.device.capitalize()
+            cur_pid = self.system_settings.get(key, '')
+            if self.validate_vpconf_profile(file_path, cur_pid, self.device):
+                self.tb_value.setText(file_path)
 
     def handle_item_change(self,  item):
         mprint(f"handle_item_change {item}")

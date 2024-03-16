@@ -109,7 +109,6 @@ class SimConnectManager(threading.Thread):
         SimVar("G", "G FORCE", "Number"),
         SimVarArray("AccBody", "ACCELERATION BODY <>", "feet per second squared", scale=0.031081, keywords=("X", "Y", "Z")), #scale fps/s to g
         SimVar("TAS", "AIRSPEED TRUE", "meter/second"),
-        SimVar("TAS2", "AIRSPEED TRUE", "meter/second"),
         SimVar("AirDensity", "AMBIENT DENSITY", "kilograms per cubic meter"),
         SimVar("AoA", "INCIDENCE ALPHA", "degrees"),
         SimVar("StallAoA", "STALL ALPHA", "degrees"),
@@ -143,6 +142,7 @@ class SimConnectManager(threading.Thread):
         SimVar("RollAccel", "ROTATION ACCELERATION BODY Z", "degrees per second squared"), # todo replace usage with AccRotBody array
         SimVarArray("AccRotBody", "ROTATION ACCELERATION BODY <>", "degrees per second squared", keywords=("X", "Y", "Z")),
         SimVarArray("DesignSpeed", "DESIGN SPEED <>", "meter/second", keywords=("VC", "VS0", "VS1")),
+        SimVar("VerticalSpeed", "VERTICAL SPEED", "meter/second"),
         SimVarArray("Brakes", "BRAKE <> POSITION", "Position", keywords=("LEFT", "RIGHT")),
         #SimVar("LinearCLAlpha", "LINEAR CL ALPHA", "Per Radian"),
         #SimVar("SigmaSqrt", "SIGMA SQRT", "Per Radian"),
@@ -168,7 +168,7 @@ class SimConnectManager(threading.Thread):
         SimVar("StallWarning", "STALL WARNING", "bool"),
         SimVar("h145SEMAx", "L:DEBUG_SEMA_PCT_X", sc_unit="percent over 100"),
         SimVar("h145SEMAy", "L:DEBUG_SEMA_PCT_Y", sc_unit="percent over 100"),
-        SimVar("h145AfcsSemaPedalX", "L:DEBUG_AFCS_SYS_SEMA_YAW", sc_unit="position"),
+        SimVar("h145SEMAyaw", "L:DEBUG_SEMA_PCT_YAW", sc_unit="percent over 100"),
         SimVar("h145AfcsMaster", "L:H145_SDK_AFCS_MASTER", "number"),
         SimVar("h145TrimRelease", "L:H145_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool"),
         SimVar("h160TrimRelease", "L:H160_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool"),
@@ -176,12 +176,19 @@ class SimConnectManager(threading.Thread):
         SimVar("h160CollectiveRelease", "L:H160_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool"),
         SimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "enum"),
         SimVar("h160CollectiveAfcsMode", "L:H160_SDK_AFCS_MODE_COLLECTIVE", "enum"),
+        SimVar("hpgHandsOnCyclic", "L:FFB_HANDS_ON_CYCLIC", "enum"),
+        SimVar("hpgFeetOnPedals", "L:FFB_FEET_ON_PEDALS", "enum"),
         SimVar("h145HandsOnCyclic", "L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum"),
         SimVar("h160HandsOnCyclic", "L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum"),
         SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
         SimVar("TailRotorPedalPos", "TAIL ROTOR BLADE PITCH PCT", "percent over 100"),
         SimVar("HPGVRSDatum", "L:DEBUG_VRS2_DATUM", "enum"),
         SimVar("HPGVRSIsInVRS", "L:DEBUG_VRS2_IS_IN_VRS", "enum"),
+        SimVarArray("HydPress", "HYDRAULIC PRESSURE", "psi", min=1, max=2),
+        SimVarArray("HydResPct", "HYDRAULIC RESERVOIR PERCENT", "Percent Over 100", min=1, max=2),
+        SimVar("HydSwitch", "HYDRAULIC SWITCH", "bool"),
+        SimVar("HydSys", "HYDRAULIC SYSTEM INTEGRITY", "Percent Over 100"),
+
     ]
     
     def __init__(self):
@@ -232,6 +239,7 @@ class SimConnectManager(threading.Thread):
         self._simdatums_to_send.append((simvar, value, units))
 
     def send_event_to_msfs(self, event, data: int = 0):
+        if event == "DO_NOT_SEND": return
         self._events_to_send.append((event, data))
 
     def tx_simdatums_to_msfs(self):
@@ -365,6 +373,16 @@ class SimConnectManager(threading.Thread):
             except OSError:
                 time.sleep(10)
                 pass
+
+    def get_var_name(self,k):
+        for sv in (self.sim_vars):
+            if isinstance(sv, SimVarArray):
+                for sv in sv.vars:
+                    if sv.name == k:
+                        return sv.var
+            else:
+                if sv.name == k:
+                    return sv.var
 
 # run test
 if __name__ == "__main__":

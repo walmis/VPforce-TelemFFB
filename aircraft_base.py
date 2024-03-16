@@ -24,12 +24,32 @@ kmh = 1.0 / 3.6
 deg = math.pi / 180
 fpss2gs = 1 / 32.17405
 
+EFFECT_SQUARE = 3
+EFFECT_SINE = 4
+EFFECT_TRIANGLE = 5
+EFFECT_SAWTOOTHUP = 6
+EFFECT_SAWTOOTHDOWN = 7
 
 class AircraftBase(object):
     aoa_buffet_freq = 13
 
+    keep_forces_on_pause: bool = True
+    enable_damper_ovd: bool = False
     damper_force: float = 0
+    enable_inertia_ovd: bool = False
     inertia_force: float = 0
+    enable_friction_ovd: bool = False
+    friction_force: float = 0
+
+    enable_hydraulic_loss_effect: bool = False
+    hydraulic_loss_threshold: float = 0.95
+    hydraulic_loss_damper: float = 1
+    hydraulic_loss_inertia: float = 1
+    hydraulic_loss_friction: float = 1
+
+    damper_coeff: int = 0
+    inertia_coeff: int = 0
+    friction_coeff: int = 0
 
     engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
     engine_prop_rumble_enabled: bool = True  # Engine Rumble - Piston specific - based on Prop RPM
@@ -64,9 +84,28 @@ class AircraftBase(object):
 
     etl_effect_enable: bool = True
     overspeed_effect_enable: bool = True
+    vrs_effect_enable: bool = False
+    vrs_effect_intensity: float = 0.0
+    vrs_threshold_speed: float = 0.0
+    vrs_vs_onset: float = 0
+    vrs_vs_max: float = 0
+
+    pedal_spring_mode = 'Static Spring'  ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    aircraft_vs_speed = 87
+    aircraft_vs_gain = 0.25
+    aircraft_vne_speed = 435
+    aircraft_vne_gain = 1.0
+
+    pedals_init = 0
+    pedal_spring_coeff_x = 0
+    last_pedal_x = 0
+    pedal_trimming_enabled = False
+    pedal_spring_gain = 1.0
+    pedal_dampening_gain = 0
 
     smoother = utils.Smoother()
     _ipc_telem = {}
+    stepper_dict = {}
 
     @property
     def telem_data(self):
@@ -78,8 +117,64 @@ class AircraftBase(object):
         self._change_counter = {}
         self._telem_data = {}
         self._ipc_telem = {}
+        self.hydraulic_factor = 0.000
         #clear any existing effects
         effects.clear()
+
+    def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
+        current_time_ms = time.perf_counter() * 1000  # Start time for the current step
+        # current_time_end = current_time_start  # End time for the current step (initially the same as start time)
+
+        if key not in self.stepper_dict:
+            self.stepper_dict[key] = {
+                'value': value,
+                'dst_val': dst_val,
+                'start_time': current_time_ms,
+                'end_time': current_time_ms + timeframe_ms,
+                'timeframe': timeframe_ms,
+                'last_iteration_ms': current_time_ms
+            }
+            return value
+        else:
+            # if it already exists, but the dst_value has changed, the condition probably changed before the timer expired, so reset the key to new condition
+            if self.stepper_dict[key]['dst_val'] != dst_val:
+                self.stepper_dict[key] = {
+                    'value': value,
+                    'dst_val': dst_val,
+                    'start_time': current_time_ms,
+                    'end_time': current_time_ms + timeframe_ms,
+                    'timeframe': timeframe_ms,
+                    'last_iteration_ms': current_time_ms
+                }
+                return value
+
+        data = self.stepper_dict[key]
+
+        iteration_ms = current_time_ms - data['last_iteration_ms']
+
+        data['last_iteration_ms'] = current_time_ms
+
+        delta_to_go = data['dst_val'] - data['value']
+        time_to_go = data['end_time'] - current_time_ms
+
+        step_size = (iteration_ms / time_to_go) * delta_to_go
+
+        if data['value'] == data['dst_val']:
+            del self.stepper_dict[key]
+            return data['value']
+
+        elapsed_time_ms = (current_time_ms - data['start_time'])
+
+        if elapsed_time_ms >= timeframe_ms:
+            data['value'] = data['dst_val']
+            return data['dst_val']
+
+        val = value + step_size
+        if not floatpoint:
+            val = round(val)
+        data['value'] = val
+        # print(f"value out = {data['value']}")
+        return data['value']
 
     def apply_settings(self, settings_dict):
         for k, v in settings_dict.items():
@@ -587,18 +682,180 @@ class AircraftBase(object):
         logging.debug(f"Adding wind effect intensity:{v}")
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
-    def _update_ffb_forces(self, telem_data):
-        if self.damper_force:
-            force = utils.clamp(self.damper_force, 0.0, 1.0)
-            effects["damper"].damper(4096*force, 4096*force).start()
-        else:
-            effects["damper"].destroy()
+    def _update_hydraulic_loss_effect(self, telem_data):
 
-        if self.inertia_force:
-            force = utils.clamp(self.inertia_force, 0.0, 1.0)
-            effects["inertia"].damper(4096*force, 4096*force).start()
+        telem_data['_hyd_factor'] = self.hydraulic_factor
+
+        if not self.enable_hydraulic_loss_effect:
+            return False
+        hydraulic_sys = telem_data.get('HydSys', "n/a")
+        hydraulic_pressure = telem_data.get('HydPress', 1)
+
+        if not self.enable_damper_ovd or not self.enable_inertia_ovd or not self.enable_friction_ovd:
+            logging.warning("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
+            self.telem_data["error"] = 1
+            return False
+
+        if hydraulic_sys == 'n/a':
+            return False
+
+        if isinstance(hydraulic_pressure, list):
+            hydraulic_pressure = max(hydraulic_pressure)
+
+        if isinstance(hydraulic_sys, list):
+            self.hydraulic_factor = max(hydraulic_sys)
+
+        elif isinstance(hydraulic_sys, bool):
+            if self._sim_is_dcs() and hydraulic_sys == True and hydraulic_pressure == 0:
+                hydraulic_sys = False
+
+            if hydraulic_sys == True:
+                self.hydraulic_factor = self.step_value_over_time('hyd_factor', self.hydraulic_factor, 2500, 1, floatpoint=True)
+            elif hydraulic_sys == False:
+                self.hydraulic_factor = self.step_value_over_time('hyd_factor', self.hydraulic_factor, 2500, 0, floatpoint=True)
+
+            # hydraulic_factor = int(hydraulic_sys)
+            telem_data['_hydraulic_factor_test'] = self.hydraulic_factor
         else:
-            effects["inertia"].destroy()
+            self.hydraulic_factor = hydraulic_sys
+
+        if self.hydraulic_factor >= self.hydraulic_loss_threshold:
+            effects["hyd_loss_damper"].destroy()
+            effects["hyd_loss_inertia"].destroy()
+            effects["hyd_loss_friction"].destroy()
+            self.damper_coeff = int(self.damper_force * 4096)
+            self.inertia_coeff = int(self.inertia_force * 4096)
+            self.friction_coeff = int(self.friction_force * 4096)
+            return False
+
+        damper = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_damper, self.damper_force))
+        inertia = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_inertia, self.inertia_force))
+        friction = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_friction, self.friction_force))
+
+        self.damper_coeff = utils.clamp(int(damper * 4096), 0, 4096)
+        self.inertia_coeff = utils.clamp(int(inertia * 4096), 0, 4096)
+        self.friction_coeff = utils.clamp(int(friction * 4096), 0, 4096)
+
+        effects["damper"].destroy()
+        effects["inertia"].destroy()
+        effects["friction"].destroy()
+
+        if not effects["hyd_loss_damper"].started or self.anything_has_changed('_hyd_loss_damper', self.damper_coeff):
+            effects["hyd_loss_damper"].damper(self.damper_coeff, self.damper_coeff).start()
+        if not effects["hyd_loss_inertia"].started or self.anything_has_changed('_hyd_loss_inertia', self.inertia_coeff):
+            effects["hyd_loss_inertia"].inertia(self.inertia_coeff, self.inertia_coeff).start()
+        if not effects["hyd_loss_friction"].started or self.anything_has_changed('_hyd_loss_friction', self.friction_coeff):
+            effects["hyd_loss_friction"].friction(self.friction_coeff, self.friction_coeff).start()
+
+        return True
+    def _old_update_hydraulic_loss_effect(self, telem_data):
+        if not self.enable_hydraulic_loss_effect:
+            return False
+        hydraulic_sys = telem_data.get('HydSys', "n/a")
+        hydraulic_pressure = telem_data.get('HydPress', 1)
+
+        if hydraulic_sys == 'n/a':
+            return False
+        if not self.enable_damper_ovd or not self.enable_inertia_ovd or not self.enable_friction_ovd:
+            logging.warning("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
+            self.telem_data["error"] = 1
+            return False
+
+
+
+        if isinstance(hydraulic_pressure, list):
+            hydraulic_pressure = max(hydraulic_pressure)
+
+        if isinstance(hydraulic_sys, list):
+            hydraulic_factor = max(hydraulic_sys)
+
+        elif isinstance(hydraulic_sys, bool):
+            if self._sim_is_dcs() and hydraulic_sys == True and hydraulic_pressure == 0:
+                hydraulic_sys = False
+            hydraulic_factor = int(hydraulic_sys)
+        else:
+            hydraulic_factor = hydraulic_sys
+
+
+        if isinstance(hydraulic_sys, bool):
+            if hydraulic_factor == False:
+                self.damper_coeff = self.step_value_over_time('hyd_loss_damper', self.damper_coeff, 5000, int(self.hydraulic_loss_damper * 4096))
+                self.inertia_coeff = self.step_value_over_time('hyd_loss_inertia', self.inertia_coeff, 5000, int(self.hydraulic_loss_inertia * 4096))
+                self.friction_coeff = self.step_value_over_time('hyd_loss_friction', self.friction_coeff, 5000, int(self.hydraulic_loss_friction * 4096))
+            else:
+                if (not effects['damper'].started or not effects['inertia'].started or not effects['friction'].started) and (self.damper_coeff > int(self.damper_force * 4096) or self.inertia_coeff > int(self.inertia_force * 4096) or self.friction_coeff > int(self.friction_force * 4096)):
+                    self.damper_coeff = self.step_value_over_time('hyd_loss_damper', self.damper_coeff, 10000, int(self.damper_force * 4096))
+                    self.inertia_coeff = self.step_value_over_time('hyd_loss_inertia', self.inertia_coeff, 10000, int(self.inertia_force * 4096))
+                    self.friction_coeff = self.step_value_over_time('hyd_loss_friction', self.friction_coeff, 10000, int(self.friction_force * 4096))
+                else:
+                    effects["hyd_loss_damper"].destroy()
+                    effects["hyd_loss_inertia"].destroy()
+                    effects["hyd_loss_friction"].destroy()
+                    self.damper_coeff = int(self.damper_force * 4096)
+                    self.inertia_coeff = int(self.inertia_force * 4096)
+                    self.friction_coeff = int(self.friction_force * 4096)
+                    return False
+
+        else:
+
+            if hydraulic_factor >= self.hydraulic_loss_threshold:
+                effects["hyd_loss_damper"].destroy()
+                effects["hyd_loss_inertia"].destroy()
+                effects["hyd_loss_friction"].destroy()
+                self.damper_coeff = int(self.damper_force * 4096)
+                self.inertia_coeff = int(self.inertia_force * 4096)
+                self.friction_coeff = int(self.friction_force * 4096)
+                return False
+
+            damper = utils.scale(hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_damper, self.damper_force))
+            inertia = utils.scale(hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_inertia, self.inertia_force))
+            friction = utils.scale(hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_friction, self.friction_force))
+
+            self.damper_coeff = utils.clamp(int(damper * 4096), 0, 4096)
+            self.inertia_coeff = utils.clamp(int(inertia * 4096), 0, 4096)
+            self.friction_coeff = utils.clamp(int(friction * 4096), 0, 4096)
+
+        effects["damper"].destroy()
+        effects["inertia"].destroy()
+        effects["friction"].destroy()
+
+        if not effects["hyd_loss_damper"].started or self.anything_has_changed('_hyd_loss_damper', self.damper_coeff):
+            effects["hyd_loss_damper"].damper(self.damper_coeff, self.damper_coeff).start()
+        if not effects["hyd_loss_inertia"].started or self.anything_has_changed('_hyd_loss_inertia', self.inertia_coeff):
+            effects["hyd_loss_inertia"].inertia(self.inertia_coeff, self.inertia_coeff).start()
+        if not effects["hyd_loss_friction"].started or self.anything_has_changed('_hyd_loss_friction', self.friction_coeff):
+            effects["hyd_loss_friction"].friction(self.friction_coeff, self.friction_coeff).start()
+
+        return True
+
+
+
+    def _update_ffb_forces(self, telem_data):
+
+        if self.enable_damper_ovd:
+            if self.anything_has_changed('damper_value', self.damper_force) or not effects['damper'].started:
+                force = utils.clamp(self.damper_force, 0.0, 1.0)
+                effects["damper"].damper(int(4096*force), int(4096*force)).start()
+        else:
+            if effects['damper'].started:
+                effects["damper"].destroy()
+
+        if self.enable_inertia_ovd:
+            if self.anything_has_changed('inertia_value', self.inertia_force) or not effects['inertia'].started:
+                force = utils.clamp(self.inertia_force, 0.0, 1.0)
+                effects["inertia"].inertia(int(4096*force), int(4096*force)).start()
+        else:
+            if effects['inertia'].started:
+                effects["inertia"].destroy()
+
+        if self.enable_friction_ovd:
+            if self.anything_has_changed('friction_value', self.friction_force) or not effects['friction'].started:
+                force = utils.clamp(self.friction_force, 0.0, 1.0)
+                effects["friction"].friction(int(4096*force), int(4096*force)).start()
+        else:
+            if effects['friction'].started:
+                effects["friction"].destroy()
+
 
     ########################################
     ######                            ######
@@ -854,7 +1111,7 @@ class AircraftBase(object):
             effects.dispose("etlX")
             effects.dispose("etlY")
 
-        if tas >= self.overspeed_shake_start:
+        if tas >= self.overspeed_shake_start and self.overspeed_effect_enable:
             shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start, self.overspeed_shake_start + 15, curvature=.7)
             shake = utils.clamp(shake, 0.0, 1.0)
             effects["overspeedY"].periodic(self.overspeed_shake_frequency, shake, 0).start()
@@ -864,6 +1121,34 @@ class AircraftBase(object):
             effects.dispose("overspeedX")
             effects.dispose("overspeedY")
 
+    def _update_vrs_effect(self, telem_data):
+        vs = telem_data.get("VerticalSpeed", 0)
+        if self._sim_is_dcs():
+            spd = abs(telem_data.get("VlctVectors")[0])
+        else:
+            spd = abs(telem_data.get('TAS', 0))
+        wow = max(telem_data.get("WeightOnWheels", 1))
+        # print(f"tas:{tas}, vs:{vs}, wow:{wow}")
+        if not self.vrs_effect_enable or wow or spd > self.vrs_threshold_speed or vs > 0:
+            # print("I'm out")
+            effects.dispose("vrs_buffet")
+            effects.dispose("vrs_buffet2")
+            return
+
+        if abs(vs) >= self.vrs_vs_onset:
+            vs_factor = utils.scale(abs(vs), (self.vrs_vs_onset, self.vrs_vs_max), (0.0, self.vrs_effect_intensity))
+            if spd == 0:
+                spd_factor = 1
+            else:
+                spd_factor = utils.scale(spd, (spd*1.2, spd), (0,1))
+
+            intensity = utils.clamp(vs_factor * spd_factor, 0, 1)
+
+            effects["vrs_buffet"].periodic(10, intensity, utils.RandomDirectionModulator).start()
+            effects['vrs_buffet2'].periodic(12, intensity, utils.RandomDirectionModulator).start()
+        else:
+            effects.dispose("vrs_buffet")
+            effects.dispose("vrs_buffet2")
 
     def _update_heli_engine_rumble(self, telem_data, blade_ct=None):
         if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:
@@ -912,12 +1197,79 @@ class AircraftBase(object):
             effects.dispose("rotor_rpm0-1")
             effects.dispose("rotor_rpm1-1")
 
+    def _override_pedal_spring(self, telem_data):
+        if not self.is_pedals(): return
+
+        input_data = HapticEffect.device.getInput()
+        phys_x, phys_y = input_data.axisXY()
+        ## 0=DCS Default
+        ## 1=spring disabled
+        ## 2=static spring enabled using "pedal_spring_gain" spring setting
+        ## 3=dynamic spring enabled.  Based on "pedal_spring_gain"
+        if self.pedal_spring_mode == 0:
+            return
+        elif self.pedal_spring_mode == 'No Spring':
+            self.spring_x.positiveCoefficient = 0
+            self.spring_x.negativeCoefficient = 0
+
+        elif self.pedal_spring_mode == 'Static Spring':
+            spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
+            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
+
+            if self.pedal_trimming_enabled:
+                self._update_pedal_trim(telem_data)
+
+        elif self.pedal_spring_mode == 'Dynamic Spring':
+            tas = telem_data.get("TAS", 0)
+            # ac_perf = self.get_aircraft_perf(telem_data)
+            # if self.aircraft_vs_speed:
+                #If user has added the speeds to their config, use that value
+            vs = self.aircraft_vs_speed
+            # else:
+                #Otherwise, use the value from the internal table
+                # vs = ac_perf['Vs']
+
+            # if self.aircraft_vne_speed:
+            vne = self.aircraft_vne_speed
+            # else:
+            #     vne = ac_perf['Vne']
+
+            if vs > vne:
+                #log error if vs speed is configured greater than vne speed and exit
+                logging.error(f"Dynamic pedal forces error: Vs speed ({vs}) is configured with a larger value than Vne ({vne}) - Invalid configuration")
+                telem_data['error'] = 1
+
+            vs_coeff = utils.clamp(round(self.aircraft_vs_gain*4096), 0, 4096)
+            vne_coeff = utils.clamp(round(self.aircraft_vne_gain*4096), 0, 4096)
+            spr_coeff = utils.scale(tas, (vs, vne), (vs_coeff, vne_coeff))
+            spr_coeff = round(spr_coeff * self.pedal_spring_gain)
+            spr_coeff = utils.clamp(spr_coeff, 0, 4096)
+            # print(f"coeff={spr_coeff}")
+            self.spring_x.positiveCoefficient = spr_coeff
+            self.spring_x.negativeCoefficient = spr_coeff
+            if self.pedal_trimming_enabled:
+                self._update_pedal_trim(telem_data)
+            # return
+        self.spring = effects["pedal_spring"].spring()
+        damper_coeff = round(utils.clamp((self.pedal_dampening_gain * 4096), 0, 4096))
+        # self.damper = effects["pedal_damper"].damper(coef_x=damper_coeff).start()
+
+        self.spring.effect.setCondition(self.spring_x)
+        self.spring.start(override=True)
+
     def on_event(self):
         pass
 
     def on_timeout(self):  # override me
         # logging.info("Telemetry Timeout, stopping effects")
-        effects.foreach(lambda e: e.stop())
+        # effects.foreach(lambda e: e.stop())
+        for key in effects.dict.keys():
+            if self.keep_forces_on_pause:
+                if 'damper' in key: continue
+                if 'inertia' in key: continue
+                if 'friction' in key: continue
+                if 'spring' in key: continue
+            effects[key].stop()
         utils.signal_emitter.telem_timeout_signal.emit(self._telem_data['src'], True)
 
     def on_telemetry(self, data): 

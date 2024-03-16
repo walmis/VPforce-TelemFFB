@@ -25,6 +25,8 @@ import logging
 import sys
 import time
 import os
+
+import ffb_rhino
 import utils
 import re
 import socket
@@ -34,6 +36,8 @@ import subprocess
 
 import traceback
 from ffb_rhino import HapticEffect, FFBRhino
+from ffb_rhino import FFB_GAIN_CONSTANT, FFB_GAIN_FRICTION, FFB_GAIN_DAMPER, FFB_GAIN_SPRING, FFB_GAIN_INERTIA, FFB_GAIN_PERIODIC, FFB_GAIN_MASTER
+
 from configobj import ConfigObj
 
 from settingsmanager import *
@@ -49,6 +53,9 @@ from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColo
     QTextCursor, QRegExpValidator, QKeySequence
 from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
+from system_settings import Ui_SystemDialog
+from configurator import Ui_ConfiguratorDialog
+from custom_widgets import *
 import resources
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
@@ -95,8 +102,7 @@ _child_instance = args.child
 
 system_settings = utils.read_system_settings(args.device, args.type)
 
-if system_settings.get('wasDefault', False):
-    config_was_default = True
+
 
 # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
 _vpf_logo = ":/image/vpforcelogo.png"
@@ -141,6 +147,11 @@ else:
         case _:
             _device_logo = ':/image/logo_j.png'
 
+system_settings = utils.read_system_settings(args.device, _device_type)
+
+if system_settings.get('wasDefault', False):
+    config_was_default = True
+
 args.sim = str.upper(args.sim)
 args.type = str.lower(args.type)
 
@@ -181,7 +192,8 @@ else:
 
 
 min_firmware_version = 'v1.0.15'
-global dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager, xplane_telem
+global dev, dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager, xplane_telem
+global startup_configurator_gains
 global window, log_window, log_folder, log_file, log_tail_window
 
 _update_available = False
@@ -717,7 +729,7 @@ class TelemManager(QObject, threading.Thread):
                         Class = module.Aircraft
 
                 if "vpconf" in params:
-                    utils.set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                    set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
 
                 logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
 
@@ -742,7 +754,7 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraft.apply_settings(updated_params)
 
                 if "vpconf" in updated_params:
-                    utils.set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                    set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
 
                 if "type" in updated_params:
                     # if user changed type or if new aircraft dialog changed type, update aircraft class
@@ -813,6 +825,7 @@ class IPCNetworkThread(QThread):
     show_signal = pyqtSignal()
     showlog_signal = pyqtSignal()
     hide_signal = pyqtSignal()
+    show_settings_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
 
     def __init__(self, host="localhost", myport=0, dstport=0, child_ports=[], master=False, child=False, keepalive_timer=1, missed_keepalive=3):
@@ -924,6 +937,9 @@ class IPCNetworkThread(QThread):
                 elif msg == 'HIDE WINDOW':
                     logging.info("Hide command received via IPC")
                     self.hide_signal.emit()
+                elif msg == "SHOW SETTINGS":
+                    logging.info("Show system settings command received via IPC")
+                    self.show_settings_signal.emit()
                 elif msg.startswith('telem:'):
                     payload = msg.removeprefix('telem:')
                     try:
@@ -1058,6 +1074,8 @@ class SimConnectSock(SimConnectManager):
         if event == "Open":
             # Reset all FFB effects on device, ensure we have a clean start
             HapticEffect.device.resetEffects()
+        if event == "Quit":
+            utils.signal_emitter.msfs_quit_signal.emit()
 
         args = [str(x) for x in args]
         self._telem.submitFrame(f"Ev={event};" + ";".join(args))
@@ -1219,499 +1237,8 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
             return False
 
 
-class Ui_SystemDialog(object):
-    def setupUi(self, SystemDialog):
-        if not SystemDialog.objectName():
-            SystemDialog.setObjectName(u"SystemDialog")
-        SystemDialog.resize(620, 600)
-        sizePolicy = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(SystemDialog.sizePolicy().hasHeightForWidth())
-        SystemDialog.setSizePolicy(sizePolicy)
-        SystemDialog.setMinimumSize(QSize(620, 515))
-        SystemDialog.setMaximumSize(QSize(620, 600))
-        self.line = QFrame(SystemDialog)
-        self.line.setObjectName(u"line")
-        self.line.setGeometry(QRect(9, 168, 581, 16))
-        font = QFont()
-        font.setBold(False)
-        font.setWeight(50)
-        self.line.setFont(font)
-        self.line.setLineWidth(2)
-        self.line.setMidLineWidth(1)
-        self.line.setFrameShape(QFrame.HLine)
-        self.line.setFrameShadow(QFrame.Sunken)
-        self.buttonBox = QDialogButtonBox(SystemDialog)
-        self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setGeometry(QRect(430, 567, 156, 23))
-        self.buttonBox.setOrientation(Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
-        self.resetButton = QPushButton(SystemDialog)
-        self.resetButton.setObjectName(u"resetButton")
-        self.resetButton.setGeometry(QRect(21, 567, 121, 23))
-        self.layoutWidget = QWidget(SystemDialog)
-        self.layoutWidget.setObjectName(u"layoutWidget")
-        self.layoutWidget.setGeometry(QRect(20, 31, 258, 71))
-        self.gridLayout = QGridLayout(self.layoutWidget)
-        self.gridLayout.setObjectName(u"gridLayout")
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)
-        self.label = QLabel(self.layoutWidget)
-        self.label.setObjectName(u"label")
 
-        self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
 
-        self.logLevel = QComboBox(self.layoutWidget)
-        self.logLevel.setObjectName(u"logLevel")
-
-        self.gridLayout.addWidget(self.logLevel, 0, 1, 1, 1)
-
-        self.label_2 = QLabel(self.layoutWidget)
-        self.label_2.setObjectName(u"label_2")
-
-        self.gridLayout.addWidget(self.label_2, 1, 0, 1, 1)
-
-        self.telemTimeout = QLineEdit(self.layoutWidget)
-        self.telemTimeout.setObjectName(u"telemTimeout")
-
-        self.gridLayout.addWidget(self.telemTimeout, 1, 1, 1, 1)
-
-        self.ignoreUpdate = QCheckBox(self.layoutWidget)
-        self.ignoreUpdate.setObjectName(u"ignoreUpdate")
-
-        self.gridLayout.addWidget(self.ignoreUpdate, 2, 0, 1, 2)
-
-        self.layoutWidget1 = QWidget(SystemDialog)
-        self.layoutWidget1.setObjectName(u"layoutWidget1")
-        self.layoutWidget1.setGeometry(QRect(30, 356, 452, 75))
-        self.il2_sub_layout = QGridLayout(self.layoutWidget1)
-        self.il2_sub_layout.setObjectName(u"il2_sub_layout")
-        self.il2_sub_layout.setContentsMargins(0, 0, 0, 0)
-        self.validateIL2 = QCheckBox(self.layoutWidget1)
-        self.validateIL2.setObjectName(u"validateIL2")
-
-        self.il2_sub_layout.addWidget(self.validateIL2, 0, 0, 1, 1)
-
-        self.horizontalLayout = QHBoxLayout()
-        self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.lab_pathIL2 = QLabel(self.layoutWidget1)
-        self.lab_pathIL2.setObjectName(u"lab_pathIL2")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-        sizePolicy1.setHorizontalStretch(0)
-        sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.lab_pathIL2.sizePolicy().hasHeightForWidth())
-        self.lab_pathIL2.setSizePolicy(sizePolicy1)
-        self.lab_pathIL2.setMinimumSize(QSize(98, 0))
-
-        self.horizontalLayout.addWidget(self.lab_pathIL2)
-
-        self.pathIL2 = QLineEdit(self.layoutWidget1)
-        self.pathIL2.setObjectName(u"pathIL2")
-
-        self.horizontalLayout.addWidget(self.pathIL2)
-
-        self.browseIL2 = QToolButton(self.layoutWidget1)
-        self.browseIL2.setObjectName(u"browseIL2")
-
-        self.horizontalLayout.addWidget(self.browseIL2)
-
-
-        self.il2_sub_layout.addLayout(self.horizontalLayout, 1, 0, 1, 1)
-
-        self.horizontalLayout_2 = QHBoxLayout()
-        self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
-        self.lab_portIL2 = QLabel(self.layoutWidget1)
-        self.lab_portIL2.setObjectName(u"lab_portIL2")
-
-        self.horizontalLayout_2.addWidget(self.lab_portIL2)
-
-        self.portIL2 = QLineEdit(self.layoutWidget1)
-        self.portIL2.setObjectName(u"portIL2")
-
-        self.horizontalLayout_2.addWidget(self.portIL2)
-
-        self.horizontalSpacer = QSpacerItem(279, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.horizontalLayout_2.addItem(self.horizontalSpacer)
-
-
-        self.il2_sub_layout.addLayout(self.horizontalLayout_2, 2, 0, 1, 1)
-
-        self.line_2 = QFrame(SystemDialog)
-        self.line_2.setObjectName(u"line_2")
-        self.line_2.setGeometry(QRect(10, 447, 581, 16))
-        self.line_2.setFont(font)
-        self.line_2.setLineWidth(2)
-        self.line_2.setMidLineWidth(1)
-        self.line_2.setFrameShape(QFrame.HLine)
-        self.line_2.setFrameShadow(QFrame.Sunken)
-        self.label_5 = QLabel(SystemDialog)
-        self.label_5.setObjectName(u"label_5")
-        self.label_5.setGeometry(QRect(20, 10, 47, 13))
-        font1 = QFont()
-        font1.setBold(True)
-        font1.setUnderline(True)
-        font1.setWeight(75)
-        self.label_5.setFont(font1)
-        self.label_6 = QLabel(SystemDialog)
-        self.label_6.setObjectName(u"label_6")
-        self.label_6.setGeometry(QRect(20, 184, 71, 16))
-        self.label_6.setFont(font1)
-        self.label_7 = QLabel(SystemDialog)
-        self.label_7.setObjectName(u"label_7")
-        self.label_7.setGeometry(QRect(20, 460, 91, 16))
-        self.label_7.setFont(font1)
-        self.label_8 = QLabel(SystemDialog)
-        self.label_8.setObjectName(u"label_8")
-        self.label_8.setGeometry(QRect(30, 480, 101, 16))
-        self.layoutWidget2 = QWidget(SystemDialog)
-        self.layoutWidget2.setObjectName(u"layoutWidget2")
-        self.layoutWidget2.setGeometry(QRect(36, 500, 184, 42))
-        self.verticalLayout_2 = QVBoxLayout(self.layoutWidget2)
-        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
-        self.cb_save_geometry = QCheckBox(self.layoutWidget2)
-        self.cb_save_geometry.setObjectName(u"cb_save_geometry")
-
-        self.verticalLayout_2.addWidget(self.cb_save_geometry)
-
-        self.cb_save_view = QCheckBox(self.layoutWidget2)
-        self.cb_save_view.setObjectName(u"cb_save_view")
-
-        self.verticalLayout_2.addWidget(self.cb_save_view)
-
-        self.label_10 = QLabel(SystemDialog)
-        self.label_10.setObjectName(u"label_10")
-        self.label_10.setGeometry(QRect(315, 152, 151, 16))
-        self.label_12 = QLabel(SystemDialog)
-        self.label_12.setObjectName(u"label_12")
-        self.label_12.setGeometry(QRect(386, 45, 51, 26))
-        self.label_12.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
-        self.label_9 = QLabel(SystemDialog)
-        self.label_9.setObjectName(u"label_9")
-        self.label_9.setGeometry(QRect(313, 45, 42, 26))
-        self.lab_auto_launch = QLabel(SystemDialog)
-        self.lab_auto_launch.setObjectName(u"lab_auto_launch")
-        self.lab_auto_launch.setEnabled(False)
-        self.lab_auto_launch.setGeometry(QRect(450, 45, 38, 26))
-        self.lab_auto_launch.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
-        self.lab_start_min = QLabel(SystemDialog)
-        self.lab_start_min.setObjectName(u"lab_start_min")
-        self.lab_start_min.setEnabled(False)
-        self.lab_start_min.setGeometry(QRect(496, 45, 49, 26))
-        self.lab_start_min.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
-        self.line_3 = QFrame(SystemDialog)
-        self.line_3.setObjectName(u"line_3")
-        self.line_3.setGeometry(QRect(283, 10, 20, 141))
-        self.line_3.setFont(font)
-        self.line_3.setLineWidth(2)
-        self.line_3.setFrameShape(QFrame.VLine)
-        self.line_3.setFrameShadow(QFrame.Sunken)
-        self.layoutWidget3 = QWidget(SystemDialog)
-        self.layoutWidget3.setObjectName(u"layoutWidget3")
-        self.layoutWidget3.setGeometry(QRect(313, 74, 284, 74))
-        self.gridLayout_2 = QGridLayout(self.layoutWidget3)
-        self.gridLayout_2.setObjectName(u"gridLayout_2")
-        self.gridLayout_2.setContentsMargins(0, 0, 0, 0)
-        self.cb_min_enable_j = QCheckBox(self.layoutWidget3)
-        self.cb_min_enable_j.setObjectName(u"cb_min_enable_j")
-        self.cb_min_enable_j.setEnabled(False)
-        self.cb_min_enable_j.setMaximumSize(QSize(15, 16777215))
-        self.cb_min_enable_j.setCheckable(True)
-
-        self.gridLayout_2.addWidget(self.cb_min_enable_j, 0, 5, 1, 1)
-
-        self.horizontalSpacer_2 = QSpacerItem(22, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_2, 0, 2, 1, 1)
-
-        self.horizontalSpacer_5 = QSpacerItem(34, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_5, 2, 4, 1, 1)
-
-        self.cb_al_enable_j = QCheckBox(self.layoutWidget3)
-        self.cb_al_enable_j.setObjectName(u"cb_al_enable_j")
-        self.cb_al_enable_j.setEnabled(False)
-        self.cb_al_enable_j.setMaximumSize(QSize(15, 16777215))
-
-        self.gridLayout_2.addWidget(self.cb_al_enable_j, 0, 3, 1, 1)
-
-        self.cb_min_enable_p = QCheckBox(self.layoutWidget3)
-        self.cb_min_enable_p.setObjectName(u"cb_min_enable_p")
-        self.cb_min_enable_p.setEnabled(False)
-        self.cb_min_enable_p.setMaximumSize(QSize(15, 16777215))
-        self.cb_min_enable_p.setCheckable(True)
-
-        self.gridLayout_2.addWidget(self.cb_min_enable_p, 1, 5, 1, 1)
-
-        self.cb_headless_c = QCheckBox(self.layoutWidget3)
-        self.cb_headless_c.setObjectName(u"cb_headless_c")
-        self.cb_headless_c.setEnabled(False)
-        self.cb_headless_c.setMaximumSize(QSize(15, 16777215))
-        self.cb_headless_c.setCheckable(True)
-
-        self.gridLayout_2.addWidget(self.cb_headless_c, 2, 7, 1, 1, Qt.AlignLeft)
-
-        self.tb_pid_c = QLineEdit(self.layoutWidget3)
-        self.tb_pid_c.setObjectName(u"tb_pid_c")
-        self.tb_pid_c.setMaximumSize(QSize(50, 16777215))
-
-        self.gridLayout_2.addWidget(self.tb_pid_c, 2, 1, 1, 1, Qt.AlignLeft)
-
-        self.cb_al_enable_c = QCheckBox(self.layoutWidget3)
-        self.cb_al_enable_c.setObjectName(u"cb_al_enable_c")
-        self.cb_al_enable_c.setEnabled(False)
-        self.cb_al_enable_c.setMaximumSize(QSize(15, 16777215))
-
-        self.gridLayout_2.addWidget(self.cb_al_enable_c, 2, 3, 1, 1)
-
-        self.rb_master_j = QRadioButton(self.layoutWidget3)
-        self.rb_master_j.setObjectName(u"rb_master_j")
-        self.rb_master_j.setChecked(True)
-
-        self.gridLayout_2.addWidget(self.rb_master_j, 0, 0, 1, 1, Qt.AlignLeft)
-
-        self.horizontalSpacer_7 = QSpacerItem(34, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_7, 0, 4, 1, 1)
-
-        self.cb_headless_p = QCheckBox(self.layoutWidget3)
-        self.cb_headless_p.setObjectName(u"cb_headless_p")
-        self.cb_headless_p.setEnabled(False)
-        self.cb_headless_p.setMaximumSize(QSize(15, 16777215))
-        self.cb_headless_p.setCheckable(True)
-
-        self.gridLayout_2.addWidget(self.cb_headless_p, 1, 7, 1, 1)
-
-        self.horizontalSpacer_3 = QSpacerItem(22, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_3, 2, 2, 1, 1)
-
-        self.rb_master_p = QRadioButton(self.layoutWidget3)
-        self.rb_master_p.setObjectName(u"rb_master_p")
-
-        self.gridLayout_2.addWidget(self.rb_master_p, 1, 0, 1, 1, Qt.AlignLeft)
-
-        self.rb_master_c = QRadioButton(self.layoutWidget3)
-        self.rb_master_c.setObjectName(u"rb_master_c")
-
-        self.gridLayout_2.addWidget(self.rb_master_c, 2, 0, 1, 1, Qt.AlignLeft)
-
-        self.tb_pid_p = QLineEdit(self.layoutWidget3)
-        self.tb_pid_p.setObjectName(u"tb_pid_p")
-        self.tb_pid_p.setMaximumSize(QSize(50, 16777215))
-
-        self.gridLayout_2.addWidget(self.tb_pid_p, 1, 1, 1, 1, Qt.AlignLeft)
-
-        self.cb_headless_j = QCheckBox(self.layoutWidget3)
-        self.cb_headless_j.setObjectName(u"cb_headless_j")
-        self.cb_headless_j.setEnabled(False)
-        self.cb_headless_j.setMaximumSize(QSize(15, 16777215))
-        self.cb_headless_j.setCheckable(True)
-
-        self.gridLayout_2.addWidget(self.cb_headless_j, 0, 7, 1, 1)
-
-        self.tb_pid_j = QLineEdit(self.layoutWidget3)
-        self.tb_pid_j.setObjectName(u"tb_pid_j")
-        self.tb_pid_j.setMaximumSize(QSize(50, 16777215))
-
-        self.gridLayout_2.addWidget(self.tb_pid_j, 0, 1, 1, 1, Qt.AlignLeft)
-
-        self.cb_min_enable_c = QCheckBox(self.layoutWidget3)
-        self.cb_min_enable_c.setObjectName(u"cb_min_enable_c")
-        self.cb_min_enable_c.setEnabled(False)
-        self.cb_min_enable_c.setMaximumSize(QSize(15, 16777215))
-        self.cb_min_enable_c.setCheckable(True)
-
-        self.gridLayout_2.addWidget(self.cb_min_enable_c, 2, 5, 1, 1)
-
-        self.horizontalSpacer_4 = QSpacerItem(22, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_4, 1, 2, 1, 1)
-
-        self.horizontalSpacer_6 = QSpacerItem(34, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_6, 1, 4, 1, 1)
-
-        self.cb_al_enable_p = QCheckBox(self.layoutWidget3)
-        self.cb_al_enable_p.setObjectName(u"cb_al_enable_p")
-        self.cb_al_enable_p.setEnabled(False)
-        self.cb_al_enable_p.setMaximumSize(QSize(15, 16777215))
-
-        self.gridLayout_2.addWidget(self.cb_al_enable_p, 1, 3, 1, 1)
-
-        self.horizontalSpacer_9 = QSpacerItem(28, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_9, 0, 6, 1, 1)
-
-        self.horizontalSpacer_10 = QSpacerItem(28, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_10, 1, 6, 1, 1)
-
-        self.horizontalSpacer_11 = QSpacerItem(28, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.gridLayout_2.addItem(self.horizontalSpacer_11, 2, 6, 1, 1)
-
-        self.layoutWidget4 = QWidget(SystemDialog)
-        self.layoutWidget4.setObjectName(u"layoutWidget4")
-        self.layoutWidget4.setGeometry(QRect(310, 10, 269, 22))
-        self.horizontalLayout_3 = QHBoxLayout(self.layoutWidget4)
-        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
-        self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
-        self.label_11 = QLabel(self.layoutWidget4)
-        self.label_11.setObjectName(u"label_11")
-        self.label_11.setFont(font1)
-
-        self.horizontalLayout_3.addWidget(self.label_11)
-
-        self.horizontalSpacer_8 = QSpacerItem(37, 20, QSizePolicy.Fixed, QSizePolicy.Minimum)
-
-        self.horizontalLayout_3.addItem(self.horizontalSpacer_8)
-
-        self.cb_al_enable = QCheckBox(self.layoutWidget4)
-        self.cb_al_enable.setObjectName(u"cb_al_enable")
-        font2 = QFont()
-        font2.setBold(False)
-        font2.setUnderline(False)
-        font2.setWeight(50)
-        self.cb_al_enable.setFont(font2)
-
-        self.horizontalLayout_3.addWidget(self.cb_al_enable)
-
-        self.lab_start_headless = QLabel(SystemDialog)
-        self.lab_start_headless.setObjectName(u"lab_start_headless")
-        self.lab_start_headless.setEnabled(False)
-        self.lab_start_headless.setGeometry(QRect(550, 45, 49, 26))
-        self.lab_start_headless.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignTop)
-        self.widget = QWidget(SystemDialog)
-        self.widget.setObjectName(u"widget")
-        self.widget.setGeometry(QRect(30, 276, 270, 45))
-        self.gridLayout_3 = QGridLayout(self.widget)
-        self.gridLayout_3.setObjectName(u"gridLayout_3")
-        self.gridLayout_3.setContentsMargins(0, 0, 0, 0)
-        self.validateXPLANE = QCheckBox(self.widget)
-        self.validateXPLANE.setObjectName(u"validateXPLANE")
-
-        self.gridLayout_3.addWidget(self.validateXPLANE, 0, 0, 1, 2)
-
-        self.pathXPLANE = QLineEdit(self.widget)
-        self.pathXPLANE.setObjectName(u"pathXPLANE")
-
-        self.gridLayout_3.addWidget(self.pathXPLANE, 1, 1, 1, 1)
-
-        self.browseXPLANE = QToolButton(self.widget)
-        self.browseXPLANE.setObjectName(u"browseXPLANE")
-
-        self.gridLayout_3.addWidget(self.browseXPLANE, 1, 2, 1, 1)
-
-        self.lab_pathXPLANE = QLabel(self.widget)
-        self.lab_pathXPLANE.setObjectName(u"lab_pathXPLANE")
-        sizePolicy1.setHeightForWidth(self.lab_pathXPLANE.sizePolicy().hasHeightForWidth())
-        self.lab_pathXPLANE.setSizePolicy(sizePolicy1)
-        self.lab_pathXPLANE.setMinimumSize(QSize(98, 0))
-
-        self.gridLayout_3.addWidget(self.lab_pathXPLANE, 1, 0, 1, 1)
-
-        self.enableXPLANE = QCheckBox(SystemDialog)
-        self.enableXPLANE.setObjectName(u"enableXPLANE")
-        self.enableXPLANE.setGeometry(QRect(17, 251, 135, 17))
-        self.enableDCS = QCheckBox(SystemDialog)
-        self.enableDCS.setObjectName(u"enableDCS")
-        self.enableDCS.setGeometry(QRect(17, 205, 150, 17))
-        self.enableIL2 = QCheckBox(SystemDialog)
-        self.enableIL2.setObjectName(u"enableIL2")
-        self.enableIL2.setGeometry(QRect(17, 330, 168, 17))
-        self.enableMSFS = QCheckBox(SystemDialog)
-        self.enableMSFS.setObjectName(u"enableMSFS")
-        self.enableMSFS.setGeometry(QRect(17, 228, 152, 17))
-        QWidget.setTabOrder(self.logLevel, self.telemTimeout)
-        QWidget.setTabOrder(self.telemTimeout, self.ignoreUpdate)
-        QWidget.setTabOrder(self.ignoreUpdate, self.cb_al_enable)
-        QWidget.setTabOrder(self.cb_al_enable, self.rb_master_j)
-        QWidget.setTabOrder(self.rb_master_j, self.rb_master_p)
-        QWidget.setTabOrder(self.rb_master_p, self.rb_master_c)
-        QWidget.setTabOrder(self.rb_master_c, self.tb_pid_j)
-        QWidget.setTabOrder(self.tb_pid_j, self.tb_pid_p)
-        QWidget.setTabOrder(self.tb_pid_p, self.tb_pid_c)
-        QWidget.setTabOrder(self.tb_pid_c, self.cb_al_enable_j)
-        QWidget.setTabOrder(self.cb_al_enable_j, self.cb_al_enable_p)
-        QWidget.setTabOrder(self.cb_al_enable_p, self.cb_al_enable_c)
-        QWidget.setTabOrder(self.cb_al_enable_c, self.cb_min_enable_j)
-        QWidget.setTabOrder(self.cb_min_enable_j, self.cb_min_enable_p)
-        QWidget.setTabOrder(self.cb_min_enable_p, self.cb_min_enable_c)
-        QWidget.setTabOrder(self.cb_min_enable_c, self.cb_headless_j)
-        QWidget.setTabOrder(self.cb_headless_j, self.cb_headless_p)
-        QWidget.setTabOrder(self.cb_headless_p, self.cb_headless_c)
-        QWidget.setTabOrder(self.cb_headless_c, self.enableDCS)
-        QWidget.setTabOrder(self.enableDCS, self.enableMSFS)
-        QWidget.setTabOrder(self.enableMSFS, self.enableXPLANE)
-        QWidget.setTabOrder(self.enableXPLANE, self.validateXPLANE)
-        QWidget.setTabOrder(self.validateXPLANE, self.pathXPLANE)
-        QWidget.setTabOrder(self.pathXPLANE, self.browseXPLANE)
-        QWidget.setTabOrder(self.browseXPLANE, self.enableIL2)
-        QWidget.setTabOrder(self.enableIL2, self.validateIL2)
-        QWidget.setTabOrder(self.validateIL2, self.pathIL2)
-        QWidget.setTabOrder(self.pathIL2, self.browseIL2)
-        QWidget.setTabOrder(self.browseIL2, self.portIL2)
-        QWidget.setTabOrder(self.portIL2, self.cb_save_geometry)
-        QWidget.setTabOrder(self.cb_save_geometry, self.cb_save_view)
-        QWidget.setTabOrder(self.cb_save_view, self.resetButton)
-
-        self.retranslateUi(SystemDialog)
-
-        QMetaObject.connectSlotsByName(SystemDialog)
-    # setupUi
-
-    def retranslateUi(self, SystemDialog):
-        SystemDialog.setWindowTitle(QCoreApplication.translate("SystemDialog", u"System Settings", None))
-        self.resetButton.setText(QCoreApplication.translate("SystemDialog", u"Reset to  Defaults", None))
-        self.label.setText(QCoreApplication.translate("SystemDialog", u"System Logging Level:", None))
-        self.label_2.setText(QCoreApplication.translate("SystemDialog", u"Telemetry Timeout (ms):", None))
-        self.ignoreUpdate.setText(QCoreApplication.translate("SystemDialog", u"Disable Update Prompt on Startup", None))
-        self.validateIL2.setText(QCoreApplication.translate("SystemDialog", u"Auto IL-2 Telemetry setup", None))
-        self.lab_pathIL2.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Install Path:", None))
-        self.browseIL2.setText(QCoreApplication.translate("SystemDialog", u"...", None))
-        self.lab_portIL2.setText(QCoreApplication.translate("SystemDialog", u"IL-2 Telemetry Port:", None))
-        self.label_5.setText(QCoreApplication.translate("SystemDialog", u"System:", None))
-        self.label_6.setText(QCoreApplication.translate("SystemDialog", u"Sim Setup:", None))
-        self.label_7.setText(QCoreApplication.translate("SystemDialog", u"Other Settings: ", None))
-        self.label_8.setText(QCoreApplication.translate("SystemDialog", u"Startup  Behavior:", None))
-        self.cb_save_geometry.setText(QCoreApplication.translate("SystemDialog", u"Restore window position", None))
-        self.cb_save_view.setText(QCoreApplication.translate("SystemDialog", u"Restore last tab view", None))
-        self.label_10.setText(QCoreApplication.translate("SystemDialog", u"Rhino default = 2055", None))
-        self.label_12.setText(QCoreApplication.translate("SystemDialog", u"USB\n"
-"Product ID", None))
-        self.label_9.setText(QCoreApplication.translate("SystemDialog", u"Master\n"
-"Instance", None))
-        self.lab_auto_launch.setText(QCoreApplication.translate("SystemDialog", u"Auto\n"
-"Launch:", None))
-        self.lab_start_min.setText(QCoreApplication.translate("SystemDialog", u"Start\n"
-"Minimized:", None))
-        self.cb_min_enable_j.setText("")
-        self.cb_al_enable_j.setText("")
-        self.cb_min_enable_p.setText("")
-        self.cb_headless_c.setText("")
-        self.cb_al_enable_c.setText("")
-        self.rb_master_j.setText(QCoreApplication.translate("SystemDialog", u"Joystick", None))
-        self.cb_headless_p.setText("")
-        self.rb_master_p.setText(QCoreApplication.translate("SystemDialog", u"Pedals", None))
-        self.rb_master_c.setText(QCoreApplication.translate("SystemDialog", u"Colective", None))
-        self.cb_headless_j.setText("")
-        self.tb_pid_j.setText(QCoreApplication.translate("SystemDialog", u"2055", None))
-        self.cb_min_enable_c.setText("")
-        self.cb_al_enable_p.setText("")
-        self.label_11.setText(QCoreApplication.translate("SystemDialog", u"Launch Options:", None))
-        self.cb_al_enable.setText(QCoreApplication.translate("SystemDialog", u"Enable Auto-Launch", None))
-        self.lab_start_headless.setText(QCoreApplication.translate("SystemDialog", u"Start\n"
-"Headless:", None))
-        self.validateXPLANE.setText(QCoreApplication.translate("SystemDialog", u"Auto X-Plane setup", None))
-        self.browseXPLANE.setText(QCoreApplication.translate("SystemDialog", u"...", None))
-        self.lab_pathXPLANE.setText(QCoreApplication.translate("SystemDialog", u"X-Plane Install Path:", None))
-        self.enableXPLANE.setText(QCoreApplication.translate("SystemDialog", u"Enable X-Plane Support", None))
-        self.enableDCS.setText(QCoreApplication.translate("SystemDialog", u"Enable DCS World Support", None))
-        self.enableIL2.setText(QCoreApplication.translate("SystemDialog", u"Enable IL-2 Sturmovik Support", None))
-        self.enableMSFS.setText(QCoreApplication.translate("SystemDialog", u"Enable MSFS 2020 Support", None))
-    # retranslateUi
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
@@ -1720,6 +1247,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.setupUi(self)
         self.retranslateUi(self)
         self.setWindowTitle(f"System Settings ({_device_type.capitalize()})")
+
 
         # Add  "INFO" and "DEBUG" options to the logLevel combo box
         self.logLevel.addItems(["INFO", "DEBUG"])
@@ -1736,6 +1264,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.validateXPLANE.setToolTip('If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes')
         self.lab_pathXPLANE.setToolTip('The root path where X-Plane is installed')
         self.pathXPLANE.setToolTip('The root path where X-Plane is installed')
+        self.enableVPConfStartup.setToolTip('Select VPforce Configurator profile to load when TelemFFB Starts')
+        self.enableVPConfExit.setToolTip('Select VPforce Configurator profile to load when TelemFFB Exits')
+
         # Connect signals to slots
         self.enableIL2.stateChanged.connect(self.toggle_il2_widgets)
         self.enableXPLANE.stateChanged.connect(self.toggle_xplane_widgets)
@@ -1745,7 +1276,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.resetButton.clicked.connect(self.reset_settings)
         self.master_button_group.buttonClicked.connect(lambda button: self.change_master_widgets(button))
         self.cb_al_enable.stateChanged.connect(self.toggle_al_widgets)
+        self.enableVPConfStartup.stateChanged.connect(self.toggle_vpconf_startup)
+        self.enableVPConfExit.stateChanged.connect(self.toggle_vpconf_exit)
+        self.browseVPConfStartup.clicked.connect(lambda: self.browse_vpconf('startup'))
+        self.browseVPConfExit.clicked.connect(lambda: self.browse_vpconf('exit'))
         self.buttonBox.rejected.connect(self.close)
+
+        self.buttonChildSettings.setEnabled(False)
+        self.buttonChildSettings.setVisible(False)
 
         # Set initial state
         self.toggle_il2_widgets()
@@ -1775,6 +1313,29 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_c.setObjectName('headless_c')
         self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+
+        if (_master_instance and _launched_children) or _child_instance:
+            self.labelSystem.setText("System (Per Instance):")
+            self.labelLaunch.setText("Launch Options (Global):")
+            self.labelSim.setText("Sim Setup (Global):")
+            self.labelOther.setText("Other Settings (Per Instance):")
+
+        if _master_instance and _launched_children:
+            self.buttonChildSettings.setVisible(True)
+            self.buttonChildSettings.setEnabled(True)
+            self.buttonChildSettings.clicked.connect(self.launch_child_settings_windows)
+
+
+
+    def closeEvent(self, event):
+        self.hide()
+        event.ignore()
+
+    def accept(self):
+        self.hide()
+
+    def launch_child_settings_windows(self):
+        window.show_child_settings()
 
     def reset_settings(self):
         # Load default settings and update widgets
@@ -1821,6 +1382,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_al_enable_p.setVisible(True)
             self.cb_min_enable_p.setVisible(True)
             self.cb_headless_p.setVisible(True)
+
+    def toggle_vpconf_startup(self):
+        vpconf_startup_enabled = self.enableVPConfStartup.isChecked()
+        self.pathVPConfStartup.setEnabled(vpconf_startup_enabled)
+        self.browseVPConfStartup.setEnabled(vpconf_startup_enabled)
+
+    def toggle_vpconf_exit(self):
+        vpconf_exit_enabled = self.enableVPConfExit.isChecked()
+        self.pathVPConfExit.setEnabled(vpconf_exit_enabled)
+        self.browseVPConfExit.setEnabled(vpconf_exit_enabled)
 
     def toggle_al_widgets(self):
         al_enabled = self.cb_al_enable.isChecked()
@@ -1942,10 +1513,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if not os.path.isdir(pth):
                 QMessageBox.warning(self, "Config Error", 'Please enter the root X-Plane install path or disable auto X-plane setup')
                 return False
-
+        if self.enableVPConfStartup.isChecked():
+            if not os.path.isfile(self.pathVPConfStartup.text()):
+                QMessageBox.warning(self, "Config Error", "Please select a valid 'on Startup' VPforce Configurator file")
+                return False
+            if not validate_vpconf_profile(self.pathVPConfStartup.text()):
+                return False
+        if self.enableVPConfExit.isChecked():
+            if not os.path.isfile(self.pathVPConfExit.text()):
+                QMessageBox.warning(self, "Config Error", "Please select a valid 'on Exit' VPforce Configurator file")
+                return False
+            if not validate_vpconf_profile(self.pathVPConfExit.text()):
+                return False
         return True
 
     def save_settings(self):
+        global system_settings
         # Create a dictionary with the values of all components
         tp = args.type
 
@@ -1981,6 +1564,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "ignoreUpdate": self.ignoreUpdate.isChecked(),
             "saveWindow": self.cb_save_geometry.isChecked(),
             "saveLastTab": self.cb_save_view.isChecked(),
+            "enableVPConfStartup": self.enableVPConfStartup.isChecked(),
+            "pathVPConfStartup": self.pathVPConfStartup.text(),
+            "enableVPConfExit": self.enableVPConfExit.isChecked(),
+            "pathVPConfExit": self.pathVPConfExit.text(),
         }
 
         key_list = [
@@ -2027,6 +1614,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             logger.setLevel(logging.INFO)
         elif ll == "DEBUG":
             logger.setLevel(logging.DEBUG)
+
+        system_settings = utils.read_system_settings(args.device, _device_type)
         self.accept()
 
     def load_settings(self, default=False):
@@ -2094,6 +1683,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
+
+        self.enableVPConfStartup.setChecked(settings_dict.get('enableVPConfStartup', False))
+        self.pathVPConfStartup.setText(settings_dict.get('pathVPConfStartup', ''))
+        self.enableVPConfExit.setChecked(settings_dict.get('enableVPConfExit', False))
+        self.pathVPConfExit.setText(settings_dict.get('pathVPConfExit', ''))
+
         self.toggle_al_widgets()
 
         # build record of auto-launch settings to see if they changed on save:
@@ -2113,6 +1708,162 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidCollective': str(self.tb_pid_c.text()),
         }
 
+    def browse_vpconf(self, mode):
+        options = QFileDialog.Options()
+        # options |= QFileDialog.DontUseNativeDialog
+        calling_button = self.sender()
+        starting_dir = os.getcwd()
+        if mode == 'startup':
+            lbl = self.pathVPConfStartup
+        elif mode == 'exit':
+            lbl = self.pathVPConfExit
+        else:
+            return
+
+        cur_path = lbl.text()
+        if os.path.exists(cur_path):
+            starting_dir = os.path.dirname(cur_path)
+
+        # Open the file browser dialog
+        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose {mode} vpconf profile for {_device_type} ", starting_dir, "vpconf Files (*.vpconf)", options=options)
+
+        if file_path:
+            if validate_vpconf_profile(file_path):
+                lbl.setText(file_path)
+
+class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
+    global dev
+    cb_states = {'cb_MasterGain': 0,'cb_Spring': 0, 'cb_Periodic': 0, 'cb_Damper': 0, 'cb_Inertia': 0, 'cb_Friction': 0, 'cb_Constant': 0}
+
+    def __init__(self, parent=None):
+        super(ConfiguratorDialog, self).__init__(parent)
+        global startup_configurator_gains
+
+        self.setupUi(self)
+        self.retranslateUi(self)
+        self.setWindowTitle(f"Configurator Gain Override ({_device_type.capitalize()})")
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        # self.cb_MasterGain.clicked
+        self.sl_MasterGain.valueChanged.connect(self.update_labels)
+        self.sl_MasterGain.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Periodic.valueChanged.connect(self.update_labels)
+        self.sl_Periodic.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Spring.valueChanged.connect(self.update_labels)
+        self.sl_Spring.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Damper.valueChanged.connect(self.update_labels)
+        self.sl_Damper.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Inertia.valueChanged.connect(self.update_labels)
+        self.sl_Inertia.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Friction.valueChanged.connect(self.update_labels)
+        self.sl_Friction.valueChanged.connect(self.set_gain_value)
+
+        self.sl_Constant.valueChanged.connect(self.update_labels)
+        self.sl_Constant.valueChanged.connect(self.set_gain_value)
+
+        self.cb_MasterGain.stateChanged.connect(self.cb_toggle)
+        self.cb_Periodic.stateChanged.connect(self.cb_toggle)
+        self.cb_Spring.stateChanged.connect(self.cb_toggle)
+        self.cb_Damper.stateChanged.connect(self.cb_toggle)
+        self.cb_Inertia.stateChanged.connect(self.cb_toggle)
+        self.cb_Friction.stateChanged.connect(self.cb_toggle)
+        self.cb_Constant.stateChanged.connect(self.cb_toggle)
+
+        self.cb_MasterGain.setChecked(self.cb_states['cb_MasterGain'])
+        self.cb_Periodic.setCheckState(self.cb_states['cb_Periodic'])
+        self.cb_Spring.setCheckState(self.cb_states['cb_Spring'])
+        self.cb_Damper.setCheckState(self.cb_states['cb_Damper'])
+        self.cb_Inertia.setCheckState(self.cb_states['cb_Inertia'])
+        self.cb_Friction.setCheckState(self.cb_states['cb_Friction'])
+        self.cb_Constant.setCheckState(self.cb_states['cb_Constant'])
+
+        self.pb_Revert.clicked.connect(self.revert_gains)
+
+        self.pb_Finish.clicked.connect(self.close)
+
+        self.starting_gains = dev.getGains()
+        self.read_gains()
+
+
+    def cb_toggle(self, state):
+        sender = self.sender()
+        sender_str = sender.objectName()
+        self.cb_states[sender_str] = state
+
+        if state: return
+        match sender_str:
+            case 'cb_MasterGain':
+                dev.setGain(FFB_GAIN_MASTER, int(startup_configurator_gains.master_gain))
+            case 'cb_Periodic':
+                dev.setGain(FFB_GAIN_PERIODIC, startup_configurator_gains.periodic_gain)
+            case 'cb_Spring':
+                dev.setGain(FFB_GAIN_SPRING, startup_configurator_gains.spring_gain)
+            case 'cb_Damper':
+                dev.setGain(FFB_GAIN_DAMPER, startup_configurator_gains.damper_gain)
+            case 'cb_Inertia':
+                dev.setGain(FFB_GAIN_INERTIA, startup_configurator_gains.inertia_gain)
+            case 'cb_Friction':
+                dev.setGain(FFB_GAIN_FRICTION, startup_configurator_gains.friction_gain)
+            case 'sl_Constant':
+                dev.setGain(FFB_GAIN_CONSTANT, startup_configurator_gains.constant_gain)
+        self.read_gains()
+
+
+
+    def revert_gains(self):
+        dev.setGain(FFB_GAIN_MASTER, self.starting_gains.master_gain)
+        dev.setGain(FFB_GAIN_PERIODIC, self.starting_gains.periodic_gain)
+        dev.setGain(FFB_GAIN_SPRING, self.starting_gains.spring_gain)
+        dev.setGain(FFB_GAIN_DAMPER, self.starting_gains.damper_gain)
+        dev.setGain(FFB_GAIN_INERTIA, self.starting_gains.inertia_gain)
+        dev.setGain(FFB_GAIN_FRICTION, self.starting_gains.friction_gain)
+        dev.setGain(FFB_GAIN_CONSTANT, self.starting_gains.constant_gain)
+        self.read_gains()
+
+    def set_gain_value(self, value):
+        sender = self.sender()
+        sender_str = sender.objectName()
+        match sender_str:
+            case 'sl_MasterGain':
+                dev.setGain(FFB_GAIN_MASTER, int(value))
+            case 'sl_Periodic':
+                dev.setGain(FFB_GAIN_PERIODIC, int(value))
+            case 'sl_Spring':
+                dev.setGain(FFB_GAIN_SPRING, int(value))
+            case 'sl_Damper':
+                dev.setGain(FFB_GAIN_DAMPER, int(value))
+            case 'sl_Inertia':
+                dev.setGain(FFB_GAIN_INERTIA, int(value))
+            case 'sl_Friction':
+                dev.setGain(FFB_GAIN_FRICTION, int(value))
+            case 'sl_Constant':
+                dev.setGain(FFB_GAIN_CONSTANT, int(value))
+
+
+    def read_gains(self):
+        gains = dev.getGains()
+        self.sl_MasterGain.setValue(gains.master_gain)
+        self.sl_Periodic.setValue(gains.periodic_gain)
+        self.sl_Spring.setValue(gains.spring_gain)
+        self.sl_Damper.setValue(gains.damper_gain)
+        self.sl_Inertia.setValue(gains.inertia_gain)
+        self.sl_Friction.setValue(gains.friction_gain)
+        self.sl_Constant.setValue(gains.constant_gain)
+        # self.update_labels()
+        print(gains)
+
+    def update_labels(self):
+        self.lab_MasterGainValue.setText(f"%{self.sl_MasterGain.value()}")
+        self.lab_PeriodicValue.setText(f"%{self.sl_Periodic.value()}")
+        self.lab_SpringValue.setText(f"%{self.sl_Spring.value()}")
+        self.lab_DamperValue.setText(f"%{self.sl_Damper.value()}")
+        self.lab_InertiaValue.setText(f"%{self.sl_Inertia.value()}")
+        self.lab_FrictionValue.setText(f"%{self.sl_Friction.value()}")
+        self.lab_ConstantValue.setText(f"%{self.sl_Constant.value()}")
 
 class ButtonPressThread(QThread):
     button_pressed = pyqtSignal(str, int)
@@ -2153,6 +1904,7 @@ class ButtonPressThread(QThread):
 
 
 class MainWindow(QMainWindow):
+    show_simvars = False
     def __init__(self, ipc_thread=None):
         super().__init__()
 
@@ -2167,7 +1919,7 @@ class MainWindow(QMainWindow):
         if _release:
             dl_url = 'https://github.com/walmis/VPforce-TelemFFB/releases'
         else:
-            dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A'
+            dl_url = 'https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=D'
 
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
@@ -2272,6 +2024,8 @@ class MainWindow(QMainWindow):
         exit_app_action = QAction('Quit TelemFFB', self)
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
+
+
 
         # Create the "Utilities" menu
         utilities_menu = self.menu.addMenu('Utilities')
@@ -2844,6 +2598,7 @@ class MainWindow(QMainWindow):
         )
 
     def add_debug_menu(self):
+        # debug mode
         for action in self.menu.actions():
             if action.text() == "Debug":
                 return
@@ -2855,6 +2610,15 @@ class MainWindow(QMainWindow):
         self.teleplot_action = QAction("Teleplot Setup", self)
         self.teleplot_action.triggered.connect(self.open_teleplot_setup_dialog)
         self.debug_menu.addAction(self.teleplot_action)
+
+        self.show_simvar_action = QAction("Show simvar in telem window", self)
+        self.show_simvar_action.triggered.connect(self.toggle_simvar_telemetry)
+        self.show_simvar_action.setCheckable(True)
+        self.debug_menu.addAction(self.show_simvar_action)
+
+        self.configurator_settings_action = QAction('Configurator Gain Override', self)
+        self.configurator_settings_action.triggered.connect(self.open_configurator_dialog)
+        self.debug_menu.addAction(self.configurator_settings_action)
 
         if _master_instance:
             self.custom_userconfig_action = QAction("Load Custom User Config", self)
@@ -2879,6 +2643,9 @@ class MainWindow(QMainWindow):
 
     def show_child_log(self, child):
         self._ipc_thread.send_broadcast_message(f'SHOW LOG:{child}')
+
+    def show_child_settings(self):
+        self._ipc_thread.send_broadcast_message("SHOW SETTINGS")
 
     def toggle_child_windows(self, toggle):
         if toggle == 'show':
@@ -3123,9 +2890,18 @@ class MainWindow(QMainWindow):
         dialog = TeleplotSetupDialog(self)
         dialog.exec_()
 
+    def open_configurator_dialog(self):
+        dialog = ConfiguratorDialog(self)
+        dialog.raise_()
+        dialog.activateWindow()
+        dialog.show()
+
     def open_system_settings_dialog(self):
         dialog = SystemSettingsDialog(self)
-        dialog.exec_()
+        dialog.raise_()
+        dialog.activateWindow()
+        dialog.show()
+        # dialog.exec_()
 
     def update_settings(self):
         self.settings_layout.reload_caller()
@@ -3427,8 +3203,16 @@ class MainWindow(QMainWindow):
             pass
 
         try:
+
             items = ""
             for k, v in data.items():
+                # check for msfs and debug mode (alt-d pressed), change to simvar name
+                if self.show_simvars:
+                    if data["src"] == "MSFS2020":
+                        simvarnames = SimConnectManager()
+                        s = simvarnames.get_var_name(k)
+                        if not s is None:
+                            k = s
                 if type(v) == float:
                     items += f"{k}: {v:.3f}\n"
                 else:
@@ -3571,7 +3355,14 @@ class MainWindow(QMainWindow):
                     return True
 
         return False
+    def toggle_simvar_telemetry(self):
+        if self.show_simvars:
+            self.show_simvars = False
+            self.show_simvar_action.setChecked(False)
 
+        else:
+            self.show_simvars = True
+            self.show_simvar_action.setChecked(True)
 
 class SettingsLayout(QGridLayout):
     expanded_items = []
@@ -4134,10 +3925,15 @@ class SettingsLayout(QGridLayout):
         file_path, _ = QFileDialog.getOpenFileName(self.mainwindow, "Choose File", starting_dir, "vpconf Files (*.vpconf)", options=options)
 
         if file_path:
-            lprint(f"Selected File: {file_path}")
-            xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, file_path, 'vpconf')
-            if settings_mgr.timedOut:
-                self.reload_caller()
+            cfg_scope = xmlutils.device
+            key = "pid" + cfg_scope.capitalize()
+            pid = system_settings.get(key, '')
+
+            if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
+                lprint(f"Selected File: {file_path}")
+                xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, file_path, 'vpconf')
+                if settings_mgr.timedOut:
+                    self.reload_caller()
 
     def dropbox_changed(self):
         setting_name = self.sender().objectName().replace('db_', '')
@@ -4320,286 +4116,6 @@ class SettingsLayout(QGridLayout):
         self.sender().valueChanged.emit(self.sender().value())
 
 
-class ClickableLabel(QLabel):
-    def __init__(self, parent=None):
-        super(ClickableLabel, self).__init__(parent)
-
-    def mousePressEvent(self, event):
-        os.startfile(userconfig_rootpath, 'open')
-        logging.debug("userpath opened")
-
-
-class NoKeyScrollArea(QScrollArea):
-    def __init__(self):
-        super().__init__()
-
-        self.sliders = []
-        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
-
-    def addSlider(self, slider):
-        self.sliders.append(slider)
-
-    def keyPressEvent(self, event):
-        # Forward keypress events to all sliders
-        for slider in self.sliders:
-            try:
-                slider.keyPressEvent(event)
-            except:
-                pass
-
-    def keyReleaseEvent(self, event):
-        # Forward keypress events to all sliders
-        for slider in self.sliders:
-            try:
-                slider.keyReleaseEvent(event)
-            except:
-                pass
-
-
-class NoWheelSlider(QSlider):
-    def __init__(self, *args, **kwargs):
-        super(NoWheelSlider, self).__init__(*args, **kwargs)
-        # Default colors
-        self.groove_color = "#bbb"
-        self.handle_color = vpf_purple
-        self.handle_height = 20
-        self.handle_width = 16
-        self.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        # Apply styles
-        self.update_styles()
-
-        self.setFocusPolicy(Qt.StrongFocus)
-        self.setMouseTracking(True)
-        self.is_mouse_over = False
-
-    def wheelEvent(self, event):
-        if event.modifiers() & Qt.ShiftModifier:
-            # Adjust the value by increments of 1
-            current_value = self.value()
-            if event.angleDelta().y() > 0:
-                new_value = current_value + 1
-            elif event.angleDelta().y() < 0:
-                new_value = current_value - 1
-
-            # Ensure the new value is within the valid range
-            new_value = max(self.minimum(), min(self.maximum(), new_value))
-
-            self.setValue(new_value)
-            event.accept()
-        else:
-            event.ignore()
-
-    def update_styles(self):
-        # Generate CSS based on color and size properties
-        css = f"""
-            QSlider::groove:horizontal {{
-                border: 1px solid #565a5e;
-                height: 8px;  /* Adjusted groove height */
-                background: {self.groove_color};
-                margin: 0;
-                border-radius: 3px;  /* Adjusted border radius */
-            }}
-            QSlider::handle:horizontal {{
-                background: {self.handle_color};
-                border: 1px solid #565a5e;
-                width: {self.handle_width}px;  /* Adjusted handle width */
-                height: {self.handle_height}px;  /* Adjusted handle height */
-                border-radius: {self.handle_height / 4}px;  /* Adjusted border radius */
-                margin-top: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
-                margin-bottom: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
-                margin-left: -1px;  /* Adjusted left margin */
-                margin-right: -1px;  /* Adjusted right margin */
-            }}
-        """
-        self.setStyleSheet(css)
-
-    def setGrooveColor(self, color):
-        self.groove_color = color
-        self.update_styles()
-
-    def setHandleColor(self, color):
-        self.handle_color = color
-        self.update_styles()
-
-    def setHandleHeight(self, height):
-        self.handle_height = height
-        self.update_styles()
-
-    def enterEvent(self, event):
-        self.is_mouse_over = True
-
-    def leaveEvent(self, event):
-        self.is_mouse_over = False
-
-    def keyPressEvent(self, event):
-
-        if self.is_mouse_over:
-            # self.blockSignals(True)
-            if event.key() == Qt.Key_Left:
-                self.setValue(self.value() - 1)
-            elif event.key() == Qt.Key_Right:
-                self.setValue(self.value() + 1)
-            else:
-                super().keyPressEvent(event)
-        # else:
-        #     super().keyPressEvent(event)
-
-    def keyReleaseEvent(self, event):
-
-        if self.is_mouse_over:
-            self.blockSignals(False)
-            # if event.key() == Qt.Key_Left:
-            #     self.valueChanged.emit(self.value() - 1)
-            # elif event.key() == Qt.Key_Right:
-            #     self.valueChanged.emit(self.value() + 1)
-
-            pass
-        else:
-            super().keyReleaseEvent(event)
-
-
-class ClickLogo(QLabel):
-    clicked = pyqtSignal()
-
-    def __init__(self, parent=None):
-
-        super(ClickLogo, self).__init__(parent)
-
-        # Initial clickable state
-        self._clickable = False
-
-    def setClickable(self, clickable):
-        self._clickable = clickable
-        if clickable:
-            self.setCursor(Qt.PointingHandCursor)
-        else:
-            self.setCursor(Qt.ArrowCursor)
-
-    def mousePressEvent(self, event):
-        if self._clickable:
-            self.clicked.emit()
-
-    def enterEvent(self, event):
-        if self._clickable:
-            self.setCursor(Qt.PointingHandCursor)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event):
-        self.setCursor(Qt.ArrowCursor)
-        super().leaveEvent(event)
-
-
-class InfoLabel(QWidget):
-    def __init__(self, text=None, tooltip=None, parent=None):
-        super(InfoLabel, self).__init__(parent)
-
-        # Text label
-        self.text_label = QLabel(self)
-        self.text_label.setText(text)
-        self.text_label.setMinimumWidth(self.text_label.sizeHint().height())
-
-        # Information icon
-        self.icon_label = QLabel(self)
-        # icon_img = os.path.join(script_dir, "image/information.png")
-        icon_img = ":/image/information.png"
-        self.pixmap = QPixmap(icon_img)
-        self.icon_label.setPixmap(self.pixmap.scaledToHeight(self.text_label.sizeHint().height()))  # Adjust the height as needed
-        self.icon_label.setVisible(False)
-
-        # Layout to align the text label and icon
-        self.layout = QHBoxLayout(self)
-        self.layout.addWidget(self.text_label, alignment=Qt.AlignLeft)
-        self.layout.addSpacing(0)
-        self.layout.addWidget(self.icon_label, alignment=Qt.AlignLeft)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.addStretch()
-
-        # Set initial size for text_label based on the size of the icon
-        # self.text_label.setFixedHeight(self.icon_label.height())
-
-        if text:
-            self.setText(text)
-        if tooltip:
-            self.setToolTip(tooltip)
-
-    def setText(self, text):
-        self.text_label.setText(text)
-        # Adjust the size of text_label based on the new text
-        # self.text_label.setFixedHeight(self.icon_label.height())
-
-    def setToolTip(self, tooltip):
-        if tooltip:
-            self.icon_label.setToolTip(tooltip)
-            self.icon_label.setVisible(True)
-        else:
-            self.icon_label.setToolTip('')
-            self.icon_label.setVisible(False)
-
-    def setTextStyleSheet(self, style_sheet):
-        self.text_label.setStyleSheet(style_sheet)
-
-    def show_icon(self):
-        # Manually scale the pixmap to a reasonable size
-        scaled_pixmap = self.pixmap.scaledToHeight(self.text_label.sizeHint().height())  # Adjust the height as needed
-        self.icon_label.setPixmap(scaled_pixmap)
-
-
-class StatusLabel(QWidget):
-    clicked = pyqtSignal(str)
-
-    def __init__(self, parent=None, text='', color: QColor = Qt.yellow, size=8):
-        super(StatusLabel, self).__init__(parent)
-
-        self.label = QLabel(text)
-        self.label.setStyleSheet("QLabel { padding-right: 5px; }")
-
-        self.dot_color = color  # Default color
-        self.dot_size = size
-        self.setCursor(Qt.PointingHandCursor)
-        self._clickable = True
-        self.setToolTip('Click to manage this device')
-        layout = QHBoxLayout(self)
-        layout.addWidget(self.label)
-
-    def enterEvent(self, event):
-        # Set the label to be blue and underlined when the mouse enters
-        self.label.setStyleSheet("QLabel { padding-right: 5px; color: blue; text-decoration: underline; }")
-
-    def leaveEvent(self, event):
-        # Set the label back to its original style when the mouse leaves
-        self.label.setStyleSheet("QLabel { padding-right: 5px; color: black; text-decoration: none; }")
-
-    def mousePressEvent(self, event):
-        if self._clickable:
-            dev = self.label.text().lower()
-            self.clicked.emit(dev)
-
-    def hide(self):
-        self.label.hide()
-        super().hide()
-
-    def show(self):
-        self.label.show()
-        super().show()
-
-    def set_text(self, text):
-        self.label.setText(text)
-
-    def set_dot_color(self, color: QColor):
-        self.dot_color = color
-        self.update()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        # Calculate adjusted positioning for the dot
-        dot_x = self.label.geometry().right() - 1  # 5 is an arbitrary offset for better alignment
-        dot_y = self.label.geometry().center().y() - self.dot_size // 2 + 1
-
-        painter.setBrush(QColor(self.dot_color))
-        painter.drawEllipse(dot_x, dot_y, self.dot_size, self.dot_size)
-
 
 class LogTailer(QThread):
     log_updated = pyqtSignal(str)
@@ -4653,6 +4169,55 @@ class LogTailer(QThread):
         self.resume()  # Resume tailing with the new log file
 
 
+def validate_vpconf_profile(file, pid=_device_pid, dev_type=_device_type, silent=False):
+    try:
+        with open(file, 'r') as f:
+            config_data = json.load(f)
+    except:
+        if not silent:
+            QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+        return False
+    cfg_pid = config_data.get('config', {}).get('usb_pid', 'unknown')
+    if cfg_pid == 'unknown':
+        if not silent:
+            QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+        return False
+    cfg_pid = format(cfg_pid, 'x')
+    cfg_serial = config_data.get('serial_number', 'unknown')
+    cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
+    if cfg_serial == 'unknown':
+        return False
+    if cfg_pid == pid:
+        return True
+    else:
+        if not silent:
+            QMessageBox.warning(window, "Wrong Device", f"The VPforce Configurator file you selected does not match the device you are trying to assign it to\n\nFile={file}\n\nThis instance is currently configuring:\n{dev_type}\npid= {pid}\n\nThe chosen profile is for\npid= {cfg_pid}\nname= {cfg_device_name}\nserial= {cfg_serial}")
+        return False
+
+
+def set_vpconf_profile(config, serial):
+    vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
+    # serial = HapticEffect.device.serial
+
+    if vpconf_path:
+        logging.info(f"Found VPforce Configurator at {vpconf_path}")
+        workdir = os.path.dirname(vpconf_path)
+        env = {}
+        env["PATH"] = os.environ["PATH"]
+        if not os.path.isfile(config):
+            logging.error(f"Error loading VPforce Configurator Profile: ({config}) - The file does not exist! ")
+            return
+
+        if not validate_vpconf_profile(config, silent=True):
+            logging.error(f"VPForce Config Error: ({config}) - The file failed validation!  Check the PID is correct for the device")
+            return
+
+        logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config} -serial {serial}")
+
+        subprocess.call([vpconf_path, "-config", config, "-serial", serial], cwd=workdir, env=env)
+    else:
+        logging.error("Unable to find VPforce Configurator installation location")
+
 def load_custom_userconfig(new_path=''):
     global userconfig_rootpath, userconfig_path, settings_mgr, defaults_path, window
     print(f"newpath=>{new_path}<")
@@ -4667,7 +4232,7 @@ def load_custom_userconfig(new_path=''):
         userconfig_rootpath = os.path.basename(new_path)
         userconfig_path = new_path
     xmlutils.update_vars(_device_type, _userconfig_path=userconfig_path, _defaults_path=defaults_path)
-    settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+    settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path, system_settings=system_settings)
     logging.info(f"Custom Configuration was loaded via debug menu: {userconfig_path}")
     if _master_instance and _launched_children:
         _ipc_thread.send_broadcast_message(f"LOADCONFIG:{userconfig_path}")
@@ -5135,16 +4700,32 @@ def main():
             QPlainTextEdit {
                 selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
             }
+            QSlider::handle:horizontal {
+                background: #ab37c8; /* Set the handle color */
+                border: 1px solid #565a5e;
+                width: 16px;  /* Adjusted handle width */
+                height: 20px;  /* Adjusted handle height */
+                border-radius: 5px;  /* Adjusted border radius */
+                margin-top: -5px;  /* Negative margin to overlap with groove */
+                margin-bottom: -5px;  /* Negative margin to overlap with groove */
+                margin-left: -1px;  /* Adjusted left margin */
+                margin-right: -1px;  /* Adjusted right margin */
+            }
+            QSlider::handle:horizontal:disabled {
+                background: #888888; /* Set the color of the handle when disabled */
+            }
         """
     )
     global window, log_window, log_tail_window
     global dev_firmware_version
     global dev_serial
+    global dev
+    global startup_configurator_gains
     log_window = LogWindow()
     global settings_mgr, telem_manager, config_was_default
     xmlutils.update_vars(args.type, userconfig_path, defaults_path)
     try:
-        settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+        settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path, system_settings=system_settings)
     except Exception as e:
         logging.error(f"Error Reading user config file..")
         ans = QMessageBox.question(None, "User Config Error", "There was an error reading the userconfig.  The file is likely corrupted.\n\nDo you want to back-up the existing config and create a new default (empty) config?\n\nIf you chose No, TelemFFB will exit.")
@@ -5164,7 +4745,7 @@ def main():
             utils.create_empty_userxml_file(userconfig_path)
 
             logging.info(f"User config Reset:  Backup file created: {backup_file}")
-            settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path)
+            settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path, system_settings=system_settings)
             QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
         else:
             QCoreApplication.instance().quit()
@@ -5208,6 +4789,9 @@ def main():
             devver = re.sub(r'\D', '', dev_firmware_version)
             if devver < minver:
                 QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
+
+        gain_values = dev.getGains()
+        print(gain_values)
     except Exception as e:
         QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {_device_vid_pid} for device: {_device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
         dev_firmware_version = 'ERROR'
@@ -5243,6 +4827,7 @@ def main():
         _ipc_thread.show_signal.connect(lambda: window.show())
         _ipc_thread.hide_signal.connect(lambda: window.hide())
         _ipc_thread.showlog_signal.connect(lambda: log_window.show())
+        _ipc_thread.show_settings_signal.connect(lambda: window.open_system_settings_dialog())
         _ipc_thread.start()
         _ipc_running = True
 
@@ -5289,33 +4874,31 @@ def main():
 
     utils.signal_emitter.telem_timeout_signal.connect(window.update_sim_indicators)
     utils.signal_emitter.error_signal.connect(window.process_error_signal)
-    # if getattr(sys, 'frozen', False):
-    #     path = os.path.dirname(sys.executable)
-    # else:
-    #     path = os.path.dirname(os.path.abspath(__file__))
-    #
-    # frozen = getattr(sys, 'frozen', False)
-    # if frozen:
-    #     # we are running in a bundle
-    #     bundle_dir = sys._MEIPASS
-    # else:
-    #     # we are running in a normal Python environment
-    #     bundle_dir = os.path.dirname(os.path.abspath(__file__))
-    # log_info = f'''
-    #     Frozen is {frozen}
-    #     bundle dir is {bundle_dir}
-    #     sys.argv[0] is {sys.argv[0]}
-    #     sys.executable is {sys.executable}
-    #     os.getcwd is {os.getcwd()}
-    #     '''
-    # logging.info(log_info)
+    utils.signal_emitter.msfs_quit_signal.connect(restart_sims)
+
+    if system_settings.get('enableVPConfStartup', False):
+        try:
+            set_vpconf_profile(system_settings.get('pathVPConfStartup', ''), dev_serial)
+        except:
+            logging.error("Unable to set VPConfigurator startup profile")
+
+    try:
+        startup_configurator_gains = dev.getGains()
+    except:
+        logging.error("Unable to get configurator slider values from device")
 
     app.exec_()
+
     if _ipc_running:
         notify_close_children()
         _ipc_thread.stop()
     stop_sims()
     telem_manager.quit()
+    if system_settings.get('enableVPConfExit', False):
+        try:
+            set_vpconf_profile(system_settings.get('pathVPConfExit', ''), dev_serial)
+        except:
+            logging.error("Unable to set VPConfigurator exit profile")
 
 
 if __name__ == "__main__":

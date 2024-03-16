@@ -113,6 +113,10 @@ class Aircraft(AircraftBase):
         super().__init__(name, **kwargs)
         self.gun_is_firing = 0
         #clear any existing effects
+        self.spring = effects["spring"].spring()
+        # self.damper = effects["damper"].damper()
+        self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         for e in effects.values(): e.destroy()
         effects.clear()
         self._focus_last_value = 1
@@ -133,9 +137,9 @@ class Aircraft(AircraftBase):
             effects["bombs"].stop()
 
         if self.anything_has_changed("Gun", gun) and not self.gun_is_firing:
-            effects["gunfire"].periodic(canon_hz, self.il2_weapon_release_intensity, 0).start(force=True)
+            effects["gunfire"].periodic(canon_hz, self.il2_weapon_release_intensity, 0, effect_type=EFFECT_SQUARE).start(force=True)
             self.gun_is_firing = 1
-            logging.info(f"Gunfire={self.il2_weapon_release_intensity}")
+            logging.debug(f"Gunfire={self.il2_weapon_release_intensity}")
         elif not self.anything_has_changed("Gun", gun, delta_ms=100):
             # effects["gunfire"].stop()
             effects.dispose("gunfire")
@@ -156,10 +160,14 @@ class Aircraft(AircraftBase):
     def _update_buffeting(self, telem_data: dict):
         freq = telem_data.get("BuffetFrequency", 0)
         amp = utils.clamp(telem_data.get("BuffetAmplitude", 0) * self.il2_buffeting_factor, 0.0, 1.0)
+        amp2 = utils.clamp(amp * 1.4, 0, 1)
         if amp:
             effects["il2_buffet"].periodic(freq, amp, 0, effect_type=EFFECT_SINE).start()
+            effects["il2_buffet2"].periodic(freq * 1.5, amp2, 0, effect_type=EFFECT_SINE, phase=90).start()
+
         else:
             effects.dispose("il2_buffet")
+            effects.dispose("il2_buffet2")
     def _update_damage(self, telem_data):
         if not self.damage_effect_enabled or not self.damage_effect_intensity:
             effects.dispose("hit")
@@ -221,6 +229,8 @@ class Aircraft(AircraftBase):
             self._update_landing_gear(telem_data.get("GearPos"), 0)
         if self.flaps_motion_intensity > 0:
             self._update_flaps(telem_data.get("Flaps"))
+        if self.is_pedals():
+            self._override_pedal_spring(telem_data)
 
         # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
         #     self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))

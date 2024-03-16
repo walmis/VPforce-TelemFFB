@@ -1,0 +1,1 @@
+pyuic5 system_settings.ui -o ../system_settings.py
