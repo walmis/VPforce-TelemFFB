@@ -1926,14 +1926,17 @@ class MainWindow(QMainWindow):
         self._current_config_scope = args.type
         if system_settings.get('saveLastTab', 0):
             if _device_type == 'joystick':
-                tab_key = 'jTab'
+                tab_key = 'jWindowData'
             elif _device_type == 'pedals':
-                tab_key = 'pTab'
+                tab_key = 'pWindowData'
             elif _device_type == 'collective':
-                tab_key = 'cTab'
-
-            tab = utils.get_reg(tab_key)
-            self.current_tab_index = tab
+                tab_key = 'cWindowData'
+            data = utils.get_reg(tab_key)
+            if data is not None:
+                tab = json.loads(data)
+                self.current_tab_index = tab.get("Tab", 0)
+            else:
+                self.current_tab_index = 0
         else:
             self.current_tab_index = 0
         self.default_tab_sizes = {
