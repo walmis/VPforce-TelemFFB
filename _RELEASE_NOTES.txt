@@ -1,9 +1,11 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
-##  March 15, 2024
+##  March 16, 2024
 ############################################
-# Hotpatch - Fix issue with older rhino firmware and 'GetGain' call to Rhino API
+# Hotpatch1 - Fix issue with older rhino firmware and 'GetGain' call to Rhino API
+# Hotpatch2 - Fix issue when 'restore window size/position' and 'restore last tab' are enabled in system settings
+# Hotpatch3 - adjust VRS effect for DCS to leverage better data for determining VRS condition based on airspeed and descent rate
 
 ############################################
 ##  March 15, 2024
