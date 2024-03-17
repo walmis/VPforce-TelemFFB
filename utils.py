@@ -139,6 +139,8 @@ class EffectTranslator:
             "il2_buffet2": ["Buffeting", "il2_buffeting_factor"],
             "inertia": ["Inertia Override", "inertia_force"],
             "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
+            "overspeedY": ["Overspeed Shake", "overspeed_shake_intensity"],
+            "overspeedX": ["Overspeed Shake", "overspeed_shake_intensity"],
             "payload_rel": ["Payload Release", "weapon_release_intensity"],
             "pause_spring": ["Pause/Slew Spring Force", ""],
             "pedal_spring": ["Pedal Spring", "pedal_spring_gain"],
