@@ -1124,7 +1124,11 @@ class AircraftBase(object):
     def _update_vrs_effect(self, telem_data):
         vs = telem_data.get("VerticalSpeed", 0)
         if self._sim_is_dcs():
-            spd = abs(telem_data.get("VlctVectors")[0])
+            # spd = abs(telem_data.get("VlctVectors")[0])
+            tas = telem_data.get("IAS")
+            adj_tas = tas - abs(vs)
+            spd = adj_tas
+            telem_data['_adj_TAS'] = adj_tas
         else:
             spd = abs(telem_data.get('TAS', 0))
         wow = max(telem_data.get("WeightOnWheels", 1))
