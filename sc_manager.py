@@ -4,7 +4,6 @@ import time
 import threading
 import logging
 
-REQ_ID = 0xfeed
 
 surface_types = {
     0: "Concrete",
@@ -103,6 +102,9 @@ EV_STARTED = 65498 # id for started event
 EV_STOPPED = 65497  # id for stopped event
 EV_SIMSTATE = 65496
 class SimConnectManager(threading.Thread):
+    def_id = 0x1234
+    REQ_ID = 0xfeed
+
     sim_vars = [
         SimVar("T", "ABSOLUTE TIME","Seconds" ),
         SimVar("N", "TITLE", "", type=DATATYPE_STRING128),
@@ -166,66 +168,94 @@ class SimConnectManager(threading.Thread):
         SimVar("AfterburnerPct", "TURB ENG AFTERBURNER PCT ACTIVE", "Percent Over 100"),
         SimVar("ACisFBW", "FLY BY WIRE FAC SWITCH", "bool"),
         SimVar("StallWarning", "STALL WARNING", "bool"),
-        SimVar("h145SEMAx", "L:DEBUG_SEMA_PCT_X", sc_unit="percent over 100"),
-        SimVar("h145SEMAy", "L:DEBUG_SEMA_PCT_Y", sc_unit="percent over 100"),
-        SimVar("h145SEMAyaw", "L:DEBUG_SEMA_PCT_YAW", sc_unit="percent over 100"),
-        SimVar("h145AfcsMaster", "L:H145_SDK_AFCS_MASTER", "number"),
-        SimVar("h145TrimRelease", "L:H145_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool"),
-        SimVar("h160TrimRelease", "L:H160_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool"),
-        SimVar("h145CollectiveRelease", "L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool"),
-        SimVar("h160CollectiveRelease", "L:H160_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool"),
-        SimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "enum"),
-        SimVar("h160CollectiveAfcsMode", "L:H160_SDK_AFCS_MODE_COLLECTIVE", "enum"),
-        SimVar("hpgHandsOnCyclic", "L:FFB_HANDS_ON_CYCLIC", "enum"),
-        SimVar("hpgFeetOnPedals", "L:FFB_FEET_ON_PEDALS", "enum"),
-        SimVar("h145HandsOnCyclic", "L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum"),
-        SimVar("h160HandsOnCyclic", "L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum"),
         SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
         SimVar("TailRotorPedalPos", "TAIL ROTOR BLADE PITCH PCT", "percent over 100"),
-        SimVar("HPGVRSDatum", "L:DEBUG_VRS2_DATUM", "enum"),
-        SimVar("HPGVRSIsInVRS", "L:DEBUG_VRS2_IS_IN_VRS", "enum"),
         SimVarArray("HydPress", "HYDRAULIC PRESSURE", "psi", min=1, max=2),
         SimVarArray("HydResPct", "HYDRAULIC RESERVOIR PERCENT", "Percent Over 100", min=1, max=2),
         SimVar("HydSwitch", "HYDRAULIC SWITCH", "bool"),
         SimVar("HydSys", "HYDRAULIC SYSTEM INTEGRITY", "Percent Over 100"),
 
     ]
-    
+
     def __init__(self):
         threading.Thread.__init__(self, daemon=True)
         self.sc = None
         self._quit = False
-
+        self.initial_subscribe_done = False
         self._sim_paused = False
         self._sim_started = 0
         self._sim_state = 0
         self._final_frame_sent = 0
         self._events_to_send = []
         self._simdatums_to_send = []
-
-
         self.subscribed_vars = []
+        self.temp_sim_vars = []
+        self.resubscribe = False
+
+
+    def addSimVar(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
+        self.temp_sim_vars.append(SimVar(name, var, sc_unit, unit=unit, type=type, scale=scale, mutator=mutator))
+    def substitute_simvars(self):
+        master_list = list(self.sim_vars)
+        override_list = list(self.temp_sim_vars)
+
+        master_dict = {simvar.name: simvar for simvar in master_list}
+        override_dict = {simvar.name: simvar for simvar in override_list}
+
+        # Update the master dict with the override dict
+        # This replaces any existing entries with the override ones and adds new ones
+        master_dict.update(override_dict)
+
+        # Convert the final dictionary back into a list
+        resulting_list = list(master_dict.values())
+        # for sv in resulting_list: print(f"SV: {sv}")
+        self.temp_sim_vars.clear()
+        print("Substitute Simvar Resulting List:")
+        print(resulting_list)
+        return resulting_list
 
     def _subscribe(self):
-        def_id = 0x1234
+
+        if self.initial_subscribe_done:
+            print("\n\n")
+            print("*****************************************************************************************************")
+            print("*****************************************************************************************************")
+            print("*****************************************************************************************************")
+            logging.info("RESUBSCRIBING")
+            print("*****************************************************************************************************")
+            print("*****************************************************************************************************")
+            print("*****************************************************************************************************")
+            print("\n\n")
+            self.sc.ClearDataDefinition(self.def_id)
+            self.def_id += 1
+            self.REQ_ID += 1
+
+        self.initial_subscribe_done = True
+        print(" Simvar List:")
+        print(self.sim_vars)
+        active_sim_vars = self.substitute_simvars()
+        # self.substitute_simvars()
+        self.subscribed_vars.clear()
 
         i = 0
-        for sv in (self.sim_vars):
+        for sv in (active_sim_vars):
             if isinstance(sv, SimVarArray):
                 for sv in sv.vars:
-                    logging.debug(f"Subscribe SimVar {i} {sv}")
-                    self.sc.AddToDataDefinition(def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
+                    res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
+                    logging.debug(f"Result: {res} Subscribe SimVar {i} {sv}")
+
                     self.subscribed_vars.append(sv)
                     i+=1
-            else:    
-                logging.debug(f"Subscribe SimVar {i} {sv}")
-                self.sc.AddToDataDefinition(def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
+            else:
+                res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
+                logging.debug(f"Result: {res} Subscribe SimVar {i} {sv}")
+
                 self.subscribed_vars.append(sv)
                 i+=1
 
         self.sc.RequestDataOnSimObject(
-            REQ_ID,  # request identifier for response packets
-            def_id,  # the data definition group
+            self.REQ_ID,  # request identifier for response packets
+            self.def_id,  # the data definition group
             OBJECT_ID_USER,
             PERIOD_SIM_FRAME,
             DATA_REQUEST_FLAG_TAGGED,# DATA_REQUEST_FLAG_CHANGED | DATA_REQUEST_FLAG_TAGGED,
@@ -233,7 +263,10 @@ class SimConnectManager(threading.Thread):
             1,  # number of periods between events, e.g. with PERIOD_SIM_FRAME
             0,  # number of repeats, 0 is forever
         )
+
     # blocks and reads telemetry
+    def _resubscribe(self):
+        self.resubscribe = True
 
     def set_simdatum_to_msfs(self, simvar, value, units=None):
         self._simdatums_to_send.append((simvar, value, units))
@@ -270,14 +303,22 @@ class SimConnectManager(threading.Thread):
         pRecv = RECV_P()
         nSize = DWORD()
         while not self._quit:
+
+
             self.tx_events_to_msfs()  # tx any pending sim events that are queued
             self.tx_simdatums_to_msfs()  # tx any pending simdatum sets that are queued
+
             try:
                 #print('Trying')
                 self.sc.GetNextDispatch(byref(pRecv), byref(nSize))
             except OSError as e:
                 #print(e)
                 time.sleep(0.001)
+                continue
+
+            if self.resubscribe:
+                self._subscribe()
+                self.resubscribe = False
                 continue
 
             recv = ReceiverInstance.cast_recv(pRecv)
@@ -290,7 +331,7 @@ class SimConnectManager(threading.Thread):
                 break
             elif isinstance(recv, RECV_OPEN):
                 self.emit_event("Open")
-                
+
             elif isinstance(recv, RECV_EVENT):
                 if recv.uEventID == EV_PAUSED:
                     logging.debug(f"EVENT PAUSED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
@@ -312,7 +353,7 @@ class SimConnectManager(threading.Thread):
             elif isinstance(recv, RECV_SIMOBJECT_DATA):
                 logging.debug(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
                 #print(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
-                if recv.dwRequestID == REQ_ID:
+                if recv.dwRequestID == self.REQ_ID:
                     #print(f"Matched request 0x{req_id:X}")
                     data = {}
                     data["SimPaused"] = self._sim_paused
@@ -322,27 +363,32 @@ class SimConnectManager(threading.Thread):
                         idx = cast(byref(recv, offset), POINTER(DWORD))[0]
                         offset += sizeof(DWORD)
                         # DATATYPE_FLOAT64 => c_double
-                        var : SimVar = self.subscribed_vars[idx]
-                        c_type = var.c_type
-                        if var.datatype == DATATYPE_STRING128: #fixme: other string types
-                            val = str(cast(byref(recv, offset), POINTER(c_type))[0].value, "utf-8")
-                        else:
-                            val = cast(byref(recv, offset), POINTER(c_type))[0]
-                        offset += sizeof(c_type)
-                        val = var._calculate(val)
-                        
-                        if var.parent: # var is part of array
-                            var.parent.values[var.index-var.parent.min] = val
-                            data[var.parent.name] = var.parent.values
-                        else:
-                            data[var.name] = val
-                            
+                        try:
+                            var : SimVar = self.subscribed_vars[idx]
+                            c_type = var.c_type
+                            if var.datatype == DATATYPE_STRING128: #fixme: other string types
+                                val = str(cast(byref(recv, offset), POINTER(c_type))[0].value, "utf-8")
+                            else:
+                                val = cast(byref(recv, offset), POINTER(c_type))[0]
+                            offset += sizeof(c_type)
+                            val = var._calculate(val)
+
+                            if var.parent: # var is part of array
+                                var.parent.values[var.index-var.parent.min] = val
+                                data[var.parent.name] = var.parent.values
+                            else:
+                                data[var.name] = val
+                        except:
+                            # print("****** BAD STUFF HAPPENED")
+                            continue
+
                     # if not self._sim_paused and not data["Parked"] and not data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
                     #     self.emit_packet(data)
                     #     self._final_frame_sent = 0
-                    if self._sim_paused or data["Parked"] or data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
+                    if self._sim_paused or data.get("Parked", 0) or data.get("Slew", 0):     # fixme: figure out why simstart/stop and sim events dont work right
                         data["STOP"] = 1
-
+                        data['_num_simvars'] = len(data)
+                    # print(f"!#$!#$!#$!#$ EMITTING PACKET LEN: {len(data)}")
                     self.emit_packet(data)
 
             else:
@@ -392,5 +438,12 @@ if __name__ == "__main__":
 
     s = SimConnectTest()
     s.start()
+    start_time = time.time()
+    tst_executed = False
     while True:
         time.sleep(1)
+        if not tst_executed and time.time() > 5:
+            s.addSimVar("APMaster", "L:ApMode", "Enum")
+            s.addSimVar("PropThrust", "L:Eng1_RPM", "number")
+            s._subscribe()
+            tst_executed = True

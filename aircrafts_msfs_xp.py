@@ -157,6 +157,10 @@ class Aircraft(AircraftBase):
 
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
+
+        if self._simconnect:
+            self._simconnect._resubscribe()
+
         # clear any existing effects
         for e in effects.values(): e.destroy()
         effects.clear()
@@ -965,6 +969,14 @@ class Aircraft(AircraftBase):
 
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop aircraft"""
+    def __init__(self, name, **kwargs):
+        if self._simconnect:
+            if "A2A" in name:
+                if "Comanche" in name:
+                    self._simconnect.addSimVar("APMaster", "L:ApMode", "Enum")
+                    self._simconnect.addSimVar("PropThrust", "L:Eng1_RPM", "number")
+
+        super().__init__(name, **kwargs)
 
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
@@ -994,7 +1006,10 @@ class JetAircraft(Aircraft):
 
     _ab_is_playing = 0
 
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
     # run on every telemetry frame
+
     def on_telemetry(self, telem_data):
         pass
         ## Jet Aircraft Telemetry Manager
@@ -1018,6 +1033,8 @@ class JetAircraft(Aircraft):
         self._update_ab_effect(telem_data)
 
 class TurbopropAircraft(PropellerAircraft):
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
 
     def on_telemetry(self, telem_data):
         pass
@@ -1039,6 +1056,9 @@ class TurbopropAircraft(PropellerAircraft):
         self._update_jet_engine_rumble(telem_data)
 
 class GliderAircraft(Aircraft):
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+
     def _update_force_trim(self, telem_data, x_axis=True, y_axis=True):
         if not self.force_trim_enabled: 
             return
@@ -1203,8 +1223,14 @@ class Helicopter(Aircraft):
     cyclic_virtual_trim_x_offs = 0
     cyclic_virtual_trim_y_offs = 0
 
-
     def __init__(self, name, **kwargs):
+        if self._simconnect:
+            if "FlyInside" in name:
+                self._simconnect.addSimVar("EngRPM", "L:Aircraft.Engine.1.Turbine.N2.Smooth", "Percent Over 100")
+                if 'B206' in name:
+                    self._simconnect.addSimVar("RotorRPM", "L:Aircraft.Rotor.RPM.Percent", "Percent Over 100", scale=3.25)
+                if 'B47' in name:
+                    self._simconnect.addSimVar("RotorRPM", "L:Aircraft.Rotor.RPM.Percent", "Percent Over 100", scale=3.00)
 
         super().__init__(name, **kwargs)
     def on_timeout(self):
@@ -1692,7 +1718,24 @@ class HPGHelicopter(Helicopter):
     vrs_effect_intensity = 0
 
     def __init__(self, name, **kwargs):
+        if self._simconnect:
+            self._simconnect.addSimVar("h145SEMAx", "L:DEBUG_SEMA_PCT_X", sc_unit="percent over 100")
+            self._simconnect.addSimVar("h145SEMAy", "L:DEBUG_SEMA_PCT_Y", sc_unit="percent over 100")
+            self._simconnect.addSimVar("h145AfcsSemaPedalX", "L:DEBUG_AFCS_SYS_SEMA_YAW", sc_unit="position")
+            self._simconnect.addSimVar("h145AfcsMaster", "L:H145_SDK_AFCS_MASTER", "number")
+            self._simconnect.addSimVar("h145TrimRelease", "L:H145_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool")
+            self._simconnect.addSimVar("h160TrimRelease", "L:H160_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool")
+            self._simconnect.addSimVar("h145CollectiveRelease", "L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool")
+            self._simconnect.addSimVar("h160CollectiveRelease", "L:H160_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool")
+            self._simconnect.addSimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "enum")
+            self._simconnect.addSimVar("h160CollectiveAfcsMode", "L:H160_SDK_AFCS_MODE_COLLECTIVE", "enum")
+            self._simconnect.addSimVar("h145HandsOnCyclic", "L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum")
+            self._simconnect.addSimVar("h160HandsOnCyclic", "L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum")
+            self._simconnect.addSimVar("HPGVRSDatum", "L:DEBUG_VRS2_DATUM", "enum")
+            self._simconnect.addSimVar("HPGVRSIsInVRS", "L:DEBUG_VRS2_IS_IN_VRS", "enum")
+
         super().__init__(name, **kwargs)
+
         input_data = HapticEffect.device.getInput()
         self.phys_x, self.phys_y = input_data.axisXY()
         self.cpO_y = round(self.phys_y * 4096)
