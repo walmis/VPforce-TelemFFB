@@ -702,6 +702,9 @@ class AircraftBase(object):
         if isinstance(hydraulic_pressure, list):
             hydraulic_pressure = max(hydraulic_pressure)
 
+        if isinstance(hydraulic_sys, int) and (hydraulic_sys == 1 or hydraulic_sys == 0):
+            hydraulic_sys = bool(hydraulic_sys)
+
         if isinstance(hydraulic_sys, list):
             self.hydraulic_factor = max(hydraulic_sys)
 

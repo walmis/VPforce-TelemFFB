@@ -1229,6 +1229,7 @@ class Helicopter(Aircraft):
                 self._simconnect.addSimVar("EngRPM", "L:Aircraft.Engine.1.Turbine.N2.Smooth", "Percent Over 100")
                 if 'B206' in name:
                     self._simconnect.addSimVar("RotorRPM", "L:Aircraft.Rotor.RPM.Percent", "Percent Over 100", scale=3.25)
+                    self._simconnect.addSimVar("HydSys", "L:Aircraft.Hydraulics.Enabled", "bool")
                 if 'B47' in name:
                     self._simconnect.addSimVar("RotorRPM", "L:Aircraft.Rotor.RPM.Percent", "Percent Over 100", scale=3.00)
 
