@@ -1722,7 +1722,7 @@ class HPGHelicopter(Helicopter):
         if self._simconnect:
             self._simconnect.addSimVar("h145SEMAx", "L:DEBUG_SEMA_PCT_X", sc_unit="percent over 100")
             self._simconnect.addSimVar("h145SEMAy", "L:DEBUG_SEMA_PCT_Y", sc_unit="percent over 100")
-            self._simconnect.addSimVar("h145AfcsSemaPedalX", "L:DEBUG_AFCS_SYS_SEMA_YAW", sc_unit="position")
+            self._simconnect.addSimVar("h145SEMAyaw", "L:DEBUG_SEMA_PCT_YAW", sc_unit="percent over 100")
             self._simconnect.addSimVar("h145AfcsMaster", "L:H145_SDK_AFCS_MASTER", "number")
             self._simconnect.addSimVar("h145TrimRelease", "L:H145_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool")
             self._simconnect.addSimVar("h160TrimRelease", "L:H160_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool")
@@ -1730,6 +1730,8 @@ class HPGHelicopter(Helicopter):
             self._simconnect.addSimVar("h160CollectiveRelease", "L:H160_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool")
             self._simconnect.addSimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "enum")
             self._simconnect.addSimVar("h160CollectiveAfcsMode", "L:H160_SDK_AFCS_MODE_COLLECTIVE", "enum")
+            self._simconnect.addSimVar("hpgHandsOnCyclic", "L:FFB_HANDS_ON_CYCLIC", "enum")
+            self._simconnect.addSimVar("hpgFeetOnPedals", "L:FFB_FEET_ON_PEDALS", "enum")
             self._simconnect.addSimVar("h145HandsOnCyclic", "L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum")
             self._simconnect.addSimVar("h160HandsOnCyclic", "L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum")
             self._simconnect.addSimVar("HPGVRSDatum", "L:DEBUG_VRS2_DATUM", "enum")
@@ -1830,8 +1832,8 @@ class HPGHelicopter(Helicopter):
                     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
                 telem_data['error'] = 1
                 return
-            sema_x = telem_data.get("h145SEMAx")
-            sema_y = telem_data.get("h145SEMAy")
+            sema_x = telem_data.get("h145SEMAx", 0)
+            sema_y = telem_data.get("h145SEMAy", 0)
 
             # sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
             # sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
