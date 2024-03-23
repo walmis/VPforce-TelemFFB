@@ -191,11 +191,15 @@ class SimConnectManager(threading.Thread):
         self.subscribed_vars = []
         self.temp_sim_vars = []
         self.resubscribe = False
+        self.current_simvars = []
+        self.current_var_tracker = []
+        self.new_var_tracker = []
 
 
     def addSimVar(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
         self.temp_sim_vars.append(SimVar(name, var, sc_unit, unit=unit, type=type, scale=scale, mutator=mutator))
     def substitute_simvars(self):
+        # build a combined list of the pre-defined simvars from __init__ and any new/updated simvars that have been set by a model
         master_list = list(self.sim_vars)
         override_list = list(self.temp_sim_vars)
 
@@ -210,47 +214,49 @@ class SimConnectManager(threading.Thread):
         resulting_list = list(master_dict.values())
         # for sv in resulting_list: print(f"SV: {sv}")
         self.temp_sim_vars.clear()
-        print("Substitute Simvar Resulting List:")
-        print(resulting_list)
+        self.new_var_tracker.clear()
+
+        for sv in (resulting_list):
+            # build list of just the simvar / l:var for use in comparing to currently subscribed list (self.current_var_tracker)
+            if isinstance(sv, SimVarArray):
+                for sv in sv.vars:
+                    self.new_var_tracker.append(sv.var)
+            else:
+                self.new_var_tracker.append(sv.var)
         return resulting_list
 
     def _subscribe(self):
 
-        if self.initial_subscribe_done:
-            print("\n\n")
-            print("*****************************************************************************************************")
-            print("*****************************************************************************************************")
-            print("*****************************************************************************************************")
-            logging.info("RESUBSCRIBING")
-            print("*****************************************************************************************************")
-            print("*****************************************************************************************************")
-            print("*****************************************************************************************************")
-            print("\n\n")
+        sim_vars = self.substitute_simvars()
+
+        if self.current_var_tracker == self.new_var_tracker:
+            # the current subscription matches the needed vars.. no need to resubscribe
+            return
+        else:
+            logging.info("Simvar list has changed, creating new SC subscription")
             self.sc.ClearDataDefinition(self.def_id)
             self.def_id += 1
             self.REQ_ID += 1
 
-        self.initial_subscribe_done = True
-        print(" Simvar List:")
-        print(self.sim_vars)
-        active_sim_vars = self.substitute_simvars()
-        # self.substitute_simvars()
         self.subscribed_vars.clear()
+        self.current_var_tracker.clear()
 
         i = 0
-        for sv in (active_sim_vars):
+        for sv in (sim_vars):
             if isinstance(sv, SimVarArray):
                 for sv in sv.vars:
                     res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
                     logging.debug(f"Result: {res} Subscribe SimVar {i} {sv}")
 
                     self.subscribed_vars.append(sv)
+                    self.current_var_tracker.append(sv.var)
                     i+=1
             else:
                 res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
                 logging.debug(f"Result: {res} Subscribe SimVar {i} {sv}")
 
                 self.subscribed_vars.append(sv)
+                self.current_var_tracker.append(sv.var)
                 i+=1
 
         self.sc.RequestDataOnSimObject(
