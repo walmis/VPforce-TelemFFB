@@ -136,7 +136,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         lprint(f'get current model {self.sim}  {self.model_name} {self.crafttype}')
 
-        self.tb_currentmodel.setText(self.model_name)
+        # self.tb_currentmodel.setText(self.model_name)
+        # self.l_currentmodel.setText(self.model_name)
         self.table_widget.clearContents()
         # self.setup_table()
         self.setup_class_list()
@@ -172,6 +173,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if self.model_type != '': self.drp_class.setCurrentText(self.model_type)
 
         self.populate_table()
+        self.l_currentmodel.setText(f"<b>{self.model_name}</b> as a <b>{self.model_type}</b> for <b>{self.sim}</b>")
 
     def init_ui(self):
         mprint(f"init_ui")
@@ -179,7 +181,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # xmlutils.create_empty_userxml_file()  # Now handled by TelemFFB on startup
         self.table_widget.horizontalHeader().setStretchLastSection(True) 
         self.table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.tb_currentmodel.setText(self.model_name)
+        # self.tb_currentmodel.setText(self.model_name)
+        # self.l_currentmodel.setText(self.model_name)
+        self.l_currentmodel.setText(f"<b>{self.model_name}</b> as a <b>{self.model_type}</b> for <b>{self.sim}</b>")
 
         self.get_current_model('', '')
         self.b_getcurrentmodel.clicked.connect(self.currentmodel_click)
@@ -228,9 +232,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_class.setCurrentIndex(0)
         self.update_table_on_sim_change()
     def currentmodel_click(self):
-
+        if self.current_sim == 'nothing':
+            QMessageBox.warning(self, "No Simulator is Running", "No Simulator is Running")
+            return
         mprint("currentmodel_click")
         self.sim = self.current_sim
+
         self.model_name = self.current_aircraft_name
         self.model_type = self.current_class
         self.get_current_model(self.sim, self.model_name, self.model_type)
@@ -273,7 +280,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def show_user_model_dialog(self):
         mprint("show_user_model_dialog")
-        current_aircraft = self.tb_currentmodel.text()
+        current_aircraft = self.drp_models.currentText()
         dialog = UserModelDialog(self.sim,current_aircraft, self.model_type, self)
         result = dialog.exec_()
         if result == QtWidgets.QDialog.Accepted:
@@ -289,7 +296,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 xmlutils.clone_pattern(self.sim, pat_to_clone, new_aircraft)
 
             self.model_name = new_aircraft
-            self.tb_currentmodel.setText(new_aircraft)
+            # self.tb_currentmodel.setText(new_aircraft)
+            # self.l_currentmodel.setText(new_aircraft)
+            self.l_currentmodel.setText(f"<b>{self.model_name}</b> as a <b>{self.model_type}</b> for <b>{self.sim}</b>")
+
             self.get_current_model(self.sim, new_aircraft)
         else:
             # Handle canceled
@@ -950,6 +960,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.drp_class.setCurrentText(old_model_type)
 
         self.reload_table()
+        if self.model_name != '':
+            self.l_currentmodel.setText(f"<b>{self.model_name}</b> as a <b>{self.model_type}</b> for <b>{self.sim}</b>")
+
+        else:
+            self.l_currentmodel.setText(f"Global Default <b>{self.model_type}</b> settings for <b>{self.sim}</b>")
+
 
     def update_table_on_class_change(self):
         mprint("update_table_on_class_change")
@@ -979,6 +995,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.table_widget.clearContents()
         # self.setup_table()
         self.reload_table()
+        if self.model_type != '':
+            self.l_currentmodel.setText(f"Global Default <b>{self.model_type}</b> settings for <b>{self.sim}</b>")
+        else:
+            self.l_currentmodel.setText(f"Global Default settings for simulator: <b>{self.sim}</b>")
 
     def update_table_on_sim_change(self):
         mprint("update_table_on_sim_change")
@@ -992,6 +1012,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.setup_model_list()
 
         self.reload_table()
+        self.l_currentmodel.setText(f"Global Default settings for simulator: <b>{self.sim}</b>")
 
         lprint(f"\nsim change for: {self.sim}  model: {self.model_name}  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
 
@@ -1109,11 +1130,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_class.setEnabled(True)
                     self.drp_models.setEnabled(True)
 
-            if self.tb_currentmodel.text() == '':
-                self.b_createusermodel.setEnabled(False)
-                self.b_getcurrentmodel.setEnabled(False)
-            else:
-                self.b_getcurrentmodel.setEnabled(True)
+            # if self.tb_currentmodel.text() == '':
+            #     # self.b_createusermodel.setEnabled(False)
+            #     self.b_getcurrentmodel.setEnabled(False)
+            # else:
+            #     self.b_getcurrentmodel.setEnabled(True)
 
         lprint(f"{mode} Mode")
 
@@ -1137,11 +1158,12 @@ class UserModelDialog(QDialog):
     the_sim = ''
     def __init__(self, sim, current_aircraft, current_type, parent=None):
         super(UserModelDialog, self).__init__(parent)
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
         self.the_sim = sim
         self.combo_box = None
         self.models_combo_box = None
         self.tb_current_aircraft = None
-        self.setWindowTitle("Create Model Setting")
+        self.setWindowTitle(f"Create Model Settings ({self.the_sim} is current/selected)")
         self.init_ui(sim, current_aircraft,current_type)
 
     def class_combo_changed(self):
@@ -1187,12 +1209,21 @@ class UserModelDialog(QDialog):
     def init_ui(self,sim,current_aircraft,current_type):
 
         layout = QVBoxLayout()
+        lb1_txt = """
+    <p>TelemFFB uses regex to match aircraft names</p>
+    <p><b style="font-family: Courier">Name.*</b> will match anything starting with '<b>Name</b>'</p>
+    <p><b style="font-family: Courier">^Name$</b> will match only the exact '<b>Name</b>'</p>
+    <p><b style="font-family: Courier">(The )?Name.*</b> matches starting with '<b>Name</b>' or '<b>The Name</b>'</p>
+"""
+        label1 = QLabel(lb1_txt)
+        # label1 = QLabel("TelemFFB uses regex to match aircraft names")
+        # label2 = QLabel("Name.* will match anything starting with 'Name'")
+        # label3 = QLabel("^Name$ will match only the exact 'Name'")
+        # label4 = QLabel("(The )?Name.* matches starting with 'Name' or 'The Name'" )
+        lb2_text = f"<br>Creating new aircraft profile within sim: <b>{self.the_sim}</b><br>"
+        label2 = QLabel(lb2_text)
 
-        label1 = QLabel("TelemFFB uses regex to match aircraft names")
-        label2 = QLabel("Name.* will match anything starting with 'Name'")
-        label3 = QLabel("^Name$ will match only the exact 'Name'")
-        label4 = QLabel("(The )?Name.* matches starting with 'Name' or 'The Name'" )
-        label5 = QLabel("Choose or Edit the match pattern below.")
+        label3 = QLabel("Choose or Edit the match pattern below.")
 
         label6 = QLabel("And choose the aircraft class:")
 
@@ -1212,7 +1243,7 @@ class UserModelDialog(QDialog):
         # FOR TESTING
         # classes.append('AllSettings')
 
-        label_aircraft = QtWidgets.QLabel("Current Aircraft:")
+        # label_aircraft = QtWidgets.QLabel("Current Aircraft:")
 
         self.tb_current_aircraft = QComboBox()
         self.tb_current_aircraft.blockSignals(True)
@@ -1254,9 +1285,8 @@ class UserModelDialog(QDialog):
         layout.addWidget(label1)
         layout.addWidget(label2)
         layout.addWidget(label3)
-        layout.addWidget(label4)
-        layout.addWidget(label5)
-
+        # layout.addWidget(label4)
+        # layout.addWidget(label5)
         layout.addWidget(self.tb_current_aircraft)
 
         layout.addWidget(label6)

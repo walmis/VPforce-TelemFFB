@@ -30,37 +30,7 @@
     </item>
     <item>
      <layout class="QGridLayout" name="gridLayout">
-      <item row="0" column="6">
-       <widget class="QLabel" name="l_mode">
-        <property name="maximumSize">
-         <size>
-          <width>150</width>
-          <height>16777215</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>Model</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="5">
-       <widget class="QLabel" name="label_3">
-        <property name="text">
-         <string>Edit Mode:</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="3">
-       <widget class="QPushButton" name="pb_clear">
-        <property name="text">
-         <string>Clear Selection</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="5">
+      <item row="1" column="6">
        <widget class="QLabel" name="label_2">
         <property name="text">
          <string>Device Scope:</string>
@@ -70,10 +40,35 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
-       <widget class="QLabel" name="label_5">
+      <item row="1" column="7">
+       <widget class="QComboBox" name="drp_device"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QComboBox" name="drp_sim">
+        <property name="editable">
+         <bool>false</bool>
+        </property>
+        <item>
+         <property name="text">
+          <string>DCS</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>IL2</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>MSFS</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="1" column="3">
+       <widget class="QPushButton" name="pb_clear">
         <property name="text">
-         <string>Class</string>
+         <string>Clear Selection</string>
         </property>
        </widget>
       </item>
@@ -89,10 +84,10 @@
         </item>
        </widget>
       </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_4">
+      <item row="0" column="1">
+       <widget class="QLabel" name="label_5">
         <property name="text">
-         <string>Simulator</string>
+         <string>Class</string>
         </property>
        </widget>
       </item>
@@ -135,39 +130,7 @@
         </item>
        </widget>
       </item>
-      <item row="1" column="0">
-       <widget class="QComboBox" name="drp_sim">
-        <property name="editable">
-         <bool>false</bool>
-        </property>
-        <item>
-         <property name="text">
-          <string>DCS</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>IL2</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>MSFS</string>
-         </property>
-        </item>
-       </widget>
-      </item>
-      <item row="1" column="6">
-       <widget class="QComboBox" name="drp_device"/>
-      </item>
-      <item row="0" column="2">
-       <widget class="QLabel" name="label_6">
-        <property name="text">
-         <string>Model</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="4">
+      <item row="1" column="5">
        <spacer name="horizontalSpacer">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -179,6 +142,53 @@
          </size>
         </property>
        </spacer>
+      </item>
+      <item row="0" column="7">
+       <widget class="QLabel" name="l_mode">
+        <property name="maximumSize">
+         <size>
+          <width>150</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>Model</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QLabel" name="label_6">
+        <property name="text">
+         <string>Model</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="6">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>Edit Mode:</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Simulator</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="4">
+       <widget class="QPushButton" name="b_createusermodel">
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select the &lt;span style=&quot; font-weight:600;&quot;&gt;Simulator&lt;/span&gt; and, optionally, the &lt;span style=&quot; font-weight:600;&quot;&gt;Class&lt;/span&gt; for the new aircraft you want to add.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;Then press this button and then fill out the resulting form.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="text">
+         <string>Create New Model</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
@@ -247,61 +257,7 @@
         </item>
         <item>
          <layout class="QGridLayout" name="gridLayout_2">
-          <item row="1" column="2">
-           <widget class="QLineEdit" name="tb_currentmodel">
-            <property name="text">
-             <string>Wilga 80X</string>
-            </property>
-            <property name="readOnly">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QPushButton" name="b_revert">
-            <property name="text">
-             <string>Revert Changes</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QPushButton" name="b_createusermodel">
-            <property name="text">
-             <string>Create Model Setting</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QPushButton" name="b_deleteModel">
-            <property name="enabled">
-             <bool>false</bool>
-            </property>
-            <property name="text">
-             <string>Delete User Model</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="0">
-           <widget class="QCheckBox" name="cb_show_inherited">
-            <property name="text">
-             <string>Show Defaults</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="2">
-           <widget class="QLabel" name="label">
-            <property name="text">
-             <string>Current Aircraft:</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="3">
+          <item row="1" column="5">
            <widget class="QLabel" name="l_manual">
             <property name="text">
              <string>&lt;a href=&quot;https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y&quot;&gt;Read manual for details&lt;/a&gt;</string>
@@ -316,6 +272,60 @@
              <bool>true</bool>
             </property>
            </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QPushButton" name="b_deleteModel">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="text">
+             <string>Delete User Model</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QLabel" name="label_9">
+            <property name="text">
+             <string>Currently Editing:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QCheckBox" name="cb_show_inherited">
+            <property name="text">
+             <string>Show Defaults</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="3">
+           <widget class="QLabel" name="l_currentmodel">
+            <property name="text">
+             <string>TextLabel</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QPushButton" name="b_revert">
+            <property name="text">
+             <string>Revert Changes</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="4">
+           <spacer name="horizontalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>40</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
           </item>
          </layout>
         </item>
@@ -340,6 +350,7 @@
           </property>
           <property name="font">
            <font>
+            <weight>75</weight>
             <bold>true</bold>
            </font>
           </property>
@@ -440,6 +451,7 @@
           </property>
           <property name="font">
            <font>
+            <weight>50</weight>
             <bold>false</bold>
             <kerning>true</kerning>
            </font>
@@ -529,6 +541,9 @@
             <width>200</width>
             <height>16777215</height>
            </size>
+          </property>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Select this button while a sim is running to recall the currently loaded aircraft.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;With no sim running, this button has no effect.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
           <property name="text">
            <string>Get Current Model</string>
