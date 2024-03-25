@@ -32,6 +32,20 @@ surface_types = {
     23: "Tarmac",
     24: "Wright flyer track",
 }
+def dbprint(color, msg):
+    match color:
+        case "red":
+            ccode = '\033[91m'
+        case 'yellow':
+            ccode = '\033[93m'
+        case 'blue':
+            ccode = '\033[94m'
+        case 'green':
+            ccode = '\033[92m'
+        case _:
+            ccode = '\033[0m'
+    print(f"{ccode}{msg}")
+
 
 class SimVar:
     def __init__(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
@@ -388,7 +402,7 @@ class SimConnectManager(threading.Thread):
                             else:
                                 data[var.name] = val
                         except:
-                            # print("****** BAD STUFF HAPPENED")
+                            dbprint("green", "**DEBUG*** Exception parsing SC FRAME")
                             continue
 
                     # if not self._sim_paused and not data["Parked"] and not data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
@@ -400,10 +414,10 @@ class SimConnectManager(threading.Thread):
                     # print(f"!#$!#$!#$!#$ EMITTING PACKET LEN: {len(data)}")
                     self.emit_packet(data)
                 else:
-                    # print(f"&&&&&&&&&&&&&& got dispatch for request ID: {recv.dwRequestID} defID: {recv.dwDefineID}")
+                    dbprint("green", f"**DEBUG*** got dispatch for OLD request: {recv.dwRequestID} defID: {recv.dwDefineID} | currrent defID: {self.def_id}")
                     pass
             else:
-                print("Received", recv)
+                logging.warning(f"Received unknown simconnect message: {recv}")
 
     def emit_packet(self, data):
         pass
