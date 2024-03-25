@@ -177,7 +177,7 @@ class SimConnectManager(threading.Thread):
 
     ]
 
-    def __init__(self):
+    def __init__(self, unique_id):
         threading.Thread.__init__(self, daemon=True)
         self.sc = None
         self._quit = False
@@ -194,6 +194,7 @@ class SimConnectManager(threading.Thread):
         self.current_simvars = []
         self.current_var_tracker = []
         self.new_var_tracker = []
+        self.REQ_ID = 60000 + unique_id
 
 
     def addSimVar(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
@@ -234,9 +235,11 @@ class SimConnectManager(threading.Thread):
             return
         else:
             logging.info("Simvar list has changed, creating new SC subscription")
-            self.sc.ClearDataDefinition(self.def_id)
-            self.def_id += 1
-            self.REQ_ID += 1
+            if self.initial_subscribe_done:
+                self.sc.ClearDataDefinition(self.def_id)
+                self.def_id += 1
+                # self.REQ_ID += 1
+            self.initial_subscribe_done = True
 
         self.subscribed_vars.clear()
         self.current_var_tracker.clear()
@@ -359,7 +362,7 @@ class SimConnectManager(threading.Thread):
             elif isinstance(recv, RECV_SIMOBJECT_DATA):
                 logging.debug(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
                 #print(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
-                if recv.dwRequestID == self.REQ_ID:
+                if recv.dwRequestID == self.REQ_ID and recv.dwDefineID == self.def_id:
                     #print(f"Matched request 0x{req_id:X}")
                     data = {}
                     data["SimPaused"] = self._sim_paused
@@ -396,7 +399,9 @@ class SimConnectManager(threading.Thread):
                         data['_num_simvars'] = len(data)
                     # print(f"!#$!#$!#$!#$ EMITTING PACKET LEN: {len(data)}")
                     self.emit_packet(data)
-
+                else:
+                    # print(f"&&&&&&&&&&&&&& got dispatch for request ID: {recv.dwRequestID} defID: {recv.dwDefineID}")
+                    pass
             else:
                 print("Received", recv)
 
@@ -413,7 +418,7 @@ class SimConnectManager(threading.Thread):
         while not self._quit:
             try:
                 logging.info("Trying SimConnect")
-                with SimConnect("TelemFFB") as self.sc:
+                with SimConnect(f"TelemFFB-{self._ffb_type}") as self.sc:
                     self.sc.SubscribeToSystemEvent(EV_PAUSED, "Pause")
                     self.sc.SubscribeToSystemEvent(EV_STARTED, "SimStart")
                     self.sc.SubscribeToSystemEvent(EV_STOPPED, "SimStop")

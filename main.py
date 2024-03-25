@@ -1055,9 +1055,11 @@ class NetworkThread(threading.Thread):
 
 
 class SimConnectSock(SimConnectManager):
-    def __init__(self, telem: TelemManager):
-        super().__init__()
+    def __init__(self, telem: TelemManager, ffb_type=_device_type, unique_id=int(_device_pid)):
+        super().__init__(unique_id)
         self._telem = telem
+        self._ffb_type = ffb_type
+
 
     def fmt(self, val):
         if isinstance(val, list):
