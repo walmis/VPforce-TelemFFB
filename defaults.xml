@@ -321,12 +321,23 @@
 		<order>15.5</order>
 		<name>force_trim_button</name>
 		<prereq>force_trim_enabled</prereq>
-		<MSFS>true</MSFS>
-		<datatype>button</datatype>
 		<info>Button # to hold to release spring while moving axis</info>
 		<displayname>Force Trim Release Button</displayname>
+		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>15.5</order>
+		<name>force_trim_button</name>
+		<prereq>force_trim_enabled</prereq>
+		<MSFS>true</MSFS>
+		<datatype>button</datatype>
+		<info>Button # to hold to release spring while moving axis&lt;br&gt;&lt;br&gt;**Cannot be set from the collective context of the master instace**&lt;br&gt;&lt;br&gt;Must be set from the actual collective instance of TelemFFB</info>
+		<displayname>Trim Release Button (must use collective instance to set)</displayname>
+		<XPLANE>true</XPLANE>
 		<collective>true</collective>
 	</defaults>
 	<defaults>
@@ -340,7 +351,6 @@
 		<displayname>Force Trim Reset Button</displayname>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
@@ -352,6 +362,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
@@ -8220,6 +8231,13 @@
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_enabled</name>
+		<type>HPGHelicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
 	</classdefaults>
 	<classdefaults>
 		<name>force_trim_enabled</name>

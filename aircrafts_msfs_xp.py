@@ -2053,7 +2053,14 @@ class HPGHelicopter(Helicopter):
             telem_data['error'] = 1
             return
         self.spring = effects["collective_ap_spring"].spring()
-        self.damper = effects["collective_damper"].damper()
+        # self.damper = effects["collective_damper"].damper()
+
+        if self.force_trim_enabled and self.force_trim_button:
+            input_data = HapticEffect.device.getInput()
+            force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
+            if self._sim_is_msfs() and force_trim_pressed:
+                self._simconnect.send_event_to_msfs("AUTO_THROTTLE_DISCONNECT", 1)
+
         collective_tr = max(telem_data.get("h145CollectiveRelease", 0), telem_data.get("h160CollectiveRelease", 0))
         afcs_mode = max(telem_data.get("h145CollectiveAfcsMode", 0), telem_data.get("h160CollectiveAfcsMode", 0))
         collective_pos = telem_data.get("CollectivePos", 0)
@@ -2080,7 +2087,7 @@ class HPGHelicopter(Helicopter):
             self.spring_y.cpOffset = self.cpO_y
 
             self.spring.effect.setCondition(self.spring_y)
-            self.damper.damper(coef_y=4096).start()
+            # self.damper.damper(coef_y=4096).start()
             self.spring.start()
             if self.last_collective_y - 0.2 < phys_y < self.last_collective_y + 0.2:
                 # dont start sending position until physical stick has centered
@@ -2097,8 +2104,8 @@ class HPGHelicopter(Helicopter):
                 # print(self.cpO_y)
                 self.spring_y.cpOffset = self.cpO_y
 
-                self.damper.damper(coef_y=0).start()
-                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(self.collective_spring_coeff_y/2)
+                # self.damper.damper(coef_y=0).start()
+                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = int(4096 * self.trim_release_spring_gain)
 
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
@@ -2124,8 +2131,8 @@ class HPGHelicopter(Helicopter):
             else:
                 self.spring_y.cpOffset = self.cpO_y
 
-                self.damper.damper(coef_y=0).start()
-                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(self.collective_spring_coeff_y / 2)
+                # self.damper.damper(coef_y=0).start()
+                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(self.collective_spring_coeff_y)
 
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
@@ -2137,8 +2144,8 @@ class HPGHelicopter(Helicopter):
                 # print(self.cpO_y)
                 self.spring_y.cpOffset = self.cpO_y
 
-                self.damper.damper(coef_y=0).start()
-                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(self.collective_spring_coeff_y/2)
+                # self.damper.damper(coef_y=0).start()
+                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = int(4096 * self.trim_release_spring_gain)
 
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
@@ -2164,7 +2171,7 @@ class HPGHelicopter(Helicopter):
                 collective_pos = telem_data.get("CollectivePos", 0)
                 self.cpO_y = round(utils.scale(collective_pos,(0, 1), (4096, -4096)))
                 self.spring_y.cpOffset = self.cpO_y
-                self.damper.damper(coef_y=0).start()
+                # self.damper.damper(coef_y=0).start()
 
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
