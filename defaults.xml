@@ -2210,7 +2210,7 @@
 	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>777</order>
-		<name>overspeed_shake_enable</name>
+		<name>overspeed_effect_enable</name>
 		<MSFS>true</MSFS>
 		<datatype>bool</datatype>
 		<displayname>Overpeed Shake </displayname>
@@ -2224,7 +2224,7 @@
 		<Grouping>Buffeting</Grouping>
 		<order>777.1</order>
 		<name>overspeed_shake_intensity</name>
-		<prereq>overspeed_shake_enable</prereq>
+		<prereq>overspeed_effect_enable</prereq>
 		<MSFS>true</MSFS>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -2239,7 +2239,7 @@
 		<Grouping>Buffeting</Grouping>
 		<order>777.2</order>
 		<name>overspeed_shake_start</name>
-		<prereq>overspeed_shake_enable</prereq>
+		<prereq>overspeed_effect_enable</prereq>
 		<MSFS>true</MSFS>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<datatype>int</datatype>
@@ -9205,14 +9205,14 @@
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>overspeed_shake_enable</name>
+		<name>overspeed_effect_enable</name>
 		<type>HPGHelicopter</type>
 		<value>True</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>overspeed_shake_enable</name>
+		<name>overspeed_effect_enable</name>
 		<type>Helicopter</type>
 		<value>True</value>
 		<sim>any</sim>
@@ -10801,7 +10801,7 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
-		<name>overspeed_shake_enable</name>
+		<name>overspeed_effect_enable</name>
 		<type>AllSettings</type>
 		<value>true</value>
 		<sim>any</sim>
