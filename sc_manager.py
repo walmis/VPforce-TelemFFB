@@ -33,6 +33,7 @@ surface_types = {
     24: "Wright flyer track",
 }
 def dbprint(color, msg):
+    reset = '\033[0m'
     match color:
         case "red":
             ccode = '\033[91m'
@@ -44,7 +45,7 @@ def dbprint(color, msg):
             ccode = '\033[92m'
         case _:
             ccode = '\033[0m'
-    print(f"{ccode}{msg}")
+    print(f"{ccode}{msg}{reset}")
 
 
 class SimVar:
@@ -403,7 +404,7 @@ class SimConnectManager(threading.Thread):
                             else:
                                 data[var.name] = val
                         except:
-                            dbprint("green", "**DEBUG*** Exception parsing SC FRAME")
+                            dbprint("red", "**DEBUG*** Exception parsing SC FRAME")
                             continue
 
                     # if not self._sim_paused and not data["Parked"] and not data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
