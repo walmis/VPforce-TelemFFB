@@ -209,6 +209,7 @@ class SimConnectManager(threading.Thread):
         self.current_var_tracker = []
         self.new_var_tracker = []
         self.REQ_ID = 60000 + unique_id
+        self.def_id = int(str(unique_id)[::-1])
 
 
     def addSimVar(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
