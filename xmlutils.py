@@ -200,6 +200,75 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False, instance
     return model_data, found_pattern
 
 
+def read_overrides(aircraft_name):
+    model_overrides, def_model_pattern = read_models_overrides(defaults_path,  aircraft_name)
+    user_model_overrides, usr_model_pattern = read_models_overrides(userconfig_path, aircraft_name)
+    result = update_overrides_with_user(model_overrides,user_model_overrides)
+    return result
+
+
+def read_models_overrides(file_path, full_model_name):
+    mprint(f"read_models_overrides  {file_path}, {full_model_name}")
+    # runs on both defaults and userconfig xml files
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+
+    model_overrides = []
+    found_pattern = ''
+
+    all_models = root.findall(f'.//sc_overrides')
+
+    # Iterate through models elements
+    for model_elem in all_models:
+        # Assuming 'model' is the element containing the wildcard pattern
+
+        unit_pattern = model_elem.find('model')
+        if unit_pattern is not None:
+            pattern = unit_pattern.text
+            if pattern is not None:
+                # Check if the full_model_name matches the pattern using re.match
+                if re.match(pattern, full_model_name) or pattern == full_model_name:
+                    name = model_elem.find('name').text
+                    var = model_elem.find('var').text
+                    sc_unit_elem = model_elem.find('unit')
+                    sc_unit = sc_unit_elem.text if sc_unit_elem is not None else ""
+                    scale_elem = model_elem.find('unit')
+                    scale = scale_elem.text if scale_elem is not None else ""
+
+                    model_dict = {
+                        'name': name,
+                        'var': var,
+                        'sc_unit': sc_unit,
+                        'scale': scale
+                    }
+                    found_pattern = pattern
+                    model_overrides.append(model_dict)
+                else:
+                    lprint (f"{pattern} does not match {full_model_name}")
+
+    return model_overrides, found_pattern
+
+def update_overrides_with_user(defaults_ovr, user_ovr):
+    updated_result = defaults_ovr.copy()
+
+    # Create a dictionary mapping settings to their corresponding values and units
+    model_dict = {model['name']: {'var': model['var'], 'sc_unit': model['sc_unit'], 'scale': model['scale'] } for model in user_ovr}
+
+    for item in updated_result:
+        name = item['name']
+
+        # Check if the setting exists in the model_data
+        if name in model_dict:
+            # Update the value and unit in defaults_data with the values from model_data
+            item['value'] = model_dict[name]['value']
+            item['sc_unit'] = model_dict[name]['sc_unit']
+            item['scale'] = model_dict[name]['scale']
+
+        else:
+            updated_result.append(model_dict)
+
+    return updated_result
+
 def read_default_class_data(the_sim, the_class, instance_device=''):
     mprint(f"read_default_class_data  sim {the_sim}, class {the_class}")
     tree = ET.parse(defaults_path)
@@ -235,6 +304,7 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
             class_data.append(model_dict)
 
     return class_data
+
 
 
 def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_device = ''):
