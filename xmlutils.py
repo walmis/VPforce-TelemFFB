@@ -201,9 +201,9 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False, instance
 
 
 def read_overrides(aircraft_name):
-    model_overrides, def_model_pattern = read_models_overrides(defaults_path,  aircraft_name)
-    user_model_overrides, usr_model_pattern = read_models_overrides(userconfig_path, aircraft_name)
-    result = update_overrides_with_user(model_overrides,user_model_overrides)
+    def_model_overrides = read_models_overrides(defaults_path,  aircraft_name)
+    user_model_overrides = read_models_overrides(userconfig_path, aircraft_name)
+    result = update_overrides_with_user(def_model_overrides,user_model_overrides)
     return result
 
 
@@ -246,7 +246,8 @@ def read_models_overrides(file_path, full_model_name):
                 else:
                     lprint (f"{pattern} does not match {full_model_name}")
 
-    return model_overrides, found_pattern
+    return model_overrides
+
 
 def update_overrides_with_user(defaults_ovr, user_ovr):
     updated_result = defaults_ovr.copy()
@@ -258,14 +259,15 @@ def update_overrides_with_user(defaults_ovr, user_ovr):
         name = item['name']
 
         # Check if the setting exists in the model_data
-        if name in model_dict:
-            # Update the value and unit in defaults_data with the values from model_data
-            item['value'] = model_dict[name]['value']
-            item['sc_unit'] = model_dict[name]['sc_unit']
-            item['scale'] = model_dict[name]['scale']
+        if model_dict:
+            if name in model_dict:
+                # Update the value and unit in defaults_data with the values from model_data
+                item['value'] = model_dict[name]['value']
+                item['sc_unit'] = model_dict[name]['sc_unit']
+                item['scale'] = model_dict[name]['scale']
 
-        else:
-            updated_result.append(model_dict)
+            else:
+                updated_result.append(model_dict[name])
 
     return updated_result
 
