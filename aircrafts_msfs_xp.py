@@ -1274,7 +1274,7 @@ class Helicopter(Aircraft):
         if self._sim_is_xplane():
             ap_active = telem_data.get("APServos", 0)
 
-        trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
+        # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
         self.spring = effects["cyclic_spring"].spring()
 
         if ffb_type == "joystick":
@@ -1789,7 +1789,8 @@ class HPGHelicopter(Helicopter):
         super()._update_heli_controls(telem_data)
         ffb_type = telem_data.get("FFBType", "joystick")
         ap_active = telem_data.get("APMaster", 0)
-        trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
+        # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
+        trim_reset = telem_data.get("hpgTrimRelease", 0)
 
         if ffb_type == "joystick":
             if not self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -1797,8 +1798,8 @@ class HPGHelicopter(Helicopter):
                     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
                 telem_data['error'] = 1
                 return
-            sema_x = telem_data.get("h145SEMAx", 0)
-            sema_y = telem_data.get("h145SEMAy", 0)
+            sema_x = telem_data.get("hpg5SEMAx", 0)
+            sema_y = telem_data.get("hpg5SEMAy", 0)
 
             # sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
             # sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
@@ -1857,7 +1858,7 @@ class HPGHelicopter(Helicopter):
             self.spring.effect.setCondition(self.spring_y)
 
             # hands_off_deadzone = 0.02
-            if (telem_data.get("h145HandsOnCyclic", 0) or telem_data.get("h160HandsOnCyclic", 0)):
+            if telem_data.get("hpgHandsOnCyclic", 0):
                 hands_on_dict = self.check_hands_on(self.hands_off_deadzone)
             else:
                 hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
@@ -1957,7 +1958,7 @@ class HPGHelicopter(Helicopter):
                     return
 
 
-            sema_yaw = telem_data.get("h145SEMAyaw", 0)
+            sema_yaw = telem_data.get("hpgSEMAyaw", 0)
 
             # sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
             # sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
@@ -2026,8 +2027,8 @@ class HPGHelicopter(Helicopter):
             if self._sim_is_msfs() and force_trim_pressed:
                 self._simconnect.send_event_to_msfs("AUTO_THROTTLE_DISCONNECT", 1)
 
-        collective_tr = max(telem_data.get("h145CollectiveRelease", 0), telem_data.get("h160CollectiveRelease", 0))
-        afcs_mode = max(telem_data.get("h145CollectiveAfcsMode", 0), telem_data.get("h160CollectiveAfcsMode", 0))
+        collective_tr = telem_data.get("hpgCollectiveRelease", 0)
+        afcs_mode = telem_data.get("hpgCollectiveAfcsMode", 0)
         collective_pos = telem_data.get("CollectivePos", 0)
 
         # input_data = HapticEffect.device.getInput()
@@ -2141,8 +2142,8 @@ class HPGHelicopter(Helicopter):
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
     def _update_vrs_effect(self, telem_data):
-        vrs_onset = telem_data.get("HPGVRSDatum", 0)
-        vrs_certain = telem_data.get("HPGVRSIsInVRS", 0)
+        vrs_onset = telem_data.get("hpgVRSDatum", 0)
+        vrs_certain = telem_data.get("hpgVRSIsInVRS", 0)
 
 
         if vrs_certain:
