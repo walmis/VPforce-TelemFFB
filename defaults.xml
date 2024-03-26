@@ -2618,7 +2618,214 @@
 		<info>Load a specific .vpconf file (created with VPForce Configurator)&lt;br&gt;&lt;br&gt;When using this function, it will remain active until set again by another sim, class, or model setting</info>
 		<XPLANE>true</XPLANE>
 	</defaults>
-	<models>
+	<sc_overrides>
+		<model>FlyInside B206.*</model>
+		<name>EngRPM</name>
+		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>FlyInside B206.*</model>
+		<name>RotorRPM</name>
+		<var>L:Aircraft.Rotor.RPM.Percent</var>
+		<sc_unit>Percent Over 100</sc_unit>
+		<scale>3.25</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<model>FlyInside B206.*</model>
+		<name>HydSys</name>
+		<var>L:Aircraft.Hydraulics.Enabled</var>
+		<sc_unit>bool</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>FlyInside - B206.*</model>
+		<name>EngRPM</name>
+		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>FlyInside - B206.*</model>
+		<name>RotorRPM</name>
+		<var>L:Aircraft.Rotor.RPM.Percent</var>
+		<sc_unit>Percent Over 100</sc_unit>
+		<scale>3.25</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<model>FlyInside - B206.*</model>
+		<name>HydSys</name>
+		<var>L:Aircraft.Hydraulics.Enabled</var>
+		<sc_unit>bool</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>FlyInside B47.*</model>
+		<name>EngRPM</name>
+		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>FlyInside B47.*</model>
+		<name>RotorRPM</name>
+		<var>L:Aircraft.Rotor.RPM.Percent</var>
+		<sc_unit>Percent Over 100</sc_unit>
+		<scale>3.00</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<model>A2A Piper PA-24.*</model>
+		<name>APMaster</name>
+		<var>L:ApMode</var>
+		<sc_unit>Enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>A2A Piper PA-24.*</model>
+		<name>PropThrust</name>
+		<var>L:Eng1_RPM</var>
+		<sc_unit>number</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgSEMAx</name>
+		<var>L:DEBUG_SEMA_PCT_X</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgSEMAy</name>
+		<var>L:DEBUG_SEMA_PCT_Y</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgSEMAyaw</name>
+		<var>L:DEBUG_SEMA_PCT_YAW</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgAfcsMaster</name>
+		<var>L:H145_SDK_AFCS_MASTER</var>
+		<sc_unit>number</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgTrimRelease</name>
+		<var>L:H145_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED</var>
+		<sc_unit>bool</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgCollectiveRelease</name>
+		<var>L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED</var>
+		<sc_unit>bool</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgCollectiveAfcsMode</name>
+		<var>L:H145_SDK_AFCS_MODE_COLLECTIVE</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgHandsOnCyclic</name>
+		<var>L:FFB_HANDS_ON_CYCLIC</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgFeetOnPedals</name>
+		<var>L:FFB_FEET_ON_PEDALS</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgHandsOnCyclic</name>
+		<var>L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgVRSDatum</name>
+		<var>L:DEBUG_VRS2_DATUM</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H145.*</model>
+		<name>hpgVRSIsInVRS</name>
+		<var>L:DEBUG_VRS2_IS_IN_VRS</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgSEMAx</name>
+		<var>L:DEBUG_SEMA_PCT_X</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgSEMAy</name>
+		<var>L:DEBUG_SEMA_PCT_Y</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgSEMAyaw</name>
+		<var>L:DEBUG_SEMA_PCT_YAW</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgAfcsMaster</name>
+		<var>L:H160_SDK_AFCS_MASTER</var>
+		<sc_unit>number</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgTrimRelease</name>
+		<var>L:H160_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED</var>
+		<sc_unit>bool</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgCollectiveRelease</name>
+		<var>L:H160_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED</var>
+		<sc_unit>bool</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgCollectiveAfcsMode</name>
+		<var>L:H160_SDK_AFCS_MODE_COLLECTIVE</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgHandsOnCyclic</name>
+		<var>L:FFB_HANDS_ON_CYCLIC</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgFeetOnPedals</name>
+		<var>L:FFB_FEET_ON_PEDALS</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgHandsOnCyclic</name>
+		<var>L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgVRSDatum</name>
+		<var>L:DEBUG_VRS2_DATUM</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Airbus H160.*</model>
+		<name>hpgVRSIsInVRS</name>
+		<var>L:DEBUG_VRS2_IS_IN_VRS</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+<models>
 		<name>type</name>
 		<model>A-10A.*</model>
 		<value>JetAircraft</value>
