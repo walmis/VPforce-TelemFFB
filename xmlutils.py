@@ -233,7 +233,7 @@ def read_models_overrides(file_path, full_model_name):
                     sc_unit_elem = model_elem.find('sc_unit')
                     sc_unit = sc_unit_elem.text if sc_unit_elem is not None else ""
                     scale_elem = model_elem.find('scale')
-                    scale = scale_elem.text if scale_elem is not None else ""
+                    scale = float(scale_elem.text) if scale_elem is not None else None
 
                     model_dict = {
                         'name': name,
