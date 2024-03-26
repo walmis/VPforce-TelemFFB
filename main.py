@@ -738,7 +738,11 @@ class TelemManager(QObject, threading.Thread):
 
                 self.currentAircraft.apply_settings(params)
                 self.currentAircraftConfig = params
-
+                if data_source == "MSFS2020" and aircraft_name != '':
+                    d1 = xmlutils.read_overrides(aircraft_name)
+                    for sv in d1:
+                        self.currentAircraft._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
+                    self.currentAircraft._simconnect._resubscribe()
                 if settings_mgr.isVisible():
                     settings_mgr.b_getcurrentmodel.click()
 
@@ -762,6 +766,12 @@ class TelemManager(QObject, threading.Thread):
                     self.currentAircraft = Class(aircraft_name)
                     self.currentAircraft.apply_settings(params)
                     self.currentAircraftConfig = params
+
+                if data_source == "MSFS2020" and aircraft_name != '':
+                    d1 = xmlutils.read_overrides(aircraft_name)
+                    for sv in d1:
+                        self.currentAircraft._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
+                    self.currentAircraft._simconnect._resubscribe()
 
                 self.updateSettingsLayout.emit()
             try:
