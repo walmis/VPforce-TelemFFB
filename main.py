@@ -55,6 +55,7 @@ from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
 
 from system_settings import Ui_SystemDialog
 from configurator import Ui_ConfiguratorDialog
+from sc_override_edit import Ui_SCOverridesDialog
 from custom_widgets import *
 import resources
 
@@ -1249,8 +1250,14 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
             return False
 
 
-
-
+class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
+    def __init__(self, parent=None, userconfig_path='', defaults_path='', current_craft=''):
+        super(SCOverridesEditor, self).__init__(parent)
+        self.setupUi(self)
+        self.retranslateUi(self)
+        self.defaults_path = defaults_path
+        self.userconfig_path = userconfig_path
+        self.pattern = current_craft
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
@@ -2026,6 +2033,10 @@ class MainWindow(QMainWindow):
         settings_manager_action = QAction('Edit Sim/Class Defaults && Offline Models', self)
         settings_manager_action.triggered.connect(self.toggle_settings_window)
         system_menu.addAction(settings_manager_action)
+
+        sc_overrides_action = QAction('SimConnect Overrides Editor', self)
+        sc_overrides_action.triggered.connect(self.open_sc_override_dialog)
+        system_menu.addAction(sc_overrides_action)
 
         cfg_log_folder_action = QAction('Open Config/Log Directory', self)
         cfg_log_folder_action.triggered.connect(self.open_cfg_dir)
@@ -2913,6 +2924,13 @@ class MainWindow(QMainWindow):
 
     def open_system_settings_dialog(self):
         dialog = SystemSettingsDialog(self)
+        dialog.raise_()
+        dialog.activateWindow()
+        dialog.show()
+        # dialog.exec_()
+
+    def open_sc_override_dialog(self):
+        dialog = SCOverridesEditor(self)
         dialog.raise_()
         dialog.activateWindow()
         dialog.show()

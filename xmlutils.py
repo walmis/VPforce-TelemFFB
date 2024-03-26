@@ -274,6 +274,99 @@ def update_overrides_with_user(defaults_ovr, user_ovr):
         updated_result.append(items_to_append)
     return updated_result
 
+
+def erase_override_from_xml(the_model, setting_name):
+    mprint(f"erase_override_from_xml   {the_model}, {setting_name}")
+    # Load the existing XML file or create a new one if it doesn't exist
+    tree = ET.parse(userconfig_path)
+    root = tree.getroot()
+
+    elements_to_remove = []
+    for ovr_elem in root.findall(f'sc_overrides[model="{the_model}"]'
+                                   f'[name="{setting_name}"]'):
+
+        if ovr_elem is not None:
+            elements_to_remove.append(ovr_elem)
+        else:
+            lprint ("override not found")
+
+    # Remove the elements outside the loop
+    for elem in elements_to_remove:
+        root.remove(elem)
+        # Write the modified XML back to the file
+        write_userconfig_xml(tree)
+        logging.info(f"Removed <sc_overrides> element with values: model={the_model}, name={setting_name}")
+
+
+def write_override_to_xml(the_model, the_var, setting_name, sc_unit='', scale=''):
+    mprint(f"write_overrides_to_xml  {the_model}, {the_var}, {setting_name}, {scale}")
+    # Load the existing XML file or create a new one if it doesn't exist
+    tree = ET.parse(userconfig_path)
+    root = tree.getroot()
+    ovr_elem = None
+    if the_model == '':
+        return
+
+    # Check if an identical <models> element already exists
+    ovr_elem = root.find(f'.//sc_overrides[model="{the_model}"]'
+                               f'[name="{setting_name}"]')
+
+    if ovr_elem is not None:
+        # Update the value of the existing element
+        for child_elem in ovr_elem:
+            if child_elem.tag == 'var':
+                child_elem.text = str(the_var)
+            if child_elem.tag == 'sc_unit':
+                child_elem.text = str(sc_unit)
+            if child_elem.tag == 'scale':
+                child_elem.text = str(scale)
+        if the_model != '':
+            write_userconfig_xml(tree)
+        logging.info(f"Updated <sc_overrides> element with values: "
+                     f"var={the_var}, sc_unit={sc_unit}, model={the_model}, name={setting_name}, scale={scale}")
+
+    else:
+        # Check if an identical <models> element already exists; if so, skip
+        model_elem_exists = any(
+            all(
+                element.tag == tag and element.text == value
+                for tag, value in [
+                    ("name", setting_name),
+                    ("model", the_model),
+                    ("var", the_var),
+                    ("sc_unit", sc_unit),
+                    ("scale", scale)
+                ]
+            )
+            for element in root.iter("sc_overrides")
+        )
+
+        if model_elem_exists:
+            lprint("<sc_overrides> element with the same values already exists. Skipping.")
+        else:
+            # Create child elements with the specified content
+            overrides = ET.SubElement(root, "sc_overrides")
+            if scale is None or scale == '':
+                for tag, value in [("name", setting_name),
+                                   ("model", the_model),
+                                   ("var", the_var),
+                                   ("sc_unit", sc_unit)]:
+                    ET.SubElement(overrides, tag).text = value
+            else:
+                for tag, value in [("name", setting_name),
+                                   ("model", the_model),
+                                   ("var", the_var),
+                                   ("sc_unit", sc_unit),
+                                   ("scale", scale)]:
+                    ET.SubElement(overrides, tag).text = value
+
+            # Write the modified XML back to the file
+            tree = ET.ElementTree(root)
+            write_userconfig_xml(tree)
+            logging.info(f"Added <sc_overrides> element with values:"
+                         f"var={the_var}, sc_unit={sc_unit}, model={the_model}, name={setting_name}, scale={scale}")
+
+
 def read_default_class_data(the_sim, the_class, instance_device=''):
     mprint(f"read_default_class_data  sim {the_sim}, class {the_class}")
     tree = ET.parse(defaults_path)
