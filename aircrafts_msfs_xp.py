@@ -158,8 +158,6 @@ class Aircraft(AircraftBase):
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
 
-        if self._simconnect:
-            self._simconnect._resubscribe()
 
         # clear any existing effects
         for e in effects.values(): e.destroy()
@@ -970,12 +968,6 @@ class Aircraft(AircraftBase):
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop aircraft"""
     def __init__(self, name, **kwargs):
-        if self._simconnect:
-            if "A2A" in name:
-                if "Comanche" in name:
-                    self._simconnect.addSimVar("APMaster", "L:ApMode", "Enum")
-                    self._simconnect.addSimVar("PropThrust", "L:Eng1_RPM", "number")
-
         super().__init__(name, **kwargs)
 
     # run on every telemetry frame
@@ -1224,15 +1216,6 @@ class Helicopter(Aircraft):
     cyclic_virtual_trim_y_offs = 0
 
     def __init__(self, name, **kwargs):
-        if self._simconnect:
-            if "FlyInside" in name:
-                self._simconnect.addSimVar("EngRPM", "L:Aircraft.Engine.1.Turbine.N2.Smooth", "Percent Over 100")
-                if 'B206' in name:
-                    self._simconnect.addSimVar("RotorRPM", "L:Aircraft.Rotor.RPM.Percent", "Percent Over 100", scale=3.25)
-                    self._simconnect.addSimVar("HydSys", "L:Aircraft.Hydraulics.Enabled", "bool")
-                if 'B47' in name:
-                    self._simconnect.addSimVar("RotorRPM", "L:Aircraft.Rotor.RPM.Percent", "Percent Over 100", scale=3.00)
-
         super().__init__(name, **kwargs)
     def on_timeout(self):
         super().on_timeout()
@@ -1719,24 +1702,6 @@ class HPGHelicopter(Helicopter):
     vrs_effect_intensity = 0
 
     def __init__(self, name, **kwargs):
-        if self._simconnect:
-            self._simconnect.addSimVar("h145SEMAx", "L:DEBUG_SEMA_PCT_X", sc_unit="percent over 100")
-            self._simconnect.addSimVar("h145SEMAy", "L:DEBUG_SEMA_PCT_Y", sc_unit="percent over 100")
-            self._simconnect.addSimVar("h145SEMAyaw", "L:DEBUG_SEMA_PCT_YAW", sc_unit="percent over 100")
-            self._simconnect.addSimVar("h145AfcsMaster", "L:H145_SDK_AFCS_MASTER", "number")
-            self._simconnect.addSimVar("h145TrimRelease", "L:H145_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool")
-            self._simconnect.addSimVar("h160TrimRelease", "L:H160_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED", "bool")
-            self._simconnect.addSimVar("h145CollectiveRelease", "L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool")
-            self._simconnect.addSimVar("h160CollectiveRelease", "L:H160_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool")
-            self._simconnect.addSimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "enum")
-            self._simconnect.addSimVar("h160CollectiveAfcsMode", "L:H160_SDK_AFCS_MODE_COLLECTIVE", "enum")
-            self._simconnect.addSimVar("hpgHandsOnCyclic", "L:FFB_HANDS_ON_CYCLIC", "enum")
-            self._simconnect.addSimVar("hpgFeetOnPedals", "L:FFB_FEET_ON_PEDALS", "enum")
-            self._simconnect.addSimVar("h145HandsOnCyclic", "L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum")
-            self._simconnect.addSimVar("h160HandsOnCyclic", "L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS", "enum")
-            self._simconnect.addSimVar("HPGVRSDatum", "L:DEBUG_VRS2_DATUM", "enum")
-            self._simconnect.addSimVar("HPGVRSIsInVRS", "L:DEBUG_VRS2_IS_IN_VRS", "enum")
-
         super().__init__(name, **kwargs)
 
         input_data = HapticEffect.device.getInput()
