@@ -201,7 +201,7 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False, instance
 
 
 def read_overrides(aircraft_name):
-    def_model_overrides = read_models_overrides(defaults_path,  aircraft_name)
+    def_model_overrides = read_models_overrides(defaults_path, aircraft_name)
     user_model_overrides = read_models_overrides(userconfig_path, aircraft_name)
     result = update_overrides_with_user(def_model_overrides,user_model_overrides)
     return result
@@ -210,11 +210,11 @@ def read_overrides(aircraft_name):
 def read_models_overrides(file_path, full_model_name):
     mprint(f"read_models_overrides  {file_path}, {full_model_name}")
     # runs on both defaults and userconfig xml files
+    #pass 'all' to get all of them
     tree = ET.parse(file_path)
     root = tree.getroot()
 
     model_overrides = []
-    found_pattern = ''
 
     all_models = root.findall(f'.//sc_overrides')
 
@@ -230,9 +230,9 @@ def read_models_overrides(file_path, full_model_name):
                 if re.match(pattern, full_model_name) or pattern == full_model_name:
                     name = model_elem.find('name').text
                     var = model_elem.find('var').text
-                    sc_unit_elem = model_elem.find('unit')
+                    sc_unit_elem = model_elem.find('sc_unit')
                     sc_unit = sc_unit_elem.text if sc_unit_elem is not None else ""
-                    scale_elem = model_elem.find('unit')
+                    scale_elem = model_elem.find('scale')
                     scale = scale_elem.text if scale_elem is not None else ""
 
                     model_dict = {
@@ -241,7 +241,6 @@ def read_models_overrides(file_path, full_model_name):
                         'sc_unit': sc_unit,
                         'scale': scale
                     }
-                    found_pattern = pattern
                     model_overrides.append(model_dict)
                 else:
                     lprint (f"{pattern} does not match {full_model_name}")
@@ -251,24 +250,28 @@ def read_models_overrides(file_path, full_model_name):
 
 def update_overrides_with_user(defaults_ovr, user_ovr):
     updated_result = defaults_ovr.copy()
+    items_to_append = []
 
-    # Create a dictionary mapping settings to their corresponding values and units
-    model_dict = {model['name']: {'var': model['var'], 'sc_unit': model['sc_unit'], 'scale': model['scale'] } for model in user_ovr}
+    for model in user_ovr:
+        model_dict = {
+            'name': model['name'], 'var': model['var'], 'sc_unit': model['sc_unit'], 'scale': model['scale']
+        }
 
-    for item in updated_result:
-        name = item['name']
+        for existingitem in updated_result:
 
-        # Check if the setting exists in the model_data
-        if model_dict:
-            if name in model_dict:
-                # Update the value and unit in defaults_data with the values from model_data
-                item['value'] = model_dict[name]['value']
-                item['sc_unit'] = model_dict[name]['sc_unit']
-                item['scale'] = model_dict[name]['scale']
+            # Check if the setting exists in the model_data
+            if model_dict:
+                if any(item['name'] == model_dict['name'] for item in updated_result):
+                    if existingitem['name'] == model_dict['name']:
+                        existingitem['var'] = model_dict['var']
+                        existingitem['sc_unit'] = model_dict['sc_unit']
+                        existingitem['scale'] = model_dict['scale']
 
-            else:
-                updated_result.append(model_dict[name])
+                else:
+                    items_to_append.append(model_dict)
 
+    if any(items_to_append):
+        updated_result.append(items_to_append)
     return updated_result
 
 def read_default_class_data(the_sim, the_class, instance_device=''):
