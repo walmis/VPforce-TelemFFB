@@ -235,7 +235,7 @@
      <item>
       <widget class="QPushButton" name="pb_delete">
        <property name="text">
-        <string>Delete Checked</string>
+        <string>Delete Selected</string>
        </property>
       </widget>
      </item>
@@ -243,7 +243,7 @@
       <widget class="QLabel" name="bottomlabel">
        <property name="minimumSize">
         <size>
-         <width>300</width>
+         <width>400</width>
          <height>0</height>
         </size>
        </property>

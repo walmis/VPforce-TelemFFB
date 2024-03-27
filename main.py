@@ -1258,6 +1258,7 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
 
 class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
     overrides = []
+    current_row = -1
     def __init__(self, parent=None, userconfig_path='', defaults_path=''):
         super(SCOverridesEditor, self).__init__(parent)
         self.setupUi(self)
@@ -1375,29 +1376,40 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         # Set selection behavior to select entire rows
         self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)
 
-        self.pb_delete.clicked.connect(lambda: self.delete_button_clicked(row-1))
+        self.pb_delete.clicked.connect(self.delete_button_clicked)
 
 
         # Connect currentItemChanged signal to handle row selection and data copying
-        self.tableWidget.currentItemChanged.connect(self.on_table_item_changed)
+        self.tableWidget.itemSelectionChanged.connect(self.on_table_item_changed)
 
         # Display the table
         self.tableWidget.show()
         self.tableWidget.blockSignals(False)
 
-    def on_table_item_changed(self, current_item, previous_item):
-        # Get the row number from the current item
-        current_row = current_item.row()
+    def on_table_item_changed(self):
 
-        # Copy data from the current row to designated widgets
-        self.cb_name.setCurrentText(self.tableWidget.item(current_row, 0).text())
-        self.tb_var.setText(self.tableWidget.item(current_row, 1).text())
-        self.cb_sc_unit.setCurrentText(self.tableWidget.item(current_row, 2).text())
-        self.tb_scale.setText(self.tableWidget.item(current_row, 3).text())
-        # enable delete button for user rows
-        if self.tableWidget.item(current_row, 4).text() == 'user':
-            self.pb_delete.setEnabled(True)
+        # Get the current selected items
+        selected_items = self.tableWidget.selectedItems()
+
+        # Check if any item is selected
+        if selected_items:
+            # Assuming you're interested in the first selected item
+            current_item = selected_items[0]
+            # Get the row number from the current item
+            current_row = current_item.row()
+            self.current_row = current_row
+            # Copy data from the current row to designated widgets
+            self.cb_name.setCurrentText(self.tableWidget.item(current_row, 0).text())
+            self.tb_var.setText(self.tableWidget.item(current_row, 1).text())
+            self.cb_sc_unit.setCurrentText(self.tableWidget.item(current_row, 2).text())
+            self.tb_scale.setText(self.tableWidget.item(current_row, 3).text())
+            # enable delete button for user rows
+            if self.tableWidget.item(current_row, 4).text() == 'user':
+                self.pb_delete.setEnabled(True)
+            else:
+                self.pb_delete.setEnabled(False)
         else:
+            self.current_row = -1
             self.pb_delete.setEnabled(False)
 
     def add_button_clicked(self):
@@ -1411,7 +1423,6 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         if scale_text != '':
             try:
                 scale = float(scale_text)
-                scale_text = scale
             except ValueError:
                 scale_valid = False
                 self.tb_scale.setText('')
@@ -1420,19 +1431,23 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         # enable delete button for user rows
         if name != '' and var != '' and sc_unit != '' and scale_valid:
             xmlutils.write_override_to_xml(settings_mgr.current_pattern, var, name, sc_unit, scale_text)
+            self.cb_name.setCurrentText('')
+            self.tb_var.setText('')
+            self.cb_sc_unit.setCurrentText('')
+            self.tb_scale.setText('')
         self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
         self.fill_table()
 
-    def delete_button_clicked(self, row):
+    def delete_button_clicked(self):
         # Get the row number from the current item
-        if row:
-            print(f"\nerase row: {row}    pattern: {settings_mgr.current_pattern} ")
-
-            name = self.tableWidget.item(row, 0).text()
+        if self.current_row >= 0:
+            name = self.tableWidget.item(self.current_row, 0).text()
+            print(f"\nerase row: {self.current_row}    pattern: {settings_mgr.current_pattern}  name: {name}")
+            self.tableWidget.blockSignals(True)
+            self.pb_delete.setEnabled(False)
             xmlutils.erase_override_from_xml(settings_mgr.current_pattern,name)
-
-        self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
-        self.fill_table()
+            self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
+            self.fill_table()
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None):
