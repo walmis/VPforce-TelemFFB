@@ -521,6 +521,10 @@ class TelemManager(QObject, threading.Thread):
         self.ipc_thread = ipc_thread
         self._ipc_telem = {}
 
+    @classmethod
+    def set_simconnect(cls, sc):
+        cls._simconnect = sc
+
     def get_aircraft_config(self, aircraft_name, data_source):
         params = {}
         cls_name = "UNKNOWN"
@@ -742,8 +746,8 @@ class TelemManager(QObject, threading.Thread):
                 if data_source == "MSFS2020" and aircraft_name != '':
                     d1 = xmlutils.read_overrides(aircraft_name)
                     for sv in d1:
-                        self.currentAircraft._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
-                    self.currentAircraft._simconnect._resubscribe()
+                        self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
+                    self._simconnect._resubscribe()
                 if settings_mgr.isVisible():
                     settings_mgr.b_getcurrentmodel.click()
 
@@ -771,8 +775,8 @@ class TelemManager(QObject, threading.Thread):
                 if data_source == "MSFS2020" and aircraft_name != '':
                     d1 = xmlutils.read_overrides(aircraft_name)
                     for sv in d1:
-                        self.currentAircraft._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
-                    self.currentAircraft._simconnect._resubscribe()
+                        self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
+                    self._simconnect._resubscribe()
 
                 self.updateSettingsLayout.emit()
             try:
@@ -1068,6 +1072,7 @@ class NetworkThread(threading.Thread):
 class SimConnectSock(SimConnectManager):
     def __init__(self, telem: TelemManager, ffb_type=_device_type, unique_id=int(_device_pid)):
         super().__init__(unique_id)
+        telem.set_simconnect(self)
         self._telem = telem
         self._ffb_type = ffb_type
 
