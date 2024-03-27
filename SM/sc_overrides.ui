@@ -220,6 +220,11 @@
        <string>Scale</string>
       </property>
      </column>
+     <column>
+      <property name="text">
+       <string>source</string>
+      </property>
+     </column>
     </widget>
    </item>
    <item>

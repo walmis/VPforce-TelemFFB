@@ -1289,6 +1289,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
                 self.overrides.sort(key=lambda x: x['name'])
                 self.bottomlabel.setText('')
                 self.fill_table()
+
         else:
             self.bottomlabel.setText('SimConnect overrides are for MSFS only.')
         pass
@@ -1309,14 +1310,13 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         model = self.cb_name.model()
         model.sort(0)  # Sort items alphabetically
 
-    from PyQt5.QtWidgets import QTableWidgetItem, QAbstractItemView
 
     def fill_table(self):
         self.tableWidget.blockSignals(True)
         self.tableWidget.clear()
         list_length = len(self.overrides) - 1
         # Set headers
-        headers = ['Property', 'Variable', 'SC Unit', 'Scale']
+        headers = ['Property', 'Variable', 'SC Unit', 'Scale', 's']
         self.tableWidget.setHorizontalHeaderLabels(headers)
         row_index = 0
         # Populate the table
@@ -1327,13 +1327,19 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             name_item = QTableWidgetItem(override['name'])
             var_item = QTableWidgetItem(override['var'])
             sc_unit_item = QTableWidgetItem(override['sc_unit'])
-            scale_item = QTableWidgetItem(str(override['scale']))
+            if override['scale'] is not None:
+                scale_item = QTableWidgetItem(str(override['scale']))
+            else:
+                scale_item = QTableWidgetItem('')
+            source_item = QTableWidgetItem(override['source'])
 
             # Set width of the variable column
             self.tableWidget.setColumnWidth(0, 140)
             self.tableWidget.setColumnWidth(1, 300)
             self.tableWidget.setColumnWidth(2, 130)
-            self.tableWidget.setColumnWidth(4, 0)
+            self.tableWidget.setColumnWidth(3, 100)
+            self.tableWidget.setColumnWidth(4, 60)
+            self.tableWidget.setColumnHidden(4, True)
 
             # If source is 'defaults', make the text color grey
             if override['source'] == 'defaults':
@@ -1359,23 +1365,39 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.tableWidget.setItem(row, 1, var_item)
             self.tableWidget.setItem(row, 2, sc_unit_item)
             self.tableWidget.setItem(row, 3, scale_item)
-            self.tableWidget.setItem(row, 4, scale_item)
+            self.tableWidget.setItem(row, 4, source_item)
 
             # Increment row index
             row_index += 1
 
-        # Set selection behavior to select rows
+        # Set selection behavior to select entire rows
         self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)
 
-        # Enable delete button when a row is selected
-        self.tableWidget.selectionModel().selectionChanged.connect(self.update_delete_button_state)
+        # Connect currentItemChanged signal to handle row selection and data copying
+        self.tableWidget.currentItemChanged.connect(self.on_table_item_changed)
 
         # Display the table
         self.tableWidget.show()
+        self.tableWidget.blockSignals(False)
 
-    def update_delete_button_state(self):
-        selected_rows = self.tableWidget.selectionModel().selectedRows()
-        self.pb_delete.setEnabled(len(selected_rows) > 0)
+    def on_table_item_changed(self, current_item, previous_item):
+        # Get the row number from the current item
+        current_row = current_item.row()
+
+        # Check if the source is 'user' for the current row
+        source_item = self.tableWidget.item(current_row, 4)
+
+        # Copy data from the current row to designated widgets
+        self.cb_name.setCurrentText(self.tableWidget.item(current_row, 0).text())
+        self.tb_var.setText(self.tableWidget.item(current_row, 1).text())
+        self.cb_sc_unit.setCurrentText(self.tableWidget.item(current_row, 2).text())
+        self.tb_scale.setText(self.tableWidget.item(current_row, 3).text())
+        # enable delete button for user rows
+        if self.tableWidget.item(current_row, 4).text() == 'user':
+            self.pb_delete.setEnabled(True)
+        else:
+            self.pb_delete.setEnabled(False)
+
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
