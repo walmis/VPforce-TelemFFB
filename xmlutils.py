@@ -253,27 +253,29 @@ def update_overrides_with_user(defaults_ovr, user_ovr):
     updated_result = defaults_ovr.copy()
     items_to_append = []
 
-    for model in user_ovr:
-        model_dict = {
-            'name': model['name'], 'var': model['var'], 'sc_unit': model['sc_unit'], 'scale': model['scale']
-        }
+    for user_model in user_ovr:
+        user_model_name = user_model['name']
+        user_model_var = user_model['var']
+        user_model_sc_unit = user_model['sc_unit']
+        user_model_scale = user_model['scale']
 
-        for existingitem in updated_result:
-
-            # Check if the setting exists in the model_data
-            if model_dict:
-                if any(item['name'] == model_dict['name'] for item in updated_result):
-                    if existingitem['name'] == model_dict['name']:
-                        existingitem['var'] = model_dict['var']
-                        existingitem['sc_unit'] = model_dict['sc_unit']
-                        existingitem['scale'] = model_dict['scale']
-                        existingitem['source'] = model_dict['source']
-
-                else:
-                    items_to_append.append(model_dict)
-
-    if any(items_to_append):
-        updated_result.append(items_to_append)
+        # Check if the user override already exists in defaults_ovr
+        for existing_item in updated_result:
+            if existing_item['name'] == user_model_name:
+                existing_item['var'] = user_model_var
+                existing_item['sc_unit'] = user_model_sc_unit
+                existing_item['scale'] = user_model_scale
+                existing_item['source'] = 'user'
+                break
+        else:
+            # If the user override is not found, add it to the updated_result
+            updated_result.append({
+                'name': user_model_name,
+                'var': user_model_var,
+                'sc_unit': user_model_sc_unit,
+                'scale': user_model_scale,
+                'source': 'user'
+            })
     return updated_result
 
 

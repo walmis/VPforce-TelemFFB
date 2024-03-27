@@ -43,7 +43,7 @@ from configobj import ConfigObj
 
 from settingsmanager import *
 import xmlutils
-
+from PyQt5.QtWidgets import QTableWidgetItem, QAbstractItemView
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
@@ -1309,6 +1309,8 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         model = self.cb_name.model()
         model.sort(0)  # Sort items alphabetically
 
+    from PyQt5.QtWidgets import QTableWidgetItem, QAbstractItemView
+
     def fill_table(self):
         self.tableWidget.blockSignals(True)
         self.tableWidget.clear()
@@ -1327,32 +1329,54 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             sc_unit_item = QTableWidgetItem(override['sc_unit'])
             scale_item = QTableWidgetItem(str(override['scale']))
 
+            # Set width of the variable column
+            self.tableWidget.setColumnWidth(0, 140)
+            self.tableWidget.setColumnWidth(1, 300)
+            self.tableWidget.setColumnWidth(2, 130)
+            self.tableWidget.setColumnWidth(4, 0)
+
+            # If source is 'defaults', make the text color grey
+            if override['source'] == 'defaults':
+                name_item.setForeground(Qt.gray)
+                var_item.setForeground(Qt.gray)
+                sc_unit_item.setForeground(Qt.gray)
+                scale_item.setForeground(Qt.gray)
+
+                # Make entire row unselectable
+                for col in range(4):
+                    item = QTableWidgetItem()
+                    item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
+                    self.tableWidget.setItem(row_index, col, item)
+
             # Setting items non-editable
             name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
             var_item.setFlags(var_item.flags() & ~Qt.ItemIsEditable)
             sc_unit_item.setFlags(sc_unit_item.flags() & ~Qt.ItemIsEditable)
             scale_item.setFlags(scale_item.flags() & ~Qt.ItemIsEditable)
 
-            # If source is 'defaults', make the row not selectable
-            if override['source'] == 'defaults':
-                name_item.setFlags(name_item.flags() & ~Qt.ItemIsSelectable)
-                var_item.setFlags(var_item.flags() & ~Qt.ItemIsSelectable)
-                sc_unit_item.setFlags(sc_unit_item.flags() & ~Qt.ItemIsSelectable)
-                scale_item.setFlags(scale_item.flags() & ~Qt.ItemIsSelectable)
-
             # Setting items for the row
             self.tableWidget.setItem(row, 0, name_item)
             self.tableWidget.setItem(row, 1, var_item)
             self.tableWidget.setItem(row, 2, sc_unit_item)
             self.tableWidget.setItem(row, 3, scale_item)
+            self.tableWidget.setItem(row, 4, scale_item)
 
             # Increment row index
             row_index += 1
 
+        # Set selection behavior to select rows
+        self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)
+
+        # Enable delete button when a row is selected
+        self.tableWidget.selectionModel().selectionChanged.connect(self.update_delete_button_state)
+
         # Display the table
         self.tableWidget.show()
 
-        pass
+    def update_delete_button_state(self):
+        selected_rows = self.tableWidget.selectionModel().selectedRows()
+        self.pb_delete.setEnabled(len(selected_rows) > 0)
+
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None):
