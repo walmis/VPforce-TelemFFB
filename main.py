@@ -1265,6 +1265,8 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         self.defaults_path = defaults_path
         self.userconfig_path = userconfig_path
         self.fill_fields()
+        self.pb_add.clicked.connect(self.add_button_clicked)
+        self.pb_delete.clicked.connect(self.delete_button_clicked)
 
     def fill_fields(self):
         is_msfs = settings_mgr.current_sim == 'MSFS'
@@ -1373,6 +1375,9 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         # Set selection behavior to select entire rows
         self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)
 
+        self.pb_delete.clicked.connect(lambda: self.delete_button_clicked(row-1))
+
+
         # Connect currentItemChanged signal to handle row selection and data copying
         self.tableWidget.currentItemChanged.connect(self.on_table_item_changed)
 
@@ -1383,9 +1388,6 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
     def on_table_item_changed(self, current_item, previous_item):
         # Get the row number from the current item
         current_row = current_item.row()
-
-        # Check if the source is 'user' for the current row
-        source_item = self.tableWidget.item(current_row, 4)
 
         # Copy data from the current row to designated widgets
         self.cb_name.setCurrentText(self.tableWidget.item(current_row, 0).text())
@@ -1398,7 +1400,39 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         else:
             self.pb_delete.setEnabled(False)
 
+    def add_button_clicked(self):
 
+        name = self.cb_name.currentText()
+        var = self.tb_var.text()
+        sc_unit = self.cb_sc_unit.currentText()
+        scale_text = self.tb_scale.text()
+        scale_valid = True
+        # Validate and convert scale to a number (integer or float)
+        if scale_text != '':
+            try:
+                scale = float(scale_text)
+                scale_text = scale
+            except ValueError:
+                scale_valid = False
+                self.tb_scale.setText('')
+
+        # Handle the case where scale is not a valid number
+        # enable delete button for user rows
+        if name != '' and var != '' and sc_unit != '' and scale_valid:
+            xmlutils.write_override_to_xml(settings_mgr.current_pattern, var, name, sc_unit, scale_text)
+        self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
+        self.fill_table()
+
+    def delete_button_clicked(self, row):
+        # Get the row number from the current item
+        if row:
+            print(f"\nerase row: {row}    pattern: {settings_mgr.current_pattern} ")
+
+            name = self.tableWidget.item(row, 0).text()
+            xmlutils.erase_override_from_xml(settings_mgr.current_pattern,name)
+
+        self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
+        self.fill_table()
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None):
