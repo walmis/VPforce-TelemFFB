@@ -3250,9 +3250,9 @@ class MainWindow(QMainWindow):
                 # check for msfs and debug mode (alt-d pressed), change to simvar name
                 if self.show_simvars:
                     if data["src"] == "MSFS2020":
-                        simvarnames = SimConnectManager()
-                        s = simvarnames.get_var_name(k)
-                        if not s is None:
+                        s = self._telem_manager._simconnect.get_var_name(k)
+                        # s = simvarnames.get_var_name(k)
+                        if s is not None:
                             k = s
                 if type(v) == float:
                     items += f"{k}: {v:.3f}\n"
