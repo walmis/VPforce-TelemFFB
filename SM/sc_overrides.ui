@@ -202,11 +202,6 @@
     <widget class="QTableWidget" name="tableWidget">
      <column>
       <property name="text">
-       <string>check</string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
        <string>Property</string>
       </property>
      </column>

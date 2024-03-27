@@ -1,0 +1,1 @@
+pyuic5 sc_overrides.ui -o ../sc_override_edit.py

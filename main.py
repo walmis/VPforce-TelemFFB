@@ -1271,6 +1271,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         self.pb_add.setEnabled(is_msfs)
         self.pb_delete.setEnabled(False)
         self.tb_var.setEnabled(is_msfs)
+        self.tableWidget.setEnabled(is_msfs)
         self.tb_scale.setEnabled(is_msfs)
         self.cb_name.setEnabled(is_msfs)
         self.cb_sc_unit.setEnabled(is_msfs)
@@ -1279,10 +1280,13 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         if is_msfs:
             self.fill_cb_name()
 
-            overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
-            if not any(overrides) :
+            self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
+
+
+            if not any(self.overrides) :
                 self.bottomlabel.setText('No overrides are set for this aircraft')
             else:
+                self.overrides.sort(key=lambda x: x['name'])
                 self.bottomlabel.setText('')
                 self.fill_table()
         else:
@@ -1290,17 +1294,63 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         pass
 
     def fill_cb_name(self):
+        blocked_names = ['T', 'N', 'G', 'AccBody', 'TAS', 'AirDensity', 'AoA', 'StallAoA', 'SideSlip',
+                         'DynPressure', 'Pitch', 'Roll', 'Heading', 'PitchRate', 'RollRate', 'VelRotBody',
+                         'PitchAccel', 'RollAccel', 'AccRotBody', 'DesignSpeed', 'VerticalSpeed', 'SimDisabled',
+                         'SimOnGround', 'Parked', 'Slew', 'SurfaceType', 'SimConnectCategory', 'EngineType',
+                         'AmbWind', 'VelWorld']
+
         self.cb_name.clear()
         self.cb_name.addItem('')
         self.cb_name.setEditable(True)
-        for x in sc_manager.SimConnectManager.sim_vars:
-            self.cb_name.addItem(x.name)
+        for x in SimConnectManager.sim_vars:
+            if x.name not in blocked_names:
+                self.cb_name.addItem(x.name)
         model = self.cb_name.model()
         model.sort(0)  # Sort items alphabetically
 
     def fill_table(self):
         self.tableWidget.blockSignals(True)
         self.tableWidget.clear()
+        list_length = len(self.overrides) - 1
+        # Set headers
+        headers = ['Property', 'Variable', 'SC Unit', 'Scale']
+        self.tableWidget.setHorizontalHeaderLabels(headers)
+        row_index = 0
+        # Populate the table
+        for row, override in enumerate(self.overrides):
+            # Increment row index for adding new row
+            self.tableWidget.setRowCount(row_index + 1)
+            # Extracting specific key-value pairs
+            name_item = QTableWidgetItem(override['name'])
+            var_item = QTableWidgetItem(override['var'])
+            sc_unit_item = QTableWidgetItem(override['sc_unit'])
+            scale_item = QTableWidgetItem(str(override['scale']))
+
+            # Setting items non-editable
+            name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
+            var_item.setFlags(var_item.flags() & ~Qt.ItemIsEditable)
+            sc_unit_item.setFlags(sc_unit_item.flags() & ~Qt.ItemIsEditable)
+            scale_item.setFlags(scale_item.flags() & ~Qt.ItemIsEditable)
+
+            # If source is 'defaults', make the row not selectable
+            if override['source'] == 'defaults':
+                name_item.setFlags(name_item.flags() & ~Qt.ItemIsSelectable)
+                var_item.setFlags(var_item.flags() & ~Qt.ItemIsSelectable)
+                sc_unit_item.setFlags(sc_unit_item.flags() & ~Qt.ItemIsSelectable)
+                scale_item.setFlags(scale_item.flags() & ~Qt.ItemIsSelectable)
+
+            # Setting items for the row
+            self.tableWidget.setItem(row, 0, name_item)
+            self.tableWidget.setItem(row, 1, var_item)
+            self.tableWidget.setItem(row, 2, sc_unit_item)
+            self.tableWidget.setItem(row, 3, scale_item)
+
+            # Increment row index
+            row_index += 1
+
+        # Display the table
+        self.tableWidget.show()
 
         pass
 
