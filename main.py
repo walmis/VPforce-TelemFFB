@@ -1257,7 +1257,7 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
 
 class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
     overrides = []
-    current_row = -1
+    current_name = ''
     def __init__(self, parent=None, userconfig_path='', defaults_path=''):
         super(SCOverridesEditor, self).__init__(parent)
         self.setupUi(self)
@@ -1321,6 +1321,14 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         headers = ['Property', 'Variable', 'SC Unit', 'Scale', 's']
         self.tableWidget.setHorizontalHeaderLabels(headers)
         row_index = 0
+        # Set width of the variable column
+        self.tableWidget.setColumnWidth(0, 140)
+        self.tableWidget.setColumnWidth(1, 300)
+        self.tableWidget.setColumnWidth(2, 130)
+        self.tableWidget.setColumnWidth(3, 100)
+        self.tableWidget.setColumnWidth(4, 60)
+        self.tableWidget.setColumnHidden(4, True)
+
         # Populate the table
         for row, override in enumerate(self.overrides):
             # Increment row index for adding new row
@@ -1334,14 +1342,6 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             else:
                 scale_item = QTableWidgetItem('')
             source_item = QTableWidgetItem(override['source'])
-
-            # Set width of the variable column
-            self.tableWidget.setColumnWidth(0, 140)
-            self.tableWidget.setColumnWidth(1, 300)
-            self.tableWidget.setColumnWidth(2, 130)
-            self.tableWidget.setColumnWidth(3, 100)
-            self.tableWidget.setColumnWidth(4, 60)
-            self.tableWidget.setColumnHidden(4, True)
 
             # If source is 'defaults', make the text color grey
             if override['source'] == 'defaults':
@@ -1396,19 +1396,20 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             current_item = selected_items[0]
             # Get the row number from the current item
             current_row = current_item.row()
-            self.current_row = current_row
+
             # Copy data from the current row to designated widgets
             self.cb_name.setCurrentText(self.tableWidget.item(current_row, 0).text())
             self.tb_var.setText(self.tableWidget.item(current_row, 1).text())
             self.cb_sc_unit.setCurrentText(self.tableWidget.item(current_row, 2).text())
             self.tb_scale.setText(self.tableWidget.item(current_row, 3).text())
+            self.current_name = self.tableWidget.item(current_row, 0).text()
             # enable delete button for user rows
             if self.tableWidget.item(current_row, 4).text() == 'user':
                 self.pb_delete.setEnabled(True)
             else:
                 self.pb_delete.setEnabled(False)
         else:
-            self.current_row = -1
+            self.current_name = ''
             self.pb_delete.setEnabled(False)
 
     def add_button_clicked(self):
@@ -1434,14 +1435,14 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.tb_var.setText('')
             self.cb_sc_unit.setCurrentText('')
             self.tb_scale.setText('')
-        self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
-        self.fill_table()
+            self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
+            self.fill_table()
 
     def delete_button_clicked(self):
         # Get the row number from the current item
-        if self.current_row >= 0:
-            name = self.tableWidget.item(self.current_row, 0).text()
-            print(f"\nerase row: {self.current_row}    pattern: {settings_mgr.current_pattern}  name: {name}")
+        if self.current_name != '':
+            name = self.current_name
+            print(f"\nerase row: {self.current_name}    pattern: {settings_mgr.current_pattern}  name: {name}")
             self.tableWidget.blockSignals(True)
             self.pb_delete.setEnabled(False)
             xmlutils.erase_override_from_xml(settings_mgr.current_pattern,name)
