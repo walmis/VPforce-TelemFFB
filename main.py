@@ -27,6 +27,7 @@ import time
 import os
 
 import ffb_rhino
+import sc_manager
 import utils
 import re
 import socket
@@ -1251,14 +1252,52 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
 
 
 class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
-    def __init__(self, parent=None, userconfig_path='', defaults_path='', current_craft=''):
+    overrides = []
+    def __init__(self, parent=None, userconfig_path='', defaults_path=''):
         super(SCOverridesEditor, self).__init__(parent)
         self.setupUi(self)
         self.retranslateUi(self)
         self.defaults_path = defaults_path
         self.userconfig_path = userconfig_path
-        self.pattern = current_craft
+        self.fill_fields()
 
+    def fill_fields(self):
+        is_msfs = settings_mgr.current_sim == 'MSFS'
+        self.pb_add.setEnabled(is_msfs)
+        self.pb_delete.setEnabled(False)
+        self.tb_var.setEnabled(is_msfs)
+        self.tb_scale.setEnabled(is_msfs)
+        self.cb_name.setEnabled(is_msfs)
+        self.cb_sc_unit.setEnabled(is_msfs)
+        self.tb_pattern.setText(settings_mgr.current_pattern)
+
+        if is_msfs:
+            self.fill_cb_name()
+
+            overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
+            if not any(overrides) :
+                self.bottomlabel.setText('No overrides are set for this aircraft')
+            else:
+                self.bottomlabel.setText('')
+                self.fill_table()
+        else:
+            self.bottomlabel.setText('SimConnect overrides are for MSFS only.')
+        pass
+
+    def fill_cb_name(self):
+        self.cb_name.clear()
+        self.cb_name.addItem('')
+        self.cb_name.setEditable(True)
+        for x in sc_manager.SimConnectManager.sim_vars:
+            self.cb_name.addItem(x.name)
+        model = self.cb_name.model()
+        model.sort(0)  # Sort items alphabetically
+
+    def fill_table(self):
+        self.tableWidget.blockSignals(True)
+        self.tableWidget.clear()
+
+        pass
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None):

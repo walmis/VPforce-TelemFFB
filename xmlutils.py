@@ -201,13 +201,13 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False, instance
 
 
 def read_overrides(aircraft_name):
-    def_model_overrides = read_models_overrides(defaults_path, aircraft_name)
-    user_model_overrides = read_models_overrides(userconfig_path, aircraft_name)
+    def_model_overrides = read_models_overrides(defaults_path, aircraft_name, 'defaults')
+    user_model_overrides = read_models_overrides(userconfig_path, aircraft_name, 'user')
     result = update_overrides_with_user(def_model_overrides,user_model_overrides)
     return result
 
 
-def read_models_overrides(file_path, full_model_name):
+def read_models_overrides(file_path, full_model_name, source):
     mprint(f"read_models_overrides  {file_path}, {full_model_name}")
     # runs on both defaults and userconfig xml files
     #pass 'all' to get all of them
@@ -239,7 +239,8 @@ def read_models_overrides(file_path, full_model_name):
                         'name': name,
                         'var': var,
                         'sc_unit': sc_unit,
-                        'scale': scale
+                        'scale': scale,
+                        'source': source
                     }
                     model_overrides.append(model_dict)
                 else:
@@ -266,6 +267,7 @@ def update_overrides_with_user(defaults_ovr, user_ovr):
                         existingitem['var'] = model_dict['var']
                         existingitem['sc_unit'] = model_dict['sc_unit']
                         existingitem['scale'] = model_dict['scale']
+                        existingitem['source'] = model_dict['source']
 
                 else:
                     items_to_append.append(model_dict)

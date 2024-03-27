@@ -171,6 +171,11 @@
        </property>
        <item>
         <property name="text">
+         <string/>
+        </property>
+       </item>
+       <item>
+        <property name="text">
          <string>bool</string>
         </property>
        </item>
@@ -231,6 +236,22 @@
       <widget class="QPushButton" name="pb_delete">
        <property name="text">
         <string>Delete Checked</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="bottomlabel">
+       <property name="minimumSize">
+        <size>
+         <width>300</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>SimConnect overrides are for MSFS only.</string>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
        </property>
       </widget>
      </item>
