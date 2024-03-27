@@ -2610,6 +2610,9 @@ class MainWindow(QMainWindow):
         shortcut = QShortcut(QKeySequence('Alt+D'), self)
         shortcut.activated.connect(self.add_debug_menu)
 
+    @classmethod
+    def set_telem_manager(cls, tm):
+        cls._telem_manager = tm
     def test_function(self):
         self.set_scrollbar(400)
 
@@ -4887,6 +4890,8 @@ def main():
 
     telem_manager = TelemManager(settings_manager=settings_mgr, ipc_thread=_ipc_thread)
     telem_manager.start()
+
+    window.set_telem_manager(telem_manager)
 
     telem_manager.telemetryReceived.connect(window.update_telemetry)
     telem_manager.updateSettingsLayout.connect(window.update_settings)
