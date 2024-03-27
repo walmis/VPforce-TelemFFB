@@ -211,6 +211,7 @@ class SimConnectManager(threading.Thread):
         self.new_var_tracker = []
         self.REQ_ID = 60000 + unique_id
         self.def_id = int(str(unique_id)[::-1])
+        self.sv_dict = {}
 
 
     def addSimVar(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
@@ -232,14 +233,18 @@ class SimConnectManager(threading.Thread):
         # for sv in resulting_list: print(f"SV: {sv}")
         self.temp_sim_vars.clear()
         self.new_var_tracker.clear()
+        self.sv_dict.clear()
 
         for sv in (resulting_list):
             # build list of just the simvar / l:var for use in comparing to currently subscribed list (self.current_var_tracker)
             if isinstance(sv, SimVarArray):
                 for sv in sv.vars:
                     self.new_var_tracker.append(sv.var)
+                    self.sv_dict[sv.name] = sv.var
             else:
                 self.new_var_tracker.append(sv.var)
+                self.sv_dict[sv.name] = sv.var
+
         return resulting_list
 
     def _subscribe(self):
@@ -259,6 +264,7 @@ class SimConnectManager(threading.Thread):
 
         self.subscribed_vars.clear()
         self.current_var_tracker.clear()
+        self.sv_dict.clear()
 
         i = 0
         for sv in (sim_vars):
@@ -269,6 +275,7 @@ class SimConnectManager(threading.Thread):
 
                     self.subscribed_vars.append(sv)
                     self.current_var_tracker.append(sv.var)
+                    self.sv_dict[sv.name] = sv.var
                     i+=1
             else:
                 res = self.sc.AddToDataDefinition(self.def_id, sv.var, sv.sc_unit, sv.datatype, 0, i)
@@ -276,6 +283,7 @@ class SimConnectManager(threading.Thread):
 
                 self.subscribed_vars.append(sv)
                 self.current_var_tracker.append(sv.var)
+                self.sv_dict[sv.name] = sv.var
                 i+=1
 
         self.sc.RequestDataOnSimObject(
@@ -448,14 +456,15 @@ class SimConnectManager(threading.Thread):
                 pass
 
     def get_var_name(self,k):
-        for sv in (self.sim_vars):
-            if isinstance(sv, SimVarArray):
-                for sv in sv.vars:
-                    if sv.name == k:
-                        return sv.var
-            else:
-                if sv.name == k:
-                    return sv.var
+        return self.sv_dict.get(k, None)
+        # for sv in (self.sim_vars):
+        #     if isinstance(sv, SimVarArray):
+        #         for sv in sv.vars:
+        #             if sv.name == k:
+        #                 return sv.var
+        #     else:
+        #         if sv.name == k:
+        #             return sv.var
 
 # run test
 if __name__ == "__main__":

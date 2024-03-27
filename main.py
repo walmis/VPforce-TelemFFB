@@ -522,6 +522,10 @@ class TelemManager(QObject, threading.Thread):
         self.ipc_thread = ipc_thread
         self._ipc_telem = {}
 
+    @classmethod
+    def set_simconnect(cls, sc):
+        cls._simconnect = sc
+
     def get_aircraft_config(self, aircraft_name, data_source):
         params = {}
         cls_name = "UNKNOWN"
@@ -743,8 +747,8 @@ class TelemManager(QObject, threading.Thread):
                 if data_source == "MSFS2020" and aircraft_name != '':
                     d1 = xmlutils.read_overrides(aircraft_name)
                     for sv in d1:
-                        self.currentAircraft._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
-                    self.currentAircraft._simconnect._resubscribe()
+                        self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
+                    self._simconnect._resubscribe()
                 if settings_mgr.isVisible():
                     settings_mgr.b_getcurrentmodel.click()
 
@@ -772,8 +776,8 @@ class TelemManager(QObject, threading.Thread):
                 if data_source == "MSFS2020" and aircraft_name != '':
                     d1 = xmlutils.read_overrides(aircraft_name)
                     for sv in d1:
-                        self.currentAircraft._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
-                    self.currentAircraft._simconnect._resubscribe()
+                        self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
+                    self._simconnect._resubscribe()
 
                 self.updateSettingsLayout.emit()
             try:
@@ -1069,6 +1073,7 @@ class NetworkThread(threading.Thread):
 class SimConnectSock(SimConnectManager):
     def __init__(self, telem: TelemManager, ffb_type=_device_type, unique_id=int(_device_pid)):
         super().__init__(unique_id)
+        telem.set_simconnect(self)
         self._telem = telem
         self._ffb_type = ffb_type
 
@@ -2644,6 +2649,9 @@ class MainWindow(QMainWindow):
         shortcut = QShortcut(QKeySequence('Alt+D'), self)
         shortcut.activated.connect(self.add_debug_menu)
 
+    @classmethod
+    def set_telem_manager(cls, tm):
+        cls._telem_manager = tm
     def test_function(self):
         self.set_scrollbar(400)
 
@@ -3281,9 +3289,9 @@ class MainWindow(QMainWindow):
                 # check for msfs and debug mode (alt-d pressed), change to simvar name
                 if self.show_simvars:
                     if data["src"] == "MSFS2020":
-                        simvarnames = SimConnectManager()
-                        s = simvarnames.get_var_name(k)
-                        if not s is None:
+                        s = self._telem_manager._simconnect.get_var_name(k)
+                        # s = simvarnames.get_var_name(k)
+                        if s is not None:
                             k = s
                 if type(v) == float:
                     items += f"{k}: {v:.3f}\n"
@@ -4921,6 +4929,8 @@ def main():
 
     telem_manager = TelemManager(settings_manager=settings_mgr, ipc_thread=_ipc_thread)
     telem_manager.start()
+
+    window.set_telem_manager(telem_manager)
 
     telem_manager.telemetryReceived.connect(window.update_telemetry)
     telem_manager.updateSettingsLayout.connect(window.update_settings)
