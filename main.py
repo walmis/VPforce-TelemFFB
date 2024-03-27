@@ -27,7 +27,6 @@ import time
 import os
 
 import ffb_rhino
-import sc_manager
 import utils
 import re
 import socket
