@@ -211,7 +211,10 @@ class Aircraft(AircraftBase):
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
-        self._update_focus_loss(telem_data)
+        if not telem_data.get("Focus",0):
+            self.on_timeout()
+            return
+        # self._update_focus_loss(telem_data)
         if self.deceleration_effect_enable:
             self._decel_effect(telem_data)
         if self.damage_effect_intensity > 0:
@@ -259,6 +262,9 @@ class PropellerAircraft(Aircraft):
         ## Propeller Aircraft Telemetry Handler
         if telem_data.get("N") == None:
             return
+        if not telem_data.get("Focus",0):
+            self.on_timeout()
+            return
         telem_data["AircraftClass"] = "PropellerAircraft"   #inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
@@ -281,6 +287,9 @@ class JetAircraft(Aircraft):
     def on_telemetry(self, telem_data):
         ## Jet Aircraft Telemetry Handler
         if telem_data.get("N")== None:
+            return
+        if not telem_data.get("Focus",0):
+            self.on_timeout()
             return
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
