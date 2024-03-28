@@ -736,6 +736,13 @@ class TelemManager(QObject, threading.Thread):
                 if "vpconf" in params:
                     set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
 
+                if params.get('command_runner_enabled', False):
+                    if params.get('command_runner_command', '') != '':
+                        try:
+                            subprocess.call(params['command_runner_command'])
+                        except Exception as e:
+                            logging.error(f"Error running Command Executor for model: {e}")
+
                 logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
 
                 # instantiate new aircraft handler
@@ -764,6 +771,13 @@ class TelemManager(QObject, threading.Thread):
 
                 if "vpconf" in updated_params:
                     set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+
+                if params.get('command_runner_enabled', False):
+                    if params.get('command_runner_command', '') != '' and 'Enter full path' not in params.get('command_runner_command', ''):
+                        try:
+                            subprocess.call(params['command_runner_command'])
+                        except Exception as e:
+                            logging.error(f"Error running Command Executor for model: {e}")
 
                 if "type" in updated_params:
                     # if user changed type or if new aircraft dialog changed type, update aircraft class
@@ -4017,6 +4031,13 @@ class SettingsLayout(QGridLayout):
 
             d_slider.blockSignals(False)
 
+        if item['datatype'] == 'text':
+            textbox = QLineEdit()
+            textbox.setObjectName(f"le_{item['name']}")
+            textbox.setText(item['value'])
+            textbox.editingFinished.connect(self.textbox_changed)
+            self.addWidget(textbox, i, entry_col, 1, entry_colspan)
+
         if item['datatype'] == 'list' or item['datatype'] == 'anylist':
             dropbox = QComboBox()
             dropbox.setMinimumWidth(150)
@@ -4159,6 +4180,14 @@ class SettingsLayout(QGridLayout):
                 xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, file_path, 'vpconf')
                 if settings_mgr.timedOut:
                     self.reload_caller()
+
+    def textbox_changed(self):
+        setting_name = self.sender().objectName().replace('le_', '')
+        value = self.sender().text()
+        logging.debug(f"Textbox {setting_name} changed. New value: {value}")
+        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name)
+        if settings_mgr.timedOut:
+            self.reload_caller()
 
     def dropbox_changed(self):
         setting_name = self.sender().objectName().replace('db_', '')

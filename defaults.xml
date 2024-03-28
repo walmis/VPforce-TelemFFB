@@ -2618,6 +2618,40 @@
 		<info>Load a specific .vpconf file (created with VPForce Configurator)&lt;br&gt;&lt;br&gt;When using this function, it will remain active until set again by another sim, class, or model setting</info>
 		<XPLANE>true</XPLANE>
 	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>960</order>
+		<name>command_runner_enabled</name>
+		<info>Enable execution of any command when aircraft loads</info>
+		<displayname>Command Runner</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>System</Grouping>
+		<order>960.2</order>
+		<name>command_runner_command</name>
+		<prereq>command_runner_enabled</prereq>
+		<info>Enter a command to be executed when an aircraft loads.  There is no path or validation checking.  Command will be executed as is.&lt;br&gt;&lt;br&gt;Enter the command with the full path exactly as if running from a command prompt</info>
+		<displayname>Command Runner String</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>Enter full path as if running from command prompt...</validvalues>
+		<value>Enter full path as if running from command prompt...</value>
+		<datatype>text</datatype>
+	</defaults>
 	<sc_overrides>
 		<model>FlyInside B206.*</model>
 		<name>EngRPM</name>

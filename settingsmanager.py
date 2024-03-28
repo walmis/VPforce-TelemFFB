@@ -730,6 +730,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 self.drp_valuebox.addItems(valids)
                 self.drp_valuebox.setCurrentText(value)
                 self.drp_valuebox.blockSignals(False)
+            case 'text':
+                self.tb_value.show()
             case 'path':
                 self.b_browse.show()
                 self.l_value.show()
