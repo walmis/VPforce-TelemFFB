@@ -1798,8 +1798,8 @@ class HPGHelicopter(Helicopter):
                     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
                 telem_data['error'] = 1
                 return
-            sema_x = telem_data.get("hpg5SEMAx", 0)
-            sema_y = telem_data.get("hpg5SEMAy", 0)
+            sema_x = telem_data.get("hpgSEMAx", 0)
+            sema_y = telem_data.get("hpgSEMAy", 0)
 
             # sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
             # sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
