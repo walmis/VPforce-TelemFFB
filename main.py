@@ -739,7 +739,7 @@ class TelemManager(QObject, threading.Thread):
                 if params.get('command_runner_enabled', False):
                     if params.get('command_runner_command', '') != '':
                         try:
-                            subprocess.call(params['command_runner_command'])
+                            subprocess.Popen(params['command_runner_command'], shell=True)
                         except Exception as e:
                             logging.error(f"Error running Command Executor for model: {e}")
 
@@ -775,7 +775,7 @@ class TelemManager(QObject, threading.Thread):
                 if params.get('command_runner_enabled', False):
                     if params.get('command_runner_command', '') != '' and 'Enter full path' not in params.get('command_runner_command', ''):
                         try:
-                            subprocess.call(params['command_runner_command'])
+                            subprocess.Popen(params['command_runner_command'], shell=True)
                         except Exception as e:
                             logging.error(f"Error running Command Executor for model: {e}")
 
