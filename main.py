@@ -42,7 +42,7 @@ from configobj import ConfigObj
 
 from settingsmanager import *
 import xmlutils
-from PyQt5.QtWidgets import QTableWidgetItem, QAbstractItemView
+from PyQt5.QtWidgets import QTableWidgetItem, QAbstractItemView, QListWidget, QSplitter
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
     QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
@@ -1117,53 +1117,65 @@ class Ui_TeleplotDialog(object):
     def setupUi(self, TeleplotDialog):
         if not TeleplotDialog.objectName():
             TeleplotDialog.setObjectName(u"TeleplotDialog")
-        TeleplotDialog.resize(273, 381)
+        TeleplotDialog.resize(270, 392)
         self.layoutWidget = QWidget(TeleplotDialog)
         self.layoutWidget.setObjectName(u"layoutWidget")
         self.layoutWidget.setGeometry(QRect(7, 10, 258, 296))
         self.gridLayout = QGridLayout(self.layoutWidget)
         self.gridLayout.setObjectName(u"gridLayout")
         self.gridLayout.setContentsMargins(0, 0, 0, 0)
+        self.label_4 = QLabel(self.layoutWidget)
+        self.label_4.setObjectName(u"label_4")
+
+        self.gridLayout.addWidget(self.label_4, 5, 0, 1, 1)
+
         self.tb_port = QLineEdit(self.layoutWidget)
         self.tb_port.setObjectName(u"tb_port")
 
         self.gridLayout.addWidget(self.tb_port, 2, 0, 1, 1, Qt.AlignLeft)
-
-        self.label = QLabel(self.layoutWidget)
-        self.label.setObjectName(u"label")
-
-        self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
-
-        self.label_2 = QLabel(self.layoutWidget)
-        self.label_2.setObjectName(u"label_2")
-
-        self.gridLayout.addWidget(self.label_2, 1, 0, 1, 1)
-
-        self.tb_vars = QPlainTextEdit(self.layoutWidget)
-        self.tb_vars.setObjectName(u"tb_vars")
-
-        self.gridLayout.addWidget(self.tb_vars, 5, 0, 1, 1)
 
         self.label_3 = QLabel(self.layoutWidget)
         self.label_3.setObjectName(u"label_3")
 
         self.gridLayout.addWidget(self.label_3, 3, 0, 1, 1)
 
-        self.label_4 = QLabel(self.layoutWidget)
-        self.label_4.setObjectName(u"label_4")
+        self.label_2 = QLabel(self.layoutWidget)
+        self.label_2.setObjectName(u"label_2")
 
-        self.gridLayout.addWidget(self.label_4, 4, 0, 1, 1)
+        self.gridLayout.addWidget(self.label_2, 1, 0, 1, 1)
+
+        self.label = QLabel(self.layoutWidget)
+        self.label.setObjectName(u"label")
+
+        self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
+
+        self.tb_vars = QPlainTextEdit(self.layoutWidget)
+        self.tb_vars.setObjectName(u"tb_vars")
+
+        self.gridLayout.addWidget(self.tb_vars, 6, 0, 1, 1)
+
+        self.splitter = QSplitter(self.layoutWidget)
+        self.splitter.setObjectName(u"splitter")
+        self.splitter.setOrientation(Qt.Horizontal)
+        self.label_6 = QLabel(self.splitter)
+        self.label_6.setObjectName(u"label_6")
+        self.splitter.addWidget(self.label_6)
+        self.pb_Select = QPushButton(self.splitter)
+        self.pb_Select.setObjectName(u"pb_Select")
+        self.splitter.addWidget(self.pb_Select)
+
+        self.gridLayout.addWidget(self.splitter, 4, 0, 1, 1)
 
         self.label_5 = QLabel(TeleplotDialog)
         self.label_5.setObjectName(u"label_5")
         self.label_5.setGeometry(QRect(7, 310, 256, 26))
-        self.widget = QWidget(TeleplotDialog)
-        self.widget.setObjectName(u"widget")
-        self.widget.setGeometry(QRect(10, 350, 251, 25))
-        self.horizontalLayout = QHBoxLayout(self.widget)
+        self.layoutWidget1 = QWidget(TeleplotDialog)
+        self.layoutWidget1.setObjectName(u"layoutWidget1")
+        self.layoutWidget1.setGeometry(QRect(10, 350, 251, 25))
+        self.horizontalLayout = QHBoxLayout(self.layoutWidget1)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
-        self.pb_clear = QPushButton(self.widget)
+        self.pb_clear = QPushButton(self.layoutWidget1)
         self.pb_clear.setObjectName(u"pb_clear")
 
         self.horizontalLayout.addWidget(self.pb_clear, 0, Qt.AlignLeft)
@@ -1176,12 +1188,13 @@ class Ui_TeleplotDialog(object):
 
         self.horizontalLayout.addItem(self.horizontalSpacer)
 
-        self.buttonBox = QDialogButtonBox(self.widget)
+        self.buttonBox = QDialogButtonBox(self.layoutWidget1)
         self.buttonBox.setObjectName(u"buttonBox")
         self.buttonBox.setOrientation(Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel | QDialogButtonBox.Save)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
 
         self.horizontalLayout.addWidget(self.buttonBox, 0, Qt.AlignRight)
+
 
         self.retranslateUi(TeleplotDialog)
 
@@ -1190,14 +1203,17 @@ class Ui_TeleplotDialog(object):
 
     def retranslateUi(self, TeleplotDialog):
         TeleplotDialog.setWindowTitle(QCoreApplication.translate("TeleplotDialog", u"Teleplot Setup", None))
-        self.label.setText(QCoreApplication.translate("TeleplotDialog", u"Open a browser to teleplot.fr, record port number", None))
-        self.label_2.setText(QCoreApplication.translate("TeleplotDialog", u"Port:", None))
-        self.label_3.setText(QCoreApplication.translate("TeleplotDialog", u"Space separated list of Telemetry variables", None))
         self.label_4.setText(QCoreApplication.translate("TeleplotDialog", u"List:", None))
-        self.label_5.setText(QCoreApplication.translate("TeleplotDialog", u"To stop sending teleplot data,\nclear the boxes and select OK", None))
+        self.label_3.setText(QCoreApplication.translate("TeleplotDialog", u"Space separated list of Telemetry variables", None))
+        self.label_2.setText(QCoreApplication.translate("TeleplotDialog", u"Port:", None))
+        self.label.setText(QCoreApplication.translate("TeleplotDialog", u"Open a browser to teleplot.fr, record port number", None))
+        self.label_6.setText(QCoreApplication.translate("TeleplotDialog", u"or select from active: ", None))
+        self.pb_Select.setText(QCoreApplication.translate("TeleplotDialog", u"Select...", None))
+        self.label_5.setText(QCoreApplication.translate("TeleplotDialog", u"To stop sending teleplot data,\n"
+"clear the boxes and select OK", None))
         self.pb_clear.setText(QCoreApplication.translate("TeleplotDialog", u"Clear", None))
     # retranslateUi
-
+    # setupUi
 
 class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
 
@@ -1224,9 +1240,53 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
         self.buttonBox.accepted.connect(self.save_teleplot)
         self.buttonBox.rejected.connect(self.close)
         self.pb_clear.clicked.connect(self.clear_form)
+        self.pb_Select.clicked.connect(self.select_active_telemetry)
         self.tb_port.setText(self.telem_port)
         self.tb_vars.setPlainText(str(self.telem_vars))
+        self.telem_data = parent.lbl_telem_data.text()
 
+    class KeySelectionDialog(QDialog):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setWindowTitle("Select Keys")
+            self.parent = parent
+            layout = QVBoxLayout(self)
+            self.list_widget = QListWidget()
+            self.list_widget.setSelectionMode(QListWidget.MultiSelection)  # Allow multiple selections
+            self.list_widget.addItems(self.get_active_keys())
+            refresh_button = QPushButton()
+            refresh_button.setText("Refresh Keys")
+            layout.addWidget(refresh_button)
+            layout.addWidget(self.list_widget)
+            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset)
+            refresh_button.clicked.connect(self.refresh_keys)
+            button_box.accepted.connect(self.populate_keys)
+            button_box.rejected.connect(self.reject)
+            button_box.button(QDialogButtonBox.Reset).clicked.connect(self.clearSelection)
+            layout.addWidget(button_box)
+
+        def populate_keys(self):
+            keys = self.selectedKeys()
+            str = ''
+            for k in keys:
+                str = str + f"{k} "
+            self.parent.tb_vars.setPlainText(str.rstrip(" "))
+            self.accept()
+        def refresh_keys(self):
+            self.list_widget.addItems(self.get_active_keys())
+        def get_active_keys(self):
+            text = self.parent.parent.lbl_telem_data.text()
+            keys = [line.split(':')[0].strip() for line in text.split('\n') if line.strip()]
+            return keys
+        def selectedKeys(self):
+            return [item.text() for item in self.list_widget.selectedItems()]
+
+        def clearSelection(self):
+            self.list_widget.clearSelection()
+    def select_active_telemetry(self):
+        self._telem_selection_window = self.KeySelectionDialog(parent=self)
+        self._telem_selection_window.exec_()
+        pass
     def save_teleplot(self):
         if self.validate_text():
             if self.tb_port == '':
