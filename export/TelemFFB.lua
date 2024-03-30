@@ -73,6 +73,16 @@ function enableGetDamage(flag)
   end
 end
 
+function get_indicated_airspeed(TAS, density)
+    local Ki = 0
+    local a0 = 290.07 -- speed of sound at sea level in ISA conditions m/s
+    local P0 = 1013.25 -- static pressure at sea level in ISA conditions Pa
+    local part1 = (0.5 * density * TAS^2 / P0) + 1
+    local part2 = ((part1)^(2/7) - 1) * 5
+    local IAS = a0 * math.sqrt(part2) + Ki
+    return IAS
+end
+
 function getUH1ShellCount(payloadInfo)
     local totalShellCount = 0
 
@@ -253,6 +263,7 @@ local f_telemFFB = {
           incidence_vec = incidence_vec:rotZ(-obj.Pitch)
           incidence_vec = incidence_vec:rotX(-obj.Bank)
           local incidence = string.format("%.3f~%.3f~%.3f", incidence_vec.x, incidence_vec.y, incidence_vec.z)
+          local calculated_TAS = math.sqrt(incidence_vec.x^2 + incidence_vec.y^2)
 
           -- calculate relative wind in body frame
           local rel_wind = Vector(wind.x, wind.y, wind.z)
@@ -283,6 +294,8 @@ local f_telemFFB = {
 
           local AirDensity = calculateAirDensity(altAsl)
           local DynamicPressure = 0.5 * AirDensity * tas^2 -- kg/ms^2
+
+          local calculated_IAS = get_indicated_airspeed(calculated_TAS, AirDensity)
 
           if MainPanel ~= nil then
             MainPanel:update_arguments()
@@ -1118,7 +1131,12 @@ local f_telemFFB = {
             {"altAgl", "%.2f", altAgl},
             {"AoA", "%.2f", aoa},
             {"IAS", "%.2f", IAS},
-            {"TAS", "%.2f", tas},
+            {"IAS_kt", "%.2f", IAS * 1.944},
+            {"TAS_raw", "%.2f", tas},
+            {"TAS", "%.2f", calculated_TAS},
+            {"TAS_incidence", "%.2f", calculated_TAS},
+            {"TAS_raw_kt", "%.2f", tas * 1.944},
+            {"TAS_incidence_kt", "%.2f", calculated_TAS * 1.944},
             {"WeightOnWheels", "%s", WoW},
             {"Flares", "%s", CM.flare},
             {"Chaff", "%s", CM.chaff},
@@ -1127,8 +1145,8 @@ local f_telemFFB = {
             {"MechInfo", "%s", JSON:encode(mech):gsub("\n", "")},
             {"Afterburner", "%s", AB},
             {"DynamicPressure", "%.3f", DynamicPressure},
-            {"Incidence", "%s", incidence},  -- relative airstream in body frame
             {"AirDensity", "%.3f", AirDensity},
+            {"Incidence", "%s", incidence},  -- relative airstream in body frame
             {"CAlpha", "%.3f", calc_alpha},
             {"CBeta", "%.3f", calc_beta}, -- sideslip angle deg
             {"RelWind", "%s", rel_wind}, --wind in body frame
