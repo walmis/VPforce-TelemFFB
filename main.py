@@ -2807,6 +2807,11 @@ class MainWindow(QMainWindow):
         self.load_main_window_geometry()
         shortcut = QShortcut(QKeySequence('Alt+D'), self)
         shortcut.activated.connect(self.add_debug_menu)
+        try:
+            if utils.get_reg("debug"):
+                self.add_debug_menu()
+        except:
+            pass
 
     @classmethod
     def set_telem_manager(cls, tm):
