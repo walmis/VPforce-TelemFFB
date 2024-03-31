@@ -73,6 +73,21 @@ function enableGetDamage(flag)
   end
 end
 
+function calculate_wind_direction_2d(wind_vector)
+    local deg = math.fmod((180 / math.pi) * math.atan2(wind_vector.z, wind_vector.x), 360)
+    if deg < 0 then
+        deg = deg + 360
+    end
+    --local wind_direction_rad = math.atan2(wind_vector.z, wind_vector.x)
+    --local wind_direction_deg = math.deg(wind_direction_rad)
+    ----if wind_direction_deg < 0 then
+    ----    wind_direction_deg = wind_direction_deg + 360  -- Convert negative angles to positive
+    ----end
+    ------ Adjust for non-standard orientation
+    ----wind_direction_deg = (wind_direction_deg + 180) % 360
+    return deg
+end
+
 function get_indicated_airspeed(TAS, density)
     local Ki = 0
     local a0 = 290.07 -- speed of sound at sea level in ISA conditions m/s
@@ -254,6 +269,8 @@ local f_telemFFB = {
 
           local wind = LoGetVectorWindVelocity()
           local wind_vec = Vector(wind.x, wind.y, wind.z)
+          local wind_velocity = math.sqrt(wind.x^2 + wind.y^2 + wind.z^2)
+          local wind_direction = calculate_wind_direction_2d(wind)
 
           local velocityVectors = string.format("%.2f~%.2f~%.2f", vectorVel.x, vectorVel.y, vectorVel.z)
 
@@ -1151,6 +1168,8 @@ local f_telemFFB = {
             {"CBeta", "%.3f", calc_beta}, -- sideslip angle deg
             {"RelWind", "%s", rel_wind}, --wind in body frame
             {"Damage", "%s", damage},
+            {"Wind_Kts", "%.2f", wind_velocity * 1.944},
+            {"Wind_direction", "%.0f", wind_direction},
           }
           
           local formattedValues = {}
