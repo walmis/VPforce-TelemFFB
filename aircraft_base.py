@@ -1128,7 +1128,7 @@ class AircraftBase(object):
         vs = telem_data.get("VerticalSpeed", 0)
         if self._sim_is_dcs():
             # spd = abs(telem_data.get("VlctVectors")[0])
-            tas = telem_data.get("IAS")
+            tas = telem_data.get("TAS")
             adj_tas = tas - abs(vs)
             spd = adj_tas
             telem_data['_adj_TAS'] = adj_tas
