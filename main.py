@@ -2297,9 +2297,7 @@ class MainWindow(QMainWindow):
         settings_manager_action.triggered.connect(self.toggle_settings_window)
         system_menu.addAction(settings_manager_action)
 
-        sc_overrides_action = QAction('SimConnect Overrides Editor', self)
-        sc_overrides_action.triggered.connect(self.open_sc_override_dialog)
-        system_menu.addAction(sc_overrides_action)
+
 
         cfg_log_folder_action = QAction('Open Config/Log Directory', self)
         cfg_log_folder_action.triggered.connect(self.open_cfg_dir)
@@ -2916,6 +2914,10 @@ class MainWindow(QMainWindow):
         self.configurator_settings_action = QAction('Configurator Gain Override', self)
         self.configurator_settings_action.triggered.connect(self.open_configurator_dialog)
         self.debug_menu.addAction(self.configurator_settings_action)
+
+        self.sc_overrides_action = QAction('SimConnect Overrides Editor', self)
+        self.sc_overrides_action.triggered.connect(self.open_sc_override_dialog)
+        self.debug_menu.addAction(self.sc_overrides_action)
 
         if _master_instance:
             self.custom_userconfig_action = QAction("Load Custom User Config", self)
