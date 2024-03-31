@@ -115,6 +115,11 @@ class Aircraft(AircraftBase):
     collective_ap_spring_gain = 4096
     cpO_x = 0
     cpO_y = 0
+
+    dcs_tr_damper_enabled = False
+    dcs_tr_button = 0
+    dcs_tr_damper_force = 0.3
+
     ####
     ####
     def __init__(self, name : str, **kwargs):
@@ -526,3 +531,28 @@ class Helicopter(Aircraft):
         self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
         self._update_vrs_effect(telem_data)
+        self.update_tr_damper()
+
+    def update_tr_damper(self):
+        if not self.is_joystick(): return
+        if not self.dcs_tr_damper_enabled: return
+        if not self.dcs_tr_button: return
+
+        input_data = HapticEffect.device.getInput()
+        force_trim_pressed = input_data.isButtonPressed(self.dcs_tr_button)
+
+        if force_trim_pressed:
+            x, y = input_data.axisXY()
+            coeff = int(self.dcs_tr_damper_force * 4096)
+            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = coeff
+            self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = coeff
+            self.spring_x.cpOffset = int(x * 4096)
+            self.spring_y.cpOffset = int(y * 4096)
+
+            # tr_spring = effects['TR Damper'].spring(coeff, coeff)
+            self.spring.effect.setCondition(self.spring_x)
+            self.spring.effect.setCondition(self.spring_y)
+            self.spring.start(override=True)
+        else:
+            self.spring.stop()
+

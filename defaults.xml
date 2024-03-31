@@ -268,6 +268,36 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
+		<order>14</order>
+		<name>dcs_tr_damper_enabled</name>
+		<displayname>Trim Release Damper</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>14.2</order>
+		<name>dcs_tr_button</name>
+		<prereq>dcs_tr_damper_enabled</prereq>
+		<displayname>In Game TR Button</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>14.3</order>
+		<name>dcs_tr_damper_force</name>
+		<prereq>dcs_tr_damper_enabled</prereq>
+		<displayname>Damper Intensity</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
 		<order>15</order>
 		<name>force_trim_enabled</name>
 		<DCS>true</DCS>
@@ -7931,6 +7961,27 @@
 		<type>Helicopter</type>
 		<value>0.6</value>
 		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dcs_tr_damper_enabled</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dcs_tr_button</name>
+		<type>Helicopter</type>
+		<value>0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dcs_tr_damper_force</name>
+		<type>Helicopter</type>
+		<value>0.3</value>
+		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
