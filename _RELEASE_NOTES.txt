@@ -1,6 +1,31 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  March 31, 2024
+############################################
+- **"Run Anything"**
+ - New feature that will allow you to kick off any shell command when an aircraft loads (or SIM or Aircraft Category).
+
+## MSFS:
+- **Dynamic SimConnect Subscriptions**
+ - Some 3rd party aircraft use alternate "L:Vars" for certain pieces of data that various effects use.  This renders the applicable effects either inoperable or inaccurate.
+ - This new functionality allows us to dynamically replace a given piece of telemetry with the L:var that is needed to retrieve the applicable data from a given aircraft.
+ - The only *known* aircraft today are the A2A Comanche and the B206/B47 from FlyInside.  These simconnect re-subscriptions are baked into this release, however this new feature will allow us to accommodate more aircraft in the future without the need to modify the underlying effects code.
+- **[HPG Helicopters] - Trim Release Damper for the Collective Axis**
+ - Similar to the Cyclic trim release damper setting that was in the previous release, this adds the same concept for the HPG collective axis when the TR button is depressed.
+## DCS:
+- **New, more accurate Airspeed Telemetry**
+ - It was recently discovered that both the 'TAS' and 'IAS' data that comes directly from the sim is inaccurate in several ways.  The 'TAS' data seems to be more in line with ground speed.  Th "IAS" data, while more accurate, seems to include a fixed value, regardless of heading, that is somewhere around 2x the current wind speed.
+   - Given the above inaccuracies, with most effects leveraging the 'TAS' data, you may have noticed odd behavior of effects like ETL.
+   - In this version, we are calculating the "true" TAS by using the aircraft velocity vectors and the wind vectors to determine the aircraft's actual speed through the air mass.  This has given us a much more accurate data set than was previously available from the sim.
+- **Helicopter Trim Release Damper**
+ - This is **not** a replacement of the in-game trim release functionality.  It is a simple spring based dampening effect, identical to the one for MSFS.
+ - To configure, simply enable the effect and bind the same button that you have configured for TR in the sim.  While the button is depressed, TelemFFB will add the dampening effect and will remove it when the button is released.  The actual trimming and centering offset is still completely handled by DCS.
+## IL-2:
+- **Improved effects handling when game window loses focus**
+ - IL-2 does some strange things, including a "kill all" when the window loses focus.  This update improves on the TelemFFB handling of this scenario
+
+############################################
 ##  March 16, 2024
 ############################################
 # Hotpatch1 - Fix issue with older rhino firmware and 'GetGain' call to Rhino API
