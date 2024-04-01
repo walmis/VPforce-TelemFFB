@@ -1,4 +1,11 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+############################################
+##  April 1, 2024
+############################################
+## Hotpatch
+- MSFS | Fix AP Following still active if axis control is disabled
+- MSFS | swap Eng1_RPM for ThrustZ var for A2A Comanche simconnect override
+- Fix lateral force effect showing enabled when it isn't
 
 ############################################
 ##  March 31, 2024
