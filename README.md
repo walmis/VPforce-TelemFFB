@@ -5,7 +5,13 @@ This Python application takes telemetry input a simulator and generates augmente
 
 Please note that while some effects may not be fully realistic, the main goal is to make the stick more lively and increase immersion during gameplay. 
 
+## Quick Start
+While there is a "stable release" version 1.0.0 posted here on github, the vast majority of users are on the "Work in Progress" code base, which 
+is more advanced and user friendly than the current 'stable" version.  
 
+To get the latest "WIP" version, simply navigate to https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=D 
+- Download the latest package, unzip and run the exe
+- Don't forget to read the manual (Section 4.2) here: https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit
 ## Features
 Note:  Not all features are listed here, not all features are supported in all simulators
 - Turbulence effects that mimic the shaking and vibrations of flying through rough air
@@ -108,7 +114,7 @@ If you are not git-savy or simply don't want to deal with python, git, and cloni
 
 - The stable (master) branch release version is available here:   https://github.com/walmis/VPforce-TelemFFB/releases
 
-- The development ('wip', possibly unstable) branch auto-builds are available here after each commit to the repository: https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=A
+- The development ('wip', possibly unstable) branch auto-builds are available here after each commit to the repository: https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=D
 <br>
 ### Installing and running
 Simply extract the zip file into a folder on your PC and run the exe
