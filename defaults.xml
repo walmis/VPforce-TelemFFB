@@ -2742,8 +2742,9 @@
 	<sc_overrides>
 		<model>A2A Piper PA-24.*</model>
 		<name>PropThrust</name>
-		<var>L:Eng1_RPM</var>
+		<var>L:Eng1_ForceZ</var>
 		<sc_unit>number</sc_unit>
+		<scale>4.45</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<model>Airbus H145.*</model>
