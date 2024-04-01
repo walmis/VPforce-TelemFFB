@@ -10397,56 +10397,56 @@
 	<classdefaults>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<type>PropellerAircraft</type>
-		<value>False</value>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<type>JetAircraft</type>
-		<value>False</value>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<type>TurbopropAircraft</type>
-		<value>False</value>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<type>GliderAircraft</type>
-		<value>False</value>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<type>PropellerAircraft</type>
-		<value>False</value>
+		<value>false</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<type>JetAircraft</type>
-		<value>False</value>
+		<value>false</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<type>TurbopropAircraft</type>
-		<value>False</value>
+		<value>false</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>uncoordinated_turn_effect_enabled</name>
 		<type>GliderAircraft</type>
-		<value>False</value>
+		<value>false</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 </classdefaults>

@@ -3892,7 +3892,7 @@ class SettingsLayout(QGridLayout):
             checkbox.setMinimumSize(QtCore.QSize(14, 20))
             checkbox.setObjectName(f"cb_{item['name']}")
             checkbox.blockSignals(True)
-            if item['value'] == 'false':
+            if item['value'].lower() == 'false':
                 checkbox.setCheckState(0)
                 rowdisabled = True
             else:
