@@ -19,6 +19,7 @@ _master_instance = False
 _ipc_running = False
 _ipc_thread = None
 _child_instance = None
+is_master_instance = None
 
 # systems settings
 system_settings = None

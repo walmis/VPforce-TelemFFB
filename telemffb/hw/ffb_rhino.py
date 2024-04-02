@@ -38,6 +38,7 @@ paths = ["hidapi.dll", "dll/hidapi.dll", os.path.join(os.path.dirname(os.path.ab
 for p in paths:
     try:
        ctypes.cdll.LoadLibrary(p)
+       break
     except:
         pass 
 

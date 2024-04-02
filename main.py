@@ -3218,16 +3218,15 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
-    global is_master, _child_ipc_ports, _launched_children
     G._ipc_running = False
-    is_master = launch_children()
-    if is_master:
+    G.is_master_instance = launch_children()
+    if G.is_master_instance:
         myport = int(f"6{G._device_pid}")
         G._ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=G._child_ipc_ports)
         G._ipc_thread.child_keepalive_signal.connect(lambda device, status: G.main_window.update_child_status(device, status))
         G._ipc_thread.start()
         G._ipc_running = True
-        _launched_children = True
+        G._launched_children = True
     elif G.args.child:
         myport = int(f"6{G._device_pid}")
         G._ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=G.args.masterport)
@@ -3267,7 +3266,7 @@ def main():
 
     init_sims()
 
-    if is_master:
+    if G.is_master_instance:
         G.main_window.show_device_logo()
         G.main_window.enable_device_logo_click(True)
         current_title = G.main_window.windowTitle()
