@@ -34,11 +34,12 @@ import usb1
 from PyQt5.QtCore import QObject, QTimerEvent
 from dataclasses import dataclass
 
-try:
-    hidapi_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')
-    ctypes.cdll.LoadLibrary(hidapi_path)
-except:
-    pass
+paths = ["hidapi.dll", "dll/hidapi.dll", os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')]
+for p in paths:
+    try:
+       ctypes.cdll.LoadLibrary(p)
+    except:
+        pass 
 
 import hid
 

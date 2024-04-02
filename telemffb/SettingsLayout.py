@@ -1,7 +1,7 @@
 
 from telemffb.custom_widgets import InfoLabel, NoWheelSlider, QCursor, QGridLayout, QIcon, QLabel, QPushButton, QStyle, QToolButton, Qt, QtCore
 from . import xmlutils
-from ffb_rhino import HapticEffect
+from telemffb.hw.ffb_rhino import HapticEffect
 
 from telemffb.ButtonPressThread import ButtonPressThread
 from telemffb.settingsmanager import QCheckBox, QComboBox, QFileDialog, QLabel, QLineEdit, QPushButton, Qt, QtCore, QtWidgets, logging, lprint, os, xmlutils

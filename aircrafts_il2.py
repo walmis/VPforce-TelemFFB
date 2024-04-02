@@ -19,7 +19,7 @@ import math
 from random import randint
 import time
 from typing import List, Dict
-from ffb_rhino import HapticEffect, FFBReport_SetCondition
+from telemffb.hw.ffb_rhino import HapticEffect, FFBReport_SetCondition
 import telemffb.utils as utils
 import logging
 import random

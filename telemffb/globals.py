@@ -5,7 +5,7 @@ defaults_path = None
 defaults_path = None
 
 # main window instance
-window = None
+main_window = None
 
 _device_type = None
 _device_pid = None
@@ -28,6 +28,9 @@ args = None
 
 # telemetry manager instance
 telem_manager = None
+
+# configurator gains read at startup
+startup_configurator_gains = None
 
 # function reference to stop/init sims
 stop_sims = None

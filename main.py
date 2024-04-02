@@ -25,6 +25,7 @@ import sys
 import time
 import os
 
+from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.SettingsLayout import SettingsLayout
 from telemffb.LogTailWindow import LogTailWindow
@@ -33,7 +34,7 @@ from telemffb.SCOverridesEditor import SCOverridesEditor
 
 import telemffb.globals as G
 
-import ffb_rhino
+import telemffb.hw.ffb_rhino as ffb_rhino
 import telemffb.utils as utils
 import re
 import socket
@@ -44,8 +45,7 @@ import subprocess
 import traceback
 from traceback import print_exc
 
-from ffb_rhino import HapticEffect, FFBRhino
-from ffb_rhino import FFB_GAIN_CONSTANT, FFB_GAIN_FRICTION, FFB_GAIN_DAMPER, FFB_GAIN_SPRING, FFB_GAIN_INERTIA, FFB_GAIN_PERIODIC, FFB_GAIN_MASTER
+from telemffb.hw.ffb_rhino import HapticEffect, FFBRhino
 
 from configobj import ConfigObj
 
@@ -54,8 +54,7 @@ from telemffb.utils import validate_vpconf_profile
 import telemffb.xmlutils as xmlutils
 
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QRadioButton, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
     QSizePolicy, QSpacerItem, QTabWidget, QGroupBox, QShortcut
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QSize, QByteArray, QTimer, \
     QThread, QMutex
@@ -63,8 +62,9 @@ from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColo
     QTextCursor, QKeySequence
 from PyQt5.QtWidgets import QGridLayout, QToolButton
 
-from telemffb.ui.configurator import Ui_ConfiguratorDialog
 from telemffb.custom_widgets import *
+
+import resources
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -1057,140 +1057,6 @@ class SimConnectSock(SimConnectManager):
 
     # retranslateUi
     # setupUi
-
-class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
-    global dev
-    cb_states = {'cb_MasterGain': 0,'cb_Spring': 0, 'cb_Periodic': 0, 'cb_Damper': 0, 'cb_Inertia': 0, 'cb_Friction': 0, 'cb_Constant': 0}
-
-    def __init__(self, parent=None):
-        super(ConfiguratorDialog, self).__init__(parent)
-        global startup_configurator_gains
-
-        self.setupUi(self)
-        self.retranslateUi(self)
-        self.setWindowTitle(f"Configurator Gain Override ({G._device_type.capitalize()})")
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
-        # self.cb_MasterGain.clicked
-        self.sl_MasterGain.valueChanged.connect(self.update_labels)
-        self.sl_MasterGain.valueChanged.connect(self.set_gain_value)
-
-        self.sl_Periodic.valueChanged.connect(self.update_labels)
-        self.sl_Periodic.valueChanged.connect(self.set_gain_value)
-
-        self.sl_Spring.valueChanged.connect(self.update_labels)
-        self.sl_Spring.valueChanged.connect(self.set_gain_value)
-
-        self.sl_Damper.valueChanged.connect(self.update_labels)
-        self.sl_Damper.valueChanged.connect(self.set_gain_value)
-
-        self.sl_Inertia.valueChanged.connect(self.update_labels)
-        self.sl_Inertia.valueChanged.connect(self.set_gain_value)
-
-        self.sl_Friction.valueChanged.connect(self.update_labels)
-        self.sl_Friction.valueChanged.connect(self.set_gain_value)
-
-        self.sl_Constant.valueChanged.connect(self.update_labels)
-        self.sl_Constant.valueChanged.connect(self.set_gain_value)
-
-        self.cb_MasterGain.stateChanged.connect(self.cb_toggle)
-        self.cb_Periodic.stateChanged.connect(self.cb_toggle)
-        self.cb_Spring.stateChanged.connect(self.cb_toggle)
-        self.cb_Damper.stateChanged.connect(self.cb_toggle)
-        self.cb_Inertia.stateChanged.connect(self.cb_toggle)
-        self.cb_Friction.stateChanged.connect(self.cb_toggle)
-        self.cb_Constant.stateChanged.connect(self.cb_toggle)
-
-        self.cb_MasterGain.setChecked(self.cb_states['cb_MasterGain'])
-        self.cb_Periodic.setCheckState(self.cb_states['cb_Periodic'])
-        self.cb_Spring.setCheckState(self.cb_states['cb_Spring'])
-        self.cb_Damper.setCheckState(self.cb_states['cb_Damper'])
-        self.cb_Inertia.setCheckState(self.cb_states['cb_Inertia'])
-        self.cb_Friction.setCheckState(self.cb_states['cb_Friction'])
-        self.cb_Constant.setCheckState(self.cb_states['cb_Constant'])
-
-        self.pb_Revert.clicked.connect(self.revert_gains)
-
-        self.pb_Finish.clicked.connect(self.close)
-
-        self.starting_gains = dev.getGains()
-        self.read_gains()
-
-
-    def cb_toggle(self, state):
-        sender = self.sender()
-        sender_str = sender.objectName()
-        self.cb_states[sender_str] = state
-
-        if state: return
-        match sender_str:
-            case 'cb_MasterGain':
-                dev.setGain(FFB_GAIN_MASTER, int(startup_configurator_gains.master_gain))
-            case 'cb_Periodic':
-                dev.setGain(FFB_GAIN_PERIODIC, startup_configurator_gains.periodic_gain)
-            case 'cb_Spring':
-                dev.setGain(FFB_GAIN_SPRING, startup_configurator_gains.spring_gain)
-            case 'cb_Damper':
-                dev.setGain(FFB_GAIN_DAMPER, startup_configurator_gains.damper_gain)
-            case 'cb_Inertia':
-                dev.setGain(FFB_GAIN_INERTIA, startup_configurator_gains.inertia_gain)
-            case 'cb_Friction':
-                dev.setGain(FFB_GAIN_FRICTION, startup_configurator_gains.friction_gain)
-            case 'sl_Constant':
-                dev.setGain(FFB_GAIN_CONSTANT, startup_configurator_gains.constant_gain)
-        self.read_gains()
-
-
-
-    def revert_gains(self):
-        dev.setGain(FFB_GAIN_MASTER, self.starting_gains.master_gain)
-        dev.setGain(FFB_GAIN_PERIODIC, self.starting_gains.periodic_gain)
-        dev.setGain(FFB_GAIN_SPRING, self.starting_gains.spring_gain)
-        dev.setGain(FFB_GAIN_DAMPER, self.starting_gains.damper_gain)
-        dev.setGain(FFB_GAIN_INERTIA, self.starting_gains.inertia_gain)
-        dev.setGain(FFB_GAIN_FRICTION, self.starting_gains.friction_gain)
-        dev.setGain(FFB_GAIN_CONSTANT, self.starting_gains.constant_gain)
-        self.read_gains()
-
-    def set_gain_value(self, value):
-        sender = self.sender()
-        sender_str = sender.objectName()
-        match sender_str:
-            case 'sl_MasterGain':
-                dev.setGain(FFB_GAIN_MASTER, int(value))
-            case 'sl_Periodic':
-                dev.setGain(FFB_GAIN_PERIODIC, int(value))
-            case 'sl_Spring':
-                dev.setGain(FFB_GAIN_SPRING, int(value))
-            case 'sl_Damper':
-                dev.setGain(FFB_GAIN_DAMPER, int(value))
-            case 'sl_Inertia':
-                dev.setGain(FFB_GAIN_INERTIA, int(value))
-            case 'sl_Friction':
-                dev.setGain(FFB_GAIN_FRICTION, int(value))
-            case 'sl_Constant':
-                dev.setGain(FFB_GAIN_CONSTANT, int(value))
-
-
-    def read_gains(self):
-        gains = dev.getGains()
-        self.sl_MasterGain.setValue(gains.master_gain)
-        self.sl_Periodic.setValue(gains.periodic_gain)
-        self.sl_Spring.setValue(gains.spring_gain)
-        self.sl_Damper.setValue(gains.damper_gain)
-        self.sl_Inertia.setValue(gains.inertia_gain)
-        self.sl_Friction.setValue(gains.friction_gain)
-        self.sl_Constant.setValue(gains.constant_gain)
-        # self.update_labels()
-        print(gains)
-
-    def update_labels(self):
-        self.lab_MasterGainValue.setText(f"%{self.sl_MasterGain.value()}")
-        self.lab_PeriodicValue.setText(f"%{self.sl_Periodic.value()}")
-        self.lab_SpringValue.setText(f"%{self.sl_Spring.value()}")
-        self.lab_DamperValue.setText(f"%{self.sl_Damper.value()}")
-        self.lab_InertiaValue.setText(f"%{self.sl_Inertia.value()}")
-        self.lab_FrictionValue.setText(f"%{self.sl_Friction.value()}")
-        self.lab_ConstantValue.setText(f"%{self.sl_Constant.value()}")
 
 class MainWindow(QMainWindow):
     show_simvars = False
@@ -2778,7 +2644,7 @@ def load_custom_userconfig(new_path=''):
 def hide_window():
 
     try:
-        G.window.hide()
+        G.main_window.hide()
     except Exception as e:
         logging.error(f"EXCEPTION: {e}")
 
@@ -2792,17 +2658,17 @@ def exit_application():
 def save_main_window_geometry():
     # Capture the mai n window's geometry
     device_type = G._device_type
-    cur_index = G.window.tab_widget.currentIndex()
-    G.window.tab_sizes[str(cur_index)]['width'] = G.window.width()
-    G.window.tab_sizes[str(cur_index)]['height'] = G.window.height()
+    cur_index = G.main_window.tab_widget.currentIndex()
+    G.main_window.tab_sizes[str(cur_index)]['width'] = G.main_window.width()
+    G.main_window.tab_sizes[str(cur_index)]['height'] = G.main_window.height()
 
     window_dict = {
         'WindowPosition': {
-            'x': G.window.pos().x(),
-            'y': G.window.pos().y(),
+            'x': G.main_window.pos().x(),
+            'y': G.main_window.pos().y(),
         },
-        'Tab': G.window.tab_widget.currentIndex(),
-        'TabSizes': G.window.tab_sizes
+        'Tab': G.main_window.tab_widget.currentIndex(),
+        'TabSizes': G.main_window.tab_sizes
     }
     if device_type == 'joystick':
         reg_key = 'jWindowData'
@@ -3055,7 +2921,7 @@ def restart_sims():
     sys_settings = utils.read_system_settings(G.args.device, G._device_type)
     stop_sims()
     init_sims()
-    G.window.init_sim_indicators(sim_list, sys_settings)
+    G.main_window.init_sim_indicators(sim_list, sys_settings)
 
 
 def init_sims():
@@ -3068,7 +2934,7 @@ def init_sims():
     if xplane_enabled or G.args.sim == 'XPLANE':
         if not G._child_instance and utils.read_system_settings(G.args.device, G.args.type).get('validateXPLANE', False):
             xplane_path = utils.read_system_settings(G.args.device, G.args.type).get('pathXPLANE', '')
-            utils.install_xplane_plugin(xplane_path, G.window)
+            utils.install_xplane_plugin(xplane_path, G.main_window)
         logging.info("Starting XPlane Telemetry Listener")
         xplane_telem.start()
 
@@ -3078,7 +2944,7 @@ def init_sims():
     if dcs_enabled or G.args.sim == "DCS":
         # check and install/update export lua script
         if not G._child_instance:
-            utils.install_export_lua(G.window)
+            utils.install_export_lua(G.main_window)
         logging.info("Starting DCS Telemetry Listener")
         dcs_telem.start()
 
@@ -3097,7 +2963,7 @@ def init_sims():
     if il2_enabled or G.args.sim == "IL2":
         if not G._child_instance:
             if il2_validate:
-                utils.analyze_il2_config(il2_path, port=il2_port, window=G.window)
+                utils.analyze_il2_config(il2_path, port=il2_port, window=G.main_window)
             else:
                 logging.warning(
                     "IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
@@ -3122,7 +2988,7 @@ def init_sims():
     il2_status = "Enabled" if il2_enabled else "Disabled"
     msfs_status = "Enabled" if msfs else "Disabled"
 
-    G.window.refresh_telem_status(dcs_enabled, il2_enabled, msfs, xplane_enabled)
+    G.main_window.refresh_telem_status(dcs_enabled, il2_enabled, msfs, xplane_enabled)
 
 def stop_sims():
     xplane_telem.quit()
@@ -3130,6 +2996,9 @@ def stop_sims():
     il2_telem.quit()
     sim_connect_telem.quit()
 
+# this needs a better solution
+G.stop_sims = stop_sims
+G.init_sims = init_sims
 
 def notify_close_children():
     if not len(G._child_ipc_ports) or not G._ipc_running:
@@ -3187,6 +3056,14 @@ def launch_children():
 
 def main():
     app = QApplication(sys.argv)
+
+    def excepthook(exc_type, exc_value, exc_tb):
+        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        print(tb)
+        #QtWidgets.QApplication.quit()
+        # or QtWidgets.QApplication.exit(0)
+    sys.excepthook = excepthook
+
     app.setStyleSheet(
         """
             QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
@@ -3255,8 +3132,7 @@ def main():
     global dev
 
     log_window = LogWindow()
-    global config_was_default
-    print(G.userconfig_path, G.defaults_path)
+
     xmlutils.update_vars(G.args.type, G.userconfig_path, G.defaults_path)
     try:
         G.settings_mgr = SettingsWindow(datasource="Global", device=G.args.type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
@@ -3348,7 +3224,7 @@ def main():
     if is_master:
         myport = int(f"6{G._device_pid}")
         G._ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=G._child_ipc_ports)
-        G._ipc_thread.child_keepalive_signal.connect(lambda device, status: G.window.update_child_status(device, status))
+        G._ipc_thread.child_keepalive_signal.connect(lambda device, status: G.main_window.update_child_status(device, status))
         G._ipc_thread.start()
         G._ipc_running = True
         _launched_children = True
@@ -3357,63 +3233,62 @@ def main():
         G._ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=G.args.masterport)
         G._ipc_thread.exit_signal.connect(lambda: exit_application())
         G._ipc_thread.restart_sim_signal.connect(lambda: restart_sims())
-        G._ipc_thread.show_signal.connect(lambda: G.window.show())
-        G._ipc_thread.hide_signal.connect(lambda: G.window.hide())
+        G._ipc_thread.show_signal.connect(lambda: G.main_window.show())
+        G._ipc_thread.hide_signal.connect(lambda: G.main_window.hide())
         G._ipc_thread.showlog_signal.connect(lambda: log_window.show())
-        G._ipc_thread.show_settings_signal.connect(lambda: G.window.open_system_settings_dialog())
+        G._ipc_thread.show_settings_signal.connect(lambda: G.main_window.open_system_settings_dialog())
         G._ipc_thread.start()
         G._ipc_running = True
 
-    G.window = MainWindow(ipc_thread=G._ipc_thread)
+    G.main_window = MainWindow(ipc_thread=G._ipc_thread)
 
     # log_tail_window = LogTailWindow(window)
 
     if not headless_mode:
         if G.args.minimize:
-            G.window.showMinimized()
+            G.main_window.showMinimized()
         else:
-            G.window.show()
+            G.main_window.show()
 
-    autoconvert_config(G.window)
+    autoconvert_config(G.main_window)
     if not _release:
         fetch_version_thread = utils.FetchLatestVersionThread()
-        fetch_version_thread.version_result_signal.connect(G.window.update_version_result)
+        fetch_version_thread.version_result_signal.connect(G.main_window.update_version_result)
         fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
         fetch_version_thread.start()
 
     G.telem_manager = TelemManager(settings_manager=G.settings_mgr, ipc_thread=G._ipc_thread)
     G.telem_manager.start()
 
-    G.window.set_telem_manager(G.telem_manager)
+    G.main_window.set_telem_manager(G.telem_manager)
 
-    G.telem_manager.telemetryReceived.connect(G.window.update_telemetry)
-    G.telem_manager.updateSettingsLayout.connect(G.window.update_settings)
+    G.telem_manager.telemetryReceived.connect(G.main_window.update_telemetry)
+    G.telem_manager.updateSettingsLayout.connect(G.main_window.update_settings)
 
     init_sims()
 
     if is_master:
-        G.window.show_device_logo()
-        G.window.enable_device_logo_click(True)
-        current_title = G.window.windowTitle()
+        G.main_window.show_device_logo()
+        G.main_window.enable_device_logo_click(True)
+        current_title = G.main_window.windowTitle()
         new_title = f"** MASTER INSTANCE ** {current_title}"
-        G.window.setWindowTitle(new_title)
+        G.main_window.setWindowTitle(new_title)
         if G._launched_joystick:
-            G.window.joystick_status_icon.show()
+            G.main_window.joystick_status_icon.show()
         if G._launched_pedals:
-            G.window.pedals_status_icon.show()
+            G.main_window.pedals_status_icon.show()
         if G._launched_collective:
-            G.window.collective_status_icon.show()
+            G.main_window.collective_status_icon.show()
 
     if config_was_default:
-        G.window.open_system_settings_dialog()
+        G.main_window.open_system_settings_dialog()
 
-    utils.signal_emitter.telem_timeout_signal.connect(G.window.update_sim_indicators)
-    utils.signal_emitter.error_signal.connect(G.window.process_error_signal)
+    utils.signal_emitter.telem_timeout_signal.connect(G.main_window.update_sim_indicators)
+    utils.signal_emitter.error_signal.connect(G.main_window.process_error_signal)
     utils.signal_emitter.msfs_quit_signal.connect(restart_sims)
 
     # do some init in the background not blocking the main window first appearance
     def init_async():
-        global startup_configurator_gains # TODO: avoid globals
         if G.system_settings.get('enableVPConfStartup', False):
             try:
                 set_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
@@ -3421,7 +3296,7 @@ def main():
                 logging.error("Unable to set VPConfigurator startup profile")
 
         try:
-            startup_configurator_gains = dev.getGains()
+            G.startup_configurator_gains = dev.getGains()
         except:
             logging.error("Unable to get configurator slider values from device")
 

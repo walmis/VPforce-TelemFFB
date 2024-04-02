@@ -27,7 +27,7 @@ import telemffb.utils as utils
 from typing import List, Dict
 from telemffb.utils import clamp, HighPassFilter, Derivative, Dispenser
 
-from ffb_rhino import HapticEffect, FFBReport_SetCondition, FFBReport_Input
+from telemffb.hw.ffb_rhino import HapticEffect, FFBReport_SetCondition, FFBReport_Input
 from aircraft_base import AircraftBase, effects, HPFs, LPFs
 
 

@@ -6,7 +6,7 @@ import telemffb.utils as utils
 from typing import List, Dict
 # from utils import clamp, HighPassFilter, Derivative, Dispenser
 
-from ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition
+from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]

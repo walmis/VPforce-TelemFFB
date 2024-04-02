@@ -19,7 +19,7 @@ import math
 from random import randint
 import time
 from typing import List, Dict
-from ffb_rhino import HapticEffect, FFBReport_SetCondition,EFFECT_SQUARE,EFFECT_SINE,EFFECT_TRIANGLE,EFFECT_SAWTOOTHUP,EFFECT_SAWTOOTHDOWN
+from telemffb.hw.ffb_rhino import HapticEffect, FFBReport_SetCondition,EFFECT_SQUARE,EFFECT_SINE,EFFECT_TRIANGLE,EFFECT_SAWTOOTHUP,EFFECT_SAWTOOTHDOWN
 from telemffb import utils
 import logging
 import random

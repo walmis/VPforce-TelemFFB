@@ -111,7 +111,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.hide()
 
     def launch_child_settings_windows(self):
-        G.window.show_child_settings()
+        G.main_window.show_child_settings()
 
     def reset_settings(self):
         # Load default settings and update widgets
@@ -304,7 +304,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         return True
 
     def save_settings(self):
-        global system_settings
         # Create a dictionary with the values of all components
         tp = G.args.type
 
@@ -387,11 +386,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # adjust logging level:
         ll = self.logLevel.currentText()
         if ll == "INFO":
-            logging.setLevel(logging.INFO)
+            logging.getLogger().setLevel(logging.INFO)
         elif ll == "DEBUG":
-            logging.setLevel(logging.DEBUG)
+            logging.getLogger().setLevel(logging.DEBUG)
 
-        system_settings = utils.read_system_settings(G.args.device, G._device_type)
+        G.system_settings = utils.read_system_settings(G.args.device, G._device_type)
         self.accept()
 
     def load_settings(self, default=False):
