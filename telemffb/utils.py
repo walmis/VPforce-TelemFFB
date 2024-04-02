@@ -33,6 +33,8 @@ from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from PyQt5 import QtCore, QtGui, Qt
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
+import telemffb.globals as G
+import logging
 import winpaths
 import winreg
 import socket
@@ -1587,3 +1589,18 @@ def validate_vpconf_profile(file, pid=None, dev_type=None, silent=False, window=
         if not silent:
             QMessageBox.warning(window, "Wrong Device", f"The VPforce Configurator file you selected does not match the device you are trying to assign it to\n\nFile={file}\n\nThis instance is currently configuring:\n{dev_type}\npid= {pid}\n\nThe chosen profile is for\npid= {cfg_pid}\nname= {cfg_device_name}\nserial= {cfg_serial}")
         return False
+
+
+class LoggingFilter(logging.Filter):
+    def __init__(self, keywords):
+        self.keywords = keywords
+
+    def filter(self, record):
+        # Check if any of the keywords are present in the log message
+        record.device_type = G._device_type
+        for keyword in self.keywords:
+            if keyword in record.getMessage():
+                # If any keyword is found, prevent the message from being logged
+                return False
+        # If none of the keywords are found, allow the message to be logged
+        return True
