@@ -22,12 +22,12 @@ import time
 import random
 import time 
 from time import monotonic
-import utils
+import telemffb.utils as utils
 
 import logging
 import sys
 
-from utils import LowPassFilter, RandomDirectionModulator
+from telemffb.utils import LowPassFilter, RandomDirectionModulator
 
 #SDL_Init(SDL_INIT_JOYSTICK)
 SDL_Init(SDL_INIT_HAPTIC)

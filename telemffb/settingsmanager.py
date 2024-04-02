@@ -4,17 +4,16 @@ import sys
 import os
 import shutil
 import json
-import utils
+import telemffb.utils as utils
 from PyQt5 import QtGui, QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
                              QVBoxLayout, QPushButton, QFileDialog, QMessageBox, QHeaderView)
 from PyQt5.QtWidgets import QTableWidget, QTextEdit, QWidget, QSlider
 from datetime import datetime
 from PyQt5.QtCore import Qt, pyqtSignal
-from settingswindow import Ui_SettingsWindow
 
-
-import xmlutils
+from .ui.settingswindow import Ui_SettingsWindow
+from . import xmlutils
 
 print_debugs = False
 print_method_calls = False

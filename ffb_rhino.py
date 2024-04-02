@@ -26,7 +26,7 @@ import time
 import ctypes
 import logging
 from typing import List
-from utils import DirectionModulator, clamp, Destroyable
+from telemffb.utils import DirectionModulator, clamp, Destroyable
 import os
 import weakref
 import inspect
@@ -731,7 +731,7 @@ class HapticEffect(Destroyable):
 
 # unit test
 if __name__ == "__main__":
-    import utils
+    import telemffb.utils as utils
     import random
 
     devs = FFBRhino.enumerate()

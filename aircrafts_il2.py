@@ -20,7 +20,7 @@ from random import randint
 import time
 from typing import List, Dict
 from ffb_rhino import HapticEffect, FFBReport_SetCondition
-import utils
+import telemffb.utils as utils
 import logging
 import random
 from aircraft_base import AircraftBase, effects

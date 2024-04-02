@@ -18,7 +18,6 @@
 import glob
 import textwrap
 
-from traceback_with_variables import print_exc, prints_exc
 import argparse
 import json
 import logging
@@ -26,8 +25,16 @@ import sys
 import time
 import os
 
+from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
+from telemffb.SettingsLayout import SettingsLayout
+from telemffb.LogTailWindow import LogTailWindow
+from telemffb.SystemSettingsDialog import SystemSettingsDialog
+from telemffb.SCOverridesEditor import SCOverridesEditor
+
+import telemffb.globals as G
+
 import ffb_rhino
-import utils
+import telemffb.utils as utils
 import re
 import socket
 import threading
@@ -35,29 +42,29 @@ from collections import OrderedDict
 import subprocess
 
 import traceback
+from traceback import print_exc
+
 from ffb_rhino import HapticEffect, FFBRhino
 from ffb_rhino import FFB_GAIN_CONSTANT, FFB_GAIN_FRICTION, FFB_GAIN_DAMPER, FFB_GAIN_SPRING, FFB_GAIN_INERTIA, FFB_GAIN_PERIODIC, FFB_GAIN_MASTER
 
 from configobj import ConfigObj
 
-from settingsmanager import *
-import xmlutils
-from PyQt5.QtWidgets import QTableWidgetItem, QAbstractItemView, QListWidget, QSplitter
+from telemffb.settingsmanager import *
+from telemffb.utils import validate_vpconf_profile
+import telemffb.xmlutils as xmlutils
+
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
-    QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget, QGroupBox, QShortcut
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
-    QThread, QMutex, QRegExp
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QIntValidator, QCursor, \
-    QTextCursor, QRegExpValidator, QKeySequence
-from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
+    QRadioButton, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
+    QSizePolicy, QSpacerItem, QTabWidget, QGroupBox, QShortcut
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QSize, QByteArray, QTimer, \
+    QThread, QMutex
+from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QCursor, \
+    QTextCursor, QKeySequence
+from PyQt5.QtWidgets import QGridLayout, QToolButton
 
-from system_settings import Ui_SystemDialog
-from configurator import Ui_ConfiguratorDialog
-from sc_override_edit import Ui_SCOverridesDialog
-from custom_widgets import *
-import resources
+from telemffb.ui.configurator import Ui_ConfiguratorDialog
+from telemffb.custom_widgets import *
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -82,63 +89,62 @@ parser.add_argument('--masterport', type=str, help='master instance IPC port', d
 
 parser.add_argument('--minimize', action='store_true', help='Minimize on startup')
 
-args = parser.parse_args()
+G.args = parser.parse_args()
 
 # script_dir = os.path.dirname(os.path.abspath(__file__))
 QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
 QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True) #use highdpi icons
 
-headless_mode = args.headless
+headless_mode = G.args.headless
 
 config_was_default = False
-_launched_joystick = False
-_launched_pedals = False
-_launched_collective = False
-_launched_children = False
-_child_ipc_ports = []
-_master_instance = False
-_ipc_running = False
-_ipc_thread = None
-_child_instance = args.child
+G._launched_joystick = False
+G._launched_pedals = False
+G._launched_collective = False
+G._launched_children = False
+G._child_ipc_ports = []
+G._master_instance = False
+G._ipc_running = False
+G._ipc_thread = None
+G._child_instance = G.args.child
 
-system_settings = utils.read_system_settings(args.device, args.type)
-
+G.system_settings = utils.read_system_settings(G.args.device, G.args.type)
 
 
 # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
 _vpf_logo = ":/image/vpforcelogo.png"
-if args.device is None:
-    master_rb = system_settings.get('masterInstance', 1)
+if G.args.device is None:
+    master_rb = G.system_settings.get('masterInstance', 1)
     match master_rb:
         case 1:
-            _device_pid = system_settings.get('pidJoystick', "2055")
-            _device_type = 'joystick'
+            G._device_pid = G.system_settings.get('pidJoystick', "2055")
+            G._device_type = 'joystick'
             _device_logo = ':/image/logo_j.png'
         case 2:
-            _device_pid = system_settings.get('pidPedals', "2055")
-            _device_type = 'pedals'
+            G._device_pid = G.system_settings.get('pidPedals', "2055")
+            G._device_type = 'pedals'
             _device_logo = ':/image/logo_p.png'
         case 3:
-            _device_pid = system_settings.get('pidCollective', "2055")
-            _device_type = 'collective'
+            G._device_pid = G.system_settings.get('pidCollective', "2055")
+            G._device_type = 'collective'
             _device_logo = ':/image/logo_c.png'
         case _:
-            _device_pid = system_settings.get('pidJoystick', "2055")
-            _device_type = 'joystick'
+            G._device_pid = G.system_settings.get('pidJoystick', "2055")
+            G._device_type = 'joystick'
             _device_logo = ':/image/logo_j.png'
 
-    _device_vid_pid = f"FFFF:{_device_pid}"
-    args.type = _device_type
+    _device_vid_pid = f"FFFF:{G._device_pid}"
+    G.args.type = G._device_type
 else:
-    if args.type is None:
-        _device_type = 'joystick'
-        args.type = _device_type
+    if G.args.type is None:
+        G._device_type = 'joystick'
+        G.args.type = G._device_type
     else:
-        _device_type = str.lower(args.type)
+        G._device_type = str.lower(G.args.type)
 
-    _device_pid = args.device.split(":")[1]
-    _device_vid_pid = args.device
-    match str.lower(args.type):
+    G._device_pid = G.args.device.split(":")[1]
+    _device_vid_pid = G.args.device
+    match str.lower(G.args.type):
         case 'joystick':
             _device_logo = ':/image/logo_j.png'
         case 'pedals':
@@ -148,13 +154,13 @@ else:
         case _:
             _device_logo = ':/image/logo_j.png'
 
-system_settings = utils.read_system_settings(args.device, _device_type)
+G.system_settings = utils.read_system_settings(G.args.device, G._device_type)
 
-if system_settings.get('wasDefault', False):
+if G.system_settings.get('wasDefault', False):
     config_was_default = True
 
-args.sim = str.upper(args.sim)
-args.type = str.lower(args.type)
+G.args.sim = str.upper(G.args.sim)
+G.args.type = str.lower(G.args.type)
 
 # need to determine if someone has auto-launch enabled but has started an instance with -D
 # The 'masterInstance' reg key holds the radio button index of the configured master instance
@@ -164,11 +170,11 @@ index_dict = {
     'pedals': 2,
     'collective': 3
 }
-master_index = system_settings.get('masterInstance', 1)
-if index_dict[_device_type] == master_index:
-    _master_instance = True
+master_index = G.system_settings.get('masterInstance', 1)
+if index_dict[G._device_type] == master_index:
+    G._master_instance = True
 else:
-    _master_instance = False
+    G._master_instance = False
 
 
 sys.path.insert(0, '')
@@ -193,9 +199,9 @@ else:
 
 
 min_firmware_version = 'v1.0.15'
-global dev, dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, settings_mgr, telem_manager, xplane_telem
+global dev, dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, xplane_telem
 global startup_configurator_gains
-global window, log_window, log_folder, log_file, log_tail_window
+global log_window, log_folder, log_file, log_tail_window
 
 _update_available = False
 _latest_version = None
@@ -211,7 +217,7 @@ class LoggingFilter(logging.Filter):
 
     def filter(self, record):
         # Check if any of the keywords are present in the log message
-        record.device_type = _device_type
+        record.device_type = G._device_type
         for keyword in self.keywords:
             if keyword in record.getMessage():
                 # If any keyword is found, prevent the message from being logged
@@ -228,22 +234,22 @@ else:
 _legacy_override_file = None
 _legacy_config_file = utils.get_resource_path('config.ini')  # get from bundle (if exe) or local root if source
 
-if args.overridefile == 'None':
+if G.args.overridefile == 'None':
     # Need to determine if user is using default config.user.ini without passing the override flag:
     if os.path.isfile(os.path.join(_install_path, 'config.user.ini')):
         _legacy_override_file = os.path.join(_install_path, 'config.user.ini')
 
 else:
-    if not os.path.isabs(args.overridefile):  # user passed just file name, construct absolute path from script/exe directory
-        ovd_path = utils.get_resource_path(args.overridefile, prefer_root=True, force=True)
+    if not os.path.isabs(G.args.overridefile):  # user passed just file name, construct absolute path from script/exe directory
+        ovd_path = utils.get_resource_path(G.args.overridefile, prefer_root=True, force=True)
     else:
-        ovd_path = args.overridefile  # user passed absolute path, use that
+        ovd_path = G.args.overridefile  # user passed absolute path, use that
 
     if os.path.isfile(ovd_path):
         _legacy_override_file = ovd_path
     else:
         _legacy_override_file = ovd_path
-        logging.warning(f"Override file {args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
+        logging.warning(f"Override file {G.args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
 
 
 log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
@@ -253,7 +259,7 @@ if not os.path.exists(log_folder):
 
 date_str = datetime.now().strftime("%Y%m%d")
 
-logname = "".join(["TelemFFB", "_", _device_vid_pid.replace(":", "-"), '_', args.type, "_", date_str, ".log"])
+logname = "".join(["TelemFFB", "_", _device_vid_pid.replace(":", "-"), '_', G.args.type, "_", date_str, ".log"])
 log_file = os.path.join(log_folder, logname)
 
 # Create a logger instance
@@ -291,14 +297,13 @@ log_filter = LoggingFilter(log_filter_strings)
 console_handler.addFilter(log_filter)
 file_handler.addFilter(log_filter)
 
-defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
+G.defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
+G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
+G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
 
-userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-userconfig_path = os.path.join(userconfig_rootpath, 'userconfig.xml')
+utils.create_empty_userxml_file(G.userconfig_path)
 
-utils.create_empty_userxml_file(userconfig_path)
-
-if not args.child:
+if not G.args.child:
     try:    # in case other instance tries doing at the same time
         utils.archive_logs(log_folder)
     except:
@@ -308,7 +313,7 @@ import aircrafts_dcs
 import aircrafts_msfs_xp
 import aircrafts_il2
 import aircrafts_msfs_xp
-from sc_manager import SimConnectManager
+from telemffb.sc_manager import SimConnectManager
 from il2_telem import IL2Manager
 from aircraft_base import effects
 
@@ -319,12 +324,12 @@ else:
     appmode = 'Source'
 logging.info("**************************************")
 logging.info("**************************************")
-logging.info(f"*****    TelemFFB starting up from {appmode}:  Args= {args.__dict__}")
+logging.info(f"*****    TelemFFB starting up from {appmode}:  Args= {G.args.__dict__}")
 logging.info("**************************************")
 logging.info("**************************************")
-if args.teleplot:
-    logging.info(f"Using {args.teleplot} for plotting")
-    utils.teleplot.configure(args.teleplot)
+if G.args.teleplot:
+    logging.info(f"Using {G.args.teleplot} for plotting")
+    utils.teleplot.configure(G.args.teleplot)
 
 
 def format_dict(data, prefix=""):
@@ -341,7 +346,7 @@ def config_has_changed(update=False) -> bool:
     # if update is true, update the current modified time
     global _config_mtime, _future_config_update_time, _pending_config_update
     # "hash" both mtimes together
-    tm = int(os.path.getmtime(userconfig_path)) + int(os.path.getmtime(defaults_path))
+    tm = int(os.path.getmtime(G.userconfig_path)) + int(os.path.getmtime(defaults_path))
     time_now = time.time()
     update_delay = 0.4
     if _config_mtime != tm:
@@ -361,7 +366,7 @@ class LogWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Log Console ({args.type})")
+        self.setWindowTitle(f"Log Console ({G.args.type})")
         self.resize(800, 500)
 
         self.central_widget = QWidget()
@@ -431,69 +436,6 @@ class LogWindow(QMainWindow):
         logging.info(f"Logging level set to INFO")
 
 
-class LogTailWindow(QMainWindow):
-    def __init__(self, main_window):
-        super(LogTailWindow, self).__init__()
-
-        self.main_window = main_window
-        self.setWindowTitle(f"Log File Monitor ({args.type})")
-        # Construct the absolute path of the icon file
-        icon_path = os.path.join(script_dir, "image/vpforceicon.png")
-        icon = QIcon(":/image/vpforceicon.png")
-        self.setWindowIcon(icon)
-        self.resize(800, 500)
-        self.move(self.main_window.x() + 50, self.main_window.y() + 100)
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
-        self.log_tail_thread = self.main_window.log_tail_thread
-
-        # Replicate the log_tab_widget contents in the new window
-        self.log_widget = QPlainTextEdit(self.central_widget)
-        self.log_widget.setReadOnly(True)
-        self.log_widget.setFont(QFont("Courier New"))
-        self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
-
-        self.clear_button = QPushButton("Clear", self.central_widget)
-        self.toggle_button = QPushButton("Pause", self.central_widget)
-        self.close_button = QPushButton("Close Window", self.central_widget)
-        self.clear_button.clicked.connect(self.clear_log_widget)
-        self.toggle_button.clicked.connect(self.toggle_log_tailing)
-        self.close_button.clicked.connect(lambda: self.hide())
-
-        # self.open_log_button.clicked.connect(self.toggle_log_window)
-
-        # Layout for the new window
-        layout = QVBoxLayout(self.central_widget)
-        layout.addWidget(self.log_widget)
-        button_layout = QHBoxLayout()
-        button_layout.addWidget(self.clear_button)
-        button_layout.addWidget(self.toggle_button)
-        button_layout.addStretch()  # Add stretch to push the next button to the right
-        button_layout.addWidget(self.close_button)
-
-        layout.addLayout(button_layout)
-
-        self.log_tail_thread.log_updated.connect(self.update_log_widget)
-
-    def toggle_log_tailing(self):
-        if self.log_tail_thread.is_paused():
-            self.log_tail_thread.resume()
-            self.toggle_button.setText("Pause")
-        else:
-            self.log_tail_thread.pause()
-            self.toggle_button.setText("Resume")
-
-    def clear_log_widget(self):
-        self.log_widget.clear()
-
-    def update_log_widget(self, log_line):
-        cursor = self.log_widget.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.insertText(log_line)
-        self.log_widget.setTextCursor(cursor)
-        self.log_widget.ensureCursorVisible()
-
-
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
     updateSettingsLayout = pyqtSignal()
@@ -543,8 +485,8 @@ class TelemManager(QObject, threading.Thread):
             else:
                 the_sim = send_source
 
-            cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, args.type)
-            settings_mgr.current_pattern = pattern
+            cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, G.args.type)
+            #globals.settings_mgr.current_pattern = pattern
             if cls_name == '': cls_name = 'Aircraft'
             for setting in result:
                 k = setting['name']
@@ -620,7 +562,7 @@ class TelemManager(QObject, threading.Thread):
         data = data.split(";")
 
         telem_data = {}
-        telem_data["FFBType"] = args.type
+        telem_data["FFBType"] = G.args.type
 
         self.frameTimes.append(int((time.perf_counter() - self.lastFrameTime)*1000))
         if len(self.frameTimes) > 500: self.frameTimes.pop(0)
@@ -651,7 +593,7 @@ class TelemManager(QObject, threading.Thread):
                 logging.error("Error Parsing Parameter: ", repr(i))
 
         # Read telemetry sent via IPC channel from child instances and update local telemetry stream
-        if _master_instance and _launched_children:
+        if G._master_instance and G._launched_children:
             self._ipc_telem = self.ipc_thread._ipc_telem
             if self._ipc_telem != {}:
                 telem_data.update(self._ipc_telem)
@@ -755,8 +697,8 @@ class TelemManager(QObject, threading.Thread):
                     for sv in d1:
                         self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
                     self._simconnect._resubscribe()
-                if settings_mgr.isVisible():
-                    settings_mgr.b_getcurrentmodel.click()
+                if G.settings_mgr.isVisible():
+                    G.settings_mgr.b_getcurrentmodel.click()
 
                 self.updateSettingsLayout.emit()
 
@@ -800,18 +742,19 @@ class TelemManager(QObject, threading.Thread):
                 telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
 
             except:
-                print_exc()
+                logging.exception(".on_telemetry Exception")
+
         # Send locally generated telemetry to master here
-        if args.child and self.currentAircraft:
+        if G.args.child and self.currentAircraft:
             ipc_telem = self.currentAircraft._ipc_telem
             if ipc_telem != {}:
                 self.ipc_thread.send_ipc_telem(ipc_telem)
                 self.currentAircraft._ipc_telem = {}
-        if args.plot:
-            for item in args.plot:
+        if G.args.plot:
+            for item in G.args.plot:
                 if item in telem_data:
-                    if _child_instance or _launched_children:
-                        utils.teleplot.sendTelemetry(item, telem_data[item], instance=_device_type)
+                    if G._child_instance or G._launched_children:
+                        utils.teleplot.sendTelemetry(item, telem_data[item], instance=G._device_type)
                     else:
                         utils.teleplot.sendTelemetry(item, telem_data[item])
 
@@ -825,9 +768,8 @@ class TelemManager(QObject, threading.Thread):
         self.timedOut = True
         self.settings_manager.timedOut = True
 
-    @prints_exc
     def run(self):
-        self.timeout = int(utils.read_system_settings(args.device, args.type).get('telemTimeout', 200))/1000
+        self.timeout = int(utils.read_system_settings(G.args.device, G.args.type).get('telemTimeout', 200))/1000
         logging.info(f"Telemetry timeout: {self.timeout}")
         while self._run:
             with self._cond:
@@ -859,7 +801,7 @@ class IPCNetworkThread(QThread):
 
     def __init__(self, host="localhost", myport=0, dstport=0, child_ports=[], master=False, child=False, keepalive_timer=1, missed_keepalive=3):
         super().__init__()
-        global window
+
         self._run = True
         self._myport = int(myport)
         self._dstport = int(dstport)
@@ -888,7 +830,7 @@ class IPCNetworkThread(QThread):
         try:
             self._socket.bind((self._host, self._myport))
         except OSError as e:
-            QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {_device_type} instance of TelemFFB.\n\n{e}\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
+            QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {G._device_type} instance of TelemFFB.\n\n{e}\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
             QCoreApplication.instance().quit()
 
     def send_ipc_telem(self, telem):
@@ -898,8 +840,8 @@ class IPCNetworkThread(QThread):
 
     def send_ipc_effects(self, active_effects, active_settings):
         payload = {
-            f'{_device_type}_active_effects': active_effects,
-            f'{_device_type}_active_settings': active_settings
+            f'{G._device_type}_active_effects': active_effects,
+            f'{G._device_type}_active_settings': active_settings
         }
 
         msg = json.dumps(payload)
@@ -928,9 +870,9 @@ class IPCNetworkThread(QThread):
                 logging.debug(f"SENT KEEPALIVES: {ts}")
                 time.sleep(self._keepalive_timer)
             elif self._child:
-                self.send_message(f"Child Keepalive:{_device_type}")
+                self.send_message(f"Child Keepalive:{G._device_type}")
                 ts = time.time()
-                logging.debug(f"{_device_type} SENT CHILD KEEPALIVE: {ts}")
+                logging.debug(f"{G._device_type} SENT CHILD KEEPALIVE: {ts}")
                 time.sleep(self._keepalive_timer)
 
     def receive_messages(self):
@@ -957,7 +899,7 @@ class IPCNetworkThread(QThread):
                     self.restart_sim_signal.emit('Restart Sims')
                 elif msg.startswith('SHOW LOG:'):
                     dev = msg.removeprefix('SHOW LOG:')
-                    if dev == _device_type:
+                    if dev == G._device_type:
                         logging.info("Show log command received via IPC")
                         self.showlog_signal.emit()
                 elif msg == 'SHOW WINDOW':
@@ -1084,7 +1026,7 @@ class NetworkThread(threading.Thread):
 
 
 class SimConnectSock(SimConnectManager):
-    def __init__(self, telem: TelemManager, ffb_type=_device_type, unique_id=int(_device_pid)):
+    def __init__(self, telem: TelemManager, ffb_type=G._device_type, unique_id=int(G._device_pid)):
         super().__init__(unique_id)
         telem.set_simconnect(self)
         self._telem = telem
@@ -1113,905 +1055,8 @@ class SimConnectSock(SimConnectManager):
         self._telem.submitFrame(f"Ev={event};" + ";".join(args))
 
 
-class Ui_TeleplotDialog(object):
-    def setupUi(self, TeleplotDialog):
-        if not TeleplotDialog.objectName():
-            TeleplotDialog.setObjectName(u"TeleplotDialog")
-        TeleplotDialog.resize(270, 392)
-        self.layoutWidget = QWidget(TeleplotDialog)
-        self.layoutWidget.setObjectName(u"layoutWidget")
-        self.layoutWidget.setGeometry(QRect(7, 10, 258, 296))
-        self.gridLayout = QGridLayout(self.layoutWidget)
-        self.gridLayout.setObjectName(u"gridLayout")
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)
-        self.label_4 = QLabel(self.layoutWidget)
-        self.label_4.setObjectName(u"label_4")
-
-        self.gridLayout.addWidget(self.label_4, 5, 0, 1, 1)
-
-        self.tb_port = QLineEdit(self.layoutWidget)
-        self.tb_port.setObjectName(u"tb_port")
-
-        self.gridLayout.addWidget(self.tb_port, 2, 0, 1, 1, Qt.AlignLeft)
-
-        self.label_3 = QLabel(self.layoutWidget)
-        self.label_3.setObjectName(u"label_3")
-
-        self.gridLayout.addWidget(self.label_3, 3, 0, 1, 1)
-
-        self.label_2 = QLabel(self.layoutWidget)
-        self.label_2.setObjectName(u"label_2")
-
-        self.gridLayout.addWidget(self.label_2, 1, 0, 1, 1)
-
-        self.label = QLabel(self.layoutWidget)
-        self.label.setObjectName(u"label")
-
-        self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
-
-        self.tb_vars = QPlainTextEdit(self.layoutWidget)
-        self.tb_vars.setObjectName(u"tb_vars")
-
-        self.gridLayout.addWidget(self.tb_vars, 6, 0, 1, 1)
-
-        self.splitter = QSplitter(self.layoutWidget)
-        self.splitter.setObjectName(u"splitter")
-        self.splitter.setOrientation(Qt.Horizontal)
-        self.label_6 = QLabel(self.splitter)
-        self.label_6.setObjectName(u"label_6")
-        self.splitter.addWidget(self.label_6)
-        self.pb_Select = QPushButton(self.splitter)
-        self.pb_Select.setObjectName(u"pb_Select")
-        self.splitter.addWidget(self.pb_Select)
-
-        self.gridLayout.addWidget(self.splitter, 4, 0, 1, 1)
-
-        self.label_5 = QLabel(TeleplotDialog)
-        self.label_5.setObjectName(u"label_5")
-        self.label_5.setGeometry(QRect(7, 310, 256, 26))
-        self.layoutWidget1 = QWidget(TeleplotDialog)
-        self.layoutWidget1.setObjectName(u"layoutWidget1")
-        self.layoutWidget1.setGeometry(QRect(10, 350, 251, 25))
-        self.horizontalLayout = QHBoxLayout(self.layoutWidget1)
-        self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
-        self.pb_clear = QPushButton(self.layoutWidget1)
-        self.pb_clear.setObjectName(u"pb_clear")
-
-        self.horizontalLayout.addWidget(self.pb_clear, 0, Qt.AlignLeft)
-
-        self.horizontalSpacer_2 = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        self.horizontalLayout.addItem(self.horizontalSpacer_2)
-
-        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        self.horizontalLayout.addItem(self.horizontalSpacer)
-
-        self.buttonBox = QDialogButtonBox(self.layoutWidget1)
-        self.buttonBox.setObjectName(u"buttonBox")
-        self.buttonBox.setOrientation(Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QDialogButtonBox.Cancel|QDialogButtonBox.Save)
-
-        self.horizontalLayout.addWidget(self.buttonBox, 0, Qt.AlignRight)
-
-
-        self.retranslateUi(TeleplotDialog)
-
-        QMetaObject.connectSlotsByName(TeleplotDialog)
-    # setupUi
-
-    def retranslateUi(self, TeleplotDialog):
-        TeleplotDialog.setWindowTitle(QCoreApplication.translate("TeleplotDialog", u"Teleplot Setup", None))
-        self.label_4.setText(QCoreApplication.translate("TeleplotDialog", u"List:", None))
-        self.label_3.setText(QCoreApplication.translate("TeleplotDialog", u"Space separated list of Telemetry variables", None))
-        self.label_2.setText(QCoreApplication.translate("TeleplotDialog", u"Port:", None))
-        self.label.setText(QCoreApplication.translate("TeleplotDialog", u"Open a browser to teleplot.fr, record port number", None))
-        self.label_6.setText(QCoreApplication.translate("TeleplotDialog", u"or select from active: ", None))
-        self.pb_Select.setText(QCoreApplication.translate("TeleplotDialog", u"Select...", None))
-        self.label_5.setText(QCoreApplication.translate("TeleplotDialog", u"To stop sending teleplot data,\n"
-"clear the boxes and select OK", None))
-        self.pb_clear.setText(QCoreApplication.translate("TeleplotDialog", u"Clear", None))
     # retranslateUi
     # setupUi
-
-class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
-
-    def __init__(self, parent=None):
-        super(TeleplotSetupDialog, self).__init__(parent)
-
-        if args.teleplot is None:
-            self.telem_port = ''
-        elif isinstance(args.teleplot, str):
-            if ':' in args.teleplot:
-                self.telem_port = args.teleplot.split(':')[1]
-            else:
-                self.telem_port = args.teleplot
-
-        if args.plot is None:
-            args.plot = []
-        self.telem_vars = ' '.join(args.plot)
-
-        self.setupUi(self)
-        self.retranslateUi(self)
-        self.parent = parent
-        int_validator = QIntValidator()
-        self.tb_port.setValidator(int_validator)
-        self.buttonBox.accepted.connect(self.save_teleplot)
-        self.buttonBox.rejected.connect(self.close)
-        self.pb_clear.clicked.connect(self.clear_form)
-        self.pb_Select.clicked.connect(self.select_active_telemetry)
-        self.tb_port.setText(self.telem_port)
-        self.tb_vars.setPlainText(str(self.telem_vars))
-        self.telem_data = parent.lbl_telem_data.text()
-
-    class KeySelectionDialog(QDialog):
-        def __init__(self, parent=None):
-            super().__init__(parent)
-            self.setWindowTitle("Select Keys")
-            self.parent = parent
-            layout = QVBoxLayout(self)
-            self.list_widget = QListWidget()
-            self.list_widget.setSelectionMode(QListWidget.MultiSelection)  # Allow multiple selections
-            self.list_widget.addItems(self.get_active_keys())
-            refresh_button = QPushButton()
-            refresh_button.setText("Refresh Keys")
-            layout.addWidget(refresh_button)
-            layout.addWidget(self.list_widget)
-            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset)
-            refresh_button.clicked.connect(self.refresh_keys)
-            button_box.accepted.connect(self.populate_keys)
-            button_box.rejected.connect(self.reject)
-            button_box.button(QDialogButtonBox.Reset).clicked.connect(self.clearSelection)
-            layout.addWidget(button_box)
-
-        def populate_keys(self):
-            keys = self.selectedKeys()
-            str = ''
-            for k in keys:
-                str = str + f"{k} "
-            self.parent.tb_vars.setPlainText(str.rstrip(" "))
-            self.accept()
-        def refresh_keys(self):
-            self.list_widget.addItems(self.get_active_keys())
-        def get_active_keys(self):
-            text = self.parent.parent.lbl_telem_data.text()
-            keys = [line.split(':')[0].strip() for line in text.split('\n') if line.strip()]
-            return keys
-        def selectedKeys(self):
-            return [item.text() for item in self.list_widget.selectedItems()]
-
-        def clearSelection(self):
-            self.list_widget.clearSelection()
-    def select_active_telemetry(self):
-        self._telem_selection_window = self.KeySelectionDialog(parent=self)
-        self._telem_selection_window.exec_()
-        pass
-    def save_teleplot(self):
-        if self.validate_text():
-            if self.tb_port == '':
-                args.plot = []
-                self.accept()
-            else:
-                address = f"teleplot.fr:{str(self.tb_port.text())}"
-                utils.teleplot.configure(address)
-                args.plot = self.tb_vars.toPlainText().split()
-                args.teleplot = str(self.tb_port.text())
-                self.accept()
-
-    def clear_form(self):
-        self.tb_port.clear()
-        self.tb_vars.clear()
-
-    def validate_text(self):
-        regex_string = r"[a-zA-Z_][a-zA-Z0-9_ ]*"
-        current_text = self.tb_vars.toPlainText()
-        validator = QRegExpValidator(QRegExp(regex_string))
-        pos = 0
-        state, valid_text, pos = validator.validate(current_text, pos)
-        if self.tb_port.text() == '':
-            if current_text == '':
-                # remove all teleplot
-                return True
-            elif current_text != '':
-                QMessageBox.warning(self, "Error", "Please enter a port number or remove the telemetry variables to stop sending")
-                return False
-
-        if current_text == '':
-            if self.tb_port.text() != '':
-                QMessageBox.warning(self, "Error", "Please enter telemetry variables to monitor or remove the port to stop sending")
-                return False
-
-        if state == QRegExpValidator.Acceptable or current_text == '':
-            return True
-        else:
-            QMessageBox.warning(self, "Error", "Please only enter valid variable characters")
-            return False
-
-
-class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
-    overrides = []
-    current_name = ''
-    def __init__(self, parent=None, userconfig_path='', defaults_path=''):
-        super(SCOverridesEditor, self).__init__(parent)
-        self.setupUi(self)
-        self.retranslateUi(self)
-        self.defaults_path = defaults_path
-        self.userconfig_path = userconfig_path
-        self.fill_fields()
-        self.pb_add.clicked.connect(self.add_button_clicked)
-        self.pb_delete.clicked.connect(self.delete_button_clicked)
-
-    def fill_fields(self):
-        is_msfs = settings_mgr.current_sim == 'MSFS'
-        self.pb_add.setEnabled(is_msfs)
-        self.pb_delete.setEnabled(False)
-        self.tb_var.setEnabled(is_msfs)
-        self.tableWidget.setEnabled(is_msfs)
-        self.tb_scale.setEnabled(is_msfs)
-        self.cb_name.setEnabled(is_msfs)
-        self.cb_sc_unit.setEnabled(is_msfs)
-        self.tb_pattern.setText(settings_mgr.current_pattern)
-
-        if is_msfs:
-            self.fill_cb_name()
-
-            self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
-
-
-            if not any(self.overrides) :
-                self.bottomlabel.setText('No overrides are set for this aircraft')
-            else:
-                self.overrides.sort(key=lambda x: x['name'])
-                self.bottomlabel.setText('')
-                self.fill_table()
-
-        else:
-            self.bottomlabel.setText('SimConnect overrides are for MSFS only.')
-        pass
-
-    def fill_cb_name(self):
-        blocked_names = ['T', 'N', 'G', 'AccBody', 'TAS', 'AirDensity', 'AoA', 'StallAoA', 'SideSlip',
-                         'DynPressure', 'Pitch', 'Roll', 'Heading', 'PitchRate', 'RollRate', 'VelRotBody',
-                         'PitchAccel', 'RollAccel', 'AccRotBody', 'DesignSpeed', 'VerticalSpeed', 'SimDisabled',
-                         'SimOnGround', 'Parked', 'Slew', 'SurfaceType', 'SimConnectCategory', 'EngineType',
-                         'AmbWind', 'VelWorld']
-
-        self.cb_name.clear()
-        self.cb_name.addItem('')
-        self.cb_name.setEditable(True)
-        for x in SimConnectManager.sim_vars:
-            if x.name not in blocked_names:
-                self.cb_name.addItem(x.name)
-        model = self.cb_name.model()
-        model.sort(0)  # Sort items alphabetically
-
-
-    def fill_table(self):
-        self.tableWidget.blockSignals(True)
-        self.tableWidget.clear()
-        list_length = len(self.overrides) - 1
-        # Set headers
-        headers = ['Property', 'Variable', 'SC Unit', 'Scale', 's']
-        self.tableWidget.setHorizontalHeaderLabels(headers)
-        row_index = 0
-        # Set width of the variable column
-        self.tableWidget.setColumnWidth(0, 140)
-        self.tableWidget.setColumnWidth(1, 300)
-        self.tableWidget.setColumnWidth(2, 130)
-        self.tableWidget.setColumnWidth(3, 100)
-        self.tableWidget.setColumnWidth(4, 60)
-        self.tableWidget.setColumnHidden(4, True)
-
-        # Populate the table
-        for row, override in enumerate(self.overrides):
-            # Increment row index for adding new row
-            self.tableWidget.setRowCount(row_index + 1)
-            # Extracting specific key-value pairs
-            name_item = QTableWidgetItem(override['name'])
-            var_item = QTableWidgetItem(override['var'])
-            sc_unit_item = QTableWidgetItem(override['sc_unit'])
-            if override['scale'] is not None:
-                scale_item = QTableWidgetItem(str(override['scale']))
-            else:
-                scale_item = QTableWidgetItem('')
-            source_item = QTableWidgetItem(override['source'])
-
-            # If source is 'defaults', make the text color grey
-            if override['source'] == 'defaults':
-                name_item.setForeground(Qt.gray)
-                var_item.setForeground(Qt.gray)
-                sc_unit_item.setForeground(Qt.gray)
-                scale_item.setForeground(Qt.gray)
-
-                # Make entire row unselectable
-                for col in range(4):
-                    item = QTableWidgetItem()
-                    item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
-                    self.tableWidget.setItem(row_index, col, item)
-
-            # Setting items non-editable
-            name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
-            var_item.setFlags(var_item.flags() & ~Qt.ItemIsEditable)
-            sc_unit_item.setFlags(sc_unit_item.flags() & ~Qt.ItemIsEditable)
-            scale_item.setFlags(scale_item.flags() & ~Qt.ItemIsEditable)
-
-            # Setting items for the row
-            self.tableWidget.setItem(row, 0, name_item)
-            self.tableWidget.setItem(row, 1, var_item)
-            self.tableWidget.setItem(row, 2, sc_unit_item)
-            self.tableWidget.setItem(row, 3, scale_item)
-            self.tableWidget.setItem(row, 4, source_item)
-
-            # Increment row index
-            row_index += 1
-
-        # Set selection behavior to select entire rows
-        self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)
-
-        self.pb_delete.clicked.connect(self.delete_button_clicked)
-
-
-        # Connect currentItemChanged signal to handle row selection and data copying
-        self.tableWidget.itemSelectionChanged.connect(self.on_table_item_changed)
-
-        # Display the table
-        self.tableWidget.show()
-        self.tableWidget.blockSignals(False)
-
-    def on_table_item_changed(self):
-
-        # Get the current selected items
-        selected_items = self.tableWidget.selectedItems()
-
-        # Check if any item is selected
-        if selected_items:
-            # Assuming you're interested in the first selected item
-            current_item = selected_items[0]
-            # Get the row number from the current item
-            current_row = current_item.row()
-
-            # Copy data from the current row to designated widgets
-            self.cb_name.setCurrentText(self.tableWidget.item(current_row, 0).text())
-            self.tb_var.setText(self.tableWidget.item(current_row, 1).text())
-            self.cb_sc_unit.setCurrentText(self.tableWidget.item(current_row, 2).text())
-            self.tb_scale.setText(self.tableWidget.item(current_row, 3).text())
-            self.current_name = self.tableWidget.item(current_row, 0).text()
-            # enable delete button for user rows
-            if self.tableWidget.item(current_row, 4).text() == 'user':
-                self.pb_delete.setEnabled(True)
-            else:
-                self.pb_delete.setEnabled(False)
-        else:
-            self.current_name = ''
-            self.pb_delete.setEnabled(False)
-
-    def add_button_clicked(self):
-
-        name = self.cb_name.currentText()
-        var = self.tb_var.text()
-        sc_unit = self.cb_sc_unit.currentText()
-        scale_text = self.tb_scale.text()
-        scale_valid = True
-        # Validate and convert scale to a number (integer or float)
-        if scale_text != '':
-            try:
-                scale = float(scale_text)
-            except ValueError:
-                scale_valid = False
-                self.tb_scale.setText('')
-
-        # Handle the case where scale is not a valid number
-        # enable delete button for user rows
-        if name != '' and var != '' and sc_unit != '' and scale_valid:
-            xmlutils.write_override_to_xml(settings_mgr.current_pattern, var, name, sc_unit, scale_text)
-            self.cb_name.setCurrentText('')
-            self.tb_var.setText('')
-            self.cb_sc_unit.setCurrentText('')
-            self.tb_scale.setText('')
-            self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
-            self.fill_table()
-
-    def delete_button_clicked(self):
-        # Get the row number from the current item
-        if self.current_name != '':
-            name = self.current_name
-            print(f"\nerase row: {self.current_name}    pattern: {settings_mgr.current_pattern}  name: {name}")
-            self.tableWidget.blockSignals(True)
-            self.pb_delete.setEnabled(False)
-            xmlutils.erase_override_from_xml(settings_mgr.current_pattern,name)
-            self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
-            self.fill_table()
-
-class SystemSettingsDialog(QDialog, Ui_SystemDialog):
-    def __init__(self, parent=None):
-        super(SystemSettingsDialog, self).__init__(parent)
-        self.setupUi(self)
-        self.retranslateUi(self)
-        self.setWindowTitle(f"System Settings ({_device_type.capitalize()})")
-
-
-        # Add  "INFO" and "DEBUG" options to the logLevel combo box
-        self.logLevel.addItems(["INFO", "DEBUG"])
-        self.master_button_group = QButtonGroup()
-        self.master_button_group.setObjectName(u"master_button_group")
-        self.master_button_group.addButton(self.rb_master_j, id=1)
-        self.master_button_group.addButton(self.rb_master_p, id=2)
-        self.master_button_group.addButton(self.rb_master_c, id=3)
-
-        # Add tooltips
-        self.validateIL2.setToolTip('If enabled, TelemFFB will automatically set up the required configuration in IL2 to support telemetry export')
-        self.pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
-        self.lab_pathIL2.setToolTip('The root path where IL-2 Strumovik is installed')
-        self.validateXPLANE.setToolTip('If enabled, TelemFFB will automatically install the required X-Plane plugin and keep it up to date when it changes')
-        self.lab_pathXPLANE.setToolTip('The root path where X-Plane is installed')
-        self.pathXPLANE.setToolTip('The root path where X-Plane is installed')
-        self.enableVPConfStartup.setToolTip('Select VPforce Configurator profile to load when TelemFFB Starts')
-        self.enableVPConfExit.setToolTip('Select VPforce Configurator profile to load when TelemFFB Exits')
-
-        # Connect signals to slots
-        self.enableIL2.stateChanged.connect(self.toggle_il2_widgets)
-        self.enableXPLANE.stateChanged.connect(self.toggle_xplane_widgets)
-        self.browseXPLANE.clicked.connect(self.select_xplane_directory)
-        self.browseIL2.clicked.connect(self.select_il2_directory)
-        self.buttonBox.accepted.connect(self.save_settings)
-        self.resetButton.clicked.connect(self.reset_settings)
-        self.master_button_group.buttonClicked.connect(lambda button: self.change_master_widgets(button))
-        self.cb_al_enable.stateChanged.connect(self.toggle_al_widgets)
-        self.enableVPConfStartup.stateChanged.connect(self.toggle_vpconf_startup)
-        self.enableVPConfExit.stateChanged.connect(self.toggle_vpconf_exit)
-        self.browseVPConfStartup.clicked.connect(lambda: self.browse_vpconf('startup'))
-        self.browseVPConfExit.clicked.connect(lambda: self.browse_vpconf('exit'))
-        self.buttonBox.rejected.connect(self.close)
-
-        self.buttonChildSettings.setEnabled(False)
-        self.buttonChildSettings.setVisible(False)
-
-        # Set initial state
-        self.toggle_il2_widgets()
-        self.toggle_xplane_widgets()
-        self.toggle_al_widgets()
-        self.parent_window = parent
-        # Load settings from the registry and update widget states
-        self.current_al_dict = {}
-        self.load_settings()
-        int_validator = QIntValidator()
-        self.telemTimeout.setValidator(int_validator)
-        self.tb_pid_j.setValidator(int_validator)
-        self.tb_pid_p.setValidator(int_validator)
-        self.tb_pid_c.setValidator(int_validator)
-
-        self.cb_min_enable_j.setObjectName('minimize_j')
-        self.cb_min_enable_j.clicked.connect(self.toggle_launchmode_cbs)
-        self.cb_min_enable_p.setObjectName('minimize_p')
-        self.cb_min_enable_p.clicked.connect(self.toggle_launchmode_cbs)
-        self.cb_min_enable_c.setObjectName('minimize_c')
-        self.cb_min_enable_c.clicked.connect(self.toggle_launchmode_cbs)
-
-        self.cb_headless_j.setObjectName('headless_j')
-        self.cb_headless_j.clicked.connect(self.toggle_launchmode_cbs)
-        self.cb_headless_p.setObjectName('headless_p')
-        self.cb_headless_p.clicked.connect(self.toggle_launchmode_cbs)
-        self.cb_headless_c.setObjectName('headless_c')
-        self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
-
-        if (_master_instance and _launched_children) or _child_instance:
-            self.labelSystem.setText("System (Per Instance):")
-            self.labelLaunch.setText("Launch Options (Global):")
-            self.labelSim.setText("Sim Setup (Global):")
-            self.labelOther.setText("Other Settings (Per Instance):")
-
-        if _master_instance and _launched_children:
-            self.buttonChildSettings.setVisible(True)
-            self.buttonChildSettings.setEnabled(True)
-            self.buttonChildSettings.clicked.connect(self.launch_child_settings_windows)
-
-
-
-    def closeEvent(self, event):
-        self.hide()
-        event.ignore()
-
-    def accept(self):
-        self.hide()
-
-    def launch_child_settings_windows(self):
-        window.show_child_settings()
-
-    def reset_settings(self):
-        # Load default settings and update widgets
-        # default_settings = utils.get_default_sys_settings()
-        self.load_settings(default=True)
-
-    def change_master_widgets(self, button):
-        if button == self.rb_master_j:
-            self.cb_al_enable_j.setChecked(False)
-            self.cb_al_enable_j.setVisible(False)
-            self.cb_min_enable_j.setChecked(False)
-            self.cb_min_enable_j.setVisible(False)
-            self.cb_headless_j.setChecked(False)
-            self.cb_headless_j.setVisible(False)
-            self.cb_al_enable_c.setVisible(True)
-            self.cb_min_enable_c.setVisible(True)
-            self.cb_headless_c.setVisible(True)
-            self.cb_al_enable_p.setVisible(True)
-            self.cb_min_enable_p.setVisible(True)
-            self.cb_headless_p.setVisible(True)
-        elif button == self.rb_master_p:
-            self.cb_al_enable_p.setChecked(False)
-            self.cb_al_enable_p.setVisible(False)
-            self.cb_min_enable_p.setChecked(False)
-            self.cb_min_enable_p.setVisible(False)
-            self.cb_headless_p.setChecked(False)
-            self.cb_headless_p.setVisible(False)
-            self.cb_al_enable_c.setVisible(True)
-            self.cb_min_enable_c.setVisible(True)
-            self.cb_headless_c.setVisible(True)
-            self.cb_al_enable_j.setVisible(True)
-            self.cb_min_enable_j.setVisible(True)
-            self.cb_headless_j.setVisible(True)
-        elif button == self.rb_master_c:
-            self.cb_al_enable_c.setChecked(False)
-            self.cb_al_enable_c.setVisible(False)
-            self.cb_min_enable_c.setChecked(False)
-            self.cb_min_enable_c.setVisible(False)
-            self.cb_headless_c.setChecked(False)
-            self.cb_headless_c.setVisible(False)
-            self.cb_al_enable_j.setVisible(True)
-            self.cb_min_enable_j.setVisible(True)
-            self.cb_headless_j.setVisible(True)
-            self.cb_al_enable_p.setVisible(True)
-            self.cb_min_enable_p.setVisible(True)
-            self.cb_headless_p.setVisible(True)
-
-    def toggle_vpconf_startup(self):
-        vpconf_startup_enabled = self.enableVPConfStartup.isChecked()
-        self.pathVPConfStartup.setEnabled(vpconf_startup_enabled)
-        self.browseVPConfStartup.setEnabled(vpconf_startup_enabled)
-
-    def toggle_vpconf_exit(self):
-        vpconf_exit_enabled = self.enableVPConfExit.isChecked()
-        self.pathVPConfExit.setEnabled(vpconf_exit_enabled)
-        self.browseVPConfExit.setEnabled(vpconf_exit_enabled)
-
-    def toggle_al_widgets(self):
-        al_enabled = self.cb_al_enable.isChecked()
-        self.lab_auto_launch.setEnabled(al_enabled)
-        self.lab_start_min.setEnabled(al_enabled)
-        self.lab_start_headless.setEnabled(al_enabled)
-        self.cb_al_enable_j.setEnabled(al_enabled)
-        self.cb_al_enable_p.setEnabled(al_enabled)
-        self.cb_al_enable_c.setEnabled(al_enabled)
-        self.cb_min_enable_j.setEnabled(al_enabled)
-        self.cb_min_enable_p.setEnabled(al_enabled)
-        self.cb_min_enable_c.setEnabled(al_enabled)
-        self.cb_headless_j.setEnabled(al_enabled)
-        self.cb_headless_p.setEnabled(al_enabled)
-        self.cb_headless_c.setEnabled(al_enabled)
-
-        if al_enabled:
-            style = "QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }"
-        else:
-            style = "QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }"
-
-        self.cb_al_enable.setStyleSheet(style)
-        self.cb_al_enable_j.setStyleSheet(style)
-        self.cb_al_enable_p.setStyleSheet(style)
-        self.cb_al_enable_c.setStyleSheet(style)
-        self.cb_min_enable_j.setStyleSheet(style)
-        self.cb_min_enable_p.setStyleSheet(style)
-        self.cb_min_enable_c.setStyleSheet(style)
-        self.cb_headless_j.setStyleSheet(style)
-        self.cb_headless_p.setStyleSheet(style)
-        self.cb_headless_c.setStyleSheet(style)
-
-    def toggle_xplane_widgets(self):
-        xplane_enabled = self.enableXPLANE.isChecked()
-        self.validateXPLANE.setEnabled(xplane_enabled)
-        self.lab_pathXPLANE.setEnabled(xplane_enabled)
-        self.pathXPLANE.setEnabled(xplane_enabled)
-        self.browseXPLANE.setEnabled(xplane_enabled)
-        if xplane_enabled:
-            self.validateXPLANE.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }")
-        else:
-            self.validateXPLANE.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }")
-    def toggle_il2_widgets(self):
-        # Show/hide IL-2 related widgets based on checkbox state
-        il2_enabled = self.enableIL2.isChecked()
-        # self.il2_sub_layout.setEnabled(il2_enabled)
-        self.validateIL2.setEnabled(il2_enabled)
-        self.lab_pathIL2.setEnabled(il2_enabled)
-        self.pathIL2.setEnabled(il2_enabled)
-        self.browseIL2.setEnabled(il2_enabled)
-        self.lab_portIL2.setEnabled(il2_enabled)
-        self.portIL2.setEnabled(il2_enabled)
-        if il2_enabled:
-            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }")
-        else:
-            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }")
-
-    def select_xplane_directory(self):
-        # Open a directory dialog and set the result in the pathIL2 QLineEdit
-        directory = QFileDialog.getExistingDirectory(self, "Select X-Plane Install Path", "")
-        if directory:
-            self.pathXPLANE.setText(directory)
-
-    def select_il2_directory(self):
-        # Open a directory dialog and set the result in the pathIL2 QLineEdit
-        directory = QFileDialog.getExistingDirectory(self, "Select IL-2 Install Path", "")
-        if directory:
-            self.pathIL2.setText(directory)
-
-    def toggle_launchmode_cbs(self):
-        sender = self.sender()
-        if not sender.isChecked():
-            return
-        object_name = sender.objectName()
-        match object_name:
-            case 'headless_j':
-                self.cb_min_enable_j.setChecked(False)
-            case 'minimize_j':
-                self.cb_headless_j.setChecked(False)
-            case 'headless_p':
-                self.cb_min_enable_p.setChecked(False)
-            case 'minimize_p':
-                self.cb_headless_p.setChecked(False)
-            case 'headless_c':
-                self.cb_min_enable_c.setChecked(False)
-            case 'minimize_c':
-                self.cb_headless_c.setChecked(False)
-        logging.debug(f"{sender.objectName()} checked:{sender.isChecked()}")
-
-    def validate_settings(self):
-        master = self.master_button_group.checkedId()
-        match master:
-            case 1:
-                val_entry = self.tb_pid_j.text()
-            case 2:
-                val_entry = self.tb_pid_p.text()
-            case 3:
-                val_entry = self.tb_pid_c.text()
-        if self.cb_al_enable.isChecked() and not (self.cb_al_enable_j.isChecked() or self.cb_al_enable_p.isChecked() or self.cb_al_enable_c.isChecked()):
-            QMessageBox.warning(self, "Config Error", "Auto Launching is enabled but no devices are configured for auto launch.  Please enable a device or disable auto launching")
-            return False
-        if val_entry == '':
-            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the selected Master Instance')
-            return False
-        if self.cb_al_enable_c.isChecked() and self.tb_pid_c.text() == '':
-            r = self.tb_pid_c.text()
-            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the collective device or disable auto-launch')
-            return False
-        if self.cb_al_enable_j.isChecked() and self.tb_pid_j.text() == '':
-            r = self.tb_pid_j.text()
-            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the joystick device or disable auto-launch')
-            return False
-        if self.cb_al_enable_p.isChecked() and self.tb_pid_p.text() == '':
-            r = self.tb_pid_p.text()
-            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the pedals device or disable auto-launch')
-            return False
-        if self.validateXPLANE.isChecked():
-            pth = os.path.join(self.pathXPLANE.text(), 'resources')
-            if not os.path.isdir(pth):
-                QMessageBox.warning(self, "Config Error", 'Please enter the root X-Plane install path or disable auto X-plane setup')
-                return False
-        if self.enableVPConfStartup.isChecked():
-            if not os.path.isfile(self.pathVPConfStartup.text()):
-                QMessageBox.warning(self, "Config Error", "Please select a valid 'on Startup' VPforce Configurator file")
-                return False
-            if not validate_vpconf_profile(self.pathVPConfStartup.text()):
-                return False
-        if self.enableVPConfExit.isChecked():
-            if not os.path.isfile(self.pathVPConfExit.text()):
-                QMessageBox.warning(self, "Config Error", "Please select a valid 'on Exit' VPforce Configurator file")
-                return False
-            if not validate_vpconf_profile(self.pathVPConfExit.text()):
-                return False
-        return True
-
-    def save_settings(self):
-        global system_settings
-        # Create a dictionary with the values of all components
-        tp = args.type
-
-        global_settings_dict = {
-            "enableDCS": self.enableDCS.isChecked(),
-            "enableMSFS": self.enableMSFS.isChecked(),
-            "enableXPLANE": self.enableXPLANE.isChecked(),
-            "validateXPLANE": self.validateXPLANE.isChecked(),
-            "pathXPLANE": self.pathXPLANE.text(),
-            "enableIL2": self.enableIL2.isChecked(),
-            "validateIL2": self.validateIL2.isChecked(),
-            "pathIL2": self.pathIL2.text(),
-            "portIL2": str(self.portIL2.text()),
-            'masterInstance': self.master_button_group.checkedId(),
-            'autolaunchMaster': self.cb_al_enable.isChecked(),
-            'autolaunchJoystick': self.cb_al_enable_j.isChecked(),
-            'autolaunchPedals': self.cb_al_enable_p.isChecked(),
-            'autolaunchCollective': self.cb_al_enable_c.isChecked(),
-            'startMinJoystick': self.cb_min_enable_j.isChecked(),
-            'startMinPedals': self.cb_min_enable_p.isChecked(),
-            'startMinCollective': self.cb_min_enable_c.isChecked(),
-            'startHeadlessJoystick': self.cb_headless_j.isChecked(),
-            'startHeadlessPedals': self.cb_headless_p.isChecked(),
-            'startHeadlessCollective': self.cb_headless_c.isChecked(),
-            'pidJoystick': str(self.tb_pid_j.text()),
-            'pidPedals': str(self.tb_pid_p.text()),
-            'pidCollective': str(self.tb_pid_c.text()),
-        }
-
-        instance_settings_dict = {
-            "logLevel": self.logLevel.currentText(),
-            "telemTimeout": str(self.telemTimeout.text()),
-            "ignoreUpdate": self.ignoreUpdate.isChecked(),
-            "saveWindow": self.cb_save_geometry.isChecked(),
-            "saveLastTab": self.cb_save_view.isChecked(),
-            "enableVPConfStartup": self.enableVPConfStartup.isChecked(),
-            "pathVPConfStartup": self.pathVPConfStartup.text(),
-            "enableVPConfExit": self.enableVPConfExit.isChecked(),
-            "pathVPConfExit": self.pathVPConfExit.text(),
-        }
-
-        key_list = [
-            'autolaunchMaster',
-            'autolaunchJoystick',
-            'autolaunchPedals',
-            'autolaunchCollective',
-            'startMinJoystick',
-            'startMinPedals',
-            'startMinCollective',
-            'startHeadlessJoystick',
-            'startHeadlessPedals',
-            'startHeadlessCollective',
-            'pidJoystick',
-            'pidPedals',
-            'pidCollective',
-        ]
-        saved_al_dict = {}
-        for key in key_list:
-            saved_al_dict[key] = global_settings_dict[key]
-
-        if self.current_al_dict != saved_al_dict:
-            QMessageBox.information(self, "Restart Required", "The Auto-Launch or Master Device settings have changed.  Please restart TelemFFB.")
-
-        # Save settings to the registry
-        g_settings = json.dumps(global_settings_dict)
-        i_settings = json.dumps(instance_settings_dict)
-        utils.set_reg('Sys', g_settings)
-        utils.set_reg(f'{tp}Sys', i_settings)
-
-        if not self.validate_settings():
-            return
-
-        stop_sims()
-        init_sims()
-
-        if _master_instance and _launched_children:
-            _ipc_thread.send_broadcast_message("RESTART SIMS")
-
-        self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2', 'XPLANE'], global_settings_dict)
-        # adjust logging level:
-        ll = self.logLevel.currentText()
-        if ll == "INFO":
-            logger.setLevel(logging.INFO)
-        elif ll == "DEBUG":
-            logger.setLevel(logging.DEBUG)
-
-        system_settings = utils.read_system_settings(args.device, _device_type)
-        self.accept()
-
-    def load_settings(self, default=False):
-        """
-        Load settings from the registry and update widget states.
-        """
-        if default:
-            settings_dict = utils.get_default_sys_settings(args.device, args.type, cmb=True)
-            self.cb_save_geometry.setChecked(True)
-            self.cb_save_view.setChecked(True)
-        else:
-            # Read settings from the registry
-            settings_dict = utils.read_system_settings(args.device, args.type)
-            pass
-        # Update widget states based on the loaded settings
-        self.logLevel.setCurrentText(settings_dict.get('logLevel', 'INFO'))
-
-        self.telemTimeout.setText(str(settings_dict.get('telemTimeout', 200)))
-
-        self.ignoreUpdate.setChecked(settings_dict.get('ignoreUpdate', False))
-
-        self.enableDCS.setChecked(settings_dict.get('enableDCS', False))
-
-        self.enableMSFS.setChecked(settings_dict.get('enableMSFS', False))
-
-        self.enableXPLANE.setChecked(settings_dict.get('enableXPLANE', False))
-        self.toggle_xplane_widgets()
-
-        self.validateXPLANE.setChecked(settings_dict.get('validateXPLANE', False))
-
-        self.pathXPLANE.setText(settings_dict.get('pathXPLANE', ''))
-
-        self.enableIL2.setChecked(settings_dict.get('enableIL2', False))
-        self.toggle_il2_widgets()
-
-        self.validateIL2.setChecked(settings_dict.get('validateIL2', True))
-
-        self.pathIL2.setText(settings_dict.get('pathIL2', 'C:/Program Files/IL-2 Sturmovik Great Battles'))
-
-        self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
-
-        self.cb_save_geometry.setChecked(settings_dict.get('saveWindow', True))
-
-        self.cb_save_view.setChecked(settings_dict.get('saveLastTab', True))
-
-        self.tb_pid_j.setText(str(settings_dict.get('pidJoystick', '')))
-
-        self.tb_pid_p.setText(str(settings_dict.get('pidPedals', '')))
-
-        self.tb_pid_c.setText(str(settings_dict.get('pidCollective', '')))
-
-        self.cb_al_enable.setChecked(settings_dict.get('autolaunchMaster', False))
-
-        self.cb_al_enable_j.setChecked(settings_dict.get('autolaunchJoystick', False))
-        self.cb_al_enable_p.setChecked(settings_dict.get('autolaunchPedals', False))
-        self.cb_al_enable_c.setChecked(settings_dict.get('autolaunchCollective', False))
-
-        self.cb_min_enable_j.setChecked(settings_dict.get('startMinJoystick', False))
-        self.cb_min_enable_p.setChecked(settings_dict.get('startMinPedals', False))
-        self.cb_min_enable_c.setChecked(settings_dict.get('startMinCollective', False))
-
-        self.cb_headless_j.setChecked(settings_dict.get('startHeadlessJoystick', False))
-        self.cb_headless_p.setChecked(settings_dict.get('startHeadlessPedals', False))
-        self.cb_headless_c.setChecked(settings_dict.get('startHeadlessCollective', False))
-
-        self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
-        self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
-
-        self.enableVPConfStartup.setChecked(settings_dict.get('enableVPConfStartup', False))
-        self.pathVPConfStartup.setText(settings_dict.get('pathVPConfStartup', ''))
-        self.enableVPConfExit.setChecked(settings_dict.get('enableVPConfExit', False))
-        self.pathVPConfExit.setText(settings_dict.get('pathVPConfExit', ''))
-
-        self.toggle_al_widgets()
-
-        # build record of auto-launch settings to see if they changed on save:
-        self.current_al_dict = {
-            'autolaunchMaster': self.cb_al_enable.isChecked(),
-            'autolaunchJoystick': self.cb_al_enable_j.isChecked(),
-            'autolaunchPedals': self.cb_al_enable_p.isChecked(),
-            'autolaunchCollective': self.cb_al_enable_c.isChecked(),
-            'startMinJoystick': self.cb_min_enable_j.isChecked(),
-            'startMinPedals': self.cb_min_enable_p.isChecked(),
-            'startMinCollective': self.cb_min_enable_c.isChecked(),
-            'startHeadlessJoystick': self.cb_headless_j.isChecked(),
-            'startHeadlessPedals': self.cb_headless_p.isChecked(),
-            'startHeadlessCollective': self.cb_headless_c.isChecked(),
-            'pidJoystick': str(self.tb_pid_j.text()),
-            'pidPedals': str(self.tb_pid_p.text()),
-            'pidCollective': str(self.tb_pid_c.text()),
-        }
-
-    def browse_vpconf(self, mode):
-        options = QFileDialog.Options()
-        # options |= QFileDialog.DontUseNativeDialog
-        calling_button = self.sender()
-        starting_dir = os.getcwd()
-        if mode == 'startup':
-            lbl = self.pathVPConfStartup
-        elif mode == 'exit':
-            lbl = self.pathVPConfExit
-        else:
-            return
-
-        cur_path = lbl.text()
-        if os.path.exists(cur_path):
-            starting_dir = os.path.dirname(cur_path)
-
-        # Open the file browser dialog
-        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose {mode} vpconf profile for {_device_type} ", starting_dir, "vpconf Files (*.vpconf)", options=options)
-
-        if file_path:
-            if validate_vpconf_profile(file_path):
-                lbl.setText(file_path)
 
 class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
     global dev
@@ -2023,7 +1068,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
 
         self.setupUi(self)
         self.retranslateUi(self)
-        self.setWindowTitle(f"Configurator Gain Override ({_device_type.capitalize()})")
+        self.setWindowTitle(f"Configurator Gain Override ({G._device_type.capitalize()})")
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
         # self.cb_MasterGain.clicked
         self.sl_MasterGain.valueChanged.connect(self.update_labels)
@@ -2147,44 +1192,6 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.lab_FrictionValue.setText(f"%{self.sl_Friction.value()}")
         self.lab_ConstantValue.setText(f"%{self.sl_Constant.value()}")
 
-class ButtonPressThread(QThread):
-    button_pressed = pyqtSignal(str, int)
-
-    def __init__(self, device, button_obj, timeout=5):
-        button_name = button_obj.objectName().replace('pb_', '')
-        self.button_obj = button_obj
-        super(ButtonPressThread, self).__init__()
-        self.device = device
-        self.button_name = button_name
-        self.timeout = timeout
-        self.prev_button_state = None
-
-    def run(self):
-        start_time = time.time()
-        emit_sent = 0
-        input_data = self.device.device.getInput()
-
-        initial_buttons = input_data.getPressedButtons()
-
-        while not emit_sent and time.time() - start_time < self.timeout:
-            input_data = self.device.device.getInput()
-            current_btns = set(input_data.getPressedButtons())
-            countdown = int(self.timeout - (time.time() - start_time))
-            self.button_obj.setText(f"Push a button! {countdown}..")
-            # Check for new button press
-            for btn in current_btns:
-                if btn not in initial_buttons:
-                    self.button_pressed.emit(self.button_name, btn)
-                    emit_sent = 1
-
-            self.prev_button_state = current_btns
-            time.sleep(0.1)
-
-        # Emit signal for timeout with value 0
-        if not emit_sent:
-            self.button_pressed.emit(self.button_name, 0)
-
-
 class MainWindow(QMainWindow):
     show_simvars = False
     def __init__(self, ipc_thread=None):
@@ -2205,13 +1212,13 @@ class MainWindow(QMainWindow):
 
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
-        self._current_config_scope = args.type
-        if system_settings.get('saveLastTab', 0):
-            if _device_type == 'joystick':
+        self._current_config_scope = G.args.type
+        if G.system_settings.get('saveLastTab', 0):
+            if G._device_type == 'joystick':
                 tab_key = 'jWindowData'
-            elif _device_type == 'pedals':
+            elif G._device_type == 'pedals':
                 tab_key = 'pWindowData'
-            elif _device_type == 'collective':
+            elif G._device_type == 'collective':
                 tab_key = 'cWindowData'
             data = utils.get_reg(tab_key)
             if data is not None:
@@ -2242,9 +1249,9 @@ class MainWindow(QMainWindow):
         self.setMinimumWidth(600)
         self.tab_sizes = self.default_tab_sizes
         self._ipc_thread = ipc_thread
-        self.system_settings_dict = utils.read_system_settings(args.device, args.type)
+        self.system_settings_dict = utils.read_system_settings(G.args.device, G.args.type)
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
-        match args.type:
+        match G.args.type:
             case 'joystick':
                 x_pos = 150
                 y_pos = 130
@@ -2257,7 +1264,7 @@ class MainWindow(QMainWindow):
 
         self.setGeometry(x_pos, y_pos, 530, 700)
         if version:
-            self.setWindowTitle(f"TelemFFB ({args.type}) ({version})")
+            self.setWindowTitle(f"TelemFFB ({G.args.type}) ({version})")
         else:
             self.setWindowTitle(f"TelemFFB")
         # Construct the absolute path of the icon file
@@ -2346,7 +1353,7 @@ class MainWindow(QMainWindow):
             convert_settings_action.triggered.connect(lambda: autoconvert_config(self))
             utilities_menu.addAction(convert_settings_action)
 
-        if _master_instance and system_settings.get('autolaunchMaster', 0):
+        if G._master_instance and G.system_settings.get('autolaunchMaster', 0):
             self.window_menu = self.menu.addMenu('Window')
             self.show_children_action = QAction('Show Child Instance Windows')
             self.show_children_action.triggered.connect(lambda: self.toggle_child_windows('show'))
@@ -2355,7 +1362,7 @@ class MainWindow(QMainWindow):
             self.hide_children_action.triggered.connect(lambda: self.toggle_child_windows('hide'))
             self.window_menu.addAction(self.hide_children_action)
 
-        if _child_instance:
+        if G._child_instance:
             self.window_menu = self.menu.addMenu('Window')
             self.hide_window_action = QAction('Hide Window')
             self.hide_window_action.triggered.connect(hide_window)
@@ -2365,17 +1372,17 @@ class MainWindow(QMainWindow):
         self.log_window_action = QAction("Open Console Log", self)
         self.log_window_action.triggered.connect(self.toggle_log_window)
         log_menu.addAction(self.log_window_action)
-        if _master_instance and system_settings.get('autolaunchMaster', 0):
+        if G._master_instance and G.system_settings.get('autolaunchMaster', 0):
             self.child_log_menu = log_menu.addMenu('Open Child Logs')
-            if _launched_joystick:
+            if G._launched_joystick:
                 self.joystick_log_action = QAction('Joystick Log')
                 self.joystick_log_action.triggered.connect(lambda: self.show_child_log('joystick'))
                 self.child_log_menu.addAction(self.joystick_log_action)
-            if _launched_pedals:
+            if G._launched_pedals:
                 self.pedals_log_action = QAction('Pedals Log')
                 self.pedals_log_action.triggered.connect(lambda: self.show_child_log('pedals'))
                 self.child_log_menu.addAction(self.pedals_log_action)
-            if _launched_collective:
+            if G._launched_collective:
                 self.collective_log_action = QAction('Collective Log')
                 self.collective_log_action.triggered.connect(lambda: self.show_child_log('collective'))
                 self.child_log_menu.addAction(self.collective_log_action)
@@ -2391,7 +1398,7 @@ class MainWindow(QMainWindow):
         help_menu.addAction(docs_action)
 
         self.support_action = QAction("Create support bundle", self)
-        self.support_action.triggered.connect(lambda: utils.create_support_bundle(userconfig_rootpath))
+        self.support_action.triggered.connect(lambda: utils.create_support_bundle(G.userconfig_rootpath))
         help_menu.addAction(self.support_action)
 
         # Create a line beneath the menu bar
@@ -2407,34 +1414,34 @@ class MainWindow(QMainWindow):
         # Set the layout of the menu frame as the main layout
         layout.addWidget(menu_frame)
 
-        dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS')
-        il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2')
-        msfs_enabled = utils.read_system_settings(args.device, args.type).get('enableMSFS')
-        xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE')
+        dcs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableDCS')
+        il2_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableIL2')
+        msfs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableMSFS')
+        xplane_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableXPLANE')
 
         self.icon_size = QSize(18, 18)
-        if args.sim == "DCS" or dcs_enabled:
+        if G.args.sim == "DCS" or dcs_enabled:
             dcs_color = QColor(255, 255, 0)
             dcs_icon = self.create_colored_icon(dcs_color, self.icon_size)
         else:
             dcs_color = QColor(128, 128, 128)
             dcs_icon = self.create_x_icon(dcs_color, self.icon_size)
 
-        if args.sim == "MSFS" or msfs_enabled:
+        if G.args.sim == "MSFS" or msfs_enabled:
             msfs_color = QColor(255, 255, 0)
             msfs_icon = self.create_colored_icon(msfs_color, self.icon_size)
         else:
             msfs_color = QColor(128, 128, 128)
             msfs_icon = self.create_x_icon(msfs_color, self.icon_size)
 
-        if args.sim == "IL2" or il2_enabled:
+        if G.args.sim == "IL2" or il2_enabled:
             il2_color = QColor(255, 255, 0)
             il2_icon = self.create_colored_icon(il2_color, self.icon_size)
         else:
             il2_color = QColor(128, 128, 128)
             il2_icon = self.create_x_icon(il2_color, self.icon_size)
 
-        if args.sim == "XPLANE" or xplane_enabled:
+        if G.args.sim == "XPLANE" or xplane_enabled:
             xplane_color = QColor(255, 255, 0)
             xplane_icon = self.create_colored_icon(xplane_color, self.icon_size)
         else:
@@ -2464,7 +1471,7 @@ class MainWindow(QMainWindow):
         self.logo_stack.setStyleSheet("QGroupBox { border: none; }")
         # Align self.image_label2 with the upper left corner of self.image_label
         self.devicetype_label.move(self.vpflogo_label.pos())
-        if not args.child:
+        if not G.args.child:
             self.devicetype_label.hide()
         # Add the image labels to the layout
         logo_status_layout.addWidget(self.logo_stack, alignment=Qt.AlignVCenter | Qt.AlignLeft)
@@ -2513,7 +1520,7 @@ class MainWindow(QMainWindow):
 
 
         status_layout.setAlignment(Qt.AlignRight)
-        self.init_sim_indicators(['DCS', 'IL2', 'MSFS', 'XPLANE'], system_settings)
+        self.init_sim_indicators(['DCS', 'IL2', 'MSFS', 'XPLANE'], G.system_settings)
 
 
 
@@ -2682,10 +1689,10 @@ class MainWindow(QMainWindow):
 
         # Create the QLabel widget and set its properties
 
-        dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS')
-        il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2')
-        msfs_enabled = utils.read_system_settings(args.device, args.type).get('enableMSFS')
-        xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE')
+        dcs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableDCS')
+        il2_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableIL2')
+        msfs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableMSFS')
+        xplane_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableXPLANE')
 
         # Convert True/False to "enabled" or "disabled"
         dcs_status = "Enabled" if dcs_enabled else "Disabled"
@@ -2722,7 +1729,7 @@ class MainWindow(QMainWindow):
 
         self.telem_lbl = QLabel('Telemetry:')
         self.effect_lbl = QLabel('Active Effects:')
-        if _master_instance:
+        if G._master_instance:
             self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
         monitor_area_layout.addWidget(self.telem_lbl, 0, 0)
         monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
@@ -2806,9 +1813,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        if _master_instance and _launched_children:
+        if G._master_instance and G._launched_children:
             self.instance_status_row = QHBoxLayout()
-            self.master_status_icon = StatusLabel(None, f'This Instance({ _device_type.capitalize() }):', Qt.green, 8)
+            self.master_status_icon = StatusLabel(None, f'This Instance({ G._device_type.capitalize() }):', Qt.green, 8)
             self.joystick_status_icon = StatusLabel(None, 'Joystick:', Qt.yellow, 8)
             self.pedals_status_icon = StatusLabel(None, 'Pedals:', Qt.yellow, 8)
             self.collective_status_icon = StatusLabel(None, 'Collective:', Qt.yellow, 8)
@@ -2919,7 +1926,7 @@ class MainWindow(QMainWindow):
         self.sc_overrides_action.triggered.connect(self.open_sc_override_dialog)
         self.debug_menu.addAction(self.sc_overrides_action)
 
-        if _master_instance:
+        if G._master_instance:
             self.custom_userconfig_action = QAction("Load Custom User Config", self)
             self.custom_userconfig_action.triggered.connect(lambda: load_custom_userconfig())
             self.debug_menu.addAction(self.custom_userconfig_action)
@@ -2941,21 +1948,20 @@ class MainWindow(QMainWindow):
             status_icon.set_dot_color(Qt.red)
 
     def show_child_log(self, child):
-        self._ipc_thread.send_broadcast_message(f'SHOW LOG:{child}')
+        self.G._ipc_thread.send_broadcast_message(f'SHOW LOG:{child}')
 
     def show_child_settings(self):
-        self._ipc_thread.send_broadcast_message("SHOW SETTINGS")
+        self.G._ipc_thread.send_broadcast_message("SHOW SETTINGS")
 
     def toggle_child_windows(self, toggle):
         if toggle == 'show':
-            self._ipc_thread.send_broadcast_message("SHOW WINDOW")
+            self.G._ipc_thread.send_broadcast_message("SHOW WINDOW")
             pass
         elif toggle == 'hide':
-            self._ipc_thread.send_broadcast_message("HIDE WINDOW")
+            self.G._ipc_thread.send_broadcast_message("HIDE WINDOW")
             pass
 
     def reset_user_config(self):
-        global userconfig_path, userconfig_rootpath
         ans = QMessageBox.warning(self, "Caution", "Are you sure you want to proceed?  All contents of your user configuration will be erased\n\nA backup of the configuration will be generated containing the current timestamp.", QMessageBox.Ok | QMessageBox.Cancel)
 
         if ans == QMessageBox.Ok:
@@ -2964,10 +1970,10 @@ class MainWindow(QMainWindow):
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M')
 
                 # Create the backup file name with the timestamp
-                backup_file = os.path.join(userconfig_rootpath, ('userconfig_' + timestamp + '.bak'))
+                backup_file = os.path.join(G.userconfig_rootpath, ('userconfig_' + timestamp + '.bak'))
 
                 # Copy the file to the backup file
-                shutil.copy(userconfig_path, backup_file)
+                shutil.copy(G.globals.userconfig_path, backup_file)
 
                 logging.debug(f"Backup created: {backup_file}")
 
@@ -2976,8 +1982,8 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, 'Error', f'There was an error resetting the config:\n\n{e}')
                 return
 
-            os.remove(userconfig_path)
-            utils.create_empty_userxml_file(userconfig_path)
+            os.remove(G.userconfig_path)
+            utils.create_empty_userxml_file(G.userconfig_path)
 
             logging.info(f"User config Reset:  Backup file created: {backup_file}")
         else:
@@ -3020,23 +2026,22 @@ class MainWindow(QMainWindow):
         )
 
     def device_logo_click_event(self):
-        global _launched_pedals, _launched_collective, _launched_collective
         # print("External function executed on label click")
         # print(self._current_config_scope)
         if self._current_config_scope == 'joystick':
-            if _launched_pedals or _device_type == 'pedals':
+            if G._launched_pedals or G._device_type == 'pedals':
                 self.change_config_scope(2)
-            elif _launched_collective or _device_type == 'collective':
+            elif G._launched_collective or G._device_type == 'collective':
                 self.change_config_scope(3)
         elif self._current_config_scope == 'pedals':
-            if _launched_collective or _device_type == 'collective':
+            if G._launched_collective or G._device_type == 'collective':
                 self.change_config_scope(3)
-            elif _launched_joystick or _device_type == 'joystick':
+            elif G._launched_joystick or G._device_type == 'joystick':
                 self.change_config_scope(1)
         elif self._current_config_scope == 'collective':
-            if _launched_joystick or _device_type == 'joystick':
+            if G._launched_joystick or G._device_type == 'joystick':
                 self.change_config_scope(1)
-            elif _launched_pedals or _device_type == 'pedals':
+            elif G._launched_pedals or G._device_type == 'pedals':
                 self.change_config_scope(2)
 
     def update_version_result(self, vers, url):
@@ -3078,7 +2083,7 @@ class MainWindow(QMainWindow):
         self.perform_update(auto=True)
 
     def change_config_scope(self, _arg):
-        global log_folder, log_file
+
         current_log_ts = log_file.split('_')[-1]
         if isinstance(_arg, str):
             if 'joystick' in _arg: arg = 1
@@ -3088,15 +2093,15 @@ class MainWindow(QMainWindow):
             arg = _arg
 
         if arg == 1:
-            xmlutils.update_vars('joystick', userconfig_path, defaults_path)
+            xmlutils.update_vars('joystick', G.userconfig_path, G.defaults_path)
             self._current_config_scope = 'joystick'
             new_device_logo = ':/image/logo_j.png'
         elif arg == 2:
-            xmlutils.update_vars('pedals', userconfig_path, defaults_path)
+            xmlutils.update_vars('pedals', G.userconfig_path, G.defaults_path)
             self._current_config_scope = 'pedals'
             new_device_logo = ':/image/logo_p.png'
         elif arg == 3:
-            xmlutils.update_vars('collective', userconfig_path, defaults_path)
+            xmlutils.update_vars('collective', G.userconfig_path, G.defaults_path)
             self._current_config_scope = 'collective'
             new_device_logo = ':/image/logo_c.png'
 
@@ -3104,7 +2109,7 @@ class MainWindow(QMainWindow):
         self.devicetype_label.setPixmap(pixmap)
         self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
 
-        if _master_instance:
+        if G._master_instance:
             self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
 
         # for file in os.listdir(log_folder):
@@ -3124,14 +2129,14 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         # Perform cleanup before closing the application
-        if _child_instance:
+        if G._child_instance:
             self.hide()
             event.ignore()
         else:
             exit_application()
 
     def reset_window_size(self):
-        match args.type:
+        match G.args.type:
             case 'joystick':
                 x_pos = 150
                 y_pos = 130
@@ -3145,8 +2150,8 @@ class MainWindow(QMainWindow):
         self.setGeometry(x_pos, y_pos, 530, 700)
 
     def load_main_window_geometry(self):
-        device_type = args.type
-        sys_settings = utils.read_system_settings(args.device, args.type)
+        device_type = G.args.type
+        sys_settings = utils.read_system_settings(G.args.device, G.args.type)
         if device_type == 'joystick':
             reg_key = 'jWindowData'
         elif device_type == 'pedals':
@@ -3179,8 +2184,8 @@ class MainWindow(QMainWindow):
             self.move(win_x, win_y)
 
     def force_sim_aircraft(self):
-        settings_mgr.current_sim = self.test_sim.currentText()
-        settings_mgr.current_aircraft_name = self.test_name.currentText()
+        G.settings_mgr.current_sim = self.test_sim.currentText()
+        G.settings_mgr.current_aircraft_name = self.test_name.currentText()
         self.settings_layout.expanded_items.clear()
         self.monitor_widget.hide()
         self.settings_layout.reload_caller()
@@ -3196,10 +2201,13 @@ class MainWindow(QMainWindow):
         dialog.show()
 
     def open_system_settings_dialog(self):
-        dialog = SystemSettingsDialog(self)
-        dialog.raise_()
-        dialog.activateWindow()
-        dialog.show()
+        try:
+            dialog = SystemSettingsDialog(self)
+            dialog.raise_()
+            dialog.activateWindow()
+            dialog.show()
+        except:
+            traceback.print_exc()
         # dialog.exec_()
 
     def open_sc_override_dialog(self):
@@ -3244,7 +2252,7 @@ class MainWindow(QMainWindow):
         if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier) and getattr(sys, 'frozen', False):
             os.startfile(sys._MEIPASS, 'open')
         else:
-            os.startfile(userconfig_rootpath, 'open')
+            os.startfile(G.userconfig_rootpath, 'open')
 
     def create_colored_icon(self, color, size):
         # Create a QPixmap with the specified color and size
@@ -3320,31 +2328,35 @@ class MainWindow(QMainWindow):
             log_window.show()
 
     def toggle_settings_window(self, dbg=False):
-        modifiers = QApplication.keyboardModifiers()
-        if ((modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier)) or dbg:
-            if self.test_craft_area.isVisible():
-                self.test_craft_area.hide()
-            else:
-                self.test_craft_area.show()
-        else:
-            if settings_mgr.isVisible():
-                settings_mgr.hide()
-            else:
-                settings_mgr.move(self.x() + 50, self.y() + 100)
-                settings_mgr.show()
-                logging.debug(f"# toggle settings window   sim:'{settings_mgr.current_sim}' ac:'{settings_mgr.current_aircraft_name}'")
-                if settings_mgr.current_aircraft_name != '':
-                    settings_mgr.currentmodel_click()
+        try:
+            modifiers = QApplication.keyboardModifiers()
+            if ((modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier)) or dbg:
+                if self.test_craft_area.isVisible():
+                    self.test_craft_area.hide()
                 else:
-                    settings_mgr.update_table_on_class_change()
+                    self.test_craft_area.show()
+            else:
+                sm = G.settings_mgr
+                if sm.isVisible():
+                    sm.hide()
+                else:
+                    sm.move(self.x() + 50, self.y() + 100)
+                    sm.show()
+                    logging.debug(f"# toggle settings window   sim:'{sm.current_sim}' ac:'{sm.current_aircraft_name}'")
+                    if sm.current_aircraft_name != '':
+                        sm.currentmodel_click()
+                    else:
+                        sm.update_table_on_class_change()
 
-                if settings_mgr.current_sim == '' or settings_mgr.current_sim == 'nothing':
-                    settings_mgr.update_table_on_sim_change()
+                    if sm.current_sim == '' or sm.current_sim == 'nothing':
+                        sm.update_table_on_sim_change()
+        except:
+            traceback.print_exc()
 
     def show_user_model_dialog(self):
         mprint("show_user_model_dialog")
         current_aircraft = self.cur_craft.text()
-        dialog = UserModelDialog(settings_mgr.current_sim, current_aircraft, settings_mgr.current_class, self)
+        dialog = UserModelDialog(G.settings_mgr.current_sim, current_aircraft, G.settings_mgr.current_class, self)
         result = dialog.exec_()
         if result == QtWidgets.QDialog.Accepted:
             # Handle accepted
@@ -3358,10 +2370,10 @@ class MainWindow(QMainWindow):
             pat_to_clone = dialog.models_combo_box.currentText()
             if pat_to_clone == '':
                 logging.info(f"New: {new_aircraft} {new_combo_box_value}")
-                xmlutils.write_models_to_xml(settings_mgr.current_sim, new_aircraft, new_combo_box_value, 'type', None)
+                xmlutils.write_models_to_xml(G.settings_mgr.current_sim, new_aircraft, new_combo_box_value, 'type', None)
             else:
                 logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
-                xmlutils.clone_pattern(settings_mgr.current_sim, pat_to_clone, new_aircraft)
+                xmlutils.clone_pattern(G.settings_mgr.current_sim, pat_to_clone, new_aircraft)
         else:
             # Handle canceled
             pass
@@ -3441,7 +2453,7 @@ class MainWindow(QMainWindow):
                 self.cb_joystick.setVisible(True)
                 self.cb_pedals.setVisible(True)
                 self.cb_collective.setVisible(True)
-                match args.type:
+                match G.args.type:
                     case 'joystick':
                         self.cb_joystick.setChecked(True)
                     case 'pedals':
@@ -3528,10 +2540,10 @@ class MainWindow(QMainWindow):
             active_effects = ""
             active_settings = []
 
-            if _master_instance and self._current_config_scope != _device_type:
+            if G._master_instance and self._current_config_scope != G._device_type:
                 dev = self._current_config_scope
-                active_effects = self._ipc_thread._ipc_telem_effects.get(f'{dev}_active_effects', '')
-                active_settings = self._ipc_thread._ipc_telem_effects.get(f'{dev}_active_settings', [])
+                active_effects = self.G._ipc_thread._ipc_telem_effects.get(f'{dev}_active_effects', '')
+                active_settings = self.G._ipc_thread._ipc_telem_effects.get(f'{dev}_active_settings', [])
             else:
                 for key in effects.dict.keys():
                     if effects[key].started:
@@ -3542,10 +2554,10 @@ class MainWindow(QMainWindow):
                         if settingname not in active_settings and settingname != '':
                             active_settings.append(settingname)
 
-            if args.child:
+            if G.args.child:
                 child_effects = str(effects.dict.keys())
                 if len(child_effects):
-                    self._ipc_thread.send_ipc_effects(active_effects, active_settings)
+                    self.G._ipc_thread.send_ipc_effects(active_effects, active_settings)
 
             window_mode = self.tab_widget.currentIndex()
             # update slider colors
@@ -3593,8 +2605,8 @@ class MainWindow(QMainWindow):
             else:
                 self.update_sim_indicators(data.get('src'), paused=is_paused)
 
-            shown_pattern = settings_mgr.current_pattern
-            if settings_mgr.current_pattern == '' and data.get('N', '') != '':
+            shown_pattern = G.settings_mgr.current_pattern
+            if G.settings_mgr.current_pattern == '' and data.get('N', '') != '':
                 shown_pattern = 'Using defaults'
                 self.new_craft_button.show()
             else:
@@ -3615,7 +2627,7 @@ class MainWindow(QMainWindow):
         if _release:
             return False
 
-        ignore_auto_updates = utils.read_system_settings(args.device, args.type).get('ignoreUpdate', False)
+        ignore_auto_updates = utils.read_system_settings(G.args.device, G.args.type).get('ignoreUpdate', False)
         if not auto:
             ignore_auto_updates = False
         update_ans = QMessageBox.No
@@ -3628,7 +2640,7 @@ class MainWindow(QMainWindow):
             logging.error(f'Error in perform_update: {e}')
         is_exe = getattr(sys, 'frozen', False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
         # is_exe = True
-        if is_exe and _update_available and not ignore_auto_updates and not _child_instance:
+        if is_exe and _update_available and not ignore_auto_updates and not G._child_instance:
             # vers, url = utils.fetch_latest_version()
             update_ans = QMessageBox.Yes
             if auto:
@@ -3669,774 +2681,6 @@ class MainWindow(QMainWindow):
         else:
             self.show_simvars = True
             self.show_simvar_action.setChecked(True)
-
-class SettingsLayout(QGridLayout):
-    expanded_items = []
-    prereq_list = []
-    ##########
-    # debug settings
-    show_slider_debug = False   # set to true for slider values shown
-    show_order_debug = False    # set to true for order numbers shown
-    bump_up = True              # set to false for no row bumping up
-
-    all_sliders = []
-
-    def __init__(self, parent=None, mainwindow=None):
-        super(SettingsLayout, self).__init__(parent)
-        result = None
-        if settings_mgr.current_sim != 'nothing':
-            a, b, result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
-
-        self.mainwindow = mainwindow
-        if result is not None:
-            self.build_rows(result)
-        self.device = HapticEffect()
-        self.setColumnMinimumWidth(7, 20)
-
-    def handleScrollKeyPressEvent(self, event):
-        # Forward key events to each slider in the layout
-        for i in range(self.count()):
-            item = self.itemAt(i)
-            if isinstance(item.widget(), NoWheelSlider()):
-                item.widget().handleKeyPressEvent(event)
-
-    def append_prereq_count(self, datalist):
-        for item in datalist:
-            item['prereq_count'] = ''
-            item['has_expander'] = ''
-            for pr in self.prereq_list:
-                if item['name'] == pr['prereq']:
-                    item['prereq_count'] = pr['count']
-            p_count = 0
-            if item['prereq_count'] != '':
-                p_count = int(item['prereq_count'])
-
-            if p_count > 1 or (p_count == 1 and item['hasbump'] != 'true'):
-                item['has_expander'] = 'true'
-
-    def has_bump(self, datalist):
-        for item in datalist:
-            item['hasbump'] = ''
-            bumped_up = item['order'][-2:] == '.1'
-            if bumped_up:
-                for b in datalist:
-                    if item['prereq'] == b['name']:
-                        b['hasbump'] = 'true'
-
-    def add_expanded(self, datalist):
-        for item in datalist:
-            item['parent_expanded'] = ''
-            for exp in self.expanded_items:
-                if item['prereq'] == exp:
-                    item['parent_expanded'] = 'true'
-                else:
-                    item['parent_expanded'] = 'false'
-
-    def is_visible(self, datalist):
-
-        for item in datalist:
-            bumped_up = item['order'][-2:] == '.1'
-            iv = 'false'
-            cond = ''
-            if item['prereq'] == '':
-                iv = 'true'
-                cond = 'no prereq needed'
-            else:
-                for p in datalist:
-                    if item['prereq'] == p['name']:
-                        if p['value'].lower() == 'true':
-                            if p['has_expander'].lower() == 'true':
-                                if p['name'] in self.expanded_items and p['is_visible'] == 'true':
-                                    iv = 'true'
-                                    cond = 'item parent expanded'
-                                else:
-                                    if p['hasbump'].lower() == 'true':
-                                        if bumped_up:
-                                            iv = 'true'
-                                            cond = 'parent hasbump & bumped'
-                            else:
-                                if p['is_visible'].lower() == 'true':
-                                    if p['hasbump'].lower() == 'true':
-                                        if bumped_up:
-                                            iv = 'true'
-                                            cond = 'parent hasbump & bumped no expander par vis'
-                        break
-
-            item['is_visible'] = iv
-            # for things not showing debugging:
-            # if iv.lower() == 'true':
-            #     print (f"{item['displayname']} visible because {cond}")
-
-    def eliminate_invisible(self, datalist):
-        newlist = []
-        for item in datalist:
-            if item['is_visible'] == 'true':
-                newlist.append(item)
-
-        for item in newlist:
-            item['prereq_count'] = '0'
-            pcount = 0
-            for row in newlist:
-                if row['prereq'] == item['name']:
-                    pcount += 1
-                    if row['has_expander'].lower() == 'true':
-                        pcount -= 1
-            item['prereq_count'] = str(pcount)
-
-        return newlist
-
-    def read_active_prereqs(self, datalist):
-        p_list = []
-        for item in datalist:
-            found = False
-            count = 0
-            for p in datalist:
-                if item['name'] == p['prereq']:
-                    count += 1
-                    found = True
-                # If 'prereq' is not in the list, add a new entry
-            if found:
-                p_list.append({'prereq': item['name'], 'value': 'False', 'count': count})
-        return p_list
-
-    def build_rows(self, datalist):
-        sorted_data = sorted(datalist, key=lambda x: float(x['order']))
-        # self.prereq_list = xmlutils.read_prereqs()
-        self.prereq_list = self.read_active_prereqs(sorted_data)
-        self.has_bump(sorted_data)
-        self.append_prereq_count(sorted_data)
-        self.add_expanded(sorted_data)
-        self.is_visible(sorted_data)
-        newlist = self.eliminate_invisible(sorted_data)
-
-        def is_expanded(item):
-            if item['name'] in self.expanded_items:
-                return True
-            for row in sorted_data:
-                if row['name'] == item['prereq'] and is_expanded(row):
-                    return True
-            return False
-
-        i = 0
-        for item in newlist:
-            bumped_up = item['order'][-2:] == '.1'
-            rowdisabled = False
-            addrow = False
-            is_expnd = is_expanded(item)
-            # print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
-            if item['is_visible'].lower() == 'true':
-                i += 1
-                if bumped_up:
-                    if self.bump_up:  # debug
-                        i -= 1   # bump .1 setting onto the enable row
-                self.generate_settings_row(item, i, rowdisabled)
-
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.addItem(spacerItem, i+1, 1, 1, 1)
-        # Give entry column a high stretch factor, all others remain default 0.
-        # When window is resized, the entry column will grow to take up all the new space
-        self.setColumnStretch(4, 10)
-
-        # print (f"{i} rows with {self.count()} widgets")
-
-    def reload_caller(self):
-        # self.mainwindow.settings_area.setUpdatesEnabled(False)
-        # pos = self.mainwindow.settings_area.verticalScrollBar().value()
-        self.reload_layout(None)
-        # QTimer.singleShot(150, lambda: self.mainwindow.set_scrollbar(pos))
-        # self.mainwindow.settings_area.setUpdatesEnabled(True)
-
-    def reload_layout(self, result=None):
-        self.clear_layout()
-        if result is None:
-            cls, pat, result = xmlutils.read_single_model(settings_mgr.current_sim, settings_mgr.current_aircraft_name)
-            settings_mgr.current_pattern = pat
-        if result is not None:
-            self.build_rows(result)
-
-    def clear_layout(self):
-        while self.count():
-            item = self.takeAt(0)
-            widget = item.widget()
-            if widget:
-                self.removeWidget(widget)
-                widget.deleteLater()
-
-    def generate_settings_row(self, item, i, rowdisabled=False):
-        self.setRowMinimumHeight(i, 25)
-        entry_colspan = 2
-        lbl_colspan = 2
-
-        exp_col = 0
-        chk_col = 1
-        lbl_col = 2
-        entry_col = 4
-        unit_col = 5
-        val_col = 6
-        erase_col = 7
-        fct_col = 10
-        ord_col = 11
-
-        validvalues = item['validvalues'].split(',')
-
-        if self.show_order_debug:
-            order_lbl = QLabel()
-            order_lbl.setText(item['order'])
-            order_lbl.setMaximumWidth(30)
-            self.addWidget(order_lbl, i, ord_col)
-
-        # booleans get a checkbox
-        if item['datatype'] == 'bool':
-            checkbox = QCheckBox("")
-            checkbox.setMaximumSize(QtCore.QSize(14, 20))
-            checkbox.setMinimumSize(QtCore.QSize(14, 20))
-            checkbox.setObjectName(f"cb_{item['name']}")
-            checkbox.blockSignals(True)
-            if item['value'].lower() == 'false':
-                checkbox.setCheckState(0)
-                rowdisabled = True
-            else:
-                checkbox.setCheckState(2)
-            checkbox.blockSignals(False)
-            if item['prereq'] != '':
-                chk_col += 1
-            self.addWidget(checkbox, i, chk_col)
-            checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
-
-        if item['unit'] is not None and item['unit'] != '':
-            entry_colspan = 1
-            unit_dropbox = QComboBox()
-            unit_dropbox.blockSignals(True)
-            if item['unit'] == 'hz':
-                unit_dropbox.addItem('hz')
-                unit_dropbox.setCurrentText('hz')
-            elif item['unit'] == 'deg':
-                unit_dropbox.addItem('deg')
-                unit_dropbox.setCurrentText('deg')
-            else:
-                unit_dropbox.addItems(validvalues)
-                unit_dropbox.setCurrentText(item['unit'])
-            unit_dropbox.setObjectName(f"ud_{item['name']}")
-            unit_dropbox.currentIndexChanged.connect(self.unit_dropbox_changed)
-            self.addWidget(unit_dropbox, i, unit_col)
-            unit_dropbox.blockSignals(False)
-            unit_dropbox.setDisabled(rowdisabled)
-
-        # everything has a name, except for things that have a checkbox *and* slider
-        label = InfoLabel(f"{item['displayname']}")
-        label.setToolTip(item['info'])
-        label.setMinimumHeight(20)
-        label.setMinimumWidth(20)
-        # label.setMaximumWidth(150)
-        if item['order'][-2:] == '.1':
-            olditem = self.itemAtPosition(i, lbl_col)
-            if olditem is not None:
-                self.remove_widget(olditem)
-            # for p_item in self.prereq_list:
-            #     if p_item['prereq'] == item['prereq'] and p_item['count'] == 1:
-            #         olditem = self.itemAtPosition(i, self.exp_col)
-            #         if olditem is not None:
-            #             self.remove_widget(olditem)
-        if item['prereq'] != '' and item['hasbump'] != 'true' and item['order'][-2:] != '.1':
-            # label.setStyleSheet("QLabel { padding-left: 20px; }")
-            lbl_colspan = 1
-            lbl_col += 1
-        self.addWidget(label, i, lbl_col, 1, lbl_colspan)
-
-        slider = NoWheelSlider()
-        slider.setOrientation(QtCore.Qt.Horizontal)
-        slider.setObjectName(f"sld_{item['name']}")
-
-        d_slider = NoWheelSlider()
-        d_slider.setOrientation(QtCore.Qt.Horizontal)
-        d_slider.setObjectName(f"dsld_{item['name']}")
-
-        df_slider = NoWheelSlider()
-        df_slider.setOrientation(QtCore.Qt.Horizontal)
-        df_slider.setObjectName(f"dfsld_{item['name']}")
-
-        line_edit = QLineEdit()
-        line_edit.blockSignals(True)
-        # unit?
-        line_edit.setText(item['value'])
-        line_edit.blockSignals(False)
-        line_edit.setAlignment(Qt.AlignHCenter)
-        line_edit.setObjectName(f"vle_{item['name']}")
-        line_edit.setMinimumWidth(150)
-        line_edit.editingFinished.connect(self.line_edit_changed)
-
-        expand_button = QToolButton()
-        if item['name'] in self.expanded_items:
-            expand_button.setArrowType(Qt.DownArrow)
-        else:
-            expand_button.setArrowType(Qt.RightArrow)
-        expand_button.setMaximumWidth(24)
-        expand_button.setMinimumWidth(24)
-        expand_button.setObjectName(f"ex_{item['name']}")
-        expand_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        expand_button.clicked.connect(self.expander_clicked)
-
-        usb_button_text = f"Button {item['value']}"
-        if item['value'] == '0':
-            usb_button_text = 'Click to Configure'
-        self.usbdevice_button = QPushButton(usb_button_text)
-        self.usbdevice_button.setMinimumWidth(150)
-        self.usbdevice_button.setObjectName(f"pb_{item['name']}")
-        self.usbdevice_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        self.usbdevice_button.clicked.connect(self.usb_button_clicked)
-
-        value_label = QLabel()
-        value_label.setAlignment(Qt.AlignVCenter)
-        value_label.setMaximumWidth(50)
-        value_label.setObjectName(f"vl_{item['name']}")
-        sliderfactor = QLabel(f"{item['sliderfactor']}")
-        if self.show_slider_debug:
-            sliderfactor.setMaximumWidth(20)
-        else:
-            sliderfactor.setMaximumWidth(0)
-        sliderfactor.setObjectName(f"sf_{item['name']}")
-
-        if item['datatype'] == 'float' or \
-                item['datatype'] == 'negfloat':
-
-            # print(f"label {value_label.objectName()} for slider {slider.objectName()}")
-            factor = float(item['sliderfactor'])
-            if '%' in item['value']:
-                floatval = float(item['value'].replace('%', ''))
-                val = floatval / 100
-            else:
-                val = float(item['value'])
-
-            pctval = int((val / factor) * 100)
-            if self.show_slider_debug:
-                logging.debug(f"read value: {item['value']}  factor: {item['sliderfactor']} slider: {pctval}")
-            slider.blockSignals(True)
-            if validvalues is None or validvalues == '':
-                pass
-            else:
-                slider.setRange(int(validvalues[0]), int(validvalues[1]))
-            slider.setValue(pctval)
-            value_label.setText(str(pctval) + '%')
-            # value_label.setToolTip(f"Actual Value: %{int(val * 100)}")
-            slider.valueChanged.connect(self.slider_changed)
-            slider.sliderPressed.connect(self.sldDisconnect)
-            slider.sliderReleased.connect(self.sldReconnect)
-            self.addWidget(slider, i, entry_col, 1, entry_colspan)
-            self.addWidget(value_label, i, val_col, alignment=Qt.AlignVCenter)
-            self.addWidget(sliderfactor, i, fct_col)
-
-            slider.blockSignals(False)
-
-        if item['datatype'] == 'd_float':
-
-            d_val = float(item['value'])
-            factor = float(item['sliderfactor'])
-            val = float(round(d_val / factor))
-            if self.show_slider_debug:
-                print(f"read value: {item['value']}   df_slider: {val}")
-            df_slider.blockSignals(True)
-            if validvalues is None or validvalues == '':
-                pass
-            else:
-                df_slider.setRange(int(validvalues[0]), int(validvalues[1]))
-            df_slider.setValue(round(val))
-            value_label.setText(str(d_val))
-            df_slider.valueChanged.connect(self.df_slider_changed)
-            df_slider.sliderPressed.connect(self.sldDisconnect)
-            df_slider.sliderReleased.connect(self.df_sldReconnect)
-            self.addWidget(df_slider, i, entry_col, 1, entry_colspan)
-            self.addWidget(value_label, i, val_col)
-            self.addWidget(sliderfactor, i, fct_col)
-            df_slider.blockSignals(False)
-
-        if item['datatype'] == 'cfgfloat':
-
-            # print(f"label {value_label.objectName()} for slider {slider.objectName()}")
-
-            if '%' in item['value']:
-                pctval = int(item['value'].replace('%', ''))
-            else:
-                pctval = int(float(item['value']) * 100)
-            pctval = int(round(pctval))
-            # print (f"configurator value: {item['value']}   slider: {pctval}")
-            slider.blockSignals(True)
-            if validvalues is None or validvalues == '':
-                pass
-            else:
-                slider.setRange(int(validvalues[0]), int(validvalues[1]))
-            slider.setValue(pctval)
-            value_label.setText(str(pctval) + '%')
-            slider.valueChanged.connect(self.cfg_slider_changed)
-            slider.sliderPressed.connect(self.sldDisconnect)
-            slider.sliderReleased.connect(self.cfg_sldReconnect)
-            self.addWidget(slider, i, entry_col, 1, entry_colspan)
-            self.addWidget(value_label, i, val_col)
-            self.addWidget(sliderfactor, i, fct_col)
-
-            slider.blockSignals(False)
-
-        if item['datatype'] == 'd_int':
-
-            d_val = int(item['value'])
-            factor = float(item['sliderfactor'])
-            val = int(round(d_val / factor))
-            if self.show_slider_debug:
-                print(f"read value: {item['value']}   d_slider: {val}")
-            d_slider.blockSignals(True)
-            if validvalues is None or validvalues == '':
-                pass
-            else:
-                d_slider.setRange(int(validvalues[0]), int(validvalues[1]))
-            d_slider.setValue(val)
-            value_label.setText(str(d_val))
-            d_slider.valueChanged.connect(self.d_slider_changed)
-            d_slider.sliderPressed.connect(self.sldDisconnect)
-            d_slider.sliderReleased.connect(self.d_sldReconnect)
-            self.addWidget(d_slider, i, entry_col, 1, entry_colspan)
-            self.addWidget(value_label, i, val_col)
-            self.addWidget(sliderfactor, i, fct_col)
-
-            d_slider.blockSignals(False)
-
-        if item['datatype'] == 'text':
-            textbox = QLineEdit()
-            textbox.setObjectName(f"le_{item['name']}")
-            textbox.setText(item['value'])
-            textbox.editingFinished.connect(self.textbox_changed)
-            self.addWidget(textbox, i, entry_col, 1, entry_colspan)
-
-        if item['datatype'] == 'list' or item['datatype'] == 'anylist':
-            dropbox = QComboBox()
-            dropbox.setMinimumWidth(150)
-            dropbox.setEditable(True)
-            dropbox.lineEdit().setAlignment(QtCore.Qt.AlignHCenter)
-            dropbox.setObjectName(f"db_{item['name']}")
-            dropbox.addItems(validvalues)
-            dropbox.blockSignals(True)
-            dropbox.setCurrentText(item['value'])
-            if item['datatype'] == 'list':
-                dropbox.lineEdit().setReadOnly(True)
-                dropbox.editTextChanged.connect(self.dropbox_changed)
-            else:
-                dropbox.currentTextChanged.connect(self.dropbox_changed)
-            dropbox.blockSignals(False)
-            self.addWidget(dropbox, i, entry_col, 1, entry_colspan)
-            # dropbox.currentTextChanged.connect(self.dropbox_changed)
-
-        if item['datatype'] == 'path':
-            browse_button = QPushButton()
-            browse_button.blockSignals(True)
-            browse_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-            browse_button.setMinimumWidth(150)
-            if item['value'] == '-':
-                browse_button.setText('Browse...')
-            else:
-                fname = os.path.basename(item['value'])
-                button_text = fname
-                browse_button.setToolTip(item['value'])
-                # p_length = len(item['value'])
-                # if p_length > 45:
-                #     button_text = f"{button_text[:40]}...{button_text[-25:]}"
-                browse_button.setText(button_text)
-            browse_button.blockSignals(False)
-            browse_button.setMaximumHeight(25)
-            browse_button.clicked.connect(self.browse_for_config)
-            self.addWidget(browse_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
-
-        if item['datatype'] == 'int' or item['datatype'] == 'anyfloat':
-            self.addWidget(line_edit, i, entry_col, 1, entry_colspan)
-
-        if item['datatype'] == 'button':
-            self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
-
-        if item['has_expander'] == 'true' and item['prereq'] != '':
-            exp_col += 1
-        if not rowdisabled:
-            # for p_item in self.prereq_list:
-            #     if p_item['prereq'] == item['name'] : # and p_item['count'] > 1:
-            p_count = 0
-            if item['prereq_count'] != '':
-                p_count = int(item['prereq_count'])
-
-            if item['has_expander'].lower() == 'true':
-                if item['name'] in self.expanded_items:
-                    row_count = p_count
-                    if item['hasbump'].lower() != 'true':
-                        row_count += 1
-                    expand_button.setMaximumHeight(200)
-                    # self.addWidget(expand_button, i, exp_col, row_count, 1)
-                    self.addWidget(expand_button, i, exp_col)
-                else:
-                    self.addWidget(expand_button, i, exp_col)
-
-        label.setDisabled(rowdisabled)
-        slider.setDisabled(rowdisabled)
-        d_slider.setDisabled(rowdisabled)
-        df_slider.setDisabled(rowdisabled)
-        line_edit.setDisabled(rowdisabled)
-        expand_button.setDisabled(rowdisabled)
-
-        self.parent().parent().parent().addSlider(slider)
-        self.parent().parent().parent().addSlider(d_slider)
-        self.parent().parent().parent().addSlider(df_slider)
-
-        erase_button = QToolButton()
-        erase_button.setObjectName(f"eb_{item['name']}")
-        pixmapi = QStyle.SP_DockWidgetCloseButton
-        icon = erase_button.style().standardIcon(pixmapi)
-
-        erase_button.clicked.connect(lambda _, name=item['name']: self.erase_setting(name))
-        erase_button.setIcon(QIcon())
-
-        erase_button.setToolTip("")
-        self.addWidget(erase_button, i, erase_col)
-        sp_retain = erase_button.sizePolicy()
-        sp_retain.setRetainSizeWhenHidden(True)
-        erase_button.setSizePolicy(sp_retain)
-
-        erase_button.setVisible(False)
-        if item['replaced'] == 'Model (user)':
-            if item['name'] != 'type':  # dont erase type on mainwindow settings
-                erase_button.setIcon(icon)
-                erase_button.setVisible(True)
-                erase_button.setToolTip("Reset to Default")
-
-        self.setRowStretch(i, 0)
-
-    def remove_widget(self, olditem):
-        widget = olditem.widget()
-        if widget is not None:
-            widget.deleteLater()
-            self.removeWidget(widget)
-
-    def checkbox_changed(self, name, state):
-        logging.debug(f"Checkbox {name} changed. New state: {state}")
-        value = 'false' if state == 0 else 'true'
-        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, name)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def erase_setting(self, name):
-        logging.debug(f"Erase {name} clicked")
-        xmlutils.erase_models_from_xml(settings_mgr.current_sim, settings_mgr.current_pattern, name)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def browse_for_config(self):
-        options = QFileDialog.Options()
-        # options |= QFileDialog.DontUseNativeDialog
-        calling_button = self.sender()
-        starting_dir = os.getcwd()
-        if calling_button:
-            tooltip_text = calling_button.toolTip()
-            print(f"Tooltip text of the calling button: {tooltip_text}")
-            if os.path.isfile(tooltip_text):
-                # Use the existing file path as the starting point
-                starting_dir = os.path.dirname(tooltip_text)
-
-        # Open the file browser dialog
-        file_path, _ = QFileDialog.getOpenFileName(self.mainwindow, "Choose File", starting_dir, "vpconf Files (*.vpconf)", options=options)
-
-        if file_path:
-            cfg_scope = xmlutils.device
-            key = "pid" + cfg_scope.capitalize()
-            pid = system_settings.get(key, '')
-
-            if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
-                lprint(f"Selected File: {file_path}")
-                xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, file_path, 'vpconf')
-                if settings_mgr.timedOut:
-                    self.reload_caller()
-
-    def textbox_changed(self):
-        setting_name = self.sender().objectName().replace('le_', '')
-        value = self.sender().text()
-        logging.debug(f"Textbox {setting_name} changed. New value: {value}")
-        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def dropbox_changed(self):
-        setting_name = self.sender().objectName().replace('db_', '')
-        value = self.sender().currentText()
-        logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
-        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def unit_dropbox_changed(self):
-        setting_name = self.sender().objectName().replace('ud_', '')
-        line_edit_name = 'vle_' + self.sender().objectName().replace('ud_', '')
-        line_edit = self.mainwindow.findChild(QLineEdit, line_edit_name)
-        value = ''
-        unit = self.sender().currentText()
-        if line_edit is not None:
-            value = line_edit.text()
-        logging.debug(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
-        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def line_edit_changed(self):
-        setting_name = self.sender().objectName().replace('vle_', '')
-        unit_dropbox_name = 'ud_' + self.sender().objectName().replace('vle_', '')
-        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
-        unit = ''
-        if unit_dropbox is not None:
-            unit = unit_dropbox.currentText()
-        value = self.sender().text()
-        logging.debug(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
-        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value, setting_name, unit)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def expander_clicked(self):
-        logging.debug(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
-        settingname = self.sender().objectName().replace('ex_', '')
-        if self.sender().arrowType() == Qt.RightArrow:
-            # print ('expanded')
-
-            self.expanded_items.append(settingname)
-            self.sender().setArrowType(Qt.DownArrow)
-
-            self.reload_caller()
-        else:
-            # print ('collapsed')
-            new_exp_items = []
-            for ex in self.expanded_items:
-                if ex != settingname:
-                    new_exp_items.append(ex)
-            self.expanded_items = new_exp_items
-            self.sender().setArrowType(Qt.DownArrow)
-
-            self.reload_caller()
-
-    def usb_button_clicked(self):
-        button_name = self.sender().objectName().replace('pb_', '')
-        the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
-        the_button.setText("Push a button! ")
-        # listen for button loop
-        # Start a thread to fetch button press with a timeout
-        self.thread = ButtonPressThread(self.device, self.sender())
-        self.thread.button_pressed.connect(self.update_button)
-        self.thread.start()
-
-    def update_button(self, button_name, value):
-        the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
-        the_button.setText(str(value))
-        if str(value) != '0':
-            xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def slider_changed(self):
-        setting_name = self.sender().objectName().replace('sld_', '')
-        value_label_name = 'vl_' + self.sender().objectName().replace('sld_', '')
-        sliderfactor_name = 'sf_' + self.sender().objectName().replace('sld_', '')
-        value_label = self.mainwindow.findChild(QLabel, value_label_name)
-        sliderfactor_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
-        value = 0
-        factor = 1.0
-        if value_label is not None:
-            value_label.setText(str(self.sender().value()) + '%')
-            value = int(self.sender().value())
-        if sliderfactor_label is not None:
-            factor = float(sliderfactor_label.text())
-        value_to_save = str(round(value * factor / 100, 4))
-        if self.show_slider_debug:
-            logging.debug(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
-        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def cfg_slider_changed(self):
-        setting_name = self.sender().objectName().replace('sld_', '')
-        value_label_name = 'vl_' + self.sender().objectName().replace('sld_', '')
-
-        value_label = self.mainwindow.findChild(QLabel, value_label_name)
-        value = 0
-        factor = 1.0
-        if value_label is not None:
-            value_label.setText(str(self.sender().value()) + '%')
-            value = int(self.sender().value())
-
-        value_to_save = str(round(value / 100, 4))
-        if self.show_slider_debug:
-            logging.debug(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
-        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def d_slider_changed(self):
-        setting_name = self.sender().objectName().replace('dsld_', '')
-        value_label_name = 'vl_' + self.sender().objectName().replace('dsld_', '')
-        sliderfactor_name = 'sf_' + self.sender().objectName().replace('dsld_', '')
-        unit_dropbox_name = 'ud_' + self.sender().objectName().replace('dsld_', '')
-        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
-        unit = ''
-        if unit_dropbox is not None:
-            unit = unit_dropbox.currentText()
-        value_label = self.mainwindow.findChild(QLabel, value_label_name)
-        sliderfactor_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
-        factor = 1
-        if sliderfactor_label is not None:
-            factor = float(sliderfactor_label.text())
-        if value_label is not None:
-            value = self.sender().value()
-            value_to_save = str(round(value * factor))
-            value_label.setText(value_to_save)
-        if self.show_slider_debug:
-            logging.debug(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
-        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    def df_slider_changed(self):
-        setting_name = self.sender().objectName().replace('dfsld_', '')
-        value_label_name = 'vl_' + self.sender().objectName().replace('dfsld_', '')
-        sliderfactor_name = 'sf_' + self.sender().objectName().replace('dfsld_', '')
-        unit_dropbox_name = 'ud_' + self.sender().objectName().replace('dfsld_', '')
-        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
-        unit = ''
-        if unit_dropbox is not None:
-            unit = unit_dropbox.currentText()
-        value_label = self.mainwindow.findChild(QLabel, value_label_name)
-        sliderfactor_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
-        factor = 1
-        if sliderfactor_label is not None:
-            factor = float(sliderfactor_label.text())
-        if value_label is not None:
-            value = self.sender().value()
-            value_to_save = str(round(value * factor, 2))
-            value_label.setText(value_to_save)
-        if self.show_slider_debug:
-            logging.debug(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
-        xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, value_to_save, setting_name, unit)
-        if settings_mgr.timedOut:
-            self.reload_caller()
-
-    # prevent slider from sending values as you drag
-    def sldDisconnect(self):
-        self.sender().valueChanged.disconnect()
-
-    # reconnect slider after you let go
-    def sldReconnect(self):
-        self.sender().valueChanged.connect(self.slider_changed)
-        self.sender().valueChanged.emit(self.sender().value())
-
-    def cfg_sldReconnect(self):
-        self.sender().valueChanged.connect(self.cfg_slider_changed)
-        self.sender().valueChanged.emit(self.sender().value())
-
-    def d_sldReconnect(self):
-        self.sender().valueChanged.connect(self.d_slider_changed)
-        self.sender().valueChanged.emit(self.sender().value())
-
-    def df_sldReconnect(self):
-        self.sender().valueChanged.connect(self.df_slider_changed)
-        self.sender().valueChanged.emit(self.sender().value())
-
-
 
 class LogTailer(QThread):
     log_updated = pyqtSignal(str)
@@ -4490,32 +2734,6 @@ class LogTailer(QThread):
         self.resume()  # Resume tailing with the new log file
 
 
-def validate_vpconf_profile(file, pid=_device_pid, dev_type=_device_type, silent=False):
-    try:
-        with open(file, 'r') as f:
-            config_data = json.load(f)
-    except:
-        if not silent:
-            QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
-        return False
-    cfg_pid = config_data.get('config', {}).get('usb_pid', 'unknown')
-    if cfg_pid == 'unknown':
-        if not silent:
-            QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
-        return False
-    cfg_pid = format(cfg_pid, 'x')
-    cfg_serial = config_data.get('serial_number', 'unknown')
-    cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
-    if cfg_serial == 'unknown':
-        return False
-    if cfg_pid == pid:
-        return True
-    else:
-        if not silent:
-            QMessageBox.warning(window, "Wrong Device", f"The VPforce Configurator file you selected does not match the device you are trying to assign it to\n\nFile={file}\n\nThis instance is currently configuring:\n{dev_type}\npid= {pid}\n\nThe chosen profile is for\npid= {cfg_pid}\nname= {cfg_device_name}\nserial= {cfg_serial}")
-        return False
-
-
 def set_vpconf_profile(config, serial):
     vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
     # serial = HapticEffect.device.serial
@@ -4540,54 +2758,51 @@ def set_vpconf_profile(config, serial):
         logging.error("Unable to find VPforce Configurator installation location")
 
 def load_custom_userconfig(new_path=''):
-    global userconfig_rootpath, userconfig_path, settings_mgr, defaults_path, window
     print(f"newpath=>{new_path}<")
     if new_path == '':
         options = QFileDialog.Options()
         file_path, _ = QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)", options=options)
         if file_path == '':
             return
-        userconfig_rootpath = os.path.basename(file_path)
-        userconfig_path = file_path
+        G.userconfig_rootpath = os.path.basename(file_path)
+        G.userconfig_path = file_path
     else:
-        userconfig_rootpath = os.path.basename(new_path)
-        userconfig_path = new_path
-    xmlutils.update_vars(_device_type, _userconfig_path=userconfig_path, _defaults_path=defaults_path)
-    settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path, system_settings=system_settings)
-    logging.info(f"Custom Configuration was loaded via debug menu: {userconfig_path}")
-    if _master_instance and _launched_children:
-        _ipc_thread.send_broadcast_message(f"LOADCONFIG:{userconfig_path}")
+        G.userconfig_rootpath = os.path.basename(new_path)
+        G.userconfig_path = new_path
+    xmlutils.update_vars(G._device_type, _userconfig_path=G.userconfig_path, _defaults_path=G.defaults_path)
+    G.settings_mgr = SettingsWindow(datasource="Global", device=G.args.type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
+    logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
+    if G._master_instance and G._launched_children:
+        G._ipc_thread.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
 
 def hide_window():
-    global window
+
     try:
-        window.hide()
+        G.window.hide()
     except Exception as e:
         logging.error(f"EXCEPTION: {e}")
 
 
 def exit_application():
-    global window
     # Perform any cleanup or save operations here
     save_main_window_geometry()
     QCoreApplication.instance().quit()
 
 
 def save_main_window_geometry():
-    global window
     # Capture the mai n window's geometry
-    device_type = _device_type
-    cur_index = window.tab_widget.currentIndex()
-    window.tab_sizes[str(cur_index)]['width'] = window.width()
-    window.tab_sizes[str(cur_index)]['height'] = window.height()
+    device_type = G._device_type
+    cur_index = G.window.tab_widget.currentIndex()
+    G.window.tab_sizes[str(cur_index)]['width'] = G.window.width()
+    G.window.tab_sizes[str(cur_index)]['height'] = G.window.height()
 
     window_dict = {
         'WindowPosition': {
-            'x': window.pos().x(),
-            'y': window.pos().y(),
+            'x': G.window.pos().x(),
+            'y': G.window.pos().y(),
         },
-        'Tab': window.tab_widget.currentIndex(),
-        'TabSizes': window.tab_sizes
+        'Tab': G.window.tab_widget.currentIndex(),
+        'TabSizes': G.window.tab_sizes
     }
     if device_type == 'joystick':
         reg_key = 'jWindowData'
@@ -4600,12 +2815,11 @@ def save_main_window_geometry():
 
 
 def send_test_message():
-    global _ipc_running, _ipc_thread, _child_ipc_ports, _master_instance
-    if _ipc_running:
-        if _master_instance:
-            _ipc_thread.send_broadcast_message("TEST MESSAGE TO ALL")
+    if G._ipc_running:
+        if G._master_instance:
+            G._ipc_thread.send_broadcast_message("TEST MESSAGE TO ALL")
         else:
-            _ipc_thread.send_message("TEST MESSAGE")
+            G._ipc_thread.send_message("TEST MESSAGE")
 
 
 def select_sim_for_conversion(window, aircraft_name):
@@ -4634,7 +2848,7 @@ def select_sim_for_conversion(window, aircraft_name):
         return None
 
 
-def config_to_dict(section, name, value, isim='', device=args.type, new_ac=False):
+def config_to_dict(section, name, value, isim='', device=G.args.type, new_ac=False):
     classes = ['PropellerAircraft', 'JetAircraft', 'TurbopropAircraft', 'Glider', 'Helicopter', 'HPGHelicopter']
     sim = ''
     cls = ''
@@ -4703,7 +2917,7 @@ def convert_system_settings(sys_dict):
         'il2_path': 'pathIL2',
     }
 
-    def_dev_dict, def_sys_dict = utils.get_default_sys_settings(args.device, args.type)
+    def_dev_dict, def_sys_dict = utils.get_default_sys_settings(G.args.device, G.args.type)
 
     sys_dict = utils.sanitize_dict(sys_dict)
     for key, value in sys_dict.items():  # iterate through the values in the ini user config
@@ -4723,7 +2937,7 @@ def convert_system_settings(sys_dict):
     formatted_dev_dict = json.dumps(def_dev_dict)
     formatted_sys_dict = json.dumps(def_sys_dict)
     utils.set_reg('Sys', formatted_sys_dict)
-    utils.set_reg(f'{args.type}Sys', formatted_dev_dict)
+    utils.set_reg(f'{G.args.type}Sys', formatted_dev_dict)
     # sys_out = {}
     # for key, value in sys_dict.items():
     #     reg_key = map_dict.get(key, None)
@@ -4781,7 +2995,7 @@ def convert_settings(cfg=_legacy_config_file, usr=_legacy_override_file, window=
                 if key == "type":
                     dev = "any"
                 else:
-                    dev = args.type
+                    dev = G.args.type
                 dif_item = config_to_dict(section, key, valuestring, isim=sim, device=dev, new_ac=True)
                 differences.append(dif_item)
 
@@ -4789,7 +3003,7 @@ def convert_settings(cfg=_legacy_config_file, usr=_legacy_override_file, window=
     return True
 
 def autoconvert_config(main_window, cfg=_legacy_config_file, usr=_legacy_override_file):
-    if _child_instance: return
+    if G._child_instance: return
     if usr is not None:
         ans = QMessageBox.information(
             main_window,
@@ -4837,67 +3051,66 @@ def autoconvert_config(main_window, cfg=_legacy_config_file, usr=_legacy_overrid
 
 
 def restart_sims():
-    global window, _device_pid, _device_type
     sim_list = ['DCS', 'MSFS', 'IL2', 'XPLANE']
-    sys_settings = utils.read_system_settings(args.device, _device_type)
+    sys_settings = utils.read_system_settings(G.args.device, G._device_type)
     stop_sims()
     init_sims()
-    window.init_sim_indicators(sim_list, sys_settings)
+    G.window.init_sim_indicators(sim_list, sys_settings)
 
 
 def init_sims():
-    global dcs_telem, il2_telem, sim_connect_telem, telem_manager, xplane_telem
+    global dcs_telem, il2_telem, sim_connect_telem, xplane_telem
 
-    xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE', False)
+    xplane_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableXPLANE', False)
 
-    xplane_telem = NetworkThread(telem_manager, host='', port=34390)
+    xplane_telem = NetworkThread(G.telem_manager, host='', port=34390)
     # xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE', False)
-    if xplane_enabled or args.sim == 'XPLANE':
-        if not _child_instance and utils.read_system_settings(args.device, args.type).get('validateXPLANE', False):
-            xplane_path = utils.read_system_settings(args.device, args.type).get('pathXPLANE', '')
-            utils.install_xplane_plugin(xplane_path, window)
+    if xplane_enabled or G.args.sim == 'XPLANE':
+        if not G._child_instance and utils.read_system_settings(G.args.device, G.args.type).get('validateXPLANE', False):
+            xplane_path = utils.read_system_settings(G.args.device, G.args.type).get('pathXPLANE', '')
+            utils.install_xplane_plugin(xplane_path, G.window)
         logging.info("Starting XPlane Telemetry Listener")
         xplane_telem.start()
 
-    dcs_telem = NetworkThread(telem_manager, host="", port=34380)
+    dcs_telem = NetworkThread(G.telem_manager, host="", port=34380)
     # dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
-    dcs_enabled = utils.read_system_settings(args.device, args.type).get('enableDCS', False)
-    if dcs_enabled or args.sim == "DCS":
+    dcs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableDCS', False)
+    if dcs_enabled or G.args.sim == "DCS":
         # check and install/update export lua script
-        if not _child_instance:
-            utils.install_export_lua(window)
+        if not G._child_instance:
+            utils.install_export_lua(G.window)
         logging.info("Starting DCS Telemetry Listener")
         dcs_telem.start()
 
     il2_mgr = IL2Manager()
     # il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
-    il2_port = int(utils.read_system_settings(args.device, args.type).get('portIL2', 34385))
+    il2_port = int(utils.read_system_settings(G.args.device, G.args.type).get('portIL2', 34385))
     # il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
-    il2_path = utils.read_system_settings(args.device, args.type).get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    il2_path = utils.read_system_settings(G.args.device, G.args.type).get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
     # il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
-    il2_validate = utils.read_system_settings(args.device, args.type).get('validateIL2', True)
-    il2_telem = NetworkThread(telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
+    il2_validate = utils.read_system_settings(G.args.device, G.args.type).get('validateIL2', True)
+    il2_telem = NetworkThread(G.telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
 
     # il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
-    il2_enabled = utils.read_system_settings(args.device, args.type).get('enableIL2', False)
+    il2_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableIL2', False)
 
-    if il2_enabled or args.sim == "IL2":
-        if not _child_instance:
+    if il2_enabled or G.args.sim == "IL2":
+        if not G._child_instance:
             if il2_validate:
-                utils.analyze_il2_config(il2_path, port=il2_port, window=window)
+                utils.analyze_il2_config(il2_path, port=il2_port, window=G.window)
             else:
                 logging.warning(
                     "IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
         logging.info("Starting IL2 Telemetry Listener")
         il2_telem.start()
 
-    sim_connect_telem = SimConnectSock(telem_manager)
-    msfs = utils.read_system_settings(args.device, args.type).get('enableMSFS', False)
+    sim_connect_telem = SimConnectSock(G.telem_manager)
+    msfs = utils.read_system_settings(G.args.device, G.args.type).get('enableMSFS', False)
 
     try:
         # msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
         logging.debug(f"MSFS={msfs}")
-        if msfs or args.sim == "MSFS":
+        if msfs or G.args.sim == "MSFS":
             logging.info("MSFS Enabled:  Starting Simconnect Manager")
             sim_connect_telem.start()
             aircrafts_msfs_xp.Aircraft.set_simconnect(sim_connect_telem)
@@ -4909,10 +3122,9 @@ def init_sims():
     il2_status = "Enabled" if il2_enabled else "Disabled"
     msfs_status = "Enabled" if msfs else "Disabled"
 
-    window.refresh_telem_status(dcs_enabled, il2_enabled, msfs, xplane_enabled)
+    G.window.refresh_telem_status(dcs_enabled, il2_enabled, msfs, xplane_enabled)
 
 def stop_sims():
-    global dcs_telem, il2_telem, sim_connect_telem, xplane_telem
     xplane_telem.quit()
     dcs_telem.quit()
     il2_telem.quit()
@@ -4920,15 +3132,14 @@ def stop_sims():
 
 
 def notify_close_children():
-    global _child_ipc_ports, _ipc_running, _ipc_thread
-    if not len(_child_ipc_ports) or not _ipc_running:
+    if not len(G._child_ipc_ports) or not G._ipc_running:
         return
-    _ipc_thread.send_broadcast_message("MASTER INSTANCE QUIT")
+    G._ipc_thread.send_broadcast_message("MASTER INSTANCE QUIT")
 
 
 def launch_children():
-    global _launched_joystick, _launched_pedals, _launched_collective, _child_ipc_ports, script_dir, _device_pid, _master_instance
-    if not system_settings.get('autolaunchMaster', False) or args.child or not _master_instance:
+    global script_dir
+    if not G.system_settings.get('autolaunchMaster', False) or G.args.child or not G._master_instance:
         return False
 
     if getattr(sys, 'frozen', False):
@@ -4936,39 +3147,39 @@ def launch_children():
     else:
         app = ['python', 'main.py']
 
-    master_port = f"6{_device_pid}"
+    master_port = f"6{G._device_pid}"
     # full_path = os.path.join(script_dir, app)
     try:
-        if system_settings.get('autolaunchJoystick', False) and _device_type != 'joystick':
-            min = ['--minimize'] if system_settings.get('startMinJoystick', False) else []
-            headless = ['--headless'] if system_settings.get('startHeadlessJoystick', False) else []
-            pid = system_settings.get('pidJoystick', '2055')
+        if G.system_settings.get('autolaunchJoystick', False) and G._device_type != 'joystick':
+            min = ['--minimize'] if G.system_settings.get('startMinJoystick', False) else []
+            headless = ['--headless'] if G.system_settings.get('startHeadlessJoystick', False) else []
+            pid = G.system_settings.get('pidJoystick', '2055')
             vidpid = f"FFFF:{pid}"
             command = app + ['-D', vidpid, '-t', 'joystick', '--child', '--masterport', master_port] + min + headless
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
-            _launched_joystick = True
-            _child_ipc_ports.append(int(f"6{pid}"))
-        if system_settings.get('autolaunchPedals', False) and _device_type != 'pedals':
-            min = ['--minimize'] if system_settings.get('startMinPedals', False) else []
-            headless = ['--headless'] if system_settings.get('startHeadlessPedals', False) else []
-            pid = system_settings.get('pidPedals', '2055')
+            G._launched_joystick = True
+            G._child_ipc_ports.append(int(f"6{pid}"))
+        if G.system_settings.get('autolaunchPedals', False) and G._device_type != 'pedals':
+            min = ['--minimize'] if G.system_settings.get('startMinPedals', False) else []
+            headless = ['--headless'] if G.system_settings.get('startHeadlessPedals', False) else []
+            pid = G.system_settings.get('pidPedals', '2055')
             vidpid = f"FFFF:{pid}"
             command = app + ['-D', vidpid, '-t', 'pedals', '--child', '--masterport', master_port] + min + headless
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
-            _launched_pedals = True
-            _child_ipc_ports.append(int(f"6{pid}"))
-        if system_settings.get('autolaunchCollective', False) and _device_type != 'collective':
-            min = ['--minimize'] if system_settings.get('startMinCollective', False) else []
-            headless = ['--headless'] if system_settings.get('startHeadlessCollective', False) else []
-            pid = system_settings.get('pidCollective', '2055')
+            G._launched_pedals = True
+            G._child_ipc_ports.append(int(f"6{pid}"))
+        if G.system_settings.get('autolaunchCollective', False) and G._device_type != 'collective':
+            min = ['--minimize'] if G.system_settings.get('startMinCollective', False) else []
+            headless = ['--headless'] if G.system_settings.get('startHeadlessCollective', False) else []
+            pid = G.system_settings.get('pidCollective', '2055')
             vidpid = f"FFFF:{pid}"
             command = app + ['-D', vidpid, '-t', 'collective', '--child', '--masterport', master_port] + min + headless
             logging.info(f"Auto-Launch: starting instance: {command}")
             subprocess.Popen(command)
-            _launched_collective = True
-            _child_ipc_ports.append(int(f"6{pid}"))
+            G._launched_collective = True
+            G._child_ipc_ports.append(int(f"6{pid}"))
     except Exception as e:
         logging.error(f"Error during Auto-Launch sequence: {e}")
     return True
@@ -5038,17 +3249,19 @@ def main():
         """
     )
     # TODO: Avoid globals
-    global window, log_window, log_tail_window
+    global log_window, log_tail_window
     global dev_firmware_version
     global dev_serial
     global dev
 
     log_window = LogWindow()
-    global settings_mgr, telem_manager, config_was_default
-    xmlutils.update_vars(args.type, userconfig_path, defaults_path)
+    global config_was_default
+    print(G.userconfig_path, G.defaults_path)
+    xmlutils.update_vars(G.args.type, G.userconfig_path, G.defaults_path)
     try:
-        settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path, system_settings=system_settings)
+        G.settings_mgr = SettingsWindow(datasource="Global", device=G.args.type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
     except Exception as e:
+        traceback.print_exc()
         logging.error(f"Error Reading user config file..")
         ans = QMessageBox.question(None, "User Config Error", "There was an error reading the userconfig.  The file is likely corrupted.\n\nDo you want to back-up the existing config and create a new default (empty) config?\n\nIf you chose No, TelemFFB will exit.")
         if ans == QMessageBox.Yes:
@@ -5056,25 +3269,25 @@ def main():
             timestamp = datetime.now().strftime('%Y%m%d_%H%M')
 
             # Create the backup file name with the timestamp
-            backup_file = os.path.join(userconfig_rootpath, ('userconfig_' + os.environ['USERNAME'] + "_" + timestamp + '_corrupted.bak'))
+            backup_file = os.path.join(G.userconfig_rootpath, ('userconfig_' + os.environ['USERNAME'] + "_" + timestamp + '_corrupted.bak'))
 
             # Copy the file to the backup file
-            shutil.copy(userconfig_path, backup_file)
+            shutil.copy(G.userconfig_path, backup_file)
 
             logging.debug(f"Backup created: {backup_file}")
 
-            os.remove(userconfig_path)
-            utils.create_empty_userxml_file(userconfig_path)
+            os.remove(G.userconfig_path)
+            utils.create_empty_userxml_file(G.userconfig_path)
 
             logging.info(f"User config Reset:  Backup file created: {backup_file}")
-            settings_mgr = SettingsWindow(datasource="Global", device=args.type, userconfig_path=userconfig_path, defaults_path=defaults_path, system_settings=system_settings)
+            G.settings_mgr = SettingsWindow(datasource="Global", device=G.args.type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
             QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
         else:
             QCoreApplication.instance().quit()
             return
 
     icon_path = ":/image/vpforceicon.png"
-    settings_mgr.setWindowIcon(QIcon(icon_path))
+    G.settings_mgr.setWindowIcon(QIcon(icon_path))
     sys.stdout = utils.OutLog(log_window.widget, sys.stdout)
     sys.stderr = utils.OutLog(log_window.widget, sys.stderr)
 
@@ -5101,7 +3314,7 @@ def main():
 
     try:
         dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
-        if args.reset:
+        if G.args.reset:
             dev.resetEffects()
         dev_firmware_version = dev.get_firmware_version()
         dev_serial = dev.serial
@@ -5113,12 +3326,12 @@ def main():
                 QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
 
     except Exception as e:
-        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {_device_vid_pid} for device: {_device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
+        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {_device_vid_pid} for device: {G._device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
         dev_firmware_version = 'ERROR'
 
     # config = get_config()
     # ll = config["system"].get("logging_level", "INFO")
-    ll = utils.read_system_settings(args.device, args.type).get('logLevel', 'INFO')
+    ll = utils.read_system_settings(G.args.device, G.args.type).get('logLevel', 'INFO')
     log_levels = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -5129,81 +3342,81 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
-    global _ipc_running, _ipc_thread, is_master, _child_ipc_ports, _launched_children
-    _ipc_running = False
+    global is_master, _child_ipc_ports, _launched_children
+    G._ipc_running = False
     is_master = launch_children()
     if is_master:
-        myport = int(f"6{_device_pid}")
-        _ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=_child_ipc_ports)
-        _ipc_thread.child_keepalive_signal.connect(lambda device, status: window.update_child_status(device, status))
-        _ipc_thread.start()
-        _ipc_running = True
+        myport = int(f"6{G._device_pid}")
+        G._ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=G._child_ipc_ports)
+        G._ipc_thread.child_keepalive_signal.connect(lambda device, status: G.window.update_child_status(device, status))
+        G._ipc_thread.start()
+        G._ipc_running = True
         _launched_children = True
-    elif args.child:
-        myport = int(f"6{_device_pid}")
-        _ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=args.masterport)
-        _ipc_thread.exit_signal.connect(lambda: exit_application())
-        _ipc_thread.restart_sim_signal.connect(lambda: restart_sims())
-        _ipc_thread.show_signal.connect(lambda: window.show())
-        _ipc_thread.hide_signal.connect(lambda: window.hide())
-        _ipc_thread.showlog_signal.connect(lambda: log_window.show())
-        _ipc_thread.show_settings_signal.connect(lambda: window.open_system_settings_dialog())
-        _ipc_thread.start()
-        _ipc_running = True
+    elif G.args.child:
+        myport = int(f"6{G._device_pid}")
+        G._ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=G.args.masterport)
+        G._ipc_thread.exit_signal.connect(lambda: exit_application())
+        G._ipc_thread.restart_sim_signal.connect(lambda: restart_sims())
+        G._ipc_thread.show_signal.connect(lambda: G.window.show())
+        G._ipc_thread.hide_signal.connect(lambda: G.window.hide())
+        G._ipc_thread.showlog_signal.connect(lambda: log_window.show())
+        G._ipc_thread.show_settings_signal.connect(lambda: G.window.open_system_settings_dialog())
+        G._ipc_thread.start()
+        G._ipc_running = True
 
-    window = MainWindow(ipc_thread=_ipc_thread)
+    G.window = MainWindow(ipc_thread=G._ipc_thread)
 
     # log_tail_window = LogTailWindow(window)
 
     if not headless_mode:
-        if args.minimize:
-            window.showMinimized()
+        if G.args.minimize:
+            G.window.showMinimized()
         else:
-            window.show()
+            G.window.show()
 
-    autoconvert_config(window)
+    autoconvert_config(G.window)
     if not _release:
         fetch_version_thread = utils.FetchLatestVersionThread()
-        fetch_version_thread.version_result_signal.connect(window.update_version_result)
+        fetch_version_thread.version_result_signal.connect(G.window.update_version_result)
         fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
         fetch_version_thread.start()
 
-    telem_manager = TelemManager(settings_manager=settings_mgr, ipc_thread=_ipc_thread)
-    telem_manager.start()
+    G.telem_manager = TelemManager(settings_manager=G.settings_mgr, ipc_thread=G._ipc_thread)
+    G.telem_manager.start()
 
-    window.set_telem_manager(telem_manager)
+    G.window.set_telem_manager(G.telem_manager)
 
-    telem_manager.telemetryReceived.connect(window.update_telemetry)
-    telem_manager.updateSettingsLayout.connect(window.update_settings)
+    G.telem_manager.telemetryReceived.connect(G.window.update_telemetry)
+    G.telem_manager.updateSettingsLayout.connect(G.window.update_settings)
 
     init_sims()
 
     if is_master:
-        window.show_device_logo()
-        window.enable_device_logo_click(True)
-        current_title = window.windowTitle()
+        G.window.show_device_logo()
+        G.window.enable_device_logo_click(True)
+        current_title = G.window.windowTitle()
         new_title = f"** MASTER INSTANCE ** {current_title}"
-        window.setWindowTitle(new_title)
-        if _launched_joystick:
-            window.joystick_status_icon.show()
-        if _launched_pedals:
-            window.pedals_status_icon.show()
-        if _launched_collective:
-            window.collective_status_icon.show()
+        G.window.setWindowTitle(new_title)
+        if G._launched_joystick:
+            G.window.joystick_status_icon.show()
+        if G._launched_pedals:
+            G.window.pedals_status_icon.show()
+        if G._launched_collective:
+            G.window.collective_status_icon.show()
 
     if config_was_default:
-        window.open_system_settings_dialog()
+        G.window.open_system_settings_dialog()
 
-    utils.signal_emitter.telem_timeout_signal.connect(window.update_sim_indicators)
-    utils.signal_emitter.error_signal.connect(window.process_error_signal)
+    utils.signal_emitter.telem_timeout_signal.connect(G.window.update_sim_indicators)
+    utils.signal_emitter.error_signal.connect(G.window.process_error_signal)
     utils.signal_emitter.msfs_quit_signal.connect(restart_sims)
 
     # do some init in the background not blocking the main window first appearance
     def init_async():
         global startup_configurator_gains # TODO: avoid globals
-        if system_settings.get('enableVPConfStartup', False):
+        if G.system_settings.get('enableVPConfStartup', False):
             try:
-                set_vpconf_profile(system_settings.get('pathVPConfStartup', ''), dev_serial)
+                set_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
             except:
                 logging.error("Unable to set VPConfigurator startup profile")
 
@@ -5216,14 +3429,14 @@ def main():
 
     app.exec_()
 
-    if _ipc_running:
+    if G._ipc_running:
         notify_close_children()
-        _ipc_thread.stop()
+        G._ipc_thread.stop()
     stop_sims()
-    telem_manager.quit()
-    if system_settings.get('enableVPConfExit', False):
+    G.telem_manager.quit()
+    if G.system_settings.get('enableVPConfExit', False):
         try:
-            set_vpconf_profile(system_settings.get('pathVPConfExit', ''), dev_serial)
+            set_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
         except:
             logging.error("Unable to set VPConfigurator exit profile")
 

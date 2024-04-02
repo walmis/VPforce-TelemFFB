@@ -18,7 +18,7 @@ from typing import List, Iterable
 import struct
 from enum import IntEnum
 from dataclasses import dataclass
-import utils
+import telemffb.utils as utils
 import pygetwindow as get_focus_window
 
 
