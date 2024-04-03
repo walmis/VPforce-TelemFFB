@@ -295,7 +295,7 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraft.apply_settings(params)
                 self.currentAircraftConfig = params
                 if data_source == "MSFS2020" and aircraft_name != '':
-                    d1 = xmlutils.read_overrides(aircraft_name)
+                    d1 = xmlutils.read_sc_overrides(aircraft_name)
                     for sv in d1:
                         self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
                     self._simconnect._resubscribe()
@@ -331,7 +331,7 @@ class TelemManager(QObject, threading.Thread):
                     self.currentAircraftConfig = params
 
                 if data_source == "MSFS2020" and aircraft_name != '':
-                    d1 = xmlutils.read_overrides(aircraft_name)
+                    d1 = xmlutils.read_sc_overrides(aircraft_name)
                     for sv in d1:
                         self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
                     self._simconnect._resubscribe()

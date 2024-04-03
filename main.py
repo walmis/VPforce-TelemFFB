@@ -1070,17 +1070,17 @@ class MainWindow(QMainWindow):
             status_icon.set_dot_color(Qt.red)
 
     def show_child_log(self, child):
-        self.G._ipc_thread.send_broadcast_message(f'SHOW LOG:{child}')
+        self._ipc_thread.send_broadcast_message(f'SHOW LOG:{child}')
 
     def show_child_settings(self):
-        self.G._ipc_thread.send_broadcast_message("SHOW SETTINGS")
+        self._ipc_thread.send_broadcast_message("SHOW SETTINGS")
 
     def toggle_child_windows(self, toggle):
         if toggle == 'show':
-            self.G._ipc_thread.send_broadcast_message("SHOW WINDOW")
+            self._ipc_thread.send_broadcast_message("SHOW WINDOW")
             pass
         elif toggle == 'hide':
-            self.G._ipc_thread.send_broadcast_message("HIDE WINDOW")
+            self._ipc_thread.send_broadcast_message("HIDE WINDOW")
             pass
 
     def reset_user_config(self):
@@ -1664,8 +1664,8 @@ class MainWindow(QMainWindow):
 
             if G._master_instance and self._current_config_scope != G._device_type:
                 dev = self._current_config_scope
-                active_effects = self.G._ipc_thread._ipc_telem_effects.get(f'{dev}_active_effects', '')
-                active_settings = self.G._ipc_thread._ipc_telem_effects.get(f'{dev}_active_settings', [])
+                active_effects = self._ipc_thread._ipc_telem_effects.get(f'{dev}_active_effects', '')
+                active_settings = self._ipc_thread._ipc_telem_effects.get(f'{dev}_active_settings', [])
             else:
                 for key in effects.dict.keys():
                     if effects[key].started:
@@ -1679,7 +1679,7 @@ class MainWindow(QMainWindow):
             if G.args.child:
                 child_effects = str(effects.dict.keys())
                 if len(child_effects):
-                    self.G._ipc_thread.send_ipc_effects(active_effects, active_settings)
+                    self._ipc_thread.send_ipc_effects(active_effects, active_settings)
 
             window_mode = self.tab_widget.currentIndex()
             # update slider colors

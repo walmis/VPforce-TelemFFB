@@ -34,7 +34,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         if is_msfs:
             self.fill_cb_name()
 
-            self.overrides = xmlutils.read_overrides(G.settings_mgr.current_pattern)
+            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern)
 
 
             if not any(self.overrides) :
@@ -182,12 +182,12 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         # Handle the case where scale is not a valid number
         # enable delete button for user rows
         if name != '' and var != '' and sc_unit != '' and scale_valid:
-            xmlutils.write_override_to_xml(G.settings_mgr.current_pattern, var, name, sc_unit, scale_text)
+            xmlutils.write_sc_override_to_xml(G.settings_mgr.current_pattern, var, name, sc_unit, scale_text)
             self.cb_name.setCurrentText('')
             self.tb_var.setText('')
             self.cb_sc_unit.setCurrentText('')
             self.tb_scale.setText('')
-            self.overrides = xmlutils.read_overrides(G.settings_mgr.current_pattern)
+            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern)
             self.fill_table()
 
     def delete_button_clicked(self):
@@ -197,6 +197,6 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             print(f"\nerase row: {self.current_name}    pattern: {G.settings_mgr.current_pattern}  name: {name}")
             self.tableWidget.blockSignals(True)
             self.pb_delete.setEnabled(False)
-            xmlutils.erase_override_from_xml(G.settings_mgr.current_pattern,name)
-            self.overrides = xmlutils.read_overrides(G.settings_mgr.current_pattern)
+            xmlutils.erase_sc_override_from_xml(G.settings_mgr.current_pattern,name)
+            self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern)
             self.fill_table()

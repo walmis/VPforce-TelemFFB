@@ -200,14 +200,14 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False, instance
     return model_data, found_pattern
 
 
-def read_overrides(aircraft_name):
-    def_model_overrides = read_models_overrides(defaults_path, aircraft_name, 'defaults')
-    user_model_overrides = read_models_overrides(userconfig_path, aircraft_name, 'user')
-    result = update_overrides_with_user(def_model_overrides,user_model_overrides)
+def read_sc_overrides(aircraft_name):
+    def_model_overrides = read_models_sc_overrides(defaults_path, aircraft_name, 'defaults')
+    user_model_overrides = read_models_sc_overrides(userconfig_path, aircraft_name, 'user')
+    result = update_sc_overrides_with_user(def_model_overrides,user_model_overrides)
     return result
 
 
-def read_models_overrides(file_path, full_model_name, source):
+def read_models_sc_overrides(file_path, full_model_name, source):
     mprint(f"read_models_overrides  {file_path}, {full_model_name}")
     # runs on both defaults and userconfig xml files
     #pass 'all' to get all of them
@@ -249,7 +249,7 @@ def read_models_overrides(file_path, full_model_name, source):
     return model_overrides
 
 
-def update_overrides_with_user(defaults_ovr, user_ovr):
+def update_sc_overrides_with_user(defaults_ovr, user_ovr):
     updated_result = defaults_ovr.copy()
     items_to_append = []
 
@@ -279,7 +279,7 @@ def update_overrides_with_user(defaults_ovr, user_ovr):
     return updated_result
 
 
-def erase_override_from_xml(the_model, setting_name):
+def erase_sc_override_from_xml(the_model, setting_name):
     mprint(f"erase_override_from_xml   {the_model}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
@@ -302,7 +302,7 @@ def erase_override_from_xml(the_model, setting_name):
         logging.info(f"Removed <sc_overrides> element with values: model={the_model}, name={setting_name}")
 
 
-def write_override_to_xml(the_model, the_var, setting_name, sc_unit='', scale=''):
+def write_sc_override_to_xml(the_model, the_var, setting_name, sc_unit='', scale=''):
     mprint(f"write_overrides_to_xml  {the_model}, {the_var}, {setting_name}, {scale}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = ET.parse(userconfig_path)
