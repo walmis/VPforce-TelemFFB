@@ -80,4 +80,28 @@ class MyClass:
    - Default arguments are evaluated at function definition time, and using global variables can lead to unexpected behavior or unintended side effects.
    - If default values are needed, prefer using immutable objects like `None` or define them within the function body to ensure predictable behavior.
 
+Example illustrating the issue:
+
+```python
+global_var = 10
+
+# Avoid using global_var as a default value
+def my_function(arg=global_var):
+    print(arg)
+
+global_var = 20
+my_function()  # Output: 20 (unexpected behavior)
+```
+
+Instead, define defaults within the function body:
+
+```python
+def my_function(arg=None):
+    if arg is None:
+        arg = 10
+    print(arg)
+```
+
+Following this guideline helps in writing more predictable and maintainable code.
+
 Following these guidelines will lead to more readable, maintainable, and robust Python code.
