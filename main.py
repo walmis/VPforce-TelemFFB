@@ -110,7 +110,6 @@ G._launched_collective = False
 G._launched_children = False
 G._child_ipc_ports = []
 G._master_instance = False
-G._ipc_running = False
 G._ipc_thread = None
 G._child_instance = G.args.child
 
@@ -295,8 +294,6 @@ if not G.args.child:
         pass
 
 from telemffb.sim import aircrafts_msfs_xp
-from telemffb.sim import aircrafts_msfs_xp
-
 from telemffb.telem.il2_telem import IL2Manager
 from telemffb.sim.aircraft_base import effects
 
@@ -1819,7 +1816,7 @@ def exit_application():
 
 
 def send_test_message():
-    if G._ipc_running:
+    if G._ipc_thread.running:
         if G._master_instance:
             G._ipc_thread.send_broadcast_message("TEST MESSAGE TO ALL")
         else:
@@ -1923,7 +1920,7 @@ G.stop_sims = stop_sims
 G.init_sims = init_sims
 
 def notify_close_children():
-    if not len(G._child_ipc_ports) or not G._ipc_running:
+    if not len(G._child_ipc_ports) or not G._ipc_thread.running:
         return
     G._ipc_thread.send_broadcast_message("MASTER INSTANCE QUIT")
 
@@ -2139,15 +2136,14 @@ def main():
     }
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
+    logging.debug("test")
 
-    G._ipc_running = False
     G.is_master_instance = launch_children()
     if G.is_master_instance:
         myport = int(f"6{G._device_pid}")
         G._ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=G._child_ipc_ports)
         G._ipc_thread.child_keepalive_signal.connect(lambda device, status: G.main_window.update_child_status(device, status))
         G._ipc_thread.start()
-        G._ipc_running = True
         G._launched_children = True
     elif G.args.child:
         myport = int(f"6{G._device_pid}")
@@ -2159,7 +2155,6 @@ def main():
         G._ipc_thread.showlog_signal.connect(lambda: log_window.show())
         G._ipc_thread.show_settings_signal.connect(lambda: G.main_window.open_system_settings_dialog())
         G._ipc_thread.start()
-        G._ipc_running = True
 
     G.main_window = MainWindow(ipc_thread=G._ipc_thread)
 
@@ -2225,7 +2220,7 @@ def main():
 
     app.exec_()
 
-    if G._ipc_running:
+    if G._ipc_thread.running:
         notify_close_children()
         G._ipc_thread.stop()
     stop_sims()

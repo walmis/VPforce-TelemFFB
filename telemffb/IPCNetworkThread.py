@@ -19,10 +19,10 @@ class IPCNetworkThread(QThread):
     show_settings_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
 
-    def __init__(self, host="localhost", myport=0, dstport=0, child_ports=[], master=False, child=False, keepalive_timer=1, missed_keepalive=3):
+    def __init__(self, host="localhost", myport=0, dstport=0, child_ports=[], master=False, child=False, keepalive_sec=1, missed_keepalive=3):
         super().__init__()
 
-        self._run = True
+        self._running = False
         self._myport = int(myport)
         self._dstport = int(dstport)
         self._host = host
@@ -30,11 +30,12 @@ class IPCNetworkThread(QThread):
         self._child = child
         self._child_ports = child_ports
         self._child_keepalive_timestamp = {}
-        self._keepalive_timer = keepalive_timer
+        self._keepalive_sec = keepalive_sec
         self._missed_keepalive = missed_keepalive
         self._last_keepalive_timestamp = time.time()
         self._ipc_telem = {}
         self._ipc_telem_effects = {}
+        self._timer : int = None # Qt timer
 
         self._child_active = {
             'joystick': False,
@@ -82,21 +83,19 @@ class IPCNetworkThread(QThread):
             encoded_data = message.encode("utf-8")
             self._socket.sendto(encoded_data, (self._host, int(port)))
 
-    def send_keepalive(self):
-        while self._run:
-            if self._master:
-                self.send_broadcast_message("Keepalive")
-                ts = time.time()
-                logging.debug(f"SENT KEEPALIVES: {ts}")
-                time.sleep(self._keepalive_timer)
-            elif self._child:
-                self.send_message(f"Child Keepalive:{G._device_type}")
-                ts = time.time()
-                logging.debug(f"{G._device_type} SENT CHILD KEEPALIVE: {ts}")
-                time.sleep(self._keepalive_timer)
+    def _send_keepalive(self):
 
-    def receive_messages(self):
-        while self._run:
+        if self._master:
+            self.send_broadcast_message("Keepalive")
+            ts = time.time()
+            logging.debug(f"SENT KEEPALIVES: {ts}")
+        elif self._child:
+            self.send_message(f"Child Keepalive:{G._device_type}")
+            ts = time.time()
+            logging.debug(f"{G._device_type} SENT CHILD KEEPALIVE: {ts}")
+
+    def _receive_messages_loop(self):
+        while self._running:
             try:
                 data, addr = self._socket.recvfrom(4096)
 
@@ -163,49 +162,51 @@ class IPCNetworkThread(QThread):
             except socket.timeout:
                 continue
 
-    def check_missed_keepalives(self):
-        while self._run:
-            if self._child:
-                time.sleep(self._keepalive_timer)
-                elapsed_time = time.time() - self._last_keepalive_timestamp
-                if elapsed_time > (self._keepalive_timer * self._missed_keepalive):
-                    logging.error("KEEPALIVE TIMEOUT... exiting in 2 seconds")
-                    time.sleep(2)
-                    # QCoreApplication.instance().quit()
-                    self.exit_signal.emit("Missed too many keepalives. Exiting.")
-                    break
-            elif self._master:
-                time.sleep(self._keepalive_timer)
-                for device in self._child_keepalive_timestamp:
-                    elapsed_time = time.time() - self._child_keepalive_timestamp.get(device, time.time())
-                    if elapsed_time > (self._keepalive_timer * self._missed_keepalive):
-                        logging.info(f"{device} KEEPALIVE TIMEOUT")
-                        if self._child_active.get(device):
-                            self.child_keepalive_signal.emit(device, 'TIMEOUT')
-                            self._child_active[device] = False
-                    else:
-                        logging.debug(f"{device} KEEPALIVE ACTIVE")
-                        if not self._child_active.get(device):
-                            self.child_keepalive_signal.emit(device, 'ACTIVE')
-                            self._child_active[device] = True
+    def start(self):
+        if not self._running:
+            self._running = True
+            self._timer = self.startTimer(self._keepalive_sec*1000)
+            super().start()
 
-    def run(self):
-        self.receive_thread = threading.Thread(target=self.receive_messages)
-        self.receive_thread.start()
 
-        if self._master:
-            self._send_ka_thread = threading.Thread(target=self.send_keepalive)
-            self._send_ka_thread.start()
-            self._check_ka_thread = threading.Thread(target=self.check_missed_keepalives)
-            self._check_ka_thread.start()
-
+    def _check_missed_keepalives(self):
         if self._child:
-            self._send_ka_thread = threading.Thread(target=self.send_keepalive)
-            self._send_ka_thread.start()
-            self._check_ka_thread = threading.Thread(target=self.check_missed_keepalives)
-            self._check_ka_thread.start()
+            elapsed_time = time.time() - self._last_keepalive_timestamp
+            if elapsed_time > (self._keepalive_sec * self._missed_keepalive):
+                logging.error("KEEPALIVE TIMEOUT... exiting in 2 seconds")
+                time.sleep(2)
+                # QCoreApplication.instance().quit()
+                self.exit_signal.emit("Missed too many keepalives. Exiting.")
+                return
+        elif self._master:
+            for device in self._child_keepalive_timestamp:
+                elapsed_time = time.time() - self._child_keepalive_timestamp.get(device, time.time())
+                if elapsed_time > (self._keepalive_sec * self._missed_keepalive):
+                    logging.info(f"{device} KEEPALIVE TIMEOUT")
+                    if self._child_active.get(device):
+                        self.child_keepalive_signal.emit(device, 'TIMEOUT')
+                        self._child_active[device] = False
+                else:
+                    logging.debug(f"{device} KEEPALIVE ACTIVE")
+                    if not self._child_active.get(device):
+                        self.child_keepalive_signal.emit(device, 'ACTIVE')
+                        self._child_active[device] = True
+
+    def timerEvent(self, id):
+        self._check_missed_keepalives()
+        self._send_keepalive()
+
+    @property
+    def running(self):
+        return self._running
+
+    # Qt thread function (override)
+    def run(self):
+        self._receive_messages_loop()
 
     def stop(self):
-        logging.info("IPC Thread stopping")
-        self._run = False
-        self._socket.close()
+        if self._running:
+            logging.info("IPC Thread stopping")
+            self.killTimer(self._timer)
+            self._running = False
+            self._socket.close()
