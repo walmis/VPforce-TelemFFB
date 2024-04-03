@@ -42,7 +42,7 @@ for p in paths:
     except:
         pass 
 
-import hid
+import telemffb.hw.hid as hid
 
 USB_REQTYPE_DEVICE_TO_HOST = 0x80
 USB_REQTYPE_VENDOR = 0x40

@@ -7,8 +7,9 @@ defaults_path = None
 # main window instance
 main_window = None
 
-_device_type = None
-_device_pid = None
+_device_type : str = None
+_device_pid : str = None
+_device_vid_pid : str = None # "FFFF:2055"
 
 _launched_joystick = False
 _launched_pedals = False

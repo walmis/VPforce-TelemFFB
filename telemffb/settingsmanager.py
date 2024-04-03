@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import QTableWidget, QTextEdit, QWidget, QSlider
 from datetime import datetime
 from PyQt5.QtCore import Qt, pyqtSignal
 
-from .ui.settingswindow import Ui_SettingsWindow
+from .ui.Ui_SettingsWindow import Ui_SettingsWindow
 from . import xmlutils
 
 print_debugs = False

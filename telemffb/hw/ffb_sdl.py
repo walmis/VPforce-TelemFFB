@@ -15,6 +15,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+# this backend is not used, kept for posterity
+
 import sdl2
 from sdl2 import *
 import sdl2.ext

@@ -1,11 +1,11 @@
 from . import xmlutils
 from telemffb.custom_widgets import QDialog, Qt
-from .sc_manager import SimConnectManager
-from .ui.sc_override_edit import Ui_SCOverridesDialog
+from .telem.SimConnectManager import SimConnectManager
+from .ui.Ui_SCOverridesDialog import Ui_SCOverridesDialog
 from PyQt5.QtWidgets import QDialog, QTableWidgetItem, QAbstractItemView
 from PyQt5.QtCore import Qt
 
-from . import globals
+from . import globals as G
 
 class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
     overrides = []
@@ -21,7 +21,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         self.pb_delete.clicked.connect(self.delete_button_clicked)
 
     def fill_fields(self):
-        is_msfs = globals.settings_mgr.current_sim == 'MSFS'
+        is_msfs = G.settings_mgr.current_sim == 'MSFS'
         self.pb_add.setEnabled(is_msfs)
         self.pb_delete.setEnabled(False)
         self.tb_var.setEnabled(is_msfs)
@@ -29,12 +29,12 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         self.tb_scale.setEnabled(is_msfs)
         self.cb_name.setEnabled(is_msfs)
         self.cb_sc_unit.setEnabled(is_msfs)
-        self.tb_pattern.setText(globals.settings_mgr.current_pattern)
+        self.tb_pattern.setText(G.settings_mgr.current_pattern)
 
         if is_msfs:
             self.fill_cb_name()
 
-            self.overrides = xmlutils.read_overrides(globals.settings_mgr.current_pattern)
+            self.overrides = xmlutils.read_overrides(G.settings_mgr.current_pattern)
 
 
             if not any(self.overrides) :
@@ -182,21 +182,21 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         # Handle the case where scale is not a valid number
         # enable delete button for user rows
         if name != '' and var != '' and sc_unit != '' and scale_valid:
-            xmlutils.write_override_to_xml(settings_mgr.current_pattern, var, name, sc_unit, scale_text)
+            xmlutils.write_override_to_xml(G.settings_mgr.current_pattern, var, name, sc_unit, scale_text)
             self.cb_name.setCurrentText('')
             self.tb_var.setText('')
             self.cb_sc_unit.setCurrentText('')
             self.tb_scale.setText('')
-            self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
+            self.overrides = xmlutils.read_overrides(G.settings_mgr.current_pattern)
             self.fill_table()
 
     def delete_button_clicked(self):
         # Get the row number from the current item
         if self.current_name != '':
             name = self.current_name
-            print(f"\nerase row: {self.current_name}    pattern: {settings_mgr.current_pattern}  name: {name}")
+            print(f"\nerase row: {self.current_name}    pattern: {G.settings_mgr.current_pattern}  name: {name}")
             self.tableWidget.blockSignals(True)
             self.pb_delete.setEnabled(False)
-            xmlutils.erase_override_from_xml(settings_mgr.current_pattern,name)
-            self.overrides = xmlutils.read_overrides(settings_mgr.current_pattern)
+            xmlutils.erase_override_from_xml(G.settings_mgr.current_pattern,name)
+            self.overrides = xmlutils.read_overrides(G.settings_mgr.current_pattern)
             self.fill_table()

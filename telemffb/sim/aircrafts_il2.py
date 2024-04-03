@@ -23,7 +23,7 @@ from telemffb.hw.ffb_rhino import HapticEffect, FFBReport_SetCondition
 import telemffb.utils as utils
 import logging
 import random
-from aircraft_base import AircraftBase, effects
+from .aircraft_base import AircraftBase, effects
 import json
 import socket
 

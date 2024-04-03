@@ -6,7 +6,7 @@ from PyQt5 import QtCore
 
 import json, logging, os
 
-from .ui.system_settings import Ui_SystemDialog
+from .ui.Ui_SystemDialog import Ui_SystemDialog
 
 from . import globals as G
 
@@ -305,7 +305,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
     def save_settings(self):
         # Create a dictionary with the values of all components
-        tp = G.args.type
+        tp = G._device_type
 
         global_settings_dict = {
             "enableDCS": self.enableDCS.isChecked(),
@@ -390,7 +390,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         elif ll == "DEBUG":
             logging.getLogger().setLevel(logging.DEBUG)
 
-        G.system_settings = utils.read_system_settings(G.args.device, G._device_type)
+        G.system_settings = utils.read_system_settings(G._device_vid_pid, G._device_type)
         self.accept()
 
     def load_settings(self, default=False):
@@ -398,12 +398,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         Load settings from the registry and update widget states.
         """
         if default:
-            settings_dict = utils.get_default_sys_settings(G.args.device, G.args.type, cmb=True)
+            settings_dict = utils.get_default_sys_settings(G._device_vid_pid, G._device_type, cmb=True)
             self.cb_save_geometry.setChecked(True)
             self.cb_save_view.setChecked(True)
         else:
             # Read settings from the registry
-            settings_dict = utils.read_system_settings(G.args.device, G.args.type)
+            settings_dict = utils.read_system_settings(G._device_vid_pid, G._device_type)
             pass
         # Update widget states based on the loaded settings
         self.logLevel.setCurrentText(settings_dict.get('logLevel', 'INFO'))

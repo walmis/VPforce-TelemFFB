@@ -16,7 +16,6 @@
 #
 
 import glob
-import textwrap
 
 import argparse
 import json
@@ -25,6 +24,11 @@ import sys
 import time
 import os
 
+from telemffb.IPCNetworkThread import IPCNetworkThread
+from telemffb.config_utils import autoconvert_config
+from telemffb.telem.NetworkThread import NetworkThread
+from telemffb.telem.SimConnectSock import SimConnectSock
+from telemffb.telem.TelemManager import TelemManager
 from telemffb.LogWindow import LogWindow
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
@@ -38,7 +42,6 @@ import telemffb.globals as G
 import telemffb.hw.ffb_rhino as ffb_rhino
 import telemffb.utils as utils
 import re
-import socket
 import threading
 from collections import OrderedDict
 import subprocess
@@ -48,17 +51,18 @@ from traceback import print_exc
 
 from telemffb.hw.ffb_rhino import HapticEffect, FFBRhino
 
-from configobj import ConfigObj
 
 from telemffb.settingsmanager import *
-from telemffb.utils import validate_vpconf_profile
+from telemffb.utils import LoggingFilter
+from telemffb.utils import load_custom_userconfig
+from telemffb.utils import set_vpconf_profile
+from telemffb.utils import save_main_window_geometry
 import telemffb.xmlutils as xmlutils
 
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QRadioButton, QScrollArea, QHBoxLayout, QAction, QMenu, QButtonGroup, QFrame, \
     QTabWidget, QGroupBox, QShortcut
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QSize, QByteArray, QTimer, \
-    QThread, QMutex
+from PyQt5.QtCore import Qt, QCoreApplication, QUrl, QSize, QByteArray, QTimer
 from PyQt5.QtGui import QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QCursor, \
     QTextCursor, QKeySequence
 from PyQt5.QtWidgets import QGridLayout, QToolButton
@@ -66,6 +70,7 @@ from PyQt5.QtWidgets import QGridLayout, QToolButton
 from telemffb.custom_widgets import *
 
 import resources
+resources # used
 
 parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 
@@ -111,7 +116,6 @@ G._child_instance = G.args.child
 
 G.system_settings = utils.read_system_settings(G.args.device, G.args.type)
 
-
 # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
 _vpf_logo = ":/image/vpforcelogo.png"
 if G.args.device is None:
@@ -120,21 +124,17 @@ if G.args.device is None:
         case 1:
             G._device_pid = G.system_settings.get('pidJoystick', "2055")
             G._device_type = 'joystick'
-            _device_logo = ':/image/logo_j.png'
         case 2:
             G._device_pid = G.system_settings.get('pidPedals', "2055")
             G._device_type = 'pedals'
-            _device_logo = ':/image/logo_p.png'
         case 3:
             G._device_pid = G.system_settings.get('pidCollective', "2055")
             G._device_type = 'collective'
-            _device_logo = ':/image/logo_c.png'
         case _:
             G._device_pid = G.system_settings.get('pidJoystick', "2055")
             G._device_type = 'joystick'
-            _device_logo = ':/image/logo_j.png'
 
-    _device_vid_pid = f"FFFF:{G._device_pid}"
+    G._device_vid_pid = f"FFFF:{G._device_pid}"
     G.args.type = G._device_type
 else:
     if G.args.type is None:
@@ -144,18 +144,19 @@ else:
         G._device_type = str.lower(G.args.type)
 
     G._device_pid = G.args.device.split(":")[1]
-    _device_vid_pid = G.args.device
-    match str.lower(G.args.type):
-        case 'joystick':
-            _device_logo = ':/image/logo_j.png'
-        case 'pedals':
-            _device_logo = ':/image/logo_p.png'
-        case 'collective':
-            _device_logo = ':/image/logo_c.png'
-        case _:
-            _device_logo = ':/image/logo_j.png'
+    G._device_vid_pid = G.args.device
 
-G.system_settings = utils.read_system_settings(G.args.device, G._device_type)
+match str.lower(G._device_type):
+    case 'joystick':
+        _device_logo = ':/image/logo_j.png'
+    case 'pedals':
+        _device_logo = ':/image/logo_p.png'
+    case 'collective':
+        _device_logo = ':/image/logo_c.png'
+    case _:
+        _device_logo = ':/image/logo_j.png'
+
+G.system_settings = utils.read_system_settings(G._device_vid_pid, G._device_type)
 
 if G.system_settings.get('wasDefault', False):
     config_was_default = True
@@ -182,9 +183,7 @@ sys.path.insert(0, '')
 # sys.path.append('/simconnect')
 
 
-_config_mtime = 0
-_future_config_update_time = time.time()
-_pending_config_update = False
+
 effects_translator = utils.EffectTranslator()
 
 #################
@@ -210,21 +209,6 @@ _latest_url = None
 _current_version = version
 dev_serial = None
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
-
-
-class LoggingFilter(logging.Filter):
-    def __init__(self, keywords):
-        self.keywords = keywords
-
-    def filter(self, record):
-        # Check if any of the keywords are present in the log message
-        record.device_type = G._device_type
-        for keyword in self.keywords:
-            if keyword in record.getMessage():
-                # If any keyword is found, prevent the message from being logged
-                return False
-        # If none of the keywords are found, allow the message to be logged
-        return True
 
 
 if getattr(sys, 'frozen', False):
@@ -260,7 +244,7 @@ if not os.path.exists(log_folder):
 
 date_str = datetime.now().strftime("%Y%m%d")
 
-logname = "".join(["TelemFFB", "_", _device_vid_pid.replace(":", "-"), '_', G.args.type, "_", date_str, ".log"])
+logname = "".join(["TelemFFB", "_", G._device_vid_pid.replace(":", "-"), '_', G._device_type, "_", date_str, ".log"])
 log_file = os.path.join(log_folder, logname)
 
 # Create a logger instance
@@ -310,13 +294,11 @@ if not G.args.child:
     except:
         pass
 
-import aircrafts_dcs
-import aircrafts_msfs_xp
-import aircrafts_il2
-import aircrafts_msfs_xp
-from telemffb.sc_manager import SimConnectManager
-from il2_telem import IL2Manager
-from aircraft_base import effects
+from telemffb.sim import aircrafts_msfs_xp
+from telemffb.sim import aircrafts_msfs_xp
+
+from telemffb.telem.il2_telem import IL2Manager
+from telemffb.sim.aircraft_base import effects
 
 
 if getattr(sys, 'frozen', False):
@@ -331,658 +313,6 @@ logging.info("**************************************")
 if G.args.teleplot:
     logging.info(f"Using {G.args.teleplot} for plotting")
     utils.teleplot.configure(G.args.teleplot)
-
-
-def format_dict(data, prefix=""):
-    output = ""
-    for key, value in data.items():
-        if isinstance(value, dict):
-            output += format_dict(value, prefix + key + ".")
-        else:
-            output += prefix + key + " = " + str(value) + "\n"
-    return output
-
-
-def config_has_changed(update=False) -> bool:
-    # if update is true, update the current modified time
-    global _config_mtime, _future_config_update_time, _pending_config_update
-    # "hash" both mtimes together
-    tm = int(os.path.getmtime(G.userconfig_path)) + int(os.path.getmtime(defaults_path))
-    time_now = time.time()
-    update_delay = 0.4
-    if _config_mtime != tm:
-        _future_config_update_time = time_now + update_delay
-        _pending_config_update = True
-        _config_mtime = tm
-        logging.info(f'Config changed: Waiting {update_delay} seconds to read changes')
-    if _pending_config_update and time_now >= _future_config_update_time:
-        _pending_config_update = False
-        logging.info(f'Config changed: {update_delay} second timer expired, reading changes')
-        return True
-    return False
-
-
-class TelemManager(QObject, threading.Thread):
-    telemetryReceived = pyqtSignal(object)
-    updateSettingsLayout = pyqtSignal()
-    currentAircraft: aircrafts_dcs.Aircraft = None
-    currentAircraftName: str = None
-    currentAircraftConfig: dict = {}
-    timedOut: bool = True
-    lastFrameTime: float
-    numFrames: int = 0
-
-    def __init__(self, settings_manager, ipc_thread=None) -> None:
-        QObject.__init__(self)
-        threading.Thread.__init__(self, daemon=True)
-
-        self._run = True
-        self._cond = threading.Condition()
-        self._data = None
-        self._events = []
-        self._dropped_frames = 0
-        self.lastFrameTime = time.perf_counter()
-        self.frameTimes = []
-        self.maxframeTime = 0
-        self.timeout = 0.2
-        self.settings_manager = settings_manager
-        self.ipc_thread = ipc_thread
-        self._ipc_telem = {}
-
-    @classmethod
-    def set_simconnect(cls, sc):
-        cls._simconnect = sc
-
-    def get_aircraft_config(self, aircraft_name, data_source):
-        params = {}
-        cls_name = "UNKNOWN"
-        input_modeltype = ''
-        try:
-            if data_source == "MSFS2020":
-                send_source = "MSFS"
-            else:
-                send_source = data_source
-
-            if '.' in send_source:
-                input = send_source.split('.')
-                sim_temp = input[0]
-                the_sim = sim_temp.replace('2020', '')
-                input_modeltype = input[1]
-            else:
-                the_sim = send_source
-
-            cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, G.args.type)
-            #globals.settings_mgr.current_pattern = pattern
-            if cls_name == '': cls_name = 'Aircraft'
-            for setting in result:
-                k = setting['name']
-                v = setting['value']
-                u = setting['unit']
-                if u is not None:
-                    vu = v + u
-                else:
-                    vu = v
-                if setting['value'] != '-':
-                    params[k] = vu
-                    logging.debug(f"Got from Settings Manager: {k} : {vu}")
-                else:
-                    logging.debug(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
-                # print(f"SETTING:\n{setting}")
-            params = utils.sanitize_dict(params)
-            self.settings_manager.update_state_vars(
-                current_sim=the_sim,
-                current_aircraft_name=aircraft_name,
-                current_class=cls_name,
-                current_pattern=pattern)
-
-            return params, cls_name
-
-            # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
-        except Exception as e:
-            logging.warning(f"Error getting settings from Settings Manager:{e}")
-
-    def quit(self):
-        self._run = False
-        self.join()
-
-    def submitFrame(self, data: bytes):
-        if type(data) == bytes:
-            data = data.decode("utf-8")
-
-        with self._cond:
-            if data.startswith("Ev="):
-                self._events.append(data.lstrip("Ev="))
-                self._cond.notify()
-            elif self._data is None:
-                self._data = data
-                self._cond.notify()  # notify waiting thread of new data
-            else:
-                self._dropped_frames += 1
-                # log dropped frames, this is not necessarily a bad thing
-                # USB interrupt transfers (1ms) might take longer than one video frame
-                # we drop frames to keep latency to a minimum
-                logging.debug(f"Droppped frame (total {self._dropped_frames})")
-
-    def process_events(self):
-        while len(self._events):
-            ev = self._events.pop(0)
-            ev = ev.split(";")
-
-            if self.currentAircraft:
-                self.currentAircraft.on_event(*ev)
-            continue
-
-    def get_changed_params(self, params):
-        diff_dict = {}
-
-        # Check for new keys or keys with different values
-        for key, new_value in params.items():
-            if key not in self.currentAircraftConfig or self.currentAircraftConfig[key] != new_value:
-                diff_dict[key] = new_value
-        logging.debug(f"get_changed_settings: {diff_dict.items()}")
-        self.currentAircraftConfig.update(diff_dict)
-        return diff_dict
-
-    def process_data(self, data):
-
-        data = data.split(";")
-
-        telem_data = {}
-        telem_data["FFBType"] = G.args.type
-
-        self.frameTimes.append(int((time.perf_counter() - self.lastFrameTime)*1000))
-        if len(self.frameTimes) > 500: self.frameTimes.pop(0)
-
-        if self.frameTimes[-1] > self.maxframeTime and len(self.frameTimes) > 40:  # skip the first frames before counting frametime as max
-            threshold = 100
-            if self.frameTimes[-1] > threshold:
-                logging.debug(
-                    f'*!*!*!* - Frametime threshold of {threshold}ms exceeded: time = {self.frameTimes[-1]}ms')
-
-            self.maxframeTime = self.frameTimes[-1]
-
-        telem_data["frameTimes"] = [self.frameTimes[-1], max(self.frameTimes)]
-        telem_data["maxFrameTime"] = f"{round(self.maxframeTime, 3)}"
-        telem_data["avgFrameTime"] = f"{round(sum(self.frameTimes) / len(self.frameTimes), 3):.3f}"
-
-        self.lastFrameTime = time.perf_counter()
-
-        for i in data:
-            try:
-                if len(i):
-                    section, conf = i.split("=")
-                    values = conf.split("~")
-                    telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
-
-            except Exception as e:
-                traceback.print_exc()
-                logging.error("Error Parsing Parameter: ", repr(i))
-
-        # Read telemetry sent via IPC channel from child instances and update local telemetry stream
-        if G._master_instance and G._launched_children:
-            self._ipc_telem = self.ipc_thread._ipc_telem
-            if self._ipc_telem != {}:
-                telem_data.update(self._ipc_telem)
-                self._ipc_telem = {}
-        # print(items)
-        aircraft_name = telem_data.get("N")
-        data_source = telem_data.get("src", None)
-        if data_source == "MSFS2020":
-            module = aircrafts_msfs_xp
-            sc_aircraft_type = telem_data.get("SimconnectCategory", None)
-            sc_engine_type = telem_data.get("EngineType", 4)
-            # 0 = Piston
-            # 1 = Jet
-            # 2 = None
-            # 3 = Helo(Bell) turbine
-            # 4 = Unsupported
-            # 5 = Turboprop
-        elif data_source == "IL2":
-            module = aircrafts_il2
-        elif data_source == 'XPLANE':
-            module = aircrafts_msfs_xp
-        else:
-            module = aircrafts_dcs
-
-        if aircraft_name and aircraft_name != self.currentAircraftName:
-
-            if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
-                logging.info(f"New aircraft loaded: resetting current aircraft config")
-                self.currentAircraftConfig = {}
-
-                params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-
-                # self.settings_manager.update_current_aircraft(send_source, aircraft_name, cls_name)
-                Class = getattr(module, cls_name, None)
-                logging.debug(f"CLASS={Class.__name__}")
-
-                if not Class or Class.__name__ == "Aircraft":
-                    if data_source == "MSFS2020":
-                        if sc_aircraft_type == "Helicopter":
-                            logging.warning(f"Aircraft definition not found, using SimConnect Data (Helicopter Type)")
-                            type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.Helicopter")
-                            params.update(type_cfg)
-                            Class = module.Helicopter
-                        elif sc_aircraft_type == "Jet":
-                            logging.warning(f"Aircraft definition not found, using SimConnect Data (Jet Type)")
-                            type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.JetAircraft")
-                            params.update(type_cfg)
-                            Class = module.JetAircraft
-                        elif sc_aircraft_type == "Airplane":
-                            if sc_engine_type == 0:     # Piston
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Propeller Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.PropellerAircraft")
-                                params.update(type_cfg)
-                                Class = module.PropellerAircraft
-                            if sc_engine_type == 1:     # Jet
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Jet Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.JetAircraft")
-                                params.update(type_cfg)
-                                Class = module.JetAircraft
-                            elif sc_engine_type == 2:   # None
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Glider Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.GliderAircraft")
-                                params.update(type_cfg)
-                                Class = module.GliderAircraft
-                            elif sc_engine_type == 3:   # Heli
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Helo Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.HelicopterAircraft")
-                                params.update(type_cfg)
-                                Class = module.Helicopter
-                            elif sc_engine_type == 5:   # Turboprop
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Turboprop Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.TurbopropAircraft")
-                                params.update(type_cfg)
-                                Class = module.TurbopropAircraft
-                        else:
-                            logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
-                            Class = module.Aircraft
-                    else:
-                        logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
-                        Class = module.Aircraft
-
-                if "vpconf" in params:
-                    set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
-
-                if params.get('command_runner_enabled', False):
-                    if params.get('command_runner_command', '') != '':
-                        try:
-                            subprocess.Popen(params['command_runner_command'], shell=True)
-                        except Exception as e:
-                            logging.error(f"Error running Command Executor for model: {e}")
-
-                logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
-
-                # instantiate new aircraft handler
-                self.currentAircraft = Class(aircraft_name)
-
-                self.currentAircraft.apply_settings(params)
-                self.currentAircraftConfig = params
-                if data_source == "MSFS2020" and aircraft_name != '':
-                    d1 = xmlutils.read_overrides(aircraft_name)
-                    for sv in d1:
-                        self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
-                    self._simconnect._resubscribe()
-                if G.settings_mgr.isVisible():
-                    G.settings_mgr.b_getcurrentmodel.click()
-
-                self.updateSettingsLayout.emit()
-
-            self.currentAircraftName = aircraft_name
-
-        if self.currentAircraft:
-            if config_has_changed():
-                logging.info("Configuration has changed, reloading")
-                params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-                updated_params = self.get_changed_params(params)
-                self.currentAircraft.apply_settings(updated_params)
-
-                if "vpconf" in updated_params:
-                    set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
-
-                if params.get('command_runner_enabled', False):
-                    if params.get('command_runner_command', '') != '' and 'Enter full path' not in params.get('command_runner_command', ''):
-                        try:
-                            subprocess.Popen(params['command_runner_command'], shell=True)
-                        except Exception as e:
-                            logging.error(f"Error running Command Executor for model: {e}")
-
-                if "type" in updated_params:
-                    # if user changed type or if new aircraft dialog changed type, update aircraft class
-                    Class = getattr(module, cls_name, None)
-                    self.currentAircraft = Class(aircraft_name)
-                    self.currentAircraft.apply_settings(params)
-                    self.currentAircraftConfig = params
-
-                if data_source == "MSFS2020" and aircraft_name != '':
-                    d1 = xmlutils.read_overrides(aircraft_name)
-                    for sv in d1:
-                        self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
-                    self._simconnect._resubscribe()
-
-                self.updateSettingsLayout.emit()
-            try:
-                _tm = time.perf_counter()
-                self.currentAircraft._telem_data = telem_data
-                self.currentAircraft.on_telemetry(telem_data)
-                telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
-
-            except:
-                logging.exception(".on_telemetry Exception")
-
-        # Send locally generated telemetry to master here
-        if G.args.child and self.currentAircraft:
-            ipc_telem = self.currentAircraft._ipc_telem
-            if ipc_telem != {}:
-                self.ipc_thread.send_ipc_telem(ipc_telem)
-                self.currentAircraft._ipc_telem = {}
-        if G.args.plot:
-            for item in G.args.plot:
-                if item in telem_data:
-                    if G._child_instance or G._launched_children:
-                        utils.teleplot.sendTelemetry(item, telem_data[item], instance=G._device_type)
-                    else:
-                        utils.teleplot.sendTelemetry(item, telem_data[item])
-
-        try:  # sometime Qt object is destroyed first on exit and this may cause a runtime exception
-            self.telemetryReceived.emit(telem_data)
-        except: pass
-
-    def on_timeout(self):
-        if self.currentAircraft and not self.timedOut:
-            self.currentAircraft.on_timeout()
-        self.timedOut = True
-        self.settings_manager.timedOut = True
-
-    def run(self):
-        self.timeout = int(utils.read_system_settings(G.args.device, G.args.type).get('telemTimeout', 200))/1000
-        logging.info(f"Telemetry timeout: {self.timeout}")
-        while self._run:
-            with self._cond:
-                if not len(self._events) and not self._data:
-                    if not self._cond.wait(self.timeout):
-                        self.on_timeout()
-                        continue
-
-                if len(self._events):
-                    self.process_events()
-
-                if self._data:
-                    self.timedOut = False
-                    self.settings_manager.timedOut = False
-                    data = self._data
-                    self._data = None
-                    self.process_data(data)
-
-
-class IPCNetworkThread(QThread):
-    message_received = pyqtSignal(str)
-    exit_signal = pyqtSignal(str)
-    restart_sim_signal = pyqtSignal(str)
-    show_signal = pyqtSignal()
-    showlog_signal = pyqtSignal()
-    hide_signal = pyqtSignal()
-    show_settings_signal = pyqtSignal()
-    child_keepalive_signal = pyqtSignal(str, str)
-
-    def __init__(self, host="localhost", myport=0, dstport=0, child_ports=[], master=False, child=False, keepalive_timer=1, missed_keepalive=3):
-        super().__init__()
-
-        self._run = True
-        self._myport = int(myport)
-        self._dstport = int(dstport)
-        self._host = host
-        self._master = master
-        self._child = child
-        self._child_ports = child_ports
-        self._child_keepalive_timestamp = {}
-        self._keepalive_timer = keepalive_timer
-        self._missed_keepalive = missed_keepalive
-        self._last_keepalive_timestamp = time.time()
-        self._ipc_telem = {}
-        self._ipc_telem_effects = {}
-
-        self._child_active = {
-            'joystick': False,
-            'pedals': False,
-            'collective': False
-        }
-
-        # Initialize socket
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
-        self._socket.settimeout(0.1)
-        logging.info(f"Setting up IPC socket at {self._host}:{self._myport}")
-        try:
-            self._socket.bind((self._host, self._myport))
-        except OSError as e:
-            QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {G._device_type} instance of TelemFFB.\n\n{e}\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
-            QCoreApplication.instance().quit()
-
-    def send_ipc_telem(self, telem):
-        j_telem = json.dumps(telem)
-        message = f"telem:{j_telem}"
-        self.send_message(message)
-
-    def send_ipc_effects(self, active_effects, active_settings):
-        payload = {
-            f'{G._device_type}_active_effects': active_effects,
-            f'{G._device_type}_active_settings': active_settings
-        }
-
-        msg = json.dumps(payload)
-
-        msg = f'effects:{msg}'
-
-        self.send_message(msg)
-
-    def send_message(self, message):
-        encoded_data = message.encode("utf-8")
-        try:    # socket may be closed
-            self._socket.sendto(encoded_data, (self._host, self._dstport))
-        except OSError as e:
-            logging.warning(f"Error sending IPC frame: {e}")
-
-    def send_broadcast_message(self, message):
-        for port in self._child_ports:
-            encoded_data = message.encode("utf-8")
-            self._socket.sendto(encoded_data, (self._host, int(port)))
-
-    def send_keepalive(self):
-        while self._run:
-            if self._master:
-                self.send_broadcast_message("Keepalive")
-                ts = time.time()
-                logging.debug(f"SENT KEEPALIVES: {ts}")
-                time.sleep(self._keepalive_timer)
-            elif self._child:
-                self.send_message(f"Child Keepalive:{G._device_type}")
-                ts = time.time()
-                logging.debug(f"{G._device_type} SENT CHILD KEEPALIVE: {ts}")
-                time.sleep(self._keepalive_timer)
-
-    def receive_messages(self):
-        while self._run:
-            try:
-                data, addr = self._socket.recvfrom(4096)
-
-                msg = data.decode("utf-8")
-                if msg == 'Keepalive':
-                    if self._child:
-                        ts = time.time()
-                        logging.debug(f"GOT KEEPALIVE: {ts}")
-                        self._last_keepalive_timestamp = ts
-                elif msg.startswith('Child Keepalive:'):
-                    ch_dev = msg.removeprefix('Child Keepalive:')
-                    logging.debug(f"GOT KEEPALIVE FROM CHILD: '{ch_dev}'")
-                    ts = time.time()
-                    self._child_keepalive_timestamp[ch_dev] = ts
-                    pass
-                elif msg == 'MASTER INSTANCE QUIT':
-                    logging.info("Received QUIT signal from master instance.  Running exit/cleanup function.")
-                    self.exit_signal.emit("Received QUIT signal from master instance.  Running exit/cleanup function.")
-                elif msg == 'RESTART SIMS':
-                    self.restart_sim_signal.emit('Restart Sims')
-                elif msg.startswith('SHOW LOG:'):
-                    dev = msg.removeprefix('SHOW LOG:')
-                    if dev == G._device_type:
-                        logging.info("Show log command received via IPC")
-                        self.showlog_signal.emit()
-                elif msg == 'SHOW WINDOW':
-                    logging.info("Show command received via IPC")
-                    self.show_signal.emit()
-                elif msg == 'HIDE WINDOW':
-                    logging.info("Hide command received via IPC")
-                    self.hide_signal.emit()
-                elif msg == "SHOW SETTINGS":
-                    logging.info("Show system settings command received via IPC")
-                    self.show_settings_signal.emit()
-                elif msg.startswith('telem:'):
-                    payload = msg.removeprefix('telem:')
-                    try:
-                        ipc_telem = json.loads(payload)
-                        # logging.info(f"GOT JSON PAYLOAD: {ipc_telem}")
-                        self._ipc_telem.update(ipc_telem)
-
-                    except json.JSONDecodeError:
-                        pass
-                elif msg.startswith('effects:'):
-                    payload = msg.removeprefix('effects:')
-                    try:
-                        telem_effects_dict = json.loads(payload)
-                        self._ipc_telem_effects.update(telem_effects_dict)
-                        # print(f"GOT EFFECTS:{self._ipc_telem_effects}")
-
-                    except json.JSONDecodeError:
-                        pass
-                elif msg.startswith("LOADCONFIG:"):
-                    path = msg.removeprefix("LOADCONFIG:")
-                    load_custom_userconfig(path)
-                else:
-                    logging.info(f"GOT GENERIC MESSAGE: {msg}")
-
-                    self.message_received.emit(msg)
-            except OSError:
-                continue
-            except ConnectionResetError:
-                continue
-            except socket.timeout:
-                continue
-
-    def check_missed_keepalives(self):
-        while self._run:
-            if self._child:
-                time.sleep(self._keepalive_timer)
-                elapsed_time = time.time() - self._last_keepalive_timestamp
-                if elapsed_time > (self._keepalive_timer * self._missed_keepalive):
-                    logging.error("KEEPALIVE TIMEOUT... exiting in 2 seconds")
-                    time.sleep(2)
-                    # QCoreApplication.instance().quit()
-                    self.exit_signal.emit("Missed too many keepalives. Exiting.")
-                    break
-            elif self._master:
-                time.sleep(self._keepalive_timer)
-                for device in self._child_keepalive_timestamp:
-                    elapsed_time = time.time() - self._child_keepalive_timestamp.get(device, time.time())
-                    if elapsed_time > (self._keepalive_timer * self._missed_keepalive):
-                        logging.info(f"{device} KEEPALIVE TIMEOUT")
-                        if self._child_active.get(device):
-                            self.child_keepalive_signal.emit(device, 'TIMEOUT')
-                            self._child_active[device] = False
-                    else:
-                        logging.debug(f"{device} KEEPALIVE ACTIVE")
-                        if not self._child_active.get(device):
-                            self.child_keepalive_signal.emit(device, 'ACTIVE')
-                            self._child_active[device] = True
-
-    def run(self):
-        self.receive_thread = threading.Thread(target=self.receive_messages)
-        self.receive_thread.start()
-
-        if self._master:
-            self._send_ka_thread = threading.Thread(target=self.send_keepalive)
-            self._send_ka_thread.start()
-            self._check_ka_thread = threading.Thread(target=self.check_missed_keepalives)
-            self._check_ka_thread.start()
-
-        if self._child:
-            self._send_ka_thread = threading.Thread(target=self.send_keepalive)
-            self._send_ka_thread.start()
-            self._check_ka_thread = threading.Thread(target=self.check_missed_keepalives)
-            self._check_ka_thread.start()
-
-    def stop(self):
-        logging.info("IPC Thread stopping")
-        self._run = False
-        self._socket.close()
-
-
-class NetworkThread(threading.Thread):
-    def __init__(self, telemetry: TelemManager, host="", port=34380, telem_parser=None):
-        super().__init__()
-        self._run = True
-        self._port = port
-        self._telem = telemetry
-        self._telem_parser = telem_parser
-
-    def run(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
-
-        s.settimeout(0.1)
-        s.bind(("", self._port))
-        logging.info(f"Listening on UDP :{self._port}")
-
-        while self._run:
-            try:
-                data, sender = s.recvfrom(4096)
-                if self._telem_parser is not None:
-                    data = self._telem_parser.process_packet(data)
-
-                self._telem.submitFrame(data)
-            except ConnectionResetError:
-                continue
-            except socket.timeout:
-                continue
-
-    def quit(self):
-        logging.info("NetworkThread stopping")
-        self._run = False
-
-
-class SimConnectSock(SimConnectManager):
-    def __init__(self, telem: TelemManager, ffb_type=G._device_type, unique_id=int(G._device_pid)):
-        super().__init__(unique_id)
-        telem.set_simconnect(self)
-        self._telem = telem
-        self._ffb_type = ffb_type
-
-
-    def fmt(self, val):
-        if isinstance(val, list):
-            return "~".join([str(x) for x in val])
-        return val
-
-    def emit_packet(self, data):
-        data["src"] = "MSFS2020"
-        packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
-        self._telem.submitFrame(packet)
-
-    def emit_event(self, event, *args):
-        # special handling of Open event
-        if event == "Open":
-            # Reset all FFB effects on device, ensure we have a clean start
-            HapticEffect.device.resetEffects()
-        if event == "Quit":
-            utils.signal_emitter.msfs_quit_signal.emit()
-
-        args = [str(x) for x in args]
-        self._telem.submitFrame(f"Ev={event};" + ";".join(args))
-
-
-    # retranslateUi
-    # setupUi
 
 class MainWindow(QMainWindow):
     show_simvars = False
@@ -1004,7 +334,7 @@ class MainWindow(QMainWindow):
 
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
-        self._current_config_scope = G.args.type
+        self._current_config_scope = G._device_type
         if G.system_settings.get('saveLastTab', 0):
             if G._device_type == 'joystick':
                 tab_key = 'jWindowData'
@@ -1041,9 +371,9 @@ class MainWindow(QMainWindow):
         self.setMinimumWidth(600)
         self.tab_sizes = self.default_tab_sizes
         self._ipc_thread = ipc_thread
-        self.system_settings_dict = utils.read_system_settings(G.args.device, G.args.type)
+        self.system_settings_dict = utils.read_system_settings(G._device_vid_pid, G._device_type)
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
-        match G.args.type:
+        match G._device_type:
             case 'joystick':
                 x_pos = 150
                 y_pos = 130
@@ -1056,7 +386,7 @@ class MainWindow(QMainWindow):
 
         self.setGeometry(x_pos, y_pos, 530, 700)
         if version:
-            self.setWindowTitle(f"TelemFFB ({G.args.type}) ({version})")
+            self.setWindowTitle(f"TelemFFB ({G._device_type}) ({version})")
         else:
             self.setWindowTitle(f"TelemFFB")
         # Construct the absolute path of the icon file
@@ -1142,7 +472,7 @@ class MainWindow(QMainWindow):
         # Add settings converter
         if _legacy_override_file is not None:
             convert_settings_action = QAction('Convert legacy user config to XML', self)
-            convert_settings_action.triggered.connect(lambda: autoconvert_config(self))
+            convert_settings_action.triggered.connect(lambda: autoconvert_config(self, _legacy_config_file, _legacy_override_file))
             utilities_menu.addAction(convert_settings_action)
 
         if G._master_instance and G.system_settings.get('autolaunchMaster', 0):
@@ -1206,10 +536,10 @@ class MainWindow(QMainWindow):
         # Set the layout of the menu frame as the main layout
         layout.addWidget(menu_frame)
 
-        dcs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableDCS')
-        il2_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableIL2')
-        msfs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableMSFS')
-        xplane_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableXPLANE')
+        dcs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableDCS')
+        il2_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableIL2')
+        msfs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableMSFS')
+        xplane_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableXPLANE')
 
         self.icon_size = QSize(18, 18)
         if G.args.sim == "DCS" or dcs_enabled:
@@ -1481,10 +811,10 @@ class MainWindow(QMainWindow):
 
         # Create the QLabel widget and set its properties
 
-        dcs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableDCS')
-        il2_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableIL2')
-        msfs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableMSFS')
-        xplane_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableXPLANE')
+        dcs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableDCS')
+        il2_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableIL2')
+        msfs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableMSFS')
+        xplane_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableXPLANE')
 
         # Convert True/False to "enabled" or "disabled"
         dcs_status = "Enabled" if dcs_enabled else "Disabled"
@@ -1928,7 +1258,7 @@ class MainWindow(QMainWindow):
             exit_application()
 
     def reset_window_size(self):
-        match G.args.type:
+        match G._device_type:
             case 'joystick':
                 x_pos = 150
                 y_pos = 130
@@ -1942,8 +1272,8 @@ class MainWindow(QMainWindow):
         self.setGeometry(x_pos, y_pos, 530, 700)
 
     def load_main_window_geometry(self):
-        device_type = G.args.type
-        sys_settings = utils.read_system_settings(G.args.device, G.args.type)
+        device_type = G._device_type
+        sys_settings = utils.read_system_settings(G._device_vid_pid, G._device_type)
         if device_type == 'joystick':
             reg_key = 'jWindowData'
         elif device_type == 'pedals':
@@ -2245,7 +1575,7 @@ class MainWindow(QMainWindow):
                 self.cb_joystick.setVisible(True)
                 self.cb_pedals.setVisible(True)
                 self.cb_collective.setVisible(True)
-                match G.args.type:
+                match G._device_type:
                     case 'joystick':
                         self.cb_joystick.setChecked(True)
                     case 'pedals':
@@ -2419,7 +1749,7 @@ class MainWindow(QMainWindow):
         if _release:
             return False
 
-        ignore_auto_updates = utils.read_system_settings(G.args.device, G.args.type).get('ignoreUpdate', False)
+        ignore_auto_updates = utils.read_system_settings(G._device_vid_pid, G._device_type).get('ignoreUpdate', False)
         if not auto:
             ignore_auto_updates = False
         update_ans = QMessageBox.No
@@ -2474,99 +1804,6 @@ class MainWindow(QMainWindow):
             self.show_simvars = True
             self.show_simvar_action.setChecked(True)
 
-class LogTailer(QThread):
-    log_updated = pyqtSignal(str)
-
-    def __init__(self, log_file_path, parent=None):
-        super(LogTailer, self).__init__(parent)
-        self.log_file_path = log_file_path
-        self.pause_mutex = QMutex()
-        self.paused = False
-
-    def run(self):
-        with open(self.log_file_path, 'r') as self.log_file:
-            self.log_file.seek(0, os.SEEK_END)
-            while True:
-                self.pause_mutex.lock()
-                while self.paused:
-                    self.pause_mutex.unlock()
-                    time.sleep(0.1)
-                    self.pause_mutex.lock()
-
-                where = self.log_file.tell()
-                line = self.log_file.readline()
-                if not line:
-                    time.sleep(0.1)
-                    self.log_file.seek(where)
-                else:
-                    self.log_updated.emit(line)
-
-                self.pause_mutex.unlock()
-
-    def pause(self):
-        self.pause_mutex.lock()
-        self.paused = True
-        self.pause_mutex.unlock()
-
-    def resume(self):
-        self.pause_mutex.lock()
-        self.paused = False
-        self.pause_mutex.unlock()
-
-    def is_paused(self):
-        return self.paused
-
-    def change_log_file(self, new_log_file_path):
-        self.pause()  # Pause the tailing while changing the log file
-        if self.log_file:
-            self.log_file.close()  # Close the current file handle
-        self.log_file_path = new_log_file_path
-        self.log_file = open(self.log_file_path, 'r')  # Open the new log file
-        self.log_file.seek(0, os.SEEK_END)
-        self.resume()  # Resume tailing with the new log file
-
-
-def set_vpconf_profile(config, serial):
-    vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
-    # serial = HapticEffect.device.serial
-
-    if vpconf_path:
-        logging.info(f"Found VPforce Configurator at {vpconf_path}")
-        workdir = os.path.dirname(vpconf_path)
-        env = {}
-        env["PATH"] = os.environ["PATH"]
-        if not os.path.isfile(config):
-            logging.error(f"Error loading VPforce Configurator Profile: ({config}) - The file does not exist! ")
-            return
-
-        if not validate_vpconf_profile(config, silent=True):
-            logging.error(f"VPForce Config Error: ({config}) - The file failed validation!  Check the PID is correct for the device")
-            return
-
-        logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config} -serial {serial}")
-
-        subprocess.call([vpconf_path, "-config", config, "-serial", serial], cwd=workdir, env=env)
-    else:
-        logging.error("Unable to find VPforce Configurator installation location")
-
-def load_custom_userconfig(new_path=''):
-    print(f"newpath=>{new_path}<")
-    if new_path == '':
-        options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)", options=options)
-        if file_path == '':
-            return
-        G.userconfig_rootpath = os.path.basename(file_path)
-        G.userconfig_path = file_path
-    else:
-        G.userconfig_rootpath = os.path.basename(new_path)
-        G.userconfig_path = new_path
-    xmlutils.update_vars(G._device_type, _userconfig_path=G.userconfig_path, _defaults_path=G.defaults_path)
-    G.settings_mgr = SettingsWindow(datasource="Global", device=G.args.type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
-    logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
-    if G._master_instance and G._launched_children:
-        G._ipc_thread.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
-
 def hide_window():
 
     try:
@@ -2581,31 +1818,6 @@ def exit_application():
     QCoreApplication.instance().quit()
 
 
-def save_main_window_geometry():
-    # Capture the mai n window's geometry
-    device_type = G._device_type
-    cur_index = G.main_window.tab_widget.currentIndex()
-    G.main_window.tab_sizes[str(cur_index)]['width'] = G.main_window.width()
-    G.main_window.tab_sizes[str(cur_index)]['height'] = G.main_window.height()
-
-    window_dict = {
-        'WindowPosition': {
-            'x': G.main_window.pos().x(),
-            'y': G.main_window.pos().y(),
-        },
-        'Tab': G.main_window.tab_widget.currentIndex(),
-        'TabSizes': G.main_window.tab_sizes
-    }
-    if device_type == 'joystick':
-        reg_key = 'jWindowData'
-    elif device_type == 'pedals':
-        reg_key = 'pWindowData'
-    elif device_type == 'collective':
-        reg_key = 'cWindowData'
-    j_window_dict = json.dumps(window_dict)
-    utils.set_reg(reg_key, j_window_dict)
-
-
 def send_test_message():
     if G._ipc_running:
         if G._master_instance:
@@ -2614,122 +1826,6 @@ def send_test_message():
             G._ipc_thread.send_message("TEST MESSAGE")
 
 
-def select_sim_for_conversion(window, aircraft_name):
-    msg_box = QMessageBox(window)
-    msg_box.setIcon(QMessageBox.Question)
-    msg_box.setText(f"Please select the simulator to which '{aircraft_name}' from your user configuration belongs:")
-    msg_box.setWindowTitle("Simulator Selection")
-
-    msfs_button = QPushButton("MSFS")
-    dcs_button = QPushButton("DCS")
-    il2_button = QPushButton("IL2")
-
-    msg_box.addButton(msfs_button, QMessageBox.YesRole)
-    msg_box.addButton(dcs_button, QMessageBox.NoRole)
-    msg_box.addButton(il2_button, QMessageBox.NoRole)
-
-    result = msg_box.exec_()
-
-    if result == 0:  # MSFS button
-        return "MSFS"
-    elif result == 1:  # DCS button
-        return "DCS"
-    elif result == 2:  # IL2 button
-        return "IL2"
-    else:
-        return None
-
-
-def config_to_dict(section, name, value, isim='', device=G.args.type, new_ac=False):
-    classes = ['PropellerAircraft', 'JetAircraft', 'TurbopropAircraft', 'Glider', 'Helicopter', 'HPGHelicopter']
-    sim = ''
-    cls = ''
-    model = ''
-    match section:
-        case 'system':
-            sim = 'Global'
-        case 'DCS':
-            sim = 'DCS'
-        case 'IL2':
-            sim = 'IL2'
-        case 'MSFS2020':
-            sim = 'MSFS'
-
-    if '.' in section:
-        subsection = section.split('.')
-        if subsection[1] in classes:  # Make sure it is actually a sim/class section and not a regex aircraft section
-            ssim = subsection[0]
-            cls = subsection[1]
-            match ssim:
-                case 'DCS':
-                    sim = 'DCS'
-                case 'IL2':
-                    sim = 'IL2'
-                case 'MSFS2020':
-                    sim = 'MSFS'
-
-    # if isim is present, is a new aircraft and user has responded with the sim information, add as new model
-    if isim != '':
-        model = section
-        sim = isim
-        cls = ''
-
-    # if sim is still blank here, must be a default model section in the user config
-    if sim == '':
-        model = section
-        sim = 'any'
-        cls = ''
-
-    data_dict = {
-        'name': name,
-        'value': value,
-        'sim': sim,
-        'class': cls,
-        'model': model,
-        'device': device,
-        'new_ac': new_ac
-    }
-    # print(data_dict)
-    return data_dict
-
-
-def convert_system_settings(sys_dict):
-    map_dev_dict = {
-        'logging_level': 'logLevel',
-        'telemetry_timeout': 'telemTimeout',
-    }
-
-    map_sys_dict = {
-        'ignore_auto_updates': 'ignoreUpdate',
-        'msfs_enabled': 'enableMSFS',
-        'dcs_enabled': 'enableDCS',
-        'il2_enabled': 'enableIL2',
-        'il2_telem_port': 'portIL2',
-        'il2_cfg_validation': 'validateIL2',
-        'il2_path': 'pathIL2',
-    }
-
-    def_dev_dict, def_sys_dict = utils.get_default_sys_settings(G.args.device, G.args.type)
-
-    sys_dict = utils.sanitize_dict(sys_dict)
-    for key, value in sys_dict.items():  # iterate through the values in the ini user config
-        if key in map_dev_dict:  # check if the key is in the new device specific settings
-            new_key = map_dev_dict.get(key, None)  # get the translated key name from the map dictionary
-            if new_key is None:  # should never be none since we already checked it existed.. but just in case..
-                continue
-            def_dev_dict[new_key] = value  # write the old value to the new dictionary with the new key
-
-        elif key in map_sys_dict:  # elif check if the key is in the new system global settings
-            new_key = map_sys_dict.get(key, None)  # get the translated key name from the map dictionary
-            if new_key is None:  # should never be none since we already checked it existed.. but just in case..
-                continue
-            def_sys_dict[new_key] = value  # write the old value to the new dictionary with the new key
-
-    # now format and write the new reg keys
-    formatted_dev_dict = json.dumps(def_dev_dict)
-    formatted_sys_dict = json.dumps(def_sys_dict)
-    utils.set_reg('Sys', formatted_sys_dict)
-    utils.set_reg(f'{G.args.type}Sys', formatted_dev_dict)
     # sys_out = {}
     # for key, value in sys_dict.items():
     #     reg_key = map_dict.get(key, None)
@@ -2742,109 +1838,9 @@ def convert_system_settings(sys_dict):
     # pass
 
 
-def convert_settings(cfg=_legacy_config_file, usr=_legacy_override_file, window=None):
-    differences = []
-    defaultconfig = ConfigObj(cfg)
-    userconfig = ConfigObj(usr, raise_errors=False)
-
-    def_params = {section: utils.sanitize_dict(defaultconfig[section]) for section in defaultconfig}
-    try:
-        usr_params = {section: utils.sanitize_dict(userconfig[section]) for section in userconfig}
-    except:
-        QMessageBox.warning(window, "Conversion Error",
-                            "There was an error converting the config.  Please inspect the .ini config for syntax issues.\n\nMake sure all settings fall under a [section] and there are no spaces in any setting name")
-        return False
-    sys = userconfig.get('system', None)
-    for section in usr_params:
-        if section == 'system':
-            convert_system_settings(usr_params[section])
-            continue
-        if section in def_params:
-            # Compare common keys with different values
-            for key, value in usr_params[section].items():
-                if key in def_params[section] and def_params[section][key] != value:
-                    value = 0 if value == 'not_configured' else value
-                    valuestring = str(value)
-                    dif_item = config_to_dict(section, key, valuestring)
-                    differences.append(dif_item)
-
-            # Identify keys that exist only in the user configuration
-            for key, value in usr_params[section].items():
-                if key not in def_params[section]:
-                    value = 0 if value == 'not_configured' else value
-                    valuestring = str(value)
-                    dif_item = config_to_dict(section, key, valuestring)
-                    differences.append(dif_item)
-                    differences.append(dif_item)
-        else:
-            # All keys in the user configuration section are new
-            # non matching sections must be new aircraft
-
-            sim = select_sim_for_conversion(window, section)
-            for key, value in usr_params[section].items():
-                value = 0 if value == 'not_configured' else value
-                valuestring = str(value)
-                if key == "type":
-                    dev = "any"
-                else:
-                    dev = G.args.type
-                dif_item = config_to_dict(section, key, valuestring, isim=sim, device=dev, new_ac=True)
-                differences.append(dif_item)
-
-    xmlutils.write_converted_to_xml(differences)
-    return True
-
-def autoconvert_config(main_window, cfg=_legacy_config_file, usr=_legacy_override_file):
-    if G._child_instance: return
-    if usr is not None:
-        ans = QMessageBox.information(
-            main_window,
-            "Important TelemFFB Update Notification",
-            textwrap.dedent(f'''
-                The 'ini' config file type is now deprecated.
-            
-                This version of TelemFFB uses a new UI-driven config model.
-            
-                It appears you are using a user override file ({usr}).  Would you
-                like to auto-convert that file to the new config model?
-            
-                If you choose no, you may also perform the conversion from
-                the Utilities menu.
-            
-                Proceeding will convert the config and re-name your
-                existing user config to '{os.path.basename(usr)}.legacy'
-            '''),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes
-        )
-
-        if ans == QMessageBox.No:
-            return
-        if not os.path.isfile(_legacy_override_file):
-            QMessageBox.warning(main_window, "Error", f"Legacy override file {usr} was passed at runtime for auto-conversion, but the file does not exist")
-            return
-        # perform the conversion
-        if not convert_settings(cfg=cfg, usr=usr, window=main_window):
-            return False
-        try:
-            os.rename(usr, f"{usr}.legacy")
-        except OSError:
-            ans = QMessageBox.warning(main_window, 'Warning', f'The legacy backup file for "{usr}" already exists, would you like to replace it?', QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if ans == QMessageBox.Yes:
-                os.replace(usr, f"{usr}.legacy")
-
-        QMessageBox.information(main_window, "Conversion Completed", '''
-            The conversion is complete.
-            
-            If you are utilizing multiple VPforce FFB enabled devices, please set up the auto-launch capabilities in the system settings menu.
-            
-            To avoid unnecessary log messages, please remove any '-c' or '-o' arguments from your startup shortcut as they are no longer supported'''
-                                )
-
-
 def restart_sims():
     sim_list = ['DCS', 'MSFS', 'IL2', 'XPLANE']
-    sys_settings = utils.read_system_settings(G.args.device, G._device_type)
+    sys_settings = utils.read_system_settings(G._device_vid_pid, G._device_type)
     stop_sims()
     init_sims()
     G.main_window.init_sim_indicators(sim_list, sys_settings)
@@ -2853,20 +1849,20 @@ def restart_sims():
 def init_sims():
     global dcs_telem, il2_telem, sim_connect_telem, xplane_telem
 
-    xplane_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableXPLANE', False)
+    xplane_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableXPLANE', False)
 
     xplane_telem = NetworkThread(G.telem_manager, host='', port=34390)
     # xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE', False)
     if xplane_enabled or G.args.sim == 'XPLANE':
-        if not G._child_instance and utils.read_system_settings(G.args.device, G.args.type).get('validateXPLANE', False):
-            xplane_path = utils.read_system_settings(G.args.device, G.args.type).get('pathXPLANE', '')
+        if not G._child_instance and utils.read_system_settings(G._device_vid_pid, G._device_type).get('validateXPLANE', False):
+            xplane_path = utils.read_system_settings(G._device_vid_pid, G._device_type).get('pathXPLANE', '')
             utils.install_xplane_plugin(xplane_path, G.main_window)
         logging.info("Starting XPlane Telemetry Listener")
         xplane_telem.start()
 
     dcs_telem = NetworkThread(G.telem_manager, host="", port=34380)
     # dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
-    dcs_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableDCS', False)
+    dcs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableDCS', False)
     if dcs_enabled or G.args.sim == "DCS":
         # check and install/update export lua script
         if not G._child_instance:
@@ -2876,15 +1872,15 @@ def init_sims():
 
     il2_mgr = IL2Manager()
     # il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
-    il2_port = int(utils.read_system_settings(G.args.device, G.args.type).get('portIL2', 34385))
+    il2_port = int(utils.read_system_settings(G._device_vid_pid, G._device_type).get('portIL2', 34385))
     # il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
-    il2_path = utils.read_system_settings(G.args.device, G.args.type).get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    il2_path = utils.read_system_settings(G._device_vid_pid, G._device_type).get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
     # il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
-    il2_validate = utils.read_system_settings(G.args.device, G.args.type).get('validateIL2', True)
+    il2_validate = utils.read_system_settings(G._device_vid_pid, G._device_type).get('validateIL2', True)
     il2_telem = NetworkThread(G.telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
 
     # il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
-    il2_enabled = utils.read_system_settings(G.args.device, G.args.type).get('enableIL2', False)
+    il2_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableIL2', False)
 
     if il2_enabled or G.args.sim == "IL2":
         if not G._child_instance:
@@ -2897,7 +1893,7 @@ def init_sims():
         il2_telem.start()
 
     sim_connect_telem = SimConnectSock(G.telem_manager)
-    msfs = utils.read_system_settings(G.args.device, G.args.type).get('enableMSFS', False)
+    msfs = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableMSFS', False)
 
     try:
         # msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
@@ -3059,9 +2055,9 @@ def main():
 
     log_window = LogWindow()
 
-    xmlutils.update_vars(G.args.type, G.userconfig_path, G.defaults_path)
+    xmlutils.update_vars(G._device_type, G.userconfig_path, G.defaults_path)
     try:
-        G.settings_mgr = SettingsWindow(datasource="Global", device=G.args.type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
+        G.settings_mgr = SettingsWindow(datasource="Global", device=G._device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
     except Exception as e:
         traceback.print_exc()
         logging.error(f"Error Reading user config file..")
@@ -3082,7 +2078,7 @@ def main():
             utils.create_empty_userxml_file(G.userconfig_path)
 
             logging.info(f"User config Reset:  Backup file created: {backup_file}")
-            G.settings_mgr = SettingsWindow(datasource="Global", device=G.args.type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
+            G.settings_mgr = SettingsWindow(datasource="Global", device=G._device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
             QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
         else:
             QCoreApplication.instance().quit()
@@ -3098,7 +2094,7 @@ def main():
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info(f"TelemFFB (version {version}) Starting")
     try:
-        vid_pid = [int(x, 16) for x in _device_vid_pid.split(":")]
+        vid_pid = [int(x, 16) for x in G._device_vid_pid.split(":")]
     except:
         pass
 
@@ -3128,12 +2124,12 @@ def main():
                 QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
 
     except Exception as e:
-        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {_device_vid_pid} for device: {G._device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
+        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {G._device_vid_pid} for device: {G._device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
         dev_firmware_version = 'ERROR'
 
     # config = get_config()
     # ll = config["system"].get("logging_level", "INFO")
-    ll = utils.read_system_settings(G.args.device, G.args.type).get('logLevel', 'INFO')
+    ll = utils.read_system_settings(G._device_vid_pid, G._device_type).get('logLevel', 'INFO')
     log_levels = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -3175,7 +2171,7 @@ def main():
         else:
             G.main_window.show()
 
-    autoconvert_config(G.main_window)
+    autoconvert_config(G.main_window, _legacy_config_file, _legacy_override_file)
     if not _release:
         fetch_version_thread = utils.FetchLatestVersionThread()
         fetch_version_thread.version_result_signal.connect(G.main_window.update_version_result)

@@ -590,7 +590,7 @@ class SettingsLayout(QGridLayout):
         if file_path:
             cfg_scope = xmlutils.device
             key = "pid" + cfg_scope.capitalize()
-            pid = system_settings.get(key, '')
+            pid = G.system_settings.get(key, '')
 
             if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
                 lprint(f"Selected File: {file_path}")

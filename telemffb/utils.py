@@ -33,9 +33,12 @@ from PyQt5.QtCore import QThread, pyqtSignal, QObject
 from PyQt5 import QtCore, QtGui, Qt
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
+from telemffb.custom_widgets import QMessageBox
 import telemffb.globals as G
 import logging
-import winpaths
+from telemffb.settingsmanager import QFileDialog, QMessageBox, SettingsWindow, json, logging, os, utils, xmlutils
+import telemffb.utils as utils
+import telemffb.winpaths as winpaths
 import winreg
 import socket
 import math
@@ -49,6 +52,8 @@ import json
 import ssl
 import io
 import xml.etree.ElementTree as ET
+
+import telemffb.xmlutils as xmlutils
 
 
 class SignalEmitter(QObject):
@@ -1604,3 +1609,87 @@ class LoggingFilter(logging.Filter):
                 return False
         # If none of the keywords are found, allow the message to be logged
         return True
+
+
+def load_custom_userconfig(new_path=''):
+    print(f"newpath=>{new_path}<")
+    if new_path == '':
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)", options=options)
+        if file_path == '':
+            return
+        G.userconfig_rootpath = os.path.basename(file_path)
+        G.userconfig_path = file_path
+    else:
+        G.userconfig_rootpath = os.path.basename(new_path)
+        G.userconfig_path = new_path
+    xmlutils.update_vars(G._device_type, _userconfig_path=G.userconfig_path, _defaults_path=G.defaults_path)
+    G.settings_mgr = SettingsWindow(datasource="Global", device=G._device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
+    logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
+    if G._master_instance and G._launched_children:
+        G._ipc_thread.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
+
+
+def set_vpconf_profile(config_filepath, serial):
+    vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
+    # serial = HapticEffect.device.serial
+
+    if vpconf_path:
+        logging.info(f"Found VPforce Configurator at {vpconf_path}")
+        workdir = os.path.dirname(vpconf_path)
+        env = {}
+        env["PATH"] = os.environ["PATH"]
+        if not os.path.isfile(config_filepath):
+            logging.error(f"Error loading VPforce Configurator Profile: ({config_filepath}) - The file does not exist! ")
+            return
+
+        if not validate_vpconf_profile(config_filepath, silent=True):
+            logging.error(f"VPForce Config Error: ({config_filepath}) - The file failed validation!  Check the PID is correct for the device")
+            return
+
+        logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
+
+        subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env)
+    else:
+        logging.error("Unable to find VPforce Configurator installation location")
+
+
+def format_dict(data, prefix=""):
+    output = ""
+    for key, value in data.items():
+        if isinstance(value, dict):
+            output += format_dict(value, prefix + key + ".")
+        else:
+            output += prefix + key + " = " + str(value) + "\n"
+    return output
+
+
+def save_main_window_geometry():
+    # Capture the mai n window's geometry
+    device_type = G._device_type
+    cur_index = G.main_window.tab_widget.currentIndex()
+    G.main_window.tab_sizes[str(cur_index)]['width'] = G.main_window.width()
+    G.main_window.tab_sizes[str(cur_index)]['height'] = G.main_window.height()
+
+    window_dict = {
+        'WindowPosition': {
+            'x': G.main_window.pos().x(),
+            'y': G.main_window.pos().y(),
+        },
+        'Tab': G.main_window.tab_widget.currentIndex(),
+        'TabSizes': G.main_window.tab_sizes
+    }
+    if device_type == 'joystick':
+        reg_key = 'jWindowData'
+    elif device_type == 'pedals':
+        reg_key = 'pWindowData'
+    elif device_type == 'collective':
+        reg_key = 'cWindowData'
+    j_window_dict = json.dumps(window_dict)
+    utils.set_reg(reg_key, j_window_dict)
+
+
+
+
+
+
