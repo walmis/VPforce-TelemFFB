@@ -15,12 +15,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import glob
+import sys
+if sys.argv[0].lower().endswith("updater.exe"):
+    from updater import main
+    main()
+    exit()
 
 import argparse
 import json
 import logging
-import sys
+
 import time
 import os
 
@@ -2179,7 +2183,7 @@ def main():
     G.main_window.set_telem_manager(G.telem_manager)
 
     G.telem_manager.telemetryReceived.connect(G.main_window.update_telemetry)
-    G.telem_manager.updateSettingsLayout.connect(G.main_window.update_settings)
+    G.telem_manager.aircraftUpdated.connect(G.main_window.update_settings)
 
     init_sims()
 
@@ -2220,9 +2224,10 @@ def main():
 
     app.exec_()
 
-    if G._ipc_thread.running:
+    if G._ipc_thread and G._ipc_thread.running:
         notify_close_children()
         G._ipc_thread.stop()
+
     stop_sims()
     G.telem_manager.quit()
     if G.system_settings.get('enableVPConfExit', False):

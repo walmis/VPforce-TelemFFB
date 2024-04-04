@@ -1,3 +1,4 @@
+from telemffb.IPCNetworkThread import IPCNetworkThread
 import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.utils import set_vpconf_profile
@@ -40,7 +41,7 @@ def config_has_changed(update=False) -> bool:
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
-    updateSettingsLayout = pyqtSignal()
+    aircraftUpdated = pyqtSignal()
     currentAircraft: aircrafts_dcs.Aircraft = None
     currentAircraftName: str = None
     currentAircraftConfig: dict = {}
@@ -62,7 +63,7 @@ class TelemManager(QObject, threading.Thread):
         self.maxframeTime = 0
         self.timeout = 0.2
         self.settings_manager = settings_manager
-        self.ipc_thread = ipc_thread
+        self.ipc_thread : IPCNetworkThread = ipc_thread
         self._ipc_telem = {}
 
     @classmethod
@@ -302,7 +303,7 @@ class TelemManager(QObject, threading.Thread):
                 if G.settings_mgr.isVisible():
                     G.settings_mgr.b_getcurrentmodel.click()
 
-                self.updateSettingsLayout.emit()
+                self.aircraftUpdated.emit()
 
             self.currentAircraftName = aircraft_name
 
@@ -336,7 +337,7 @@ class TelemManager(QObject, threading.Thread):
                         self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
                     self._simconnect._resubscribe()
 
-                self.updateSettingsLayout.emit()
+                self.aircraftUpdated.emit()
             try:
                 _tm = time.perf_counter()
                 self.currentAircraft._telem_data = telem_data
@@ -349,9 +350,9 @@ class TelemManager(QObject, threading.Thread):
         # Send locally generated telemetry to master here
         if G.args.child and self.currentAircraft:
             ipc_telem = self.currentAircraft._ipc_telem
-            if ipc_telem != {}:
+            if ipc_telem:
                 self.ipc_thread.send_ipc_telem(ipc_telem)
-                self.currentAircraft._ipc_telem = {}
+                self.currentAircraft._ipc_telem.clear()
         if G.args.plot:
             for item in G.args.plot:
                 if item in telem_data:

@@ -1472,7 +1472,7 @@ def launch_vpconf(serial=None):
             call = [vpconf_path, "-serial", serial]
         else:
             call = vpconf_path
-        subprocess.Popen(call, cwd=workdir, env=env)
+        subprocess.Popen(call, cwd=workdir, env=env, shell=True)
 
 
 def get_version():
@@ -1485,7 +1485,7 @@ def get_version():
         pass
 
     try:
-        ver = subprocess.check_output(['git', 'describe', '--always', '--abbrev=8', '--dirty']).decode('ascii').strip()
+        ver = subprocess.check_output(['git', 'describe', '--always', '--abbrev=8', '--dirty'], shell=True).decode('ascii').strip()
         ver = f"local-{ver}"
     except:
         pass
@@ -1649,7 +1649,7 @@ def set_vpconf_profile(config_filepath, serial):
 
         logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
 
-        subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env)
+        subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
     else:
         logging.error("Unable to find VPforce Configurator installation location")
 

@@ -2,15 +2,15 @@
 
 import PyInstaller.config
 
-PyInstaller.config.CONF['distpath'] = "./dist/windows/VPforce-TelemFFB"
-distpath = PyInstaller.config.CONF['distpath']
+#PyInstaller.config.CONF['distpath'] = "./dist/windows/VPforce-TelemFFB"
+distpath = PyInstaller.config.CONF['distpath'] + "/VPforce-TelemFFB"
 block_cipher = None
 
-
+print(distpath)
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[('xplane-plugin/TelemFFB-XPP/64/win.xpl', 'xplane-plugin/TelemFFB-XPP/64'), ('dll/hidapi.dll', 'dll'), ('simconnect/simconnect.dll', 'simconnect')],
+    binaries=[('xplane-plugin/TelemFFB-XPP/64/win.xpl', 'xplane-plugin/TelemFFB-XPP/64'), ('dll/hidapi.dll', '.'), ('simconnect/simconnect.dll', 'simconnect')],
     datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.')],
     hiddenimports=[],
     hookspath=[],
@@ -94,22 +94,35 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
+    #a.binaries,
+    #a.zipfiles,
+    #a.datas,
     [],
+	exclude_binaries=True,
     name='VPforce-TelemFFB',
     icon='image/vpforceicon.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,
+    console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    contents_directory='assets',
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='VPforce-TelemFFB',
 )
 
 import shutil
@@ -118,5 +131,4 @@ shutil.copyfile('_RELEASE_NOTES.txt', os.path.join(distpath, '_RELEASE_NOTES.txt
 os.makedirs(os.path.join(distpath, 'xplane-plugin/TelemFFB-XPP/64'), exist_ok=True)
 shutil.copyfile('xplane-plugin/TelemFFB-XPP/64/win.xpl', os.path.join(distpath, 'xplane-plugin/TelemFFB-XPP/64/win.xpl'))
 shutil.copytree('export', os.path.join(distpath, 'export'), dirs_exist_ok=True)
-shutil.copytree('updater', os.path.join(distpath, 'updater'), dirs_exist_ok=True)
 

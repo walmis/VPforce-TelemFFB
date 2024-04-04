@@ -102,6 +102,29 @@ def my_function(arg=None):
     print(arg)
 ```
 
-Following this guideline helps in writing more predictable and maintainable code.
+7. **Member Variable Names Should Start with _ to Indicate a Private Member**:
+   - Prefix member variable names with an underscore (_) to indicate that they are intended to be private and should only be accessed within the class.
+   - While Python does not enforce strict encapsulation, using the underscore convention helps communicate the intended usage of the variable to other developers.
+   - Accessing private members directly from outside the class should be discouraged, and access should be controlled through getter and setter methods if necessary.
+
+Example illustrating the usage:
+
+```python
+class MyClass:
+    def __init__(self):
+        self._private_member = None
+
+    def set_private_member(self, value):
+        self._private_member = value
+
+    def get_private_member(self):
+        return self._private_member
+
+# Usage
+obj = MyClass()
+obj.set_private_member(10)
+print(obj.get_private_member())  # Output: 10
+```
+
 
 Following these guidelines will lead to more readable, maintainable, and robust Python code.

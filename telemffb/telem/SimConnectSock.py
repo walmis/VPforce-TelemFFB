@@ -7,10 +7,13 @@ from telemffb.settingsmanager import utils
 from telemffb.telem.TelemManager import TelemManager
 
 class SimConnectSock(SimConnectManager):
-    def __init__(self, telem: TelemManager, ffb_type=G._device_type, unique_id=None):
+    def __init__(self, telem: TelemManager, ffb_type=None, unique_id=None):
         if not unique_id:
             # TODO: maybe use process PID here?
             unique_id = int(G._device_pid)
+        
+        if not ffb_type:
+            ffb_type = G._device_type
 
         super().__init__(unique_id)
         telem.set_simconnect(self)
