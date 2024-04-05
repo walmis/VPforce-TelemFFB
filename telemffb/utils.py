@@ -1566,11 +1566,7 @@ if __name__ == "__main__":
 
 
 def validate_vpconf_profile(file, pid=None, dev_type=None, silent=False, window=None):
-    if not pid:
-        pid = globals._device_pid
-    if not dev_type:
-        dev_type = globals._device_type
-        
+
     try:
         with open(file, 'r') as f:
             config_data = json.load(f)
@@ -1643,7 +1639,7 @@ def set_vpconf_profile(config_filepath, serial):
             logging.error(f"Error loading VPforce Configurator Profile: ({config_filepath}) - The file does not exist! ")
             return
 
-        if not validate_vpconf_profile(config_filepath, silent=True):
+        if not validate_vpconf_profile(config_filepath, G._device_pid, G._device_type, silent=True):
             logging.error(f"VPForce Config Error: ({config_filepath}) - The file failed validation!  Check the PID is correct for the device")
             return
 

@@ -293,13 +293,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if not os.path.isfile(self.pathVPConfStartup.text()):
                 QMessageBox.warning(self, "Config Error", "Please select a valid 'on Startup' VPforce Configurator file")
                 return False
-            if not validate_vpconf_profile(self.pathVPConfStartup.text()):
+            if not validate_vpconf_profile(self.pathVPConfStartup.text(), G._device_pid, G._device_type):
                 return False
         if self.enableVPConfExit.isChecked():
             if not os.path.isfile(self.pathVPConfExit.text()):
                 QMessageBox.warning(self, "Config Error", "Please select a valid 'on Exit' VPforce Configurator file")
                 return False
-            if not validate_vpconf_profile(self.pathVPConfExit.text()):
+            if not validate_vpconf_profile(self.pathVPConfExit.text(), G._device_pid, G._device_type):
                 return False
         return True
 
@@ -503,5 +503,5 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         file_path, _ = QFileDialog.getOpenFileName(self, f"Choose {mode} vpconf profile for {G._device_type} ", starting_dir, "vpconf Files (*.vpconf)", options=options)
 
         if file_path:
-            if validate_vpconf_profile(file_path):
+            if validate_vpconf_profile(file_path, G._device_pid, G._device_type):
                 lbl.setText(file_path)
