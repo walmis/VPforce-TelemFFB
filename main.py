@@ -19,7 +19,7 @@ import sys
 if sys.argv[0].lower().endswith("updater.exe"):
     from updater import main
     main()
-    exit()
+    sys.exit()
 
 import argparse
 import json
@@ -185,10 +185,6 @@ else:
 sys.path.insert(0, '')
 # sys.path.append('/simconnect')
 
-
-
-effects_translator = utils.EffectTranslator()
-
 #################
 ################
 ###  Setting _release flag to true will disable all auto-updating and 'WiP' downloads server version checking
@@ -204,15 +200,9 @@ else:
 min_firmware_version = 'v1.0.15'
 global dev, dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, xplane_telem
 global startup_configurator_gains
-global log_window, log_folder, log_file, log_tail_window
 
-_update_available = False
-_latest_version = None
-_latest_url = None
-_current_version = version
 dev_serial = None
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
-
 
 if getattr(sys, 'frozen', False):
     _install_path = os.path.dirname(sys.executable)
@@ -240,62 +230,11 @@ else:
         logging.warning(f"Override file {G.args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
 
 
-log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
-
-if not os.path.exists(log_folder):
-    os.makedirs(log_folder)
-
-date_str = datetime.now().strftime("%Y%m%d")
-
-logname = "".join(["TelemFFB", "_", G._device_vid_pid.replace(":", "-"), '_', G._device_type, "_", date_str, ".log"])
-log_file = os.path.join(log_folder, logname)
-
-# Create a logger instance
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
-
-# Create a formatter for the log messages
-formatter = logging.Formatter('%(asctime)s.%(msecs)03d - %(levelname)s - %(device_type)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-# Create a StreamHandler to log messages to the console
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.DEBUG)
-console_handler.setFormatter(formatter)
-
-# Create a FileHandler to log messages to the log file
-file_handler = logging.FileHandler(log_file, mode='a')
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
-
-# Add the handlers to the logger
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
-# Create a list of keywords to filter
-
-log_filter_strings = [
-    # "unrecognized Miscellaneous Unit in typefor(POSITION)",
-    # "Unrecognized event AXIS_CYCLIC_LATERAL_SET",
-    # "Unrecognized event AXIS_CYCLIC_LONGITUDINAL_SET",
-    # "Unrecognized event ROTOR_AXIS_TAIL_ROTOR_SET",
-    # "Unrecognized event AXIS_COLLECTIVE_SET",
-]
-
-log_filter = LoggingFilter(log_filter_strings)
-
-console_handler.addFilter(log_filter)
-file_handler.addFilter(log_filter)
-
 G.defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
 G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
 G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
 
 utils.create_empty_userxml_file(G.userconfig_path)
-
-if not G.args.child:
-    try:    # in case other instance tries doing at the same time
-        utils.archive_logs(log_folder)
-    except:
-        pass
 
 from telemffb.sim import aircrafts_msfs_xp
 from telemffb.telem.il2_telem import IL2Manager
@@ -320,8 +259,10 @@ class MainWindow(QMainWindow):
     def __init__(self, ipc_thread=None):
         super().__init__()
 
-        global _update_available
-        global _latest_version, _latest_url, log_tail_window
+        global log_tail_window
+        self._latest_version_url = None
+        self.latest_version = None
+        self._update_available = None
 
         self.show_new_craft_button = False
         # Get the absolute path of the script's directory
@@ -1048,6 +989,14 @@ class MainWindow(QMainWindow):
         self.sc_overrides_action = QAction('SimConnect Overrides Editor', self)
         self.sc_overrides_action.triggered.connect(self.open_sc_override_dialog)
         self.debug_menu.addAction(self.sc_overrides_action)
+        
+        self.test_update = QAction('Test updater', self)
+        def do_test_update():
+            self._update_available = True
+            self.perform_update()
+        self.test_update.triggered.connect(do_test_update)
+        self.debug_menu.addAction(self.test_update)
+        
 
         if G._master_instance:
             self.custom_userconfig_action = QAction("Load Custom User Config", self)
@@ -1168,11 +1117,8 @@ class MainWindow(QMainWindow):
                 self.change_config_scope(2)
 
     def update_version_result(self, vers, url):
-        global _update_available
-        global _latest_version
-        global _latest_url
-        _latest_version = vers
-        _latest_url = url
+        self.latest_version = vers
+        self.latest_version_url = url
 
         is_exe = getattr(sys, 'frozen', False)
 
@@ -1194,7 +1140,7 @@ class MainWindow(QMainWindow):
 
         else:
             # print(_update_available)
-            _update_available = True
+            self._update_available = True
             logging.info(f"<<<<Update available - new version={vers}>>>>")
 
             status_text = f"New version <a href='{url}'><b>{vers}</b></a> is available!"
@@ -1207,7 +1153,6 @@ class MainWindow(QMainWindow):
 
     def change_config_scope(self, _arg):
 
-        current_log_ts = log_file.split('_')[-1]
         if isinstance(_arg, str):
             if 'joystick' in _arg: arg = 1
             elif 'pedals' in _arg: arg = 2
@@ -1444,11 +1389,11 @@ class MainWindow(QMainWindow):
         log_tail_window.activateWindow()
 
     def toggle_log_window(self):
-        if log_window.isVisible():
-            log_window.hide()
+        if G.log_window.isVisible():
+            G.log_window.hide()
         else:
-            log_window.move(self.x()+50, self.y()+100)
-            log_window.show()
+            G.log_window.move(self.x()+50, self.y()+100)
+            G.log_window.show()
 
     def toggle_settings_window(self, dbg=False):
         try:
@@ -1670,8 +1615,8 @@ class MainWindow(QMainWindow):
             else:
                 for key in effects.dict.keys():
                     if effects[key].started:
-                        descr = effects_translator.get_translation(key)[0]
-                        settingname = effects_translator.get_translation(key)[1]
+                        descr = utils.EffectTranslator.get_translation(key)[0]
+                        settingname = utils.EffectTranslator.get_translation(key)[1]
                         if descr not in active_effects:
                             active_effects = '\n'.join([active_effects, descr])
                         if settingname not in active_settings and settingname != '':
@@ -1763,12 +1708,12 @@ class MainWindow(QMainWindow):
             logging.error(f'Error in perform_update: {e}')
         is_exe = getattr(sys, 'frozen', False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
         # is_exe = True
-        if is_exe and _update_available and not ignore_auto_updates and not G._child_instance:
+        if is_exe and self._update_available and not ignore_auto_updates and not G._child_instance:
             # vers, url = utils.fetch_latest_version()
             update_ans = QMessageBox.Yes
             if auto:
                 update_ans = QMessageBox.information(self, "Update Available!!",
-                                                     f"A new version of TelemFFB is available ({_latest_version}).\n\nWould you like to automatically download and install it now?\n\nYou may also update later from the Utilities menu, or the\nnext time TelemFFB starts.\n\n~~ Note ~~ If you no longer wish to see this message on startup,\nyou may enable `ignore_auto_updates` in your user config.\n\nYou will still be able to update via the Utilities menu",
+                                                     f"A new version of TelemFFB is available ({self.latest_version}).\n\nWould you like to automatically download and install it now?\n\nYou may also update later from the Utilities menu, or the\nnext time TelemFFB starts.\n\n~~ Note ~~ If you no longer wish to see this message on startup,\nyou may enable `ignore_auto_updates` in your user config.\n\nYou will still be able to update via the Utilities menu",
                                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
 
             if update_ans == QMessageBox.Yes:
@@ -1777,16 +1722,14 @@ class MainWindow(QMainWindow):
                                                       QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
 
             if proceed_ans == QMessageBox.Ok:
-                global _current_version
-                updater_source_path = utils.get_resource_path('updater/updater.exe', prefer_root=True, force=True)
                 updater_execution_path = os.path.join(utils.get_script_path(), 'updater.exe')
+                shutil.copy(sys.argv[0], updater_execution_path)
 
                 # Copy the updater executable with forced overwrite
-                shutil.copy2(updater_source_path, updater_execution_path)
                 active_args, unknown_args = parser.parse_known_args()
                 args_list = [f'--{k}={v}' for k, v in vars(active_args).items() if
                              v is not None and v != parser.get_default(k)]
-                call = [updater_execution_path, "--current_version", _current_version] + args_list
+                call = [updater_execution_path, "--current_version", version] + args_list
                 subprocess.Popen(call, cwd=_install_path)
                 if auto:
                     for child_widget in self.findChildren(QMessageBox):
@@ -2049,12 +1992,13 @@ def main():
         """
     )
     # TODO: Avoid globals
-    global log_window, log_tail_window
     global dev_firmware_version
     global dev_serial
     global dev
 
-    log_window = LogWindow()
+    G.log_window = LogWindow()
+    init_logging(G.log_window.widget)
+    G.log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
 
     xmlutils.update_vars(G._device_type, G.userconfig_path, G.defaults_path)
     try:
@@ -2087,12 +2031,7 @@ def main():
 
     icon_path = ":/image/vpforceicon.png"
     G.settings_mgr.setWindowIcon(QIcon(icon_path))
-    sys.stdout = utils.OutLog(log_window.widget, sys.stdout)
-    sys.stderr = utils.OutLog(log_window.widget, sys.stderr)
 
-    log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
-
-    logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.info(f"TelemFFB (version {version}) Starting")
     try:
         vid_pid = [int(x, 16) for x in G._device_vid_pid.split(":")]
@@ -2138,6 +2077,7 @@ def main():
         "ERROR": logging.ERROR,
         "CRITICAL": logging.CRITICAL,
     }
+    logger = logging.getLogger()
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
     logging.debug("test")
@@ -2156,7 +2096,7 @@ def main():
         G._ipc_thread.restart_sim_signal.connect(lambda: restart_sims())
         G._ipc_thread.show_signal.connect(lambda: G.main_window.show())
         G._ipc_thread.hide_signal.connect(lambda: G.main_window.hide())
-        G._ipc_thread.showlog_signal.connect(lambda: log_window.show())
+        G._ipc_thread.showlog_signal.connect(lambda: G.log_window.show())
         G._ipc_thread.show_settings_signal.connect(lambda: G.main_window.open_system_settings_dialog())
         G._ipc_thread.start()
 
@@ -2235,6 +2175,77 @@ def main():
             set_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
         except:
             logging.error("Unable to set VPConfigurator exit profile")
+
+def init_logging(log_widget : QPlainTextEdit):
+    log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
+    
+    sys.stdout = utils.OutLog(log_widget, sys.stdout)
+    sys.stderr = utils.OutLog(log_widget, sys.stderr)
+
+    if not os.path.exists(log_folder):
+        os.makedirs(log_folder)
+
+    date_str = datetime.now().strftime("%Y%m%d")
+
+    logname = "".join(["TelemFFB", "_", G._device_vid_pid.replace(":", "-"), '_', G._device_type, "_", date_str, ".log"])
+    log_file = os.path.join(log_folder, logname)
+
+    # Create a logger instance
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    logging.addLevelName(logging.DEBUG, f'{utils.AnsiColors.GREEN}DEBUG{utils.AnsiColors.END}')
+    logging.addLevelName(logging.INFO, f'{utils.AnsiColors.BLUE}INFO{utils.AnsiColors.END}')
+    logging.addLevelName(logging.ERROR, f'{utils.AnsiColors.RED}ERROR{utils.AnsiColors.END}')
+    logging.addLevelName(logging.WARNING, f'{utils.AnsiColors.YELLOW}WARNING{utils.AnsiColors.END}')
+
+    # remove ansi escape strings
+    class MyFormatter(logging.Formatter):
+        def format(self, record):
+            s = super().format(record)
+            p = utils.AnsiColorParser().parse_ansi(s)
+            return "".join([txt[0] for txt in p])
+            
+    # Create a formatter for the log messages
+    fmt_string = f'{utils.AnsiColors.DARK_GRAY}%(asctime)s.%(msecs)03d - {G._device_type}{utils.AnsiColors.END} - %(levelname)s - %(message)s'
+    formatter = logging.Formatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
+    formatter_file = MyFormatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
+
+    # Create a StreamHandler to log messages to the console
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(formatter)
+
+    # Create a FileHandler to log messages to the log file
+    file_handler = logging.FileHandler(log_file, mode='a')
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter_file)
+
+    # Add the handlers to the logger
+    #logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+    # Create a list of keywords to filter
+    log_filter_strings = [
+        # "unrecognized Miscellaneous Unit in typefor(POSITION)",
+        # "Unrecognized event AXIS_CYCLIC_LATERAL_SET",
+        # "Unrecognized event AXIS_CYCLIC_LONGITUDINAL_SET",
+        # "Unrecognized event ROTOR_AXIS_TAIL_ROTOR_SET",
+        # "Unrecognized event AXIS_COLLECTIVE_SET",
+    ]
+
+    log_filter = LoggingFilter(log_filter_strings)
+
+    console_handler.addFilter(log_filter)
+    file_handler.addFilter(log_filter)
+
+    logging.getLogger().handlers[0].setStream(sys.stdout)
+    logging.getLogger().handlers[0].setFormatter(formatter)
+
+    if not G.args.child:
+        try:    # in case other instance tries doing at the same time
+            utils.archive_logs(log_folder)
+        except: pass
 
 
 if __name__ == "__main__":

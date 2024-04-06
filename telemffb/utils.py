@@ -106,82 +106,82 @@ class Smoother:
 
 
 class EffectTranslator:
-    def __init__(self):
-        self.effect_dict = {
-            "ab_rumble_1_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
-            "ab_rumble_1_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
-            "ab_rumble_2_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
-            "ab_rumble_2_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
-            "aoa": ["AoA Effect", "aoa_effect_gain"],
-            "buffeting": ["AoA\\Stall Buffeting", "buffeting_intensity"],
-            "bombs": ["Bomb Release", "weapon_release_intensity"],
-            "canopymovement": ["Canopy Motion", "canopy_motion_intensity"],
-            "collective_ap_spring": ["Collective AP/Lock Spring Force", "collective_ap_spring_gain"],
-            "collective_damper": ["Collective Dampening Force", "collective_dampening_gain"],
-            "crit_aoa": ["AoA Reduction Force", "aoa_reduction_max_force"],
-            "cm": ["Countermeasure Deployment", "cm_vibration_intensity"],
-            "cyclic_spring": ["Cyclic Spring Force", "cyclic_spring_gain"],
-            "damage": ["Aircraft Damage Event", "damage_effect_intensity"],
-            "damper": ["Damper Override", "damper_force"],
-            "decel": ["Decelleration Force", "deceleration_max_force"],
-            "dynamic_spring": ["Dynamic Spring Force", ".*_spring_gain"],
-            "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
-            "etlY": ["ETL Shaking", "etl_effect_intensity"],
-            "etlX": ["ETL Shaking", "etl_effect_intensity"],
-            "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
-            "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
-            "friction": ["Friction Override", "friction_force"],
-            "gearbuffet": ["Gear Drag Buffeting", "gear_buffet_intensity"],
-            "gearbuffet2": ["Gear Drag Buffeting", "gear_buffet_intensity"],
-            "gearmovement": ["Gear Motion", "gear_motion_intensity"],
-            "gearmovement2": ["Gear Motion", "gear_motion_intensity"],
-            "gforce": ["G-Force Loading", "gforce_effect_max_intensity"],
-            "gunfire": ["Gunfire Rumble", "gun_vibration_intensity"],
-            "hit": ["Aircraft Hit Event", ""],
-            "je_rumble_1_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
-            "je_rumble_1_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
-            "je_rumble_2_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
-            "je_rumble_2_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
-            "il2_buffet": ["Buffeting", "il2_buffeting_factor"],
-            "il2_buffet2": ["Buffeting", "il2_buffeting_factor"],
-            "inertia": ["Inertia Override", "inertia_force"],
-            "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
-            "overspeedY": ["Overspeed Shake", "overspeed_shake_intensity"],
-            "overspeedX": ["Overspeed Shake", "overspeed_shake_intensity"],
-            "payload_rel": ["Payload Release", "weapon_release_intensity"],
-            "pause_spring": ["Pause/Slew Spring Force", ""],
-            "pedal_spring": ["Pedal Spring", "pedal_spring_gain"],
-            "pedal_damper": ["Pedal Damper", "pedal_dampening_gain"],
-            "prop_rpm0-1": ["Propeller Engine Rumble", "engine_rumble_.*"],
-            "prop_rpm0-2": ["Propeller Engine Rumble", "engine_rumble_.*"],
-            "prop_rpm1-1": ["Propeller Engine Rumble", "engine_rumble_.*"],
-            "prop_rpm1-2": ["Propeller Engine Rumble", "engine_rumble_.*"],
-            "rockets": ["Rocket Fire", "il2_weapon_release_intensity"],
-            "rotor_rpm0-1": ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity"],
-            "rotor_rpm1-1": ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity"],
-            "runway0": ["Runway Rumble", "runway_rumble_intensity"],
-            "runway1": ["Runway Rumble", "runway_rumble_intensity"],
-            "speedbrakebuffet": ["Speedbrake Buffeting", "speedbrake_buffet_intensity"],
-            "speedbrakebuffet2": ["Speedbrake Buffeting", "speedbrake_buffet_intensity"],
-            "speedbrakemovement": ["Speedbrake Motion", "speedbrake_motion_intensity"],
-            "spoilerbuffet1-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
-            "spoilerbuffet1-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
-            "spoilerbuffet2-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
-            "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
-            "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
-            "stick_shaker" : ["Stick Shaker","stick_shaker_intensity"],
-            "trim_spring": ["Trim Override Spring", ""],
-            "control_weight": ["Control Weight", ""],
-            "vrs_buffet": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
-            "vrs_buffet2": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
-            "wnd": ["Wind Effect", "wind_effect_max_intensity"],
-            "hyd_loss_damper": ["Low Hydraulic Damper", "hydraulic_loss_damper"],
-            "hyd_loss_inertia": ["Low Hydraulic Inertia", "hydraulic_loss_inertia"],
-            "hyd_loss_friction": ["Low Hydraulic Friction", "hydraulic_loss_friction"],
-        }
 
-    def get_translation(self, key):
-        return self.effect_dict.get(key, [f"No Lookup: {key}", ''])
+    effect_dict = {
+        "ab_rumble_1_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
+        "ab_rumble_1_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
+        "ab_rumble_2_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
+        "ab_rumble_2_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
+        "aoa": ["AoA Effect", "aoa_effect_gain"],
+        "buffeting": ["AoA\\Stall Buffeting", "buffeting_intensity"],
+        "bombs": ["Bomb Release", "weapon_release_intensity"],
+        "canopymovement": ["Canopy Motion", "canopy_motion_intensity"],
+        "collective_ap_spring": ["Collective AP/Lock Spring Force", "collective_ap_spring_gain"],
+        "collective_damper": ["Collective Dampening Force", "collective_dampening_gain"],
+        "crit_aoa": ["AoA Reduction Force", "aoa_reduction_max_force"],
+        "cm": ["Countermeasure Deployment", "cm_vibration_intensity"],
+        "cyclic_spring": ["Cyclic Spring Force", "cyclic_spring_gain"],
+        "damage": ["Aircraft Damage Event", "damage_effect_intensity"],
+        "damper": ["Damper Override", "damper_force"],
+        "decel": ["Decelleration Force", "deceleration_max_force"],
+        "dynamic_spring": ["Dynamic Spring Force", ".*_spring_gain"],
+        "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
+        "etlY": ["ETL Shaking", "etl_effect_intensity"],
+        "etlX": ["ETL Shaking", "etl_effect_intensity"],
+        "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
+        "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
+        "friction": ["Friction Override", "friction_force"],
+        "gearbuffet": ["Gear Drag Buffeting", "gear_buffet_intensity"],
+        "gearbuffet2": ["Gear Drag Buffeting", "gear_buffet_intensity"],
+        "gearmovement": ["Gear Motion", "gear_motion_intensity"],
+        "gearmovement2": ["Gear Motion", "gear_motion_intensity"],
+        "gforce": ["G-Force Loading", "gforce_effect_max_intensity"],
+        "gunfire": ["Gunfire Rumble", "gun_vibration_intensity"],
+        "hit": ["Aircraft Hit Event", ""],
+        "je_rumble_1_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
+        "je_rumble_1_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
+        "je_rumble_2_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
+        "je_rumble_2_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
+        "il2_buffet": ["Buffeting", "il2_buffeting_factor"],
+        "il2_buffet2": ["Buffeting", "il2_buffeting_factor"],
+        "inertia": ["Inertia Override", "inertia_force"],
+        "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
+        "overspeedY": ["Overspeed Shake", "overspeed_shake_intensity"],
+        "overspeedX": ["Overspeed Shake", "overspeed_shake_intensity"],
+        "payload_rel": ["Payload Release", "weapon_release_intensity"],
+        "pause_spring": ["Pause/Slew Spring Force", ""],
+        "pedal_spring": ["Pedal Spring", "pedal_spring_gain"],
+        "pedal_damper": ["Pedal Damper", "pedal_dampening_gain"],
+        "prop_rpm0-1": ["Propeller Engine Rumble", "engine_rumble_.*"],
+        "prop_rpm0-2": ["Propeller Engine Rumble", "engine_rumble_.*"],
+        "prop_rpm1-1": ["Propeller Engine Rumble", "engine_rumble_.*"],
+        "prop_rpm1-2": ["Propeller Engine Rumble", "engine_rumble_.*"],
+        "rockets": ["Rocket Fire", "il2_weapon_release_intensity"],
+        "rotor_rpm0-1": ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity"],
+        "rotor_rpm1-1": ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity"],
+        "runway0": ["Runway Rumble", "runway_rumble_intensity"],
+        "runway1": ["Runway Rumble", "runway_rumble_intensity"],
+        "speedbrakebuffet": ["Speedbrake Buffeting", "speedbrake_buffet_intensity"],
+        "speedbrakebuffet2": ["Speedbrake Buffeting", "speedbrake_buffet_intensity"],
+        "speedbrakemovement": ["Speedbrake Motion", "speedbrake_motion_intensity"],
+        "spoilerbuffet1-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
+        "spoilerbuffet1-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
+        "spoilerbuffet2-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
+        "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
+        "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
+        "stick_shaker" : ["Stick Shaker","stick_shaker_intensity"],
+        "trim_spring": ["Trim Override Spring", ""],
+        "control_weight": ["Control Weight", ""],
+        "vrs_buffet": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
+        "vrs_buffet2": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
+        "wnd": ["Wind Effect", "wind_effect_max_intensity"],
+        "hyd_loss_damper": ["Low Hydraulic Damper", "hydraulic_loss_damper"],
+        "hyd_loss_inertia": ["Low Hydraulic Inertia", "hydraulic_loss_inertia"],
+        "hyd_loss_friction": ["Low Hydraulic Friction", "hydraulic_loss_friction"],
+    }
+    @classmethod
+    def get_translation(cls, key):
+        return cls.effect_dict.get(key, [f"No Lookup: {key}", ''])
 
 
 class Destroyable:
@@ -1343,6 +1343,143 @@ def install_export_lua(window):
                     f.close()
                 write_script()
 
+from PyQt5.QtGui import QTextCharFormat, QColor
+
+class AnsiColors:
+    """ ANSI color codes """
+    BLACK = "\033[0;30m"
+    RED = "\033[0;31m"
+    GREEN = "\033[0;32m"
+    BROWN = "\033[0;33m"
+    BLUE = "\033[0;34m"
+    PURPLE = "\033[0;35m"
+    CYAN = "\033[0;36m"
+    LIGHT_GRAY = "\033[0;37m"
+    DARK_GRAY = "\033[1;30m"
+    LIGHT_RED = "\033[1;31m"
+    LIGHT_GREEN = "\033[1;32m"
+    YELLOW = "\033[1;33m"
+    LIGHT_BLUE = "\033[1;34m"
+    LIGHT_PURPLE = "\033[1;35m"
+    LIGHT_CYAN = "\033[1;36m"
+    LIGHT_WHITE = "\033[1;37m"
+    BOLD = "\033[1m"
+    FAINT = "\033[2m"
+    ITALIC = "\033[3m"
+    UNDERLINE = "\033[4m"
+    BLINK = "\033[5m"
+    NEGATIVE = "\033[7m"
+    CROSSED = "\033[9m"
+    END = "\033[0m"
+    try:
+        # cancel SGR codes if we don't write to a terminal
+        if not __import__("sys").stdout.isatty():
+            for _ in dir():
+                if isinstance(_, str) and _[0] != "_":
+                    locals()[_] = ""
+        else:
+            # set Windows console in VT mode
+            if __import__("platform").system() == "Windows":
+                kernel32 = __import__("ctypes").windll.kernel32
+                kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+                del kernel32
+    except: pass
+class AnsiColorParser:
+    def __init__(self):
+        self.text_parts = []
+
+        self.reset_format()
+    
+    def reset_format(self):
+        self.format = QTextCharFormat()
+
+    def parse_ansi(self, text : str):
+        self.reset_format()
+        i = 0
+        while i < len(text):
+            if text[i] == '\x1b' and i + 1 < len(text) and text[i + 1] == '[':
+                # ANSI escape sequence found
+                end = text.find('m', i)
+                if end != -1:
+                    codes = [text[i+2:end]]
+                    for code in codes:
+                        if code == '0':
+                            self.reset_format()
+                        elif code == '1':
+                            self.format.setFontWeight(75)  # Bold
+                        elif code == '2':
+                            self.format.setFontWeight(25)  # Faint
+                        elif code == '3':
+                            self.format.setFontItalic(True)  # Italic
+                        elif code == '4':
+                            self.format.setFontUnderline(True)  # Underline
+                        elif code == '5':
+                            self.format.setFontStrikeOut(True)  # Crossed
+                        elif code == '7':
+                            self.format.setForeground(QColor(255, 255, 255))  # Negative
+                            self.format.setBackground(QColor(0, 0, 0))  # Negative background
+                        elif code == '9':
+                            self.format.setFontStrikeOut(True)  # Crossed
+                        elif code == '30':
+                            self.format.setForeground(QColor(0, 0, 0))  # Black text
+                        elif code == '31':
+                            self.format.setForeground(QColor(255, 0, 0))  # Red text
+                        elif code == '32':
+                            self.format.setForeground(QColor(0, 128, 0))  # Green text
+                        elif code == '33':
+                            self.format.setForeground(QColor(165, 42, 42))  # Brown text
+                        elif code == '34':
+                            self.format.setForeground(QColor(0, 0, 200))  # Blue text
+                        elif code == '35':
+                            self.format.setForeground(QColor(128, 0, 128))  # Purple text
+                        elif code == '36':
+                            self.format.setForeground(QColor(0, 128, 128))  # Cyan text
+                        elif code == '37':
+                            self.format.setForeground(QColor(169, 169, 169))  # Light gray text
+                        elif code == '0;30':
+                            self.format.setForeground(QColor(0, 0, 0))  # Black text
+                        elif code == '0;31':
+                            self.format.setForeground(QColor(255, 0, 0))  # Red text
+                        elif code == '0;32':
+                            self.format.setForeground(QColor(0, 128, 0))  # Green text
+                        elif code == '0;33':
+                            self.format.setForeground(QColor(165, 42, 42))  # Brown text
+                        elif code == '0;34':
+                            self.format.setForeground(QColor(0, 0, 200))  # Blue text
+                        elif code == '0;35':
+                            self.format.setForeground(QColor(128, 0, 128))  # Purple text
+                        elif code == '0;36':
+                            self.format.setForeground(QColor(0, 128, 128))  # Cyan text
+                        elif code == '0;37':
+                            self.format.setForeground(QColor(169, 169, 169))  # Light gray text
+                        elif code == '1;30':
+                            self.format.setForeground(QColor(128, 128, 128))  # Dark gray text
+                        elif code == '1;31':
+                            self.format.setForeground(QColor(255, 0, 0))  # Light red text
+                        elif code == '1;32':
+                            self.format.setForeground(QColor(0, 255, 0))  # Light green text
+                        elif code == '1;33':
+                            self.format.setForeground(QColor(255, 200, 0))  # Yellow text
+                        elif code == '1;34':
+                            self.format.setForeground(QColor(0, 0, 255))  # Light blue text
+                        elif code == '1;35':
+                            self.format.setForeground(QColor(255, 0, 255))  # Light purple text
+                        elif code == '1;36':
+                            self.format.setForeground(QColor(0, 255, 255))  # Light cyan text
+                        elif code == '1;37':
+                            self.format.setForeground(QColor(255, 255, 255))  # Light white text
+                        elif code == '5':
+                            self.format.setFontStrikeOut(True)  # Blink
+
+
+                i = end + 1
+            else:
+                start = i
+                while i < len(text) and text[i] != '\x1b':
+                    i += 1
+                self.text_parts.append((text[start:i], self.format))
+                self.reset_format()
+        return self.text_parts
 
 class OutLog(QtCore.QObject):
     textReceived = QtCore.pyqtSignal(str)
@@ -1362,18 +1499,25 @@ class OutLog(QtCore.QObject):
         self.textReceived.connect(self.on_received, Qt.Qt.QueuedConnection)
         self.log_paused = False
 
+    def isatty(self):
+        return False
+
     def toggle_pause(self):
         # Toggle the pause state
         self.log_paused = not self.log_paused
 
     def on_received(self, m):
+        p = AnsiColorParser()
+        p = p.parse_ansi(m)
         try:
             if self.color:
                 tc = self.edit.textColor()
                 self.edit.setTextColor(self.color)
 
             self.edit.moveCursor(QtGui.QTextCursor.End)
-            self.edit.insertPlainText(m)
+            for text, char_format in p:
+                self.edit.setCurrentCharFormat(char_format)
+                self.edit.insertPlainText(text)
 
             if self.color:
                 self.edit.setTextColor(tc)

@@ -3,9 +3,9 @@ import logging
 import shutil
 import ssl
 import tempfile
-import urllib
+import urllib.request
+import traceback
 
-import requests
 import os
 from zipfile import ZipFile
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
@@ -49,7 +49,6 @@ if args.debugzip is not None:
 g_folder_contents = os.listdir(g_application_path)
 def fetch_latest_version():
     global g_url_is_good
-    ctx = ssl._create_unverified_context()
 
     current_version = args.current_version
     latest_version = None
@@ -59,7 +58,7 @@ def fetch_latest_version():
     send_url = url + file
 
     try:
-        with urllib.request.urlopen(send_url, context=ctx) as req:
+        with urllib.request.urlopen(send_url, context=ssl._create_unverified_context()) as req:
             latest = json.loads(req.read().decode())
             latest_version = latest["version"]
             latest_url = url + latest["filename"]
@@ -91,27 +90,29 @@ class Downloader(QThread):
 
     def download(self):
         if args.debugzip is None:
-            response = requests.get(self.url, stream=True)
-            if response.status_code != 200:
+            try:
+                resp = urllib.request.urlopen(self.url, context=ssl._create_unverified_context())
+                total_size = int(resp.headers.get('Content-Length'))
+            except:
                 QMessageBox.critical(None, "Error downloading latest version info",
                                      f"There was an error downloading the latest version:\n\nHTTP Status Code:  {response}\n\nThe updater will now exit")
                 sys.exit(-1)
-            total_size = int(response.headers.get('content-length', 0))
+
             current_size = 0
             self.update_status_label.emit("Downloading Update:")
 
             zip_path = os.path.join(self.destination, "temp.zip")
 
-
             with open(zip_path, "wb") as zip_file:
-                for chunk in response.iter_content(chunk_size=1024):
+                chunk = resp.read(1024)
+                while chunk:
+                    print(f"Downloading {zip_path}......")
+                    current_size += len(chunk)
+                    progress_percentage = int((current_size / total_size) * 100)
+                    self.update_progress.emit(progress_percentage)
+                    zip_file.write(chunk)
 
-                    if chunk:
-                        print(f"Downloading {zip_path}......")
-                        current_size += len(chunk)
-                        progress_percentage = int((current_size / total_size) * 100)
-                        self.update_progress.emit(progress_percentage)
-                        zip_file.write(chunk)
+                    chunk = resp.read(1024)
         else:
             zip_path = args.debugzip
         self.update_progress.emit(100)
@@ -132,7 +133,7 @@ class Downloader(QThread):
         os.makedirs(backup_folder, exist_ok=True)
 
         for f in file_list:
-            if f == 'updater.exe' or f == '_previous_version_backup':
+            if f in ['updater.exe', '_previous_version_backup']:
                 continue
             elif f.endswith('.ini') and f != 'config.ini':
                 shutil.copy(os.path.join(source_folder, f), os.path.join(backup_folder, f))
@@ -149,6 +150,13 @@ class Downloader(QThread):
         self.update_status_label.emit("Extracting Update Files:")
         self.sleep(1)
 
+        # workaround so the unzip succeeds (base_library.zip is required)
+        try: 
+            os.makedirs("assets", exist_ok=True)
+            shutil.copy("_previous_version_backup/assets/base_library.zip", "assets/base_library.zip")
+        except: 
+            traceback.print_exc()
+        ###
 
         # Create a temporary directory inside the script's folder
         temp_dir = tempfile.mkdtemp(dir=g_application_path)
@@ -176,6 +184,7 @@ class Downloader(QThread):
 
         except Exception as e:
             print(f"Error during extraction: {e}")
+            traceback.print_exc()
         finally:
             # Clean up: remove the temporary directory
             print("Cleaning up temporary files")

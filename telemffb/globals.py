@@ -37,3 +37,5 @@ startup_configurator_gains = None
 # function reference to stop/init sims
 stop_sims = None
 init_sims = None
+
+log_window = None

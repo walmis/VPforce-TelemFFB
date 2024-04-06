@@ -3,7 +3,6 @@ import telemffb.globals as G
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QAction, QHBoxLayout, QMainWindow, QPlainTextEdit, QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
 
-
 import logging
 
 logger = logging.getLogger()
