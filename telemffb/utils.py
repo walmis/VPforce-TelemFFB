@@ -1593,7 +1593,6 @@ def launch_vpconf(serial=None):
             call = [vpconf_path, "-serial", serial]
         else:
             call = vpconf_path
-        print(call)
         subprocess.Popen(call, cwd=workdir, env=env, shell=True)
 
 
@@ -1811,6 +1810,7 @@ def get_install_path():
 
 
 def get_device_logo(dev_type :str):
+
     match str.lower(dev_type):
         case 'joystick':
             _device_logo = ':/image/logo_j.png'
