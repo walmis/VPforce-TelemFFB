@@ -31,7 +31,7 @@ import os
 import weakref
 import inspect
 import usb1
-from PyQt5.QtCore import QObject, QTimerEvent
+from PyQt5.QtCore import QObject, QTimerEvent, QTimer
 from dataclasses import dataclass
 
 paths = ["hidapi.dll", "dll/hidapi.dll", os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')]
@@ -451,7 +451,7 @@ class DeviceInfo:
     usage_page: int
     vendor_id: int
 
-class FFBRhino(hid.Device, QObject):
+class FFBRhino(QObject):
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> None:
 
         self.vid = vid
@@ -470,12 +470,31 @@ class FFBRhino(hid.Device, QObject):
 
         self._in_reports = {}
         self._effectHandles : List[FFBEffectHandle] = []
-        
-        hid.Device.__init__(self, path=self.info.path)
+        self._dev = None
+
         QObject.__init__(self)
-        self.nonblocking = True
         self.startTimer(1) # start Qt timer to read HID reports every 1ms
 
+        self.reconnect()
+
+    def reconnect(self):
+        if self._dev:
+            self._dev.close()
+            self._dev = None
+        
+        self._dev = hid.Device(path=self.info.path)
+        self._dev.nonblocking = True
+
+    @property
+    def serial(self):
+        return self._dev.serial
+    @property
+    def product(self):
+        return self._dev.product
+    @property
+    def manufacturer(self):
+        return self._dev.manufacturer
+    
     @staticmethod
     def enumerate(pid=0) -> List[DeviceInfo]:
         devs = hid.enumerate(vid=0xffff, pid=pid)
@@ -496,7 +515,7 @@ class FFBRhino(hid.Device, QObject):
 
     # Get global effect slider values as seen in VPConfigurator
     def getGains(self) -> FFBReport_Get_Gains_Feature_Data:
-        d = self.get_feature_report(HID_REPORT_FEATURE_ID_GET_GAINS, ctypes.sizeof(FFBReport_Get_Gains_Feature_Data))
+        d = self._dev.get_feature_report(HID_REPORT_FEATURE_ID_GET_GAINS, ctypes.sizeof(FFBReport_Get_Gains_Feature_Data))
         data = FFBReport_Get_Gains_Feature_Data.from_buffer_copy(d)
         return data
     
@@ -507,7 +526,7 @@ class FFBRhino(hid.Device, QObject):
         data.reportId = HID_REPORT_FEATURE_ID_SET_GAIN
         data.gain_id = slider_id
         data.gain_value = value
-        self.send_feature_report(bytes(data))
+        self._dev.send_feature_report(bytes(data))
 
     # runs on mainThread
     def timerEvent(self, a0: QTimerEvent) -> None:
@@ -515,6 +534,20 @@ class FFBRhino(hid.Device, QObject):
             self.readReports()
         except:
             logging.exception("Exception")
+            self._dev.close()
+            self._dev = None
+
+            logging.warn("Reconnecting HID device in 1s")
+            def do_reconnect():
+                try:
+                    self.reconnect()
+                    logging.info("HID connected!")
+                except:
+                    logging.warn("Reconnecting HID device in 1s")
+                    QTimer.singleShot(1000, do_reconnect)
+
+            QTimer.singleShot(1000, do_reconnect)
+            
 
     def on_hid_report_received(self, report_id):
         if report_id == HID_REPORT_ID_PID_STATE_REPORT:
@@ -553,12 +586,12 @@ class FFBRhino(hid.Device, QObject):
 
     def resetEffects(self):
         logging.info("FFB: Reset device effects")
-        super().write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
+        self._dev.write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
         time.sleep(0.01)
 
     def createEffect(self, type) -> FFBEffectHandle:
-        super().send_feature_report(bytes([HID_REPORT_ID_CREATE_EFFECT, type, 0, 0]))
-        r = bytearray(super().get_feature_report(HID_REPORT_ID_PID_BLOCK_LOAD, 5))
+        self._dev.send_feature_report(bytes([HID_REPORT_ID_CREATE_EFFECT, type, 0, 0]))
+        r = bytearray(self._dev.get_feature_report(HID_REPORT_ID_PID_BLOCK_LOAD, 5))
 
         assert(r[0] == HID_REPORT_ID_PID_BLOCK_LOAD)
         effect_id = r[1]
@@ -573,15 +606,17 @@ class FFBRhino(hid.Device, QObject):
         return handle
     
     def write(self, data):
-        if super().write(data) < 0:
+        if self._dev.write(data) < 0:
             raise IOError("HID Write")
         
     def readReports(self):
+        if not self._dev:
+            return
         # read all input reports from the operating system buffer
         # we only care about the latest ones, otherwise there will be latency!
         # this function is non-blocking
         while True:
-            tmp = super().read(64)
+            tmp = self._dev.read(64)
             if tmp:
                 report_id = tmp[0]
                 self._in_reports[report_id] = tmp
