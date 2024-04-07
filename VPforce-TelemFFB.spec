@@ -105,7 +105,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -128,7 +128,5 @@ coll = COLLECT(
 import shutil
 import os
 shutil.copyfile('_RELEASE_NOTES.txt', os.path.join(distpath, '_RELEASE_NOTES.txt'))
-os.makedirs(os.path.join(distpath, 'xplane-plugin/TelemFFB-XPP/64'), exist_ok=True)
-shutil.copyfile('xplane-plugin/TelemFFB-XPP/64/win.xpl', os.path.join(distpath, 'xplane-plugin/TelemFFB-XPP/64/win.xpl'))
-shutil.copytree('export', os.path.join(distpath, 'export'), dirs_exist_ok=True)
+
 

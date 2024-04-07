@@ -40,11 +40,16 @@ from telemffb.SettingsLayout import SettingsLayout
 from telemffb.LogTailWindow import LogTailWindow
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.SCOverridesEditor import SCOverridesEditor
+from telemffb.sim import aircrafts_msfs_xp
+from telemffb.telem.il2_telem import IL2Manager
+from telemffb.sim.aircraft_base import effects
 
 import telemffb.globals as G
 
 import telemffb.hw.ffb_rhino as ffb_rhino
 import telemffb.utils as utils
+from telemffb.utils import AnsiColors
+
 import re
 import threading
 from collections import OrderedDict
@@ -54,7 +59,6 @@ import traceback
 from traceback import print_exc
 
 from telemffb.hw.ffb_rhino import HapticEffect, FFBRhino
-
 
 from telemffb.settingsmanager import *
 from telemffb.utils import LoggingFilter
@@ -66,7 +70,7 @@ import telemffb.xmlutils as xmlutils
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QRadioButton, QScrollArea, QHBoxLayout, QAction, QMenu, QButtonGroup, QFrame, \
     QTabWidget, QGroupBox, QShortcut
-from PyQt5.QtCore import Qt, QCoreApplication, QUrl, QSize, QByteArray, QTimer
+from PyQt5.QtCore import Qt, QCoreApplication, QUrl, QSize, QByteArray, QTimer, QSettings
 from PyQt5.QtGui import QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QCursor, \
     QTextCursor, QKeySequence
 from PyQt5.QtWidgets import QGridLayout, QToolButton
@@ -75,184 +79,6 @@ from telemffb.custom_widgets import *
 
 import resources
 resources # used
-
-parser = argparse.ArgumentParser(description='Send telemetry data over USB')
-
-# Add destination telemetry address argument
-parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default=None,
-                    help='Destination IP:port address for teleplot.fr telemetry plotting service')
-
-parser.add_argument('-p', '--plot', type=str, nargs='+',
-                    help='Telemetry item names to send to teleplot, separated by spaces')
-
-parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default=None)
-parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
-
-# Add config file argument, default config.ini
-parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default='config.ini')
-parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='None')
-parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
-parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default=None)
-parser.add_argument('--headless', action='store_true', help='Run in headless mode')
-parser.add_argument('--child', action='store_true', help='Is a child instance')
-parser.add_argument('--masterport', type=str, help='master instance IPC port', default=None)
-
-parser.add_argument('--minimize', action='store_true', help='Minimize on startup')
-
-G.args = parser.parse_args()
-
-# script_dir = os.path.dirname(os.path.abspath(__file__))
-QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
-QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True) #use highdpi icons
-
-headless_mode = G.args.headless
-
-config_was_default = False
-G._launched_joystick = False
-G._launched_pedals = False
-G._launched_collective = False
-G._launched_children = False
-G._child_ipc_ports = []
-G._master_instance = False
-G._ipc_thread = None
-G._child_instance = G.args.child
-
-G.system_settings = utils.read_system_settings(G.args.device, G.args.type)
-
-# _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
-_vpf_logo = ":/image/vpforcelogo.png"
-if G.args.device is None:
-    master_rb = G.system_settings.get('masterInstance', 1)
-    match master_rb:
-        case 1:
-            G._device_pid = G.system_settings.get('pidJoystick', "2055")
-            G._device_type = 'joystick'
-        case 2:
-            G._device_pid = G.system_settings.get('pidPedals', "2055")
-            G._device_type = 'pedals'
-        case 3:
-            G._device_pid = G.system_settings.get('pidCollective', "2055")
-            G._device_type = 'collective'
-        case _:
-            G._device_pid = G.system_settings.get('pidJoystick', "2055")
-            G._device_type = 'joystick'
-
-    G._device_vid_pid = f"FFFF:{G._device_pid}"
-    G.args.type = G._device_type
-else:
-    if G.args.type is None:
-        G._device_type = 'joystick'
-        G.args.type = G._device_type
-    else:
-        G._device_type = str.lower(G.args.type)
-
-    G._device_pid = G.args.device.split(":")[1]
-    G._device_vid_pid = G.args.device
-
-match str.lower(G._device_type):
-    case 'joystick':
-        _device_logo = ':/image/logo_j.png'
-    case 'pedals':
-        _device_logo = ':/image/logo_p.png'
-    case 'collective':
-        _device_logo = ':/image/logo_c.png'
-    case _:
-        _device_logo = ':/image/logo_j.png'
-
-G.system_settings = utils.read_system_settings(G._device_vid_pid, G._device_type)
-
-if G.system_settings.get('wasDefault', False):
-    config_was_default = True
-
-G.args.sim = str.upper(G.args.sim)
-G.args.type = str.lower(G.args.type)
-
-# need to determine if someone has auto-launch enabled but has started an instance with -D
-# The 'masterInstance' reg key holds the radio button index of the configured master instance
-# 1=joystick, 2=pedals, 3=collective
-index_dict = {
-    'joystick': 1,
-    'pedals': 2,
-    'collective': 3
-}
-master_index = G.system_settings.get('masterInstance', 1)
-if index_dict[G._device_type] == master_index:
-    G._master_instance = True
-else:
-    G._master_instance = False
-
-
-sys.path.insert(0, '')
-# sys.path.append('/simconnect')
-
-#################
-################
-###  Setting _release flag to true will disable all auto-updating and 'WiP' downloads server version checking
-###  Set the version number to version tag that will be pushed to master repository branch
-_release = False  # Todo: Validate release flag!
-
-if _release:
-    version = "vX.X.X"
-else:
-    version = utils.get_version()
-
-
-min_firmware_version = 'v1.0.15'
-global dev, dev_firmware_version, dcs_telem, il2_telem, sim_connect_telem, xplane_telem
-global startup_configurator_gains
-
-dev_serial = None
-vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
-
-if getattr(sys, 'frozen', False):
-    _install_path = os.path.dirname(sys.executable)
-else:
-    _install_path = os.path.dirname(os.path.abspath(__file__))
-
-_legacy_override_file = None
-_legacy_config_file = utils.get_resource_path('config.ini')  # get from bundle (if exe) or local root if source
-
-if G.args.overridefile == 'None':
-    # Need to determine if user is using default config.user.ini without passing the override flag:
-    if os.path.isfile(os.path.join(_install_path, 'config.user.ini')):
-        _legacy_override_file = os.path.join(_install_path, 'config.user.ini')
-
-else:
-    if not os.path.isabs(G.args.overridefile):  # user passed just file name, construct absolute path from script/exe directory
-        ovd_path = utils.get_resource_path(G.args.overridefile, prefer_root=True, force=True)
-    else:
-        ovd_path = G.args.overridefile  # user passed absolute path, use that
-
-    if os.path.isfile(ovd_path):
-        _legacy_override_file = ovd_path
-    else:
-        _legacy_override_file = ovd_path
-        logging.warning(f"Override file {G.args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
-
-
-G.defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
-G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
-
-utils.create_empty_userxml_file(G.userconfig_path)
-
-from telemffb.sim import aircrafts_msfs_xp
-from telemffb.telem.il2_telem import IL2Manager
-from telemffb.sim.aircraft_base import effects
-
-
-if getattr(sys, 'frozen', False):
-    appmode = 'Executable'
-else:
-    appmode = 'Source'
-logging.info("**************************************")
-logging.info("**************************************")
-logging.info(f"*****    TelemFFB starting up from {appmode}:  Args= {G.args.__dict__}")
-logging.info("**************************************")
-logging.info("**************************************")
-if G.args.teleplot:
-    logging.info(f"Using {G.args.teleplot} for plotting")
-    utils.teleplot.configure(G.args.teleplot)
 
 class MainWindow(QMainWindow):
     show_simvars = False
@@ -277,21 +103,14 @@ class MainWindow(QMainWindow):
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
         self._current_config_scope = G._device_type
+        self.current_tab_index = 0
+
         if G.system_settings.get('saveLastTab', 0):
-            if G._device_type == 'joystick':
-                tab_key = 'jWindowData'
-            elif G._device_type == 'pedals':
-                tab_key = 'pWindowData'
-            elif G._device_type == 'collective':
-                tab_key = 'cWindowData'
-            data = utils.get_reg(tab_key)
+            data = G.system_settings.get("WindowData")
             if data is not None:
                 tab = json.loads(data)
                 self.current_tab_index = tab.get("Tab", 0)
-            else:
-                self.current_tab_index = 0
-        else:
-            self.current_tab_index = 0
+
         self.default_tab_sizes = {
             "0": {  # monitor
                 'height': 530,
@@ -313,7 +132,7 @@ class MainWindow(QMainWindow):
         self.setMinimumWidth(600)
         self.tab_sizes = self.default_tab_sizes
         self._ipc_thread = ipc_thread
-        self.system_settings_dict = utils.read_system_settings(G._device_vid_pid, G._device_type)
+        
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
         match G._device_type:
             case 'joystick':
@@ -382,8 +201,6 @@ class MainWindow(QMainWindow):
         exit_app_action = QAction('Quit TelemFFB', self)
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
-
-
 
         # Create the "Utilities" menu
         utilities_menu = self.menu.addMenu('Utilities')
@@ -478,10 +295,10 @@ class MainWindow(QMainWindow):
         # Set the layout of the menu frame as the main layout
         layout.addWidget(menu_frame)
 
-        dcs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableDCS')
-        il2_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableIL2')
-        msfs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableMSFS')
-        xplane_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableXPLANE')
+        dcs_enabled = G.system_settings.get('enableDCS')
+        il2_enabled = G.system_settings.get('enableIL2')
+        msfs_enabled = G.system_settings.get('enableMSFS')
+        xplane_enabled = G.system_settings.get('enableXPLANE')
 
         self.icon_size = QSize(18, 18)
         if G.args.sim == "DCS" or dcs_enabled:
@@ -518,12 +335,11 @@ class MainWindow(QMainWindow):
         # Add a label for the image
         # Construct the absolute path of the image file
         self.logo_stack = QGroupBox()
-        global _device_logo, _vpf_logo
         self.vpflogo_label = QLabel(self.logo_stack)
         self.devicetype_label = ClickLogo(self.logo_stack)
         self.devicetype_label.clicked.connect(self.device_logo_click_event)
         pixmap = QPixmap(_vpf_logo)
-        pixmap2 = QPixmap(_device_logo)
+        pixmap2 = QPixmap(utils.get_device_logo(G._device_type))
         self.vpflogo_label.setPixmap(pixmap)
         self.devicetype_label.setPixmap(pixmap2)
         self.devicetype_label.setScaledContents(True)
@@ -715,7 +531,6 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabShape(QTabWidget.Triangular)  # Set triangular tab shape
         # self.tab_widget.addTab(QWidget(), "Log")
         # self.tab_widget.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        self.tab_widget.currentChanged.connect(lambda index: self.switch_window_view(index))
 
         # Set the main window area height to 0
         self.tab_widget.setMinimumHeight(14)
@@ -753,10 +568,10 @@ class MainWindow(QMainWindow):
 
         # Create the QLabel widget and set its properties
 
-        dcs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableDCS')
-        il2_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableIL2')
-        msfs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableMSFS')
-        xplane_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableXPLANE')
+        dcs_enabled = G.system_settings.get('enableDCS')
+        il2_enabled = G.system_settings.get('enableIL2')
+        msfs_enabled = G.system_settings.get('enableMSFS')
+        xplane_enabled = G.system_settings.get('enableXPLANE')
 
         # Convert True/False to "enabled" or "disabled"
         dcs_status = "Enabled" if dcs_enabled else "Disabled"
@@ -845,6 +660,8 @@ class MainWindow(QMainWindow):
         # self.open_log_button.clicked.connect(self.show_tail_log_window)
 
         self.tab_widget.addTab(QWidget(), "Hide")
+        self.tab_widget.currentChanged.connect(lambda index: self.switch_window_view(index))
+
 
         # log_layout = QVBoxLayout(self.log_tab_widget)
         # log_layout.addWidget(self.log_widget)
@@ -1160,20 +977,16 @@ class MainWindow(QMainWindow):
         else:
             arg = _arg
 
-        if arg == 1:
-            xmlutils.update_vars('joystick', G.userconfig_path, G.defaults_path)
-            self._current_config_scope = 'joystick'
-            new_device_logo = ':/image/logo_j.png'
-        elif arg == 2:
-            xmlutils.update_vars('pedals', G.userconfig_path, G.defaults_path)
-            self._current_config_scope = 'pedals'
-            new_device_logo = ':/image/logo_p.png'
-        elif arg == 3:
-            xmlutils.update_vars('collective', G.userconfig_path, G.defaults_path)
-            self._current_config_scope = 'collective'
-            new_device_logo = ':/image/logo_c.png'
+        types = {
+            1 : "joystick",
+            2 : "pedals",
+            3 : "collective"
+        }
 
-        pixmap = QPixmap(new_device_logo)
+        xmlutils.update_vars(types[arg], G.userconfig_path, G.defaults_path)
+        self._current_config_scope = types[arg]
+
+        pixmap = QPixmap(utils.get_device_logo(self._current_config_scope))
         self.devicetype_label.setPixmap(pixmap)
         self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
 
@@ -1218,29 +1031,21 @@ class MainWindow(QMainWindow):
         self.setGeometry(x_pos, y_pos, 530, 700)
 
     def load_main_window_geometry(self):
-        device_type = G._device_type
-        sys_settings = utils.read_system_settings(G._device_vid_pid, G._device_type)
-        if device_type == 'joystick':
-            reg_key = 'jWindowData'
-        elif device_type == 'pedals':
-            reg_key = 'pWindowData'
-        elif device_type == 'collective':
-            reg_key = 'cWindowData'
-
-        window_data = utils.get_reg(reg_key)
+        window_data = G.system_settings.get("WindowData")
         # print(window_data)
         if window_data is not None:
             window_data_dict = json.loads(window_data)
         else:
             window_data_dict = {}
         # print(window_data_dict)
-        load_geometry = sys_settings.get('saveWindow', False)
-        load_tab = sys_settings.get('saveLastTab', False)
+        load_geometry = G.system_settings.get('saveWindow', False)
+        load_tab = G.system_settings.get('saveLastTab', False)
 
         if load_tab:
             tab = window_data_dict.get('Tab', 0)
             self.tab_sizes = window_data_dict.get('TabSizes', self.default_tab_sizes)
             self.tab_widget.setCurrentIndex(tab)
+            self.switch_window_view(tab)
             h = self.tab_sizes[str(tab)]['height']
             w = self.tab_sizes[str(tab)]['width']
             self.resize(w, h)
@@ -1730,7 +1535,7 @@ class MainWindow(QMainWindow):
                 args_list = [f'--{k}={v}' for k, v in vars(active_args).items() if
                              v is not None and v != parser.get_default(k)]
                 call = [updater_execution_path, "--current_version", version] + args_list
-                subprocess.Popen(call, cwd=_install_path)
+                subprocess.Popen(call, cwd=utils.get_install_path())
                 if auto:
                     for child_widget in self.findChildren(QMessageBox):
                         child_widget.reject()
@@ -1921,11 +1726,183 @@ def launch_children():
 
 
 def main():
+    # TODO: Avoid globals
+    global dev_firmware_version
+    global dev_serial
+    global dev
+    global _release
+    global version
+    global _legacy_override_file
+    global _vpf_logo
+    global _device_logo
+    global dcs_telem, il2_telem, sim_connect_telem, xplane_telem
+
     app = QApplication(sys.argv)
+    G.qsettings = QSettings('VPforce', 'TelemFFB')
+
+    parser = argparse.ArgumentParser(description='Send telemetry data over USB')
+
+    # Add destination telemetry address argument
+    parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default=None,
+                        help='Destination IP:port address for teleplot.fr telemetry plotting service')
+
+    parser.add_argument('-p', '--plot', type=str, nargs='+',
+                        help='Telemetry item names to send to teleplot, separated by spaces')
+
+    parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default=None)
+    parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
+
+    # Add config file argument, default config.ini
+    parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default='config.ini')
+    parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='None')
+    parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
+    parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default=None)
+    parser.add_argument('--headless', action='store_true', help='Run in headless mode')
+    parser.add_argument('--child', action='store_true', help='Is a child instance')
+    parser.add_argument('--masterport', type=str, help='master instance IPC port', default=None)
+
+    parser.add_argument('--minimize', action='store_true', help='Minimize on startup')
+
+    G.args = parser.parse_args()
+
+    # script_dir = os.path.dirname(os.path.abspath(__file__))
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True) #use highdpi icons
+
+    headless_mode = G.args.headless
+
+    G._launched_joystick = False
+    G._launched_pedals = False
+    G._launched_collective = False
+    G._launched_children = False
+    G._child_ipc_ports = []
+    G._master_instance = False
+    G._ipc_thread = None
+    G._child_instance = G.args.child
+
+    G.system_settings = utils.read_system_settings(G.args.device, G.args.type)
+
+    # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
+    _vpf_logo = ":/image/vpforcelogo.png"
+    if G.args.device is None:
+        master_rb = G.system_settings.get('masterInstance', 1)
+        match master_rb:
+            case 1:
+                G._device_pid = G.system_settings.get('pidJoystick', "2055")
+                G._device_type = 'joystick'
+            case 2:
+                G._device_pid = G.system_settings.get('pidPedals', "2055")
+                G._device_type = 'pedals'
+            case 3:
+                G._device_pid = G.system_settings.get('pidCollective', "2055")
+                G._device_type = 'collective'
+            case _:
+                G._device_pid = G.system_settings.get('pidJoystick', "2055")
+                G._device_type = 'joystick'
+
+        if not G._device_pid: # check empty string
+            G._device_pid = '2055'
+
+        G._device_vid_pid = f"FFFF:{G._device_pid}"
+        G.args.type = G._device_type
+    else:
+        if G.args.type is None:
+            G._device_type = 'joystick'
+            G.args.type = G._device_type
+        else:
+            G._device_type = str.lower(G.args.type)
+
+        G._device_pid = G.args.device.split(":")[1]
+        G._device_vid_pid = G.args.device
+
+
+
+    G.system_settings = utils.SystemSettings()
+
+    G.args.sim = str.upper(G.args.sim)
+    G.args.type = str.lower(G.args.type)
+
+    # need to determine if someone has auto-launch enabled but has started an instance with -D
+    # The 'masterInstance' reg key holds the radio button index of the configured master instance
+    # 1=joystick, 2=pedals, 3=collective
+    index_dict = {
+        'joystick': 1,
+        'pedals': 2,
+        'collective': 3
+    }
+    master_index = G.system_settings.get('masterInstance', 1)
+    if index_dict[G._device_type] == master_index:
+        G._master_instance = True
+    else:
+        G._master_instance = False
+
+
+    sys.path.insert(0, '')
+    # sys.path.append('/simconnect')
+
+    #################
+    ################
+    ###  Setting _release flag to true will disable all auto-updating and 'WiP' downloads server version checking
+    ###  Set the version number to version tag that will be pushed to master repository branch
+    _release = False  # Todo: Validate release flag!
+
+    if _release:
+        version = "vX.X.X"
+    else:
+        version = utils.get_version()
+
+    min_firmware_version = 'v1.0.15'
+
+    dev_serial = None
+    vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
+
+
+    _legacy_override_file = None
+    _legacy_config_file = utils.get_resource_path('config.ini')  # get from bundle (if exe) or local root if source
+
+    if G.args.overridefile == 'None':
+        _install_path = utils.get_install_path()
+
+        # Need to determine if user is using default config.user.ini without passing the override flag:
+        if os.path.isfile(os.path.join(_install_path, 'config.user.ini')):
+            _legacy_override_file = os.path.join(_install_path, 'config.user.ini')
+
+    else:
+        if not os.path.isabs(G.args.overridefile):  # user passed just file name, construct absolute path from script/exe directory
+            ovd_path = utils.get_resource_path(G.args.overridefile, prefer_root=True, force=True)
+        else:
+            ovd_path = G.args.overridefile  # user passed absolute path, use that
+
+        if os.path.isfile(ovd_path):
+            _legacy_override_file = ovd_path
+        else:
+            _legacy_override_file = ovd_path
+            logging.warning(f"Override file {G.args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
+
+
+    G.defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
+    G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
+    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
+
+    utils.create_empty_userxml_file(G.userconfig_path)
+
+
+    if getattr(sys, 'frozen', False):
+        appmode = 'Executable'
+    else:
+        appmode = 'Source'
+    logging.info("**************************************")
+    logging.info("**************************************")
+    logging.info(f"*****    TelemFFB starting up from {appmode}:  Args= {G.args.__dict__}")
+    logging.info("**************************************")
+    logging.info("**************************************")
+    if G.args.teleplot:
+        logging.info(f"Using {G.args.teleplot} for plotting")
+        utils.teleplot.configure(G.args.teleplot)
 
     def excepthook(exc_type, exc_value, exc_tb):
         tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        print(tb)
+        sys.stdout.write(f"{AnsiColors.BRIGHT_REDBG}{AnsiColors.WHITE}{tb}{AnsiColors.END}")
         #QtWidgets.QApplication.quit()
         # or QtWidgets.QApplication.exit(0)
     sys.excepthook = excepthook
@@ -1991,10 +1968,7 @@ def main():
             }
         """
     )
-    # TODO: Avoid globals
-    global dev_firmware_version
-    global dev_serial
-    global dev
+
 
     G.log_window = LogWindow()
     init_logging(G.log_window.widget)
@@ -2064,6 +2038,7 @@ def main():
                 QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
 
     except Exception as e:
+        logging.exception("Exception")
         QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {G._device_vid_pid} for device: {G._device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
         dev_firmware_version = 'ERROR'
 
@@ -2080,7 +2055,6 @@ def main():
     logger = logging.getLogger()
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
-    logging.debug("test")
 
     G.is_master_instance = launch_children()
     if G.is_master_instance:
@@ -2140,7 +2114,7 @@ def main():
         if G._launched_collective:
             G.main_window.collective_status_icon.show()
 
-    if config_was_default:
+    if not G.system_settings.get("pidJoystick", None):
         G.main_window.open_system_settings_dialog()
 
     utils.signal_emitter.telem_timeout_signal.connect(G.main_window.update_sim_indicators)
@@ -2176,6 +2150,7 @@ def main():
         except:
             logging.error("Unable to set VPConfigurator exit profile")
 
+
 def init_logging(log_widget : QPlainTextEdit):
     log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
     
@@ -2194,16 +2169,16 @@ def init_logging(log_widget : QPlainTextEdit):
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
 
-    logging.addLevelName(logging.DEBUG, f'{utils.AnsiColors.GREEN}DEBUG{utils.AnsiColors.END}')
-    logging.addLevelName(logging.INFO, f'{utils.AnsiColors.BLUE}INFO{utils.AnsiColors.END}')
-    logging.addLevelName(logging.ERROR, f'{utils.AnsiColors.RED}ERROR{utils.AnsiColors.END}')
-    logging.addLevelName(logging.WARNING, f'{utils.AnsiColors.YELLOW}WARNING{utils.AnsiColors.END}')
+    logging.addLevelName(logging.DEBUG, f'{AnsiColors.GREEN}DEBUG{AnsiColors.END}')
+    logging.addLevelName(logging.INFO, f'{AnsiColors.BLUE}INFO{AnsiColors.END}')
+    logging.addLevelName(logging.ERROR, f'{AnsiColors.REDBG}{AnsiColors.WHITE}ERROR{AnsiColors.END}')
+    logging.addLevelName(logging.WARNING, f'{AnsiColors.YELLOW}WARNING{AnsiColors.END}')
 
     # remove ansi escape strings
     class MyFormatter(logging.Formatter):
         def format(self, record):
             s = super().format(record)
-            p = utils.AnsiColorParser().parse_ansi(s)
+            p = utils.parseAnsiText(s)
             return "".join([txt[0] for txt in p])
             
     # Create a formatter for the log messages

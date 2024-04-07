@@ -2,7 +2,7 @@ import telemffb.globals as G
 
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QAction, QHBoxLayout, QMainWindow, QPlainTextEdit, QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
-
+from PyQt5.QtCore import QSettings
 import logging
 
 logger = logging.getLogger()
@@ -21,7 +21,10 @@ class LogWindow(QMainWindow):
         self.widget = QPlainTextEdit(self.central_widget)
         self.widget.setMaximumBlockCount(20000)
         self.widget.setReadOnly(True)
-        self.widget.setFont(QFont("Courier New"))
+        font = QFont("Cascadia mono", 10)
+        font.setFamilies(["Cascadia Mono", "Courier New"])
+
+        self.widget.setFont(font)
 
         layout = QVBoxLayout(self.central_widget)
         layout.addWidget(self.widget)
@@ -57,7 +60,13 @@ class LogWindow(QMainWindow):
         # Add the button layout to the main layout
         layout.addLayout(button_layout)
 
+        geo = G.qsettings.value(f"{G._device_type}/logWindowState")
+        if geo:
+            self.restoreGeometry(geo)
+
     def closeEvent(self, event):
+        geo = self.saveGeometry()
+        G.qsettings.setValue(f"{G._device_type}/logWindowState", geo)
         self.hide()
         event.ignore()
 

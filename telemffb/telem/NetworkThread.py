@@ -7,12 +7,13 @@ from telemffb.telem import TelemManager
 class NetworkThread(threading.Thread):
     def __init__(self, telemetry: TelemManager, host="", port=34380, telem_parser=None):
         super().__init__()
-        self._run = True
+        self._run = False
         self._port = port
         self._telem = telemetry
         self._telem_parser = telem_parser
 
     def run(self):
+        self._run = True
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
@@ -34,5 +35,6 @@ class NetworkThread(threading.Thread):
                 continue
 
     def quit(self):
-        logging.info("NetworkThread stopping")
-        self._run = False
+        if self._run:
+            logging.info(f"NetworkThread stopping")
+            self._run = False

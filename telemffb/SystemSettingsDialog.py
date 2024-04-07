@@ -367,11 +367,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if self.current_al_dict != saved_al_dict:
             QMessageBox.information(self, "Restart Required", "The Auto-Launch or Master Device settings have changed.  Please restart TelemFFB.")
 
-        # Save settings to the registry
-        g_settings = json.dumps(global_settings_dict)
-        i_settings = json.dumps(instance_settings_dict)
-        utils.set_reg('Sys', g_settings)
-        utils.set_reg(f'{tp}Sys', i_settings)
+        for k,v in global_settings_dict.items():
+            G.qsettings.setValue(f"{k}", v)
+
+        for k,v in instance_settings_dict.items():
+            G.qsettings.setValue(f"{G._device_type}/{k}", v)
+        
 
         if not self.validate_settings():
             return
@@ -436,7 +437,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.cb_save_view.setChecked(settings_dict.get('saveLastTab', True))
 
-        self.tb_pid_j.setText(str(settings_dict.get('pidJoystick', '')))
+        self.tb_pid_j.setText(str(settings_dict.get('pidJoystick', '2055')))
 
         self.tb_pid_p.setText(str(settings_dict.get('pidPedals', '')))
 

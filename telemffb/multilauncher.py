@@ -1,4 +1,4 @@
-from telemffb.ui.launcherwindow import Ui_LauncherWindow
+from telemffb.ui.Ui_LauncherWindow import Ui_LauncherWindow
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
                              QVBoxLayout, QPushButton, QFileDialog)

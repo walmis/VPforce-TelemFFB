@@ -95,7 +95,7 @@ class Downloader(QThread):
                 total_size = int(resp.headers.get('Content-Length'))
             except:
                 QMessageBox.critical(None, "Error downloading latest version info",
-                                     f"There was an error downloading the latest version:\n\nHTTP Status Code:  {response}\n\nThe updater will now exit")
+                                     f"There was an error downloading the latest version:\n\nThe updater will now exit")
                 sys.exit(-1)
 
             current_size = 0

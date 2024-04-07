@@ -25,20 +25,22 @@ import zipfile
 from collections import defaultdict, deque
 
 import select
-from time import monotonic
 import logging
 import sys
 
 from PyQt5.QtCore import QThread, pyqtSignal, QObject
+from PyQt5.QtGui import QTextCharFormat, QColor
+
 from PyQt5 import QtCore, QtGui, Qt
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 from telemffb.custom_widgets import QMessageBox
+from telemffb.settingsmanager import QFileDialog, QMessageBox, SettingsWindow
 import telemffb.globals as G
-import logging
-from telemffb.settingsmanager import QFileDialog, QMessageBox, SettingsWindow, json, logging, os, utils, xmlutils
 import telemffb.utils as utils
 import telemffb.winpaths as winpaths
+
+import logging
 import winreg
 import socket
 import math
@@ -50,10 +52,10 @@ import subprocess
 import urllib.request
 import json
 import ssl
-import io
 import xml.etree.ElementTree as ET
 
 import telemffb.xmlutils as xmlutils
+import stransi
 
 
 class SignalEmitter(QObject):
@@ -560,7 +562,37 @@ def read_all_system_settings():
     return settings_dict
 
 
+
+
+class SystemSettings:
+    def __init__(self, pid=None, tp=None):
+        #self.def_inst_sys_dict, self.def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
+        pass
+
+    def get(self, name, default=None):       
+        # check instance params
+        val = G.qsettings.value(f"{G._device_type}/{name}")
+        if val is None:
+            # check global param
+            val = G.qsettings.value(name)
+
+        if val is None:
+            logging.warn(f"SystemSettings: not found {name} {repr(default)} {repr(val)}")
+            return default
+
+        if val == "true": val = 1
+        elif val == "false": val = 0
+        try:
+            val = int(val)
+        except: pass
+
+        return val
+
+s = SystemSettings()
+
+
 def read_system_settings(pid, tp):
+    return s
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
     def_inst_sys_dict, def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
 
@@ -600,6 +632,10 @@ def read_system_settings(pid, tp):
         winreg.CloseKey(registry_key)
     except WindowsError:
         pass
+
+    
+
+
     settings_dict = g_settings_dict.copy()
     settings_dict.update(i_settings_dict)
     if was_default:
@@ -1343,26 +1379,38 @@ def install_export_lua(window):
                     f.close()
                 write_script()
 
-from PyQt5.QtGui import QTextCharFormat, QColor
 
 class AnsiColors:
     """ ANSI color codes """
-    BLACK = "\033[0;30m"
-    RED = "\033[0;31m"
-    GREEN = "\033[0;32m"
-    BROWN = "\033[0;33m"
-    BLUE = "\033[0;34m"
-    PURPLE = "\033[0;35m"
-    CYAN = "\033[0;36m"
-    LIGHT_GRAY = "\033[0;37m"
-    DARK_GRAY = "\033[1;30m"
-    LIGHT_RED = "\033[1;31m"
-    LIGHT_GREEN = "\033[1;32m"
-    YELLOW = "\033[1;33m"
-    LIGHT_BLUE = "\033[1;34m"
-    LIGHT_PURPLE = "\033[1;35m"
-    LIGHT_CYAN = "\033[1;36m"
-    LIGHT_WHITE = "\033[1;37m"
+    BLACK = "\033[30m"
+    RED = "\033[38;5;160m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    PURPLE = "\033[35m"
+    CYAN = "\033[36m"
+    LIGHT_GRAY = "\033[37m"
+
+    BLACKBG = "\033[40m"
+    REDBG = "\033[48;5;160m"
+    GREENBG = "\033[42m"
+    YELLOWBG = "\033[43m"
+    BLUEBG = "\033[44m"
+    PURPLEBG = "\033[45m"
+    CYANBG = "\033[46m"
+    LIGHT_GRAYBG = "\033[47m"
+
+    BRIGHT_REDBG = "\033[101m"
+
+    GRAY = DARK_GRAY = "\033[90m"
+    BRIGHT_RED = "\033[91m"
+    BRIGHT_GREEN = "\033[92m"
+    BRIGHT_BROWN = "\033[93m"
+    BRIGHT_BLUE = "\033[94m"
+    BRIGHT_PURPLE = "\033[95m"
+    BRIGHT_CYAN = "\033[96m"
+    WHITE = "\033[97m"
+
     BOLD = "\033[1m"
     FAINT = "\033[2m"
     ITALIC = "\033[3m"
@@ -1371,6 +1419,7 @@ class AnsiColors:
     NEGATIVE = "\033[7m"
     CROSSED = "\033[9m"
     END = "\033[0m"
+
     try:
         # cancel SGR codes if we don't write to a terminal
         if not __import__("sys").stdout.isatty():
@@ -1384,102 +1433,31 @@ class AnsiColors:
                 kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
                 del kernel32
     except: pass
-class AnsiColorParser:
-    def __init__(self):
-        self.text_parts = []
 
-        self.reset_format()
-    
-    def reset_format(self):
-        self.format = QTextCharFormat()
-
-    def parse_ansi(self, text : str):
-        self.reset_format()
-        i = 0
-        while i < len(text):
-            if text[i] == '\x1b' and i + 1 < len(text) and text[i + 1] == '[':
-                # ANSI escape sequence found
-                end = text.find('m', i)
-                if end != -1:
-                    codes = [text[i+2:end]]
-                    for code in codes:
-                        if code == '0':
-                            self.reset_format()
-                        elif code == '1':
-                            self.format.setFontWeight(75)  # Bold
-                        elif code == '2':
-                            self.format.setFontWeight(25)  # Faint
-                        elif code == '3':
-                            self.format.setFontItalic(True)  # Italic
-                        elif code == '4':
-                            self.format.setFontUnderline(True)  # Underline
-                        elif code == '5':
-                            self.format.setFontStrikeOut(True)  # Crossed
-                        elif code == '7':
-                            self.format.setForeground(QColor(255, 255, 255))  # Negative
-                            self.format.setBackground(QColor(0, 0, 0))  # Negative background
-                        elif code == '9':
-                            self.format.setFontStrikeOut(True)  # Crossed
-                        elif code == '30':
-                            self.format.setForeground(QColor(0, 0, 0))  # Black text
-                        elif code == '31':
-                            self.format.setForeground(QColor(255, 0, 0))  # Red text
-                        elif code == '32':
-                            self.format.setForeground(QColor(0, 128, 0))  # Green text
-                        elif code == '33':
-                            self.format.setForeground(QColor(165, 42, 42))  # Brown text
-                        elif code == '34':
-                            self.format.setForeground(QColor(0, 0, 200))  # Blue text
-                        elif code == '35':
-                            self.format.setForeground(QColor(128, 0, 128))  # Purple text
-                        elif code == '36':
-                            self.format.setForeground(QColor(0, 128, 128))  # Cyan text
-                        elif code == '37':
-                            self.format.setForeground(QColor(169, 169, 169))  # Light gray text
-                        elif code == '0;30':
-                            self.format.setForeground(QColor(0, 0, 0))  # Black text
-                        elif code == '0;31':
-                            self.format.setForeground(QColor(255, 0, 0))  # Red text
-                        elif code == '0;32':
-                            self.format.setForeground(QColor(0, 128, 0))  # Green text
-                        elif code == '0;33':
-                            self.format.setForeground(QColor(165, 42, 42))  # Brown text
-                        elif code == '0;34':
-                            self.format.setForeground(QColor(0, 0, 200))  # Blue text
-                        elif code == '0;35':
-                            self.format.setForeground(QColor(128, 0, 128))  # Purple text
-                        elif code == '0;36':
-                            self.format.setForeground(QColor(0, 128, 128))  # Cyan text
-                        elif code == '0;37':
-                            self.format.setForeground(QColor(169, 169, 169))  # Light gray text
-                        elif code == '1;30':
-                            self.format.setForeground(QColor(128, 128, 128))  # Dark gray text
-                        elif code == '1;31':
-                            self.format.setForeground(QColor(255, 0, 0))  # Light red text
-                        elif code == '1;32':
-                            self.format.setForeground(QColor(0, 255, 0))  # Light green text
-                        elif code == '1;33':
-                            self.format.setForeground(QColor(255, 200, 0))  # Yellow text
-                        elif code == '1;34':
-                            self.format.setForeground(QColor(0, 0, 255))  # Light blue text
-                        elif code == '1;35':
-                            self.format.setForeground(QColor(255, 0, 255))  # Light purple text
-                        elif code == '1;36':
-                            self.format.setForeground(QColor(0, 255, 255))  # Light cyan text
-                        elif code == '1;37':
-                            self.format.setForeground(QColor(255, 255, 255))  # Light white text
-                        elif code == '5':
-                            self.format.setFontStrikeOut(True)  # Blink
-
-
-                i = end + 1
-            else:
-                start = i
-                while i < len(text) and text[i] != '\x1b':
-                    i += 1
-                self.text_parts.append((text[start:i], self.format))
-                self.reset_format()
-        return self.text_parts
+def parseAnsiText(ansi_text):
+    parsed = stransi.Ansi(ansi_text)
+    current_format = QTextCharFormat()
+    output = []
+    for i in parsed.instructions():
+        if isinstance(i, stransi.SetColor):
+            rgb = i.color.hex
+            if i.role == stransi.color.ColorRole.BACKGROUND:
+                current_format.setBackground(QColor(rgb.hex_code))
+            elif i.role ==  stransi.color.ColorRole.FOREGROUND:
+                current_format.setForeground(QColor(rgb.hex_code))
+        elif isinstance(i, stransi.SetAttribute):
+            match i.attribute:
+                case stransi.attribute.Attribute.BOLD:
+                    current_format.setFontWeight(100)
+                case stransi.attribute.Attribute.ITALIC:
+                    current_format.setFontItalic(i.is_on())
+                case stransi.attribute.Attribute.UNDERLINE:
+                    current_format.setFontUnderline(i.is_on())
+                case stransi.attribute.Attribute.NORMAL:
+                    current_format = QTextCharFormat()
+        else:
+            output.append((i, QTextCharFormat(current_format)))
+    return output
 
 class OutLog(QtCore.QObject):
     textReceived = QtCore.pyqtSignal(str)
@@ -1507,8 +1485,7 @@ class OutLog(QtCore.QObject):
         self.log_paused = not self.log_paused
 
     def on_received(self, m):
-        p = AnsiColorParser()
-        p = p.parse_ansi(m)
+        p = parseAnsiText(m)
         try:
             if self.color:
                 tc = self.edit.textColor()
@@ -1616,6 +1593,7 @@ def launch_vpconf(serial=None):
             call = [vpconf_path, "-serial", serial]
         else:
             call = vpconf_path
+        print(call)
         subprocess.Popen(call, cwd=workdir, env=env, shell=True)
 
 
@@ -1819,17 +1797,27 @@ def save_main_window_geometry():
         'Tab': G.main_window.tab_widget.currentIndex(),
         'TabSizes': G.main_window.tab_sizes
     }
-    if device_type == 'joystick':
-        reg_key = 'jWindowData'
-    elif device_type == 'pedals':
-        reg_key = 'pWindowData'
-    elif device_type == 'collective':
-        reg_key = 'cWindowData'
-    j_window_dict = json.dumps(window_dict)
-    utils.set_reg(reg_key, j_window_dict)
+
+    G.qsettings.setValue(f"{device_type}/WindowData", json.dumps(window_dict))
 
 
+def get_install_path():
+    """ return path where executable or main script is installed"""
+    if getattr(sys, 'frozen', False):
+        _install_path = os.path.dirname(sys.executable)
+    else:
+        _install_path = os.path.dirname(os.path.abspath(__file__))
+    return _install_path
 
 
-
-
+def get_device_logo(dev_type :str):
+    match str.lower(dev_type):
+        case 'joystick':
+            _device_logo = ':/image/logo_j.png'
+        case 'pedals':
+            _device_logo = ':/image/logo_p.png'
+        case 'collective':
+            _device_logo = ':/image/logo_c.png'
+        case _:
+            _device_logo = ':/image/logo_j.png'
+    return _device_logo
