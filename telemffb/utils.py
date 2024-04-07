@@ -1627,11 +1627,6 @@ def create_empty_userxml_file(path):
         logging.info(f"XML file exists at {path}")
 
 
-def self_update(zip_uri):
-    r = urllib.request.urlopen(zip_uri, context=ssl._create_unverified_context())
-    r.read()
-
-
 def get_script_path():
     if getattr(sys, 'frozen', False):
         # we are running in a bundle
@@ -1675,15 +1670,6 @@ def get_resource_path(relative_path, prefer_root=False, force=False):
         if not os.path.isfile(f_path):
             logging.warning(f"Warning, get_resource_path did not find file in bundle folder: {f_path}")
         return f_path
-
-
-if __name__ == "__main__":
-    # test install
-    # from PyQt5.QtWidgets import QApplication
-    # app = QApplication(sys.argv)
-    # install_export_lua()
-    uri = "https://vpforcecontrols.com/downloads/TelemFFB/VPforce-TelemFFB-wip-2e79e046.zip"
-    self_update(uri)
 
 
 def validate_vpconf_profile(file, pid=None, dev_type=None, silent=False, window=None):
