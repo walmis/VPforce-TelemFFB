@@ -1702,7 +1702,6 @@ def main():
     global dcs_telem, il2_telem, sim_connect_telem, xplane_telem
 
     app = QApplication(sys.argv)
-    G.qsettings = QSettings('VPforce', 'TelemFFB')
 
     parser = argparse.ArgumentParser(description='Send telemetry data over USB')
 

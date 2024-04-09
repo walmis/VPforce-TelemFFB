@@ -60,13 +60,13 @@ class LogWindow(QMainWindow):
         # Add the button layout to the main layout
         layout.addLayout(button_layout)
 
-        geo = G.qsettings.value(f"{G.device_type}/logWindowState")
+        geo = G.system_settings.value(f"{G.device_type}/logWindowState")
         if geo:
             self.restoreGeometry(geo)
 
     def closeEvent(self, event):
         geo = self.saveGeometry()
-        G.qsettings.setValue(f"{G.device_type}/logWindowState", geo)
+        G.system_settings.setValue(f"{G.device_type}/logWindowState", geo)
         self.hide()
         event.ignore()
 

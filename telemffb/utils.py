@@ -1712,7 +1712,7 @@ def save_main_window_geometry():
         'TabSizes': G.main_window.tab_sizes
     }
 
-    G.qsettings.setValue(f"{device_type}/WindowData", json.dumps(window_dict))
+    G.system_settings.setValue(f"{device_type}/WindowData", json.dumps(window_dict))
 
 
 def get_install_path():

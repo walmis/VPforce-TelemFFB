@@ -368,10 +368,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             QMessageBox.information(self, "Restart Required", "The Auto-Launch or Master Device settings have changed.  Please restart TelemFFB.")
 
         for k,v in global_settings_dict.items():
-            G.qsettings.setValue(f"{k}", v)
+            G.system_settings.setValue(f"{k}", v)
 
         for k,v in instance_settings_dict.items():
-            G.qsettings.setValue(f"{G.device_type}/{k}", v)
+            G.system_settings.setValue(f"{G.device_type}/{k}", v)
         
 
         if not self.validate_settings():
