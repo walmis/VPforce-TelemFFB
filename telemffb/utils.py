@@ -1658,7 +1658,7 @@ def load_custom_userconfig(new_path=''):
     xmlutils.update_vars(G.device_type, _userconfig_path=G.userconfig_path, _defaults_path=G.defaults_path)
     G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
     logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
-    if G._master_instance and G._launched_children:
+    if G.master_instance and G.launched_instances:
         G.ipc_instance.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
 
 

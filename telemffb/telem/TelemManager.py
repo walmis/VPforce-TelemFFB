@@ -203,7 +203,7 @@ class TelemManager(QObject, threading.Thread):
                 logging.error("Error Parsing Parameter: ", repr(i))
 
         # Read telemetry sent via IPC channel from child instances and update local telemetry stream
-        if G._master_instance and G._launched_children:
+        if G.master_instance and G.launched_instances:
             self._ipc_telem_data = G.ipc_instance._ipc_telem
             if self._ipc_telem_data != {}:
                 telem_data.update(self._ipc_telem_data)
@@ -356,7 +356,7 @@ class TelemManager(QObject, threading.Thread):
                 logging.exception(".on_telemetry Exception")
 
         # Send locally generated telemetry to master here
-        if G.args.child and self.currentAircraft:
+        if G.child_instance and self.currentAircraft:
             ipc_telem = self.currentAircraft._ipc_telem
             if ipc_telem:
                 G.ipc_instance.send_ipc_telem(ipc_telem)
@@ -364,7 +364,7 @@ class TelemManager(QObject, threading.Thread):
         if G.args.plot:
             for item in G.args.plot:
                 if item in telem_data:
-                    if G._child_instance or G._launched_children:
+                    if G.child_instance or G.launched_instances:
                         utils.teleplot.sendTelemetry(item, telem_data[item], instance=G.device_type)
                     else:
                         utils.teleplot.sendTelemetry(item, telem_data[item])

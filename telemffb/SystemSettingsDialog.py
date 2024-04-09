@@ -90,13 +90,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
-        if (G._master_instance and G._launched_children) or G._child_instance:
+        if (G.master_instance and G.launched_instances) or G.child_instance:
             self.labelSystem.setText("System (Per Instance):")
             self.labelLaunch.setText("Launch Options (Global):")
             self.labelSim.setText("Sim Setup (Global):")
             self.labelOther.setText("Other Settings (Per Instance):")
 
-        if G._master_instance and G._launched_children:
+        if G.master_instance and G.launched_instances:
             self.buttonChildSettings.setVisible(True)
             self.buttonChildSettings.setEnabled(True)
             self.buttonChildSettings.clicked.connect(self.launch_child_settings_windows)
@@ -380,7 +380,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         G.stop_sims()
         G.init_sims()
 
-        if G._master_instance and G._launched_children:
+        if G.master_instance and G.launched_instances:
             G.ipc_instance.send_broadcast_message("RESTART SIMS")
 
         self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2', 'XPLANE'], global_settings_dict)

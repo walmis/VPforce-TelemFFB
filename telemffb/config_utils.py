@@ -180,7 +180,7 @@ def convert_settings(cfg, usr, window=None):
 
 
 def autoconvert_config(main_window, cfg, usr):
-    if G._child_instance: return
+    if G.child_instance: return
     if usr is not None:
         ans = QMessageBox.information(
             main_window,

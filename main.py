@@ -253,7 +253,7 @@ class MainWindow(QMainWindow):
             convert_settings_action.triggered.connect(lambda: autoconvert_config(self, _legacy_config_file, _legacy_override_file))
             utilities_menu.addAction(convert_settings_action)
 
-        if G._master_instance and G.system_settings.get('autolaunchMaster', 0):
+        if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
             self.window_menu = self.menu.addMenu('Window')
 
             def do_toggle_child_windows(toggle):
@@ -269,7 +269,7 @@ class MainWindow(QMainWindow):
             self.hide_children_action.triggered.connect(lambda: do_toggle_child_windows('hide'))
             self.window_menu.addAction(self.hide_children_action)
 
-        if G._child_instance:
+        if G.child_instance:
             self.window_menu = self.menu.addMenu('Window')
             self.hide_window_action = QAction('Hide Window')
             def do_hide_window():
@@ -292,12 +292,12 @@ class MainWindow(QMainWindow):
 
         self.log_window_action.triggered.connect(do_toggle_log_window)
         log_menu.addAction(self.log_window_action)
-        if G._master_instance and G.system_settings.get('autolaunchMaster', 0):
+        if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
             self.child_log_menu = log_menu.addMenu('Open Child Logs')
             
             self.log_action = {}
             for d in ["joystick", "pedals", "collective"]:
-                if d in G._launched_instances:
+                if d in G.launched_instances:
                     def do_show_child_log(child=d):
                         G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
                     log_action = QAction(f'{d} Log'.capitalize())
@@ -395,7 +395,7 @@ class MainWindow(QMainWindow):
         self.logo_stack.setStyleSheet("QGroupBox { border: none; }")
         # Align self.image_label2 with the upper left corner of self.image_label
         self.devicetype_label.move(self.vpflogo_label.pos())
-        if not G.args.child:
+        if not G.child_instance:
             self.devicetype_label.hide()
         # Add the image labels to the layout
         logo_status_layout.addWidget(self.logo_stack, alignment=Qt.AlignVCenter | Qt.AlignLeft)
@@ -635,7 +635,7 @@ class MainWindow(QMainWindow):
 
         self.telem_lbl = QLabel('Telemetry:')
         self.effect_lbl = QLabel('Active Effects:')
-        if G._master_instance:
+        if G.master_instance:
             self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
         monitor_area_layout.addWidget(self.telem_lbl, 0, 0)
         monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
@@ -732,7 +732,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        if G._master_instance and G._launched_children:
+        if G.master_instance and G.launched_instances:
             self.instance_status_row = QHBoxLayout()
             self.master_status_icon = StatusLabel(None, f'This Instance({ G.device_type.capitalize() }):', Qt.green, 8)
             self.joystick_status_icon = StatusLabel(None, 'Joystick:', Qt.yellow, 8)
@@ -877,7 +877,7 @@ class MainWindow(QMainWindow):
         self.debug_menu.addAction(self.test_update)
         
 
-        if G._master_instance:
+        if G.master_instance:
             self.custom_userconfig_action = QAction("Load Custom User Config", self)
             self.custom_userconfig_action.triggered.connect(lambda: load_custom_userconfig())
             self.debug_menu.addAction(self.custom_userconfig_action)
@@ -963,7 +963,7 @@ class MainWindow(QMainWindow):
     def device_logo_click_event(self):
         # print("External function executed on label click")
         # print(self._current_config_scope)
-        def check_instance(name): return name in G._launched_instances or G.device_type == name
+        def check_instance(name): return name in G.launched_instances or G.device_type == name
         if self._current_config_scope == 'joystick':
             if check_instance("pedals"):
                 self.change_config_scope(2)
@@ -1037,7 +1037,7 @@ class MainWindow(QMainWindow):
         self.devicetype_label.setPixmap(pixmap)
         self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
 
-        if G._master_instance:
+        if G.master_instance:
             self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
 
         # for file in os.listdir(log_folder):
@@ -1057,7 +1057,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         # Perform cleanup before closing the application
-        if G._child_instance:
+        if G.child_instance:
             self.hide()
             event.ignore()
         else:
@@ -1409,7 +1409,7 @@ class MainWindow(QMainWindow):
             active_effects = ""
             active_settings = []
 
-            if G._master_instance and self._current_config_scope != G.device_type:
+            if G.master_instance and self._current_config_scope != G.device_type:
                 dev = self._current_config_scope
                 active_effects = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_effects', '')
                 active_settings = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_settings', [])
@@ -1423,7 +1423,7 @@ class MainWindow(QMainWindow):
                         if settingname not in active_settings and settingname != '':
                             active_settings.append(settingname)
 
-            if G.args.child:
+            if G.child_instance:
                 child_effects = str(effects.dict.keys())
                 if len(child_effects):
                     G.ipc_instance.send_ipc_effects(active_effects, active_settings)
@@ -1509,7 +1509,7 @@ class MainWindow(QMainWindow):
             logging.error(f'Error in perform_update: {e}')
         is_exe = getattr(sys, 'frozen', False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
         # is_exe = True
-        if is_exe and self._update_available and not ignore_auto_updates and not G._child_instance:
+        if is_exe and self._update_available and not ignore_auto_updates and not G.child_instance:
             # vers, url = utils.fetch_latest_version()
             update_ans = QMessageBox.Yes
             if auto:
@@ -1551,7 +1551,7 @@ def exit_application():
 
 def send_test_message():
     if G.ipc_instance.running:
-        if G._master_instance:
+        if G.master_instance:
             G.ipc_instance.send_broadcast_message("TEST MESSAGE TO ALL")
         else:
             G.ipc_instance.send_message("TEST MESSAGE")
@@ -1585,7 +1585,7 @@ def init_sims():
     xplane_telem = NetworkThread(G.telem_manager, host='', port=34390)
     # xplane_enabled = G.system_settings.get('enableXPLANE', False)
     if xplane_enabled or G.args.sim == 'XPLANE':
-        if not G._child_instance and G.system_settings.get('validateXPLANE', False):
+        if not G.child_instance and G.system_settings.get('validateXPLANE', False):
             xplane_path = G.system_settings.get('pathXPLANE', '')
             utils.install_xplane_plugin(xplane_path, G.main_window)
         logging.info("Starting XPlane Telemetry Listener")
@@ -1596,7 +1596,7 @@ def init_sims():
     dcs_enabled = G.system_settings.get('enableDCS', False)
     if dcs_enabled or G.args.sim == "DCS":
         # check and install/update export lua script
-        if not G._child_instance:
+        if not G.child_instance:
             utils.install_export_lua(G.main_window)
         logging.info("Starting DCS Telemetry Listener")
         dcs_telem.start()
@@ -1613,7 +1613,7 @@ def init_sims():
     il2_enabled = G.system_settings.get('enableIL2', False)
 
     if il2_enabled or G.args.sim == "IL2":
-        if not G._child_instance:
+        if not G.child_instance:
             if il2_validate:
                 utils.analyze_il2_config(il2_path, port=il2_port, window=G.main_window)
             else:
@@ -1656,7 +1656,7 @@ G.init_sims = init_sims
 
 
 def launch_children():
-    if not G.system_settings.get('autolaunchMaster', False) or G.args.child or not G._master_instance:
+    if not G.system_settings.get('autolaunchMaster', False) or G.child_instance or not G.master_instance:
         return False
 
     master_port = f"6{G.device_usbpid}"
@@ -1677,8 +1677,8 @@ def launch_children():
 
                 logging.info(f"Auto-Launch: starting instance: {args}")
                 subprocess.Popen(args)
-                G._launched_instances.append(dev_type)
-                G._child_ipc_ports.append(int(f"6{usbpid}"))
+                G.launched_instances.append(dev_type)
+                G.child_ipc_ports.append(int(f"6{usbpid}"))
 
         check_launch_instance("joystick")
         check_launch_instance("pedals")
@@ -1734,14 +1734,10 @@ def main():
 
     headless_mode = G.args.headless
 
-    G._launched_joystick = False
-    G._launched_pedals = False
-    G._launched_collective = False
-    G._launched_children = False
-    G._child_ipc_ports = []
-    G._master_instance = False
+    G.child_ipc_ports = []
+    G.master_instance = False
     G.ipc_instance = None
-    G._child_instance = G.args.child
+    G.child_instance = G.child_instance
 
     G.system_settings = utils.SystemSettings()
 
@@ -1795,9 +1791,9 @@ def main():
     }
     master_index = G.system_settings.get('masterInstance', 1)
     if index_dict[G.device_type] == master_index:
-        G._master_instance = True
+        G.master_instance = True
     else:
-        G._master_instance = False
+        G.master_instance = False
 
 
     sys.path.insert(0, '')
@@ -2018,14 +2014,13 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
-    G.is_master_instance = launch_children()
-    if G.is_master_instance:
+    is_master_inst = launch_children()
+    if is_master_inst:
         myport = int(f"6{G.device_usbpid}")
-        G.ipc_instance = IPCNetworkThread(master=True, myport=myport, child_ports=G._child_ipc_ports)
+        G.ipc_instance = IPCNetworkThread(master=True, myport=myport, child_ports=G.child_ipc_ports)
         G.ipc_instance.child_keepalive_signal.connect(lambda device, status: G.main_window.update_child_status(device, status))
         G.ipc_instance.start()
-        G._launched_children = True
-    elif G.args.child:
+    elif G.child_instance:
         myport = int(f"6{G.device_usbpid}")
         G.ipc_instance = IPCNetworkThread(child=True, myport=myport, dstport=G.args.masterport)
         G.ipc_instance.exit_signal.connect(exit_application)
@@ -2061,17 +2056,17 @@ def main():
 
     init_sims()
 
-    if G.is_master_instance:
+    if is_master_inst:
         G.main_window.show_device_logo()
         G.main_window.enable_device_logo_click(True)
         current_title = G.main_window.windowTitle()
         new_title = f"** MASTER INSTANCE ** {current_title}"
         G.main_window.setWindowTitle(new_title)
-        if "joystick" in G._launched_instances:
+        if "joystick" in G.launched_instances:
             G.main_window.joystick_status_icon.show()
-        if "pedals" in G._launched_instances:
+        if "pedals" in G.launched_instances:
             G.main_window.pedals_status_icon.show()
-        if "collective" in G._launched_instances:
+        if "collective" in G.launched_instances:
             G.main_window.collective_status_icon.show()
 
     if not G.system_settings.get("pidJoystick", None):
@@ -2178,7 +2173,7 @@ def init_logging(log_widget : QPlainTextEdit):
     logging.getLogger().handlers[0].setStream(sys.stdout)
     logging.getLogger().handlers[0].setFormatter(formatter)
 
-    if not G.args.child:
+    if not G.child_instance:
         try:    # in case other instance tries doing at the same time
             utils.archive_logs(log_folder)
         except: pass

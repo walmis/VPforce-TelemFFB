@@ -21,17 +21,11 @@ device_type : str = None
 device_usbpid : str = None
 device_usbvidpid : str = None # "FFFF:2055"
 
-_launched_joystick = False
-_launched_pedals = False
-_launched_collective = False
-_launched_instances = []
-_launched_children = False
-_child_ipc_ports = []
-_master_instance = False
-_ipc_running = False
+launched_instances = []
+child_ipc_ports = []
+master_instance = False
 ipc_instance : 'IPCNetworkThread' = None
-_child_instance = None
-is_master_instance = None
+child_instance = None
 
 # systems settings
 system_settings : 'SystemSettings' = None
@@ -50,5 +44,3 @@ stop_sims = None
 init_sims = None
 
 log_window : 'LogWindow' = None
-
-qsettings : 'QSettings' = None
