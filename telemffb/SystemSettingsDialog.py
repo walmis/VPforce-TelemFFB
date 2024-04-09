@@ -22,7 +22,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         super(SystemSettingsDialog, self).__init__(parent)
         self.setupUi(self)
         self.retranslateUi(self)
-        self.setWindowTitle(f"System Settings ({G._device_type.capitalize()})")
+        self.setWindowTitle(f"System Settings ({G.device_type.capitalize()})")
 
 
         # Add  "INFO" and "DEBUG" options to the logLevel combo box
@@ -293,19 +293,19 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if not os.path.isfile(self.pathVPConfStartup.text()):
                 QMessageBox.warning(self, "Config Error", "Please select a valid 'on Startup' VPforce Configurator file")
                 return False
-            if not validate_vpconf_profile(self.pathVPConfStartup.text(), G._device_pid, G._device_type):
+            if not validate_vpconf_profile(self.pathVPConfStartup.text(), G.device_usbpid, G.device_type):
                 return False
         if self.enableVPConfExit.isChecked():
             if not os.path.isfile(self.pathVPConfExit.text()):
                 QMessageBox.warning(self, "Config Error", "Please select a valid 'on Exit' VPforce Configurator file")
                 return False
-            if not validate_vpconf_profile(self.pathVPConfExit.text(), G._device_pid, G._device_type):
+            if not validate_vpconf_profile(self.pathVPConfExit.text(), G.device_usbpid, G.device_type):
                 return False
         return True
 
     def save_settings(self):
         # Create a dictionary with the values of all components
-        tp = G._device_type
+        tp = G.device_type
 
         global_settings_dict = {
             "enableDCS": self.enableDCS.isChecked(),
@@ -371,7 +371,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             G.qsettings.setValue(f"{k}", v)
 
         for k,v in instance_settings_dict.items():
-            G.qsettings.setValue(f"{G._device_type}/{k}", v)
+            G.qsettings.setValue(f"{G.device_type}/{k}", v)
         
 
         if not self.validate_settings():
@@ -381,7 +381,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         G.init_sims()
 
         if G._master_instance and G._launched_children:
-            G._ipc_thread.send_broadcast_message("RESTART SIMS")
+            G.ipc_instance.send_broadcast_message("RESTART SIMS")
 
         self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2', 'XPLANE'], global_settings_dict)
         # adjust logging level:
@@ -391,7 +391,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         elif ll == "DEBUG":
             logging.getLogger().setLevel(logging.DEBUG)
 
-        G.system_settings = utils.read_system_settings(G._device_vid_pid, G._device_type)
         self.accept()
 
     def load_settings(self, default=False):
@@ -399,12 +398,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         Load settings from the registry and update widget states.
         """
         if default:
-            settings_dict = utils.get_default_sys_settings(G._device_vid_pid, G._device_type, cmb=True)
+            settings_dict = G.system_settings.defaults
             self.cb_save_geometry.setChecked(True)
             self.cb_save_view.setChecked(True)
         else:
             # Read settings from the registry
-            settings_dict = utils.read_system_settings(G._device_vid_pid, G._device_type)
+            settings_dict = G.system_settings
             pass
         # Update widget states based on the loaded settings
         self.logLevel.setCurrentText(settings_dict.get('logLevel', 'INFO'))
@@ -501,8 +500,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             starting_dir = os.path.dirname(cur_path)
 
         # Open the file browser dialog
-        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose {mode} vpconf profile for {G._device_type} ", starting_dir, "vpconf Files (*.vpconf)", options=options)
+        file_path, _ = QFileDialog.getOpenFileName(self, f"Choose {mode} vpconf profile for {G.device_type} ", starting_dir, "vpconf Files (*.vpconf)", options=options)
 
         if file_path:
-            if validate_vpconf_profile(file_path, G._device_pid, G._device_type):
+            if validate_vpconf_profile(file_path, G.device_usbpid, G.device_type):
                 lbl.setText(file_path)

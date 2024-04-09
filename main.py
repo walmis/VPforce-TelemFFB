@@ -82,7 +82,7 @@ resources # used
 
 class MainWindow(QMainWindow):
     show_simvars = False
-    def __init__(self, ipc_thread=None):
+    def __init__(self):
         super().__init__()
 
         global log_tail_window
@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
 
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
-        self._current_config_scope = G._device_type
+        self._current_config_scope = G.device_type
         self.current_tab_index = 0
 
         if G.system_settings.get('saveLastTab', 0):
@@ -131,10 +131,9 @@ class MainWindow(QMainWindow):
         }
         self.setMinimumWidth(600)
         self.tab_sizes = self.default_tab_sizes
-        self._ipc_thread = ipc_thread
         
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
-        match G._device_type:
+        match G.device_type:
             case 'joystick':
                 x_pos = 150
                 y_pos = 130
@@ -147,7 +146,7 @@ class MainWindow(QMainWindow):
 
         self.setGeometry(x_pos, y_pos, 530, 700)
         if version:
-            self.setWindowTitle(f"TelemFFB ({G._device_type}) ({version})")
+            self.setWindowTitle(f"TelemFFB ({G.device_type}) ({version})")
         else:
             self.setWindowTitle(f"TelemFFB")
         # Construct the absolute path of the icon file
@@ -190,11 +189,31 @@ class MainWindow(QMainWindow):
 
 
         cfg_log_folder_action = QAction('Open Config/Log Directory', self)
-        cfg_log_folder_action.triggered.connect(self.open_cfg_dir)
+        def do_open_cfg_dir():
+            modifiers = QApplication.keyboardModifiers()
+            if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier) and getattr(sys, 'frozen', False):
+                os.startfile(sys._MEIPASS, 'open')
+            else:
+                os.startfile(G.userconfig_rootpath, 'open')
+        cfg_log_folder_action.triggered.connect(do_open_cfg_dir)
         system_menu.addAction(cfg_log_folder_action)
 
         reset_geometry = QAction('Reset Window Size/Position', self)
-        reset_geometry.triggered.connect(self.reset_window_size)
+
+        def do_reset_window_size():
+            match G.device_type:
+                case 'joystick':
+                    x_pos = 150
+                    y_pos = 130
+                case 'pedals':
+                    x_pos = 100
+                    y_pos = 100
+                case 'collective':
+                    x_pos = 50
+                    y_pos = 70
+            self.setGeometry(x_pos, y_pos, 530, 700)
+
+        reset_geometry.triggered.connect(do_reset_window_size)
         system_menu.addAction(reset_geometry)
 
         # self.menu.setStyleSheet("QMenu::item:selected { color: red; }")
@@ -236,42 +255,67 @@ class MainWindow(QMainWindow):
 
         if G._master_instance and G.system_settings.get('autolaunchMaster', 0):
             self.window_menu = self.menu.addMenu('Window')
+
+            def do_toggle_child_windows(toggle):
+                if toggle == 'show':
+                    G.ipc_instance.send_broadcast_message("SHOW WINDOW")
+                elif toggle == 'hide':
+                    G.ipc_instance.send_broadcast_message("HIDE WINDOW")
+
             self.show_children_action = QAction('Show Child Instance Windows')
-            self.show_children_action.triggered.connect(lambda: self.toggle_child_windows('show'))
+            self.show_children_action.triggered.connect(lambda: do_toggle_child_windows('show'))
             self.window_menu.addAction(self.show_children_action)
             self.hide_children_action = QAction('Hide Child Instance Windows')
-            self.hide_children_action.triggered.connect(lambda: self.toggle_child_windows('hide'))
+            self.hide_children_action.triggered.connect(lambda: do_toggle_child_windows('hide'))
             self.window_menu.addAction(self.hide_children_action)
 
         if G._child_instance:
             self.window_menu = self.menu.addMenu('Window')
             self.hide_window_action = QAction('Hide Window')
-            self.hide_window_action.triggered.connect(hide_window)
+            def do_hide_window():
+                try:
+                    self.hide()
+                except Exception as e:
+                    logging.error(f"EXCEPTION: {e}")
+            self.hide_window_action.triggered.connect(do_hide_window)
             self.window_menu.addAction(self.hide_window_action)
 
         log_menu = self.menu.addMenu('Log')
         self.log_window_action = QAction("Open Console Log", self)
-        self.log_window_action.triggered.connect(self.toggle_log_window)
+        
+        def do_toggle_log_window():
+            if G.log_window.isVisible():
+                G.log_window.hide()
+            else:
+                G.log_window.move(self.x()+50, self.y()+100)
+                G.log_window.show()
+
+        self.log_window_action.triggered.connect(do_toggle_log_window)
         log_menu.addAction(self.log_window_action)
         if G._master_instance and G.system_settings.get('autolaunchMaster', 0):
             self.child_log_menu = log_menu.addMenu('Open Child Logs')
-            if G._launched_joystick:
-                self.joystick_log_action = QAction('Joystick Log')
-                self.joystick_log_action.triggered.connect(lambda: self.show_child_log('joystick'))
-                self.child_log_menu.addAction(self.joystick_log_action)
-            if G._launched_pedals:
-                self.pedals_log_action = QAction('Pedals Log')
-                self.pedals_log_action.triggered.connect(lambda: self.show_child_log('pedals'))
-                self.child_log_menu.addAction(self.pedals_log_action)
-            if G._launched_collective:
-                self.collective_log_action = QAction('Collective Log')
-                self.collective_log_action.triggered.connect(lambda: self.show_child_log('collective'))
-                self.child_log_menu.addAction(self.collective_log_action)
+            
+            self.log_action = {}
+            for d in ["joystick", "pedals", "collective"]:
+                if d in G._launched_instances:
+                    def do_show_child_log(child=d):
+                        G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
+                    log_action = QAction(f'{d} Log'.capitalize())
+                    log_action.triggered.connect(lambda: do_show_child_log())
+                    self.log_action[d] = log_action
+                    self.child_log_menu.addAction(log_action)
+
 
         help_menu = self.menu.addMenu('Help')
 
         notes_action = QAction('Release Notes', self)
-        notes_action.triggered.connect(lambda : self.open_file(notes_url))
+        def do_open_file(url):
+            try:
+                file_url = QUrl.fromLocalFile(url)
+                QDesktopServices.openUrl(file_url)
+            except Exception as e:
+                logging.error(f"There was an error opening the file: {str(e)}")
+        notes_action.triggered.connect(lambda : do_open_file(notes_url))
         help_menu.addAction(notes_action)
 
         docs_action = QAction('Documentation', self)
@@ -339,7 +383,7 @@ class MainWindow(QMainWindow):
         self.devicetype_label = ClickLogo(self.logo_stack)
         self.devicetype_label.clicked.connect(self.device_logo_click_event)
         pixmap = QPixmap(_vpf_logo)
-        pixmap2 = QPixmap(utils.get_device_logo(G._device_type))
+        pixmap2 = QPixmap(utils.get_device_logo(G.device_type))
         self.vpflogo_label.setPixmap(pixmap)
         self.devicetype_label.setPixmap(pixmap2)
         self.devicetype_label.setScaledContents(True)
@@ -568,25 +612,8 @@ class MainWindow(QMainWindow):
 
         # Create the QLabel widget and set its properties
 
-        dcs_enabled = G.system_settings.get('enableDCS')
-        il2_enabled = G.system_settings.get('enableIL2')
-        msfs_enabled = G.system_settings.get('enableMSFS')
-        xplane_enabled = G.system_settings.get('enableXPLANE')
+        self.refresh_telem_status()
 
-        # Convert True/False to "enabled" or "disabled"
-        dcs_status = "Enabled" if dcs_enabled else "Disabled"
-        il2_status = "Enabled" if il2_enabled else "Disabled"
-        msfs_status = "Enabled" if msfs_enabled else "Disabled"
-        xplane_status = "Enabled" if xplane_enabled else "Disabled"
-
-        self.lbl_telem_data = QLabel(
-            f"Waiting for data...\n\n"
-            f"DCS     : {dcs_status}\n"
-            f"IL2     : {il2_status}\n"
-            f"MSFS    : {msfs_status}\n"
-            f"X-Plane : {xplane_status}\n\n"
-            "Enable or Disable in System -> System Settings"
-        )
         self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_telem_data.setWordWrap(False)
         self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
@@ -656,8 +683,19 @@ class MainWindow(QMainWindow):
         # self.open_log_button = QPushButton("Open in Window", self.log_tab_widget)
 
         # self.clear_button.clicked.connect(self.clear_log_widget)
+        # def toggle_log_tailing():
+        #     if self.log_tail_thread.is_paused():
+        #         self.log_tail_thread.resume()
+        #         self.toggle_button.setText("Pause")
+        #     else:
+        #         self.log_tail_thread.pause()
+        #         self.toggle_button.setText("Resume")
         # self.toggle_button.clicked.connect(self.toggle_log_tailing)
-        # self.open_log_button.clicked.connect(self.show_tail_log_window)
+        # def show_tail_log_window():
+        #     log_tail_window.move(self.x() + 50, self.y() + 100)
+        #     log_tail_window.show()
+        #     log_tail_window.activateWindow()
+        # self.open_log_button.clicked.connect(show_tail_log_window)
 
         self.tab_widget.addTab(QWidget(), "Hide")
         self.tab_widget.currentChanged.connect(lambda index: self.switch_window_view(index))
@@ -696,7 +734,7 @@ class MainWindow(QMainWindow):
 
         if G._master_instance and G._launched_children:
             self.instance_status_row = QHBoxLayout()
-            self.master_status_icon = StatusLabel(None, f'This Instance({ G._device_type.capitalize() }):', Qt.green, 8)
+            self.master_status_icon = StatusLabel(None, f'This Instance({ G.device_type.capitalize() }):', Qt.green, 8)
             self.joystick_status_icon = StatusLabel(None, 'Joystick:', Qt.yellow, 8)
             self.pedals_status_icon = StatusLabel(None, 'Pedals:', Qt.yellow, 8)
             self.collective_status_icon = StatusLabel(None, 'Collective:', Qt.yellow, 8)
@@ -759,19 +797,22 @@ class MainWindow(QMainWindow):
         except:
             pass
 
-    @classmethod
-    def set_telem_manager(cls, tm):
-        cls._telem_manager = tm
     def test_function(self):
         self.set_scrollbar(400)
 
-    def refresh_telem_status(self, dcs, il2, msfs, xplane):
-        dcs_status = "Enabled" if dcs else "Disabled"
-        il2_status = "Enabled" if il2 else "Disabled"
-        msfs_status = "Enabled" if msfs else "Disabled"
-        xplane_status = "Enabled" if xplane else "Disabled"
+    def refresh_telem_status(self):
+        dcs_enabled = G.system_settings.get('enableDCS')
+        il2_enabled = G.system_settings.get('enableIL2')
+        msfs_enabled = G.system_settings.get('enableMSFS')
+        xplane_enabled = G.system_settings.get('enableXPLANE')
 
-        self.lbl_telem_data.setText(
+        # Convert True/False to "enabled" or "disabled"
+        dcs_status = "Enabled" if dcs_enabled else "Disabled"
+        il2_status = "Enabled" if il2_enabled else "Disabled"
+        msfs_status = "Enabled" if msfs_enabled else "Disabled"
+        xplane_status = "Enabled" if xplane_enabled else "Disabled"
+
+        self.lbl_telem_data = QLabel(
             f"Waiting for data...\n\n"
             f"DCS     : {dcs_status}\n"
             f"IL2     : {il2_status}\n"
@@ -791,20 +832,41 @@ class MainWindow(QMainWindow):
         self.debug_menu.addAction(aircraft_picker_action)
 
         self.teleplot_action = QAction("Teleplot Setup", self)
-        self.teleplot_action.triggered.connect(self.open_teleplot_setup_dialog)
+        def do_open_teleplot_setup_dialog():
+            dialog = TeleplotSetupDialog(self)
+            dialog.exec_()
+        self.teleplot_action.triggered.connect(do_open_teleplot_setup_dialog)
         self.debug_menu.addAction(self.teleplot_action)
 
         self.show_simvar_action = QAction("Show simvar in telem window", self)
-        self.show_simvar_action.triggered.connect(self.toggle_simvar_telemetry)
+        def do_toggle_simvar_telemetry():
+            if self.show_simvars:
+                self.show_simvars = False
+                self.show_simvar_action.setChecked(False)
+            else:
+                self.show_simvars = True
+                self.show_simvar_action.setChecked(True)
+        self.show_simvar_action.triggered.connect(do_toggle_simvar_telemetry)
         self.show_simvar_action.setCheckable(True)
         self.debug_menu.addAction(self.show_simvar_action)
 
         self.configurator_settings_action = QAction('Configurator Gain Override', self)
-        self.configurator_settings_action.triggered.connect(self.open_configurator_dialog)
+        def do_open_configurator_dialog():
+            dialog = ConfiguratorDialog(self)
+            dialog.raise_()
+            dialog.activateWindow()
+            dialog.show()
+        self.configurator_settings_action.triggered.connect(do_open_configurator_dialog)
         self.debug_menu.addAction(self.configurator_settings_action)
 
         self.sc_overrides_action = QAction('SimConnect Overrides Editor', self)
-        self.sc_overrides_action.triggered.connect(self.open_sc_override_dialog)
+        def do_open_sc_override_dialog():
+            dialog = SCOverridesEditor(self)
+            dialog.raise_()
+            dialog.activateWindow()
+            dialog.show()
+        # dialog.exec_()
+        self.sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
         self.debug_menu.addAction(self.sc_overrides_action)
         
         self.test_update = QAction('Test updater', self)
@@ -836,19 +898,10 @@ class MainWindow(QMainWindow):
         if status_icon is not None and status == 'TIMEOUT':
             status_icon.set_dot_color(Qt.red)
 
-    def show_child_log(self, child):
-        self._ipc_thread.send_broadcast_message(f'SHOW LOG:{child}')
+
 
     def show_child_settings(self):
-        self._ipc_thread.send_broadcast_message("SHOW SETTINGS")
-
-    def toggle_child_windows(self, toggle):
-        if toggle == 'show':
-            self._ipc_thread.send_broadcast_message("SHOW WINDOW")
-            pass
-        elif toggle == 'hide':
-            self._ipc_thread.send_broadcast_message("HIDE WINDOW")
-            pass
+        G.ipc_instance.send_broadcast_message("SHOW SETTINGS")
 
     def reset_user_config(self):
         ans = QMessageBox.warning(self, "Caution", "Are you sure you want to proceed?  All contents of your user configuration will be erased\n\nA backup of the configuration will be generated containing the current timestamp.", QMessageBox.Ok | QMessageBox.Cancel)
@@ -888,13 +941,6 @@ class MainWindow(QMainWindow):
     def clear_log_widget(self):
         self.log_widget.clear()
 
-    def toggle_log_tailing(self):
-        if self.log_tail_thread.is_paused():
-            self.log_tail_thread.resume()
-            self.toggle_button.setText("Pause")
-        else:
-            self.log_tail_thread.pause()
-            self.toggle_button.setText("Resume")
 
     def show_device_logo(self):
         self.devicetype_label.show()
@@ -917,20 +963,21 @@ class MainWindow(QMainWindow):
     def device_logo_click_event(self):
         # print("External function executed on label click")
         # print(self._current_config_scope)
+        def check_instance(name): return name in G._launched_instances or G.device_type == name
         if self._current_config_scope == 'joystick':
-            if G._launched_pedals or G._device_type == 'pedals':
+            if check_instance("pedals"):
                 self.change_config_scope(2)
-            elif G._launched_collective or G._device_type == 'collective':
+            elif check_instance("collective"):
                 self.change_config_scope(3)
         elif self._current_config_scope == 'pedals':
-            if G._launched_collective or G._device_type == 'collective':
+            if check_instance("collective"):
                 self.change_config_scope(3)
-            elif G._launched_joystick or G._device_type == 'joystick':
+            elif check_instance("joystick"):
                 self.change_config_scope(1)
         elif self._current_config_scope == 'collective':
-            if G._launched_joystick or G._device_type == 'joystick':
+            if check_instance("joystick"):
                 self.change_config_scope(1)
-            elif G._launched_pedals or G._device_type == 'pedals':
+            elif check_instance("pedals"):
                 self.change_config_scope(2)
 
     def update_version_result(self, vers, url):
@@ -1016,19 +1063,7 @@ class MainWindow(QMainWindow):
         else:
             exit_application()
 
-    def reset_window_size(self):
-        match G._device_type:
-            case 'joystick':
-                x_pos = 150
-                y_pos = 130
-            case 'pedals':
-                x_pos = 100
-                y_pos = 100
-            case 'collective':
-                x_pos = 50
-                y_pos = 70
 
-        self.setGeometry(x_pos, y_pos, 530, 700)
 
     def load_main_window_geometry(self):
         window_data = G.system_settings.get("WindowData")
@@ -1038,8 +1073,8 @@ class MainWindow(QMainWindow):
         else:
             window_data_dict = {}
         # print(window_data_dict)
-        load_geometry = G.system_settings.get('saveWindow', False)
-        load_tab = G.system_settings.get('saveLastTab', False)
+        load_geometry = G.system_settings.get('saveWindow', True)
+        load_tab = G.system_settings.get('saveLastTab', True)
 
         if load_tab:
             tab = window_data_dict.get('Tab', 0)
@@ -1063,15 +1098,6 @@ class MainWindow(QMainWindow):
         self.monitor_widget.hide()
         self.settings_layout.reload_caller()
 
-    def open_teleplot_setup_dialog(self):
-        dialog = TeleplotSetupDialog(self)
-        dialog.exec_()
-
-    def open_configurator_dialog(self):
-        dialog = ConfiguratorDialog(self)
-        dialog.raise_()
-        dialog.activateWindow()
-        dialog.show()
 
     def open_system_settings_dialog(self):
         try:
@@ -1083,26 +1109,12 @@ class MainWindow(QMainWindow):
             traceback.print_exc()
         # dialog.exec_()
 
-    def open_sc_override_dialog(self):
-        dialog = SCOverridesEditor(self)
-        dialog.raise_()
-        dialog.activateWindow()
-        dialog.show()
-        # dialog.exec_()
-
     def update_settings(self):
         self.settings_layout.reload_caller()
 
-    def show_sub_menu(self):
-        edit_button = self.sender()
-        self.sub_menu.popup(edit_button.mapToGlobal(edit_button.rect().bottomLeft()))
-
-    def open_file(self, url):
-        try:
-            file_url = QUrl.fromLocalFile(url)
-            QDesktopServices.openUrl(file_url)
-        except Exception as e:
-            logging.error(f"There was an error opening the file: {str(e)}")
+    # def show_sub_menu(self):
+    #     edit_button = self.sender()
+    #     self.sub_menu.popup(edit_button.mapToGlobal(edit_button.rect().bottomLeft()))
 
     def open_url(self, url):
 
@@ -1120,12 +1132,7 @@ class MainWindow(QMainWindow):
             except Exception as error:
                 pass
 
-    def open_cfg_dir(self):
-        modifiers = QApplication.keyboardModifiers()
-        if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier) and getattr(sys, 'frozen', False):
-            os.startfile(sys._MEIPASS, 'open')
-        else:
-            os.startfile(G.userconfig_rootpath, 'open')
+
 
     def create_colored_icon(self, color, size):
         # Create a QPixmap with the specified color and size
@@ -1188,17 +1195,6 @@ class MainWindow(QMainWindow):
 
         return pixmap
 
-    def show_tail_log_window(self):
-        log_tail_window.move(self.x() + 50, self.y() + 100)
-        log_tail_window.show()
-        log_tail_window.activateWindow()
-
-    def toggle_log_window(self):
-        if G.log_window.isVisible():
-            G.log_window.hide()
-        else:
-            G.log_window.move(self.x()+50, self.y()+100)
-            G.log_window.show()
 
     def toggle_settings_window(self, dbg=False):
         try:
@@ -1326,7 +1322,7 @@ class MainWindow(QMainWindow):
                 self.cb_joystick.setVisible(True)
                 self.cb_pedals.setVisible(True)
                 self.cb_collective.setVisible(True)
-                match G._device_type:
+                match G.device_type:
                     case 'joystick':
                         self.cb_joystick.setChecked(True)
                     case 'pedals':
@@ -1400,7 +1396,7 @@ class MainWindow(QMainWindow):
                 # check for msfs and debug mode (alt-d pressed), change to simvar name
                 if self.show_simvars:
                     if data["src"] == "MSFS2020":
-                        s = self._telem_manager._simconnect.get_var_name(k)
+                        s = G.telem_manager.simconnect.get_var_name(k)
                         # s = simvarnames.get_var_name(k)
                         if s is not None:
                             k = s
@@ -1413,10 +1409,10 @@ class MainWindow(QMainWindow):
             active_effects = ""
             active_settings = []
 
-            if G._master_instance and self._current_config_scope != G._device_type:
+            if G._master_instance and self._current_config_scope != G.device_type:
                 dev = self._current_config_scope
-                active_effects = self._ipc_thread._ipc_telem_effects.get(f'{dev}_active_effects', '')
-                active_settings = self._ipc_thread._ipc_telem_effects.get(f'{dev}_active_settings', [])
+                active_effects = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_effects', '')
+                active_settings = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_settings', [])
             else:
                 for key in effects.dict.keys():
                     if effects[key].started:
@@ -1430,7 +1426,7 @@ class MainWindow(QMainWindow):
             if G.args.child:
                 child_effects = str(effects.dict.keys())
                 if len(child_effects):
-                    self._ipc_thread.send_ipc_effects(active_effects, active_settings)
+                    G.ipc_instance.send_ipc_effects(active_effects, active_settings)
 
             window_mode = self.tab_widget.currentIndex()
             # update slider colors
@@ -1500,7 +1496,7 @@ class MainWindow(QMainWindow):
         if _release:
             return False
 
-        ignore_auto_updates = utils.read_system_settings(G._device_vid_pid, G._device_type).get('ignoreUpdate', False)
+        ignore_auto_updates = G.system_settings.get('ignoreUpdate', False)
         if not auto:
             ignore_auto_updates = False
         update_ans = QMessageBox.No
@@ -1531,10 +1527,8 @@ class MainWindow(QMainWindow):
                 shutil.copy(sys.argv[0], updater_execution_path)
 
                 # Copy the updater executable with forced overwrite
-                active_args, unknown_args = parser.parse_known_args()
-                args_list = [f'--{k}={v}' for k, v in vars(active_args).items() if
-                             v is not None and v != parser.get_default(k)]
-                call = [updater_execution_path, "--current_version", version] + args_list
+
+                call = [updater_execution_path, "--current_version", version] + sys.argv[1:]
                 subprocess.Popen(call, cwd=utils.get_install_path())
                 if auto:
                     for child_widget in self.findChildren(QMessageBox):
@@ -1544,21 +1538,9 @@ class MainWindow(QMainWindow):
                     return True
 
         return False
-    def toggle_simvar_telemetry(self):
-        if self.show_simvars:
-            self.show_simvars = False
-            self.show_simvar_action.setChecked(False)
 
-        else:
-            self.show_simvars = True
-            self.show_simvar_action.setChecked(True)
 
-def hide_window():
 
-    try:
-        G.main_window.hide()
-    except Exception as e:
-        logging.error(f"EXCEPTION: {e}")
 
 
 def exit_application():
@@ -1568,11 +1550,11 @@ def exit_application():
 
 
 def send_test_message():
-    if G._ipc_thread.running:
+    if G.ipc_instance.running:
         if G._master_instance:
-            G._ipc_thread.send_broadcast_message("TEST MESSAGE TO ALL")
+            G.ipc_instance.send_broadcast_message("TEST MESSAGE TO ALL")
         else:
-            G._ipc_thread.send_message("TEST MESSAGE")
+            G.ipc_instance.send_message("TEST MESSAGE")
 
 
     # sys_out = {}
@@ -1589,7 +1571,7 @@ def send_test_message():
 
 def restart_sims():
     sim_list = ['DCS', 'MSFS', 'IL2', 'XPLANE']
-    sys_settings = utils.read_system_settings(G._device_vid_pid, G._device_type)
+    sys_settings = G.system_settings
     stop_sims()
     init_sims()
     G.main_window.init_sim_indicators(sim_list, sys_settings)
@@ -1598,20 +1580,20 @@ def restart_sims():
 def init_sims():
     global dcs_telem, il2_telem, sim_connect_telem, xplane_telem
 
-    xplane_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableXPLANE', False)
+    xplane_enabled = G.system_settings.get('enableXPLANE', False)
 
     xplane_telem = NetworkThread(G.telem_manager, host='', port=34390)
-    # xplane_enabled = utils.read_system_settings(args.device, args.type).get('enableXPLANE', False)
+    # xplane_enabled = G.system_settings.get('enableXPLANE', False)
     if xplane_enabled or G.args.sim == 'XPLANE':
-        if not G._child_instance and utils.read_system_settings(G._device_vid_pid, G._device_type).get('validateXPLANE', False):
-            xplane_path = utils.read_system_settings(G._device_vid_pid, G._device_type).get('pathXPLANE', '')
+        if not G._child_instance and G.system_settings.get('validateXPLANE', False):
+            xplane_path = G.system_settings.get('pathXPLANE', '')
             utils.install_xplane_plugin(xplane_path, G.main_window)
         logging.info("Starting XPlane Telemetry Listener")
         xplane_telem.start()
 
     dcs_telem = NetworkThread(G.telem_manager, host="", port=34380)
     # dcs_enabled = utils.sanitize_dict(config["system"]).get("dcs_enabled", None)
-    dcs_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableDCS', False)
+    dcs_enabled = G.system_settings.get('enableDCS', False)
     if dcs_enabled or G.args.sim == "DCS":
         # check and install/update export lua script
         if not G._child_instance:
@@ -1619,17 +1601,16 @@ def init_sims():
         logging.info("Starting DCS Telemetry Listener")
         dcs_telem.start()
 
-    il2_mgr = IL2Manager()
     # il2_port = utils.sanitize_dict(config["system"]).get("il2_telem_port", 34385)
-    il2_port = int(utils.read_system_settings(G._device_vid_pid, G._device_type).get('portIL2', 34385))
+    il2_port = int(G.system_settings.get('portIL2', 34385))
     # il2_path = utils.sanitize_dict(config["system"]).get("il2_path", 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
-    il2_path = utils.read_system_settings(G._device_vid_pid, G._device_type).get('pathIL2', 'C: \\Program Files\\IL-2 Sturmovik Great Battles')
+    il2_path = G.system_settings.get('pathIL2', 'C:\\Program Files\\IL-2 Sturmovik Great Battles')
     # il2_validate = utils.sanitize_dict(config["system"]).get("il2_cfg_validation", True)
-    il2_validate = utils.read_system_settings(G._device_vid_pid, G._device_type).get('validateIL2', True)
-    il2_telem = NetworkThread(G.telem_manager, host="", port=il2_port, telem_parser=il2_mgr)
+    il2_validate = G.system_settings.get('validateIL2', True)
+    il2_telem = NetworkThread(G.telem_manager, host="", port=il2_port, telem_parser=IL2Manager())
 
     # il2_enabled = utils.sanitize_dict(config["system"]).get("il2_enabled", None)
-    il2_enabled = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableIL2', False)
+    il2_enabled = G.system_settings.get('enableIL2', False)
 
     if il2_enabled or G.args.sim == "IL2":
         if not G._child_instance:
@@ -1642,7 +1623,7 @@ def init_sims():
         il2_telem.start()
 
     sim_connect_telem = SimConnectSock(G.telem_manager)
-    msfs = utils.read_system_settings(G._device_vid_pid, G._device_type).get('enableMSFS', False)
+    msfs = G.system_settings.get('enableMSFS', False)
 
     try:
         # msfs = utils.sanitize_dict(config["system"]).get("msfs_enabled", None)
@@ -1659,7 +1640,7 @@ def init_sims():
     il2_status = "Enabled" if il2_enabled else "Disabled"
     msfs_status = "Enabled" if msfs else "Disabled"
 
-    G.main_window.refresh_telem_status(dcs_enabled, il2_enabled, msfs, xplane_enabled)
+    G.main_window.refresh_telem_status()
 
 def stop_sims():
     xplane_telem.quit()
@@ -1671,55 +1652,38 @@ def stop_sims():
 G.stop_sims = stop_sims
 G.init_sims = init_sims
 
-def notify_close_children():
-    if not len(G._child_ipc_ports) or not G._ipc_thread.running:
-        return
-    G._ipc_thread.send_broadcast_message("MASTER INSTANCE QUIT")
+
 
 
 def launch_children():
-    global script_dir
     if not G.system_settings.get('autolaunchMaster', False) or G.args.child or not G._master_instance:
         return False
 
-    if getattr(sys, 'frozen', False):
-        app = ['VPForce-TelemFFB.exe']
-    else:
-        app = ['python', 'main.py']
-
-    master_port = f"6{G._device_pid}"
-    # full_path = os.path.join(script_dir, app)
+    master_port = f"6{G.device_usbpid}"
     try:
-        if G.system_settings.get('autolaunchJoystick', False) and G._device_type != 'joystick':
-            min = ['--minimize'] if G.system_settings.get('startMinJoystick', False) else []
-            headless = ['--headless'] if G.system_settings.get('startHeadlessJoystick', False) else []
-            pid = G.system_settings.get('pidJoystick', '2055')
-            vidpid = f"FFFF:{pid}"
-            command = app + ['-D', vidpid, '-t', 'joystick', '--child', '--masterport', master_port] + min + headless
-            logging.info(f"Auto-Launch: starting instance: {command}")
-            subprocess.Popen(command)
-            G._launched_joystick = True
-            G._child_ipc_ports.append(int(f"6{pid}"))
-        if G.system_settings.get('autolaunchPedals', False) and G._device_type != 'pedals':
-            min = ['--minimize'] if G.system_settings.get('startMinPedals', False) else []
-            headless = ['--headless'] if G.system_settings.get('startHeadlessPedals', False) else []
-            pid = G.system_settings.get('pidPedals', '2055')
-            vidpid = f"FFFF:{pid}"
-            command = app + ['-D', vidpid, '-t', 'pedals', '--child', '--masterport', master_port] + min + headless
-            logging.info(f"Auto-Launch: starting instance: {command}")
-            subprocess.Popen(command)
-            G._launched_pedals = True
-            G._child_ipc_ports.append(int(f"6{pid}"))
-        if G.system_settings.get('autolaunchCollective', False) and G._device_type != 'collective':
-            min = ['--minimize'] if G.system_settings.get('startMinCollective', False) else []
-            headless = ['--headless'] if G.system_settings.get('startHeadlessCollective', False) else []
-            pid = G.system_settings.get('pidCollective', '2055')
-            vidpid = f"FFFF:{pid}"
-            command = app + ['-D', vidpid, '-t', 'collective', '--child', '--masterport', master_port] + min + headless
-            logging.info(f"Auto-Launch: starting instance: {command}")
-            subprocess.Popen(command)
-            G._launched_collective = True
-            G._child_ipc_ports.append(int(f"6{pid}"))
+
+        def check_launch_instance(dev_type :str):
+            Dev_type = dev_type.capitalize()
+            if G.system_settings.get(f'autolaunch{Dev_type}', False) and G.device_type != dev_type:
+                usbpid = G.system_settings.get(f'pid{Dev_type}', '2055')
+                usb_vidpid = f"FFFF:{usbpid}"
+            
+                args = [sys.argv[0], '-D', usb_vidpid, '-t', dev_type, '--child', '--masterport', master_port]
+                if sys.argv[0].endswith(".py"): # insert python interpreter if we launch ourselves as a script
+                    args.insert(0, sys.executable)
+
+                if G.system_settings.get(f'startMin{Dev_type}', False): args.append('--minimize')
+                if G.system_settings.get(f'startHeadless{Dev_type}', False): args.append('--headless')
+
+                logging.info(f"Auto-Launch: starting instance: {args}")
+                subprocess.Popen(args)
+                G._launched_instances.append(dev_type)
+                G._child_ipc_ports.append(int(f"6{usbpid}"))
+
+        check_launch_instance("joystick")
+        check_launch_instance("pedals")
+        check_launch_instance("collective")
+
     except Exception as e:
         logging.error(f"Error during Auto-Launch sequence: {e}")
     return True
@@ -1777,10 +1741,10 @@ def main():
     G._launched_children = False
     G._child_ipc_ports = []
     G._master_instance = False
-    G._ipc_thread = None
+    G.ipc_instance = None
     G._child_instance = G.args.child
 
-    G.system_settings = utils.read_system_settings(G.args.device, G.args.type)
+    G.system_settings = utils.SystemSettings()
 
     # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
     _vpf_logo = ":/image/vpforcelogo.png"
@@ -1788,32 +1752,32 @@ def main():
         master_rb = G.system_settings.get('masterInstance', 1)
         match master_rb:
             case 1:
-                G._device_pid = G.system_settings.get('pidJoystick', "2055")
-                G._device_type = 'joystick'
+                G.device_usbpid = G.system_settings.get('pidJoystick', "2055")
+                G.device_type = 'joystick'
             case 2:
-                G._device_pid = G.system_settings.get('pidPedals', "2055")
-                G._device_type = 'pedals'
+                G.device_usbpid = G.system_settings.get('pidPedals', "2055")
+                G.device_type = 'pedals'
             case 3:
-                G._device_pid = G.system_settings.get('pidCollective', "2055")
-                G._device_type = 'collective'
+                G.device_usbpid = G.system_settings.get('pidCollective', "2055")
+                G.device_type = 'collective'
             case _:
-                G._device_pid = G.system_settings.get('pidJoystick', "2055")
-                G._device_type = 'joystick'
+                G.device_usbpid = G.system_settings.get('pidJoystick', "2055")
+                G.device_type = 'joystick'
 
-        if not G._device_pid: # check empty string
-            G._device_pid = '2055'
+        if not G.device_usbpid: # check empty string
+            G.device_usbpid = '2055'
 
-        G._device_vid_pid = f"FFFF:{G._device_pid}"
-        G.args.type = G._device_type
+        G.device_usbvidpid = f"FFFF:{G.device_usbpid}"
+        G.args.type = G.device_type
     else:
         if G.args.type is None:
-            G._device_type = 'joystick'
-            G.args.type = G._device_type
+            G.device_type = 'joystick'
+            G.args.type = G.device_type
         else:
-            G._device_type = str.lower(G.args.type)
+            G.device_type = str.lower(G.args.type)
 
-        G._device_pid = G.args.device.split(":")[1]
-        G._device_vid_pid = G.args.device
+        G.device_usbpid = G.args.device.split(":")[1]
+        G.device_usbvidpid = G.args.device
 
 
 
@@ -1831,7 +1795,7 @@ def main():
         'collective': 3
     }
     master_index = G.system_settings.get('masterInstance', 1)
-    if index_dict[G._device_type] == master_index:
+    if index_dict[G.device_type] == master_index:
         G._master_instance = True
     else:
         G._master_instance = False
@@ -1974,9 +1938,9 @@ def main():
     init_logging(G.log_window.widget)
     G.log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
 
-    xmlutils.update_vars(G._device_type, G.userconfig_path, G.defaults_path)
+    xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
     try:
-        G.settings_mgr = SettingsWindow(datasource="Global", device=G._device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
+        G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
     except Exception as e:
         traceback.print_exc()
         logging.error(f"Error Reading user config file..")
@@ -1997,18 +1961,17 @@ def main():
             utils.create_empty_userxml_file(G.userconfig_path)
 
             logging.info(f"User config Reset:  Backup file created: {backup_file}")
-            G.settings_mgr = SettingsWindow(datasource="Global", device=G._device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
+            G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
             QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
         else:
             QCoreApplication.instance().quit()
             return
 
-    icon_path = ":/image/vpforceicon.png"
-    G.settings_mgr.setWindowIcon(QIcon(icon_path))
+
 
     logging.info(f"TelemFFB (version {version}) Starting")
     try:
-        vid_pid = [int(x, 16) for x in G._device_vid_pid.split(":")]
+        vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
     except:
         pass
 
@@ -2039,12 +2002,12 @@ def main():
 
     except Exception as e:
         logging.exception("Exception")
-        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {G._device_vid_pid} for device: {G._device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
+        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {G.device_usbvidpid} for device: {G.device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
         dev_firmware_version = 'ERROR'
 
     # config = get_config()
     # ll = config["system"].get("logging_level", "INFO")
-    ll = utils.read_system_settings(G._device_vid_pid, G._device_type).get('logLevel', 'INFO')
+    ll = G.system_settings.get('logLevel', 'INFO')
     log_levels = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
@@ -2058,23 +2021,23 @@ def main():
 
     G.is_master_instance = launch_children()
     if G.is_master_instance:
-        myport = int(f"6{G._device_pid}")
-        G._ipc_thread = IPCNetworkThread(master=True, myport=myport, child_ports=G._child_ipc_ports)
-        G._ipc_thread.child_keepalive_signal.connect(lambda device, status: G.main_window.update_child_status(device, status))
-        G._ipc_thread.start()
+        myport = int(f"6{G.device_usbpid}")
+        G.ipc_instance = IPCNetworkThread(master=True, myport=myport, child_ports=G._child_ipc_ports)
+        G.ipc_instance.child_keepalive_signal.connect(lambda device, status: G.main_window.update_child_status(device, status))
+        G.ipc_instance.start()
         G._launched_children = True
     elif G.args.child:
-        myport = int(f"6{G._device_pid}")
-        G._ipc_thread = IPCNetworkThread(child=True, myport=myport, dstport=G.args.masterport)
-        G._ipc_thread.exit_signal.connect(lambda: exit_application())
-        G._ipc_thread.restart_sim_signal.connect(lambda: restart_sims())
-        G._ipc_thread.show_signal.connect(lambda: G.main_window.show())
-        G._ipc_thread.hide_signal.connect(lambda: G.main_window.hide())
-        G._ipc_thread.showlog_signal.connect(lambda: G.log_window.show())
-        G._ipc_thread.show_settings_signal.connect(lambda: G.main_window.open_system_settings_dialog())
-        G._ipc_thread.start()
+        myport = int(f"6{G.device_usbpid}")
+        G.ipc_instance = IPCNetworkThread(child=True, myport=myport, dstport=G.args.masterport)
+        G.ipc_instance.exit_signal.connect(exit_application)
+        G.ipc_instance.restart_sim_signal.connect(restart_sims)
+        G.ipc_instance.show_signal.connect(lambda: G.main_window.show())
+        G.ipc_instance.hide_signal.connect(lambda: G.main_window.hide())
+        G.ipc_instance.showlog_signal.connect(lambda: G.log_window.show())
+        G.ipc_instance.show_settings_signal.connect(lambda: G.main_window.open_system_settings_dialog())
+        G.ipc_instance.start()
 
-    G.main_window = MainWindow(ipc_thread=G._ipc_thread)
+    G.main_window = MainWindow()
 
     # log_tail_window = LogTailWindow(window)
 
@@ -2086,15 +2049,13 @@ def main():
 
     autoconvert_config(G.main_window, _legacy_config_file, _legacy_override_file)
     if not _release:
-        fetch_version_thread = utils.FetchLatestVersionThread()
-        fetch_version_thread.version_result_signal.connect(G.main_window.update_version_result)
-        fetch_version_thread.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
-        fetch_version_thread.start()
+        th = utils.FetchLatestVersionThread()
+        th.version_result_signal.connect(G.main_window.update_version_result)
+        th.error_signal.connect(lambda error_message: print("Error in thread:", error_message))
+        th.start()
 
-    G.telem_manager = TelemManager(settings_manager=G.settings_mgr, ipc_thread=G._ipc_thread)
+    G.telem_manager = TelemManager()
     G.telem_manager.start()
-
-    G.main_window.set_telem_manager(G.telem_manager)
 
     G.telem_manager.telemetryReceived.connect(G.main_window.update_telemetry)
     G.telem_manager.aircraftUpdated.connect(G.main_window.update_settings)
@@ -2107,17 +2068,18 @@ def main():
         current_title = G.main_window.windowTitle()
         new_title = f"** MASTER INSTANCE ** {current_title}"
         G.main_window.setWindowTitle(new_title)
-        if G._launched_joystick:
+        if "joystick" in G._launched_instances:
             G.main_window.joystick_status_icon.show()
-        if G._launched_pedals:
+        if "pedals" in G._launched_instances:
             G.main_window.pedals_status_icon.show()
-        if G._launched_collective:
+        if "collective" in G._launched_instances:
             G.main_window.collective_status_icon.show()
 
     if not G.system_settings.get("pidJoystick", None):
         G.main_window.open_system_settings_dialog()
 
-    utils.signal_emitter.telem_timeout_signal.connect(G.main_window.update_sim_indicators)
+    G.telem_manager.telemetryTimeout.connect(lambda state: G.main_window.update_sim_indicators(G.telem_manager.getTelemValue("src"), state))
+
     utils.signal_emitter.error_signal.connect(G.main_window.process_error_signal)
     utils.signal_emitter.msfs_quit_signal.connect(restart_sims)
 
@@ -2138,9 +2100,9 @@ def main():
 
     app.exec_()
 
-    if G._ipc_thread and G._ipc_thread.running:
-        notify_close_children()
-        G._ipc_thread.stop()
+    if G.ipc_instance:
+        G.ipc_instance.notify_close_children()
+        G.ipc_instance.stop()
 
     stop_sims()
     G.telem_manager.quit()
@@ -2162,7 +2124,7 @@ def init_logging(log_widget : QPlainTextEdit):
 
     date_str = datetime.now().strftime("%Y%m%d")
 
-    logname = "".join(["TelemFFB", "_", G._device_vid_pid.replace(":", "-"), '_', G._device_type, "_", date_str, ".log"])
+    logname = "".join(["TelemFFB", "_", G.device_usbvidpid.replace(":", "-"), '_', G.device_type, "_", date_str, ".log"])
     log_file = os.path.join(log_folder, logname)
 
     # Create a logger instance
@@ -2182,7 +2144,7 @@ def init_logging(log_widget : QPlainTextEdit):
             return "".join([txt[0] for txt in p])
             
     # Create a formatter for the log messages
-    fmt_string = f'{utils.AnsiColors.DARK_GRAY}%(asctime)s.%(msecs)03d - {G._device_type}{utils.AnsiColors.END} - %(levelname)s - %(message)s'
+    fmt_string = f'{utils.AnsiColors.DARK_GRAY}%(asctime)s.%(msecs)03d - {G.device_type}{utils.AnsiColors.END} - %(levelname)s - %(message)s'
     formatter = logging.Formatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
     formatter_file = MyFormatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
 

@@ -1277,7 +1277,6 @@ class AircraftBase(object):
                 if 'friction' in key: continue
                 if 'spring' in key: continue
             effects[key].stop()
-        utils.signal_emitter.telem_timeout_signal.emit(self._telem_data['src'], True)
 
     def on_telemetry(self, data): 
         pass

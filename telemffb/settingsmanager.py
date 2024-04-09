@@ -9,6 +9,7 @@ from PyQt5 import QtGui, QtWidgets, QtCore
 from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
                              QVBoxLayout, QPushButton, QFileDialog, QMessageBox, QHeaderView)
 from PyQt5.QtWidgets import QTableWidget, QTextEdit, QWidget, QSlider
+from PyQt5.QtGui import QIcon
 from datetime import datetime
 from PyQt5.QtCore import Qt, pyqtSignal
 
@@ -60,6 +61,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         self.sim = self.current_sim
         self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")
+        self.setWindowIcon(QIcon(":/image/vpforceicon.png"))
         self.b_browse.clicked.connect(self.browse_vpconf_file)
         self.b_update.clicked.connect(self.update_button)
         self.b_deleteModel.clicked.connect(self.delete_model)

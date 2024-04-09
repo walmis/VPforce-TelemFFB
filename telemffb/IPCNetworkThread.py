@@ -51,7 +51,7 @@ class IPCNetworkThread(QThread):
         try:
             self._socket.bind((self._host, self._myport))
         except OSError as e:
-            QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {G._device_type} instance of TelemFFB.\n\n{e}\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
+            QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {G.device_type} instance of TelemFFB.\n\n{e}\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
             QCoreApplication.instance().quit()
 
     def send_ipc_telem(self, telem):
@@ -59,10 +59,13 @@ class IPCNetworkThread(QThread):
         message = f"telem:{j_telem}"
         self.send_message(message)
 
+    def notify_close_children(self):
+        self.send_broadcast_message("MASTER INSTANCE QUIT")
+
     def send_ipc_effects(self, active_effects, active_settings):
         payload = {
-            f'{G._device_type}_active_effects': active_effects,
-            f'{G._device_type}_active_settings': active_settings
+            f'{G.device_type}_active_effects': active_effects,
+            f'{G.device_type}_active_settings': active_settings
         }
 
         msg = json.dumps(payload)
@@ -90,9 +93,9 @@ class IPCNetworkThread(QThread):
             ts = time.time()
             logging.debug(f"SENT KEEPALIVES: {ts}")
         elif self._child:
-            self.send_message(f"Child Keepalive:{G._device_type}")
+            self.send_message(f"Child Keepalive:{G.device_type}")
             ts = time.time()
-            logging.debug(f"{G._device_type} SENT CHILD KEEPALIVE: {ts}")
+            logging.debug(f"{G.device_type} SENT CHILD KEEPALIVE: {ts}")
 
     def _receive_messages_loop(self):
         while self._running:
@@ -118,7 +121,7 @@ class IPCNetworkThread(QThread):
                     self.restart_sim_signal.emit('Restart Sims')
                 elif msg.startswith('SHOW LOG:'):
                     dev = msg.removeprefix('SHOW LOG:')
-                    if dev == G._device_type:
+                    if dev == G.device_type:
                         logging.info("Show log command received via IPC")
                         self.showlog_signal.emit()
                 elif msg == 'SHOW WINDOW':

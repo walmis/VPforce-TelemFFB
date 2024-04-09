@@ -24,7 +24,7 @@ def convert_system_settings(sys_dict):
         'il2_path': 'pathIL2',
     }
 
-    def_dev_dict, def_sys_dict = utils.get_default_sys_settings(G._device_vid_pid, G._device_type)
+    def_dev_dict, def_sys_dict = G.system_settings.defaults, G.system_settings.defaults
 
     sys_dict = utils.sanitize_dict(sys_dict)
     for key, value in sys_dict.items():  # iterate through the values in the ini user config
@@ -44,10 +44,10 @@ def convert_system_settings(sys_dict):
     formatted_dev_dict = json.dumps(def_dev_dict)
     formatted_sys_dict = json.dumps(def_sys_dict)
     utils.set_reg('Sys', formatted_sys_dict)
-    utils.set_reg(f'{G._device_type}Sys', formatted_dev_dict)
+    utils.set_reg(f'{G.device_type}Sys', formatted_dev_dict)
 
 
-def config_to_dict(section, name, value, isim='', device=G._device_type, new_ac=False):
+def config_to_dict(section, name, value, isim='', device=G.device_type, new_ac=False):
     classes = ['PropellerAircraft', 'JetAircraft', 'TurbopropAircraft', 'Glider', 'Helicopter', 'HPGHelicopter']
     sim = ''
     cls = ''
@@ -171,7 +171,7 @@ def convert_settings(cfg, usr, window=None):
                 if key == "type":
                     dev = "any"
                 else:
-                    dev = G._device_type
+                    dev = G.device_type
                 dif_item = config_to_dict(section, key, valuestring, isim=sim, device=dev, new_ac=True)
                 differences.append(dif_item)
 

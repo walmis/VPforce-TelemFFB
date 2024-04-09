@@ -12,7 +12,7 @@ class LogWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Log Console ({G._device_type})")
+        self.setWindowTitle(f"Log Console ({G.device_type})")
         self.resize(800, 500)
 
         self.central_widget = QWidget()
@@ -60,13 +60,13 @@ class LogWindow(QMainWindow):
         # Add the button layout to the main layout
         layout.addLayout(button_layout)
 
-        geo = G.qsettings.value(f"{G._device_type}/logWindowState")
+        geo = G.qsettings.value(f"{G.device_type}/logWindowState")
         if geo:
             self.restoreGeometry(geo)
 
     def closeEvent(self, event):
         geo = self.saveGeometry()
-        G.qsettings.setValue(f"{G._device_type}/logWindowState", geo)
+        G.qsettings.setValue(f"{G.device_type}/logWindowState", geo)
         self.hide()
         event.ignore()
 

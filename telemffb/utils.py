@@ -28,7 +28,7 @@ import select
 import logging
 import sys
 
-from PyQt5.QtCore import QThread, pyqtSignal, QObject
+from PyQt5.QtCore import QThread, pyqtSignal, QObject, QSettings
 from PyQt5.QtGui import QTextCharFormat, QColor
 
 from PyQt5 import QtCore, QtGui, Qt
@@ -413,73 +413,6 @@ def get_reg(name):
     except WindowsError:
         return None
 
-
-def get_default_sys_settings(device_id, device_type, cmb=False):
-    pid_j = ''
-    pid_p = ''
-    pid_c = ''
-    if device_id is None:
-        device = '2055'
-    elif ':' in device_id:
-        device = device_id.split(":")[1]
-
-    if device_type is None:
-        device_type = 'joystick'
-    match device_type:
-        case 'joystick':
-            pid_j = device
-        case 'pedals':
-            pid_p = device
-        case 'collective':
-            pid_c = device
-
-    instance_sys_dict = {
-        'logLevel': 'INFO',
-        'telemTimeout': 200,
-        'saveWindow': False,
-        'saveLastTab': False,
-        'enableVPConfStartup': False,
-        'pathVPConfStartup': '',
-        'enableVPConfExit': False,
-        'pathVPConfExit': '',
-    }
-
-    globl_sys_dict = {
-        'ignoreUpdate': False,
-        'enableDCS': False,
-        'enableMSFS': False,
-        'enableXPLANE': False,
-        'validateXPLANE': False,
-        'pathXPLANE': '',
-        'enableIL2': False,
-        'validateIL2': True,
-        'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
-        'portIL2': 34385,
-        'masterInstance': 1,
-        'autolaunchMaster': False,
-        'autolaunchJoystick': False,
-        'autolaunchPedals': False,
-        'autolaunchCollective': False,
-        'startMinJoystick': False,
-        'startMinPedals': False,
-        'startMinCollective': False,
-        'startHeadlessJoystick': False,
-        'startHeadlessPedals': False,
-        'startHeadlessCollective': False,
-        'pidJoystick': pid_j,
-        'pidPedals': pid_p,
-        'pidCollective': pid_c,
-
-    }
-
-    if cmb:
-        sys_dict = globl_sys_dict.copy()
-        sys_dict.update(instance_sys_dict)
-        return sys_dict
-    else:
-        return instance_sys_dict, globl_sys_dict
-
-
 def create_support_bundle(userconfig_rootpath):
     # Get the  system settings
     sys_dict = read_all_system_settings()
@@ -564,20 +497,70 @@ def read_all_system_settings():
 
 
 
-class SystemSettings:
+class SystemSettings(QSettings):
+    default_inst = {
+        'logLevel': 'INFO',
+        'telemTimeout': 200,
+        'saveWindow': True,
+        'saveLastTab': True,
+        'enableVPConfStartup': False,
+        'pathVPConfStartup': '',
+        'enableVPConfExit': False,
+        'pathVPConfExit': '',
+    }
+
+    globl_sys_dict = {
+        'ignoreUpdate': False,
+        'enableDCS': False,
+        'enableMSFS': False,
+        'enableXPLANE': False,
+        'validateXPLANE': False,
+        'pathXPLANE': '',
+        'enableIL2': False,
+        'validateIL2': True,
+        'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
+        'portIL2': 34385,
+        'masterInstance': 1,
+        'autolaunchMaster': False,
+        'autolaunchJoystick': False,
+        'autolaunchPedals': False,
+        'autolaunchCollective': False,
+        'startMinJoystick': False,
+        'startMinPedals': False,
+        'startMinCollective': False,
+        'startHeadlessJoystick': False,
+        'startHeadlessPedals': False,
+        'startHeadlessCollective': False,
+    }
+
+    @property
+    def defaults(self):
+        s = {}
+        s.update(self.default_inst)
+        s.update(self.globl_sys_dict)
+        return s
+
     def __init__(self, pid=None, tp=None):
+        super().__init__('VPforce', 'TelemFFB')
         #self.def_inst_sys_dict, self.def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
         pass
 
     def get(self, name, default=None):       
         # check instance params
-        val = G.qsettings.value(f"{G._device_type}/{name}")
+        val = self.value(f"{G.device_type}/{name}")
         if val is None:
             # check global param
-            val = G.qsettings.value(name)
+            val = self.value(name)
 
         if val is None:
-            logging.warn(f"SystemSettings: not found {name} {repr(default)} {repr(val)}")
+            val = self.defaults.get(name, None)
+            if val is not None:
+                if name in self.default_inst:
+                    self.setValue(f"{G.device_type}/{name}", val) # save instance variable
+                else:
+                    self.setValue(name, val)
+                return val
+            #logging.warn(f"SystemSettings: not found {name} default={repr(default)} val={repr(val)}")
             return default
 
         if val == "true": val = 1
@@ -587,60 +570,6 @@ class SystemSettings:
         except: pass
 
         return val
-
-s = SystemSettings()
-
-
-def read_system_settings(pid, tp):
-    return s
-    REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
-    def_inst_sys_dict, def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
-
-    settings_dict = {}
-    g_settings_dict = {}
-    i_settings_dict = {}
-    was_default = False
-    g_key = 'Sys'
-    i_key = f'{tp}Sys'
-    try:
-        # try to create the path key in case it doesn't exist
-        winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
-        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0,
-                                      winreg.KEY_READ | winreg.KEY_WRITE)
-        # for key, default_value in def_sys_dict.items():
-        try:
-            # try to read the global system settings key
-            value, _ = winreg.QueryValueEx(registry_key, g_key)
-            g_settings_dict = json.loads(value)
-        except OSError:
-            # If the key does not exist, set it to the default value
-            # reg_type = winreg.REG_DWORD if isinstance(default_value, int) else winreg.REG_SZ
-            winreg.SetValueEx(registry_key, g_key, 0, winreg.REG_SZ, json.dumps(def_global_sys_dict))
-            g_settings_dict = def_global_sys_dict
-            was_default = True
-        try:
-            # try to read the instance system settings key
-            value, _ = winreg.QueryValueEx(registry_key, i_key)
-            i_settings_dict = json.loads(value)
-        except OSError:
-            # If the key does not exist, set it to the default value
-            # reg_type = winreg.REG_DWORD if isinstance(default_value, int) else winreg.REG_SZ
-            winreg.SetValueEx(registry_key, i_key, 0, winreg.REG_SZ, json.dumps(def_inst_sys_dict))
-            i_settings_dict = def_inst_sys_dict
-            was_default = True
-
-        winreg.CloseKey(registry_key)
-    except WindowsError:
-        pass
-
-    
-
-
-    settings_dict = g_settings_dict.copy()
-    settings_dict.update(i_settings_dict)
-    if was_default:
-        settings_dict['wasDefault'] = True
-    return settings_dict
 
 
 def mix(a, b, val):
@@ -1705,7 +1634,7 @@ class LoggingFilter(logging.Filter):
 
     def filter(self, record):
         # Check if any of the keywords are present in the log message
-        record.device_type = G._device_type
+        record.device_type = G.device_type
         for keyword in self.keywords:
             if keyword in record.getMessage():
                 # If any keyword is found, prevent the message from being logged
@@ -1726,11 +1655,11 @@ def load_custom_userconfig(new_path=''):
     else:
         G.userconfig_rootpath = os.path.basename(new_path)
         G.userconfig_path = new_path
-    xmlutils.update_vars(G._device_type, _userconfig_path=G.userconfig_path, _defaults_path=G.defaults_path)
-    G.settings_mgr = SettingsWindow(datasource="Global", device=G._device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
+    xmlutils.update_vars(G.device_type, _userconfig_path=G.userconfig_path, _defaults_path=G.defaults_path)
+    G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
     logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
     if G._master_instance and G._launched_children:
-        G._ipc_thread.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
+        G.ipc_instance.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
 
 
 def set_vpconf_profile(config_filepath, serial):
@@ -1746,7 +1675,7 @@ def set_vpconf_profile(config_filepath, serial):
             logging.error(f"Error loading VPforce Configurator Profile: ({config_filepath}) - The file does not exist! ")
             return
 
-        if not validate_vpconf_profile(config_filepath, G._device_pid, G._device_type, silent=True):
+        if not validate_vpconf_profile(config_filepath, G.device_usbpid, G.device_type, silent=True):
             logging.error(f"VPForce Config Error: ({config_filepath}) - The file failed validation!  Check the PID is correct for the device")
             return
 
@@ -1769,7 +1698,7 @@ def format_dict(data, prefix=""):
 
 def save_main_window_geometry():
     # Capture the mai n window's geometry
-    device_type = G._device_type
+    device_type = G.device_type
     cur_index = G.main_window.tab_widget.currentIndex()
     G.main_window.tab_sizes[str(cur_index)]['width'] = G.main_window.width()
     G.main_window.tab_sizes[str(cur_index)]['height'] = G.main_window.height()

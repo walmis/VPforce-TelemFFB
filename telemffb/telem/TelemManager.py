@@ -6,6 +6,7 @@ import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.settingsmanager import logging, pyqtSignal, utils, xmlutils
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
+from telemffb.telem.SimConnectManager import SimConnectManager
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -42,14 +43,17 @@ def config_has_changed(update=False) -> bool:
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
     aircraftUpdated = pyqtSignal()
+    telemetryTimeout = pyqtSignal(bool)
+
     currentAircraft: aircrafts_dcs.Aircraft = None
     currentAircraftName: str = None
     currentAircraftConfig: dict = {}
+
     timedOut: bool = True
     lastFrameTime: float
     numFrames: int = 0
 
-    def __init__(self, settings_manager, ipc_thread=None) -> None:
+    def __init__(self) -> None:
         QObject.__init__(self)
         threading.Thread.__init__(self, daemon=True)
 
@@ -61,14 +65,16 @@ class TelemManager(QObject, threading.Thread):
         self.lastFrameTime = time.perf_counter()
         self.frameTimes = []
         self.maxframeTime = 0
-        self.timeout = 0.2
-        self.settings_manager = settings_manager
-        self.ipc_thread : IPCNetworkThread = ipc_thread
-        self._ipc_telem = {}
+        self.timeout_sec = 0.2
+        self._ipc_telem_data = {}
+        self._simconnect : SimConnectManager= None
 
-    @classmethod
-    def set_simconnect(cls, sc):
-        cls._simconnect = sc
+    def set_simconnect(self, sc : SimConnectManager):
+        self._simconnect = sc
+
+    @property
+    def simconnect(self) -> SimConnectManager:
+        return self._simconnect
 
     def get_aircraft_config(self, aircraft_name, data_source):
         params = {}
@@ -88,7 +94,7 @@ class TelemManager(QObject, threading.Thread):
             else:
                 the_sim = send_source
 
-            cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, G._device_type)
+            cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, G.device_type)
             #globals.settings_mgr.current_pattern = pattern
             if cls_name == '': cls_name = 'Aircraft'
             for setting in result:
@@ -106,7 +112,8 @@ class TelemManager(QObject, threading.Thread):
                     logging.debug(f"Ignoring blank setting from Settings Manager: {k} : {vu}")
                 # print(f"SETTING:\n{setting}")
             params = utils.sanitize_dict(params)
-            self.settings_manager.update_state_vars(
+
+            G.settings_mgr.update_state_vars(
                 current_sim=the_sim,
                 current_aircraft_name=aircraft_name,
                 current_class=cls_name,
@@ -165,7 +172,7 @@ class TelemManager(QObject, threading.Thread):
         data = data.split(";")
 
         telem_data = {}
-        telem_data["FFBType"] = G._device_type
+        telem_data["FFBType"] = G.device_type
 
         self.frameTimes.append(int((time.perf_counter() - self.lastFrameTime)*1000))
         if len(self.frameTimes) > 500: self.frameTimes.pop(0)
@@ -197,10 +204,10 @@ class TelemManager(QObject, threading.Thread):
 
         # Read telemetry sent via IPC channel from child instances and update local telemetry stream
         if G._master_instance and G._launched_children:
-            self._ipc_telem = self.ipc_thread._ipc_telem
-            if self._ipc_telem != {}:
-                telem_data.update(self._ipc_telem)
-                self._ipc_telem = {}
+            self._ipc_telem_data = G.ipc_instance._ipc_telem
+            if self._ipc_telem_data != {}:
+                telem_data.update(self._ipc_telem_data)
+                self._ipc_telem_data = {}
         # print(items)
         aircraft_name = telem_data.get("N")
         data_source = telem_data.get("src", None)
@@ -300,6 +307,7 @@ class TelemManager(QObject, threading.Thread):
                     for sv in d1:
                         self._simconnect.addSimVar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
                     self._simconnect._resubscribe()
+
                 if G.settings_mgr.isVisible():
                     G.settings_mgr.b_getcurrentmodel.click()
 
@@ -351,13 +359,13 @@ class TelemManager(QObject, threading.Thread):
         if G.args.child and self.currentAircraft:
             ipc_telem = self.currentAircraft._ipc_telem
             if ipc_telem:
-                self.ipc_thread.send_ipc_telem(ipc_telem)
+                G.ipc_instance.send_ipc_telem(ipc_telem)
                 self.currentAircraft._ipc_telem.clear()
         if G.args.plot:
             for item in G.args.plot:
                 if item in telem_data:
                     if G._child_instance or G._launched_children:
-                        utils.teleplot.sendTelemetry(item, telem_data[item], instance=G._device_type)
+                        utils.teleplot.sendTelemetry(item, telem_data[item], instance=G.device_type)
                     else:
                         utils.teleplot.sendTelemetry(item, telem_data[item])
 
@@ -365,19 +373,25 @@ class TelemManager(QObject, threading.Thread):
             self.telemetryReceived.emit(telem_data)
         except: pass
 
+    def getTelemValue(self, key):
+        if self.currentAircraft:
+            return self.currentAircraft._telem_data.get(key, None)
+
     def on_timeout(self):
         if self.currentAircraft and not self.timedOut:
             self.currentAircraft.on_timeout()
-        self.timedOut = True
-        self.settings_manager.timedOut = True
+            self.telemetryTimeout.emit(True)
+            self.timedOut = True
+            G.settings_mgr.timedOut = True
 
     def run(self):
-        self.timeout = int(utils.read_system_settings(G._device_vid_pid, G._device_type).get('telemTimeout', 200))/1000
-        logging.info(f"Telemetry timeout: {self.timeout}")
+        self.timeout_sec = int(G.system_settings.get('telemTimeout', 200))/1000.0
+        logging.info(f"Telemetry timeout: {self.timeout_sec}")
+        self._run = True
         while self._run:
             with self._cond:
                 if not len(self._events) and not self._data:
-                    if not self._cond.wait(self.timeout):
+                    if not self._cond.wait(self.timeout_sec):
                         self.on_timeout()
                         continue
 
@@ -385,7 +399,10 @@ class TelemManager(QObject, threading.Thread):
                     self.process_events()
 
                 if self._data:
-                    self.timedOut = False
+                    if self.timedOut:
+                        self.telemetryTimeout.emit(False)
+                        self.timedOut = False
+
                     self.settings_manager.timedOut = False
                     data = self._data
                     self._data = None

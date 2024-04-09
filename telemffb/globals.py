@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from .utils import SystemSettings
     from .settingsmanager import SettingsWindow
     from .telem.TelemManager import TelemManager
+    from main import MainWindow
 
 settings_mgr : 'SettingsWindow' = None
 userconfig_rootpath = None
@@ -14,20 +15,21 @@ defaults_path = None
 defaults_path = None
 
 # main window instance
-main_window = None
+main_window : 'MainWindow' = None
 
-_device_type : str = None
-_device_pid : str = None
-_device_vid_pid : str = None # "FFFF:2055"
+device_type : str = None
+device_usbpid : str = None
+device_usbvidpid : str = None # "FFFF:2055"
 
 _launched_joystick = False
 _launched_pedals = False
 _launched_collective = False
+_launched_instances = []
 _launched_children = False
 _child_ipc_ports = []
 _master_instance = False
 _ipc_running = False
-_ipc_thread : 'IPCNetworkThread' = None
+ipc_instance : 'IPCNetworkThread' = None
 _child_instance = None
 is_master_instance = None
 

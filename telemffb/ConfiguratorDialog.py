@@ -16,7 +16,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
 
         self.setupUi(self)
         self.retranslateUi(self)
-        self.setWindowTitle(f"Configurator Gain Override ({G._device_type.capitalize()})")
+        self.setWindowTitle(f"Configurator Gain Override ({G.device_type.capitalize()})")
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
         # self.cb_MasterGain.clicked
         self.sl_MasterGain.valueChanged.connect(self.update_labels)
