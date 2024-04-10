@@ -57,7 +57,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.userconfig_path = userconfig_path
         self.device = device
         self.system_settings = system_settings
-        self.timedOut = False
+        self.timed_out = False
 
         self.sim = self.current_sim
         self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")
@@ -323,31 +323,31 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         match self.sim:
 
             case 'DCS':
-                for disable in { 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter'}:
+                for disable in [ 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter']:
                     lprint(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
-                for enable in {'PropellerAircraft', 'JetAircraft', 'Helicopter'}:
+                for enable in ['PropellerAircraft', 'JetAircraft', 'Helicopter']:
                     lprint(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'IL2':
-                for disable in {'TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                for disable in ['TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter']:
                     lprint(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
-                for enable in {'PropellerAircraft', 'JetAircraft'}:
+                for enable in ['PropellerAircraft', 'JetAircraft']:
                     lprint(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'MSFS':
-                for enable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter'}:
+                for enable in ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter']:
                     lprint(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'XPLANE':
-                for disable in {'HPGHelicopter'}:
+                for disable in ['HPGHelicopter']:
                     lprint(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
-                for enable in {'PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter'}:
+                for enable in ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter']:
                     lprint(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 

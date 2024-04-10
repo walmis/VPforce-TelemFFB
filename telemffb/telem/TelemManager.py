@@ -382,7 +382,7 @@ class TelemManager(QObject, threading.Thread):
             self.currentAircraft.on_timeout()
             self.telemetryTimeout.emit(True)
             self.timedOut = True
-            G.settings_mgr.timedOut = True
+            G.settings_mgr.timed_out = True
 
     def run(self):
         self.timeout_sec = int(G.system_settings.get('telemTimeout', 200))/1000.0

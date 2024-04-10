@@ -37,7 +37,7 @@ from telemffb.LogWindow import LogWindow
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.SettingsLayout import SettingsLayout
-from telemffb.LogTailWindow import LogTailWindow
+#from telemffb.LogTailWindow import LogTailWindow
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.sim import aircrafts_msfs_xp
@@ -85,7 +85,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        global log_tail_window
         self._latest_version_url = None
         self.latest_version = None
         self._update_available = None
