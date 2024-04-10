@@ -675,7 +675,13 @@ class MainWindow(QMainWindow):
         # self.log_widget.setFont(QFont("Courier New"))
         # self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
         # self.log_tail_thread = LogTailer(log_file)
-        # self.log_tail_thread.log_updated.connect(self.update_log_widget)
+        # def update_log_widget(log_line):
+        #     cursor = self.log_widget.textCursor()
+        #     cursor.movePosition(QTextCursor.End)
+        #     cursor.insertText(log_line)
+        #     self.log_widget.setTextCursor(cursor)
+        #     self.log_widget.ensureCursorVisible()
+        # self.log_tail_thread.log_updated.connect(update_log_widget)
         # self.log_tail_thread.start()
 
         # self.clear_button = QPushButton("Clear", self.log_tab_widget)
@@ -931,12 +937,7 @@ class MainWindow(QMainWindow):
         else:
             return
 
-    def update_log_widget(self, log_line):
-        cursor = self.log_widget.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        cursor.insertText(log_line)
-        self.log_widget.setTextCursor(cursor)
-        self.log_widget.ensureCursorVisible()
+
 
     def clear_log_widget(self):
         self.log_widget.clear()
