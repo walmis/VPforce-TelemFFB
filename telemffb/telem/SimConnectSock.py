@@ -7,18 +7,14 @@ from telemffb.settingsmanager import utils
 from telemffb.telem.TelemManager import TelemManager
 
 class SimConnectSock(SimConnectManager):
-    def __init__(self, telem: TelemManager, ffb_type=None, unique_id=None):
+    def __init__(self, telem: TelemManager):
         if not unique_id:
             # TODO: maybe use process PID here?
             unique_id = int(G.device_usbpid)
         
-        if not ffb_type:
-            ffb_type = G.device_type
-
         super().__init__(unique_id)
         telem.set_simconnect(self)
         self._telem = telem
-        self._ffb_type = ffb_type
 
 
     def fmt(self, val):

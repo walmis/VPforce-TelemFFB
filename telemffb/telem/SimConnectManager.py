@@ -3,7 +3,8 @@ from ctypes import byref, cast, sizeof
 import time
 import threading
 import logging
-
+import os
+import globals as G
 
 surface_types = {
     0: "Concrete",
@@ -117,8 +118,6 @@ EV_STARTED = 65498 # id for started event
 EV_STOPPED = 65497  # id for stopped event
 EV_SIMSTATE = 65496
 class SimConnectManager(threading.Thread):
-    def_id = 0x1234
-    REQ_ID = 0xfeed
 
     sim_vars = [
         SimVar("T", "ABSOLUTE TIME","Seconds" ),
@@ -209,13 +208,14 @@ class SimConnectManager(threading.Thread):
         self.current_simvars = []
         self.current_var_tracker = []
         self.new_var_tracker = []
-        self.REQ_ID = 60000 + unique_id
-        self.def_id = int(str(unique_id)[::-1])
+        self.req_id = os.getpid()
+        self.def_id = 1
         self.sv_dict = {}
 
 
     def addSimVar(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
         self.temp_sim_vars.append(SimVar(name, var, sc_unit, unit=unit, type=type, scale=scale, mutator=mutator))
+        
     def substitute_simvars(self):
         # build a combined list of the pre-defined simvars from __init__ and any new/updated simvars that have been set by a model
         master_list = list(self.sim_vars)
@@ -287,7 +287,7 @@ class SimConnectManager(threading.Thread):
                 i+=1
 
         self.sc.RequestDataOnSimObject(
-            self.REQ_ID,  # request identifier for response packets
+            self.req_id,  # request identifier for response packets
             self.def_id,  # the data definition group
             OBJECT_ID_USER,
             PERIOD_SIM_FRAME,
@@ -386,7 +386,7 @@ class SimConnectManager(threading.Thread):
             elif isinstance(recv, RECV_SIMOBJECT_DATA):
                 logging.debug(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
                 #print(f"Received SIMOBJECT_DATA with {recv.dwDefineCount} data elements, flags {recv.dwFlags}")
-                if recv.dwRequestID == self.REQ_ID and recv.dwDefineID == self.def_id:
+                if recv.dwRequestID == self.req_id and recv.dwDefineID == self.def_id:
                     #print(f"Matched request 0x{req_id:X}")
                     data = {}
                     data["SimPaused"] = self._sim_paused
@@ -442,7 +442,7 @@ class SimConnectManager(threading.Thread):
         while not self._quit:
             try:
                 logging.info("Trying SimConnect")
-                with SimConnect(f"TelemFFB-{self._ffb_type}") as self.sc:
+                with SimConnect(f"TelemFFB-{G.device_type}") as self.sc:
                     self.sc.SubscribeToSystemEvent(EV_PAUSED, "Pause")
                     self.sc.SubscribeToSystemEvent(EV_STARTED, "SimStart")
                     self.sc.SubscribeToSystemEvent(EV_STOPPED, "SimStop")
