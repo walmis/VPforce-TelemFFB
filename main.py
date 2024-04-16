@@ -249,6 +249,7 @@ class MainWindow(QMainWindow):
         # Add settings converter
         if _legacy_override_file is not None:
             convert_settings_action = QAction('Convert legacy user config to XML', self)
+            _legacy_config_file = utils.get_resource_path('config.ini')
             convert_settings_action.triggered.connect(lambda: autoconvert_config(self, _legacy_config_file, _legacy_override_file))
             utilities_menu.addAction(convert_settings_action)
 
@@ -873,18 +874,17 @@ class MainWindow(QMainWindow):
         # dialog.exec_()
         self.sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
         self.debug_menu.addAction(self.sc_overrides_action)
-        
+
         self.test_update = QAction('Test updater', self)
         def do_test_update():
             self._update_available = True
             self.perform_update()
         self.test_update.triggered.connect(do_test_update)
         self.debug_menu.addAction(self.test_update)
-        
 
         if G.master_instance:
             self.custom_userconfig_action = QAction("Load Custom User Config", self)
-            self.custom_userconfig_action.triggered.connect(lambda: load_custom_userconfig())
+            self.custom_userconfig_action.triggered.connect(lambda: utils.load_custom_userconfig())
             self.debug_menu.addAction(self.custom_userconfig_action)
 
     def set_scrollbar(self, pos):
@@ -1400,7 +1400,7 @@ class MainWindow(QMainWindow):
                         # s = simvarnames.get_var_name(k)
                         if s is not None:
                             k = s
-                if type(v) == float:
+                if isinstance(v, float):
                     items += f"{k}: {v:.3f}\n"
                 else:
                     if isinstance(v, list):
@@ -1540,9 +1540,6 @@ class MainWindow(QMainWindow):
         return False
 
 
-
-
-
 def exit_application():
     # Perform any cleanup or save operations here
     save_main_window_geometry()
@@ -1666,16 +1663,22 @@ def launch_children():
             Dev_type = dev_type.capitalize()
             if G.system_settings.get(f'autolaunch{Dev_type}', False) and G.device_type != dev_type:
                 usbpid = G.system_settings.get(f'pid{Dev_type}', '2055')
+                if not usbpid:
+                    logging.warning("Device PID unset for device %s, not launching", dev_type)
+                    return
+                
                 usb_vidpid = f"FFFF:{usbpid}"
             
                 args = [sys.argv[0], '-D', usb_vidpid, '-t', dev_type, '--child', '--masterport', master_port]
                 if sys.argv[0].endswith(".py"): # insert python interpreter if we launch ourselves as a script
                     args.insert(0, sys.executable)
 
-                if G.system_settings.get(f'startMin{Dev_type}', False): args.append('--minimize')
-                if G.system_settings.get(f'startHeadless{Dev_type}', False): args.append('--headless')
+                if G.system_settings.get(f'startMin{Dev_type}', False): 
+                    args.append('--minimize')
+                if G.system_settings.get(f'startHeadless{Dev_type}', False): 
+                    args.append('--headless')
 
-                logging.info(f"Auto-Launch: starting instance: {args}")
+                logging.info("Auto-Launch: starting instance: %s", args)
                 subprocess.Popen(args)
                 G.launched_instances.append(dev_type)
                 G.child_ipc_ports.append(int(f"6{usbpid}"))
@@ -1817,7 +1820,6 @@ def main():
 
 
     _legacy_override_file = None
-    _legacy_config_file = utils.get_resource_path('config.ini')  # get from bundle (if exe) or local root if source
 
     if G.args.overridefile == 'None':
         _install_path = utils.get_install_path()
@@ -2041,7 +2043,7 @@ def main():
         else:
             G.main_window.show()
 
-    autoconvert_config(G.main_window, _legacy_config_file, _legacy_override_file)
+    autoconvert_config(G.main_window, utils.get_resource_path('config.ini'), _legacy_override_file)
     if not _release:
         th = utils.FetchLatestVersionThread()
         th.version_result_signal.connect(G.main_window.update_version_result)
