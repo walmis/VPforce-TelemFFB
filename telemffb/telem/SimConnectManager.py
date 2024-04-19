@@ -4,7 +4,7 @@ import time
 import threading
 import logging
 import os
-import globals as G
+import telemffb.globals as G
 
 surface_types = {
     0: "Concrete",

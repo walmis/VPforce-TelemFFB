@@ -10,7 +10,7 @@ Here are the full Python programming guidelines for best practices:
    - Access global variables using the `G.variable_name` syntax to clearly indicate their global nature and avoid namespace collisions.
 
 ```python
-import globals as G
+import telemffb.globals as G
 
 # Example usage
 G.my_var = 10
