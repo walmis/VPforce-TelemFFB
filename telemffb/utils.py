@@ -28,24 +28,8 @@ import select
 import logging
 import sys
 
-from PyQt5.QtCore import QThread, pyqtSignal, QObject, QSettings
-from PyQt5.QtGui import QTextCharFormat, QColor
-
-from PyQt5 import QtCore, QtGui, Qt
-from PyQt5.QtWidgets import QFileDialog, QMessageBox
-
-from telemffb.custom_widgets import QMessageBox
-from telemffb.settingsmanager import QFileDialog, QMessageBox, SettingsWindow
-import telemffb.globals as G
-import telemffb.utils as utils
-import telemffb.winpaths as winpaths
-
-import logging
 import winreg
 import socket
-import math
-import time
-import random
 import time
 import zlib
 import subprocess
@@ -54,8 +38,18 @@ import json
 import ssl
 import xml.etree.ElementTree as ET
 
-import telemffb.xmlutils as xmlutils
+from PyQt5.QtCore import QThread, pyqtSignal, QObject, QSettings
+from PyQt5.QtGui import QTextCharFormat, QColor
+
+from PyQt5 import QtCore, QtGui, Qt
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
 import stransi
+
+from telemffb.settingsmanager import SettingsWindow
+import telemffb.globals as G
+import telemffb.winpaths as winpaths
+
+import telemffb.xmlutils as xmlutils
 
 
 class SignalEmitter(QObject):
@@ -187,7 +181,7 @@ class EffectTranslator:
 
 
 class Destroyable:
-    def destroy():
+    def destroy(self):
         raise NotImplementedError
 
 

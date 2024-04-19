@@ -8,11 +8,7 @@ from telemffb.telem.TelemManager import TelemManager
 
 class SimConnectSock(SimConnectManager):
     def __init__(self, telem: TelemManager):
-        if not unique_id:
-            # TODO: maybe use process PID here?
-            unique_id = int(G.device_usbpid)
-        
-        super().__init__(unique_id)
+        super().__init__()
         telem.set_simconnect(self)
         self._telem = telem
 

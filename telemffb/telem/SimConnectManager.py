@@ -50,14 +50,14 @@ def dbprint(color, msg):
 
 
 class SimVar:
-    def __init__(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
+    def __init__(self, name, var, sc_unit, unit=None, datatype=DATATYPE_FLOAT64, scale=None, mutator=None):
         self.name = name
         self.var = var
         self.scale = scale
         self.mutator = mutator
         self.sc_unit = sc_unit
         self.unit = unit
-        self.datatype = type
+        self.datatype = datatype
         self.parent = None
         self.index = None # index for multivariable simvars
         if self.sc_unit.lower() in ["bool", "enum"]:
@@ -121,7 +121,7 @@ class SimConnectManager(threading.Thread):
 
     sim_vars = [
         SimVar("T", "ABSOLUTE TIME","Seconds" ),
-        SimVar("N", "TITLE", "", type=DATATYPE_STRING128),
+        SimVar("N", "TITLE", "", datatype=DATATYPE_STRING128),
         SimVar("G", "G FORCE", "Number"),
         SimVarArray("AccBody", "ACCELERATION BODY <>", "feet per second squared", scale=0.031081, keywords=("X", "Y", "Z")), #scale fps/s to g
         SimVar("TAS", "AIRSPEED TRUE", "meter/second"),
@@ -167,10 +167,10 @@ class SimConnectManager(threading.Thread):
         SimVar("Parked", "PLANE IN PARKING STATE", "Bool"),
         SimVar("Slew", "IS SLEW ACTIVE", "Bool"),
         SimVar("SurfaceType", "SURFACE TYPE", "Enum", mutator=lambda x: surface_types.get(x, "unknown")),
-        SimVar("SimconnectCategory", "CATEGORY", "", type=DATATYPE_STRING128),
+        SimVar("SimconnectCategory", "CATEGORY", "", datatype=DATATYPE_STRING128),
         SimVar("EngineType", "ENGINE TYPE", "Enum"),
         SimVarArray("EngRPM", "GENERAL ENG PCT MAX RPM", "percent", min=1, max=4),
-        SimVar("NumEngines", "NUMBER OF ENGINES", "Number", type=DATATYPE_INT32),
+        SimVar("NumEngines", "NUMBER OF ENGINES", "Number", datatype=DATATYPE_INT32),
         SimVarArray("AmbWind", "AMBIENT WIND <>", "meter/second", keywords= ("X", "Y", "Z")),
         SimVarArray("VelWorld", "VELOCITY WORLD <>", "meter/second", keywords= ("X", "Y", "Z")),
         SimVarArray("WeightOnWheels", "CONTACT POINT COMPRESSION", "Number", min=0, max=2),
@@ -191,7 +191,7 @@ class SimConnectManager(threading.Thread):
 
     ]
 
-    def __init__(self, unique_id):
+    def __init__(self):
         threading.Thread.__init__(self, daemon=True)
         self.sc = None
         self._quit = False
@@ -213,8 +213,8 @@ class SimConnectManager(threading.Thread):
         self.sv_dict = {}
 
 
-    def addSimVar(self, name, var, sc_unit, unit=None, type=DATATYPE_FLOAT64, scale=None, mutator=None):
-        self.temp_sim_vars.append(SimVar(name, var, sc_unit, unit=unit, type=type, scale=scale, mutator=mutator))
+    def add_simvar(self, name, var, sc_unit, unit=None, datatype=DATATYPE_FLOAT64, scale=None, mutator=None):
+        self.temp_sim_vars.append(SimVar(name, var, sc_unit, unit=unit, datatype=datatype, scale=scale, mutator=mutator))
         
     def substitute_simvars(self):
         # build a combined list of the pre-defined simvars from __init__ and any new/updated simvars that have been set by a model
@@ -479,7 +479,7 @@ if __name__ == "__main__":
     while True:
         time.sleep(1)
         if not tst_executed and time.time() > 5:
-            s.addSimVar("APMaster", "L:ApMode", "Enum")
-            s.addSimVar("PropThrust", "L:Eng1_RPM", "number")
+            s.add_simvar("APMaster", "L:ApMode", "Enum")
+            s.add_simvar("PropThrust", "L:Eng1_RPM", "number")
             s._subscribe()
             tst_executed = True
