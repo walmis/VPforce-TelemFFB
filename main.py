@@ -154,11 +154,12 @@ def main():
     headless_mode = G.args.headless
 
     G.child_ipc_ports = []
-    G.master_instance = False
+    G.master_instance = not G.args.child
     G.ipc_instance = None
-    G.child_instance = G.child_instance
+    G.child_instance = G.args.child
 
     G.system_settings = utils.SystemSettings()
+
 
     # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
     _vpf_logo = ":/image/vpforcelogo.png"
@@ -214,7 +215,6 @@ def main():
     else:
         G.master_instance = False
 
-
     sys.path.insert(0, '')
     # sys.path.append('/simconnect')
 
@@ -252,7 +252,7 @@ def main():
 
     def excepthook(exc_type, exc_value, exc_tb):
         tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        sys.stdout.write(f"{AnsiColors.BRIGHT_REDBG}{AnsiColors.WHITE}{tb}{AnsiColors.END}")
+        sys.stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
         #QtWidgets.QApplication.quit()
         # or QtWidgets.QApplication.exit(0)
     sys.excepthook = excepthook
@@ -404,12 +404,14 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
     
+    is_master_inst = launch_children()
+
     G.telem_manager = TelemManager()
     G.telem_manager.start()
     G.sim_listeners = SimListenerManager()
     G.main_window = MainWindow()
 
-    is_master_inst = launch_children()
+
 
     if is_master_inst:
         myport = int(f"6{G.device_usbpid}")
