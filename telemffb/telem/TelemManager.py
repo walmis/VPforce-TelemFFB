@@ -1,22 +1,19 @@
-from telemffb.IPCNetworkThread import IPCNetworkThread
+import logging
+import os
+import subprocess
+import threading
+import time
+
+from PyQt5.QtCore import QObject, pyqtSignal
+
 import telemffb.globals as G
 import telemffb.utils as utils
-from telemffb.utils import set_vpconf_profile
 import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.settingsmanager import logging, pyqtSignal, utils, xmlutils
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
 from telemffb.telem.SimConnectManager import SimConnectManager
-
-from PyQt5.QtCore import QObject, pyqtSignal
-
-
-import logging
-import subprocess
-import threading
-import time
-import traceback
-import os
+from telemffb.utils import set_vpconf_profile
 
 _config_mtime = 0
 _future_config_update_time = time.time()

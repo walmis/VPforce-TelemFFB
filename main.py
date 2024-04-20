@@ -461,9 +461,6 @@ def main():
 
     G.telem_manager.telemetryTimeout.connect(lambda state: G.main_window.update_sim_indicators(G.telem_manager.getTelemValue("src"), state))
 
-    utils.signal_emitter.error_signal.connect(G.main_window.process_error_signal)
-    utils.signal_emitter.msfs_quit_signal.connect(G.sim_listeners.restart_all)
-
     # do some init in the background not blocking the main window first appearance
     @utils.threaded()
     def init_async():

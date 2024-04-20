@@ -29,7 +29,7 @@ import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import (FFBReport_Input, FFBReport_SetCondition,
                                    HapticEffect)
 from telemffb.sim.aircraft_base import AircraftBase, HPFs, LPFs, effects
-from telemffb.utils import Derivative, Dispenser, HighPassFilter, clamp
+from telemffb.utils import Derivative, Dispenser, HighPassFilter, clamp, overrides
 
 deg = 180 / math.pi
 slugft3 = 0.00194032  # SI to slugft3
@@ -47,8 +47,6 @@ EFFECT_SAWTOOTHDOWN = 7
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
 
-
-
     speedbrake_motion_intensity: float = 0.12  # peak vibration intensity when speed brake is moving, 0 to disable
     speedbrake_buffet_intensity: float = 0.15  # peak buffeting intensity when speed brake deployed,  0 to disable
 
@@ -65,8 +63,6 @@ class Aircraft(AircraftBase):
     afterburner_effect_intensity = 0.2  # peak intensity for afterburner rumble effect
     jet_engine_rumble_intensity = 0.12  # peak intensity for jet engine rumble effect
     jet_engine_rumble_freq = 45  # base frequency for jet engine rumble effect (Hz)
-
-
 
     rotor_blade_count = 2
     heli_engine_rumble_intensity=0.15
@@ -865,7 +861,9 @@ class Aircraft(AircraftBase):
         if telem_data.get("STOP",0):
             self.on_timeout()
             return
-        effects["pause_spring"].spring().stop()
+        
+        effects["pause_spring"].stop()
+
         if telem_data.get('Parked', 0): # MSFS in Hangar
             return
 
@@ -909,6 +907,7 @@ class Aircraft(AircraftBase):
     def on_timeout(self):
         if not self.pause_spring.started:
             super().on_timeout()
+
         self.cyclic_spring_init = 0
 
         self.const_force.stop()
@@ -930,6 +929,7 @@ class PropellerAircraft(Aircraft):
         super().__init__(name, **kwargs)
 
     # run on every telemetry frame
+    @overrides(Aircraft)
     def on_telemetry(self, telem_data):
         ### Propeller Aircraft Class Telemetry Handler
         if telem_data.get("N") == None:
@@ -961,6 +961,7 @@ class JetAircraft(Aircraft):
         super().__init__(name, **kwargs)
     # run on every telemetry frame
 
+    @overrides(Aircraft)
     def on_telemetry(self, telem_data):
         pass
         ## Jet Aircraft Telemetry Manager
@@ -987,6 +988,7 @@ class TurbopropAircraft(PropellerAircraft):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
+    @overrides(PropellerAircraft)
     def on_telemetry(self, telem_data):
         pass
         if telem_data.get("N") == None:
@@ -1109,6 +1111,8 @@ class GliderAircraft(Aircraft):
         telem_data["StickXY_offset"] = self.stick_center
         self.force_trim_x_offset = self.stick_center[0]
         self.force_trim_y_offset = self.stick_center[1]
+
+    @overrides(Aircraft)
     def on_telemetry(self, telem_data):
         pass
         if telem_data.get("N") == None:
@@ -1176,12 +1180,15 @@ class Helicopter(Aircraft):
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
+    
+    @overrides(Aircraft)
     def on_timeout(self):
         super().on_timeout()
         self.cyclic_spring_init = 0
         self.collective_init = 0
         self.pedals_init = 0
 
+    @overrides(Aircraft)
     def on_telemetry(self, telem_data):
         self.speedbrake_motion_intensity = 0.0
         if telem_data.get("N") == None:
@@ -1743,8 +1750,8 @@ class HPGHelicopter(Helicopter):
         }
 
         return result
+    
     def _update_heli_controls(self, telem_data):
-
         super()._update_heli_controls(telem_data)
         ffb_type = telem_data.get("FFBType", "joystick")
         ap_active = telem_data.get("APMaster", 0)
@@ -2100,6 +2107,7 @@ class HPGHelicopter(Helicopter):
 
                 self.spring.effect.setCondition(self.spring_y)
                 self.spring.start()
+
     def _update_vrs_effect(self, telem_data):
         vrs_onset = telem_data.get("hpgVRSDatum", 0)
         vrs_certain = telem_data.get("hpgVRSIsInVRS", 0)

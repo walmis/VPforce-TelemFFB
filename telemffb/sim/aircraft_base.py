@@ -1367,10 +1367,8 @@ class AircraftBase(object):
         # effects.foreach(lambda e: e.stop())
         for key, effect in effects.dict.items():
             if self.keep_forces_on_pause:
-                if 'damper' in key: continue
-                if 'inertia' in key: continue
-                if 'friction' in key: continue
-                if 'spring' in key: continue
+                if key in ["damper", "inertia", "friction", "spring"]:
+                    continue
             effect.stop()
 
     def on_telemetry(self, telem_data): 
