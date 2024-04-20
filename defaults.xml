@@ -7052,14 +7052,14 @@
 		</models>
 	<models>
 		<name>etl_effect_intensity</name>
-		<model>Shrike.*</model>
+		<model>Shrike Simulations 530F.*</model>
 		<value>0.4</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>etl_start_speed</name>
-		<model>Shrike.*</model>
+		<model>Shrike Simulations 530F.*</model>
 		<value>10</value>
 		<unit>kt</unit>
 		<sim>MSFS</sim>
@@ -7067,7 +7067,7 @@
 	</models>
 	<models>
 		<name>etl_stop_speed</name>
-		<model>Shrike.*</model>
+		<model>Shrike Simulations 530F.*</model>
 		<value>30</value>
 		<unit>kt</unit>
 		<sim>MSFS</sim>
@@ -7075,7 +7075,7 @@
 	</models>
 	<models>
 		<name>overspeed_shake_start</name>
-		<model>Shrike.*</model>
+		<model>Shrike Simulations 530F.*</model>
 		<value>130</value>
 		<unit>kt</unit>
 		<sim>MSFS</sim>
@@ -7083,21 +7083,21 @@
 	</models>
 	<models>
 		<name>rotor_blade_count</name>
-		<model>Shrike.*</model>
+		<model>Shrike Simulations 530F.*</model>
 		<value>5</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>runway_rumble_intensity</name>
-		<model>Shrike.*</model>
+		<model>Shrike Simulations 530F.*</model>
 		<value>0.6</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
-		<model>Shrike.*</model>
+		<model>Shrike Simulations 530F.*</model>
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
