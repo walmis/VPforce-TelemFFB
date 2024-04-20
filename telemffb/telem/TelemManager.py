@@ -42,6 +42,8 @@ def config_has_changed(update=False) -> bool:
 
 class TelemManager(QObject, threading.Thread):
     telemetryReceived = pyqtSignal(object)
+    eventReceived = pyqtSignal(tuple)
+
     aircraftUpdated = pyqtSignal()
     telemetryTimeout = pyqtSignal(bool)
 
@@ -49,8 +51,8 @@ class TelemManager(QObject, threading.Thread):
     currentAircraftName: str = None
     currentAircraftConfig: dict = {}
 
-    timedOut: bool = True
-    lastFrameTime: float
+    timed_out: bool = True
+    last_frame_time: float
     numFrames: int = 0
 
     def __init__(self) -> None:
@@ -62,9 +64,9 @@ class TelemManager(QObject, threading.Thread):
         self._data = None
         self._events = []
         self._dropped_frames = 0
-        self.lastFrameTime = time.perf_counter()
-        self.frameTimes = []
-        self.maxframeTime = 0
+        self.last_frame_time = time.perf_counter()
+        self.frame_times = []
+        self.max_frame_time = 0
         self.timeout_sec = 0.2
         self._ipc_telem_data = {}
         self._simconnect : SimConnectManager= None
@@ -96,7 +98,8 @@ class TelemManager(QObject, threading.Thread):
 
             cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, G.device_type)
             #globals.settings_mgr.current_pattern = pattern
-            if cls_name == '': cls_name = 'Aircraft'
+            if cls_name == '': 
+                cls_name = 'Aircraft'
             for setting in result:
                 k = setting['name']
                 v = setting['value']
@@ -129,8 +132,8 @@ class TelemManager(QObject, threading.Thread):
         self._run = False
         self.join()
 
-    def submitFrame(self, data: bytes):
-        if type(data) == bytes:
+    def submit_frame(self, data: bytes):
+        if isinstance(data, bytes):
             data = data.decode("utf-8")
 
         with self._cond:
@@ -148,12 +151,13 @@ class TelemManager(QObject, threading.Thread):
                 logging.debug(f"Droppped frame (total {self._dropped_frames})")
 
     def process_events(self):
-        while len(self._events):
+        while self._events:
             ev = self._events.pop(0)
             ev = ev.split(";")
 
             if self.currentAircraft:
                 self.currentAircraft.on_event(*ev)
+            self.eventReceived.emit(tuple(ev))
             continue
 
     def get_changed_params(self, params):
@@ -166,7 +170,7 @@ class TelemManager(QObject, threading.Thread):
         logging.debug(f"get_changed_settings: {diff_dict.items()}")
         self.currentAircraftConfig.update(diff_dict)
         return diff_dict
-
+    
     def process_data(self, data):
 
         data = data.split(";")
@@ -174,22 +178,23 @@ class TelemManager(QObject, threading.Thread):
         telem_data = {}
         telem_data["FFBType"] = G.device_type
 
-        self.frameTimes.append(int((time.perf_counter() - self.lastFrameTime)*1000))
-        if len(self.frameTimes) > 500: self.frameTimes.pop(0)
+        self.frame_times.append(int((time.perf_counter() - self.last_frame_time)*1000))
+        if len(self.frame_times) > 500: 
+            self.frame_times.pop(0)
 
-        if self.frameTimes[-1] > self.maxframeTime and len(self.frameTimes) > 40:  # skip the first frames before counting frametime as max
+        if self.frame_times[-1] > self.max_frame_time and len(self.frame_times) > 40:  # skip the first frames before counting frametime as max
             threshold = 100
-            if self.frameTimes[-1] > threshold:
+            if self.frame_times[-1] > threshold:
                 logging.debug(
-                    f'*!*!*!* - Frametime threshold of {threshold}ms exceeded: time = {self.frameTimes[-1]}ms')
+                    f'*!*!*!* - Frametime threshold of {threshold}ms exceeded: time = {self.frame_times[-1]}ms')
 
-            self.maxframeTime = self.frameTimes[-1]
+            self.max_frame_time = self.frame_times[-1]
 
-        telem_data["frameTimes"] = [self.frameTimes[-1], max(self.frameTimes)]
-        telem_data["maxFrameTime"] = f"{round(self.maxframeTime, 3)}"
-        telem_data["avgFrameTime"] = f"{round(sum(self.frameTimes) / len(self.frameTimes), 3):.3f}"
+        telem_data["frameTimes"] = [self.frame_times[-1], max(self.frame_times)]
+        telem_data["maxFrameTime"] = f"{round(self.max_frame_time, 3)}"
+        telem_data["avgFrameTime"] = f"{round(sum(self.frame_times) / len(self.frame_times), 3):.3f}"
 
-        self.lastFrameTime = time.perf_counter()
+        self.last_frame_time = time.perf_counter()
 
         for i in data:
             try:
@@ -198,9 +203,8 @@ class TelemManager(QObject, threading.Thread):
                     values = conf.split("~")
                     telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
 
-            except Exception as e:
-                traceback.print_exc()
-                logging.error("Error Parsing Parameter: ", repr(i))
+            except Exception:
+                logging.exception("Error Parsing Parameter: ", repr(i))
 
         # Read telemetry sent via IPC channel from child instances and update local telemetry stream
         if G.master_instance and G.launched_instances:
@@ -243,38 +247,38 @@ class TelemManager(QObject, threading.Thread):
                 if not Class or Class.__name__ == "Aircraft":
                     if data_source == "MSFS2020":
                         if sc_aircraft_type == "Helicopter":
-                            logging.warning(f"Aircraft definition not found, using SimConnect Data (Helicopter Type)")
+                            logging.warning("Aircraft definition not found, using SimConnect Data (Helicopter Type)")
                             type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.Helicopter")
                             params.update(type_cfg)
                             Class = module.Helicopter
                         elif sc_aircraft_type == "Jet":
-                            logging.warning(f"Aircraft definition not found, using SimConnect Data (Jet Type)")
+                            logging.warning("Aircraft definition not found, using SimConnect Data (Jet Type)")
                             type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.JetAircraft")
                             params.update(type_cfg)
                             Class = module.JetAircraft
                         elif sc_aircraft_type == "Airplane":
                             if sc_engine_type == 0:     # Piston
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Propeller Type)")
+                                logging.warning("Aircraft definition not found, using SimConnect Data (Propeller Type)")
                                 type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.PropellerAircraft")
                                 params.update(type_cfg)
                                 Class = module.PropellerAircraft
                             if sc_engine_type == 1:     # Jet
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Jet Type)")
+                                logging.warning("Aircraft definition not found, using SimConnect Data (Jet Type)")
                                 type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.JetAircraft")
                                 params.update(type_cfg)
                                 Class = module.JetAircraft
                             elif sc_engine_type == 2:   # None
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Glider Type)")
+                                logging.warning("Aircraft definition not found, using SimConnect Data (Glider Type)")
                                 type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.GliderAircraft")
                                 params.update(type_cfg)
                                 Class = module.GliderAircraft
                             elif sc_engine_type == 3:   # Heli
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Helo Type)")
+                                logging.warning("Aircraft definition not found, using SimConnect Data (Helo Type)")
                                 type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.HelicopterAircraft")
                                 params.update(type_cfg)
                                 Class = module.Helicopter
                             elif sc_engine_type == 5:   # Turboprop
-                                logging.warning(f"Aircraft definition not found, using SimConnect Data (Turboprop Type)")
+                                logging.warning("Aircraft definition not found, using SimConnect Data (Turboprop Type)")
                                 type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS2020.TurbopropAircraft")
                                 params.update(type_cfg)
                                 Class = module.TurbopropAircraft
@@ -352,7 +356,7 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraft.on_telemetry(telem_data)
                 telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
 
-            except:
+            except Exception:
                 logging.exception(".on_telemetry Exception")
 
         # Send locally generated telemetry to master here
@@ -378,10 +382,10 @@ class TelemManager(QObject, threading.Thread):
             return self.currentAircraft._telem_data.get(key, None)
 
     def on_timeout(self):
-        if self.currentAircraft and not self.timedOut:
+        if self.currentAircraft and not self.timed_out:
             self.currentAircraft.on_timeout()
             self.telemetryTimeout.emit(True)
-            self.timedOut = True
+            self.timed_out = True
             G.settings_mgr.timed_out = True
 
     def run(self):
@@ -390,20 +394,20 @@ class TelemManager(QObject, threading.Thread):
         self._run = True
         while self._run:
             with self._cond:
-                if not len(self._events) and not self._data:
+                if not self._events and not self._data:
                     if not self._cond.wait(self.timeout_sec):
                         self.on_timeout()
                         continue
 
-                if len(self._events):
-                    self.process_events()
-
                 if self._data:
-                    if self.timedOut:
+                    if self.timed_out:
                         self.telemetryTimeout.emit(False)
-                        self.timedOut = False
+                        self.timed_out = False
 
                     G.settings_mgr.timedOut = False
                     data = self._data
                     self._data = None
                     self.process_data(data)
+                
+                if self._events:
+                    self.process_events()

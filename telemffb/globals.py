@@ -6,7 +6,8 @@ if TYPE_CHECKING:
     from .utils import SystemSettings
     from .settingsmanager import SettingsWindow
     from .telem.TelemManager import TelemManager
-    from main import MainWindow
+    from .sim.SimListener import SimListenerManager
+    from telemffb.MainWindow import MainWindow
 
 settings_mgr : 'SettingsWindow' = None
 userconfig_rootpath = None
@@ -39,8 +40,8 @@ telem_manager : 'TelemManager' = None
 # configurator gains read at startup
 startup_configurator_gains = None
 
-# function reference to stop/init sims
-stop_sims = None
-init_sims = None
+sim_listeners : 'SimListenerManager' = None
 
 log_window : 'LogWindow' = None
+
+release_version : bool = False

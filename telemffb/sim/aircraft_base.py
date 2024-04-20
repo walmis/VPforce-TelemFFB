@@ -1268,15 +1268,15 @@ class AircraftBase(object):
         pass
 
     def on_timeout(self):  # override me
-        # logging.info("Telemetry Timeout, stopping effects")
+        logging.info("Telemetry Timeout, stopping effects")
         # effects.foreach(lambda e: e.stop())
-        for key in effects.dict.keys():
+        for key, effect in effects.dict.items():
             if self.keep_forces_on_pause:
                 if 'damper' in key: continue
                 if 'inertia' in key: continue
                 if 'friction' in key: continue
                 if 'spring' in key: continue
-            effects[key].stop()
+            effect.stop()
 
     def on_telemetry(self, data): 
         pass

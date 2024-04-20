@@ -21,7 +21,7 @@ class SimConnectSock(SimConnectManager):
     def emit_packet(self, data):
         data["src"] = "MSFS2020"
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
-        self._telem.submitFrame(packet)
+        self._telem.submit_frame(packet)
 
     def emit_event(self, event, *args):
         # special handling of Open event
@@ -32,4 +32,4 @@ class SimConnectSock(SimConnectManager):
             utils.signal_emitter.msfs_quit_signal.emit()
 
         args = [str(x) for x in args]
-        self._telem.submitFrame(f"Ev={event};" + ";".join(args))
+        self._telem.submit_frame(f"Ev={event};" + ";".join(args))

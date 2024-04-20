@@ -1,21 +1,16 @@
-from  PyQt5.QtWidgets import QDialog, QMessageBox, QDialog, QFileDialog, QMessageBox, QButtonGroup
-
-#from main import _child_instance, _device_type, _ipc_thread, _launched_children, _master_instance, args, init_sims, logger, stop_sims, validate_vpconf_profile, window
-from PyQt5.QtGui import QIntValidator
-from PyQt5 import QtCore
-
-import json, logging, os
-
-from .ui.Ui_SystemDialog import Ui_SystemDialog
-
-from . import globals as G
-
 import json
 import logging
 import os
 
+from PyQt5 import QtCore
+from PyQt5.QtGui import QIntValidator
+from PyQt5.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox
+
+from . import globals as G
 from . import utils
+from .ui.Ui_SystemDialog import Ui_SystemDialog
 from .utils import validate_vpconf_profile
+
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None,):
@@ -377,13 +372,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if not self.validate_settings():
             return
 
-        G.stop_sims()
-        G.init_sims()
+        G.sim_listeners.restart_all()
 
         if G.master_instance and G.launched_instances:
             G.ipc_instance.send_broadcast_message("RESTART SIMS")
 
-        self.parent_window.init_sim_indicators(['DCS', 'MSFS', 'IL2', 'XPLANE'], global_settings_dict)
         # adjust logging level:
         ll = self.logLevel.currentText()
         if ll == "INFO":

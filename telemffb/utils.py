@@ -38,7 +38,7 @@ import json
 import ssl
 import xml.etree.ElementTree as ET
 
-from PyQt5.QtCore import QThread, pyqtSignal, QObject, QSettings
+from PyQt5.QtCore import QCoreApplication, QThread, pyqtSignal, QObject, QSettings
 from PyQt5.QtGui import QTextCharFormat, QColor
 
 from PyQt5 import QtCore, QtGui, Qt
@@ -1270,7 +1270,7 @@ def install_export_lua(window):
 
         try:
             data = open(os.path.join(path, "Export.lua")).read()
-        except:
+        except Exception:
             data = ""
 
         local_telemffb = get_resource_path('export/TelemFFB.lua', prefer_root=True)
@@ -1520,6 +1520,10 @@ def launch_vpconf(serial=None):
 
 
 def get_version():
+    if G.release_version:
+        version = "vX.X.X"
+        return version
+
     ver = "UNKNOWN"
     try:
         import version
@@ -1730,3 +1734,97 @@ def get_device_logo(dev_type :str):
         case _:
             _device_logo = ':/image/logo_j.png'
     return _device_logo
+
+
+import threading
+class ResultThread(threading.Thread):
+    """
+    A custom Thread that can return the value of the function 
+    runned inside it
+    """
+    fx_output = None
+    error = None
+
+    def run(self, *args, **kwargs):
+        try:
+            if self._target:
+                self.fx_output = self._target(*self._args, **self._kwargs)
+        except Exception as e:
+            self.error = e
+        finally:
+            # Avoid a refcycle if the thread is running a function with
+            # an argument that has a member that points to the thread.
+            del self._target, self._args, self._kwargs
+
+    def await_output(self):
+        """
+        Wait for the thread to finish and return the return value of fx
+        """
+        self.join()
+        return self.fx_output
+
+    def get_error(self):
+        """
+        Return error if any, return None if no error occured
+        """
+        self.join()
+        return self.error
+
+
+def threaded(daemon=False):
+    """
+    A decorator to run a function in a separate thread, this is useful
+    when you want to do any IO operations (network request, prints, etc...)
+    and want to do something else while waiting for it to finish.
+    :param fx: the function to run in a separate thread
+    :param daemon: boolean whether or not to run as a daemon thread
+    :return: whatever fx returns
+    """
+    def _threaded(fx):
+        def wrapper(*args, **kwargs):
+            thread = ResultThread(target=fx, daemon=daemon,
+                                  args=args, kwargs=kwargs)
+            thread.start()
+            return thread
+        return wrapper
+
+    return _threaded
+
+
+def overrides(interface_class):
+    """Decorator to ensure that a method in a subclass overrides a method in its superclass or interface."""
+
+    def overrider(method):
+        assert method.__name__ in dir(interface_class)
+        return method
+    return overrider
+
+
+def exit_application():
+    # Perform any cleanup or save operations here
+    save_main_window_geometry()
+    QCoreApplication.instance().quit()
+
+def get_legacy_override_file():
+    _legacy_override_file = None
+
+    if G.args.overridefile == 'None':
+        _install_path = get_install_path()
+
+        # Need to determine if user is using default config.user.ini without passing the override flag:
+        if os.path.isfile(os.path.join(_install_path, 'config.user.ini')):
+            _legacy_override_file = os.path.join(_install_path, 'config.user.ini')
+
+    else:
+        if not os.path.isabs(G.args.overridefile):  # user passed just file name, construct absolute path from script/exe directory
+            ovd_path = get_resource_path(G.args.overridefile, prefer_root=True, force=True)
+        else:
+            ovd_path = G.args.overridefile  # user passed absolute path, use that
+
+        if os.path.isfile(ovd_path):
+            _legacy_override_file = ovd_path
+        else:
+            _legacy_override_file = ovd_path
+            logging.warning(f"Override file {G.args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
+
+    return _legacy_override_file

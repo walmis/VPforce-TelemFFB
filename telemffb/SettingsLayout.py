@@ -1,23 +1,20 @@
 
-from telemffb.custom_widgets import InfoLabel, NoWheelSlider, QCursor, QGridLayout, QIcon, QLabel, QPushButton, QStyle, QToolButton, Qt, QtCore
-from . import xmlutils
-from telemffb.hw.ffb_rhino import HapticEffect
-
-from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.settingsmanager import QCheckBox, QComboBox, QFileDialog, QLabel, QLineEdit, QPushButton, Qt, QtCore, QtWidgets, logging, lprint, os, xmlutils
-from telemffb.utils import validate_vpconf_profile
-
-
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QCursor, QIcon
-from PyQt5.QtWidgets import QGridLayout, QLabel, QPushButton, QStyle, QToolButton
-
-
 import logging
 import os
 
+from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QCursor, QIcon
+from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
+                             QToolButton,QCheckBox,QComboBox,QLineEdit,QFileDialog)
+
+from telemffb.ButtonPressThread import ButtonPressThread
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider)
+from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.utils import validate_vpconf_profile
+
 from . import globals as G
+from . import xmlutils
 
 
 class SettingsLayout(QGridLayout):
@@ -593,7 +590,7 @@ class SettingsLayout(QGridLayout):
             pid = G.system_settings.get(key, '')
 
             if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
-                lprint(f"Selected File: {file_path}")
+                #lprint(f"Selected File: {file_path}")
                 xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, file_path, 'vpconf')
                 if G.settings_mgr.timed_out:
                     self.reload_caller()

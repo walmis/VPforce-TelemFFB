@@ -1,10 +1,14 @@
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QDialog
+
 import telemffb.globals as G
-from .hw.ffb_rhino import FFB_GAIN_CONSTANT, FFB_GAIN_DAMPER, FFB_GAIN_FRICTION, FFB_GAIN_INERTIA, FFB_GAIN_MASTER, FFB_GAIN_PERIODIC, FFB_GAIN_SPRING, HapticEffect
-from telemffb.custom_widgets import QDialog, QtCore
-from telemffb.settingsmanager import QDialog, QtCore
 from telemffb.ui.Ui_ConfiguratorDialog import Ui_ConfiguratorDialog
 
-from PyQt5.QtWidgets import QDialog
+from .hw.ffb_rhino import (FFB_GAIN_CONSTANT, FFB_GAIN_DAMPER,
+                           FFB_GAIN_FRICTION, FFB_GAIN_INERTIA,
+                           FFB_GAIN_MASTER, FFB_GAIN_PERIODIC, FFB_GAIN_SPRING,
+                           HapticEffect)
+
 
 class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
     global dev
@@ -12,7 +16,6 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
 
     def __init__(self, parent=None):
         super(ConfiguratorDialog, self).__init__(parent)
-        global startup_configurator_gains
 
         self.setupUi(self)
         self.retranslateUi(self)

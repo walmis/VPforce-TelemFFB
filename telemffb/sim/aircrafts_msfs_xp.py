@@ -14,23 +14,22 @@
 # You should have received a copy of the GNU General Public License 
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import socket
-import time
-import math
-from math import sin, cos, radians, sqrt, atan2
-from ctypes import byref, cast, sizeof
-from time import sleep
-from pprint import pprint
-import sys
 import logging
+import math
+import socket
+import sys
+import time
+from ctypes import byref, cast, sizeof
+from math import atan2, cos, radians, sin, sqrt
+from pprint import pprint
+from time import sleep
+from typing import Dict, List
+
 import telemffb.utils as utils
-from typing import List, Dict
-from telemffb.utils import clamp, HighPassFilter, Derivative, Dispenser
-
-from telemffb.hw.ffb_rhino import HapticEffect, FFBReport_SetCondition, FFBReport_Input
-from .aircraft_base import AircraftBase, effects, HPFs, LPFs
-
-
+from telemffb.hw.ffb_rhino import (FFBReport_Input, FFBReport_SetCondition,
+                                   HapticEffect)
+from telemffb.sim.aircraft_base import AircraftBase, HPFs, LPFs, effects
+from telemffb.utils import Derivative, Dispenser, HighPassFilter, clamp
 
 deg = 180 / math.pi
 slugft3 = 0.00194032  # SI to slugft3

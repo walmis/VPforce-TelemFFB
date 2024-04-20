@@ -1,12 +1,8 @@
 from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QMainWindow, QVBoxLayout, QMessageBox, QPushButton, QDialog, \
-    QRadioButton, QListView, QScrollArea, QHBoxLayout, QAction, QPlainTextEdit, QMenu, QButtonGroup, QFrame, \
-    QDialogButtonBox, QSizePolicy, QSpacerItem, QTabWidget, QGroupBox, QShortcut, QSlider
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QCoreApplication, QUrl, QRect, QMetaObject, QSize, QByteArray, QTimer, \
-    QThread, QMutex, QRegExp
-from PyQt5.QtGui import QFont, QPixmap, QIcon, QDesktopServices, QPainter, QColor, QKeyEvent, QIntValidator, QCursor, \
-    QTextCursor, QRegExpValidator, QKeySequence
-from PyQt5.QtWidgets import QGridLayout, QToolButton, QStyle
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider
+from PyQt5.QtCore import pyqtSignal, Qt, QSize
+from PyQt5.QtGui import QPixmap, QPainter, QColor, QCursor
+
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 
 
@@ -299,3 +295,165 @@ class StatusLabel(QWidget):
 
         painter.setBrush(QColor(self.dot_color))
         painter.drawEllipse(dot_x, dot_y, self.dot_size, self.dot_size)
+
+
+class SimStatusLabel(QWidget):
+    def __init__(self, name : str):
+        super().__init__()
+        self.icon_size = QSize(18, 18)
+
+        self._paused_state = False
+        self._error_state = False
+        self._active_state = False
+        self._enabled_state = False
+
+        self.lbl = QLabel(name)
+        self.lbl.setStyleSheet("padding: 2px")
+        self.lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        self.pix = QLabel()
+        self.pix.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        enable_color = QColor(255,255,0)
+        disable_color = QColor(128, 128, 128) # grey
+        active_color = QColor(0, 255, 0)
+        paused_color = QColor(0, 0, 255)
+        error_color = QColor(255, 0, 0)
+
+        self.enabled_pixmap = self.create_colored_icon(enable_color, self.icon_size)
+        self.disabled_pixmap = self.create_x_icon(disable_color, self.icon_size)
+        self.paused_pixmap = self.create_paused_icon(paused_color, self.icon_size)
+        self.active_pixmap = self.create_colored_icon(active_color, self.icon_size)
+        self.error_pixmap = self.create_x_icon(error_color, self.icon_size)
+
+        h_layout = QtWidgets.QHBoxLayout()
+        self.setLayout(h_layout)
+        h_layout.addWidget(self.pix)
+        h_layout.addWidget(self.lbl)
+
+        self.update()
+
+    @property
+    def paused(self):
+        return self._paused_state
+
+    @paused.setter
+    def paused(self, value):
+        if self._paused_state != value:
+            self._paused_state = value
+            self.update()
+
+    @property
+    def error(self):
+        return self._error_state
+
+    @error.setter
+    def error(self, value):
+        if self._error_state != value:
+            self._error_state = value
+            self.update()
+
+    @property
+    def active(self):
+        return self._active_state
+
+    @active.setter
+    def active(self, value):
+        if self._active_state != value:
+            self._active_state = value
+            self.update()
+
+    @property
+    def enabled(self):
+        return self._enabled_state
+
+    @enabled.setter
+    def enabled(self, value):
+        if self._enabled_state != value:
+            self._enabled_state = value
+            self.update()
+
+    def update(self):
+        if self._error_state:
+            self.pix.setPixmap(self.error_pixmap)
+            self.setToolTip("Error condition: check log")
+        elif self._paused_state:
+            self.pix.setPixmap(self.paused_pixmap)
+            self.setToolTip("Telemetry stopped or sim is paused")
+        elif self._active_state:
+            self.pix.setPixmap(self.active_pixmap)
+            self.setToolTip("Sim is running, receiving telemetry")
+        elif self._enabled_state:
+            self.pix.setPixmap(self.enabled_pixmap)
+            self.setToolTip("Sim is enabled, not receiving telemetry")
+        else:
+            self.pix.setPixmap(self.disabled_pixmap)
+            self.setToolTip("Sim is disabled")
+
+
+    def create_paused_icon(self, color, size):
+        pixmap = QPixmap(size)
+        pixmap.fill(Qt.transparent)
+
+        # Draw a circle (optional)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, 1)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
+        painter.setBrush(color)
+        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+
+        # Draw two vertical lines for the pause icon
+        line_length = int(size.width() / 3)
+        line_width = 1
+        line1_x = int((size.width() / 2) - 2)
+        line2_x = int((size.width() / 2) + 2)
+        line_y = int((size.height() - line_length) / 2)
+
+        painter.setPen(QColor(Qt.white))
+        painter.drawLine(line1_x, line_y, line1_x, line_y + line_length)
+        painter.drawLine(line2_x, line_y, line2_x, line_y + line_length)
+
+        painter.end()
+
+        return pixmap
+
+    def create_colored_icon(self, color, size):
+        # Create a QPixmap with the specified color and size
+        pixmap = QPixmap(size)
+        pixmap.fill(Qt.transparent)
+
+        # Draw a circle (optional)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, 1)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
+        painter.setBrush(color)
+        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+        painter.end()
+
+        return pixmap
+
+    def create_x_icon(self, color, size):
+        pixmap = QPixmap(size)
+        pixmap.fill(Qt.transparent)
+
+        # Draw a circle (optional)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, 1)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
+        painter.setBrush(color)
+        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+
+        # Draw two vertical lines for the pause icon
+        line_length = int(size.width() / 3)
+        line_width = 1
+        line1_x = int((size.width() / 2) - 2)
+        line2_x = int((size.width() / 2) + 2)
+        line_y = int((size.height() - line_length) / 2)
+
+        painter.setPen(QColor(Qt.white))
+        painter.drawLine(line1_x, line_y, line2_x, line_y + line_length)
+        painter.drawLine(line2_x, line_y, line1_x, line_y + line_length)
+
+        painter.end()
+
+        return pixmap

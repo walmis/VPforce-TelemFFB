@@ -1,11 +1,11 @@
-from . import xmlutils
-from telemffb.custom_widgets import QDialog, Qt
-from .telem.SimConnectManager import SimConnectManager
-from .ui.Ui_SCOverridesDialog import Ui_SCOverridesDialog
-from PyQt5.QtWidgets import QDialog, QTableWidgetItem, QAbstractItemView
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QAbstractItemView, QDialog, QTableWidgetItem
 
 from . import globals as G
+from . import xmlutils
+from .telem.SimConnectManager import SimConnectManager
+from .ui.Ui_SCOverridesDialog import Ui_SCOverridesDialog
+
 
 class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
     overrides = []

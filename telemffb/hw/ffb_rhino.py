@@ -26,7 +26,7 @@ import time
 import ctypes
 import logging
 from typing import List
-from telemffb.utils import DirectionModulator, clamp, Destroyable
+from telemffb.utils import DirectionModulator, clamp, Destroyable, overrides
 import os
 import weakref
 import inspect
@@ -457,6 +457,7 @@ class FFBRhino(QObject):
         self.vid = vid
         self.pid = pid
         self.info : DeviceInfo = None
+        self.firmware_version : str = None
 
         if not path:
             devs = FFBRhino.enumerate(pid)
@@ -529,10 +530,11 @@ class FFBRhino(QObject):
         self._dev.send_feature_report(bytes(data))
 
     # runs on mainThread
+    @overrides(QObject)
     def timerEvent(self, a0: QTimerEvent) -> None:
         try:
             self.readReports()
-        except:
+        except Exception:
             logging.exception("Exception")
             self._dev.close()
             self._dev = None
@@ -542,7 +544,7 @@ class FFBRhino(QObject):
                 try:
                     self.reconnect()
                     logging.info("HID connected!")
-                except:
+                except Exception:
                     logging.warn("Reconnecting HID device in 1s")
                     QTimer.singleShot(1000, do_reconnect)
 
@@ -565,7 +567,10 @@ class FFBRhino(QObject):
                     if effect.effect_id == report.effectBlockIndex:
                         effect._started = False
 
-    def get_firmware_version(self):
+    def get_firmware_version(self, cached=True):
+        if self.firmware_version and cached:
+            return self.firmware_version
+        
         try:
             with usb1.USBContext() as context:
                 handle = context.openByVendorIDAndProductID(
@@ -577,9 +582,10 @@ class FFBRhino(QObject):
                     # Device not present, or user is not allowed to access device.
                 ##request_type, request, value, index, length
 
-                return handle.controlRead(USB_REQTYPE_DEVICE_TO_HOST|USB_REQTYPE_VENDOR, 
+                self.firmware_version = handle.controlRead(USB_REQTYPE_DEVICE_TO_HOST|USB_REQTYPE_VENDOR, 
                                         USB_CTRL_REQ_GET_VERSION, 0, 0, 64).decode("utf-8")
-        except:
+                return self.firmware_version
+        except Exception:
             logging.exception("Unable to read Firmware Version")
         
         return None

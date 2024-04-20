@@ -172,7 +172,8 @@ class Aircraft(AircraftBase):
         self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
         hyd_loss = self._update_hydraulic_loss_effect(telem_data)
-        if not hyd_loss: self._update_ffb_forces(telem_data)
+        if not hyd_loss: 
+            self._update_ffb_forces(telem_data)
         self._update_damage(telem_data)
         self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
         self._update_landing_gear(telem_data.get("gear_value"), telem_data.get("TAS"))
