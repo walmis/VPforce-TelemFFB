@@ -854,14 +854,15 @@ class Aircraft(AircraftBase):
     def find_xp_gear_orientation(self, x, y, z):
         pass
 
+    @overrides(AircraftBase)
     def on_event(self, event, *args):
         logging.info(f"on_event {event} {args}")
 
-    def on_telemetry(self, telem_data):
-        if telem_data.get("STOP",0):
+        if event == "STOP":
             self.on_timeout()
-            return
-        
+
+    @overrides(AircraftBase)
+    def on_telemetry(self, telem_data):
         effects["pause_spring"].stop()
 
         if telem_data.get('Parked', 0): # MSFS in Hangar
@@ -935,9 +936,7 @@ class PropellerAircraft(Aircraft):
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "PropellerAircraft"  # inject aircraft class into telemetry
-        if telem_data.get("STOP", 0):
-            self.on_timeout()
-            return
+
         super().on_telemetry(telem_data)
 
         self.update_piston_engine_rumble(telem_data)
@@ -963,14 +962,12 @@ class JetAircraft(Aircraft):
 
     @overrides(Aircraft)
     def on_telemetry(self, telem_data):
-        pass
         ## Jet Aircraft Telemetry Manager
         if telem_data.get("N") == None:
             return
+        
         telem_data["AircraftClass"] = "JetAircraft"  # inject aircraft class into telemetry
-        if telem_data.get("STOP",0):
-            self.on_timeout()
-            return
+
         super().on_telemetry(telem_data)
         #
         if self._sim_is_xplane():
@@ -994,9 +991,7 @@ class TurbopropAircraft(PropellerAircraft):
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
-        if telem_data.get("STOP",0):
-            self.on_timeout()
-            return
+
         super().on_telemetry(telem_data)
         if self._sim_is_xplane():
             self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("TAS"), spd_thresh=120*kt2ms)
@@ -1118,9 +1113,7 @@ class GliderAircraft(Aircraft):
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "GliderAircraft"  # inject aircraft class into telemetry
-        if telem_data.get("STOP",0):
-            self.on_timeout()
-            return
+
         super().on_telemetry(telem_data)
         if self.force_trim_enabled:
             self._update_force_trim(telem_data, x_axis=self.aileron_force_trim, y_axis=self.elevator_force_trim)
@@ -1194,9 +1187,7 @@ class Helicopter(Aircraft):
         if telem_data.get("N") == None:
             return
         telem_data["AircraftClass"] = "Helicopter"  # inject aircraft class into telemetry
-        if telem_data.get("STOP",0):
-            self.on_timeout()
-            return
+
         super().on_telemetry(telem_data)
 
         self._update_heli_controls(telem_data)
@@ -1681,9 +1672,7 @@ class HPGHelicopter(Helicopter):
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
-        if telem_data.get("STOP",0):
-            self.on_timeout()
-            return
+
         # self._update_vrs_effect(telem_data)
 
     def on_timeout(self):

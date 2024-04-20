@@ -199,6 +199,7 @@ class SimConnectManager(threading.Thread):
         self._sim_paused = False
         self._sim_started = 0
         self._sim_state = 0
+        self._stop_state = 0
         self._final_frame_sent = 0
         self._events_to_send = []
         self._simdatums_to_send = []
@@ -211,6 +212,7 @@ class SimConnectManager(threading.Thread):
         self.req_id = os.getpid()
         self.def_id = 1
         self.sv_dict = {}
+
 
 
     def add_simvar(self, name, var, sc_unit, unit=None, datatype=DATATYPE_FLOAT64, scale=None, mutator=None):
@@ -335,9 +337,8 @@ class SimConnectManager(threading.Thread):
     def _read_telem(self) -> bool:
         pRecv = RECV_P()
         nSize = DWORD()
+
         while not self._quit:
-
-
             self.tx_events_to_msfs()  # tx any pending sim events that are queued
             self.tx_simdatums_to_msfs()  # tx any pending simdatum sets that are queued
 
@@ -374,6 +375,7 @@ class SimConnectManager(threading.Thread):
                     logging.debug(f"EVENT STARTED,  EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_started = 1
                     self.emit_event("SimStart")
+                    self._stop_state = False # clear stop state, this will cause a reload of current aircraft in telemFFB
                 elif recv.uEventID == EV_STOPPED:
                     logging.debug(f"EVENT STOPPED, EVENT: {recv.uEventID}, DATA: {recv.dwData}")
                     self._sim_started = 0
@@ -421,8 +423,15 @@ class SimConnectManager(threading.Thread):
                     if self._sim_paused or data.get("Parked", 0) or data.get("Slew", 0):     # fixme: figure out why simstart/stop and sim events dont work right
                         data["STOP"] = 1
                         data['_num_simvars'] = len(data)
+                        
+                        if not self._stop_state:
+                            self.emit_event("STOP")
+                            self.emit_packet(data) # emit last packet
+                            self._stop_state = True
+                    else:
                     # print(f"!#$!#$!#$!#$ EMITTING PACKET LEN: {len(data)}")
-                    self.emit_packet(data)
+                        self._stop_state = False
+                        self.emit_packet(data)
                 else:
                     dbprint("green", f"**DEBUG*** got dispatch for OLD request: {recv.dwRequestID} defID: {recv.dwDefineID} | currrent defID: {self.def_id}")
                     pass
