@@ -1352,12 +1352,12 @@ class AircraftBase(object):
             if self.pedal_trimming_enabled:
                 self._update_pedal_trim(telem_data)
             # return
-        self.spring = effects["pedal_spring"].spring()
+        spring = effects["pedal_spring"].spring()
         damper_coeff = round(utils.clamp((self.pedal_dampening_gain * 4096), 0, 4096))
         # self.damper = effects["pedal_damper"].damper(coef_x=damper_coeff).start()
 
-        self.spring.effect.setCondition(self.spring_x)
-        self.spring.start(override=True)
+        spring.effect.setCondition(self.spring_x)
+        spring.start(override=True)
 
     def on_event(self):
         pass

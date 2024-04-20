@@ -801,9 +801,6 @@ class MainWindow(QMainWindow):
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
 
-    def process_error_signal(self, message):
-        # Placeholder function to process signal generated from anywhere using utils.signal_emitter
-        pass
 
     def update_child_status(self, device, status):
         status_icon_name = f'{device}_status_icon'
@@ -1218,6 +1215,7 @@ class MainWindow(QMainWindow):
                     if isinstance(v, list):
                         v = "[" + ", ".join([f"{x:.3f}" if not isinstance(x, str) else x for x in v]) + "]"
                     items += f"{k}: {v}\n"
+
             active_effects = ""
             active_settings = []
 
@@ -1226,10 +1224,10 @@ class MainWindow(QMainWindow):
                 active_effects = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_effects', '')
                 active_settings = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_settings', [])
             else:
-                for key in effects.dict:
-                    if effects[key].started:
-                        descr = utils.EffectTranslator.get_translation(key)[0]
-                        settingname = utils.EffectTranslator.get_translation(key)[1]
+                effect : HapticEffect
+                for key, effect in effects.dict.items():
+                    if effect.started:
+                        descr, settingname = utils.EffectTranslator.get_translation(effect.name)
                         if descr not in active_effects:
                             active_effects = '\n'.join([active_effects, descr])
                         if settingname not in active_settings and settingname != '':

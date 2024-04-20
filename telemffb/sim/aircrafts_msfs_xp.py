@@ -118,8 +118,8 @@ class Aircraft(AircraftBase):
         for e in effects.values(): e.destroy()
         effects.clear()
         # self.spring = HapticEffect().spring()
-        self.spring = effects["spring"].spring()
-        self.pause_spring = effects["pause_spring"].spring()
+        self._spring_handle =  effects["spring"].spring()
+        self._spring_handle.name = "spring"
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.const_force = HapticEffect().constant(0, 0)
@@ -222,7 +222,7 @@ class Aircraft(AircraftBase):
         if self._sim_is_xplane():
             ap_active = telem_data.get("APServos", 0)
 
-        self.spring = effects['fbw_spring'].spring()
+        self._spring_handle.name = "fbw_spring"
         if ffb_type == "joystick":
 
             if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -350,8 +350,8 @@ class Aircraft(AircraftBase):
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
             self.spring_x.cpOffset = phys_stick_x_offs
 
-            self.spring.effect.setCondition(self.spring_y)
-            self.spring.effect.setCondition(self.spring_x)
+            self._spring_handle.effect.setCondition(self.spring_y)
+            self._spring_handle.effect.setCondition(self.spring_x)
 
         elif ffb_type == "pedals":
             if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -435,14 +435,14 @@ class Aircraft(AircraftBase):
             self.spring_x.cpOffset = phys_rudder_x_offs
             logging.debug(f"Elev Coeef: {x_coeff}")
 
-            self.spring.effect.setCondition(self.spring_x)
-        self.spring.start()
+            self._spring_handle.effect.setCondition(self.spring_x)
+        self._spring_handle.start()
 
     def _update_flight_controls(self, telem_data):
         # calculations loosely based on FLightGear FFB page:
         # https://wiki.flightgear.org/Force_feedback
         # https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
-        self.spring = effects["dynamic_spring"].spring()
+        self._spring_handle.name = "dynamic_spring"
         if self._sim_is_msfs():
             ap_active = telem_data.get("APMaster", 0)
         if self._sim_is_xplane():
@@ -526,7 +526,6 @@ class Aircraft(AircraftBase):
         else:
             _elevator_aoa = 0
         telem_data["_elevator_aoa"] = _elevator_aoa
-        telem_data["Incidence"] = [incidence_vec.x, incidence_vec.y, incidence_vec.z]
 
         # calculate dynamic pressure based on air flow from propeller
         # elevator_prop_flow_ratio defines how much prop wash the elevator receives
@@ -705,8 +704,8 @@ class Aircraft(AircraftBase):
             self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = ac
 
             # update spring data
-            self.spring.effect.setCondition(self.spring_y)
-            self.spring.effect.setCondition(self.spring_x)
+            self._spring_handle.effect.setCondition(self.spring_y)
+            self._spring_handle.effect.setCondition(self.spring_x)
 
             # update constant forces
             cf_pitch = -_elevator_droop_term - _G_term # + _aoa_term
@@ -730,7 +729,7 @@ class Aircraft(AircraftBase):
                 # print(mag, theta*deg)
                 # self.const_force.constant(mag, theta*deg).start()
 
-            self.spring.start() # ensure spring is started
+            self._spring_handle.start() # ensure spring is started
 
         elif ffb_type == 'pedals':
             if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -752,7 +751,7 @@ class Aircraft(AircraftBase):
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
             self.spring_x.cpOffset = phys_rudder_x_offs
 
-            self.spring.effect.setCondition(self.spring_x)
+            self._spring_handle.effect.setCondition(self.spring_x)
             tas = telem_data.get("TAS")
             if telem_data['src'] == 'XPLANE':
                 vne = telem_data.get('Vne')
@@ -793,7 +792,8 @@ class Aircraft(AircraftBase):
                     self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
             self.const_force.constant(rud_force, 270).start()
-            self.spring.start()
+            self._spring_handle.start()
+            
     def _update_stick_shaker(self, telem_data):
         if not self._sim_is_msfs():
             return
@@ -854,7 +854,7 @@ class Aircraft(AircraftBase):
 
     @overrides(AircraftBase)
     def on_telemetry(self, telem_data):
-        effects["pause_spring"].stop()
+        effects["pause_spring"].destroy()
 
         if telem_data.get('Parked', 0): # MSFS in Hangar
             return
@@ -911,20 +911,22 @@ class Aircraft(AircraftBase):
                 self._update_nosewheel_shimmy(telem_data)
 
     def on_timeout(self):
-        if not self.pause_spring.started:
+        if not effects["pause_spring"].started:
             super().on_timeout()
 
         self.cyclic_spring_init = 0
 
         self.const_force.stop()
-        self.spring.stop()
+        self._spring_handle.stop()
         if self.center_spring_on_pause:
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = 4096
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
             self.spring_x.cpOffset = self.spring_y.cpOffset = 0
-            self.pause_spring.effect.setCondition(self.spring_x)
-            self.pause_spring.effect.setCondition(self.spring_y)
-            self.pause_spring.start()
+            
+            pause_spring = effects["pause_spring"]
+            pause_spring.effect.setCondition(self.spring_x)
+            pause_spring.effect.setCondition(self.spring_y)
+            pause_spring.start()
 
 
 
@@ -1015,7 +1017,7 @@ class GliderAircraft(Aircraft):
     def _update_force_trim(self, telem_data, x_axis=True, y_axis=True):
         if not self.force_trim_enabled: 
             return
-        self.spring = effects["dynamic_spring"].spring()
+        
         ffb_type = telem_data.get("FFBType", "joystick")
         offs_x = 0
         offs_y = 0
@@ -1026,6 +1028,7 @@ class GliderAircraft(Aircraft):
             telem_data['error'] = 1
             return
 
+        self._spring_handle.name = "dynamic_spring"
         # logging.debug(f"update_force_trim: x={x_axis}, y={y_axis}")
         input_data = HapticEffect.device.getInput()
 
@@ -1043,7 +1046,7 @@ class GliderAircraft(Aircraft):
                 offs_x = round(x * 4096)
                 self.spring_x.cpOffset = offs_x
 
-                self.spring.effect.setCondition(self.spring_x)
+                self._spring_handle.effect.setCondition(self.spring_x)
 
             if y_axis:
                 self.spring_y.positiveCoefficient = 2048
@@ -1052,7 +1055,7 @@ class GliderAircraft(Aircraft):
                 offs_y = round(y * 4096)
                 self.spring_y.cpOffset = offs_y
 
-                self.spring.effect.setCondition(self.spring_y)
+                self._spring_handle.effect.setCondition(self.spring_y)
 
             self.stick_center = [x,y]
 
@@ -1070,12 +1073,12 @@ class GliderAircraft(Aircraft):
             if x_axis:
                 offs_x = round(x * 4096)
                 self.spring_x.cpOffset = offs_x
-                self.spring.effect.setCondition(self.spring_x)
+                self._spring_handle.effect.setCondition(self.spring_x)
 
             if y_axis:
                 offs_y = round(y * 4096)
                 self.spring_y.cpOffset = offs_y
-                self.spring.effect.setCondition(self.spring_y)
+                self._spring_handle.effect.setCondition(self.spring_y)
 
             # self.spring.start()
             self.stick_center = [x,y]
@@ -1093,14 +1096,14 @@ class GliderAircraft(Aircraft):
                 self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
                 cpO_x = round(self.cyclic_center[0]*4096)
                 self.spring_x.cpOffset = cpO_x
-                self.spring.effect.setCondition(self.spring_x)
+                self._spring_handle.effect.setCondition(self.spring_x)
 
             if y_axis:
                 self.spring_y.positiveCoefficient = clamp(int(4096 * self.elevator_spring_gain), 0, 4096)
                 self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
                 cpO_y = round(self.cyclic_center[1]*4096)
                 self.spring_y.cpOffset = cpO_y
-                self.spring.effect.setCondition(self.spring_y)
+                self._spring_handle.effect.setCondition(self.spring_y)
 
             # self.spring.start()
             self.force_trim_spring_init = 1
@@ -1237,7 +1240,7 @@ class Helicopter(Aircraft):
             ap_active = telem_data.get("APServos", 0)
 
         # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
-        self.spring = effects["cyclic_spring"].spring()
+        self._spring_handle.name = "cyclic_spring"
 
         if ffb_type == "joystick":
             if self.force_trim_enabled:
@@ -1355,9 +1358,9 @@ class Helicopter(Aircraft):
 
                     self.spring_x.cpOffset = self.cpO_x
                     self.spring_y.cpOffset = self.cpO_y
-                    self.spring.effect.setCondition(self.spring_x)
-                    self.spring.effect.setCondition(self.spring_y)
-                    self.spring.start()
+                    self._spring_handle.effect.setCondition(self.spring_x)
+                    self._spring_handle.effect.setCondition(self.spring_y)
+                    self._spring_handle.start()
                     if (self.cpO_x/4096 - 0.15 < phys_x < self.cpO_x/4096 + 0.15) and (self.cpO_y/4096 - 0.15 < phys_y < self.cpO_y/4096 + 0.15):
                         #dont start sending position until physical stick has centered
                         self.cyclic_spring_init = 1
@@ -1380,7 +1383,7 @@ class Helicopter(Aircraft):
                 telem_data["StickXY"] = [x, y]
                 telem_data["StickXY_offset"] = self.cyclic_center
             else:
-                self.spring.stop()
+                self._spring_handle.stop()
 
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.getInput()
@@ -1443,10 +1446,10 @@ class Helicopter(Aircraft):
 
             self.spring_x.cpOffset = int(self.cpO_x) + self.cyclic_physical_trim_x_offs
             self.spring_y.cpOffset = int(self.cpO_y) + self.cyclic_physical_trim_y_offs
-            self.spring.effect.setCondition(self.spring_x)
-            self.spring.effect.setCondition(self.spring_y)
+            self._spring_handle.effect.setCondition(self.spring_x)
+            self._spring_handle.effect.setCondition(self.spring_y)
             if self.force_trim_enabled:
-                self.spring.start()
+                self._spring_handle.start()
 
     def _update_cyclic_trim(self, telem_data):
         if telem_data.get("FFBType", None) != 'joystick':
@@ -1481,7 +1484,7 @@ class Helicopter(Aircraft):
             phys_x, phys_y = input_data.axisXY()
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
-            self.spring = effects["pedal_ap_spring"].spring()
+            self._spring_handle.name = "pedal_ap_spring"
             # self.damper = effects["pedal_damper"].damper()
 
             pedal_pos = telem_data.get("TailRotorPedalPos")
@@ -1502,15 +1505,15 @@ class Helicopter(Aircraft):
 
                 self.spring_x.cpOffset = self.cpO_x
 
-                self.spring.effect.setCondition(self.spring_x)
+                self._spring_handle.effect.setCondition(self.spring_x)
                 # self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
-                self.spring.start()
+                self._spring_handle.start()
                 logging.debug(f"self.cpO_x:{self.cpO_x}, phys_x:{phys_x}")
                 if self.cpO_x / 4096 - 0.1 < phys_x < self.cpO_x / 4096 + 0.1:
                     # dont start sending position until physical pedals have centered
                     self.pedals_init = 1
                     logging.info("Pedals Initialized")
-                    self.spring.stop()
+                    self._spring_handle.stop()
                 else:
                     if self._sim_is_msfs():
                         if self.enable_custom_x_axis:
@@ -1551,7 +1554,7 @@ class Helicopter(Aircraft):
             # logging.error(
             #     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
             return
-        self.spring = effects["collective_ap_spring"].spring()
+        self._spring_handle.name = "collective_ap_spring"
         # self.damper = effects["collective_damper"].damper()
         # collective_tr = telem_data.get("h145CollectiveRelease", 0)
         # afcs_mode = telem_data.get("h145CollectiveAfcsMode", 0)
@@ -1590,9 +1593,9 @@ class Helicopter(Aircraft):
 
             self.spring_y.cpOffset = self.cpO_y
 
-            self.spring.effect.setCondition(self.spring_y)
+            self._spring_handle.effect.setCondition(self.spring_y)
             # self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
-            self.spring.start()
+            self._spring_handle.start()
             # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
             if self.cpO_y/4096 - 0.1 < phys_y < self.cpO_y/4096 + 0.1:
                 # dont start sending position until physical stick has centered
@@ -1612,8 +1615,8 @@ class Helicopter(Aircraft):
         self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(
             self.collective_spring_coeff_y / 2)
 
-        self.spring.effect.setCondition(self.spring_y)
-        self.spring.start()
+        self._spring_handle.effect.setCondition(self.spring_y)
+        self._spring_handle.start()
 
         if self._sim_is_xplane():
             pos_y_pos = utils.scale(phys_y, (-1, 1), (1, 0))
@@ -1814,8 +1817,8 @@ class HPGHelicopter(Helicopter):
                             self.cpO_y += self.afcsy_step_size
             self.spring_x.cpOffset = int(self.cpO_x)
             self.spring_y.cpOffset = int(self.cpO_y)
-            self.spring.effect.setCondition(self.spring_x)
-            self.spring.effect.setCondition(self.spring_y)
+            self._spring_handle.effect.setCondition(self.spring_x)
+            self._spring_handle.effect.setCondition(self.spring_y)
 
             # hands_off_deadzone = 0.02
             if telem_data.get("hpgHandsOnCyclic", 0):
@@ -1856,7 +1859,7 @@ class HPGHelicopter(Helicopter):
             telem_data["deviation_x"] = dev_x
             telem_data["deviation_y"] = dev_y
 
-            self.spring.start()
+            self._spring_handle.start()
 
     def _update_cyclic_trim(self, telem_data):
         # Trimming is handled by the AFCS integration - override parent class function
@@ -1890,7 +1893,7 @@ class HPGHelicopter(Helicopter):
 
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
-            self.spring = effects["pedal_ap_spring"].spring()
+            self._spring_handle.name = "pedal_ap_spring"
 
             if not self.pedals_init:
 
@@ -1906,9 +1909,9 @@ class HPGHelicopter(Helicopter):
 
                 self.spring_x.cpOffset = self.cpO_x
 
-                self.spring.effect.setCondition(self.spring_x)
+                self._spring_handle.effect.setCondition(self.spring_x)
                 # self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
-                self.spring.start()
+                self._spring_handle.start()
                 logging.debug(f"self.cpO_x:{self.cpO_x}, phys_x:{phys_x}")
                 if self.cpO_x / 4096 - 0.1 < phys_x < self.cpO_x / 4096 + 0.1:
                     # dont start sending position until physical pedals have centered
@@ -1950,8 +1953,8 @@ class HPGHelicopter(Helicopter):
             telem_data['_cp0_x'] = self.cpO_x
 
             self.spring_x.cpOffset = int(self.cpO_x)
-            self.spring.effect.setCondition(self.spring_x)
-            self.spring.start()
+            self._spring_handle.effect.setCondition(self.spring_x)
+            self._spring_handle.start()
 
             if self.enable_custom_x_axis:
                 x_var = self.custom_x_axis
@@ -1978,7 +1981,7 @@ class HPGHelicopter(Helicopter):
             logging.error("Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
             telem_data['error'] = 1
             return
-        self.spring = effects["collective_ap_spring"].spring()
+        self._spring_handle.name = "collective_ap_spring"
         # self.damper = effects["collective_damper"].damper()
 
         if self.force_trim_enabled and self.force_trim_button:
@@ -2012,9 +2015,9 @@ class HPGHelicopter(Helicopter):
 
             self.spring_y.cpOffset = self.cpO_y
 
-            self.spring.effect.setCondition(self.spring_y)
+            self._spring_handle.effect.setCondition(self.spring_y)
             # self.damper.damper(coef_y=4096).start()
-            self.spring.start()
+            self._spring_handle.start()
             if self.last_collective_y - 0.2 < phys_y < self.last_collective_y + 0.2:
                 # dont start sending position until physical stick has centered
                 self.collective_init = 1
@@ -2033,8 +2036,8 @@ class HPGHelicopter(Helicopter):
                 # self.damper.damper(coef_y=0).start()
                 self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = int(4096 * self.trim_release_spring_gain)
 
-                self.spring.effect.setCondition(self.spring_y)
-                self.spring.start()
+                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.start()
 
                 if self.enable_custom_y_axis:
                     y_var = self.custom_y_axis
@@ -2060,8 +2063,8 @@ class HPGHelicopter(Helicopter):
                 # self.damper.damper(coef_y=0).start()
                 self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(self.collective_spring_coeff_y)
 
-                self.spring.effect.setCondition(self.spring_y)
-                self.spring.start()
+                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.start()
 
         else:
             if collective_tr:
@@ -2073,8 +2076,8 @@ class HPGHelicopter(Helicopter):
                 # self.damper.damper(coef_y=0).start()
                 self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = int(4096 * self.trim_release_spring_gain)
 
-                self.spring.effect.setCondition(self.spring_y)
-                self.spring.start()
+                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.start()
 
                 if self.enable_custom_y_axis:
                     y_var = self.custom_y_axis
@@ -2099,8 +2102,8 @@ class HPGHelicopter(Helicopter):
                 self.spring_y.cpOffset = self.cpO_y
                 # self.damper.damper(coef_y=0).start()
 
-                self.spring.effect.setCondition(self.spring_y)
-                self.spring.start()
+                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.start()
 
     def _update_vrs_effect(self, telem_data):
         vrs_onset = telem_data.get("hpgVRSDatum", 0)
