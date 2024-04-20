@@ -403,7 +403,7 @@ class TelemManager(QObject, threading.Thread):
                         self.telemetryTimeout.emit(False)
                         self.timedOut = False
 
-                    self.settings_manager.timedOut = False
+                    G.settings_mgr.timedOut = False
                     data = self._data
                     self._data = None
                     self.process_data(data)
