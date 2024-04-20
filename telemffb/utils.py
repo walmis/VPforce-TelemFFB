@@ -54,7 +54,6 @@ import telemffb.xmlutils as xmlutils
 
 class SignalEmitter(QObject):
     error_signal = pyqtSignal(str)
-    telem_timeout_signal = pyqtSignal(str, bool)
     msfs_quit_signal = pyqtSignal()
 
     def trigger_signal(self, data):
@@ -255,6 +254,9 @@ class Vector:
 
     def __unm__(self):
         return Vector(-self.x, -self.y, -self.z)
+
+    def __iter__(self):
+        return iter((self.x, self.y, self.z))
 
     def __mul__(self, s):
         if isinstance(s, Vector):

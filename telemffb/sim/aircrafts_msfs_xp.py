@@ -478,17 +478,8 @@ class Aircraft(AircraftBase):
             ailer_base_gain = self.aileron_spring_gain
             rudder_base_gain = self.rudder_spring_gain
             logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{ailer_base_gain}:{elev_base_gain}, rudder base gain to {rudder_base_gain}")
-        if telem_data['src'] == "XPLANE":
-            incidence_vec = utils.Vector(telem_data["VelAcf"])
-        else:
-            incidence_vec = utils.Vector(telem_data["VelWorld"])
-            wind_vec = utils.Vector(telem_data["AmbWind"])
-            incidence_vec = incidence_vec - wind_vec
-            # Rotate the vector from world frame into body frame
-            incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
-            incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
-            incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
-
+        
+        incidence_vec = utils.Vector(telem_data["Incidence"])
 
         force_trim_x_offset = self.force_trim_x_offset
         force_trim_y_offset = self.force_trim_y_offset
@@ -872,6 +863,20 @@ class Aircraft(AircraftBase):
             self.toggle_xp_control()
 
         super().on_telemetry(telem_data)
+
+        if telem_data['src'] == "XPLANE":
+            incidence_vec = utils.Vector(telem_data["VelAcf"])
+        else:
+            incidence_vec = utils.Vector(telem_data["VelWorld"])
+            wind_vec = utils.Vector(telem_data["AmbWind"])
+            incidence_vec = incidence_vec - wind_vec
+            # Rotate the vector from world frame into body frame
+            incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
+            incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
+            incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
+
+        telem_data["Incidence"] = list(incidence_vec)
+
         #
         ### Generic Aircraft Class Telemetry Handler
         if not "AircraftClass" in telem_data:
