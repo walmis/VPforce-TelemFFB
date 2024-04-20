@@ -47,21 +47,7 @@ EFFECT_SAWTOOTHDOWN = 7
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
 
-    buffeting_intensity: float = 0.2  # peak AoA buffeting intensity  0 to disable
-    buffet_aoa: float = 10.0  # AoA when buffeting starts
-    stall_aoa: float = 15.0  # Stall AoA
-    aoa_effect_enabled: int = 1
 
-    aoa_buffeting_enabled: bool = True
-    aoa_effect_gain: float = 1.0
-    uncoordinated_turn_effect_enabled: int = 1
-
-    runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
-    runway_rumble_enabled: bool = True
-    gun_vibration_intensity: float = 0.12  # peak gunfire vibration intensity, 0 to disable
-    cm_vibration_intensity: float = 0.12  # peak countermeasure release vibration intensity, 0 to disable
-    weapon_release_intensity: float = 0.12  # peak weapon release vibration intensity, 0 to disable
-    weapon_effect_direction: int = 45  # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
 
     speedbrake_motion_intensity: float = 0.12  # peak vibration intensity when speed brake is moving, 0 to disable
     speedbrake_buffet_intensity: float = 0.15  # peak buffeting intensity when speed brake deployed,  0 to disable
@@ -69,10 +55,6 @@ class Aircraft(AircraftBase):
     spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
     spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
 
-    gear_motion_effect_enabled: bool = True
-    gear_motion_intensity: float = 0.12
-    gear_buffet_effect_enabled: bool = True
-    gear_buffet_intensity: float = 0.15     # peak buffeting intensity when gear down during flight,  0 to disable
 
     flaps_motion_intensity: float = 0.12  # peak vibration intensity when flaps are moving, 0 to disable
     flaps_buffet_intensity: float = 0.0  # peak buffeting intensity when flaps are deployed,  0 to disable
@@ -83,30 +65,8 @@ class Aircraft(AircraftBase):
     afterburner_effect_intensity = 0.2  # peak intensity for afterburner rumble effect
     jet_engine_rumble_intensity = 0.12  # peak intensity for jet engine rumble effect
     jet_engine_rumble_freq = 45  # base frequency for jet engine rumble effect (Hz)
-    ####
-    #### Beta effects - set to 1 to enable
-    deceleration_effect_enable = 0
-    deceleration_effect_enable_areyoureallysure = 0
-    deceleration_max_force = 0.5
-    ###
 
-    ####
-    #### Beta effects - set to 1 to enable
-    gforce_effect_invert_force = 0  # 0=disabled(default),1=enabled (case where "180" degrees does not equal "away from pilot")
-    gforce_effect_enable = 0
-    gforce_effect_enable_areyoureallysure = 0
-    gforce_effect_curvature = 2.2
-    gforce_effect_max_intensity = 1.0
-    gforce_min_gs = 1.5  # G's where the effect starts playing
-    gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
 
-    ###
-    ### AoA reduction force effect
-    ###
-    aoa_reduction_effect_enabled = 0
-    aoa_reduction_max_force = 0.0
-    critical_aoa_start = 22
-    critical_aoa_max = 25
 
     rotor_blade_count = 2
     heli_engine_rumble_intensity=0.15

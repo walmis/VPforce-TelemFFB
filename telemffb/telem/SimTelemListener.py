@@ -1,4 +1,5 @@
 import logging
+from typing import List
 
 from PyQt5 import QtCore
 
@@ -11,7 +12,7 @@ from telemffb.telem.SimConnectSock import SimConnectSock
 from telemffb.utils import overrides
 
 
-class SimListener(QtCore.QObject):
+class SimTelemListener(QtCore.QObject):
     stateChanged = QtCore.pyqtSignal(bool)
 
     def __init__(self, name : str):
@@ -61,11 +62,11 @@ class SimListener(QtCore.QObject):
         return port
 
 
-class SimIL2(SimListener):
+class SimIL2(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("IL2")
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def start(self):
         if not self.is_enabled:
             return
@@ -80,24 +81,24 @@ class SimIL2(SimListener):
         self.telem.start()
         self.started = True
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def validate(self):
         il2_path = G.system_settings.get('pathIL2', 'C:\\Program Files\\IL-2 Sturmovik Great Battles')
         utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window)
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def stop(self):
         if self.telem:
             self.telem.quit()
             self.telem = None
             self.started = False
 
-class SimDCS(SimListener):
+class SimDCS(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("DCS")
         self.telem : NetworkThread = None
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def start(self):
         if not self.is_enabled:
             return
@@ -109,24 +110,24 @@ class SimDCS(SimListener):
         self.telem.start()
         self.started = True
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def validate(self):
         # check and install/update export lua script
         utils.install_export_lua(G.main_window)
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def stop(self):
         if self.telem:
             self.telem.quit()
             self.telem = None
             self.started = False
 
-class SimXPLANE(SimListener):
+class SimXPLANE(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("XPLANE")
         self.telem : NetworkThread = None
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def start(self):
         if not self.is_enabled:
             return
@@ -139,24 +140,24 @@ class SimXPLANE(SimListener):
         self.telem.start()
         self.started = True
     
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def validate(self):
         xplane_path = G.system_settings.get('pathXPLANE', '')
         utils.install_xplane_plugin(xplane_path, G.main_window)
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def stop(self):
         if self.telem:
             self.telem.quit()
             self.telem = None
             self.started = False
 
-class SimMSFS(SimListener):
+class SimMSFS(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("MSFS")
         self.telem : NetworkThread = None
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def start(self):
         if not self.is_enabled:
             return
@@ -167,7 +168,7 @@ class SimMSFS(SimListener):
         Aircraft.set_simconnect(self.telem)
         self.started = True
 
-    @overrides(SimListener)
+    @overrides(SimTelemListener)
     def stop(self):
         if self.telem:
             self.telem.quit()
@@ -182,7 +183,7 @@ class SimListenerManager(QtCore.QObject):
 
     def __init__(self, parent = None):
         super().__init__(parent)
-        self.sims : List[SimListener] = [
+        self.sims : List[SimTelemListener] = [
             SimDCS(),
             SimMSFS(),
             SimIL2(),

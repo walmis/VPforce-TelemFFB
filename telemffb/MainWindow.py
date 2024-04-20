@@ -31,7 +31,7 @@ from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
 from telemffb.settingsmanager import UserModelDialog
 from telemffb.sim.aircraft_base import effects
-from telemffb.sim.SimListener import SimListener
+from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.utils import exit_application, overrides
@@ -346,7 +346,7 @@ class MainWindow(QMainWindow):
             'XPLANE': self.xplane_label_icon,
         }
 
-        def on_sims_changed(sim : SimListener):
+        def on_sims_changed(sim : SimTelemListener):
             self.label_icons[sim.name].enabled = sim.started
             self.refresh_telem_status()
 
@@ -698,6 +698,9 @@ class MainWindow(QMainWindow):
         # self.test_button.clicked.connect(lambda: send_test_message())
 
         # layout.addWidget(self.test_button)
+        G.telem_manager.telemetryReceived.connect(self.on_update_telemetry)
+        G.telem_manager.telemetryTimeout.connect(self.on_telemetry_timeout)
+        G.telem_manager.aircraftUpdated.connect(self.update_settings)
 
         central_widget.setLayout(layout)
 
@@ -1172,8 +1175,11 @@ class MainWindow(QMainWindow):
 
         # Create and return the interpolated color
         return QColor(r, g, b, a)
+    
+    def on_telemetry_timeout(self):
+        self.lbl_effects_data.setText("")
 
-    def update_telemetry(self, datadict: dict):
+    def on_update_telemetry(self, datadict: dict):
 
         data = OrderedDict(sorted(datadict.items()))  # Alphabetize telemetry data
         keys = data.keys()
@@ -1335,7 +1341,7 @@ class MainWindow(QMainWindow):
 
                 # Copy the updater executable with forced overwrite
 
-                call = [updater_execution_path, "--current_version", version] + sys.argv[1:]
+                call = [updater_execution_path, "--current_version", utils.get_version()] + sys.argv[1:]
                 subprocess.Popen(call, cwd=utils.get_install_path())
                 if auto:
                     for child_widget in self.findChildren(QMessageBox):

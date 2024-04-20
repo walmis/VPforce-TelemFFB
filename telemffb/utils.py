@@ -234,6 +234,9 @@ class Vector2D:
 
 class Vector:
     def __init__(self, x, y=None, z=None):
+        self.x : float
+        self.y : float
+        self.z : float
         if isinstance(x, list):
             self.x, self.y, self.z = x
         else:

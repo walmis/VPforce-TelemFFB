@@ -204,7 +204,7 @@ class TelemManager(QObject, threading.Thread):
                     telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
 
             except Exception:
-                logging.exception("Error Parsing Parameter: ", repr(i))
+                logging.exception("Error Parsing Parameter: %s", repr(i))
 
         # Read telemetry sent via IPC channel from child instances and update local telemetry stream
         if G.master_instance and G.launched_instances:

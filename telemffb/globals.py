@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from .utils import SystemSettings
     from .settingsmanager import SettingsWindow
     from .telem.TelemManager import TelemManager
-    from .sim.SimListener import SimListenerManager
+    from .telem.SimTelemListener import SimListenerManager
     from telemffb.MainWindow import MainWindow
 
 settings_mgr : 'SettingsWindow' = None

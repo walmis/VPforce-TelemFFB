@@ -21,18 +21,19 @@ This bypasses directinput and other layers which allows to augment directInput
 with additional FFB effects.
 """
 
-from enum import IntEnum
-import time
 import ctypes
-import logging
-from typing import List
-from telemffb.utils import DirectionModulator, clamp, Destroyable, overrides
-import os
-import weakref
 import inspect
-import usb1
-from PyQt5.QtCore import QObject, QTimerEvent, QTimer
+import logging
+import os
+import time
+import weakref
 from dataclasses import dataclass
+from typing import List
+
+import usb1
+from PyQt5.QtCore import QObject, QTimer, QTimerEvent
+
+from telemffb.utils import Destroyable, DirectionModulator, clamp, overrides
 
 paths = ["hidapi.dll", "dll/hidapi.dll", os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')]
 for p in paths:
@@ -307,10 +308,10 @@ input_report_handlers = {
 }
 
 class FFBEffectHandle:
-    def __init__(self, device, effect_id, type) -> None:
+    def __init__(self, device, effect_id, effect_type) -> None:
         self.ffb : FFBRhino = device
         self.effect_id = effect_id
-        self.type = type
+        self.type = effect_type
         self._finalizer = weakref.finalize(self, lambda ref: ref() and ref().destroy(), weakref.ref(self))
         self._cache = {}
         self._started = False
@@ -556,7 +557,7 @@ class FFBRhino(QObject):
             report = self.getReport(HID_REPORT_ID_PID_STATE_REPORT)
             #print(report)
             if report.deviceResetEvent:
-                logging.info("Device reset event: Invalidating all effects")
+                logging.info("Device FFB reset event: Invalidating all effects")
                 for ref in self._effectHandles:
                     effect : FFBEffectHandle = ref()
                     effect.invalidate()
@@ -677,13 +678,13 @@ class HapticEffect(Destroyable):
 
         if coef_x is not None:
             cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
-                                            positiveCoefficient=int(coef_x), 
+                                            positiveCoefficient=int(coef_x),
                                             negativeCoefficient=int(coef_x))
             self.effect.setCondition(cond_x)
 
         if coef_y is not None:
             cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
-                                            positiveCoefficient=int(coef_y), 
+                                            positiveCoefficient=int(coef_y),
                                             negativeCoefficient=int(coef_y))
             self.effect.setCondition(cond_y)
 
@@ -774,8 +775,9 @@ class HapticEffect(Destroyable):
 
 # unit test
 if __name__ == "__main__":
-    import telemffb.utils as utils
     import random
+
+    import telemffb.utils as utils
 
     devs = FFBRhino.enumerate()
     print()

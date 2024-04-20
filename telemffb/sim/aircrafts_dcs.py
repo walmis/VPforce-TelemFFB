@@ -15,17 +15,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
  
-import math
-from random import randint
-import time
-from typing import List, Dict
-from telemffb.hw.ffb_rhino import HapticEffect, FFBReport_SetCondition,EFFECT_SQUARE,EFFECT_SINE,EFFECT_TRIANGLE,EFFECT_SAWTOOTHUP,EFFECT_SAWTOOTHDOWN
-from telemffb import utils
-import logging
-import random
-from .aircraft_base import AircraftBase, effects, HPFs, LPFs
 import json
+import logging
+import math
+import random
 import socket
+import time
+
+from telemffb import utils
+from telemffb.utils import overrides
+from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE,
+                                   HapticEffect)
+
+from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects
 
 #unit conversions (to m/s)
 knots = 0.514444
@@ -42,44 +44,11 @@ class Aircraft(AircraftBase):
     deceleration_effect_enable_areyoureallysure = 0
     deceleration_max_force = 0.5
     ###
-    aoa_buffeting_enabled: bool = True
-    buffeting_intensity : float = 0.2               # peak AoA buffeting intensity  0 to disable
-    buffet_aoa : float          = 10.0              # AoA when buffeting starts
-    stall_aoa : float           = 15.0              # Stall AoA
-    wind_effect_enabled : int = 0
-    wind_effect_scaling: int = 0
-    wind_effect_max_intensity: int = 0
 
-    runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
-    runway_rumble_enabled: bool = False
-    gunfire_effect_enabled: bool = False
-    gun_vibration_intensity : float = 0.12          # peak gunfire vibration intensity, 0 to disable
-    countermeasure_effect_enabled: bool = False
-    cm_vibration_intensity : float = 0.12           # peak countermeasure release vibration intensity, 0 to disable
-    weapon_release_effect_enabled: bool = False
-    weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
-    weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
-    
-    speedbrake_motion_intensity : float = 0.12      # peak vibration intensity when speed brake is moving, 0 to disable
-    speedbrake_buffet_intensity : float = 0.15      # peak buffeting intensity when speed brake deployed,  0 to disable
-
-    spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
-    spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
-    
-    # gear_motion_effect_enabled: bool = True
+     # gear_motion_effect_enabled: bool = True
     gear_motion_intensity : float = 0.12      # peak vibration intensity when gear is moving, 0 to disable
     # gear_buffet_effect_enabled: bool = True
     gear_buffet_intensity : float = 0.15      # peak buffeting intensity when gear down during flight,  0 to disable
-    
-    flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable
-    flaps_buffet_intensity : float = 0.0      # peak buffeting intensity when flaps are deployed,  0 to disable
-    
-    canopy_motion_intensity : float = 0.12      # peak vibration intensity when canopy is moving, 0 to disable
-    canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
-
-    afterburner_effect_intensity = 0.0      # peak intensity for afterburner rumble effect
-    jet_engine_rumble_intensity = 0      # peak intensity for jet engine rumble effect
-    jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
     ####
     #### Beta effects - set to 1 to enable
@@ -126,8 +95,7 @@ class Aircraft(AircraftBase):
         super().__init__(name, **kwargs)
         self.spring = effects["spring"].spring()
         # self.damper = effects["damper"].damper()
-        self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
-        self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
+
         self.damage_enable_cmd_sent = 0
         self.pedals_init = 0
         input_data = HapticEffect.device.getInput()
@@ -136,6 +104,7 @@ class Aircraft(AircraftBase):
         self.last_collective_y = self.last_device_y
 
 
+    @overrides(AircraftBase)
     def on_telemetry(self, telem_data : dict):
         ## Generic Aircraft Telemetry Handler
         """when telemetry frame is received, aircraft class receives data in dict format
@@ -188,12 +157,13 @@ class Aircraft(AircraftBase):
         if self.is_collective():
             self._override_collective_spring(telem_data)
 
-
+    @overrides(AircraftBase)
     def on_event(self, event, *args):
         logging.info(f"on_event: {event}")
         if event == "Stop":
             effects.clear()
 
+    @overrides(AircraftBase)
     def on_timeout(self):
         super().on_timeout()
         input_data = HapticEffect.device.getInput()
@@ -511,15 +481,7 @@ class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
     buffeting_intensity = 0.0
 
-    etl_start_speed = 6.0 # m/s
-    etl_stop_speed = 22.0 # m/s
-    etl_effect_intensity = 0.2 # [ 0.0 .. 1.0]
-    etl_shake_frequency = 14.0 # value has been deprecated in favor of rotor RPM calculation
-    overspeed_shake_start = 70.0 # m/s
-    overspeed_shake_intensity = 0.2
-    heli_engine_rumble_intensity = 0.12
     pedal_spring_mode = 'No Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
-
 
     def on_telemetry(self, telem_data):
         self.speedbrake_motion_intensity = 0.0

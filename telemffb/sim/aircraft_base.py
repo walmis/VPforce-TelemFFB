@@ -33,6 +33,14 @@ EFFECT_SAWTOOTHDOWN = 7
 class AircraftBase(object):
     aoa_buffet_freq = 13
 
+    buffeting_intensity: float = 0.2  # peak AoA buffeting intensity  0 to disable
+    buffet_aoa: float = 10.0  # AoA when buffeting starts
+    stall_aoa: float = 15.0  # Stall AoA
+    aoa_effect_enabled: int = 1
+
+    runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
+    runway_rumble_enabled: bool = True
+
     keep_forces_on_pause: bool = True
     enable_damper_ovd: bool = False
     damper_force: float = 0
@@ -40,6 +48,58 @@ class AircraftBase(object):
     inertia_force: float = 0
     enable_friction_ovd: bool = False
     friction_force: float = 0
+
+    speedbrake_motion_intensity : float = 0.12      # peak vibration intensity when speed brake is moving, 0 to disable
+    speedbrake_buffet_intensity : float = 0.15      # peak buffeting intensity when speed brake deployed,  0 to disable
+
+    spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
+    spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
+
+    aoa_buffeting_enabled: bool = True
+    buffeting_intensity : float = 0.2               # peak AoA buffeting intensity  0 to disable
+    buffet_aoa : float          = 10.0              # AoA when buffeting starts
+    stall_aoa : float           = 15.0              # Stall AoA
+    wind_effect_enabled : int = 0
+    wind_effect_scaling: int = 0
+    wind_effect_max_intensity: int = 0
+
+    aoa_buffeting_enabled: bool = True
+    aoa_effect_gain: float = 1.0
+    uncoordinated_turn_effect_enabled: int = 1
+
+    afterburner_effect_intensity = 0.0      # peak intensity for afterburner rumble effect
+    jet_engine_rumble_intensity = 0      # peak intensity for jet engine rumble effect
+    jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
+
+    ###
+    ### AoA reduction force effect
+    ###
+    aoa_reduction_effect_enabled = 0
+    aoa_reduction_max_force = 0.0
+    critical_aoa_start = 22
+    critical_aoa_max = 25
+
+    ####
+    #### Beta effects - set to 1 to enable
+    gforce_effect_invert_force = 0  # 0=disabled(default),1=enabled (case where "180" degrees does not equal "away from pilot")
+    gforce_effect_enable = 0
+    gforce_effect_enable_areyoureallysure = 0
+    gforce_effect_curvature = 2.2
+    gforce_effect_max_intensity = 1.0
+    gforce_min_gs = 1.5  # G's where the effect starts playing
+    gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
+
+    gear_motion_effect_enabled: bool = True
+    gear_motion_intensity: float = 0.12
+    gear_buffet_effect_enabled: bool = True
+    gear_buffet_intensity: float = 0.15     # peak buffeting intensity when gear down during flight,  0 to disable
+
+    ####
+    #### Beta effects - set to 1 to enable
+    deceleration_effect_enable = 0
+    deceleration_effect_enable_areyoureallysure = 0
+    deceleration_max_force = 0.5
+    ###
 
     enable_hydraulic_loss_effect: bool = False
     hydraulic_loss_threshold: float = 0.95
@@ -50,6 +110,13 @@ class AircraftBase(object):
     damper_coeff: int = 0
     inertia_coeff: int = 0
     friction_coeff: int = 0
+
+    runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
+    runway_rumble_enabled: bool = True
+    gun_vibration_intensity: float = 0.12  # peak gunfire vibration intensity, 0 to disable
+    cm_vibration_intensity: float = 0.12  # peak countermeasure release vibration intensity, 0 to disable
+    weapon_release_intensity: float = 0.12  # peak weapon release vibration intensity, 0 to disable
+    weapon_effect_direction: int = 45  # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
 
     engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
     engine_prop_rumble_enabled: bool = True  # Engine Rumble - Piston specific - based on Prop RPM
@@ -62,6 +129,12 @@ class AircraftBase(object):
     engine_rumble_highrpm_intensity: float = 0.06
 
     gforce_effect_enable : bool = False
+
+    flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable
+    flaps_buffet_intensity : float = 0.0      # peak buffeting intensity when flaps are deployed,  0 to disable
+
+    canopy_motion_intensity : float = 0.12      # peak vibration intensity when canopy is moving, 0 to disable
+    canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
 
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
     elevator_droop_enabled: bool = False
@@ -79,6 +152,17 @@ class AircraftBase(object):
     canopy_motion_effect_enabled: bool = False
     spoiler_motion_effect_enabled: bool = False
     spoiler_buffet_effect_enabled: bool = False
+
+    weapon_release_effect_enabled: bool = False
+    weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
+    weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
+
+    runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
+    runway_rumble_enabled: bool = False
+    gunfire_effect_enabled: bool = False
+    gun_vibration_intensity : float = 0.12          # peak gunfire vibration intensity, 0 to disable
+    countermeasure_effect_enabled: bool = False
+    cm_vibration_intensity : float = 0.12           # peak countermeasure release vibration intensity, 0 to disable
 
     afterburner_effect_enabled: bool = True
 
@@ -103,6 +187,14 @@ class AircraftBase(object):
     pedal_spring_gain = 1.0
     pedal_dampening_gain = 0
 
+    etl_start_speed = 6.0 # m/s
+    etl_stop_speed = 22.0 # m/s
+    etl_effect_intensity = 0.2 # [ 0.0 .. 1.0]
+    etl_shake_frequency = 14.0 # value has been deprecated in favor of rotor RPM calculation
+    overspeed_shake_start = 70.0 # m/s
+    overspeed_shake_intensity = 0.2
+    heli_engine_rumble_intensity = 0.12
+
     smoother = utils.Smoother()
     _ipc_telem = {}
     stepper_dict = {}
@@ -120,6 +212,9 @@ class AircraftBase(object):
         self.hydraulic_factor = 0.000
         #clear any existing effects
         effects.clear()
+
+        self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         current_time_ms = time.perf_counter() * 1000  # Start time for the current step
@@ -630,7 +725,7 @@ class AircraftBase(object):
             effects.dispose("spoilermovement2")
             return
         # average all spoiler values together
-        if type(spoiler) == list:
+        if isinstance(spoiler, list):
             if "F-14" in self._telem_data.get("N") and self._telem_data.get('src') == 'DCS':
                 # give %85 weight to inner spoilers for intensity calculation
                 spoiler_inner = (spoiler[1], spoiler[2])
@@ -645,7 +740,7 @@ class AircraftBase(object):
                 effects["spoilermovement"].periodic(118, self.spoiler_motion_intensity, 0, 4).start()
                 effects["spoilermovement2"].periodic(118, self.spoiler_motion_intensity, 90, 4).start()
             else:
-                logging.debug(f"Destroying Spoiler Effects")
+                logging.debug("Destroying Spoiler Effects")
                 effects.dispose("spoilermovement")
                 effects.dispose("spoilermovement2")
 
@@ -1278,5 +1373,5 @@ class AircraftBase(object):
                 if 'spring' in key: continue
             effect.stop()
 
-    def on_telemetry(self, data): 
+    def on_telemetry(self, telem_data): 
         pass

@@ -16,11 +16,6 @@
 #
 
 import sys
-from typing import List
-
-from telemffb.MainWindow import MainWindow
-from telemffb.sim.SimListener import SimIL2, SimListenerManager
-from telemffb.utils import exit_application
 
 if sys.argv[0].lower().endswith("updater.exe"):
     import updater
@@ -33,21 +28,15 @@ import os
 import re
 import shutil
 import subprocess
-import threading
-import time
 import traceback
 from datetime import datetime
 
 from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import (QByteArray, QCoreApplication, QSettings)
-from PyQt5.QtGui import (QKeyEvent,
-                         QTextCursor)
-from PyQt5.QtWidgets import (QApplication, QMenu,
-                             QMessageBox, QPlainTextEdit, QRadioButton)
+from PyQt5.QtCore import QCoreApplication
+from PyQt5.QtWidgets import QApplication, QMessageBox, QPlainTextEdit
 
 import resources
 import telemffb.globals as G
-import telemffb.hw.ffb_rhino as ffb_rhino
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.config_utils import autoconvert_config
@@ -55,13 +44,12 @@ from telemffb.hw.ffb_rhino import FFBRhino, HapticEffect
 from telemffb.IPCNetworkThread import IPCNetworkThread
 from telemffb.LogWindow import LogWindow
 from telemffb.settingsmanager import SettingsWindow
-from telemffb.sim import aircrafts_msfs_xp
 #from telemffb.LogTailWindow import LogTailWindow
-from telemffb.telem.NetworkThread import NetworkThread
-from telemffb.telem.SimConnectSock import SimConnectSock
 from telemffb.telem.TelemManager import TelemManager
-from telemffb.utils import (AnsiColors, LoggingFilter, load_custom_userconfig,
-                            set_vpconf_profile)
+from telemffb.utils import AnsiColors, LoggingFilter, set_vpconf_profile
+from telemffb.MainWindow import MainWindow
+from telemffb.telem.SimTelemListener import SimListenerManager
+from telemffb.utils import exit_application
 
 resources # used
 
@@ -454,10 +442,6 @@ def main():
         th.version_result_signal.connect(G.main_window.update_version_result)
         th.error_signal.connect(lambda error_message: logging.error("Error in thread: %s", error_message))
         th.start()
-
-    G.telem_manager.telemetryReceived.connect(G.main_window.update_telemetry)
-    G.telem_manager.aircraftUpdated.connect(G.main_window.update_settings)
-
 
     if is_master_inst:
         G.main_window.show_device_logo()
