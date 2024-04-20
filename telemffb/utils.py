@@ -1609,7 +1609,7 @@ def validate_vpconf_profile(file, pid=None, dev_type=None, silent=False, window=
         if not silent:
             QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
         return False
-    cfg_pid = format(cfg_pid, 'x')
+    cfg_pid = int(format(cfg_pid, 'x'))
     cfg_serial = config_data.get('serial_number', 'unknown')
     cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
     if cfg_serial == 'unknown':
@@ -1657,7 +1657,7 @@ def load_custom_userconfig(new_path=''):
 
 
 def set_vpconf_profile(config_filepath, serial):
-    vpconf_path = utils.winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
+    vpconf_path = winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
     # serial = HapticEffect.device.serial
 
     if vpconf_path:
