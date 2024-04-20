@@ -923,7 +923,7 @@ class Aircraft(AircraftBase):
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
             self.spring_x.cpOffset = self.spring_y.cpOffset = 0
             
-            pause_spring = effects["pause_spring"]
+            pause_spring = effects["pause_spring"].spring()
             pause_spring.effect.setCondition(self.spring_x)
             pause_spring.effect.setCondition(self.spring_y)
             pause_spring.start()
