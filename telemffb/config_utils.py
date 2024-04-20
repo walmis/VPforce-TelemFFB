@@ -59,7 +59,7 @@ def config_to_dict(section, name, value, isim='', device=G.device_type, new_ac=F
             sim = 'DCS'
         case 'IL2':
             sim = 'IL2'
-        case 'MSFS2020':
+        case 'MSFS':
             sim = 'MSFS'
 
     if '.' in section:
@@ -72,7 +72,7 @@ def config_to_dict(section, name, value, isim='', device=G.device_type, new_ac=F
                     sim = 'DCS'
                 case 'IL2':
                     sim = 'IL2'
-                case 'MSFS2020':
+                case 'MSFS':
                     sim = 'MSFS'
 
     # if isim is present, is a new aircraft and user has responded with the sim information, add as new model

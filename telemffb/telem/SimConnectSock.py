@@ -19,7 +19,7 @@ class SimConnectSock(SimConnectManager):
         return val
 
     def emit_packet(self, data):
-        data["src"] = "MSFS2020"
+        data["src"] = "MSFS"
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
         self._telem.submit_frame(packet)
 

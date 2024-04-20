@@ -1207,7 +1207,7 @@ class MainWindow(QMainWindow):
             for k, v in data.items():
                 # check for msfs and debug mode (alt-d pressed), change to simvar name
                 if self.show_simvars:
-                    if data["src"] == "MSFS2020":
+                    if data["src"] == "MSFS":
                         s = G.telem_manager.simconnect.get_var_name(k)
                         # s = simvarnames.get_var_name(k)
                         if s is not None:

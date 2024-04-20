@@ -343,7 +343,7 @@ class AircraftBase(object):
         return False
     
     def _sim_is_msfs(self, *unused):
-        if self._telem_data.get("src") == "MSFS2020":
+        if self._telem_data.get("src") == "MSFS":
             return 1
         else:
             return 0
@@ -491,7 +491,7 @@ class AircraftBase(object):
 
         if self._sim_is("DCS") or self._sim_is("IL2"):
             y_gs = telem_data.get("ACCs")[0]
-        elif self._sim_is("MSFS2020"):
+        elif self._sim_is("MSFS"):
             y_gs = telem_data.get("AccBody")[2]
         elif self._sim_is_xplane():
             y_gs = -telem_data.get("Gaxil")
@@ -1006,7 +1006,7 @@ class AircraftBase(object):
 
         if self._sim_is('DCS'):
             rpm = telem_data.get("ActualRPM", 0.0)
-        elif self._sim_is('MSFS2020') or self._sim_is_xplane():
+        elif self._sim_is('MSFS') or self._sim_is_xplane():
             rpm = telem_data.get("PropRPM", 0.0)
         elif self._sim_is('IL2'):
             rpm = telem_data.get("RPM", 0.0)
