@@ -85,7 +85,6 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self._latest_version_url = None
         self.latest_version = None
         self._update_available = None
 
@@ -983,7 +982,6 @@ class MainWindow(QMainWindow):
 
     def update_version_result(self, vers, url):
         self.latest_version = vers
-        self.latest_version_url = url
 
         is_exe = getattr(sys, 'frozen', False)
 
