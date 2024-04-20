@@ -611,6 +611,7 @@ class MainWindow(QMainWindow):
         self.effects_area.setMaximumWidth(200)
 
         # Create the QLabel widget and set its properties
+        self.lbl_telem_data = QLabel()
 
         self.refresh_telem_status()
 
@@ -818,7 +819,7 @@ class MainWindow(QMainWindow):
         msfs_status = "Enabled" if msfs_enabled else "Disabled"
         xplane_status = "Enabled" if xplane_enabled else "Disabled"
 
-        self.lbl_telem_data = QLabel(
+        self.lbl_telem_data.setText(
             f"Waiting for data...\n\n"
             f"DCS     : {dcs_status}\n"
             f"IL2     : {il2_status}\n"
@@ -1275,6 +1276,8 @@ class MainWindow(QMainWindow):
                 lb.setToolTip("Sim is disabled")
 
     def update_sim_indicators(self, source, paused=False, error=False):
+        if source is None:
+            return
         label_icons = {
             'DCS': self.dcs_label_icon,
             'IL2': self.il2_label_icon,
