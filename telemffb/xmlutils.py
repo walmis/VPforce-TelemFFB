@@ -163,16 +163,34 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False, instance
     if alldevices:
         # Iterate through models elements
         #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{device}"]'):
-        all_models = root.findall(f'.//models[sim="{sim}"]') + \
-                          root.findall(f'.//models[sim="any"]')
-    else:
-        all_models = root.findall(f'.//models[sim="{sim}"][device="{the_device}"]') + \
-                          root.findall(f'.//models[sim="any"][device="{the_device}"]') + \
-                          root.findall(f'.//models[sim="{sim}"][device="any"]') + \
-                          root.findall(f'.//models[sim="any"][device="any"]')
+        any_models = root.findall(f'.//models[sim="any"]')
 
-    # Iterate through models elements
+        all_models = root.findall(f'.//models[sim="{sim}"]') 
+
+    else:
+        # Collect models with 'device' set to 'any' or both 'sim' and 'device' set to 'any'
+        any_models = root.findall(f'.//models[sim="{sim}"][device="any"]') + \
+                     root.findall(f'.//models[sim="any"][device="any"]')
+
+        # Collect models with specific devices
+        all_models = root.findall(f'.//models[sim="{sim}"][device="{the_device}"]') + \
+                     root.findall(f'.//models[sim="any"][device="{the_device}"]')
+
+        # Create a dictionary to store models based on unique keys
+    model_dict = {}
+
+    # Process any_models
+    for model_elem in any_models:
+        model_key = (model_elem.find('model').text, model_elem.find('name').text)
+        model_dict[model_key] = model_elem
+
+    # Process all_models, overwriting any existing models with the same key
     for model_elem in all_models:
+        model_key = (model_elem.find('model').text, model_elem.find('name').text)
+        model_dict[model_key] = model_elem
+
+    # Process the models
+    for model_elem in model_dict.values():
         # Assuming 'model' is the element containing the wildcard pattern
 
         unit_pattern = model_elem.find('model')
