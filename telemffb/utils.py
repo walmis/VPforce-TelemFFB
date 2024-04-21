@@ -362,52 +362,52 @@ def archive_logs(directory):
                     zip_file.write(log_file_path, os.path.basename(log_file_path))
                     os.remove(log_file_path)  # Remove the original log file
 
-"""
-def set_reg(name, value):
-    REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
-    try:
-        winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
-        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
 
-        if isinstance(value, bool):
-            # Convert boolean to integer (1 for True, 0 for False)
-            value = int(value)
-        # Check if the value is an integer
-        if isinstance(value, int):
-            # For integers, use REG_DWORD
-            reg_type = winreg.REG_DWORD
-        elif isinstance(value, bytes):
-            # For binary data, use REG_BINARY
-            reg_type = winreg.REG_BINARY
-        else:
-            # For strings, use REG_SZ
-            reg_type = winreg.REG_SZ
+# def set_reg(name, value):
+#     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
+#     try:
+#         winreg.CreateKey(winreg.HKEY_CURRENT_USER, REG_PATH)
+#         registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
 
-        winreg.SetValueEx(registry_key, name, 0, reg_type, value)
-        winreg.CloseKey(registry_key)
-        return True
-    except WindowsError:
-        return False
-"""
+#         if isinstance(value, bool):
+#             # Convert boolean to integer (1 for True, 0 for False)
+#             value = int(value)
+#         # Check if the value is an integer
+#         if isinstance(value, int):
+#             # For integers, use REG_DWORD
+#             reg_type = winreg.REG_DWORD
+#         elif isinstance(value, bytes):
+#             # For binary data, use REG_BINARY
+#             reg_type = winreg.REG_BINARY
+#         else:
+#             # For strings, use REG_SZ
+#             reg_type = winreg.REG_SZ
 
-def get_reg(name):
-    REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
-    try:
-        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
+#         winreg.SetValueEx(registry_key, name, 0, reg_type, value)
+#         winreg.CloseKey(registry_key)
+#         return True
+#     except WindowsError:
+#         return False
 
-        # Query the value and its type
-        value, reg_type = winreg.QueryValueEx(registry_key, name)
 
-        # If the type is REG_DWORD, return the integer value
-        if reg_type == winreg.REG_DWORD:
-            return value
-        elif reg_type == winreg.REG_BINARY:
-            return value
-        else:
-            return str(value)  # Return as string for other types
+# def get_reg(name):
+#     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
+#     try:
+#         registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
 
-    except WindowsError:
-        return None
+#         # Query the value and its type
+#         value, reg_type = winreg.QueryValueEx(registry_key, name)
+
+#         # If the type is REG_DWORD, return the integer value
+#         if reg_type == winreg.REG_DWORD:
+#             return value
+#         elif reg_type == winreg.REG_BINARY:
+#             return value
+#         else:
+#             return str(value)  # Return as string for other types
+
+#     except WindowsError:
+#         return None
 
 def create_support_bundle(userconfig_rootpath):
     # Get the  system settings
