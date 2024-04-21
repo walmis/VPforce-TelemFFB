@@ -2736,7 +2736,7 @@
 	<sc_overrides>
 		<model>A2A Piper PA-24.*</model>
 		<name>APMaster</name>
-		<var>L:ApMode</var>
+		<var>L:ApDisableAileron</var>
 		<sc_unit>Enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
