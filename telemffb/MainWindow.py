@@ -37,9 +37,11 @@ from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.utils import exit_application, overrides
 
 class MainWindow(QMainWindow):
-    show_simvars = False
+    
     def __init__(self):
         super().__init__()
+
+        self.show_simvars = False
 
         self.latest_version = None
         self._update_available = None
@@ -716,60 +718,57 @@ class MainWindow(QMainWindow):
         for action in self.menu.actions():
             if action.text() == "Debug":
                 return
-        self.debug_menu = self.menu.addMenu("Debug")
+        debug_menu = self.menu.addMenu("Debug")
         aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
         aircraft_picker_action.triggered.connect(lambda: self.toggle_settings_window(dbg=True))
-        self.debug_menu.addAction(aircraft_picker_action)
+        debug_menu.addAction(aircraft_picker_action)
 
-        self.teleplot_action = QAction("Teleplot Setup", self)
+        teleplot_action = QAction("Teleplot Setup", self)
         def do_open_teleplot_setup_dialog():
             dialog = TeleplotSetupDialog(self)
             dialog.exec_()
-        self.teleplot_action.triggered.connect(do_open_teleplot_setup_dialog)
-        self.debug_menu.addAction(self.teleplot_action)
+        teleplot_action.triggered.connect(do_open_teleplot_setup_dialog)
+        debug_menu.addAction(teleplot_action)
 
-        self.show_simvar_action = QAction("Show simvar in telem window", self)
+        show_simvar_action = QAction("Show simvar in telem window", self)
         def do_toggle_simvar_telemetry():
-            if self.show_simvars:
-                self.show_simvars = False
-                self.show_simvar_action.setChecked(False)
-            else:
-                self.show_simvars = True
-                self.show_simvar_action.setChecked(True)
-        self.show_simvar_action.triggered.connect(do_toggle_simvar_telemetry)
-        self.show_simvar_action.setCheckable(True)
-        self.debug_menu.addAction(self.show_simvar_action)
+            self.show_simvars = not self.show_simvars
+            show_simvar_action.setChecked(self.show_simvars)
 
-        self.configurator_settings_action = QAction('Configurator Gain Override', self)
+        show_simvar_action.triggered.connect(do_toggle_simvar_telemetry)
+        show_simvar_action.setCheckable(True)
+        debug_menu.addAction(show_simvar_action)
+
+        configurator_settings_action = QAction('Configurator Gain Override', self)
         def do_open_configurator_dialog():
             dialog = ConfiguratorDialog(self)
             dialog.raise_()
             dialog.activateWindow()
             dialog.show()
-        self.configurator_settings_action.triggered.connect(do_open_configurator_dialog)
-        self.debug_menu.addAction(self.configurator_settings_action)
+        configurator_settings_action.triggered.connect(do_open_configurator_dialog)
+        debug_menu.addAction(configurator_settings_action)
 
-        self.sc_overrides_action = QAction('SimConnect Overrides Editor', self)
+        sc_overrides_action = QAction('SimConnect Overrides Editor', self)
         def do_open_sc_override_dialog():
             dialog = SCOverridesEditor(self)
             dialog.raise_()
             dialog.activateWindow()
             dialog.show()
         # dialog.exec_()
-        self.sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
-        self.debug_menu.addAction(self.sc_overrides_action)
+        sc_overrides_action.triggered.connect(do_open_sc_override_dialog)
+        debug_menu.addAction(sc_overrides_action)
 
-        self.test_update = QAction('Test updater', self)
+        test_update = QAction('Test updater', self)
         def do_test_update():
             self._update_available = True
             self.perform_update()
-        self.test_update.triggered.connect(do_test_update)
-        self.debug_menu.addAction(self.test_update)
+        test_update.triggered.connect(do_test_update)
+        debug_menu.addAction(test_update)
 
         if G.master_instance:
-            self.custom_userconfig_action = QAction("Load Custom User Config", self)
-            self.custom_userconfig_action.triggered.connect(utils.load_custom_userconfig)
-            self.debug_menu.addAction(self.custom_userconfig_action)
+            custom_userconfig_action = QAction("Load Custom User Config", self)
+            custom_userconfig_action.triggered.connect(lambda: utils.load_custom_userconfig())
+            debug_menu.addAction(custom_userconfig_action)
 
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
