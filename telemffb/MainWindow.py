@@ -24,8 +24,8 @@ import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
-from telemffb.custom_widgets import (ClickLogo, NoKeyScrollArea, NoWheelSlider,
-                                     SimStatusLabel, StatusLabel, vpf_purple)
+from telemffb.custom_widgets import (ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider,
+                                     SimStatusLabel, vpf_purple)
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
@@ -35,7 +35,6 @@ from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.utils import exit_application, overrides
-
 
 class MainWindow(QMainWindow):
     show_simvars = False
@@ -148,7 +147,7 @@ class MainWindow(QMainWindow):
         def do_open_cfg_dir():
             modifiers = QApplication.keyboardModifiers()
             if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier) and getattr(sys, 'frozen', False):
-                os.startfile(sys._MEIPASS, 'open')
+                os.startfile(getattr(sys, "_MEIPASS"), 'open')
             else:
                 os.startfile(G.userconfig_rootpath, 'open')
         cfg_log_folder_action.triggered.connect(do_open_cfg_dir)
@@ -318,8 +317,8 @@ class MainWindow(QMainWindow):
         self.logo_stack.setStyleSheet("QGroupBox { border: none; }")
         # Align self.image_label2 with the upper left corner of self.image_label
         self.devicetype_label.move(self.vpflogo_label.pos())
-        if not G.child_instance:
-            self.devicetype_label.hide()
+
+           
         # Add the image labels to the layout
         logo_status_layout.addWidget(self.logo_stack, alignment=Qt.AlignVCenter | Qt.AlignLeft)
 
@@ -641,36 +640,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        if G.master_instance and G.launched_instances:
-            self.instance_status_row = QHBoxLayout()
-            self.master_status_icon = StatusLabel(None, f'This Instance({ G.device_type.capitalize() }):', Qt.green, 8)
-            self.joystick_status_icon = StatusLabel(None, 'Joystick:', Qt.yellow, 8)
-            self.pedals_status_icon = StatusLabel(None, 'Pedals:', Qt.yellow, 8)
-            self.collective_status_icon = StatusLabel(None, 'Collective:', Qt.yellow, 8)
-
-            self.status_icons = {
-                "joystick" : self.joystick_status_icon,
-                "pedals" : self.pedals_status_icon,
-                "collective" : self.collective_status_icon
-            }
-
-            self.master_status_icon.clicked.connect(self.change_config_scope)
-            self.joystick_status_icon.clicked.connect(self.change_config_scope)
-            self.pedals_status_icon.clicked.connect(self.change_config_scope)
-            self.collective_status_icon.clicked.connect(self.change_config_scope)
-
-            self.instance_status_row.addWidget(self.master_status_icon)
-            self.instance_status_row.addWidget(self.joystick_status_icon)
-            self.instance_status_row.addWidget(self.pedals_status_icon)
-            self.instance_status_row.addWidget(self.collective_status_icon)
-            self.joystick_status_icon.hide()
-            self.pedals_status_icon.hide()
-            self.collective_status_icon.hide()
-
-            self.instance_status_row.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
-            self.instance_status_row.setSpacing(10)
-
-            layout.addLayout(self.instance_status_row)
+        self.instance_status_row = InstanceStatusRow()
+        self.instance_status_row.changeConfigScope.connect(self.change_config_scope)
+        self.instance_status_row.hide()
+        layout.addWidget(self.instance_status_row)          
 
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
@@ -803,15 +776,7 @@ class MainWindow(QMainWindow):
 
 
     def update_child_status(self, device, status):
-        status_icon_name = f'{device}_status_icon'
-        status_icon = getattr(self, status_icon_name, None)
-
-        if status_icon is not None and status == 'ACTIVE':
-            status_icon.set_dot_color(Qt.green)
-        if status_icon is not None and status == 'TIMEOUT':
-            status_icon.set_dot_color(Qt.red)
-
-
+        self.instance_status_row.set_status(device, status)
 
     def show_child_settings(self):
         G.ipc_instance.send_broadcast_message("SHOW SETTINGS")
@@ -848,15 +813,18 @@ class MainWindow(QMainWindow):
     def setup_master_instance(self):
         self.show_device_logo()
         self.enable_device_logo_click(True)
+
+        #self.devicetype_label.hide()
         current_title = self.windowTitle()
         new_title = f"** MASTER INSTANCE ** {current_title}"
         self.setWindowTitle(new_title)
+        self.instance_status_row.show()
         if "joystick" in G.launched_instances:
-            self.joystick_status_icon.show()
+            self.instance_status_row.joystick_status_icon.show()
         if "pedals" in G.launched_instances:
-            self.pedals_status_icon.show()
+            self.instance_status_row.pedals_status_icon.show()
         if "collective" in G.launched_instances:
-            self.collective_status_icon.show()
+            self.instance_status_row.collective_status_icon.show()
 
 
     def clear_log_widget(self):
@@ -1333,7 +1301,11 @@ class MainWindow(QMainWindow):
 
         is_exe = getattr(sys, 'frozen', False)  # TODO: Make sure to swap these comment-outs before build to commit - this line should be active, next line should be commented out
         # is_exe = True
-        if is_exe and self._update_available and not ignore_auto_updates and not G.child_instance:
+        if G.child_instance: return False
+        if ignore_auto_updates: return False
+        if not is_exe: return False
+
+        if self._update_available:
             # vers, url = utils.fetch_latest_version()
             update_ans = QMessageBox.Yes
             if auto:

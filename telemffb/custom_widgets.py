@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayo
 from PyQt5.QtCore import pyqtSignal, Qt, QSize
 from PyQt5.QtGui import QPixmap, QPainter, QColor, QCursor
 
+import telemffb.globals as G
+
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 
 
@@ -457,3 +459,51 @@ class SimStatusLabel(QWidget):
         painter.end()
 
         return pixmap
+
+
+class InstanceStatusRow(QWidget):
+    changeConfigScope = QtCore.pyqtSignal(str)
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.instance_status_row = QHBoxLayout()
+        self.master_status_icon = StatusLabel(None, f'This Instance({ G.device_type.capitalize() }):', Qt.green, 8)
+        self.joystick_status_icon = StatusLabel(None, 'Joystick:', Qt.yellow, 8)
+        self.pedals_status_icon = StatusLabel(None, 'Pedals:', Qt.yellow, 8)
+        self.collective_status_icon = StatusLabel(None, 'Collective:', Qt.yellow, 8)
+
+        self.status_icons = {
+            "joystick" : self.joystick_status_icon,
+            "pedals" : self.pedals_status_icon,
+            "collective" : self.collective_status_icon
+        }
+
+        self.master_status_icon.clicked.connect(self.change_config_scope)
+        self.joystick_status_icon.clicked.connect(self.change_config_scope)
+        self.pedals_status_icon.clicked.connect(self.change_config_scope)
+        self.collective_status_icon.clicked.connect(self.change_config_scope)
+
+        self.instance_status_row.addWidget(self.master_status_icon)
+        self.instance_status_row.addWidget(self.joystick_status_icon)
+        self.instance_status_row.addWidget(self.pedals_status_icon)
+        self.instance_status_row.addWidget(self.collective_status_icon)
+        self.joystick_status_icon.hide()
+        self.pedals_status_icon.hide()
+        self.collective_status_icon.hide()
+
+        self.instance_status_row.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
+        self.instance_status_row.setSpacing(10)
+
+        self.setLayout(self.instance_status_row)
+
+    def change_config_scope(self, val):
+        self.changeConfigScope.emit(val)
+
+    def set_status(self, device, status):
+        status_icon = self.status_icons[device]
+        if status == 'ACTIVE':
+            status_icon.set_dot_color(Qt.green)
+        elif status == 'TIMEOUT':
+            status_icon.set_dot_color(Qt.red)
+        else:
+            status_icon.set_dot_color(Qt.yellow)
