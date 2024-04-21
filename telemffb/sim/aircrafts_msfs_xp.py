@@ -186,7 +186,6 @@ class Aircraft(AircraftBase):
         self.enable_stick_shaker = 0
         self.stick_shaker_intensity = 0
 
-
         self.ap_following = True
 
         self.use_fbw_for_ap_follow = True
@@ -207,17 +206,15 @@ class Aircraft(AircraftBase):
         if not wow or not on_ground:
             effects.dispose("nw_shimmy")
             return
-        tas = telem_data.get("TAS", 0)
+        gs = telem_data.get("GroundSpeed", 0)
         logging.debug(f"brakes = {brakes}")
         avg_brakes = sum(brakes) / len(brakes)
-        if avg_brakes >= self.nosewheel_shimmy_min_brakes and tas > self.nosewheel_shimmy_min_speed:
+        if avg_brakes >= self.nosewheel_shimmy_min_brakes and gs > self.nosewheel_shimmy_min_speed:
             shimmy = utils.non_linear_scaling(avg_brakes, self.nosewheel_shimmy_min_brakes, 1.0, curvature=curve)
-            logging.debug(f"Nosewheel Shimmy intensity calculation: (BrakesPct:{avg_brakes} | TAS:{tas} | RT Inensity: {shimmy}")
+            logging.debug(f"Nosewheel Shimmy intensity calculation: (BrakesPct:{avg_brakes} | GS:{gs} | RT Intensity: {shimmy}")
             effects["nw_shimmy"].periodic(freq, shimmy, 90).start()
         else:
             effects.dispose("nw_shimmy")
-
-        self.cp_int = 0
 
     def _update_fbw_flight_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
