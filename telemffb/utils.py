@@ -23,6 +23,7 @@ import re
 import shutil
 import zipfile
 from collections import defaultdict, deque
+import threading
 
 import select
 import logging
@@ -48,23 +49,19 @@ import stransi
 from telemffb.settingsmanager import SettingsWindow
 import telemffb.globals as G
 import telemffb.winpaths as winpaths
-
 import telemffb.xmlutils as xmlutils
 
+def overrides(interface_class):
+    """Decorator to ensure that a method in a subclass overrides a method in its superclass or interface."""
 
-class SignalEmitter(QObject):
-    error_signal = pyqtSignal(str)
-    msfs_quit_signal = pyqtSignal()
-
-    def trigger_signal(self, data):
-        self.error_signal.emit(data)
-
-
-signal_emitter = SignalEmitter()
+    def overrider(method):
+        assert method.__name__ in dir(interface_class)
+        return method
+    return overrider
 
 
 class Smoother:
-    def __init__(self, window_size=5):
+    def __init__(self):
         self.value_dict = {}
 
     def get_average(self, key, value, sample_size=10):
@@ -365,7 +362,7 @@ def archive_logs(directory):
                     zip_file.write(log_file_path, os.path.basename(log_file_path))
                     os.remove(log_file_path)  # Remove the original log file
 
-
+"""
 def set_reg(name, value):
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
     try:
@@ -391,7 +388,7 @@ def set_reg(name, value):
         return True
     except WindowsError:
         return False
-
+"""
 
 def get_reg(name):
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
@@ -544,6 +541,13 @@ class SystemSettings(QSettings):
         #self.def_inst_sys_dict, self.def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
         pass
 
+    @overrides(QSettings)
+    def setValue(self, key: str, value, instance=None) -> None:
+        if instance:
+            super().setValue(f"{instance}/{key}", value)
+        else:
+            super().setValue(key, value)
+
     def get(self, name, default=None):       
         # check instance params
         val = self.value(f"{G.device_type}/{name}")
@@ -562,11 +566,13 @@ class SystemSettings(QSettings):
             #logging.warn(f"SystemSettings: not found {name} default={repr(default)} val={repr(val)}")
             return default
 
-        if val == "true": val = 1
-        elif val == "false": val = 0
+        if val == "true": 
+            val = 1
+        elif val == "false":
+            val = 0
         try:
             val = int(val)
-        except: pass
+        except Exception: pass
 
         return val
 
@@ -1753,7 +1759,6 @@ def get_device_logo(dev_type :str):
     return _device_logo
 
 
-import threading
 class ResultThread(threading.Thread):
     """
     A custom Thread that can return the value of the function 
@@ -1806,15 +1811,6 @@ def threaded(daemon=False):
         return wrapper
 
     return _threaded
-
-
-def overrides(interface_class):
-    """Decorator to ensure that a method in a subclass overrides a method in its superclass or interface."""
-
-    def overrider(method):
-        assert method.__name__ in dir(interface_class)
-        return method
-    return overrider
 
 
 def exit_application():

@@ -1,16 +1,18 @@
-from telemffb.ui.Ui_LauncherWindow import Ui_LauncherWindow
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
-                             QVBoxLayout, QPushButton, QFileDialog)
-from PyQt5.QtGui import QPixmap, QIcon
-
+import concurrent.futures
 import os
 import subprocess
-import winreg
 import sys
-import concurrent.futures
+import winreg
 
-#import main
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
+                             QFileDialog, QLabel, QLineEdit, QPushButton,
+                             QTableWidgetItem, QVBoxLayout)
+
+from telemffb.ui.Ui_LauncherWindow import Ui_LauncherWindow
+
+raise NotImplemented
 
 REG_PATH = r"SOFTWARE\VPForce\TelemFFB\MultiLauncher"
 class LauncherWindow(QtWidgets.QMainWindow, Ui_LauncherWindow):
