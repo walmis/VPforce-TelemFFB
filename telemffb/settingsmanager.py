@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
                              QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget)
 
 import telemffb.utils as utils
+from telemffb.utils import overrides
 
 from . import xmlutils
 from .ui.Ui_SettingsWindow import Ui_SettingsWindow
@@ -93,6 +94,18 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # self.update_table_on_model_change()
         # self.clear_propmgr()
         self.reload_table()
+
+    @overrides(QtWidgets.QMainWindow)
+    def show(self):
+        super().show()
+        logging.debug(f"# toggle settings window   sim:'{self.current_sim}' ac:'{self.current_aircraft_name}'")
+        if self.current_aircraft_name != '':
+            self.currentmodel_click()
+        else:
+            self.update_table_on_class_change()
+
+        if self.current_sim == '' or self.current_sim == 'nothing':
+            self.update_table_on_sim_change()
 
     def get_current_model(self,the_sim, dbg_model_name, dbg_crafttype = None ):
         mprint(f"get_current_model {the_sim}, {dbg_model_name}, {dbg_crafttype}")
@@ -212,6 +225,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_models.setCurrentIndex(0)
         self.drp_class.setCurrentIndex(0)
         self.update_table_on_sim_change()
+
     def currentmodel_click(self):
         if self.current_sim == 'nothing':
             QMessageBox.warning(self, "No Simulator is Running", "No Simulator is Running")
@@ -447,7 +461,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             name_item = QTableWidgetItem(data_dict['name'])
             name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
             state_item = QTableWidgetItem(str(state))
-
 
             # Connect the itemChanged signal to your custom function
             value_item.setData(Qt.UserRole, row)  # Attach row to the item
@@ -852,7 +865,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         elif val in ('n', 'no', 'f', 'false', 'off', '0'):
             return 0
         else:
-            raise ValueError("invalid truth value %r" % (val,))
+            raise ValueError(f"invalid truth value {val}")
 
 
     # Slot function to handle checkbox state changes
