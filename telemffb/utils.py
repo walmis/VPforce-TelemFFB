@@ -1605,7 +1605,8 @@ def get_resource_path(relative_path, prefer_root=False, force=False):
 
 
 def validate_vpconf_profile(file, pid=None, dev_type=None, silent=False, window=None):
-
+    if isinstance(pid, str):
+        pid = int(pid)
     try:
         with open(file, 'r') as f:
             config_data = json.load(f)

@@ -84,29 +84,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         for key, value in kwargs.items():
             setattr(cls, key, value)
 
-    def validate_vpconf_profile(self, file, pid, dev_type):
-
-        try:
-            with open(file, 'r') as f:
-                config_data = json.load(f)
-        except json.JSONDecodeError:
-            QMessageBox.warning(self, "Error", "The VPforce Configurator file you selected appears to be invalid")
-            return False
-        cfg_pid = config_data.get('config', {}).get('usb_pid', 'unknown')
-        if cfg_pid == 'unknown':
-            QMessageBox.warning(self, "Error", "The VPforce Configurator file you selected appears to be invalid")
-            return False
-        cfg_pid = format(cfg_pid, 'x')
-        cfg_serial = config_data.get('serial_number', 'unknown')
-        cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
-        if cfg_serial == 'unknown':
-            return False
-        if cfg_pid == pid:
-            return True
-        else:
-            QMessageBox.warning(self, "Wrong Device", f"The VPforce Configurator file you selected does not match the device you are trying to assign it to\n\nThis instance is currently configuring:\n{dev_type}\npid= {pid}\n\nThe chosen profile is for\npid= {cfg_pid}\nname= {cfg_device_name}\nserial= {cfg_serial}")
-            return False
-
     def update_device_scope(self, dev):
         self.device = dev
         xmlutils.update_vars(dev, self.userconfig_path, self.defaults_path)
@@ -808,7 +785,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if file_path:
             key = 'pid' + self.device.capitalize()
             cur_pid = self.system_settings.get(key, '')
-            if self.validate_vpconf_profile(file_path, cur_pid, self.device):
+            if utils.validate_vpconf_profile(file_path, cur_pid, self.device):
                 self.tb_value.setText(file_path)
 
     def handle_item_change(self,  item):
