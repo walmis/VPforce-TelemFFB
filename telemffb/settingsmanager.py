@@ -1,20 +1,23 @@
-import logging
-import re
-import sys
-import os
-import shutil
 import json
-import telemffb.utils as utils
-from PyQt5 import QtGui, QtWidgets, QtCore
-from PyQt5.QtWidgets import (QApplication,  QTableWidgetItem, QCheckBox, QLineEdit, QDialog, QLabel, QComboBox,
-                             QVBoxLayout, QPushButton, QFileDialog, QMessageBox, QHeaderView)
-from PyQt5.QtWidgets import QTableWidget, QTextEdit, QWidget, QSlider
-from PyQt5.QtGui import QIcon
+import logging
+import os
+import re
+import shutil
+import sys
 from datetime import datetime
-from PyQt5.QtCore import Qt, pyqtSignal
 
-from .ui.Ui_SettingsWindow import Ui_SettingsWindow
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
+                             QFileDialog, QHeaderView, QLabel, QLineEdit,
+                             QMessageBox, QPushButton, QSlider, QTableWidget,
+                             QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget)
+
+import telemffb.utils as utils
+
 from . import xmlutils
+from .ui.Ui_SettingsWindow import Ui_SettingsWindow
 
 print_debugs = False
 print_method_calls = False
