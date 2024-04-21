@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
 
 from telemffb.ui.Ui_LauncherWindow import Ui_LauncherWindow
 
-raise NotImplemented
+raise NotImplementedError
 
 REG_PATH = r"SOFTWARE\VPForce\TelemFFB\MultiLauncher"
 class LauncherWindow(QtWidgets.QMainWindow, Ui_LauncherWindow):
