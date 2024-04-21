@@ -1,17 +1,17 @@
-# 
+#
 # This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
 # Copyright (c) 2023 Valmantas Palikša.
-# 
-# This program is free software: you can redistribute it and/or modify  
-# it under the terms of the GNU General Public License as published by  
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, version 3.
 #
-# This program is distributed in the hope that it will be useful, but 
-# WITHOUT ANY WARRANTY; without even the implied warranty of 
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 # General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License 
+# You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import hashlib
@@ -46,7 +46,6 @@ from PyQt5 import QtCore, QtGui, Qt
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 import stransi
 
-from telemffb.settingsmanager import SettingsWindow
 import telemffb.globals as G
 import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
@@ -489,8 +488,6 @@ def read_all_system_settings():
             pass
 
     return settings_dict
-
-
 
 
 class SystemSettings(QSettings):
@@ -1025,8 +1022,6 @@ class Teleplot:
 
 
 teleplot = Teleplot()
-
-
 
 
 def analyze_il2_config(path, port=34385, window=None):
@@ -1664,20 +1659,29 @@ class LoggingFilter(logging.Filter):
         return True
 
 
-def load_custom_userconfig(new_path=''):
+def load_custom_userconfig(new_path=""):
     print(f"newpath=>{new_path}<")
-    if new_path == '':
+    if new_path == "":
         options = QFileDialog.Options()
-        file_path, _ = QFileDialog.getOpenFileName(None, "Select File", "", "All Files (*)", options=options)
-        if file_path == '':
+        file_path, _ = QFileDialog.getOpenFileName(
+            None, "Select File", "", "All Files (*)", options=options
+        )
+        if file_path == "":
             return
         G.userconfig_rootpath = os.path.basename(file_path)
         G.userconfig_path = file_path
     else:
         G.userconfig_rootpath = os.path.basename(new_path)
         G.userconfig_path = new_path
-    xmlutils.update_vars(G.device_type, _userconfig_path=G.userconfig_path, _defaults_path=G.defaults_path)
-    G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
+
+    xmlutils.update_vars(
+        G.device_type,
+        _userconfig_path=G.userconfig_path,
+        _defaults_path=G.defaults_path,
+    )
+    # reinitialize table from new config
+    G.settings_mgr.init_ui()
+
     logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
     if G.master_instance and G.launched_instances:
         G.ipc_instance.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")

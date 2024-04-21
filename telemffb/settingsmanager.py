@@ -15,8 +15,8 @@ from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
                              QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget)
 
 import telemffb.utils as utils
+import telemffb.globals as G
 from telemffb.utils import overrides
-
 from . import xmlutils
 from .ui.Ui_SettingsWindow import Ui_SettingsWindow
 
@@ -57,10 +57,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         mprint(f"__init__ {datasource}, {device}")
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
-        self.defaults_path = defaults_path
-        self.userconfig_path = userconfig_path
         self.device = device
-        self.system_settings = system_settings
         self.timed_out = False
 
         self.sim = self.current_sim
@@ -90,7 +87,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def update_device_scope(self, dev):
         self.device = dev
-        xmlutils.update_vars(dev, self.userconfig_path, self.defaults_path)
+        xmlutils.update_vars(dev, G.userconfig_path, G.defaults_path)
         # self.update_table_on_model_change()
         # self.clear_propmgr()
         self.reload_table()
@@ -243,14 +240,14 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         # Ensure the userconfig.xml file exists
         # xmlutils.create_empty_userxml_file()  # Now handled by TelemFFB on startup
 
-        backup_path = self.userconfig_path + ".backup"
+        backup_path = G.userconfig_path + ".backup"
         # Create a timestamp
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        backup_path_time = f"{self.userconfig_path}_{timestamp}.backup"
+        backup_path_time = f"{G.userconfig_path}_{timestamp}.backup"
         try:
             # Copy the userconfig.xml file to the backup location
-            shutil.copy2(self.userconfig_path, backup_path)
-            #shutil.copy2(self.userconfig_path, backup_path_time)        #  do we want lots of backups?
+            shutil.copy2(G.userconfig_path, backup_path)
+            #shutil.copy2(G.userconfig_path, backup_path_time)        #  do we want lots of backups?
             logging.info(f"Backup created: {backup_path}")
         except Exception as e:
             logging.info(f"Error creating backup: {e}")
@@ -258,7 +255,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def restore_userconfig_backup(self):
         mprint("restore_userconfig_backup")
         # Ensure the backup file exists
-        backup_path = self.userconfig_path + ".backup"
+        backup_path = G.userconfig_path + ".backup"
 
         if not os.path.isfile(backup_path):
             logging.info(f"Backup file '{backup_path}' not found.")
@@ -266,7 +263,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         try:
             # Copy the backup file to userconfig.xml
-            shutil.copy2(backup_path, self.userconfig_path)
+            shutil.copy2(backup_path, G.userconfig_path)
             logging.info(f"Backup '{backup_path}' restored to userconfig.xml")
             #self.get_current_model()
 
@@ -800,7 +797,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         if file_path:
             key = 'pid' + self.device.capitalize()
-            cur_pid = self.system_settings.get(key, '')
+            cur_pid = G.system_settings.get(key, '')
             if utils.validate_vpconf_profile(file_path, cur_pid, self.device):
                 self.tb_value.setText(file_path)
 
