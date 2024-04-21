@@ -45,13 +45,13 @@ from telemffb.config_utils import autoconvert_config
 from telemffb.hw.ffb_rhino import FFBRhino, HapticEffect
 from telemffb.IPCNetworkThread import IPCNetworkThread
 from telemffb.LogWindow import LogWindow
+from telemffb.MainWindow import MainWindow
 from telemffb.settingsmanager import SettingsWindow
+from telemffb.telem.SimTelemListener import SimListenerManager
 #from telemffb.LogTailWindow import LogTailWindow
 from telemffb.telem.TelemManager import TelemManager
-from telemffb.utils import AnsiColors, LoggingFilter, set_vpconf_profile
-from telemffb.MainWindow import MainWindow
-from telemffb.telem.SimTelemListener import SimListenerManager
-from telemffb.utils import exit_application
+from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
+                            set_vpconf_profile)
 
 resources # used
 
