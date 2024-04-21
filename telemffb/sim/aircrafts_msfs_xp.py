@@ -202,7 +202,11 @@ class Aircraft(AircraftBase):
         curve = 2.5
         freq = 8
         brakes = telem_data.get("Brakes", (0, 0))
+        on_ground = telem_data.get("SimOnGround", 0)
         wow = sum(telem_data.get("WeightOnWheels", 0))
+        if not wow or not on_ground:
+            effects.dispose("nw_shimmy")
+            return
         tas = telem_data.get("TAS", 0)
         logging.debug(f"brakes = {brakes}")
         avg_brakes = sum(brakes) / len(brakes)
