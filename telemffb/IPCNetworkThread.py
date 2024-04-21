@@ -1,12 +1,14 @@
-import telemffb.globals as G
-from telemffb.utils import load_custom_userconfig
-from PyQt5.QtCore import QCoreApplication, QThread, pyqtSignal
-from PyQt5.QtWidgets import QMessageBox
 import json
 import logging
 import socket
 import threading
 import time
+
+from PyQt5.QtCore import QCoreApplication, QThread, pyqtSignal, QObject
+from PyQt5.QtWidgets import QMessageBox
+
+import telemffb.globals as G
+from telemffb.utils import ChildPopen, load_custom_userconfig, overrides
 
 
 class IPCNetworkThread(QThread):
@@ -19,16 +21,15 @@ class IPCNetworkThread(QThread):
     show_settings_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
 
-    def __init__(self, host="localhost", myport=0, dstport=0, child_ports=[], master=False, child=False, keepalive_sec=1, missed_keepalive=3):
+    def __init__(self, host="localhost", myport=0, dstport=0, master=False, keepalive_sec=1, missed_keepalive=3):
         super().__init__()
 
         self._running = False
-        self._myport = int(myport)
-        self._dstport = int(dstport)
+        self._myport = int(myport or 0)
+        self._dstport = int(dstport or 0)
         self._host = host
+        # master False imples child
         self._master = master
-        self._child = child
-        self._child_ports = child_ports
         self._child_keepalive_timestamp = {}
         self._keepalive_sec = keepalive_sec
         self._missed_keepalive = missed_keepalive
@@ -75,6 +76,8 @@ class IPCNetworkThread(QThread):
         self.send_message(msg)
 
     def send_message(self, message):
+        if not self._dstport:
+            return
         encoded_data = message.encode("utf-8")
         try:    # socket may be closed
             self._socket.sendto(encoded_data, (self._host, self._dstport))
@@ -82,7 +85,9 @@ class IPCNetworkThread(QThread):
             logging.warning(f"Error sending IPC frame: {e}")
 
     def send_broadcast_message(self, message):
-        for port in self._child_ports:
+        inst : ChildPopen
+        for inst in G.launched_instances.values():
+            port = inst.udp_port
             encoded_data = message.encode("utf-8")
             self._socket.sendto(encoded_data, (self._host, int(port)))
 
@@ -92,7 +97,7 @@ class IPCNetworkThread(QThread):
             self.send_broadcast_message("Keepalive")
             ts = time.time()
             logging.debug(f"SENT KEEPALIVES: {ts}")
-        elif self._child:
+        else:
             self.send_message(f"Child Keepalive:{G.device_type}")
             ts = time.time()
             logging.debug(f"{G.device_type} SENT CHILD KEEPALIVE: {ts}")
@@ -104,7 +109,7 @@ class IPCNetworkThread(QThread):
 
                 msg = data.decode("utf-8")
                 if msg == 'Keepalive':
-                    if self._child:
+                    if not self._master:
                         ts = time.time()
                         logging.debug(f"GOT KEEPALIVE: {ts}")
                         self._last_keepalive_timestamp = ts
@@ -173,15 +178,7 @@ class IPCNetworkThread(QThread):
 
 
     def _check_missed_keepalives(self):
-        if self._child:
-            elapsed_time = time.time() - self._last_keepalive_timestamp
-            if elapsed_time > (self._keepalive_sec * self._missed_keepalive):
-                logging.error("KEEPALIVE TIMEOUT... exiting in 2 seconds")
-                time.sleep(2)
-                # QCoreApplication.instance().quit()
-                self.exit_signal.emit("Missed too many keepalives. Exiting.")
-                return
-        elif self._master:
+        if self._master:
             for device in self._child_keepalive_timestamp:
                 elapsed_time = time.time() - self._child_keepalive_timestamp.get(device, time.time())
                 if elapsed_time > (self._keepalive_sec * self._missed_keepalive):
@@ -195,6 +192,16 @@ class IPCNetworkThread(QThread):
                         self.child_keepalive_signal.emit(device, 'ACTIVE')
                         self._child_active[device] = True
 
+        else: # we are child instance
+            elapsed_time = time.time() - self._last_keepalive_timestamp
+            if elapsed_time > (self._keepalive_sec * self._missed_keepalive):
+                logging.error("KEEPALIVE TIMEOUT... exiting in 2 seconds")
+                time.sleep(2)
+                # QCoreApplication.instance().quit()
+                self.exit_signal.emit("Missed too many keepalives. Exiting.")
+                return
+
+    @overrides(QObject)
     def timerEvent(self, id):
         self._check_missed_keepalives()
         self._send_keepalive()
@@ -203,7 +210,7 @@ class IPCNetworkThread(QThread):
     def running(self):
         return self._running
 
-    # Qt thread function (override)
+    @overrides(QThread)
     def run(self):
         self._receive_messages_loop()
 

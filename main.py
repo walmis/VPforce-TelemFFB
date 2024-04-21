@@ -17,6 +17,8 @@
 
 import sys
 
+from telemffb.CmdLineArgs import CmdLineArgs
+
 if sys.argv[0].lower().endswith("updater.exe"):
     import updater
     updater.main()
@@ -77,75 +79,23 @@ def launch_children():
     if not G.system_settings.get('autolaunchMaster', False) or G.child_instance or not G.master_instance:
         return False
 
-    master_port = f"6{G.device_usbpid}"
+    master_port = 60000 + G.device_usbpid
     try:
 
-        def check_launch_instance(dev_type :str):
-            dev_type_cap = dev_type.capitalize()
-            if G.system_settings.get(f'autolaunch{dev_type_cap}', False) and G.device_type != dev_type:
-                usbpid = G.system_settings.get(f'pid{dev_type_cap}', '2055')
-                if not usbpid:
-                    logging.warning("Device PID unset for device %s, not launching", dev_type)
-                    return
-                
-                usb_vidpid = f"FFFF:{usbpid}"
-            
-                args = [sys.argv[0], '-D', usb_vidpid, '-t', dev_type, '--child', '--masterport', master_port]
-                if sys.argv[0].endswith(".py"): # insert python interpreter if we launch ourselves as a script
-                    args.insert(0, sys.executable)
-
-                if G.system_settings.get(f'startMin{dev_type_cap}', False): 
-                    args.append('--minimize')
-                if G.system_settings.get(f'startHeadless{dev_type_cap}', False): 
-                    args.append('--headless')
-
-                logging.info("Auto-Launch: starting instance: %s", args)
-                subprocess.Popen(args)
-                G.launched_instances.append(dev_type)
-                G.child_ipc_ports.append(int(f"6{usbpid}"))
-
-        check_launch_instance("joystick")
-        check_launch_instance("pedals")
-        check_launch_instance("collective")
+        utils.check_launch_instance("joystick", master_port)
+        utils.check_launch_instance("pedals", master_port)
+        utils.check_launch_instance("collective", master_port)
 
     except Exception:
-        logging.exception(f"Error during Auto-Launch sequence")
+        logging.exception("Error during Auto-Launch sequence")
+
     return True
 
 
 def main():
-    # TODO: Avoid globals
-    global dev_firmware_version
-    global dev
-
-    global version
-
     app = QApplication(sys.argv)
 
-    parser = argparse.ArgumentParser(description='Send telemetry data over USB')
-
-    # Add destination telemetry address argument
-    parser.add_argument('--teleplot', type=str, metavar="IP:PORT", default=None,
-                        help='Destination IP:port address for teleplot.fr telemetry plotting service')
-
-    parser.add_argument('-p', '--plot', type=str, nargs='+',
-                        help='Telemetry item names to send to teleplot, separated by spaces')
-
-    parser.add_argument('-D', '--device', type=str, help='Rhino device USB VID:PID', default=None)
-    parser.add_argument('-r', '--reset', help='Reset all FFB effects', action='store_true')
-
-    # Add config file argument, default config.ini
-    parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default='config.ini')
-    parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='None')
-    parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
-    parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default=None)
-    parser.add_argument('--headless', action='store_true', help='Run in headless mode')
-    parser.add_argument('--child', action='store_true', help='Is a child instance')
-    parser.add_argument('--masterport', type=str, help='master instance IPC port', default=None)
-
-    parser.add_argument('--minimize', action='store_true', help='Minimize on startup')
-
-    G.args = parser.parse_args()
+    G.args = CmdLineArgs.parse()
 
     # script_dir = os.path.dirname(os.path.abspath(__file__))
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
@@ -153,7 +103,6 @@ def main():
 
     headless_mode = G.args.headless
 
-    G.child_ipc_ports = []
     G.master_instance = not G.args.child
     G.ipc_instance = None
     G.child_instance = G.args.child
@@ -164,20 +113,16 @@ def main():
     # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
     _vpf_logo = ":/image/vpforcelogo.png"
     if G.args.device is None:
+        mapping = {1: "joystick", 2: "pedals", 3: "collective"}
         master_rb = G.system_settings.get('masterInstance', 1)
-        match master_rb:
-            case 1:
-                G.device_usbpid = G.system_settings.get('pidJoystick', "2055")
-                G.device_type = 'joystick'
-            case 2:
-                G.device_usbpid = G.system_settings.get('pidPedals', "2055")
-                G.device_type = 'pedals'
-            case 3:
-                G.device_usbpid = G.system_settings.get('pidCollective', "2055")
-                G.device_type = 'collective'
-            case _:
-                G.device_usbpid = G.system_settings.get('pidJoystick', "2055")
-                G.device_type = 'joystick'
+        
+        try:
+            dev = mapping[master_rb]
+            G.device_usbpid = G.system_settings.get(f'pid{dev.capitalize()}', "2055")
+            G.device_type = dev
+        except KeyError:
+            G.device_usbpid = 2055
+            G.device_type = 'joystick'
 
         if not G.device_usbpid: # check empty string
             G.device_usbpid = '2055'
@@ -251,6 +196,9 @@ def main():
         utils.teleplot.configure(G.args.teleplot)
 
     def excepthook(exc_type, exc_value, exc_tb):
+        if exc_type == KeyboardInterrupt:
+            utils.exit_application()
+
         tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
         sys.stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
         #QtWidgets.QApplication.quit()
@@ -371,7 +319,6 @@ def main():
 
     logging.info("-------")
 
-
     try:
         dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
         if G.args.reset:
@@ -405,6 +352,7 @@ def main():
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
     
     is_master_inst = launch_children()
+    
 
     G.telem_manager = TelemManager()
     G.telem_manager.start()
@@ -412,15 +360,10 @@ def main():
     G.main_window = MainWindow()
 
 
-
-    if is_master_inst:
-        myport = int(f"6{G.device_usbpid}")
-        G.ipc_instance = IPCNetworkThread(master=True, myport=myport, child_ports=G.child_ipc_ports)
+    local_port = 60000 + int(G.device_usbpid)
+    if is_master_inst or G.child_instance:
+        G.ipc_instance = IPCNetworkThread(master=is_master_inst, myport=local_port, dstport=G.args.masterport)
         G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
-        G.ipc_instance.start()
-    elif G.child_instance:
-        myport = int(f"6{G.device_usbpid}")
-        G.ipc_instance = IPCNetworkThread(child=True, myport=myport, dstport=G.args.masterport)
         G.ipc_instance.exit_signal.connect(exit_application)
         G.ipc_instance.restart_sim_signal.connect(G.sim_listeners.restart_all)
         G.ipc_instance.show_signal.connect(G.main_window.show)
@@ -428,7 +371,6 @@ def main():
         G.ipc_instance.showlog_signal.connect(G.log_window.show)
         G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
         G.ipc_instance.start()
-
 
     # log_tail_window = LogTailWindow(window)
 
@@ -440,23 +382,12 @@ def main():
 
     autoconvert_config(G.main_window, utils.get_resource_path('config.ini'), utils.get_legacy_override_file())
     if not G.release_version:
-        th = utils.FetchLatestVersionThread()
-        th.version_result_signal.connect(G.main_window.update_version_result)
-        th.error_signal.connect(lambda error_message: logging.error("Error in thread: %s", error_message))
-        th.start()
+        utils.FetchLatestVersion(G.main_window.update_version_result,
+                                lambda error_message: logging.error("Error in thread: %s", error_message))
+
 
     if is_master_inst:
-        G.main_window.show_device_logo()
-        G.main_window.enable_device_logo_click(True)
-        current_title = G.main_window.windowTitle()
-        new_title = f"** MASTER INSTANCE ** {current_title}"
-        G.main_window.setWindowTitle(new_title)
-        if "joystick" in G.launched_instances:
-            G.main_window.joystick_status_icon.show()
-        if "pedals" in G.launched_instances:
-            G.main_window.pedals_status_icon.show()
-        if "collective" in G.launched_instances:
-            G.main_window.collective_status_icon.show()
+        G.main_window.setup_master_instance()
 
     if not G.system_settings.get("pidJoystick", None):
         G.main_window.open_system_settings_dialog()

@@ -1,13 +1,15 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 if TYPE_CHECKING:
     from PyQt5.QtCore import QSettings
     from .LogWindow import LogWindow
     from .IPCNetworkThread import IPCNetworkThread
-    from .utils import SystemSettings
+    from .utils import SystemSettings, ChildPopen
     from .settingsmanager import SettingsWindow
     from .telem.TelemManager import TelemManager
     from .telem.SimTelemListener import SimListenerManager
     from telemffb.MainWindow import MainWindow
+    from subprocess import Popen
+    from telemffb.CmdLineArgs import CmdLineArgs
 
 settings_mgr : 'SettingsWindow' = None
 userconfig_rootpath = None
@@ -22,17 +24,16 @@ device_type : str = None
 device_usbpid : str = None
 device_usbvidpid : str = None # "FFFF:2055"
 
-launched_instances = []
-child_ipc_ports = []
-master_instance = False
+launched_instances : Dict[str, 'ChildPopen'] = {}
+master_instance : bool = False
 ipc_instance : 'IPCNetworkThread' = None
-child_instance = None
+child_instance : bool = None
 
 # systems settings
 system_settings : 'SystemSettings' = None
 
 #parsed startup arguments
-args = None
+args : 'CmdLineArgs' = None
 
 # telemetry manager instance
 telem_manager : 'TelemManager' = None

@@ -1453,9 +1453,20 @@ def winreg_get(path, key):
         return None
 
 
-class FetchLatestVersionThread(QThread):
+class FetchLatestVersion(QThread):
+    workers = []
+
     version_result_signal = pyqtSignal(str, str)
     error_signal = pyqtSignal(str)
+    def __init__(self, on_fetch, on_error) -> None:
+        super().__init__()
+        if on_fetch:
+            self.version_result_signal.connect(on_fetch)
+        if on_error:
+            self.error_signal.connect(on_error)
+        self.__class__.workers.append(self)
+        self.start()
+
 
     def run(self):
         try:
@@ -1499,10 +1510,10 @@ class FetchLatestVersionThread(QThread):
                 else:
                     self.version_result_signal.emit("needsupdate", "needsupdate")
 
-
-
         except Exception as e:
             self.error_signal.emit(str(e))
+        finally:
+            self.__class__.workers.remove(self)
 
 
 def launch_vpconf(serial=None):
@@ -1834,3 +1845,37 @@ def get_legacy_override_file():
             logging.warning(f"Override file {G.args.overridefile} passed with -o argument, but can not find the file for auto-conversion")
 
     return _legacy_override_file
+
+class ChildPopen(subprocess.Popen):
+    udp_port : int
+
+def check_launch_instance(dev_type :str, master_port : int) -> subprocess.Popen:
+    """Check prerequisites and launch a new telemFFB instance
+
+    :param dev_type: _description_
+    :type dev_type: str
+    """
+    dev_type_cap = dev_type.capitalize()
+    if G.system_settings.get(f'autolaunch{dev_type_cap}', False) and G.device_type != dev_type:
+        usbpid = G.system_settings.get(f'pid{dev_type_cap}', '2055')
+
+        if not usbpid:
+            logging.warning("Device PID unset for device %s, not launching", dev_type)
+            return None
+        
+        usb_vidpid = f"FFFF:{usbpid}"
+    
+        args = [sys.argv[0], '-D', usb_vidpid, '-t', dev_type, '--child', '--masterport', str(master_port)]
+        if sys.argv[0].endswith(".py"): # insert python interpreter if we launch ourselves as a script
+            args.insert(0, sys.executable)
+
+        if G.system_settings.get(f'startMin{dev_type_cap}', False):
+            args.append('--minimize')
+        if G.system_settings.get(f'startHeadless{dev_type_cap}', False):
+            args.append('--headless')
+
+        logging.info("Auto-Launch: starting instance: %s", args)
+        proc = ChildPopen(args)
+        proc.udp_port = 60000 + int(usbpid)
+        G.launched_instances[dev_type] = proc
+        return proc

@@ -845,6 +845,19 @@ class MainWindow(QMainWindow):
             return
 
 
+    def setup_master_instance(self):
+        self.show_device_logo()
+        self.enable_device_logo_click(True)
+        current_title = self.windowTitle()
+        new_title = f"** MASTER INSTANCE ** {current_title}"
+        self.setWindowTitle(new_title)
+        if "joystick" in G.launched_instances:
+            self.joystick_status_icon.show()
+        if "pedals" in G.launched_instances:
+            self.pedals_status_icon.show()
+        if "collective" in G.launched_instances:
+            self.collective_status_icon.show()
+
 
     def clear_log_widget(self):
         self.log_widget.clear()
