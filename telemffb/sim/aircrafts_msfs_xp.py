@@ -199,7 +199,9 @@ class Aircraft(AircraftBase):
 
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
-        freq = 8
+        # freq = 8
+        freq_lo = 8
+        freq_hi = 16
         brakes = telem_data.get("Brakes", (0, 0))
         on_ground = telem_data.get("SimOnGround", 0)
         wow = sum(telem_data.get("WeightOnWheels", 0))
@@ -207,6 +209,8 @@ class Aircraft(AircraftBase):
             effects.dispose("nw_shimmy")
             return
         gs = telem_data.get("GroundSpeed", 0)
+
+        freq = int(utils.scale(gs, (self.nosewheel_shimmy_min_speed, self.nosewheel_shimmy_min_speed*3), (freq_lo, freq_hi)))
         logging.debug(f"brakes = {brakes}")
         avg_brakes = sum(brakes) / len(brakes)
         if avg_brakes >= self.nosewheel_shimmy_min_brakes and gs > self.nosewheel_shimmy_min_speed:
