@@ -211,7 +211,7 @@ class SimConnectManager(threading.Thread):
         self.current_var_tracker = []
         self.new_var_tracker = []
         self.req_id = os.getpid()
-        self.def_id = int(os.getpid() / 2)
+        self.def_id = os.getpid()
         self.sv_dict = {}
 
 
