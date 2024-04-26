@@ -217,6 +217,7 @@ class SimConnectManager(threading.Thread):
         self._simdatums_to_send = []
         self.subscribed_vars = []
         self.temp_sim_vars = []
+        self.temp_sv_array_element = []
         self.resubscribe = False
         self.current_simvars = []
         self.current_var_tracker = []
@@ -228,7 +229,14 @@ class SimConnectManager(threading.Thread):
 
 
     def add_simvar(self, name, var, sc_unit, unit=None, datatype=DATATYPE_FLOAT64, scale=None, mutator=None):
-        self.temp_sim_vars.append(SimVar(name, var, sc_unit, unit=unit, datatype=datatype, scale=scale, mutator=mutator))
+        if ":" in name:
+            # We are replacing an element in a SimVarArray, create separate list
+            sv = SimVar(name.split(":")[0], var, sc_unit, unit=unit, datatype=datatype, scale=scale, mutator=mutator)
+            sv.index = int(name.split(":")[1])
+            self.temp_sv_array_element.append(sv)
+
+        else:
+            self.temp_sim_vars.append(SimVar(name, var, sc_unit, unit=unit, datatype=datatype, scale=scale, mutator=mutator))
         
     def substitute_simvars(self):
         # build a combined list of the pre-defined simvars from __init__ and any new/updated simvars that have been set by a model
@@ -238,18 +246,50 @@ class SimConnectManager(threading.Thread):
         master_dict = {simvar.name: simvar for simvar in master_list}
         override_dict = {simvar.name: simvar for simvar in override_list}
 
+        for sv_array_override in self.temp_sv_array_element:
+            """clone each SimVarArray that we need to override so that we can modify its elements while leaving the 
+            original in-tact.  Then add those simvars to the override dictionary for later processing
+            """
+            sv_array = master_dict.get(sv_array_override.name, None)  # Get Array element from master dictionary
+            if sv_array is None:
+                logging.error(f"Error resubscribing to SimVarArray element for '{sv_array_override.name}':  SimVarArray does not exist")
+                continue
+            if sv_array_override.name in override_dict:
+                """if  the key already exists we have likely already cloned the original simvar array and this is 
+                just another simvar to replace in the same array"""
+                continue
+            override_dict[sv_array_override.name] = sv_array.clone()  # create the cloned copy, add to override dictionary
+
+        while self.temp_sv_array_element:
+            """Now iterate through any overrides for SimVarArrays.  For each overridden simvar, we find the matching
+            array and replace the simvar index given in the config file"""
+            sv = self.temp_sv_array_element.pop(0)
+            sv_array = override_dict.get(sv.name, None)  # Get cloned Array from override dictionary
+            if sv_array is None:  # Check if  'name:idx' given in the config file is invalid and does not match an existing SimVarArray
+                logging.error(f"Error resubscribing to SimVarArray element for '{sv.name}':  SimVarArray does not exist")
+                continue
+
+            if not 0 <= int(sv.index) < len(sv_array.vars):  # Check whether the given index to override exists in the SimVarArray
+                logging.error(f"Error resubscribing to SimVarArray element for '{sv.name}':  The index '{sv.index}' doex not exist in SimVarArray '{sv.name}'")
+                continue
+
+            sv_array.vars[int(sv.index)] = sv  # Replace the defined index with the new simvar
+            sv_array.vars[int(sv.index)].parent = sv_array  # set parent of newly replaced simvar array element
+
+            override_dict[sv_array.name] = sv_array
+
         # Update the master dict with the override dict
         # This replaces any existing entries with the override ones and adds new ones
         master_dict.update(override_dict)
 
-        # Convert the final dictionary back into a list
-        resulting_list = list(master_dict.values())
-        # for sv in resulting_list: print(f"SV: {sv}")
+        resulting_list = list(master_dict.values())  # Convert the final dictionary back into a list
+
         self.temp_sim_vars.clear()
+        self.temp_sv_array_element.clear()
         self.new_var_tracker.clear()
         self.sv_dict.clear()
 
-        for sv in (resulting_list):
+        for sv in resulting_list:
             # build list of just the simvar / l:var for use in comparing to currently subscribed list (self.current_var_tracker)
             if isinstance(sv, SimVarArray):
                 for sv in sv.vars:
