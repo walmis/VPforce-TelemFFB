@@ -87,12 +87,15 @@ class SimVar:
 class SimVarArray:
     def __init__(self, name, var, unit, type=DATATYPE_FLOAT64, scale=None, min=0, max=1, keywords=None):
         self.name = name
+        self.var = var
         self.unit = unit
         self.type = type
         self.scale = scale
         self.vars = []
         self.values = []
         self.min = min
+        self.max = max
+        self.keywords = keywords
         if keywords is not None:
             for key in keywords:
                 index = keywords.index(key)
@@ -112,6 +115,14 @@ class SimVarArray:
                     v.parent = self
                     self.vars.append(v)
                     self.values.append(0)
+    def clone(self):
+        """Return new SimVarArray object with copied values from called instance.
+        This method is used to create a separate copy of existing SimVarArrays for editing during dynamic
+        subscriptions without modifying the original array"""
+        cloned_sv_array = SimVarArray(self.name, self.var, self.unit, type=self.type, scale=self.scale, min=self.min, max=self.max, keywords=self.keywords)
+        return cloned_sv_array
+
+
 
 EV_PAUSED = 65499 # id for paused event
 EV_STARTED = 65498 # id for started event
