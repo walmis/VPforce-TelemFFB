@@ -76,20 +76,19 @@ def send_test_message():
 
 
 def launch_children():
-    if not G.system_settings.get('autolaunchMaster', False) or G.child_instance or not G.master_instance:
-        return False
-
-    master_port = 60000 + G.device_usbpid
+    if not G.system_settings.get('autolaunchMaster'):
+        return
+    if not G.master_instance:
+        return
+    
+    master_port = G.ipc_instance.local_port
     try:
-
         utils.check_launch_instance("joystick", master_port)
         utils.check_launch_instance("pedals", master_port)
         utils.check_launch_instance("collective", master_port)
 
     except Exception:
         logging.exception("Error during Auto-Launch sequence")
-
-    return True
 
 
 def main():
@@ -104,11 +103,9 @@ def main():
     headless_mode = G.args.headless
 
     G.master_instance = not G.args.child
-    G.ipc_instance = None
     G.child_instance = G.args.child
 
     G.system_settings = utils.SystemSettings()
-
 
     # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
     _vpf_logo = ":/image/vpforcelogo.png"
@@ -351,7 +348,7 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
     
-    is_master_inst = launch_children()
+    
     
 
     G.telem_manager = TelemManager()
@@ -359,18 +356,17 @@ def main():
     G.sim_listeners = SimListenerManager()
     G.main_window = MainWindow()
 
+    G.ipc_instance = IPCNetworkThread(dstport=G.args.masterport)
+    G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
+    G.ipc_instance.exit_signal.connect(exit_application)
+    G.ipc_instance.restart_sim_signal.connect(G.sim_listeners.restart_all)
+    G.ipc_instance.show_signal.connect(G.main_window.show)
+    G.ipc_instance.hide_signal.connect(G.main_window.hide)
+    G.ipc_instance.showlog_signal.connect(G.log_window.show)
+    G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
+    G.ipc_instance.start()
 
-    local_port = 60000 + int(G.device_usbpid)
-    if is_master_inst or G.child_instance:
-        G.ipc_instance = IPCNetworkThread(master=is_master_inst, myport=local_port, dstport=G.args.masterport)
-        G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
-        G.ipc_instance.exit_signal.connect(exit_application)
-        G.ipc_instance.restart_sim_signal.connect(G.sim_listeners.restart_all)
-        G.ipc_instance.show_signal.connect(G.main_window.show)
-        G.ipc_instance.hide_signal.connect(G.main_window.hide)
-        G.ipc_instance.showlog_signal.connect(G.log_window.show)
-        G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
-        G.ipc_instance.start()
+    launch_children()
 
     # log_tail_window = LogTailWindow(window)
 
@@ -386,7 +382,7 @@ def main():
                                 lambda error_message: logging.error("Error in thread: %s", error_message))
 
 
-    if is_master_inst:
+    if G.master_instance:
         G.main_window.setup_master_instance()
 
     if not G.system_settings.get("pidJoystick", None):

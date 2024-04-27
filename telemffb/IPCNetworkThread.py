@@ -1,7 +1,6 @@
 import json
 import logging
 import socket
-import threading
 import time
 
 from PyQt5.QtCore import QCoreApplication, QThread, pyqtSignal, QObject
@@ -21,15 +20,16 @@ class IPCNetworkThread(QThread):
     show_settings_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
 
-    def __init__(self, host="localhost", myport=0, dstport=0, master=False, keepalive_sec=1, missed_keepalive=3):
+    def __init__(self, host="127.0.0.1", dstport=0, keepalive_sec=1, missed_keepalive=3):
         super().__init__()
 
         self._running = False
-        self._myport = int(myport or 0)
+        self._myport : int = 0
         self._dstport = int(dstport or 0)
         self._host = host
         # master False imples child
-        self._master = master
+        self._master = not bool(dstport) # valid dst port implies child instance
+        
         self._child_keepalive_timestamp = {}
         self._keepalive_sec = keepalive_sec
         self._missed_keepalive = missed_keepalive
@@ -37,23 +37,33 @@ class IPCNetworkThread(QThread):
         self._ipc_telem = {}
         self._ipc_telem_effects = {}
         self._timer : int = None # Qt timer
+        
+        self._child_addrs = {}
 
         self._child_active = {
-            'joystick': False,
-            'pedals': False,
-            'collective': False
+            'joystick': None,
+            'pedals': None,
+            'collective': None
         }
 
         # Initialize socket
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
         self._socket.settimeout(0.1)
-        logging.info(f"Setting up IPC socket at {self._host}:{self._myport}")
         try:
-            self._socket.bind((self._host, self._myport))
+            #bind to any available OS port
+            self._socket.bind((self._host, 0)) # port 0 lets OS choose a free port
         except OSError as e:
             QMessageBox.warning(None, "Error", f"There was an error while setting up the inter-instance communications for the {G.device_type} instance of TelemFFB.\n\n{e}\nLikely there is a hung instance of TelemFFB (or python if running from source) that is holding the socket open.\n\nPlease close any instances of TelemFFB and then open Task Manager and kill any existing instances of TelemFFB")
             QCoreApplication.instance().quit()
+
+        self._host, self._myport = self._socket.getsockname()
+
+        logging.info(f"Setting up IPC socket at {self._host}:{self._myport}")
+
+    @property
+    def local_port(self):
+        return self._myport
 
     def send_ipc_telem(self, telem):
         j_telem = json.dumps(telem)
@@ -85,11 +95,10 @@ class IPCNetworkThread(QThread):
             logging.warning(f"Error sending IPC frame: {e}")
 
     def send_broadcast_message(self, message):
-        inst : ChildPopen
-        for inst in G.launched_instances.values():
-            port = inst.udp_port
-            encoded_data = message.encode("utf-8")
-            self._socket.sendto(encoded_data, (self._host, int(port)))
+        for fromaddr in self._child_addrs.values():
+            if fromaddr:
+                encoded_data = message.encode("utf-8")
+                self._socket.sendto(encoded_data, fromaddr)
 
     def _send_keepalive(self):
 
@@ -105,7 +114,7 @@ class IPCNetworkThread(QThread):
     def _receive_messages_loop(self):
         while self._running:
             try:
-                data, addr = self._socket.recvfrom(4096)
+                data, fromaddr = self._socket.recvfrom(4096)
 
                 msg = data.decode("utf-8")
                 if msg == 'Keepalive':
@@ -118,6 +127,7 @@ class IPCNetworkThread(QThread):
                     logging.debug(f"GOT KEEPALIVE FROM CHILD: '{ch_dev}'")
                     ts = time.time()
                     self._child_keepalive_timestamp[ch_dev] = ts
+                    self._child_addrs[ch_dev] = fromaddr
                     pass
                 elif msg == 'MASTER INSTANCE QUIT':
                     logging.info("Received QUIT signal from master instance.  Running exit/cleanup function.")
@@ -163,11 +173,12 @@ class IPCNetworkThread(QThread):
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")
 
                     self.message_received.emit(msg)
-            except OSError:
-                continue
+                    
             except ConnectionResetError:
                 continue
             except socket.timeout:
+                continue
+            except OSError:
                 continue
 
     def start(self):
@@ -175,6 +186,8 @@ class IPCNetworkThread(QThread):
             self._running = True
             self._timer = self.startTimer(self._keepalive_sec*1000)
             super().start()
+            # send keepalive immediately after start
+            self._send_keepalive()
 
 
     def _check_missed_keepalives(self):
@@ -202,7 +215,7 @@ class IPCNetworkThread(QThread):
                 return
 
     @overrides(QObject)
-    def timerEvent(self, id):
+    def timerEvent(self, timer_id):
         self._check_missed_keepalives()
         self._send_keepalive()
 
