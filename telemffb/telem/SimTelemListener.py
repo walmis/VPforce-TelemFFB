@@ -22,13 +22,13 @@ class SimTelemListener(QtCore.QObject):
         self._started = False
 
     def start(self):
-        pass
+        raise NotImplementedError
 
     def stop(self):
-        pass
+        raise NotImplementedError
 
     def validate(self):
-        pass
+        raise NotImplementedError
 
     def do_validate(self) -> bool:
         if G.child_instance:
@@ -83,7 +83,8 @@ class SimIL2(SimTelemListener):
 
     @overrides(SimTelemListener)
     def validate(self):
-        il2_path = G.system_settings.get('pathIL2', 'C:\\Program Files\\IL-2 Sturmovik Great Battles')
+        il2_path = G.system_settings.get('pathIL2')
+        logging.info("Validating IL2 Config")
         utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window)
 
     @overrides(SimTelemListener)
@@ -113,6 +114,7 @@ class SimDCS(SimTelemListener):
     @overrides(SimTelemListener)
     def validate(self):
         # check and install/update export lua script
+        logging.info("Checking DCS export script")
         utils.install_export_lua(G.main_window)
 
     @overrides(SimTelemListener)
@@ -139,9 +141,10 @@ class SimXPLANE(SimTelemListener):
 
         self.telem.start()
         self.started = True
-    
+
     @overrides(SimTelemListener)
     def validate(self):
+        logging.info("Checking XPlane Plugin")
         xplane_path = G.system_settings.get('pathXPLANE', '')
         utils.install_xplane_plugin(xplane_path, G.main_window)
 
@@ -175,7 +178,10 @@ class SimMSFS(SimTelemListener):
             self.telem = None
             Aircraft.set_simconnect(None)
             self.started = False
-
+    
+    @overrides(SimTelemListener)
+    def validate(self):
+        return
 
 class SimListenerManager(QtCore.QObject):
     simStarted = QtCore.pyqtSignal(object)

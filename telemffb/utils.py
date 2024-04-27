@@ -228,7 +228,7 @@ class Vector2D:
 
 
 class Vector:
-    def __init__(self, x, y=None, z=None):
+    def __init__(self, x, y=0.0, z=0.0):
         self.x : float
         self.y : float
         self.z : float
@@ -511,6 +511,7 @@ class SystemSettings(QSettings):
         'pathXPLANE': '',
         'enableIL2': False,
         'validateIL2': True,
+        'validateDCS': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
         'portIL2': 34385,
         'masterInstance': 1,
@@ -923,7 +924,7 @@ class DirectionModulator:
 
 
 class RandomDirectionModulator(DirectionModulator):
-    def __init__(self, period=0.1, *args, **kwargs):
+    def __init__(self, *args, period=0.1, **kwargs):
         self.prev_upd = time.perf_counter()
         self.value = 0
         self.period = period
@@ -971,8 +972,7 @@ class Dispenser:
         del self.dict[name]
 
     def clear(self):
-        for k in self.dict.keys():
-            v = self.dict[k]
+        for k,v in self.dict.items():
             if isinstance(v, Destroyable):
                 v.destroy()
         self.dict.clear()
@@ -1002,7 +1002,7 @@ class Teleplot:
             address[1] = int(address[1])
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock.connect(tuple(address))
-        except:
+        except Exception:
             pass
 
     def sendTelemetry(self, name, value, instance=None):
@@ -1017,7 +1017,7 @@ class Teleplot:
                 else:
                     msg = f"{name}:{now}:{value}"
                 self.sock.send(msg.encode())
-        except:
+        except Exception:
             pass
 
 
@@ -1053,7 +1053,7 @@ def analyze_il2_config(path, port=34385, window=None):
     }
     telem_config = None
     motion_config = None
-    with open(file_path, 'r') as config_file:
+    with open(file_path, 'r', encoding="utf-8") as config_file:
         lines = config_file.readlines()
 
     for line in lines:
@@ -1070,7 +1070,7 @@ def analyze_il2_config(path, port=34385, window=None):
             config_data[current_section][key] = value
     telem_match = 0
     telem_exists = 0
-    if not "telemetrydevice" in config_data:
+    if "telemetrydevice" not in config_data:
         # no telemetry config exists in current config, so add our own canned config
         telem_proposed = telemetry_reference
     else:
@@ -1115,7 +1115,7 @@ def analyze_il2_config(path, port=34385, window=None):
                         telem_match = 0
     motion_match = 0
     motion_exists = 0
-    if not "motiondevice" in config_data:
+    if "motiondevice" not in config_data:
         # no telemetry config exists in current config, so add our own canned config
         motion_proposed = motion_reference
     else:
@@ -1197,7 +1197,7 @@ def analyze_il2_config(path, port=34385, window=None):
                 QMessageBox.warning(window, "Config Update Error",
                                     f"There was an error writing to the Il-2 Config file:\n{e}")
         elif ans == QMessageBox.No:
-            print(f"Answer: NO")
+            print("Answer: NO")
 
         # return config_data, telem_match, motion_match
 
@@ -1210,7 +1210,7 @@ def calculate_crc(file_path):
     return crc.hexdigest()
 
 def write_il2_config(file_path, config_data):
-    with open(file_path, 'w') as config_file:
+    with open(file_path, 'w', encoding="utf-8") as config_file:
         for section, options in config_data.items():
             config_file.write(f"[KEY = {section}]\n")
             for key, value in options.items():
@@ -1232,7 +1232,7 @@ def install_xplane_plugin(path, window):
     else:
         src_crc = calculate_crc(src_path)
         dst_crc = calculate_crc(dst_path)
-        if not src_crc == dst_crc:
+        if src_crc != dst_crc:
             ans = QMessageBox.question(window, "X-Plane Plugin Installer", "X-plane plugin is out of date, update now?\n\nNote: X-Plane must not be running for this operation to succeed")
         else:
             return True
@@ -1543,16 +1543,16 @@ def get_version():
 
     ver = "UNKNOWN"
     try:
-        import version
+        version = __import__("version")
         ver = version.VERSION
         return ver
-    except:
+    except Exception:
         pass
 
     try:
         ver = subprocess.check_output(['git', 'describe', '--always', '--abbrev=8', '--dirty'], shell=True).decode('ascii').strip()
         ver = f"local-{ver}"
-    except:
+    except Exception:
         pass
     return ver
 
