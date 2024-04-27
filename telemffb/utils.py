@@ -1295,11 +1295,11 @@ def install_export_lua(window):
             if crc_a != crc_b:
                 dia = QMessageBox.question(window, "Contents of TelemFFB.lua export script have changed",
                                            f"Update export script {out_path} ?")
-                if dia == QMessageBox.StandardButton.Yes:
+                if dia == QMessageBox.Yes:
                     write_script()
         else:
             dia = QMessageBox.question(window, "Confirm", f"Install export script into {path}?")
-            if dia == QMessageBox.StandardButton.Yes:
+            if dia == QMessageBox.Yes:
                 if not export_installed:
                     logging.info("Updating export.lua")
                     line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
