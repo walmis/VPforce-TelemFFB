@@ -1034,14 +1034,7 @@ class MainWindow(QMainWindow):
                 else:
                     sm.move(self.x() + 50, self.y() + 100)
                     sm.show()
-                    logging.debug(f"# toggle settings window   sim:'{sm.current_sim}' ac:'{sm.current_aircraft_name}'")
-                    if sm.current_aircraft_name != '':
-                        sm.currentmodel_click()
-                    else:
-                        sm.update_table_on_class_change()
 
-                    if sm.current_sim == '' or sm.current_sim == 'nothing':
-                        sm.update_table_on_sim_change()
         except Exception:
             traceback.print_exc()
 
