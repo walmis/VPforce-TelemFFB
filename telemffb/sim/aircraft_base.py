@@ -653,7 +653,7 @@ class AircraftBase(object):
             logging.debug(f"Flaps Pos: {flapspos}")
             effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, 0, 3).start()
         else:
-            effects.dispose("flapsmovement")
+            effects["flapsmovement"].stop(destroy_after=5000)
 
     def _update_canopy(self, canopypos):
 
@@ -662,7 +662,7 @@ class AircraftBase(object):
             logging.debug(f"Canopy Pos: {canopypos}")
             effects["canopymovement"].periodic(120, self.canopy_motion_intensity, 0, 3).start()
         else:
-            effects.dispose("canopymovement")
+            effects["canopymovement"].stop(destroy_after=5000)
 
     def _update_landing_gear(self, gearpos, tas):
         if self._sim_is_xplane():
@@ -1154,7 +1154,7 @@ class AircraftBase(object):
         effects["je_rumble_1_1"].periodic(rt_freq, intensity, 0, effect_index).start()
         effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
         effects["je_rumble_2_1"].periodic(rt_freq2, intensity, 90, effect_index, phase=phase_offset).start()
-        effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
+        effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset+30).start()
         logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
 
 
