@@ -158,8 +158,10 @@ end
 local f_telemFFB = {
   Start = function(self)
 
-    self.recv_data = ""
+    self.dbg_recv_cmds = ""
     self.prev_command_t = socket.gettime()
+
+    self.queued_commands = {}
 
     self.host = "127.0.0.1"
     self.port = 34380
@@ -178,31 +180,39 @@ local f_telemFFB = {
   end,
   BeforeNextFrame = function(self)
     --LoSetCommand(2001, 0.25)
+    
     if self.sock_rcv then
-      while sock_readable(self.sock_rcv)
-      do
-        local data, addr = self.sock_rcv:receivefrom()
+      while sock_readable(self.sock_rcv) do
+        local data, addr, src_port = self.sock_rcv:receivefrom()
+        -- Update the time of the last command reception
         self.prev_command_t = socket.gettime()
+    
         if data == nil then
           data = ""
         else
-          self.recv_data = data
+          -- Store command along with its source port and reception time
+          self.queued_commands[src_port] = {
+            command = data,
+            time = socket.gettime()
+          }
         end
       end
-
-      -- if no commands are received in 100ms, do not repeat last commands
-      if socket.gettime() - self.prev_command_t > 0.1 then
-        self.recv_data = ""
+    
+      -- Remove commands older than 100ms
+      for port, command_info in pairs(self.queued_commands) do
+        if socket.gettime() - command_info.time > 0.1 then
+          self.queued_commands[port] = nil
+        end
       end
-
-      if self.recv_data ~= "" then
-        local f = loadstring(self.recv_data)
+      self.dbg_recv_cmds = ""
+      -- Execute commands from the command table
+      for _, command_info in pairs(self.queued_commands) do
+        self.dbg_recv_cmds = self.dbg_recv_cmds .. "\n" .. command_info.command
+        local f = loadstring(command_info.command)
         if f then
           f()
         end
       end
-  
-
     end
     
   end,
@@ -920,12 +930,12 @@ local f_telemFFB = {
 
             stringToSend =
               string.format(
-              "AileronTrim=%.3f;RudderTrim=%.3f;StickX=%.3f;StickY=%.3f;vv=%s",
+              "AileronTrim=%.3f;RudderTrim=%.3f;StickX=%.3f;StickY=%.3f;dbg_recv_cmds=%s",
               AileronTrim,
               RudderTrim,
               stickX,
               stickY,
-              self.recv_data
+              self.dbg_recv_cmds
             )
 
           elseif string.find(obj.Name, "F-14", 0, true) then
