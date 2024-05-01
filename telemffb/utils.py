@@ -58,6 +58,21 @@ def overrides(interface_class):
         return method
     return overrider
 
+def millis() -> int:
+    """return millisecond timer
+
+    :return: milliseconds
+    :rtype: int
+    """
+    return time.perf_counter_ns() // 1000000
+
+def micros() -> int:
+    """return microsecond timer
+
+    :return: microseconds
+    :rtype: int
+    """
+    return time.perf_counter_ns() // 1000
 
 class Smoother:
     def __init__(self):

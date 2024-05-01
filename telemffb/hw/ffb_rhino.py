@@ -33,7 +33,7 @@ from typing import List
 import usb1
 from PyQt5.QtCore import QObject, QTimer, QTimerEvent
 
-from telemffb.utils import Destroyable, DirectionModulator, clamp, overrides
+from telemffb.utils import Destroyable, DirectionModulator, clamp, overrides, millis
 
 paths = ["hidapi.dll", "dll/hidapi.dll", os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')]
 for p in paths:
@@ -655,6 +655,7 @@ class HapticEffect(Destroyable):
 
     def __init__(self):
        self.name = None
+       self._stopped_time : int = 0
 
     def __repr__(self):
         return f"HapticEffect({self.effect})"
@@ -702,7 +703,7 @@ class HapticEffect(Destroyable):
     def spring(self, coef_x = None, coef_y = None):
         return self._conditional_effect(EFFECT_SPRING, coef_x, coef_y) 
 
-    def periodic(self, frequency, magnitude:float, direction:float, effect_type=EFFECT_SINE, duration=0, *args, **kwargs):
+    def periodic(self, frequency, magnitude:float, direction:float, *args, effect_type=EFFECT_SINE, duration=0, **kwargs):
         if not self.effect:
             self.effect = self.device.create_effect(effect_type)
             if not self.effect: return self
@@ -748,16 +749,31 @@ class HapticEffect(Destroyable):
             name = f" (\"{self.name}\")" if self.name else ""
             logging.info(f"Start effect {self.effect.effect_id} ({self.effect.name}){name}")
             self.effect.start(**kw)
+            self._stopped_time = 0
+
         return self
     
-    def stop(self):
+    def stop(self, destroy_after : int = 10000):
+        """Stop active effect
+
+        :param destroy_after: Cleanup (destroy) effect if unused for x milliseconds
+        :type destroy_after: int, optional
+        """
         if self.effect and self.effect.started:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
             logging.debug(f"The function {caller_name} is stopping effect {self.effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
             logging.info(f"Stop effect {self.effect.effect_id} ({self.effect.name}){name}")
-            self.effect.stop() 
+            self.effect.stop()
+            if destroy_after:
+                if not self._stopped_time:
+                    self._stopped_time = millis()
+
+        if self._stopped_time and destroy_after:
+            if millis() - self._stopped_time > destroy_after:
+                self._stopped_time = 0
+                self.destroy()
         return self
 
     def destroy(self):

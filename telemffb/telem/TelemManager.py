@@ -10,7 +10,6 @@ import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.settingsmanager import logging, pyqtSignal, utils, xmlutils
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
 from telemffb.telem.SimConnectManager import SimConnectManager
 from telemffb.utils import set_vpconf_profile
