@@ -258,7 +258,7 @@ class Aircraft(AircraftBase):
                 phys_stick_y_offs = int(elev_trim*4096)
 
                 if self.ap_following and ap_active:
-                    input_data = HapticEffect.device.getInput()
+                    input_data = HapticEffect.device.get_input()
                     phys_x, phys_y = input_data.axisXY()
                     if self._sim_is_msfs():
                         aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
@@ -298,7 +298,7 @@ class Aircraft(AircraftBase):
                 virtual_stick_y_offs = 0
 
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
-                input_data = HapticEffect.device.getInput()
+                input_data = HapticEffect.device.get_input()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
                 telem_data['phys_y'] = phys_y
@@ -369,7 +369,7 @@ class Aircraft(AircraftBase):
                 phys_rudder_x_offs = int(rudder_trim * 4096)
 
                 if self.ap_following and ap_active:
-                    input_data = HapticEffect.device.getInput()
+                    input_data = HapticEffect.device.get_input()
                     # print("I am here")
                     phys_x, phys_y = input_data.axisXY()
                     if self._sim_is_msfs():
@@ -400,7 +400,7 @@ class Aircraft(AircraftBase):
                 virtual_rudder_x_offs = 0
 
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
-                input_data = HapticEffect.device.getInput()
+                input_data = HapticEffect.device.get_input()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
 
@@ -616,7 +616,7 @@ class Aircraft(AircraftBase):
                 virtual_stick_y_offs = 0
 
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
-                input_data = HapticEffect.device.getInput()
+                input_data = HapticEffect.device.get_input()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
                 telem_data['phys_y'] = phys_y
@@ -769,7 +769,7 @@ class Aircraft(AircraftBase):
             # telem_data["RudForce"] = rud_force * speed_factor
 
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
-                input_data = HapticEffect.device.getInput()
+                input_data = HapticEffect.device.get_input()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
                 x_pos = phys_x - virtual_rudder_x_offs
@@ -1035,7 +1035,7 @@ class GliderAircraft(Aircraft):
 
         self._spring_handle.name = "dynamic_spring"
         # logging.debug(f"update_force_trim: x={x_axis}, y={y_axis}")
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
 
         force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
         if self.force_trim_reset_button > 0:
@@ -1254,7 +1254,7 @@ class Helicopter(Aircraft):
                     logging.warning("Force trim enabled but buttons not configured")
                     telem_data['error'] = 1
                     return
-                input_data = HapticEffect.device.getInput()
+                input_data = HapticEffect.device.get_input()
 
                 force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
                 if self.force_trim_reset_button > 0:
@@ -1339,7 +1339,7 @@ class Helicopter(Aircraft):
                 elif not self.cyclic_spring_init:
                     self.cyclic_center = [0, 0]
 
-                    input_data = HapticEffect.device.getInput()
+                    input_data = HapticEffect.device.get_input()
 
 
                     # force_trim_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
@@ -1391,7 +1391,7 @@ class Helicopter(Aircraft):
                 self._spring_handle.stop()
 
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
-                input_data = HapticEffect.device.getInput()
+                input_data = HapticEffect.device.get_input()
                 phys_x, phys_y = input_data.axisXY()
                 telem_data['phys_x'] = phys_x
                 telem_data['phys_y'] = phys_y
@@ -1485,7 +1485,7 @@ class Helicopter(Aircraft):
             return
 
         if self.telemffb_controls_axes and not self.local_disable_axis_control:
-            input_data = HapticEffect.device.getInput()
+            input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
             x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
@@ -1493,7 +1493,7 @@ class Helicopter(Aircraft):
             # self.damper = effects["pedal_damper"].damper()
 
             pedal_pos = telem_data.get("TailRotorPedalPos")
-            input_data = HapticEffect.device.getInput()
+            input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
             telem_data['phys_x'] = phys_x
             if not self.pedals_init:
@@ -1570,7 +1570,7 @@ class Helicopter(Aircraft):
         # SimVar("h145CollectiveRelease", "L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool"),
         # SimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "number"),
         # SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
         telem_data['phys_y'] = phys_y
         if not self.collective_init:
@@ -1674,7 +1674,7 @@ class HPGHelicopter(Helicopter):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         self.phys_x, self.phys_y = input_data.axisXY()
         self.cpO_y = round(self.phys_y * 4096)
         self.collective_spring_coeff_y = round(4096 * utils.clamp(self.collective_ap_spring_gain, 0, 1))
@@ -1694,7 +1694,7 @@ class HPGHelicopter(Helicopter):
         self.pedals_init = 0
 
     def check_feet_on(self, percent):
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
 
         # Convert phys input to +/-4096
@@ -1721,7 +1721,7 @@ class HPGHelicopter(Helicopter):
 
 
     def check_hands_on(self, percent):
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
 
         # Convert phys input to +/-4096
@@ -1876,7 +1876,7 @@ class HPGHelicopter(Helicopter):
             return
 
         if self.telemffb_controls_axes and not self.local_disable_axis_control:
-            input_data = HapticEffect.device.getInput()
+            input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
             telem_data['phys_x'] = phys_x
 
@@ -1990,7 +1990,7 @@ class HPGHelicopter(Helicopter):
         # self.damper = effects["collective_damper"].damper()
 
         if self.force_trim_enabled and self.force_trim_button:
-            input_data = HapticEffect.device.getInput()
+            input_data = HapticEffect.device.get_input()
             force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
             if self._sim_is_msfs() and force_trim_pressed:
                 self._simconnect.send_event_to_msfs("AUTO_THROTTLE_DISCONNECT", 1)
@@ -2004,7 +2004,7 @@ class HPGHelicopter(Helicopter):
         # SimVar("h145CollectiveRelease", "L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED", "bool"),
         # SimVar("h145CollectiveAfcsMode", "L:H145_SDK_AFCS_MODE_COLLECTIVE", "number"),
         # SimVar("CollectivePos", "COLLECTIVE POSITION", "percent over 100"),
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
         telem_data['phys_y'] = phys_y
         if not self.collective_init:

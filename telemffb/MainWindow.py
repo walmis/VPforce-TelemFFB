@@ -1015,7 +1015,7 @@ class MainWindow(QMainWindow):
 
         if result == QMessageBox.Ok:
             try:
-                HapticEffect.device.resetEffects()
+                HapticEffect.device.reset_effects()
             except Exception:
                 pass
 

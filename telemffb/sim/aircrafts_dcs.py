@@ -98,7 +98,7 @@ class Aircraft(AircraftBase):
 
         self.damage_enable_cmd_sent = 0
         self.pedals_init = 0
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         self.last_device_x, self.last_device_y = input_data.axisXY()
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = self.last_device_y
@@ -166,7 +166,7 @@ class Aircraft(AircraftBase):
     @overrides(AircraftBase)
     def on_timeout(self):
         super().on_timeout()
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         self.last_device_x, self.last_device_y = input_data.axisXY()
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = self.last_device_y
@@ -315,7 +315,7 @@ class Aircraft(AircraftBase):
         self.spring = effects["collective_ap_spring"].spring()
         # self.damper = effects["collective_damper"].damper()
         if not self.collective_init:
-            input_data = HapticEffect.device.getInput()
+            input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
 
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = self.collective_spring_coeff_y
@@ -341,7 +341,7 @@ class Aircraft(AircraftBase):
             else:
                 return
 
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
         self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
         self.spring_y.cpOffset = self.cpO_y
@@ -357,7 +357,7 @@ class Aircraft(AircraftBase):
     def _update_pedal_trim(self, telem_data):
         if not self.is_pedals(): return
 
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         x, y = input_data.axisXY()
         telem_data["X"] = x
 
@@ -380,7 +380,7 @@ class Aircraft(AircraftBase):
 
         if not ("StickX" in telem_data and "StickY" in telem_data): return
 
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         x, y = input_data.axisXY()
         telem_data["X"] = x
         telem_data["Y"] = y
@@ -501,7 +501,7 @@ class Helicopter(Aircraft):
         if not self.dcs_tr_damper_enabled: return
         if not self.dcs_tr_button: return
 
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         force_trim_pressed = input_data.isButtonPressed(self.dcs_tr_button)
 
         if force_trim_pressed:

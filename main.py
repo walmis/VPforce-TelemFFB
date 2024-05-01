@@ -319,7 +319,7 @@ def main():
     try:
         dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
         if G.args.reset:
-            dev.resetEffects()
+            dev.reset_effects()
         dev_firmware_version = dev.get_firmware_version()
         dev_serial = dev.serial
         if dev_firmware_version:
@@ -400,7 +400,7 @@ def main():
                 logging.exception("Unable to set VPConfigurator startup profile")
 
         try:
-            G.startup_configurator_gains = dev.getGains()
+            G.startup_configurator_gains = dev.get_gains()
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 

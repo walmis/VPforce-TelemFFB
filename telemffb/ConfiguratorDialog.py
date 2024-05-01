@@ -63,7 +63,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
 
         self.pb_Finish.clicked.connect(self.close)
 
-        self.starting_gains = HapticEffect.device.getGains()
+        self.starting_gains = HapticEffect.device.get_gains()
         self.read_gains()
 
 
@@ -77,19 +77,19 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         if state: return
         match sender_str:
             case 'cb_MasterGain':
-                dev.setGain(FFB_GAIN_MASTER, int(G.startup_configurator_gains.master_gain))
+                dev.set_gain(FFB_GAIN_MASTER, int(G.startup_configurator_gains.master_gain))
             case 'cb_Periodic':
-                dev.setGain(FFB_GAIN_PERIODIC, G.startup_configurator_gains.periodic_gain)
+                dev.set_gain(FFB_GAIN_PERIODIC, G.startup_configurator_gains.periodic_gain)
             case 'cb_Spring':
-                dev.setGain(FFB_GAIN_SPRING, G.startup_configurator_gains.spring_gain)
+                dev.set_gain(FFB_GAIN_SPRING, G.startup_configurator_gains.spring_gain)
             case 'cb_Damper':
-                dev.setGain(FFB_GAIN_DAMPER, G.startup_configurator_gains.damper_gain)
+                dev.set_gain(FFB_GAIN_DAMPER, G.startup_configurator_gains.damper_gain)
             case 'cb_Inertia':
-                dev.setGain(FFB_GAIN_INERTIA, G.startup_configurator_gains.inertia_gain)
+                dev.set_gain(FFB_GAIN_INERTIA, G.startup_configurator_gains.inertia_gain)
             case 'cb_Friction':
-                dev.setGain(FFB_GAIN_FRICTION, G.startup_configurator_gains.friction_gain)
+                dev.set_gain(FFB_GAIN_FRICTION, G.startup_configurator_gains.friction_gain)
             case 'sl_Constant':
-                dev.setGain(FFB_GAIN_CONSTANT, G.startup_configurator_gains.constant_gain)
+                dev.set_gain(FFB_GAIN_CONSTANT, G.startup_configurator_gains.constant_gain)
         self.read_gains()
 
 
@@ -97,13 +97,13 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
     def revert_gains(self):
         dev = HapticEffect.device
 
-        dev.setGain(FFB_GAIN_MASTER, self.starting_gains.master_gain)
-        dev.setGain(FFB_GAIN_PERIODIC, self.starting_gains.periodic_gain)
-        dev.setGain(FFB_GAIN_SPRING, self.starting_gains.spring_gain)
-        dev.setGain(FFB_GAIN_DAMPER, self.starting_gains.damper_gain)
-        dev.setGain(FFB_GAIN_INERTIA, self.starting_gains.inertia_gain)
-        dev.setGain(FFB_GAIN_FRICTION, self.starting_gains.friction_gain)
-        dev.setGain(FFB_GAIN_CONSTANT, self.starting_gains.constant_gain)
+        dev.set_gain(FFB_GAIN_MASTER, self.starting_gains.master_gain)
+        dev.set_gain(FFB_GAIN_PERIODIC, self.starting_gains.periodic_gain)
+        dev.set_gain(FFB_GAIN_SPRING, self.starting_gains.spring_gain)
+        dev.set_gain(FFB_GAIN_DAMPER, self.starting_gains.damper_gain)
+        dev.set_gain(FFB_GAIN_INERTIA, self.starting_gains.inertia_gain)
+        dev.set_gain(FFB_GAIN_FRICTION, self.starting_gains.friction_gain)
+        dev.set_gain(FFB_GAIN_CONSTANT, self.starting_gains.constant_gain)
         self.read_gains()
 
     def set_gain_value(self, value):
@@ -113,23 +113,23 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         sender_str = sender.objectName()
         match sender_str:
             case 'sl_MasterGain':
-                dev.setGain(FFB_GAIN_MASTER, int(value))
+                dev.set_gain(FFB_GAIN_MASTER, int(value))
             case 'sl_Periodic':
-                dev.setGain(FFB_GAIN_PERIODIC, int(value))
+                dev.set_gain(FFB_GAIN_PERIODIC, int(value))
             case 'sl_Spring':
-                dev.setGain(FFB_GAIN_SPRING, int(value))
+                dev.set_gain(FFB_GAIN_SPRING, int(value))
             case 'sl_Damper':
-                dev.setGain(FFB_GAIN_DAMPER, int(value))
+                dev.set_gain(FFB_GAIN_DAMPER, int(value))
             case 'sl_Inertia':
-                dev.setGain(FFB_GAIN_INERTIA, int(value))
+                dev.set_gain(FFB_GAIN_INERTIA, int(value))
             case 'sl_Friction':
-                dev.setGain(FFB_GAIN_FRICTION, int(value))
+                dev.set_gain(FFB_GAIN_FRICTION, int(value))
             case 'sl_Constant':
-                dev.setGain(FFB_GAIN_CONSTANT, int(value))
+                dev.set_gain(FFB_GAIN_CONSTANT, int(value))
 
 
     def read_gains(self):
-        gains = HapticEffect.device.getGains()
+        gains = HapticEffect.device.get_gains()
         self.sl_MasterGain.setValue(gains.master_gain)
         self.sl_Periodic.setValue(gains.periodic_gain)
         self.sl_Spring.setValue(gains.spring_gain)

@@ -1302,7 +1302,7 @@ class AircraftBase(object):
     def _override_pedal_spring(self, telem_data):
         if not self.is_pedals(): return
 
-        input_data = HapticEffect.device.getInput()
+        input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
         ## 0=DCS Default
         ## 1=spring disabled

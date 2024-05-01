@@ -466,7 +466,7 @@ class FFBRhino(QObject):
                 devs = list(filter(lambda x: x.serial_number == serial, devs))
             if path:
                 devs = list(filter(lambda x: x.path == path, devs))
-            if not len(devs):
+            if not devs:
                 raise hid.HIDException('unable to open device')
             self.info = devs[0]
 
@@ -516,13 +516,13 @@ class FFBRhino(QObject):
         return list(filter(lambda x: x.interface_number == 0 and x.usage == 4, devs))
 
     # Get global effect slider values as seen in VPConfigurator
-    def getGains(self) -> FFBReport_Get_Gains_Feature_Data:
+    def get_gains(self) -> FFBReport_Get_Gains_Feature_Data:
         d = self._dev.get_feature_report(HID_REPORT_FEATURE_ID_GET_GAINS, ctypes.sizeof(FFBReport_Get_Gains_Feature_Data))
         data = FFBReport_Get_Gains_Feature_Data.from_buffer_copy(d)
         return data
     
     # Set global effect class gain, same as in VPConfigurator sliders
-    def setGain(self, slider_id, value):
+    def set_gain(self, slider_id, value):
         assert(value >= 0 and value <= 100)
         data = FFBReport_Set_Gain_Feature_Data_t()
         data.reportId = HID_REPORT_FEATURE_ID_SET_GAIN
@@ -534,7 +534,7 @@ class FFBRhino(QObject):
     @overrides(QObject)
     def timerEvent(self, a0: QTimerEvent) -> None:
         try:
-            self.readReports()
+            self.read_reports()
         except Exception:
             logging.exception("Exception")
             self._dev.close()
@@ -554,7 +554,7 @@ class FFBRhino(QObject):
 
     def on_hid_report_received(self, report_id):
         if report_id == HID_REPORT_ID_PID_STATE_REPORT:
-            report = self.getReport(HID_REPORT_ID_PID_STATE_REPORT)
+            report = self.get_report(HID_REPORT_ID_PID_STATE_REPORT)
             #print(report)
             if report.deviceResetEvent:
                 logging.info("Device FFB reset event: Invalidating all effects")
@@ -591,12 +591,12 @@ class FFBRhino(QObject):
         
         return None
 
-    def resetEffects(self):
+    def reset_effects(self):
         logging.info("FFB: Reset device effects")
         self._dev.write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
         time.sleep(0.01)
 
-    def createEffect(self, type) -> FFBEffectHandle:
+    def create_effect(self, type) -> FFBEffectHandle:
         self._dev.send_feature_report(bytes([HID_REPORT_ID_CREATE_EFFECT, type, 0, 0]))
         r = bytearray(self._dev.get_feature_report(HID_REPORT_ID_PID_BLOCK_LOAD, 5))
 
@@ -616,7 +616,7 @@ class FFBRhino(QObject):
         if self._dev.write(data) < 0:
             raise IOError("HID Write")
         
-    def readReports(self):
+    def read_reports(self):
         if not self._dev:
             return
         # read all input reports from the operating system buffer
@@ -630,7 +630,7 @@ class FFBRhino(QObject):
                 self.on_hid_report_received(report_id)
             else: break
         
-    def getReport(self, report_id):   
+    def get_report(self, report_id):   
         #self.readReports()
 
         data = self._in_reports.get(report_id, None)
@@ -643,8 +643,8 @@ class FFBRhino(QObject):
 
         return data
         
-    def getInput(self) -> FFBReport_Input:
-        return self.getReport(HID_REPORT_ID_INPUT)
+    def get_input(self) -> FFBReport_Input:
+        return self.get_report(HID_REPORT_ID_INPUT)
 
 
 # Higher level effect interface
@@ -672,7 +672,7 @@ class HapticEffect(Destroyable):
     
     def _conditional_effect(self, type, coef_x = None, coef_y= None):
         if not self.effect:
-            self.effect = self.device.createEffect(type)
+            self.effect = self.device.create_effect(type)
             if not self.effect: return self
             self.effect.setEffect() # initialize defaults
 
@@ -704,7 +704,7 @@ class HapticEffect(Destroyable):
 
     def periodic(self, frequency, magnitude:float, direction:float, effect_type=EFFECT_SINE, duration=0, *args, **kwargs):
         if not self.effect:
-            self.effect = self.device.createEffect(effect_type)
+            self.effect = self.device.create_effect(effect_type)
             if not self.effect: return self
         
         if type(direction) == type and issubclass(direction, DirectionModulator):
@@ -724,7 +724,7 @@ class HapticEffect(Destroyable):
         :type direction_deg: float
         """
         if not self.effect:
-            self.effect = self.device.createEffect(EFFECT_CONSTANT)
+            self.effect = self.device.create_effect(EFFECT_CONSTANT)
             if not self.effect: return self
 
         if type(direction) == type and issubclass(direction, DirectionModulator):
@@ -792,16 +792,16 @@ if __name__ == "__main__":
     d = FFBRhino(0xffff, 0x2055)
 
     print("Example getGains()")
-    gains = d.getGains()
+    gains = d.get_gains()
     print("Result:", gains)
     print(f"Master Gain: {gains.master_gain}")
     print(f"Periodic Gain: {gains.periodic_gain}")
     
     print("Set constant gain to 90")
-    d.setGain(FFB_GAIN_CONSTANT, 90)
-    gains = d.getGains()
+    d.set_gain(FFB_GAIN_CONSTANT, 90)
+    gains = d.get_gains()
     print(f"Constant Gain(Should be 90): {gains.constant_gain}")
-    d.setGain(FFB_GAIN_CONSTANT, 100)
+    d.set_gain(FFB_GAIN_CONSTANT, 100)
 
 
     exit()

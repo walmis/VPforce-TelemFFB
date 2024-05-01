@@ -28,7 +28,7 @@ class SimConnectSock(SimConnectManager):
         # special handling of Open event
         if event == "Open":
             # Reset all FFB effects on device, ensure we have a clean start
-            HapticEffect.device.resetEffects()
+            HapticEffect.device.reset_effects()
 
         if event == "Quit":
             # Restart sim listeners on MSFS quit, TODO: Why?
