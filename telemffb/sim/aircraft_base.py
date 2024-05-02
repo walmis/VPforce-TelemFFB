@@ -222,9 +222,15 @@ class AircraftBase(object):
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
+        '''
+        This function creates an entry in the  stepper dictionary which can be used to track the progress of driving a
+        value from "a to b" over a period of time across multiple passes through the effects loop.
+        '''
+
         current_time_ms = time.perf_counter() * 1000  # Start time for the current step
         # current_time_end = current_time_start  # End time for the current step (initially the same as start time)
 
+        # add a new key to the dictionary if one does not exist and initialize the tracking variables
         if key not in self.stepper_dict:
             self.stepper_dict[key] = {
                 'value': value,
@@ -250,27 +256,28 @@ class AircraftBase(object):
 
         data = self.stepper_dict[key]
 
-        iteration_ms = current_time_ms - data['last_iteration_ms']
+        iteration_ms = current_time_ms - data['last_iteration_ms']  # calculate time since last iteration
 
-        data['last_iteration_ms'] = current_time_ms
+        data['last_iteration_ms'] = current_time_ms  # reset iteration timestamp to current timestamp
 
-        delta_to_go = data['dst_val'] - data['value']
-        time_to_go = data['end_time'] - current_time_ms
+        delta_to_go = data['dst_val'] - data['value']  # calculate distance left to move the value
+        time_to_go = data['end_time'] - current_time_ms  # calculate time left to move the value to destination
 
-        step_size = (iteration_ms / time_to_go) * delta_to_go
+        step_size = (iteration_ms / time_to_go) * delta_to_go  # calculate step size required to reach target at time
 
-        if data['value'] == data['dst_val']:
+        if data['value'] == data['dst_val']:  # if we have reached the dst value, delete the key and return the value
             del self.stepper_dict[key]
             return data['value']
 
         elapsed_time_ms = (current_time_ms - data['start_time'])
 
-        if elapsed_time_ms >= timeframe_ms:
+        if elapsed_time_ms >= timeframe_ms:  # if the elapsed time is greater than the given timeframe, return the destination value
             data['value'] = data['dst_val']
             return data['dst_val']
 
         val = value + step_size
-        if not floatpoint:
+
+        if not floatpoint:  # if floatpoint is not specified, return a rounded integer value
             val = round(val)
         data['value'] = val
         # print(f"value out = {data['value']}")
