@@ -156,6 +156,7 @@ class Aircraft(AircraftBase):
             self._override_pedal_spring(telem_data)
         if self.is_collective():
             self._override_collective_spring(telem_data)
+        self._update_touchdown_effect(telem_data)
 
     @overrides(AircraftBase)
     def on_event(self, event, *args):

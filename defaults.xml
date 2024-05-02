@@ -2325,6 +2325,46 @@
 		</defaults>
 	<defaults>
 		<Grouping>Movement</Grouping>
+		<order>782</order>
+		<name>touchdown_effect_enabled</name>
+		<displayname>Touch-Down Effect</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>782.1</order>
+		<name>touchdown_effect_max_force</name>
+		<prereq>touchdown_effect_enabled</prereq>
+		<info>Max force that will be used to generate effect</info>
+		<displayname>Touch-Down Max Force</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.5</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>782.2</order>
+		<name>touchdown_effect_max_gs</name>
+		<prereq>touchdown_effect_enabled</prereq>
+		<info>G loading where max force will be reached</info>
+		<displayname>Touch-Down Max G's</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>0,70</validvalues>
+		<value>3</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
 		<order>785</order>
 		<name>nosewheel_shimmy</name>
 		<MSFS>true</MSFS>

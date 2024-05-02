@@ -112,6 +112,13 @@ class Smoother:
 
 
 class EffectTranslator:
+    """
+    Effects translator is used to display "human-readable text" in the UI for effects that are active.  In the
+    dictionary, the "key" is the actual effect instance name used during creation.  The "value" is a list containing
+    the desired description that will be displayed in the UI, and the applicable setting variable.  The setting
+    variable name is used to change the color of the slider handle in the settings page when that particular effect
+    is active
+    """
 
     effect_dict = {
         "ab_rumble_1_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
@@ -176,6 +183,7 @@ class EffectTranslator:
         "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
         "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
         "stick_shaker" : ["Stick Shaker","stick_shaker_intensity"],
+        "touchdown": ["Touch-down Effect", "touchdown_effect_max_force"],
         "trim_spring": ["Trim Override Spring", ""],
         "control_weight": ["Control Weight", ""],
         "vrs_buffet": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],

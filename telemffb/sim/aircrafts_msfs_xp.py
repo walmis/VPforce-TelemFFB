@@ -894,6 +894,7 @@ class Aircraft(AircraftBase):
         self._update_buffeting(telem_data)
         self._update_flight_controls(telem_data)
         self._decel_effect(telem_data)
+        self._update_touchdown_effect(telem_data)
         if self._sim_is_xplane():
             self._update_canopy(telem_data.get("CanopyPos", 0))
         #

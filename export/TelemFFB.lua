@@ -254,6 +254,8 @@ local f_telemFFB = {
           local AB = string.format("%.2f~%.2f", LoGetAircraftDrawArgumentValue(28), LoGetAircraftDrawArgumentValue(29))
 
           local WoW = string.format("%.2f~%.2f~%.2f", LeftGear, NoseGear, RightGear)
+          local tot_wow = tonumber(string.format("%2f",LeftGear+NoseGear+RightGear))
+          local on_ground = tot_wow > 0.00
 
           local mech = LoGetMechInfo()
 
@@ -424,6 +426,9 @@ local f_telemFFB = {
             local NoseGear = LoGetAircraftDrawArgumentValue(104)
             local RightGear = LoGetAircraftDrawArgumentValue(104)
             WoW = string.format("%.2f~%.2f~%.2f", LeftGear, NoseGear, RightGear)
+            tot_wow = tonumber(string.format("%2f",LeftGear+NoseGear+RightGear))
+            on_ground = tot_wow > 0
+
             -- UH1 places canon shell data only in payload block
             -- pull it out and write to CannonShells for proper effect generation
             local uh1payload = LoGetPayloadInfo()
@@ -1165,6 +1170,7 @@ local f_telemFFB = {
             {"TAS_raw_kt", "%.2f", tas * 1.944},
             {"TAS_incidence_kt", "%.2f", calculated_TAS * 1.944},
             {"WeightOnWheels", "%s", WoW},
+            {"SimOnGround", "%s", tostring(on_ground)},
             {"Flares", "%s", CM.flare},
             {"Chaff", "%s", CM.chaff},
             {"PayloadInfo", "%s", PayloadInfo},

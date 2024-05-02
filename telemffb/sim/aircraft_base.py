@@ -159,6 +159,11 @@ class AircraftBase(object):
 
     runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
     runway_rumble_enabled: bool = False
+
+    touchdown_effect_enabled: bool = False
+    touchdown_effect_max_force: float = 0.5
+    touchdown_effect_max_gs: float = 3.0
+
     gunfire_effect_enabled: bool = False
     gun_vibration_intensity : float = 0.12          # peak gunfire vibration intensity, 0 to disable
     countermeasure_effect_enabled: bool = False
@@ -370,6 +375,35 @@ class AircraftBase(object):
     ######  Generic Aircraft Effects  ######
     ######                            ######
     ########################################
+    def _update_touchdown_effect(self, telem_data):
+        """Generates a g-based force upon landing or as a result of large bumps"""
+
+        max_force = 0.5
+        max_g = 2
+        if self.is_collective() or self.is_pedals():
+            return
+        if self._sim_is("DCS") or self._sim_is("IL2"):
+            gs = round(telem_data.get("ACCs")[1] - 1, 2)  # subtract nominal G to align with zero based data from MSFS
+        elif self._sim_is("MSFS") or self._sim_is("XPLANE"):
+            gs = round(telem_data.get("AccBody")[1], 2)
+        else:
+            return
+
+        if not self.touchdown_effect_enabled:
+            effects.dispose("touchdown")
+            return
+        on_ground = telem_data.get("SimOnGround", 0)
+        if not on_ground:
+            effects.dispose("touchdown")
+            return
+        force = round(utils.scale_clamp(gs, (0, self.touchdown_effect_max_gs), (0,self.touchdown_effect_max_force)), 2)
+
+        logging.debug(f"Touchdown Effect: Realtime Gs: {gs}, Force:{force}")
+        # telem_data["_gs"] = gs
+        # telem_data["_force"] = force
+        effects['touchdown'].constant(force, 180).start()
+
+
     def _update_runway_rumble(self, telem_data):
         """Add wheel based rumble effects for immersion
         Generates bumps/etc on touchdown, rolling, field landing etc
