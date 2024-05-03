@@ -463,6 +463,18 @@ local f_telemFFB = {
               deadPilot
             )
 
+          elseif string.find(obj.Name, "OH-6A", 0, true) then
+              -- Rotor RPM gauge is panel arg # 308
+              local mainRotorGauge = MainPanel:get_argument_value(308)
+              -- Rotor RPM reads 500 when gauge data is 0.745.. scale based on these values
+              local mainRotorRPM = math.floor(scale(mainRotorGauge, 0, .745, 0, 500))
+
+              stringToSend =
+                string.format(
+              "RotorRPM=%.0f",
+                mainRotorRPM
+              )
+
           elseif string.find(obj.Name, "Ka-50", 0, true) then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             -- calculate gauge percentage reading from gauge deflection value
