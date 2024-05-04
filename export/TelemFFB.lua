@@ -98,12 +98,12 @@ function get_indicated_airspeed(TAS, density)
     return IAS
 end
 
-function getUH1ShellCount(payloadInfo)
+function getShellCount(payloadInfo, id)
     local totalShellCount = 0
 
     for _, station in ipairs(payloadInfo.Stations) do
         weapon_id = string.format( "%d.%d.%d.%d", station.weapon.level1, station.weapon.level2, station.weapon.level3, station.weapon.level4)
-        if weapon_id == "4.6.10.0" then
+        if weapon_id == id then
             totalShellCount = totalShellCount + station.count
         end
     end
@@ -180,13 +180,13 @@ local f_telemFFB = {
   end,
   BeforeNextFrame = function(self)
     --LoSetCommand(2001, 0.25)
-    
+
     if self.sock_rcv then
       while sock_readable(self.sock_rcv) do
         local data, addr, src_port = self.sock_rcv:receivefrom()
         -- Update the time of the last command reception
         self.prev_command_t = socket.gettime()
-    
+
         if data == nil then
           data = ""
         else
@@ -197,7 +197,7 @@ local f_telemFFB = {
           }
         end
       end
-    
+
       -- Remove commands older than 100ms
       for port, command_info in pairs(self.queued_commands) do
         if socket.gettime() - command_info.time > 0.1 then
@@ -432,12 +432,14 @@ local f_telemFFB = {
             -- UH1 places canon shell data only in payload block
             -- pull it out and write to CannonShells for proper effect generation
             local uh1payload = LoGetPayloadInfo()
-            CannonShells = getUH1ShellCount(uh1payload)
+            CannonShells = getShellCount(uh1payload, "4.6.10.0")
             stations = LoGetPayloadInfo().Stations
             PayloadInfo = "empty"
             temparray = {}
 
             for i_st, st in pairs(stations) do
+              -- we want to re-write the payload block without the "unknown" data which contains the cannon rounds.  This is so
+              -- the "payload release" effect does not play while canons are firing.
               local name = LoGetNameByType(st.weapon.level1,st.weapon.level2,st.weapon.level3,st.weapon.level4);
               if not string.find(name, "UNKNOWN") then
                   temparray[#temparray + 1] =
@@ -464,16 +466,44 @@ local f_telemFFB = {
             )
 
           elseif string.find(obj.Name, "OH-6A", 0, true) then
+
               -- Rotor RPM gauge is panel arg # 308
               local mainRotorGauge = MainPanel:get_argument_value(308)
               -- Rotor RPM reads 500 when gauge data is 0.745.. scale based on these values
               local mainRotorRPM = math.floor(scale(mainRotorGauge, 0, .745, 0, 500))
+              local oh6payload = LoGetPayloadInfo()
+              -- OH-6A, like the UH1 only has cannon info in payload block.  use getShellCount to pull out the applicable data and write it into the CannonShells telemetry
+              CannonShells = getShellCount(oh6payload, "4.6.6.0")
+              stations = LoGetPayloadInfo().Stations
+              PayloadInfo = "empty"
+              temparray = {}
+
+              for i_st, st in pairs(stations) do
+                  -- we want to re-write the payload block without the canon data which contains the cannon rounds.  This is so
+                  -- the "payload release" effect does not play while canons are firing.
+                  local name = LoGetNameByType(st.weapon.level1,st.weapon.level2,st.weapon.level3,st.weapon.level4);
+                  id = string.format( "%d.%d.%d.%d", st.weapon.level1, st.weapon.level2, st.weapon.level3, st.weapon.level4)
+                  if id ~= "4.6.6.0" and id ~= "0.0.0.0" then
+                      temparray[#temparray + 1] =
+                        string.format(
+                        "%s-%d.%d.%d.%d*%d",
+                        name,
+                        st.weapon.level1,
+                        st.weapon.level2,
+                        st.weapon.level3,
+                        st.weapon.level4,
+                        st.count
+                        )
+                      PayloadInfo = table.concat(temparray, "~")
+                  end
+              end
 
               stringToSend =
                 string.format(
               "RotorRPM=%.0f",
                 mainRotorRPM
               )
+
 
           elseif string.find(obj.Name, "Ka-50", 0, true) then
             -------------------------------------------------------------------------------------------------------------------------------------------------------

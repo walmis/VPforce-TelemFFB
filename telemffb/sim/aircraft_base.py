@@ -1303,7 +1303,7 @@ class AircraftBase(object):
             if isinstance(rrpm, list):
                 rrpm = rrpm[0]
         else:
-            rrpm = telem_data.get("RotorRPM")
+            rrpm = telem_data.get("RotorRPM", 0)
             if isinstance(rrpm, list):
                 rrpm = max(rrpm)
         mod = telem_data.get("N")

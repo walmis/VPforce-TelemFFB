@@ -1,5 +1,12 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
+##  May 3, 2024
+############################################
+## Hotpatch
+- DCS | Add basic support for OH-6A Community Mod
+
+
+############################################
 ##  April 1, 2024
 ############################################
 ## Hotpatch
