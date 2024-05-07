@@ -522,6 +522,7 @@ class SystemSettings(QSettings):
         'enableVPConfStartup': False,
         'pathVPConfStartup': '',
         'enableVPConfExit': False,
+        'enableVPConfGlobalDefault': False,
         'pathVPConfExit': '',
     }
 
@@ -1730,6 +1731,7 @@ def set_vpconf_profile(config_filepath, serial):
         logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
 
         subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
+        G.current_vpconf_profile = config_filepath
     else:
         logging.error("Unable to find VPforce Configurator installation location")
 

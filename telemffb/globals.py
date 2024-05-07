@@ -16,6 +16,7 @@ userconfig_rootpath = None
 userconfig_path = None
 defaults_path = None
 defaults_path = None
+current_vpconf_profile = None
 
 # main window instance
 main_window : 'MainWindow' = None

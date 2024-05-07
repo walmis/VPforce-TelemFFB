@@ -42,7 +42,6 @@
    </property>
    <property name="font">
     <font>
-     <weight>50</weight>
      <bold>false</bold>
     </font>
    </property>
@@ -91,7 +90,7 @@
      <x>20</x>
      <y>31</y>
      <width>258</width>
-     <height>71</height>
+     <height>78</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout">
@@ -129,8 +128,8 @@
     <rect>
      <x>30</x>
      <y>356</y>
-     <width>452</width>
-     <height>75</height>
+     <width>459</width>
+     <height>82</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="il2_sub_layout">
@@ -217,7 +216,6 @@
    </property>
    <property name="font">
     <font>
-     <weight>50</weight>
      <bold>false</bold>
     </font>
    </property>
@@ -242,7 +240,6 @@
    </property>
    <property name="font">
     <font>
-     <weight>75</weight>
      <bold>true</bold>
      <underline>true</underline>
     </font>
@@ -262,7 +259,6 @@
    </property>
    <property name="font">
     <font>
-     <weight>75</weight>
      <bold>true</bold>
      <underline>true</underline>
     </font>
@@ -282,7 +278,6 @@
    </property>
    <property name="font">
     <font>
-     <weight>75</weight>
      <bold>true</bold>
      <underline>true</underline>
     </font>
@@ -310,7 +305,7 @@
      <x>36</x>
      <y>500</y>
      <width>184</width>
-     <height>42</height>
+     <height>48</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -425,7 +420,6 @@ Minimized:</string>
    </property>
    <property name="font">
     <font>
-     <weight>50</weight>
      <bold>false</bold>
     </font>
    </property>
@@ -441,8 +435,8 @@ Minimized:</string>
     <rect>
      <x>313</x>
      <y>74</y>
-     <width>284</width>
-     <height>74</height>
+     <width>289</width>
+     <height>80</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout_2">
@@ -825,7 +819,6 @@ Minimized:</string>
      <widget class="QLabel" name="labelLaunch">
       <property name="font">
        <font>
-        <weight>75</weight>
         <bold>true</bold>
         <underline>true</underline>
        </font>
@@ -839,7 +832,6 @@ Minimized:</string>
      <widget class="QCheckBox" name="cb_al_enable">
       <property name="font">
        <font>
-        <weight>50</weight>
         <bold>false</bold>
         <underline>false</underline>
        </font>
@@ -877,7 +869,7 @@ Headless:</string>
      <x>30</x>
      <y>276</y>
      <width>270</width>
-     <height>45</height>
+     <height>50</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout_3">
@@ -990,24 +982,10 @@ Headless:</string>
      <x>222</x>
      <y>500</y>
      <width>371</width>
-     <height>48</height>
+     <height>80</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout_4">
-    <item row="0" column="0">
-     <widget class="QCheckBox" name="enableVPConfStartup">
-      <property name="text">
-       <string>Load on Startup:</string>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="1">
-     <widget class="QLineEdit" name="pathVPConfStartup">
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-     </widget>
-    </item>
     <item row="0" column="2">
      <widget class="QToolButton" name="browseVPConfStartup">
       <property name="enabled">
@@ -1018,21 +996,14 @@ Headless:</string>
       </property>
      </widget>
     </item>
-    <item row="1" column="0" alignment="Qt::AlignLeft">
-     <widget class="QCheckBox" name="enableVPConfExit">
+    <item row="0" column="0">
+     <widget class="QCheckBox" name="enableVPConfStartup">
       <property name="text">
-       <string>Load on Exit:</string>
+       <string>Load on Startup:</string>
       </property>
      </widget>
     </item>
-    <item row="1" column="1">
-     <widget class="QLineEdit" name="pathVPConfExit">
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="1" column="2" alignment="Qt::AlignRight">
+    <item row="2" column="2" alignment="Qt::AlignRight">
      <widget class="QToolButton" name="browseVPConfExit">
       <property name="enabled">
        <bool>false</bool>
@@ -1041,6 +1012,60 @@ Headless:</string>
        <string>...</string>
       </property>
      </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QLineEdit" name="pathVPConfExit">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QLineEdit" name="pathVPConfStartup">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0" alignment="Qt::AlignLeft">
+     <widget class="QCheckBox" name="enableVPConfExit">
+      <property name="text">
+       <string>Load on Exit:</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0" colspan="3">
+     <layout class="QHBoxLayout" name="horizontalLayout_4">
+      <item>
+       <spacer name="horizontalSpacer_8">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="enableVPConfGlobalDefault">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="toolTip">
+         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Startup profile will also re-load for any aircraft that does not&lt;/p&gt;&lt;p&gt;have an override defined at the Sim/Class/Model level.  &lt;br/&gt;&lt;br/&gt;The profile will only re-load if the previously loaded aircraft changed&lt;/p&gt;&lt;p&gt;the profile and the new aircraft does not have one defined at the&lt;/p&gt;&lt;p&gt;Sim/Class/Model level.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        </property>
+        <property name="text">
+         <string>Make Startup Profile Global Default</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>

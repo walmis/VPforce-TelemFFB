@@ -158,6 +158,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         vpconf_startup_enabled = self.enableVPConfStartup.isChecked()
         self.pathVPConfStartup.setEnabled(vpconf_startup_enabled)
         self.browseVPConfStartup.setEnabled(vpconf_startup_enabled)
+        if not vpconf_startup_enabled:
+            self.enableVPConfGlobalDefault.setChecked(False)
+        self.enableVPConfGlobalDefault.setEnabled(vpconf_startup_enabled)
 
     def toggle_vpconf_exit(self):
         vpconf_exit_enabled = self.enableVPConfExit.isChecked()
@@ -338,6 +341,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "pathVPConfStartup": self.pathVPConfStartup.text(),
             "enableVPConfExit": self.enableVPConfExit.isChecked(),
             "pathVPConfExit": self.pathVPConfExit.text(),
+            "enableVPConfGlobalDefault": self.enableVPConfGlobalDefault.isChecked()
         }
 
         key_list = [
@@ -456,6 +460,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.pathVPConfStartup.setText(settings_dict.get('pathVPConfStartup', ''))
         self.enableVPConfExit.setChecked(settings_dict.get('enableVPConfExit', False))
         self.pathVPConfExit.setText(settings_dict.get('pathVPConfExit', ''))
+        self.enableVPConfGlobalDefault.setChecked(settings_dict.get('enableVPConfGlobalDefault', False))
+
 
         self.toggle_al_widgets()
 
