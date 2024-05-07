@@ -1,1 +1,1 @@
-pyuic5 configurator.ui -o ../configurator.py
+pyuic5 configurator.ui -o ../telemffb/ui/Ui_ConfiguratorDialog.py

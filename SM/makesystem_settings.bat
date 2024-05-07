@@ -1,1 +1,1 @@
-pyuic5 system_settings.ui -o ../system_settings.py
+pyuic5 system_settings.ui -o ../telemffb/ui/Ui_SystemDialog.py
