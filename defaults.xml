@@ -280,6 +280,7 @@
 		<order>14.2</order>
 		<name>dcs_tr_button</name>
 		<prereq>dcs_tr_damper_enabled</prereq>
+		<info>Trim release button (mirror what is configured in DCS)</info>
 		<displayname>In Game TR Button</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
@@ -290,6 +291,7 @@
 		<order>14.3</order>
 		<name>dcs_tr_damper_force</name>
 		<prereq>dcs_tr_damper_enabled</prereq>
+		<info>Damper force applied while TR is pressed</info>
 		<displayname>Damper Intensity</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
@@ -2064,7 +2066,7 @@
 		<value>0.4</value>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
-		<info>Peak vibration intensity when flaps are moving</info>
+		<info>Peak intensity of damage effect shake</info>
 		<displayname>Damage Effect</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -2266,6 +2268,7 @@
 		<order>777.1</order>
 		<name>overspeed_shake_intensity</name>
 		<prereq>overspeed_effect_enable</prereq>
+		<info>Maximum overspeed shake intensity</info>
 		<MSFS>true</MSFS>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
@@ -2281,6 +2284,7 @@
 		<order>777.2</order>
 		<name>overspeed_shake_start</name>
 		<prereq>overspeed_effect_enable</prereq>
+		<info>Threshold at which overspeed shake will start to ramp up</info>
 		<MSFS>true</MSFS>
 		<validvalues>m/s,kt,mph,kph</validvalues>
 		<datatype>int</datatype>
@@ -2378,6 +2382,7 @@
 		<Grouping>Movement</Grouping>
 		<order>785.1</order>
 		<name>nosewheel_shimmy_intensity</name>
+		<info>Max intensity of shimmy effect</info>
 		<MSFS>true</MSFS>
 		<value>0.15</value>
 		<validvalues>0,100</validvalues>
@@ -2391,6 +2396,7 @@
 		<order>785.2</order>
 		<name>nosewheel_shimmy_min_brakes</name>
 		<prereq>nosewheel_shimmy</prereq>
+		<info>Minimum brake percent required to trigger shimmy effect</info>
 		<MSFS>true</MSFS>
 		<value>0.65</value>
 		<validvalues>0,100</validvalues>
@@ -2404,6 +2410,7 @@
 		<order>785.3</order>
 		<name>nosewheel_shimmy_min_speed</name>
 		<prereq>nosewheel_shimmy</prereq>
+		<info>Speed threshold below which the shimmy effect will not be triggered regardless of brakes</info>
 		<MSFS>true</MSFS>
 		<value>7</value>
 		<validvalues>m/s,kt,mph,kph</validvalues>
