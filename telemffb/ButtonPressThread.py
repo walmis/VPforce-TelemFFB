@@ -17,12 +17,12 @@ class ButtonPressThread(QThread):
     def run(self):
         start_time = time.time()
         emit_sent = 0
-        input_data = self.device.device.getInput()
+        input_data = self.device.device.get_input()
 
         initial_buttons = input_data.getPressedButtons()
 
         while not emit_sent and time.time() - start_time < self.timeout:
-            input_data = self.device.device.getInput()
+            input_data = self.device.device.get_input()
             current_btns = set(input_data.getPressedButtons())
             countdown = int(self.timeout - (time.time() - start_time))
             self.button_obj.setText(f"Push a button! {countdown}..")
