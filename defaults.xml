@@ -3315,6 +3315,36 @@
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
+		<model>F-4E-45MC</model>
+		<value>800</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>aircraft_vs_speed</name>
+		<model>F-4E-45MC</model>
+		<value>130</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>F-4E-45MC</model>
+		<value>3.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F-4E-45MC</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aircraft_vne_speed</name>
 		<model>F-5E</model>
 		<value>800</value>
 		<unit>kt</unit>
