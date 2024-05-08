@@ -1,4 +1,32 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+
+############################################
+##  Todo: Update with actual date before release
+############################################
+## General/System:
+- Major code refactoring and re-organization of code
+ - NOTE: *** Users running from python natively will need to re-run the requirements.txt pip install or manually install the "stransi" python library ***
+ - NOTE: *** The format of the system settings in the registry has changed, thus you will need to re-configure your TelemFFB system settings. ***
+ - Distribution structure has been changed.  You will again notice some subfolders that contain the compiled python libraries and other supporting files.  This was done to aid in reducing false positive malware detection.
+
+- New Global "vpconf" profile option
+ - Can set the "startup profile" in system settings to use as a default configurator profile if the profile was changed by an aircraft and there is no profile defined for the newly loaded aircraft
+
+## DCS
+- Added basic support and default profile for the F-4E
+
+## DCS/MSFS
+- New acceleration vector based "touch down" effect.  Creates a sharp forward force on the stick when touching down.  The harder you hit, the more force is applied (with configurable limits)
+
+## MSFS
+- Nosewheel Shimmy effect enhancements:
+ - Fixed effect playing while applying brakes while airborn
+ - Fixed effect playing while stationary on the ground with a headwind
+ - Enhanced nosewheel shimmy so the shake frequency is higher at higher speeds and reduces as speed decreases
+- Enhanced dynamic simconnect subscription capabilities
+ - A2A Comanche now uses acceleration vector data directly from the AccuSim flight model.  This should fix the long-standing "shifting stick position" issue.
+   - Requires latest update from A2A (v1.5.0 or later)
+
 ############################################
 ##  May 3, 2024
 ############################################
