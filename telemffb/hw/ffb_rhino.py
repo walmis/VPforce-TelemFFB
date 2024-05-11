@@ -28,7 +28,7 @@ import os
 import time
 import weakref
 from dataclasses import dataclass
-from typing import List
+from typing import List, Self
 
 import usb1
 from PyQt5.QtCore import QObject, QTimer, QTimerEvent
@@ -198,6 +198,16 @@ class FFBReport_SetConstantForce(BaseStructure):
     _defaults_ = { "reportId": HID_REPORT_ID_SET_CONSTANT_FORCE }
 
 class FFBReport_SetCondition(BaseStructure):
+    reportId: int
+    effectBlockIndex: int
+    parameterBlockOffset: int
+    cpOffset: int
+    positiveCoefficient: int
+    negativeCoefficient: int
+    positiveSaturation: int
+    negativeSaturation: int
+    deadBand: int
+
     _pack_ = 1
     _fields_ = [("reportId", ctypes.c_uint8),
                 ("effectBlockIndex", ctypes.c_uint8), 
@@ -649,16 +659,18 @@ class FFBRhino(QObject):
 
 # Higher level effect interface
 class HapticEffect(Destroyable):
-    effect : FFBEffectHandle = None
     device : FFBRhino = None
-    modulator = None
 
     def __init__(self):
        self.name = None
        self._stopped_time : int = 0
+       self._h_effect : FFBEffectHandle = None
+       self.modulator = None
+       self.effect_type = None
+       self._conds = {}
 
     def __repr__(self):
-        return f"HapticEffect({self.effect})"
+        return f"HapticEffect({self._h_effect})"
 
     # Open defaut Rhino device, specific devices can be specified using serial or path arguments
     # path example: \\\\?\\HID#VID_FFFF&PID_2055&MI_00#9&3450694a&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
@@ -671,23 +683,35 @@ class HapticEffect(Destroyable):
 
         return cls.device
     
-    def _conditional_effect(self, type, coef_x = None, coef_y= None):
-        if not self.effect:
-            self.effect = self.device.create_effect(type)
-            if not self.effect: return self
-            self.effect.setEffect() # initialize defaults
+    def setCondition(self, cond : FFBReport_SetCondition) -> Self:
+        assert(self.effect_type in [EFFECT_SPRING, EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION])
+
+        if not self._h_effect:
+            self._conditional_effect(self.effect_type)
+        
+        self._h_effect.setCondition(cond)
+
+        return self
+    
+    def _conditional_effect(self, effect_type, coef_x = None, coef_y= None) -> Self:
+        if not self._h_effect:
+            self._h_effect = self.device.create_effect(effect_type)
+            self.effect_type = effect_type
+            if not self._h_effect: 
+                return self
+            self._h_effect.setEffect() # initialize defaults
 
         if coef_x is not None:
             cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
                                             positiveCoefficient=int(coef_x),
                                             negativeCoefficient=int(coef_x))
-            self.effect.setCondition(cond_x)
+            self._h_effect.setCondition(cond_x)
 
         if coef_y is not None:
             cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
                                             positiveCoefficient=int(coef_y),
                                             negativeCoefficient=int(coef_y))
-            self.effect.setCondition(cond_y)
+            self._h_effect.setCondition(cond_y)
 
         return self
     
@@ -704,16 +728,18 @@ class HapticEffect(Destroyable):
         return self._conditional_effect(EFFECT_SPRING, coef_x, coef_y) 
 
     def periodic(self, frequency, magnitude:float, direction:float, *args, effect_type=EFFECT_SINE, duration=0, **kwargs):
-        if not self.effect:
-            self.effect = self.device.create_effect(effect_type)
-            if not self.effect: return self
+        if not self._h_effect:
+            self._h_effect = self.device.create_effect(effect_type)
+            self.effect_type = effect_type
+            if not self._h_effect: 
+                return self
         
         if type(direction) == type and issubclass(direction, DirectionModulator):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
 
-        self.effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+        self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
         return self
 
     def constant(self, magnitude:float, direction:float, *args, **kwargs):
@@ -724,31 +750,32 @@ class HapticEffect(Destroyable):
         :param direction_deg: Angle in degrees
         :type direction_deg: float
         """
-        if not self.effect:
-            self.effect = self.device.create_effect(EFFECT_CONSTANT)
-            if not self.effect: return self
+        if not self._h_effect:
+            self._h_effect = self.device.create_effect(EFFECT_CONSTANT)
+            self.effect_type = EFFECT_CONSTANT
+            if not self._h_effect: return self
 
         if type(direction) == type and issubclass(direction, DirectionModulator):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
 
-        self.effect.setConstantForce(magnitude, direction, **kwargs)
+        self._h_effect.setConstantForce(magnitude, direction, **kwargs)
         return self
 
     @property
     def started(self) -> bool:
-        return self.effect and self.effect.started
+        return self._h_effect and self._h_effect.started
 
     def start(self, force=False, **kw):
 
-        if self.effect and (not self.started or force):
+        if self._h_effect and (not self.started or force):
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is starting effect {self.effect.effect_id}")
+            logging.debug(f"The function {caller_name} is starting effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""
-            logging.info(f"Start effect {self.effect.effect_id} ({self.effect.name}){name}")
-            self.effect.start(**kw)
+            logging.info(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            self._h_effect.start(**kw)
             self._stopped_time = 0
 
         return self
@@ -759,13 +786,13 @@ class HapticEffect(Destroyable):
         :param destroy_after: Cleanup (destroy) effect if unused for x milliseconds
         :type destroy_after: int, optional
         """
-        if self.effect and self.effect.started:
+        if self._h_effect and self._h_effect.started:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is stopping effect {self.effect.effect_id}")
+            logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
-            logging.info(f"Stop effect {self.effect.effect_id} ({self.effect.name}){name}")
-            self.effect.stop()
+            logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            self._h_effect.stop()
             if destroy_after:
                 if not self._stopped_time:
                     self._stopped_time = millis()
@@ -777,14 +804,14 @@ class HapticEffect(Destroyable):
         return self
 
     def destroy(self):
-        if self.effect:
+        if self._h_effect:
             caller_frame = inspect.currentframe().f_back
             caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is destroying effect {self.effect.effect_id}")
+            logging.debug(f"The function {caller_name} is destroying effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
-            logging.info(f"Destroying effect {self.effect.effect_id} ({self.effect.name}){name}")
-            self.effect.destroy()
-            self.effect = None
+            logging.info(f"Destroying effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
+            self._h_effect.destroy()
+            self._h_effect = None
 
     def __del__(self):
         self.destroy()

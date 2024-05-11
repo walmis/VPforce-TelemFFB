@@ -355,8 +355,8 @@ class Aircraft(AircraftBase):
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
             self.spring_x.cpOffset = phys_stick_x_offs
 
-            self._spring_handle.effect.setCondition(self.spring_y)
-            self._spring_handle.effect.setCondition(self.spring_x)
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_x)
 
         elif ffb_type == "pedals":
             if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -440,7 +440,7 @@ class Aircraft(AircraftBase):
             self.spring_x.cpOffset = phys_rudder_x_offs
             logging.debug(f"Elev Coeef: {x_coeff}")
 
-            self._spring_handle.effect.setCondition(self.spring_x)
+            self._spring_handle.setCondition(self.spring_x)
         self._spring_handle.start()
 
     def _update_flight_controls(self, telem_data):
@@ -709,8 +709,8 @@ class Aircraft(AircraftBase):
             self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = ac
 
             # update spring data
-            self._spring_handle.effect.setCondition(self.spring_y)
-            self._spring_handle.effect.setCondition(self.spring_x)
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_x)
 
             # update constant forces
             cf_pitch = -_elevator_droop_term - _G_term # + _aoa_term
@@ -756,7 +756,7 @@ class Aircraft(AircraftBase):
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
             self.spring_x.cpOffset = phys_rudder_x_offs
 
-            self._spring_handle.effect.setCondition(self.spring_x)
+            self._spring_handle.setCondition(self.spring_x)
             tas = telem_data.get("TAS")
             if telem_data['src'] == 'XPLANE':
                 vne = telem_data.get('Vne')
@@ -930,8 +930,8 @@ class Aircraft(AircraftBase):
             self.spring_x.cpOffset = self.spring_y.cpOffset = 0
             
             pause_spring = effects["pause_spring"].spring()
-            pause_spring.effect.setCondition(self.spring_x)
-            pause_spring.effect.setCondition(self.spring_y)
+            pause_spring.setCondition(self.spring_x)
+            pause_spring.setCondition(self.spring_y)
             pause_spring.start()
 
 
@@ -1052,7 +1052,7 @@ class GliderAircraft(Aircraft):
                 offs_x = round(x * 4096)
                 self.spring_x.cpOffset = offs_x
 
-                self._spring_handle.effect.setCondition(self.spring_x)
+                self._spring_handle.setCondition(self.spring_x)
 
             if y_axis:
                 self.spring_y.positiveCoefficient = 2048
@@ -1061,7 +1061,7 @@ class GliderAircraft(Aircraft):
                 offs_y = round(y * 4096)
                 self.spring_y.cpOffset = offs_y
 
-                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.setCondition(self.spring_y)
 
             self.stick_center = [x,y]
 
@@ -1079,12 +1079,12 @@ class GliderAircraft(Aircraft):
             if x_axis:
                 offs_x = round(x * 4096)
                 self.spring_x.cpOffset = offs_x
-                self._spring_handle.effect.setCondition(self.spring_x)
+                self._spring_handle.setCondition(self.spring_x)
 
             if y_axis:
                 offs_y = round(y * 4096)
                 self.spring_y.cpOffset = offs_y
-                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.setCondition(self.spring_y)
 
             # self.spring.start()
             self.stick_center = [x,y]
@@ -1102,14 +1102,14 @@ class GliderAircraft(Aircraft):
                 self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
                 cpO_x = round(self.cyclic_center[0]*4096)
                 self.spring_x.cpOffset = cpO_x
-                self._spring_handle.effect.setCondition(self.spring_x)
+                self._spring_handle.setCondition(self.spring_x)
 
             if y_axis:
                 self.spring_y.positiveCoefficient = clamp(int(4096 * self.elevator_spring_gain), 0, 4096)
                 self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
                 cpO_y = round(self.cyclic_center[1]*4096)
                 self.spring_y.cpOffset = cpO_y
-                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.setCondition(self.spring_y)
 
             # self.spring.start()
             self.force_trim_spring_init = 1
@@ -1364,8 +1364,8 @@ class Helicopter(Aircraft):
 
                     self.spring_x.cpOffset = self.cpO_x
                     self.spring_y.cpOffset = self.cpO_y
-                    self._spring_handle.effect.setCondition(self.spring_x)
-                    self._spring_handle.effect.setCondition(self.spring_y)
+                    self._spring_handle.setCondition(self.spring_x)
+                    self._spring_handle.setCondition(self.spring_y)
                     self._spring_handle.start()
                     if (self.cpO_x/4096 - 0.15 < phys_x < self.cpO_x/4096 + 0.15) and (self.cpO_y/4096 - 0.15 < phys_y < self.cpO_y/4096 + 0.15):
                         #dont start sending position until physical stick has centered
@@ -1452,8 +1452,8 @@ class Helicopter(Aircraft):
 
             self.spring_x.cpOffset = int(self.cpO_x) + self.cyclic_physical_trim_x_offs
             self.spring_y.cpOffset = int(self.cpO_y) + self.cyclic_physical_trim_y_offs
-            self._spring_handle.effect.setCondition(self.spring_x)
-            self._spring_handle.effect.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.setCondition(self.spring_y)
             if self.force_trim_enabled:
                 self._spring_handle.start()
 
@@ -1511,7 +1511,7 @@ class Helicopter(Aircraft):
 
                 self.spring_x.cpOffset = self.cpO_x
 
-                self._spring_handle.effect.setCondition(self.spring_x)
+                self._spring_handle.setCondition(self.spring_x)
                 # self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
                 self._spring_handle.start()
                 logging.debug(f"self.cpO_x:{self.cpO_x}, phys_x:{phys_x}")
@@ -1599,7 +1599,7 @@ class Helicopter(Aircraft):
 
             self.spring_y.cpOffset = self.cpO_y
 
-            self._spring_handle.effect.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_y)
             # self.damper.damper(coef_y=int(4096*self.collective_dampening_gain)).start()
             self._spring_handle.start()
             # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
@@ -1621,7 +1621,7 @@ class Helicopter(Aircraft):
         self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(
             self.collective_spring_coeff_y / 2)
 
-        self._spring_handle.effect.setCondition(self.spring_y)
+        self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.start()
 
         if self._sim_is_xplane():
@@ -1823,8 +1823,8 @@ class HPGHelicopter(Helicopter):
                             self.cpO_y += self.afcsy_step_size
             self.spring_x.cpOffset = int(self.cpO_x)
             self.spring_y.cpOffset = int(self.cpO_y)
-            self._spring_handle.effect.setCondition(self.spring_x)
-            self._spring_handle.effect.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.setCondition(self.spring_y)
 
             # hands_off_deadzone = 0.02
             if telem_data.get("hpgHandsOnCyclic", 0):
@@ -1915,7 +1915,7 @@ class HPGHelicopter(Helicopter):
 
                 self.spring_x.cpOffset = self.cpO_x
 
-                self._spring_handle.effect.setCondition(self.spring_x)
+                self._spring_handle.setCondition(self.spring_x)
                 # self.damper.damper(coef_x=int(4096 * self.pedal_dampening_gain)).start()
                 self._spring_handle.start()
                 logging.debug(f"self.cpO_x:{self.cpO_x}, phys_x:{phys_x}")
@@ -1959,7 +1959,7 @@ class HPGHelicopter(Helicopter):
             telem_data['_cp0_x'] = self.cpO_x
 
             self.spring_x.cpOffset = int(self.cpO_x)
-            self._spring_handle.effect.setCondition(self.spring_x)
+            self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.start()
 
             if self.enable_custom_x_axis:
@@ -2021,7 +2021,7 @@ class HPGHelicopter(Helicopter):
 
             self.spring_y.cpOffset = self.cpO_y
 
-            self._spring_handle.effect.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_y)
             # self.damper.damper(coef_y=4096).start()
             self._spring_handle.start()
             if self.last_collective_y - 0.2 < phys_y < self.last_collective_y + 0.2:
@@ -2042,7 +2042,7 @@ class HPGHelicopter(Helicopter):
                 # self.damper.damper(coef_y=0).start()
                 self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = int(4096 * self.trim_release_spring_gain)
 
-                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.setCondition(self.spring_y)
                 self._spring_handle.start()
 
                 if self.enable_custom_y_axis:
@@ -2069,7 +2069,7 @@ class HPGHelicopter(Helicopter):
                 # self.damper.damper(coef_y=0).start()
                 self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(self.collective_spring_coeff_y)
 
-                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.setCondition(self.spring_y)
                 self._spring_handle.start()
 
         else:
@@ -2082,7 +2082,7 @@ class HPGHelicopter(Helicopter):
                 # self.damper.damper(coef_y=0).start()
                 self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = int(4096 * self.trim_release_spring_gain)
 
-                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.setCondition(self.spring_y)
                 self._spring_handle.start()
 
                 if self.enable_custom_y_axis:
@@ -2108,7 +2108,7 @@ class HPGHelicopter(Helicopter):
                 self.spring_y.cpOffset = self.cpO_y
                 # self.damper.damper(coef_y=0).start()
 
-                self._spring_handle.effect.setCondition(self.spring_y)
+                self._spring_handle.setCondition(self.spring_y)
                 self._spring_handle.start()
 
     def _update_vrs_effect(self, telem_data):

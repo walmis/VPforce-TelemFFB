@@ -331,7 +331,7 @@ class Aircraft(AircraftBase):
 
             self.spring_y.cpOffset = self.cpO_y
 
-            self.spring.effect.setCondition(self.spring_y)
+            self.spring.setCondition(self.spring_y)
             # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
             self.spring.start(override=True)
             # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
@@ -350,7 +350,7 @@ class Aircraft(AircraftBase):
         # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
         self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
 
-        self.spring.effect.setCondition(self.spring_y)
+        self.spring.setCondition(self.spring_y)
         self.spring.start(override=True)
 
 
@@ -369,7 +369,7 @@ class Aircraft(AircraftBase):
         offs_x = lp_x.update(pedal_pos - x - lp_x.value)
         self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
         self.spring = effects["pedal_spring"].spring()
-        self.spring.effect.setCondition(self.spring_x)
+        self.spring.setCondition(self.spring_x)
         self.spring.start(override=True)
 
         self.send_commands([f"LoSetCommand(2003, {x - offs_x})"])
@@ -404,8 +404,8 @@ class Aircraft(AircraftBase):
 
         spring = effects["trim_spring"].spring()
         # upload effect parameters to stick
-        spring.effect.setCondition(self.spring_x)
-        spring.effect.setCondition(self.spring_y)
+        spring.setCondition(self.spring_x)
+        spring.setCondition(self.spring_y)
         # ensure effect is started
         spring.start(override=True)
 
@@ -514,8 +514,8 @@ class Helicopter(Aircraft):
             self.spring_y.cpOffset = int(y * 4096)
 
             # tr_spring = effects['TR Damper'].spring(coeff, coeff)
-            self.spring.effect.setCondition(self.spring_x)
-            self.spring.effect.setCondition(self.spring_y)
+            self.spring.setCondition(self.spring_x)
+            self.spring.setCondition(self.spring_y)
             self.spring.start(override=True)
         else:
             self.spring.stop()

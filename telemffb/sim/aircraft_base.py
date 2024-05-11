@@ -1397,7 +1397,7 @@ class AircraftBase(object):
         damper_coeff = round(utils.clamp((self.pedal_dampening_gain * 4096), 0, 4096))
         # self.damper = effects["pedal_damper"].damper(coef_x=damper_coeff).start()
 
-        spring.effect.setCondition(self.spring_x)
+        spring.setCondition(self.spring_x)
         spring.start(override=True)
 
     def on_event(self):
