@@ -426,7 +426,6 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
     return class_data
 
 
-
 def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_device = ''):
     logging.info (f"Reading from XML:  Sim: {the_sim}, Aircraft name: {aircraft_name}, Class: {input_modeltype}")
 
@@ -824,13 +823,15 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
 def clone_pattern(the_sim, old_pattern, new_pattern):
     model_data, def_model_pattern = read_models_data(defaults_path, the_sim, old_pattern, True)
     user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, old_pattern, True)
+    sc_overrides = read_sc_overrides(old_pattern)
     for item in user_model_data:
         model_data.append(item)
     for item in model_data:
         if item['unit'] is None:
             item['unit'] = ''
         write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'], item['device'])
-
+    for item in sc_overrides:
+        write_sc_override_to_xml(new_pattern,item['var'],item['name'],item['sc_unit'],item['scale'])
 
 def write_converted_to_xml(differences):
     sim_set = []
