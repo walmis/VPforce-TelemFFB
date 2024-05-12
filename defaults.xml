@@ -267,11 +267,24 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
+		<Grouping>FFB</Grouping>
+		<order>11</order>
+		<name>force_disable_collective_gain</name>
+		<info>Option to enable/disable TelemFFB from setting &lt;br&gt; the spring gain on the collective to 0 (Fixed wing only)</info>
+		<displayname>Disable Collective Spring</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<collective>true</collective>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>Basic</Grouping>
 		<order>14</order>
 		<name>dcs_tr_damper_enabled</name>
 		<displayname>Trim Release Damper</displayname>
 		<DCS>true</DCS>
+		<MSFS></MSFS>
 		<joystick>true</joystick>
 		<datatype>bool</datatype>
 	</defaults>
@@ -8618,6 +8631,76 @@
 		<value>true</value>
 		<sim>any</sim>
 		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_disable_collective_gain</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>collective</device>
 	</classdefaults>
 	<classdefaults>
 		<name>force_trim_button</name>
