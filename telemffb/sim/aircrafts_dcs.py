@@ -77,6 +77,7 @@ class Aircraft(AircraftBase):
 
     aoa_effect_enabled = 1
 
+    force_disable_collective_gain = 1
     collective_dampening_gain = 0
     collective_init = 0
     collective_spring_coeff_y = 0
@@ -311,10 +312,21 @@ class Aircraft(AircraftBase):
     #     return perf_dict.get('default')
 
     def _override_collective_spring(self, telem_data):
+        """
+        Overrides the spring on a collective to avoid DCS sending FFB events for the Y Axis.  By default sets gain to 0
+        with option to override with gain = 4096
+        """
         if not self.is_collective(): return
 
         self.spring = effects["collective_ap_spring"].spring()
         # self.damper = effects["collective_damper"].damper()
+        if not self.force_disable_collective_gain:
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
+            self.spring_y.cpOffset = 0
+            self.spring.setCondition(self.spring_y)
+            self.spring.start(override=True)
+            return
+
         if not self.collective_init:
             input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
