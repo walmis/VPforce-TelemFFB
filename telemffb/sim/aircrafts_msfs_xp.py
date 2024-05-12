@@ -159,6 +159,7 @@ class Aircraft(AircraftBase):
         self.cyclic_spring_init = 0
         self.cyclic_center = [0, 0]  # x, y
         self.collective_spring_init = 0
+        self.force_disable_collective_gain = True
         self.trim_release_spring_gain = 0
 
         self.force_trim_release_active = 0
@@ -847,6 +848,29 @@ class Aircraft(AircraftBase):
             self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
             logging.info(f"Sending to XPLANE: >>{sendstr}<<")
             self.xplane_axis_override_active = False
+
+    def _override_collective_spring(self):
+        """
+        Method specifically intended to start a spring with force=0 for use in fixed wing aircraft so it may be stowed
+        and kept out of the way
+        .
+        Option to leave spring active also exists
+        """
+        if not self.is_collective(): return
+
+        self.spring = effects["collective_ap_spring"].spring()
+
+        if not self.force_disable_collective_gain:
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
+            self.spring_y.cpOffset = 0
+            self.spring.setCondition(self.spring_y)
+            self.spring.start(override=True)
+            return
+
+        self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
+        self.spring.setCondition(self.spring_y)
+        self.spring.start(override=True)
+
     def find_xp_gear_orientation(self, x, y, z):
         pass
 
@@ -961,7 +985,8 @@ class PropellerAircraft(Aircraft):
             self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("TAS"), spd_thresh=80 * kt2ms)
         if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
             self._gforce_effect(telem_data)
-
+        if self.is_collective():
+            self._override_collective_spring()
 
 class JetAircraft(Aircraft):
     """Generic Class for Jets"""
@@ -993,7 +1018,8 @@ class JetAircraft(Aircraft):
         if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
             self._gforce_effect(telem_data)
         self._update_ab_effect(telem_data)
-
+        if self.is_collective():
+            self._override_collective_spring()
 class TurbopropAircraft(PropellerAircraft):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -1015,7 +1041,8 @@ class TurbopropAircraft(PropellerAircraft):
         if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
             self._gforce_effect(telem_data)
         self._update_jet_engine_rumble(telem_data)
-
+        if self.is_collective():
+            self._override_collective_spring()
 class GliderAircraft(Aircraft):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -1141,7 +1168,8 @@ class GliderAircraft(Aircraft):
             self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
         if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
             self._gforce_effect(telem_data)
-
+        if self.is_collective():
+            self._override_collective_spring()
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
     buffeting_intensity = 0.0
