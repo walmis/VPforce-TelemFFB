@@ -37,8 +37,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.pathXPLANE.setToolTip('The root path where X-Plane is installed')
         self.enableVPConfStartup.setToolTip('Select VPforce Configurator profile to load when TelemFFB Starts')
         self.enableVPConfExit.setToolTip('Select VPforce Configurator profile to load when TelemFFB Exits')
+        self.cb_logPrune.setToolTip('Auto delete archived logs after time frame')
 
         # Connect signals to slots
+        self.cb_logPrune.stateChanged.connect(self.toggle_log_prune_widgets)
         self.enableIL2.stateChanged.connect(self.toggle_il2_widgets)
         self.enableXPLANE.stateChanged.connect(self.toggle_xplane_widgets)
         self.browseXPLANE.clicked.connect(self.select_xplane_directory)
@@ -57,6 +59,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.buttonChildSettings.setVisible(False)
 
         # Set initial state
+        self.toggle_log_prune_widgets()
         self.toggle_il2_widgets()
         self.toggle_xplane_widgets()
         self.toggle_al_widgets()
@@ -65,6 +68,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.current_al_dict = {}
         self.load_settings()
         int_validator = QIntValidator()
+        self.tb_logPrune.setValidator(int_validator)
         self.telemTimeout.setValidator(int_validator)
         self.tb_pid_j.setValidator(int_validator)
         self.tb_pid_p.setValidator(int_validator)
@@ -208,6 +212,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.validateXPLANE.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }")
         else:
             self.validateXPLANE.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }")
+
     def toggle_il2_widgets(self):
         # Show/hide IL-2 related widgets based on checkbox state
         il2_enabled = self.enableIL2.isChecked()
@@ -222,6 +227,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }")
         else:
             self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }")
+
+    def toggle_log_prune_widgets(self):
+        prune = self.cb_logPrune.isChecked()
+        self.lab_logPrune.setEnabled(prune)
+        self.tb_logPrune.setEnabled(prune)
+        self.combo_logPrune.setEnabled(prune)
 
     def select_xplane_directory(self):
         # Open a directory dialog and set the result in the pathIL2 QLineEdit
@@ -329,6 +340,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidJoystick': str(self.tb_pid_j.text()),
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
+            'pruneLogs': self.cb_logPrune.isChecked(),
+            'pruneLogsNum': self.tb_logPrune.text(),
+            'pruneLogsUnit': self.combo_logPrune.currentText()
         }
 
         instance_settings_dict = {
@@ -408,6 +422,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.telemTimeout.setText(str(settings_dict.get('telemTimeout', 200)))
 
         self.ignoreUpdate.setChecked(settings_dict.get('ignoreUpdate', False))
+
+        self.cb_logPrune.setChecked(settings_dict.get('pruneLogs', False))
+
+        self.tb_logPrune.setText(str(settings_dict.get("pruneLogsNum", 1)))
+
+        self.combo_logPrune.setCurrentText(settings_dict.get("pruneLogsUnit", "Week(s)"))
 
         self.enableDCS.setChecked(settings_dict.get('enableDCS', False))
 

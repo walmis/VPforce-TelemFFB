@@ -42,6 +42,7 @@
    </property>
    <property name="font">
     <font>
+     <weight>50</weight>
      <bold>false</bold>
     </font>
    </property>
@@ -89,20 +90,30 @@
     <rect>
      <x>20</x>
      <y>31</y>
-     <width>258</width>
-     <height>78</height>
+     <width>261</width>
+     <height>122</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="1">
+     <widget class="QComboBox" name="logLevel"/>
+    </item>
+    <item row="1" column="1">
+     <widget class="QLineEdit" name="telemTimeout"/>
+    </item>
+    <item row="3" column="0">
+     <widget class="QCheckBox" name="cb_logPrune">
+      <property name="text">
+       <string>Prune Logs (Global):</string>
+      </property>
+     </widget>
+    </item>
     <item row="0" column="0">
      <widget class="QLabel" name="label">
       <property name="text">
        <string>System Logging Level:</string>
       </property>
      </widget>
-    </item>
-    <item row="0" column="1">
-     <widget class="QComboBox" name="logLevel"/>
     </item>
     <item row="1" column="0">
      <widget class="QLabel" name="label_2">
@@ -111,15 +122,102 @@
       </property>
      </widget>
     </item>
-    <item row="1" column="1">
-     <widget class="QLineEdit" name="telemTimeout"/>
-    </item>
     <item row="2" column="0" colspan="2">
      <widget class="QCheckBox" name="ignoreUpdate">
       <property name="text">
        <string>Disable Update Prompt on Startup</string>
       </property>
      </widget>
+    </item>
+    <item row="4" column="0" colspan="2">
+     <layout class="QHBoxLayout" name="horizontalLayout_5">
+      <item>
+       <spacer name="horizontalSpacer_12">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>30</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="lab_logPrune">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="text">
+         <string>After:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="tb_logPrune">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>30</width>
+          <height>16777215</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="combo_logPrune">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <item>
+         <property name="text">
+          <string>Day(s)</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Week(s)</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Month(s)</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer_13">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>
@@ -216,6 +314,7 @@
    </property>
    <property name="font">
     <font>
+     <weight>50</weight>
      <bold>false</bold>
     </font>
    </property>
@@ -240,6 +339,7 @@
    </property>
    <property name="font">
     <font>
+     <weight>75</weight>
      <bold>true</bold>
      <underline>true</underline>
     </font>
@@ -259,6 +359,7 @@
    </property>
    <property name="font">
     <font>
+     <weight>75</weight>
      <bold>true</bold>
      <underline>true</underline>
     </font>
@@ -278,6 +379,7 @@
    </property>
    <property name="font">
     <font>
+     <weight>75</weight>
      <bold>true</bold>
      <underline>true</underline>
     </font>
@@ -420,6 +522,7 @@ Minimized:</string>
    </property>
    <property name="font">
     <font>
+     <weight>50</weight>
      <bold>false</bold>
     </font>
    </property>
@@ -819,6 +922,7 @@ Minimized:</string>
      <widget class="QLabel" name="labelLaunch">
       <property name="font">
        <font>
+        <weight>75</weight>
         <bold>true</bold>
         <underline>true</underline>
        </font>
@@ -832,6 +936,7 @@ Minimized:</string>
      <widget class="QCheckBox" name="cb_al_enable">
       <property name="font">
        <font>
+        <weight>50</weight>
         <bold>false</bold>
         <underline>false</underline>
        </font>

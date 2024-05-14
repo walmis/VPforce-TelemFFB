@@ -15,7 +15,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 import math
 import os
 import random
@@ -383,7 +383,43 @@ def archive_logs(directory):
                     log_file_path = os.path.join(directory, filename)
                     zip_file.write(log_file_path, os.path.basename(log_file_path))
                     os.remove(log_file_path)  # Remove the original log file
+    if G.system_settings.get("pruneLogs", False):
+        num = G.system_settings.get('pruneLogsNum', 1)
+        unit = G.system_settings.get('pruneLogsUnit', "Month(s)")
+        prune_log_files(directory, num, unit)
 
+
+def prune_log_files(path, number, unit):
+    # Define mapping from unit strings to timedelta units
+    units_mapping = {
+        "Day(s)": 1,
+        "Week(s)": 7,
+        "Month(s)": 30  # approximate month as 30 days
+    }
+
+    # Get the timedelta unit from the mapping
+    num_days = number * units_mapping.get(unit)
+    if num_days is None:
+        raise ValueError("Invalid unit. Valid units are: 'Day(s)', 'Week(s)', 'Month(s)'.")
+
+
+    # Calculate the cutoff date
+    cutoff_date = datetime.now() - timedelta(**{"days": num_days + 1})
+    # Iterate over log files and delete files older than the cutoff date
+    for filename in os.listdir(path):
+        if filename.endswith(".zip") and filename.startswith("TelemFFB_Log_Archive_"):
+            # Extract date from filename
+            date_str = filename.split("_")[-1].split(".")[0]
+            try:
+                file_date = datetime.strptime(date_str, "%Y%m%d")
+            except ValueError:
+                # Skip files with invalid date format
+                continue
+
+            # Delete file if older than cutoff date
+            if file_date < cutoff_date:
+                os.remove(os.path.join(path, filename))
+                logging.info(f'Deleting log archive: {filename} as it has exceeded the pruning threshold of {num_days} Days')
 
 # def set_reg(name, value):
 #     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
@@ -527,6 +563,9 @@ class SystemSettings(QSettings):
     }
 
     globl_sys_dict = {
+        'pruneLogs': False,
+        'pruneLogsNum': 1,
+        'pruneLogsUnit': 'Week(s)',
         'ignoreUpdate': False,
         'enableDCS': False,
         'enableMSFS': False,
