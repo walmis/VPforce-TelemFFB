@@ -295,6 +295,7 @@ class MainWindow(QMainWindow):
         self.devicetype_label.clicked.connect(self.device_logo_click_event)
         pixmap = QPixmap(":/image/vpforcelogo.png")
         pixmap2 = QPixmap(utils.get_device_logo(G.device_type))
+        
         self.vpflogo_label.setPixmap(pixmap)
         self.devicetype_label.setPixmap(pixmap2)
         self.devicetype_label.setScaledContents(True)

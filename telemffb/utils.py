@@ -21,6 +21,7 @@ import os
 import random
 import re
 import shutil
+import typing
 import zipfile
 from collections import defaultdict, deque
 import threading
@@ -39,8 +40,8 @@ import json
 import ssl
 import xml.etree.ElementTree as ET
 
-from PyQt5.QtCore import QCoreApplication, QThread, pyqtSignal, QObject, QSettings
-from PyQt5.QtGui import QTextCharFormat, QColor
+from PyQt5.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings
+from PyQt5.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
 
 from PyQt5 import QtCore, QtGui, Qt
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
@@ -1943,3 +1944,17 @@ def check_launch_instance(dev_type :str, master_port : int) -> subprocess.Popen:
         proc.udp_port = 60000 + int(usbpid)
         G.launched_instances[dev_type] = proc
         return proc
+
+
+class HiDpiPixmap(QPixmap):
+    def __init__(self, arg):
+        ratio = QGuiApplication.instance().devicePixelRatio()
+
+        if isinstance(arg, QSize):  # If arg is QSize, create a pixmap with a specific size
+            super().__init__(QSize(round(arg.width() * ratio), round(arg.height() * ratio)))
+        elif isinstance(arg, str):  # If arg is a filename, create a pixmap from a file
+            super().__init__(arg)
+        else:  # If no arg is provided, create an empty pixmap
+            super().__init__()
+
+        self.setDevicePixelRatio(ratio)

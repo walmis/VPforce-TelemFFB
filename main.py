@@ -92,13 +92,14 @@ def launch_children():
 
 
 def main():
+    QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
+    QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)  #use highdpi icons
+    
     app = QApplication(sys.argv)
 
     G.args = CmdLineArgs.parse()
 
     # script_dir = os.path.dirname(os.path.abspath(__file__))
-    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
-    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True) #use highdpi icons
 
     headless_mode = G.args.headless
 

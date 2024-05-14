@@ -1,9 +1,10 @@
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider
 from PyQt5.QtCore import pyqtSignal, Qt, QSize
-from PyQt5.QtGui import QPixmap, QPainter, QColor, QCursor
+from PyQt5.QtGui import QPainter, QColor, QCursor, QGuiApplication
 
 import telemffb.globals as G
+from telemffb.utils import HiDpiPixmap
 
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 
@@ -200,7 +201,7 @@ class InfoLabel(QWidget):
         self.icon_label = QLabel(self)
         # icon_img = os.path.join(script_dir, "image/information.png")
         icon_img = ":/image/information.png"
-        self.pixmap = QPixmap(icon_img)
+        self.pixmap = HiDpiPixmap(icon_img)
         self.icon_label.setPixmap(self.pixmap.scaledToHeight(self.text_label.sizeHint().height()))  # Adjust the height as needed
         self.icon_label.setVisible(False)
 
@@ -298,7 +299,6 @@ class StatusLabel(QWidget):
         painter.setBrush(QColor(self.dot_color))
         painter.drawEllipse(dot_x, dot_y, self.dot_size, self.dot_size)
 
-
 class SimStatusLabel(QWidget):
     def __init__(self, name : str):
         super().__init__()
@@ -394,9 +394,8 @@ class SimStatusLabel(QWidget):
 
 
     def create_paused_icon(self, color, size):
-        pixmap = QPixmap(size)
+        pixmap = HiDpiPixmap(size)
         pixmap.fill(Qt.transparent)
-
         # Draw a circle (optional)
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing, 1)
@@ -419,23 +418,24 @@ class SimStatusLabel(QWidget):
 
         return pixmap
 
-    def create_colored_icon(self, color, size):
+    def create_colored_icon(self, color, size : QSize):
         # Create a QPixmap with the specified color and size
-        pixmap = QPixmap(size)
+        pixmap = HiDpiPixmap(size)
         pixmap.fill(Qt.transparent)
 
         # Draw a circle (optional)
         painter = QPainter(pixmap)
+        
         painter.setRenderHint(QPainter.Antialiasing, 1)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
         painter.setBrush(color)
-        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+        painter.drawEllipse(QtCore.QRectF(2, 2, size.width() - 4, size.height() - 4))
         painter.end()
 
         return pixmap
 
     def create_x_icon(self, color, size):
-        pixmap = QPixmap(size)
+        pixmap = HiDpiPixmap(size)
         pixmap.fill(Qt.transparent)
 
         # Draw a circle (optional)
