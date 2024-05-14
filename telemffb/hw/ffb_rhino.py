@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from typing import List, Self
 
 import usb1
-from PyQt5.QtCore import QObject, QTimer, QTimerEvent
+from PyQt5.QtCore import QObject, QTimer, QTimerEvent, pyqtSignal
 
 from telemffb.utils import Destroyable, DirectionModulator, clamp, overrides, millis
 
@@ -463,12 +463,16 @@ class DeviceInfo:
     vendor_id: int
 
 class FFBRhino(QObject):
+    buttonPressed = pyqtSignal(int)
+    buttonReleased = pyqtSignal(int)
+
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> None:
 
         self.vid = vid
         self.pid = pid
         self.info : DeviceInfo = None
         self.firmware_version : str = None
+        self._button_state : int = 0
 
         if not path:
             devs = FFBRhino.enumerate(pid)
@@ -481,7 +485,7 @@ class FFBRhino(QObject):
             self.info = devs[0]
 
         self._in_reports = {}
-        self._effectHandles : List[FFBEffectHandle] = []
+        self._effect_handles : List[FFBEffectHandle] = []
         self._dev = None
 
         QObject.__init__(self)
@@ -563,17 +567,38 @@ class FFBRhino(QObject):
             
 
     def on_hid_report_received(self, report_id):
-        if report_id == HID_REPORT_ID_PID_STATE_REPORT:
+        if report_id == HID_REPORT_ID_INPUT:
+            report = self.get_input()
+
+            btns: int = report.Button | (report.ButtonAux << 32)
+
+            prev = self._button_state
+            self._button_state = btns
+            
+            diff = btns ^ prev # xor to get differences
+            i = 0
+            while diff: # iterate and shift out all changed bits
+                if diff & 1:
+                    if (~prev & btns)&1: # do some bitwise magic to check presses/releases
+                        self.buttonPressed.emit(i)
+                    if (prev & ~btns)&1:
+                        self.buttonReleased.emit(i)
+                i+=1
+                diff = diff >> 1
+                btns = btns >> 1
+                prev = prev >> 1
+
+        elif report_id == HID_REPORT_ID_PID_STATE_REPORT:
             report = self.get_report(HID_REPORT_ID_PID_STATE_REPORT)
             #print(report)
             if report.deviceResetEvent:
                 logging.info("Device FFB reset event: Invalidating all effects")
-                for ref in self._effectHandles:
+                for ref in self._effect_handles:
                     effect : FFBEffectHandle = ref()
                     effect.invalidate()
 
             if report.effectPlaying == 0:
-                for ref in self._effectHandles:
+                for ref in self._effect_handles:
                     effect : FFBEffectHandle = ref()
                     if effect.effect_id == report.effectBlockIndex:
                         effect._started = False
@@ -619,7 +644,7 @@ class FFBRhino(QObject):
             return None
 
         handle = FFBEffectHandle(self, effect_id, type)
-        self._effectHandles.append(weakref.ref(handle, lambda x: self._effectHandles.remove(x)))
+        self._effect_handles.append(weakref.ref(handle, lambda x: self._effect_handles.remove(x)))
         return handle
     
     def write(self, data):
