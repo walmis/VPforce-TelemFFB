@@ -338,10 +338,11 @@ class TelemManager(QObject, threading.Thread):
                 updated_params = self.get_changed_params(params)
                 self.currentAircraft.apply_settings(updated_params)
 
-                if "vpconf" in updated_params and G.current_vpconf_profile != params.get('vpconf', None):
-                    # Load the vpconf configurator file specified for the model, only if it is not the current
-                    # one loaded
-                    set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                if "vpconf" in params:
+                    if G.current_vpconf_profile != params.get('vpconf', None):
+                        # Load the vpconf configurator file specified for the model, only if it is not the current
+                        # one loaded
+                        set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
                 else:
                     # If the current model does not have a vpconf specified, check whether the global default is
                     # configured and enabled.  If so, load that vpconf profile
