@@ -239,7 +239,7 @@ class MainWindow(QMainWindow):
             self.hide_window_action.triggered.connect(do_hide_window)
             self.window_menu.addAction(self.hide_window_action)
 
-        log_menu = self.menu.addMenu('Log')
+        self.log_menu = self.menu.addMenu('Log')
         self.log_window_action = QAction("Open Console Log", self)
 
         def do_toggle_log_window():
@@ -250,20 +250,7 @@ class MainWindow(QMainWindow):
                 G.log_window.show()
 
         self.log_window_action.triggered.connect(do_toggle_log_window)
-        log_menu.addAction(self.log_window_action)
-        if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
-            self.child_log_menu = log_menu.addMenu('Open Child Logs')
-
-            self.log_action = {}
-            for d in ["joystick", "pedals", "collective"]:
-                if d in G.launched_instances:
-                    def do_show_child_log(child=d):
-                        G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
-                    log_action = QAction(f'{d} Log'.capitalize())
-                    log_action.triggered.connect(lambda: do_show_child_log())
-                    self.log_action[d] = log_action
-                    self.child_log_menu.addAction(log_action)
-
+        self.log_menu.addAction(self.log_window_action)
 
         help_menu = self.menu.addMenu('Help')
 
@@ -689,6 +676,21 @@ class MainWindow(QMainWindow):
         # except Exception:
         #     pass
 
+    def add_instance_log_menu(self):
+        self.log_menu.addAction(self.log_window_action)
+        if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
+            self.child_log_menu = self.log_menu.addMenu('Open Child Logs')
+
+            self.log_action = {}
+            for d in ["joystick", "pedals", "collective"]:
+                if d in G.launched_instances:
+                    def do_show_child_log(child=d):
+                        G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
+
+                    self.log_action[d] = QAction(f'{d} Log'.capitalize())
+                    self.log_action[d].triggered.connect(lambda _, child=d: do_show_child_log(child))
+                    self.child_log_menu.addAction(self.log_action[d])
+
     def test_function(self):
         self.set_scrollbar(400)
 
@@ -824,6 +826,7 @@ class MainWindow(QMainWindow):
             self.instance_status_row.pedals_status_icon.show()
         if "collective" in G.launched_instances:
             self.instance_status_row.collective_status_icon.show()
+        self.add_instance_log_menu()
 
 
     def clear_log_widget(self):
