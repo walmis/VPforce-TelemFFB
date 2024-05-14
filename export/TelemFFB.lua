@@ -471,6 +471,13 @@ local f_telemFFB = {
               local mainRotorGauge = MainPanel:get_argument_value(308)
               -- Rotor RPM reads 500 when gauge data is 0.745.. scale based on these values
               local mainRotorRPM = math.floor(scale(mainRotorGauge, 0, .745, 0, 500))
+
+              local LeftGear = LoGetAircraftDrawArgumentValue(101) + LoGetAircraftDrawArgumentValue(102)
+              local NoseGear = 0
+              local RightGear = LoGetAircraftDrawArgumentValue(103) + LoGetAircraftDrawArgumentValue(104)
+              WoW = string.format("%.2f~%.2f~%.2f", LeftGear, NoseGear, RightGear)
+              tot_wow = tonumber(string.format("%2f",LeftGear+NoseGear+RightGear))
+              on_ground = tot_wow > 0.00
               local oh6payload = LoGetPayloadInfo()
               -- OH-6A, like the UH1 only has cannon info in payload block.  use getShellCount to pull out the applicable data and write it into the CannonShells telemetry
               CannonShells = getShellCount(oh6payload, "4.6.6.0")
