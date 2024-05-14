@@ -286,7 +286,7 @@ class AircraftBase(object):
     def apply_settings(self, settings_dict):
         for k, v in settings_dict.items():
             if k in ["type"]: continue
-            if getattr(self, k, None) is None and k != 'vpconf' and 'dummy' and 'command_runner' not in k:
+            if getattr(self, k, None) is None and k != 'vpconf' and 'dummy' not in k and 'command_runner' not in k:
                 logging.info(f"WARNING: Unknown parameter {k} in config")
                 continue
             logging.info(f"set {k} = {v}")
