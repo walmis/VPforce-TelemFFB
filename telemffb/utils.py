@@ -1569,11 +1569,9 @@ class FetchLatestVersion(QThread):
 
                 current_version = current_version.removeprefix('local-')
                 if '-dirty' in current_version:
-                    self.version_result_signal.emit('dev', 'dev')
-                elif current_version == latest_version:
-                    self.version_result_signal.emit("uptodate", "uptodate")
+                    self.version_result_signal.emit('dirty', 'dirty')
                 else:
-                    self.version_result_signal.emit("needsupdate", "needsupdate")
+                    self.version_result_signal.emit("dev", "dev")
 
         except Exception as e:
             self.error_signal.emit(str(e))

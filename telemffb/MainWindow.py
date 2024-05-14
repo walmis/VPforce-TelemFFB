@@ -889,10 +889,13 @@ class MainWindow(QMainWindow):
             if is_exe:
                 self.version_label.setText('Version Status: <b>Development Build</b>')
             else:
-                self.version_label.setText('Version Status: <b>Non release - Modified Source</b>')
+                self.version_label.setText('Version Status: <b>Development - Clean source</b>')
 
         elif vers == 'needsupdate':
             self.version_label.setText('Version Status: <b>Out of Date Source - Git pull needed</b>')
+        
+        elif vers == 'dirty':
+            self.version_label.setText('Version Status: <b>Development - Modified Source</b>')
 
         else:
             # print(_update_available)
