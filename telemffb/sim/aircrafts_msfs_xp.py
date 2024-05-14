@@ -215,7 +215,7 @@ class Aircraft(AircraftBase):
         logging.debug(f"brakes = {brakes}")
         avg_brakes = sum(brakes) / len(brakes)
         if avg_brakes >= self.nosewheel_shimmy_min_brakes and gs > self.nosewheel_shimmy_min_speed:
-            shimmy = utils.non_linear_scaling(avg_brakes, self.nosewheel_shimmy_min_brakes, 1.0, curvature=curve)
+            shimmy = utils.non_linear_scaling(avg_brakes, self.nosewheel_shimmy_min_brakes, 1.0, curvature=curve) * self.nosewheel_shimmy_intensity
             logging.debug(f"Nosewheel Shimmy intensity calculation: (BrakesPct:{avg_brakes} | GS:{gs} | RT Intensity: {shimmy}")
             effects["nw_shimmy"].periodic(freq, shimmy, 90).start()
         else:
