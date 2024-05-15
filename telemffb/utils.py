@@ -589,6 +589,7 @@ class SystemSettings(QSettings):
         'startHeadlessJoystick': False,
         'startHeadlessPedals': False,
         'startHeadlessCollective': False,
+        'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
     }
 
     @property

@@ -671,11 +671,10 @@ class MainWindow(QMainWindow):
         self.load_main_window_geometry()
         shortcut = QShortcut(QKeySequence('Alt+D'), self)
         shortcut.activated.connect(self.add_debug_menu)
-        # try:
-        #     if utils.get_reg("debug"):
-        #         self.add_debug_menu()
-        # except Exception:
-        #     pass
+        if G.system_settings.get('debug', False):
+            # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
+            self.add_debug_menu()
+
 
     def add_instance_log_menu(self):
         self.log_menu.addAction(self.log_window_action)
