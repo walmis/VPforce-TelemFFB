@@ -3016,6 +3016,36 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>aircraft_vne_speed</name>
+		<model>A-4E-C</model>
+		<value>800</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>aircraft_vs_speed</name>
+		<model>A-4E-C</model>
+		<value>130</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>A-4E-C</model>
+		<value>2.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>A-4E-C</model>
+		<value>JetAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>cm_vibration_intensity</name>
 		<model>AH-64D_BLK_II</model>
 		<value>0.12</value>

@@ -466,7 +466,9 @@ local f_telemFFB = {
             )
 
           elseif string.find(obj.Name, "OH-6A", 0, true) then
-
+              damage_vars = {
+                419,420,421,423,424,425,426,427,430,431,470,471,472,473,474,475,476
+              }
               -- Rotor RPM gauge is panel arg # 308
               local mainRotorGauge = MainPanel:get_argument_value(308)
               -- Rotor RPM reads 500 when gauge data is 0.745.. scale based on these values
@@ -1118,7 +1120,10 @@ local f_telemFFB = {
           elseif string.find(obj.Name, "F-4E-45MC", 0, true) then
             damage_vars = "not supported" -- Just a place holder so the F4 does not get treated as an FC3 aircraft, until module is out and data can be identified
 
-
+          elseif string.find(obj.Name, "A-4E-C", 0, true) then
+            damage_vars = {
+              600,601,602,603,605,606,607,608,609,610,611,612,613,614,615
+            }
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           else -- FC3 Planes
             if obj.Name == "MiG-29A" or obj.Name == "MiG-29S" or obj.Name == "MiG-29G" then
