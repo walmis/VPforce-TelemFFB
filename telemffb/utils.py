@@ -137,7 +137,7 @@ class EffectTranslator:
         "cyclic_spring": ["Cyclic Spring Force", "cyclic_spring_gain"],
         "damage": ["Aircraft Damage Event", "damage_effect_intensity"],
         "damper": ["Damper Override", "damper_force"],
-        "dcs_spr_override": ["DCS Spring Override", "override_spring_gain"],
+        "dcs_spr_override": ["DCS Spring Override", ""],
         "decel": ["Decelleration Force", "deceleration_max_force"],
         "dynamic_spring": ["Dynamic Spring Force", ".*_spring_gain"],
         "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
@@ -1007,16 +1007,24 @@ class RandomDirectionModulator(DirectionModulator):
 
 class PerformanceTracker:
     def __init__(self):
-        self.last_time = None
+        self.trackers = {}
 
-    def get_time_delta(self):
+    def get_time_delta(self, name: str):
         now = time.perf_counter()
-        if self.last_time is None:
-            self.last_time = now
+        if name not in self.trackers:
+            self.trackers[name] = now
             return 0.0
-        delta = now - self.last_time
-        self.last_time = now
+        last_time = self.trackers[name]
+        delta = now - last_time
+        self.trackers[name] = now
         return delta
+
+    def remove_tracker(self, name: str):
+        if name in self.trackers:
+            del self.trackers[name]
+
+    def clear_trackers(self):
+        self.trackers.clear()
 
 class Dispenser:
     def __init__(self, cls) -> None:

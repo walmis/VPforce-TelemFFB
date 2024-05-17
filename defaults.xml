@@ -803,7 +803,7 @@
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
-		<value>0.5</value>
+		<value>0.15</value>
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>

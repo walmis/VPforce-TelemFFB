@@ -101,6 +101,8 @@ class Aircraft(AircraftBase):
     override_spring_trim_up = 0
     override_spring_trim_right = 0
     override_spring_trim_rate = 200
+    override_spring_cp0_x = 0
+    override_spring_cp0_y = 0
 
     ####
     ####
@@ -348,17 +350,9 @@ class Aircraft(AircraftBase):
 
         spring = effects['dcs_spr_override'].spring()
 
-        # get delta time from performance tracker dispenser
-        perf = perftracker.get('override_spring_perf')
-        dt = perf.get_time_delta()
-        self.telem_data['_override_spr_dt'] = dt
-        # calculate step size based on configured rate and delta time
-        trim_step_size = round(self.override_spring_trim_rate * dt)
-        if self.override_spring_trim_rate and trim_step_size == 0:
-            # At very high frame rates (~300) and very low slew rate (<100), calculation will always round to 0
-            # ensure minimum step size of 1 unless trim rate is set at 0
-            trim_step_size = 1
-        self.telem_data['_override_spr_step'] = trim_step_size
+        dt = perftracker.get_time_delta('override_spring_perf')
+        self.telem_data['_ovrd_spr_dt'] = dt
+
 
 
         if self.override_spring_ft_enabled:
@@ -378,11 +372,11 @@ class Aircraft(AircraftBase):
                 self.spring_y.positiveCoefficient = gain
                 self.spring_y.negativeCoefficient = gain
 
-                self.cpO_x = round(x * 4096)
-                self.spring_x.cpOffset = self.cpO_x
+                self.override_spring_cp0_x = round(x * 4096)
+                self.spring_x.cpOffset = self.override_spring_cp0_x
 
-                self.cpO_y = round(y * 4096)
-                self.spring_y.cpOffset = self.cpO_y
+                self.override_spring_cp0_y = round(y * 4096)
+                self.spring_y.cpOffset = self.override_spring_cp0_y
                 spring.setCondition(self.spring_x)
                 spring.setCondition(self.spring_y)
                 spring.start(override=True)
@@ -390,46 +384,53 @@ class Aircraft(AircraftBase):
             elif self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
                 # if trim reset button pressed, set offsets back to 0
                 # print("TRIM RESET")
-                self.spring_x.cpOffset = self.cpO_x = 0
-                self.spring_y.cpOffset = self.cpO_y = 0
+                self.spring_x.cpOffset = self.override_spring_cp0_x = 0
+                self.spring_y.cpOffset = self.override_spring_cp0_y = 0
                 spring.setCondition(self.spring_x)
                 spring.setCondition(self.spring_y)
+
+            # calculate step size based on configured rate and delta time
+            trim_step_size = self.override_spring_trim_rate * dt
+
+            self.telem_data['_ovrd_spr_step'] = trim_step_size
 
             # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
             # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
             if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM DOWN")
-                if self.cpO_y - trim_step_size < -4096:
-                    self.cpO_y = -4096
+                if self.override_spring_cp0_y - trim_step_size < -4096:
+                    self.override_spring_cp0_y = -4096
                 else:
-                    self.cpO_y -= trim_step_size
-                self.spring_y.cpOffset = self.cpO_y
+                    self.override_spring_cp0_y -= trim_step_size
+                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
             elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM UP")
-                if self.cpO_y + trim_step_size > 4096:
-                    self.cpO_y = 4096
+                if self.override_spring_cp0_y + trim_step_size > 4096:
+                    self.override_spring_cp0_y = 4096
                 else:
-                    self.cpO_y += trim_step_size
-                self.spring_y.cpOffset = self.cpO_y
+                    self.override_spring_cp0_y += trim_step_size
+                self.spring_y.cpOffset = round(self.override_spring_cp0_y)
 
             if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM LEFT")
-                if self.cpO_x - trim_step_size < -4096:
-                    self.cpO_x = -4096
+                if self.override_spring_cp0_x - trim_step_size < -4096:
+                    self.override_spring_cp0_x = -4096
                 else:
-                    self.cpO_x -= trim_step_size
-                self.spring_x.cpOffset = self.cpO_x
+                    self.override_spring_cp0_x -= trim_step_size
+                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
             elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
                 # shift offset based on previously calculated step size.  Ensure value does not exceed limits
                 # print("TRIM RIGHT")
-                if self.cpO_x + trim_step_size > 4096:
-                    self.cpO_x = 4096
+                if self.override_spring_cp0_x + trim_step_size > 4096:
+                    self.override_spring_cp0_x = 4096
                 else:
-                    self.cpO_x += trim_step_size
-                self.spring_x.cpOffset = self.cpO_x
+                    self.override_spring_cp0_x += trim_step_size
+                self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+
+        self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y)]
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
         self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = int(self.override_spring_gain * 4096)
