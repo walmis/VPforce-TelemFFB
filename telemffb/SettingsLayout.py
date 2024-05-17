@@ -673,6 +673,8 @@ class SettingsLayout(QGridLayout):
         the_button.setText(str(value))
         if str(value) != '0':
             xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, str(value), button_name)
+        else:
+            the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
             self.reload_caller()
 

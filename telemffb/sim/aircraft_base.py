@@ -18,6 +18,8 @@ HPFs: Dict[str, utils.HighPassFilter] = utils.Dispenser(utils.HighPassFilter)
 # Lowpass filter dispenser
 LPFs: Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
 
+perftracker: Dict[str, utils.PerformanceTracker] = utils.Dispenser(utils.PerformanceTracker)
+
 # unit conversions (to m/s)
 knots = 0.514444
 kmh = 1.0 / 3.6

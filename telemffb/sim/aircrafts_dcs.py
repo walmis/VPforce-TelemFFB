@@ -27,7 +27,7 @@ from telemffb.utils import overrides
 from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE,
                                    HapticEffect)
 
-from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects
+from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects, perftracker
 
 #unit conversions (to m/s)
 knots = 0.514444
@@ -89,6 +89,18 @@ class Aircraft(AircraftBase):
     dcs_tr_damper_enabled = False
     dcs_tr_button = 0
     dcs_tr_damper_force = 0.3
+
+    override_spring_enabled = False
+    override_spring_gain = 1.0
+    override_spring_ft_enabled = False
+    override_spring_tr_damper = 0.5
+    override_spring_trim_release = 0
+    override_spring_trim_reset = 0
+    override_spring_trim_down = 0
+    override_spring_trim_left = 0
+    override_spring_trim_up = 0
+    override_spring_trim_right = 0
+    override_spring_trim_rate = 200
 
     ####
     ####
@@ -158,6 +170,7 @@ class Aircraft(AircraftBase):
         if self.is_collective():
             self._override_collective_spring(telem_data)
         self._update_touchdown_effect(telem_data)
+        self.override_spring()
 
     @overrides(AircraftBase)
     def on_event(self, event, *args):
@@ -315,7 +328,117 @@ class Aircraft(AircraftBase):
         # override DCS input and set our own values
         self.send_commands([f"LoSetCommand(2001, {y - offs_y})", 
                             f"LoSetCommand(2002, {x - offs_x})"])
-                   
+
+    def override_spring(self):
+        if not self.is_joystick(): return
+        if not self.override_spring_enabled:
+            # If feature disabled, ensure spring is stopped and abort
+            effects['dcs_spr_override'].stop()
+            return
+        # Since override_spring overtakes DCS spring already, both the TR damper and trim workaround features are not
+        # needed and would conflict with the override of the spring effect
+        if self.dcs_tr_damper_enabled:
+            logging.error('Override DCS Spring is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
+            self.telem_data['error'] = 1
+            return
+        if self.trim_workaround:
+            logging.error('Override DCS Spring is not compatible with the Trim Workaround feature.  Please disable one or the other.')
+            self.telem_data['error'] = 1
+            return
+
+        spring = effects['dcs_spr_override'].spring()
+
+        # get delta time from performance tracker dispenser
+        perf = perftracker.get('override_spring_perf')
+        dt = perf.get_time_delta()
+        self.telem_data['_override_spr_dt'] = dt
+        # calculate step size based on configured rate and delta time
+        trim_step_size = round(self.override_spring_trim_rate * dt)
+        if self.override_spring_trim_rate and trim_step_size == 0:
+            # At very high frame rates (~300) and very low slew rate (<100), calculation will always round to 0
+            # ensure minimum step size of 1 unless trim rate is set at 0
+            trim_step_size = 1
+        self.telem_data['_override_spr_step'] = trim_step_size
+
+
+        if self.override_spring_ft_enabled:
+            input_data = HapticEffect.device.get_input()
+            x, y = input_data.axisXY()
+            current_buttons = input_data.getPressedButtons()
+            # print(f"BUTTONS:>{current_buttons}<")
+            # decide what to do depending on which button is pressed
+            if self.override_spring_trim_release and self.override_spring_trim_release in current_buttons:
+                # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
+                # as it is moved while spring force is enabled.
+                # return from method so default spring gains do not get applied at the end of the method
+                gain = int (self.override_spring_tr_damper * 4096)
+                self.spring_x.positiveCoefficient = gain
+                self.spring_x.negativeCoefficient = gain
+
+                self.spring_y.positiveCoefficient = gain
+                self.spring_y.negativeCoefficient = gain
+
+                self.cpO_x = round(x * 4096)
+                self.spring_x.cpOffset = self.cpO_x
+
+                self.cpO_y = round(y * 4096)
+                self.spring_y.cpOffset = self.cpO_y
+                spring.setCondition(self.spring_x)
+                spring.setCondition(self.spring_y)
+                spring.start(override=True)
+                return
+            elif self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
+                # if trim reset button pressed, set offsets back to 0
+                # print("TRIM RESET")
+                self.spring_x.cpOffset = self.cpO_x = 0
+                self.spring_y.cpOffset = self.cpO_y = 0
+                spring.setCondition(self.spring_x)
+                spring.setCondition(self.spring_y)
+
+            # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
+            # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
+            if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
+                # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+                # print("TRIM DOWN")
+                if self.cpO_y - trim_step_size < -4096:
+                    self.cpO_y = -4096
+                else:
+                    self.cpO_y -= trim_step_size
+                self.spring_y.cpOffset = self.cpO_y
+            elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
+                # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+                # print("TRIM UP")
+                if self.cpO_y + trim_step_size > 4096:
+                    self.cpO_y = 4096
+                else:
+                    self.cpO_y += trim_step_size
+                self.spring_y.cpOffset = self.cpO_y
+
+            if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
+                # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+                # print("TRIM LEFT")
+                if self.cpO_x - trim_step_size < -4096:
+                    self.cpO_x = -4096
+                else:
+                    self.cpO_x -= trim_step_size
+                self.spring_x.cpOffset = self.cpO_x
+            elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
+                # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+                # print("TRIM RIGHT")
+                if self.cpO_x + trim_step_size > 4096:
+                    self.cpO_x = 4096
+                else:
+                    self.cpO_x += trim_step_size
+                self.spring_x.cpOffset = self.cpO_x
+
+        # If trim release is not pressed, set spring gain based on user setting and start spring override
+        self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = int(self.override_spring_gain * 4096)
+        self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = int(self.override_spring_gain * 4096)
+
+        spring.setCondition(self.spring_x)
+        spring.setCondition(self.spring_y)
+        # ensure spring is started with override = true
+        spring.start(override=True)
 
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop/WW2 aircraft"""

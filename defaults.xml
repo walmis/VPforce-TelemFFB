@@ -750,6 +750,132 @@
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>50</order>
+		<name>override_spring_enabled</name>
+		<info>Override the spring effect set by DCS&lt;br&gt;&lt;br&gt;Warning: If you enable this for an official DCS module that has FFB Support, all DCS generated spring effects will cease to function, including dynamic forces and trim.&lt;br&gt;&lt;br&gt;Note: Not compatible with 'Trim Workaround' or 'Trim Release Damper' features</info>
+		<displayname>Override DCS Spring</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>50.2</order>
+		<name>override_spring_gain</name>
+		<prereq>override_spring_enabled</prereq>
+		<displayname>Override DCS Spring Gain</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>1.0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>51</order>
+		<name>override_spring_ft_enabled</name>
+		<prereq>override_spring_enabled</prereq>
+		<displayname>Force Trim</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>51.2</order>
+		<name>override_spring_trim_release</name>
+		<prereq>override_spring_ft_enabled</prereq>
+		<displayname>Trim Release</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>51.3</order>
+		<name>override_spring_tr_damper</name>
+		<prereq>override_spring_ft_enabled</prereq>
+		<displayname>Trim Release Damper</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.5</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>51.4</order>
+		<name>override_spring_trim_reset</name>
+		<prereq>override_spring_ft_enabled</prereq>
+		<displayname>Trim Reset</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>51.5</order>
+		<name>override_spring_trim_down</name>
+		<prereq>override_spring_ft_enabled</prereq>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>51.6</order>
+		<name>override_spring_trim_up</name>
+		<prereq>override_spring_ft_enabled</prereq>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>51.7</order>
+		<name>override_spring_trim_left</name>
+		<prereq>override_spring_ft_enabled</prereq>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>51.8</order>
+		<name>override_spring_trim_right</name>
+		<prereq>override_spring_ft_enabled</prereq>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>51.9</order>
+		<name>override_spring_trim_rate</name>
+		<prereq>override_spring_ft_enabled</prereq>
+		<info>Rate at which the trim will move.&lt;br&gt;&lt;br&gt;Calculated as "steps per second" (1 step =1/8192 of total throw)</info>
+		<displayname>Trim Slew Rate</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,1000</validvalues>
+		<value>200</value>
+		<datatype>d_int</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>Axis Control</Grouping>
 		<order>90</order>
 		<name>telemffb_controls_axes</name>
