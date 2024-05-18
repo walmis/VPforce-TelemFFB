@@ -11,9 +11,18 @@ This is not an exhaustive change log (see github for that).  This file only outl
 
 - New Global "vpconf" profile option
  - Can set the "startup profile" in system settings to use as a default configurator profile if the profile was changed by an aircraft and there is no profile defined for the newly loaded aircraft
+- New option to prune log archive zips after a configurable time threshold
+
+## IL-2
+- Fixed issue where sim constantly sends stale telemetry after crash or in MP map, causing effects to play forever
 
 ## DCS
 - Added basic support and default profile for the F-4E
+- New "Spring Override" feature to better support popular community mods or other aircraft that do not support FFB
+ - Implements identical functionality to what is traditionally accomplished with "Sticky Spring" and "Hardware Trim" in configurator
+ - Supports force trim and hat/button based trim.
+- Add damage effect support for OH-6 and A-4 community mods
+- Add **basic** support for F-4E module
 
 ## DCS/MSFS
 - New acceleration vector based "touch down" effect.  Creates a sharp forward force on the stick when touching down.  The harder you hit, the more force is applied (with configurable limits)
