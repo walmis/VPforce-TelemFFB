@@ -108,6 +108,7 @@ class Aircraft(AircraftBase):
     il2_enable_runway_rumble = 0  # not yet implemented
     il2_enable_buffet = 0  # not yet impelemnted
     il2_buffeting_factor: float  = 1.0
+    stop_state = False
 
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
@@ -205,15 +206,24 @@ class Aircraft(AircraftBase):
         :param new_data: New telemetry data
         :type new_data: dict
         """
+        if telem_data.get('SimPaused', False):
+            if not self.stop_state:
+                self.on_timeout()
+            self.stop_state = True
+            return
+        self.stop_state = False
 
         if telem_data["AircraftClass"] == "unknown":
             telem_data["AircraftClass"] = "GenericAircraft"#inject aircraft class into telemetry
         self._telem_data = telem_data
+
         if telem_data.get("N") == None:
             return
+
         if not telem_data.get("Focus",0):
             self.on_timeout()
             return
+
         # self._update_focus_loss(telem_data)
         if self.deceleration_effect_enable:
             self._decel_effect(telem_data)
@@ -260,11 +270,20 @@ class PropellerAircraft(Aircraft):
     # run on every telemetry frame
     def on_telemetry(self, telem_data):
         ## Propeller Aircraft Telemetry Handler
+        if telem_data.get('SimPaused', False):
+            if not self.stop_state:
+                self.on_timeout()
+            self.stop_state = True
+            return
+        self.stop_state = False
+
         if telem_data.get("N") == None:
             return
+
         if not telem_data.get("Focus",0):
             self.on_timeout()
             return
+
         telem_data["AircraftClass"] = "PropellerAircraft"   #inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
@@ -286,11 +305,20 @@ class JetAircraft(Aircraft):
       # run on every telemetry frame
     def on_telemetry(self, telem_data):
         ## Jet Aircraft Telemetry Handler
+        if telem_data.get('SimPaused', False):
+            if not self.stop_state:
+                self.on_timeout()
+            self.stop_state = True
+            return
+        self.stop_state = False
+
         if telem_data.get("N")== None:
             return
+
         if not telem_data.get("Focus",0):
             self.on_timeout()
             return
+
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 

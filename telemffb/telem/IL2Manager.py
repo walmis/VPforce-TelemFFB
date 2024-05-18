@@ -207,7 +207,7 @@ class IL2Manager():
         self.guns_dict = {}
         self._changes = {}
         self._change_counter = {}
-
+        self.last_paused_data: list = []
         self.telem_data = {"src": "IL2", "N": "", "AircraftClass": "unknown"}
 
         self.state = StateDataStructure()
@@ -217,8 +217,6 @@ class IL2Manager():
         packet_header = data.get_uint32()
         lenpack = len(packet)
         hex_pack = packet.hex().upper()
-        # self.telem_data["src"] = "IL2"
-
         ##
         ## Run Decoders
         ##
@@ -237,7 +235,6 @@ class IL2Manager():
         self.telem_data["src"] = "IL2"
         if self.ac_name != "":
             self.telem_data["N"] = self.ac_name
-        # self.telem_data['AircraftClass'] = []
         self.telem_data['TAS'] = self.state.indicated_air_speed_metres_second
         self.telem_data['AGL'] = self.state.above_ground_level_metres
         self.telem_data['RPM'] = self.state.rpm
@@ -265,14 +262,9 @@ class IL2Manager():
         self.telem_data['Speedbrakes'] = self.state.air_brake_position
         self.telem_data["GunData"] = self.gun_data
         self.telem_data["Gun"] = self.guns_fired
-        # self.telem_data["wheeldata"] = self.wheel_data
-        # self.telem_data["BombData"] = self.bombs_data
         self.telem_data["Bombs"] = self.bombs_released
-        # self.telem_data["RocketData"] = self.rockets_data
         self.telem_data["Rockets"] = self.rockets_fired
-        # self.telem_data["HitData"] = self.hit_data
         self.telem_data["Hits"] = self.hit_events
-        # self.telem_data["DamageData"] = self.ev_damage_data
         self.telem_data["Damage"] = self.damage_events
         self.telem_data["SeatData"] = self.seat_data
         self.telem_data['unknown_data_2'] = list(self.state.val2)
@@ -285,7 +277,15 @@ class IL2Manager():
         self.telem_data['rot_velocity'] = self.rot_velocity
         self.telem_data['rot_accel'] = self.rot_accel
 
-        # return self.telem_data
+        # create structure of the most real-time data to determine if updated telemetry is flowing.  If not, consider
+        # the sim paused.  This avoids effects continuing to play when in multiplayer map or after crash since IL-2 never stops sending
+        # stale frames.
+        paused_data = [self.state.acceleration_Gs, self.state.above_ground_level_metres,self.state.rpm, self.rot_accel, self.rot_velocity]
+        if paused_data == self.last_paused_data:
+            self.telem_data['SimPaused'] = True
+        else:
+            self.telem_data['SimPaused'] = False
+        self.last_paused_data = paused_data
 
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in self.telem_data.items()]), "utf-8")
         return packet
