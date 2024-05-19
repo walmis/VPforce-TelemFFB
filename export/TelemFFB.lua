@@ -223,6 +223,10 @@ local f_telemFFB = {
         if self.sock_udp then
           local stringToSend = ""
 
+          local obj = LoGetSelfData()
+
+          if obj == nil then return end
+
           local t = LoGetModelTime()
           local altAsl = LoGetAltitudeAboveSeaLevel()
           local altAgl = LoGetAltitudeAboveGroundLevel()
@@ -263,7 +267,6 @@ local f_telemFFB = {
             AccelerationUnits = string.format("%.2f~%.2f~%.2f", acceleration.x, acceleration.y, acceleration.z)
           end
 
-          local obj = LoGetSelfData()
           local myselfData
 
           if obj then
