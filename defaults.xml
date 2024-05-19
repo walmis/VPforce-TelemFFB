@@ -777,7 +777,8 @@
 		<order>51</order>
 		<name>override_spring_ft_enabled</name>
 		<prereq>override_spring_enabled</prereq>
-		<displayname>Force Trim</displayname>
+		<info>Bindings and other options for force trim release and hat based hardware trim</info>
+		<displayname>Hardware Force Trim</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<value>false</value>
@@ -799,6 +800,7 @@
 		<order>51.3</order>
 		<name>override_spring_tr_damper</name>
 		<prereq>override_spring_ft_enabled</prereq>
+		<info>Dampening force while trim release is active</info>
 		<displayname>Trim Release Damper</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
