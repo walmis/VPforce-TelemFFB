@@ -6,7 +6,7 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QCursor, QIcon
 from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
-                             QToolButton,QCheckBox,QComboBox,QLineEdit,QFileDialog)
+                             QToolButton,QCheckBox,QComboBox,QLineEdit,QFileDialog, QSpinBox)
 
 from telemffb.ButtonPressThread import ButtonPressThread
 from telemffb.custom_widgets import (InfoLabel, NoWheelSlider)
@@ -452,6 +452,22 @@ class SettingsLayout(QGridLayout):
             textbox.editingFinished.connect(self.textbox_changed)
             self.addWidget(textbox, i, entry_col, 1, entry_colspan)
 
+        if item['datatype'] == 'spin_int':
+            spin_box = QSpinBox()
+            spin_box.blockSignals(True)
+            spin_box.setValue(int(item['value']))
+            spin_box.blockSignals(False)
+            spin_box.setMinimumWidth(80)
+            spin_box.setAlignment(Qt.AlignHCenter)
+            spin_box.setObjectName(f"sb_{item['name']}")
+            if validvalues is None or validvalues == '':
+                pass
+            else:
+                spin_box.setMinimum(int(validvalues[0]))
+                spin_box.setMaximum(int(validvalues[1]))
+            spin_box.valueChanged.connect(self.spin_box_changed)
+            self.addWidget(spin_box, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+
         if item['datatype'] == 'list' or item['datatype'] == 'anylist':
             dropbox = QComboBox()
             dropbox.setMinimumWidth(150)
@@ -594,6 +610,14 @@ class SettingsLayout(QGridLayout):
                 xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, file_path, 'vpconf')
                 if G.settings_mgr.timed_out:
                     self.reload_caller()
+
+    def spin_box_changed(self):
+        setting_name = self.sender().objectName().replace('sb_', '')
+        value = str(self.sender().value())
+        logging.debug(f"Spin Box {setting_name} changed. New value: {value}")
+        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
+        if G.settings_mgr.timed_out:
+            self.reload_caller()
 
     def textbox_changed(self):
         setting_name = self.sender().objectName().replace('le_', '')
