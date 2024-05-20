@@ -1627,7 +1627,7 @@ def get_version():
 
     ver = "UNKNOWN"
     try:
-        version = __import__("version")
+        import version
         ver = version.VERSION
         return ver
     except Exception:
