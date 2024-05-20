@@ -40,21 +40,21 @@ jobs:
         # A file, directory or wildcard pattern that describes what to upload
         # Required.
         path: ${{ env.ZIP_FILENAME }}
-
-    # - name: Deploy to Server
-    #   uses: easingthemes/ssh-deploy@main
-    #   env:
-    #       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-    #       ARGS: "-v"
-    #       SOURCE: "VPforce-TelemFFB*.zip latest.json"
-    #       REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-    #       REMOTE_USER: ${{ secrets.REMOTE_USER }}
-    #       TARGET: ${{ secrets.REMOTE_TARGET }}
-    #       #EXCLUDE: "/dist/, /node_modules/"
+        
+    - name: Deploy to Server
+      uses: easingthemes/ssh-deploy@main
+      env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-v"
+          SOURCE: "VPforce-TelemFFB*.zip latest.json"
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          TARGET: ${{ secrets.REMOTE_TARGET }}
+          #EXCLUDE: "/dist/, /node_modules/"
           
-    # - name: Invoke webhook
-    #   uses: joelwmale/webhook-action@master
-    #   with:
-    #     url: ${{ secrets.WEBHOOK_URL }}
-    #     #headers: '{"repository": "joelwmale/webhook-action"}'
-    #     body: '{"content": "🛠️ New Build Published: https://vpforce.eu/downloads/TelemFFB/${{ env.ZIP_FILENAME }}" }'
+    - name: Invoke webhook
+      uses: joelwmale/webhook-action@master
+      with:
+        url: ${{ secrets.WEBHOOK_URL }}
+        #headers: '{"repository": "joelwmale/webhook-action"}'
+        body: '{"content": "🛠️ New Build Published: https://vpforce.eu/downloads/TelemFFB/${{ env.ZIP_FILENAME }}" }'
