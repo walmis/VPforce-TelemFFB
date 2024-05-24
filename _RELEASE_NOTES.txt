@@ -1,6 +1,21 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  May 24, 2024
+############################################
+## DCS F-4E Maintenance Release
+- Added telemetry hooks needed to enable the damage effect
+- Added 'stick/pedal' shaker effect
+ - Disabled by default but set-up in F-4E profile to activate at 22.3deg AoA
+ - Is only a pedal feature IRL for the F-4E, but can be enabled on joystick and/or pedals
+- Disabled for default F-4E profile as they conflict with HB's native implementation of each:
+ - G-force effect
+ - Gear Buffeting
+ - Stall Buffeting
+ - Speedbrake Buffeting
+ - Afterburner Rumble
+
+############################################
 ##  May 19, 2024
 ############################################
 ## General/System:
