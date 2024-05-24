@@ -1979,6 +1979,69 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>705</order>
+		<name>enable_stick_shaker</name>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>AoA Stick Shaker</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>705</order>
+		<name>enable_stick_shaker</name>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>AoA Pedal Shaker</displayname>
+		<DCS>true</DCS>
+		<pedals>true</pedals>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>705.2</order>
+		<name>stick_shaker_intensity</name>
+		<prereq>enable_stick_shaker</prereq>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>Shaker Intensity</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>0.4</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>705.3</order>
+		<name>stick_shaker_aoa</name>
+		<prereq>enable_stick_shaker</prereq>
+		<any>true</any>
+		<info>AoA at which stick shaker activates</info>
+		<displayname>Shaker AoA Threshold</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>22.3</value>
+		<datatype>anyfloat</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>705.4</order>
+		<name>stick_shaker_frequency</name>
+		<prereq>enable_stick_shaker</prereq>
+		<info>Freqency in Hz of the effect</info>
+		<displayname>Shaker Freqency (Hz)</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>40</value>
+		<datatype>d_int</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>710</order>
 		<name>aoa_effect_enabled</name>
@@ -3505,7 +3568,84 @@
 		<model>F-4E-45MC</model>
 		<value>3.0</value>
 		<sim>DCS</sim>
-		<device>joystick</device>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gforce_effect_enable</name>
+		<model>F-4E-45MC</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aoa_buffeting_enabled</name>
+		<model>F-4E-45MC</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>afterburner_effect_enabled</name>
+		<model>F-4E-45MC</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gear_buffet_effect_enabled</name>
+		<model>F-4E-45MC</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>speedbrake_buffet_effect_enabled</name>
+		<model>F-4E-45MC</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>dummy_weapon_direction</name>
+		<model>F-4E-45MC</model>
+		<value>true</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>weapon_effect_direction</name>
+		<model>F-4E-45MC</model>
+		<value>-1</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>enable_stick_shaker</name>
+		<model>F-4E-45MC</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>stick_shaker_intensity</name>
+		<model>F-4E-45MC</model>
+		<value>0.4</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>stick_shaker_aoa</name>
+		<model>F-4E-45MC</model>
+		<value>22.3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>stick_shaker_frequency</name>
+		<model>F-4E-45MC</model>
+		<value>40</value>
+		<sim>DCS</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -8550,6 +8690,34 @@
 		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>enable_stick_shaker</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>enable_stick_shaker</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>enable_stick_shaker</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>enable_stick_shaker</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>engine_jet_rumble_enabled</name>
