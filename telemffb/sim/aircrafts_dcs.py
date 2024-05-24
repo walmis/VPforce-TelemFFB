@@ -24,8 +24,7 @@ import time
 
 from telemffb import utils
 from telemffb.utils import overrides
-from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE,
-                                   HapticEffect)
+from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
 
 from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects, perftracker
 
@@ -104,6 +103,11 @@ class Aircraft(AircraftBase):
     override_spring_cp0_x = 0
     override_spring_cp0_y = 0
 
+    enable_stick_shaker = 1
+    stick_shaker_intensity = .5
+    stick_shaker_aoa = 22.3
+    stick_shaker_frequency = 40
+
     ####
     ####
     def __init__(self, name : str, **kwargs):
@@ -172,6 +176,7 @@ class Aircraft(AircraftBase):
         if self.is_collective():
             self._override_collective_spring(telem_data)
         self._update_touchdown_effect(telem_data)
+        self._update_stick_shaker(telem_data)
         self.override_spring()
 
     @overrides(AircraftBase)
@@ -330,6 +335,38 @@ class Aircraft(AircraftBase):
         # override DCS input and set our own values
         self.send_commands([f"LoSetCommand(2001, {y - offs_y})", 
                             f"LoSetCommand(2002, {x - offs_x})"])
+
+    def _update_stick_shaker(self, telem_data):
+        if not self.enable_stick_shaker:
+            effects['stick_shaker1'].destroy()
+            effects['stick_shaker2'].destroy()
+            return
+
+        aoa = telem_data.get('AoA', 0)
+        if aoa > self.stick_shaker_aoa:
+            shake = True
+        else:
+            shake = False
+
+        if self.is_joystick():
+            dir1 = 0
+            dir2 = 180
+        elif self.is_pedals():
+            dir1 = 90
+            dir2 = 270
+        else:
+            return
+
+
+
+
+        if shake:
+            freq = self.stick_shaker_frequency
+            effects['stick_shaker1'].periodic(freq, self.stick_shaker_intensity, dir1, EFFECT_SAWTOOTHUP).start()
+            effects['stick_shaker2'].periodic(freq, self.stick_shaker_intensity, dir2, EFFECT_SAWTOOTHDOWN).start()
+        else:
+            effects['stick_shaker1'].destroy()
+            effects['stick_shaker2'].destroy()
 
     def override_spring(self):
         if not self.is_joystick(): return

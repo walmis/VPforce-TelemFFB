@@ -185,6 +185,8 @@ class EffectTranslator:
         "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
         "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
         "stick_shaker" : ["Stick Shaker","stick_shaker_intensity"],
+        "stick_shaker1" : ["Stick Shaker","stick_shaker_intensity"],
+        "stick_shaker2" : ["Stick Shaker","stick_shaker_intensity"],
         "touchdown": ["Touch-down Effect", "touchdown_effect_max_force"],
         "trim_spring": ["Trim Override Spring", ""],
         "control_weight": ["Control Weight", ""],
