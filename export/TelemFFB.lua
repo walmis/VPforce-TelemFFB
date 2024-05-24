@@ -1120,9 +1120,10 @@ local f_telemFFB = {
             damage_vars = {
               65,134,135,136,148,153,154,159,216,223,225,226,227,242,246,248,271,700,701,800,801,997,998,999
             }
-          elseif string.find(obj.Name, "F-4E-45MC", 0, true) then
-            damage_vars = "not supported" -- Just a place holder so the F4 does not get treated as an FC3 aircraft, until module is out and data can be identified
-
+          elseif string.find(obj.Name, "F-4E", 0, true) then
+            damage_vars = {
+              3200,3201,3202,3203,3204,3205,3206,3207,3208,3209,3210,3211,3212,3213,3214,3215,3216,3217,3218,3219,3220
+            }
           elseif string.find(obj.Name, "A-4E-C", 0, true) then
             damage_vars = {
               600,601,602,603,605,606,607,608,609,610,611,612,613,614,615
