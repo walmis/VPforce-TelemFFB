@@ -20,7 +20,12 @@ jobs:
       run: |
         cd dist/windows/VPforce-TelemFFB && zip -r ../../../VPforce-TelemFFB .
         echo "::set-output name=tag_name::$(git tag --sort version:refname | tail -n 1)"
-        
+     
+    - name: Extract latest release notes
+      run: |
+        pattern='(?s)############################################\n##.*?\n############################################\n((.|\n)*?)\n############################################\n'
+        python -c "import re; print(re.search('$pattern', open('_RELEASE_NOTES.txt').read()).groups()[0])" > latest_release_notes.txt
+
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
@@ -29,7 +34,8 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
-        draft: false
+        body_path: latest_release_notes.txt
+        draft: true
         prerelease: false
         
     - name: upload windows artifact
