@@ -23,7 +23,7 @@ jobs:
     - name: Make Zip
       id: zip
       run: |
-        commit_id=$(git describe --always --abbrev=8)
+        commit_id=$(git describe --always --abbrev=8 --tags)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         zip_filename="VPforce-TelemFFB-${branch_name}-${commit_id}.zip"
         echo "{ \"filename\" : \"${zip_filename}\", \"date\": \"`date -Iseconds`\", \"version\": \"${commit_id}\" }" > latest.json

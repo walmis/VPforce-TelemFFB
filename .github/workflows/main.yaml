@@ -10,15 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    
-    - name: Package Application
-      uses: walmis/pyinstaller-action-windows@py311
-      with:
-        path: .
 
     - name: Create Version file
       run: |
         echo VERSION = \"`git describe --always --abbrev=8 --dirty --tags`\" > version.py
+
+    - name: Package Application
+      uses: walmis/pyinstaller-action-windows@py311
+      with:
+        path: .
 
     - name: Make Zip
       id: zip
