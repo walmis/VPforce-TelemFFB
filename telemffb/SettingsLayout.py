@@ -4,12 +4,13 @@ import os
 
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QCursor, QIcon
+from PyQt5.QtGui import QCursor, QIcon, QColor
 from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
                              QToolButton,QCheckBox,QComboBox,QLineEdit,QFileDialog, QSpinBox)
 
 from telemffb.ButtonPressThread import ButtonPressThread
 from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider)
+from qtwidgets import Toggle, AnimatedToggle
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile
 
@@ -234,11 +235,20 @@ class SettingsLayout(QGridLayout):
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
-            checkbox = QCheckBox("")
-            checkbox.setMaximumSize(QtCore.QSize(14, 20))
-            checkbox.setMinimumSize(QtCore.QSize(14, 20))
+            t_purple = QColor("44ab37c8")
+            checkbox = Toggle(
+                checked_color="#ab37c8",
+                # bar_color=t_purple
+            )
+
+            # checkbox = AnimatedToggle(
+            #     checked_color="#ab37c8",
+            #     pulse_checked_color="#44ab37c8"
+            # )
+            checkbox.setMaximumSize(QtCore.QSize(40, 25))
+            checkbox.setMinimumSize(QtCore.QSize(40, 25))
             checkbox.setObjectName(f"cb_{item['name']}")
-            checkbox.blockSignals(True)
+            # checkbox.blockSignals(True)
             if item['value'].lower() == 'false':
                 checkbox.setCheckState(0)
                 rowdisabled = True
