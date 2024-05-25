@@ -343,7 +343,8 @@ class Aircraft(AircraftBase):
             return
 
         aoa = telem_data.get('AoA', 0)
-        if aoa > self.stick_shaker_aoa:
+        on_ground = telem_data.get('SimOnGround', True)
+        if aoa > self.stick_shaker_aoa and not on_ground:
             shake = True
         else:
             shake = False
@@ -356,9 +357,6 @@ class Aircraft(AircraftBase):
             dir2 = 270
         else:
             return
-
-
-
 
         if shake:
             freq = self.stick_shaker_frequency

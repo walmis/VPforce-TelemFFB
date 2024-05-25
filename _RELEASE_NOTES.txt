@@ -3,6 +3,8 @@ This is not an exhaustive change log (see github for that).  This file only outl
 ############################################
 ##  May 24/25, 2024
 ############################################
+## Patch 2 - May 25, 2024
+- Fix issue with stick shaker effect playing on ground with DCS F-4E
 ## Patch 1 - May 25, 2024
 - Fix issue loading app when device disconnected or configured/default PID is incorrect
 ## Release - May 24, 2024
