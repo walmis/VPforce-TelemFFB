@@ -14,6 +14,7 @@ jobs:
     - name: Create Version file
       run: |
         echo VERSION = \"`git describe --always --abbrev=8 --dirty --tags`\" > version.py
+        echo RELEASE=True >> version.py
 
     - name: Package Application
       uses: walmis/pyinstaller-action-windows@py311
