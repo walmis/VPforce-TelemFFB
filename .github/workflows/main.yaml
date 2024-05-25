@@ -58,15 +58,18 @@ jobs:
       run: |
         commit_id=$(git describe --always --abbrev=8 --tags)
         branch_name=$(git rev-parse --abbrev-ref HEAD)
-        echo "{ \"filename\" : \"${{ steps.upload_release.outputs.browser_download_url }}\", \"date\": \"`date -Iseconds`\", \"version\": \"${commit_id}\" }" > latest.json
+        filename=VPforce-TelemFFB-${{ steps.zip.outputs.tag_name }}.zip
+        
+        echo "{ \"url\" : \"${{ steps.upload_release.outputs.browser_download_url }}\", \"filename\" : \"${filename}\", \"date\": \"`date -Iseconds`\", \"version\": \"${commit_id}\" }" > latest.json
         cat latest.json
+        mv VPforce-TelemFFB.zip VPforce-TelemFFB-${{ steps.zip.outputs.tag_name }}.zip
 
     - name: Deploy to Server
       uses: easingthemes/ssh-deploy@main
       env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-v"
-          SOURCE: "latest.json"
+          SOURCE: "VPforce-TelemFFB*.zip latest.json"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ${{ secrets.REMOTE_TARGET }}
