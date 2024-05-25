@@ -57,4 +57,4 @@ jobs:
       with:
         url: ${{ secrets.WEBHOOK_URL }}
         #headers: '{"repository": "joelwmale/webhook-action"}'
-        body: '{"content": "🛠️ New Build Published: https://vpforce.eu/downloads/TelemFFB/${{ env.ZIP_FILENAME }}" }'
+        body: '{"content": "🛠️ New Dev Build Published: https://vpforce.eu/downloads/TelemFFB/${{ env.ZIP_FILENAME }}" }'

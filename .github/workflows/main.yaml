@@ -44,6 +44,7 @@ jobs:
         prerelease: false
         
     - name: upload windows artifact
+      id: upload_release
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ github.token }}
@@ -52,3 +53,10 @@ jobs:
         asset_path:  VPforce-TelemFFB.zip
         asset_name: VPforce-TelemFFB-${{ steps.zip.outputs.tag_name }}.zip
         asset_content_type: application/zip
+
+    - name: update latest.json
+      run: |
+        commit_id=$(git describe --always --abbrev=8 --tags)
+        branch_name=$(git rev-parse --abbrev-ref HEAD)
+        echo "{ \"filename\" : \"${{ steps.upload_release.outputs.browser_download_url }}\", \"date\": \"`date -Iseconds`\", \"version\": \"${commit_id}\" }" > latest.json
+        cat latest.json
