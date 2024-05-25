@@ -1,7 +1,8 @@
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider
-from PyQt5.QtCore import pyqtSignal, Qt, QSize
-from PyQt5.QtGui import QPainter, QColor, QCursor, QGuiApplication
+from PyQt5.QtCore import pyqtSignal, Qt, QSize, QRect
+from PyQt5.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen
+from PyQt5.QtWidgets import QStyle, QStyleOptionSlider
 
 import telemffb.globals as G
 from telemffb.utils import HiDpiPixmap
@@ -156,6 +157,165 @@ class NoWheelSlider(QSlider):
         else:
             super().keyReleaseEvent(event)
 
+
+class NoWheelNumberSlider(QSlider):
+    def __init__(self, *args, **kwargs):
+        super(NoWheelNumberSlider, self).__init__(*args, **kwargs)
+        # Default colors
+        self.groove_color = "#bbb"
+        self.handle_color = vpf_purple
+        self.handle_height = 20
+        self.handle_width = 32
+        self.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        # Apply styles
+        self.update_styles()
+        #self.pct_max = 0
+        self.value_text = ""  # Add an attribute to store the text to be shown in the handle
+
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setMouseTracking(True)
+        self.is_mouse_over = False
+
+    def wheelEvent(self, event):
+        if event.modifiers() & Qt.ShiftModifier:
+            # Adjust the value by increments of 1
+            current_value = self.value()
+            if event.angleDelta().y() > 0:
+                new_value = current_value + 1
+            elif event.angleDelta().y() < 0:
+                new_value = current_value - 1
+
+            # Ensure the new value is within the valid range
+            new_value = max(self.minimum(), min(self.maximum(), new_value))
+
+            self.setValue(new_value)
+            event.accept()
+        else:
+            event.ignore()
+
+    def update_styles(self):
+        # Generate CSS based on color and size properties
+        css = f"""
+            QSlider::groove:horizontal {{
+                border: 1px solid #565a5e;
+                height: 8px;  /* Adjusted groove height */
+                background: {self.groove_color};
+                margin: 0;
+                border-radius: 3px;  /* Adjusted border radius */
+            }}
+            QSlider::handle:horizontal {{
+                background: {self.handle_color};
+                border: 1px solid #565a5e;
+                width: {self.handle_width}px;  /* Adjusted handle width */
+                height: {self.handle_height}px;  /* Adjusted handle height */
+                border-radius: {self.handle_height / 4}px;  /* Adjusted border radius */
+                margin-top: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
+                margin-bottom: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
+                margin-left: -1px;  /* Adjusted left margin */
+                margin-right: -1px;  /* Adjusted right margin */
+            }}
+        """
+        self.setStyleSheet(css)
+
+    def setGrooveColor(self, color):
+        self.groove_color = color
+        self.update_styles()
+
+    def setHandleColor(self, color, text=""):
+        self.handle_color = color
+        self.value_text = text
+        self.update_styles()
+        self.update()  # Ensure the slider is repainted to show the new text
+
+    def setHandleHeight(self, height):
+        self.handle_height = height
+        self.update_styles()
+
+    def enterEvent(self, event):
+        self.is_mouse_over = True
+
+    def leaveEvent(self, event):
+        self.is_mouse_over = False
+
+    def keyPressEvent(self, event):
+
+        if self.is_mouse_over:
+            # self.blockSignals(True)
+            if event.key() == Qt.Key_Left:
+                self.setValue(self.value() - 1)
+            elif event.key() == Qt.Key_Right:
+                self.setValue(self.value() + 1)
+            else:
+                super().keyPressEvent(event)
+        # else:
+        #     super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event):
+
+        if self.is_mouse_over:
+            self.blockSignals(False)
+            # if event.key() == Qt.Key_Left:
+            #     self.valueChanged.emit(self.value() - 1)
+            # elif event.key() == Qt.Key_Right:
+            #     self.valueChanged.emit(self.value() + 1)
+
+            pass
+        else:
+            super().keyReleaseEvent(event)
+
+    def paintEvent(self, event):
+        super(NoWheelNumberSlider, self).paintEvent(event)
+        painter = QPainter(self)
+
+        # Draw the handle with the gradient color
+        option = QStyleOptionSlider()
+        self.initStyleOption(option)
+        handle_rect = self.style().subControlRect(self.style().CC_Slider, option,
+                                                  self.style().SC_SliderHandle, self)
+
+        # Adjust the handle rect width to match the custom handle width
+        handle_rect.setWidth(self.handle_width)
+
+        # Calculate the correct position for the handle based on the slider value
+        if self.orientation() == Qt.Horizontal:
+            handle_x = self.style().sliderPositionFromValue(self.minimum(), self.maximum(), self.value(),
+                                                            self.width() - self.handle_width)
+            handle_rect.moveLeft(handle_x + 3)
+        else:
+            handle_y = self.style().sliderPositionFromValue(self.minimum(), self.maximum(), self.value(),
+                                                            self.height() - self.handle_height)
+            handle_rect.moveTop(handle_y)
+
+        # Calculate the center of the handle rect
+        handle_center = handle_rect.center()
+
+        # Calculate the text width and height
+        text_width = painter.fontMetrics().width(self.value_text)
+        text_height = painter.fontMetrics().height()
+
+        # Calculate the top-left position for the text to be centered
+        text_x = handle_center.x() - text_width / 2
+        text_y = handle_center.y() - text_height / 2
+
+        # Set the text position within the handle
+        text_rect = QRect(int(text_x), int(text_y), text_width, text_height)
+
+        # Draw the text inside the handle
+        painter.setPen(Qt.white)
+        painter.drawText(handle_rect, Qt.AlignCenter, self.value_text)
+
+    def initStyleOption(self, option):
+        option.initFrom(self)
+        option.subControls = QStyle.SC_SliderHandle | QStyle.SC_SliderGroove
+        option.orientation = self.orientation()
+        option.minimum = self.minimum()
+        option.maximum = self.maximum()
+        option.sliderPosition = self.sliderPosition()
+        option.sliderValue = self.value()
+        option.singleStep = self.singleStep()
+        option.pageStep = self.pageStep()
+        option.tickPosition = self.tickPosition()
+        option.tickInterval = self.tickInterval()
 
 class ClickLogo(QLabel):
     clicked = pyqtSignal()
@@ -396,6 +556,7 @@ class SimStatusLabel(QWidget):
     def create_paused_icon(self, color, size):
         pixmap = HiDpiPixmap(size)
         pixmap.fill(Qt.transparent)
+
         # Draw a circle (optional)
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing, 1)
@@ -425,7 +586,7 @@ class SimStatusLabel(QWidget):
 
         # Draw a circle (optional)
         painter = QPainter(pixmap)
-        
+
         painter.setRenderHint(QPainter.Antialiasing, 1)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
         painter.setBrush(color)

@@ -76,7 +76,7 @@
 		<MSFS>true</MSFS>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
+		<datatype>n_float</datatype>
 		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<displayname>Aileron Max Force</displayname>
 		<XPLANE>true</XPLANE>
@@ -102,7 +102,7 @@
 		<MSFS>true</MSFS>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
+		<datatype>n_float</datatype>
 		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<displayname>Elevator Max Force</displayname>
 		<XPLANE>true</XPLANE>
@@ -128,7 +128,7 @@
 		<MSFS>true</MSFS>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
+		<datatype>n_float</datatype>
 		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<displayname>Rudder Max Force</displayname>
 		<XPLANE>true</XPLANE>

@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
                              QToolButton,QCheckBox,QComboBox,QLineEdit,QFileDialog, QSpinBox)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider)
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider)
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile
 
@@ -294,6 +294,10 @@ class SettingsLayout(QGridLayout):
         slider.setOrientation(QtCore.Qt.Horizontal)
         slider.setObjectName(f"sld_{item['name']}")
 
+        n_slider = NoWheelNumberSlider()
+        n_slider.setOrientation(QtCore.Qt.Horizontal)
+        n_slider.setObjectName(f"sld_{item['name']}")
+
         d_slider = NoWheelSlider()
         d_slider.setOrientation(QtCore.Qt.Horizontal)
         d_slider.setObjectName(f"dsld_{item['name']}")
@@ -373,6 +377,36 @@ class SettingsLayout(QGridLayout):
             self.addWidget(sliderfactor, i, fct_col)
 
             slider.blockSignals(False)
+
+        if item['datatype'] == 'n_float' :
+
+            # print(f"label {value_label.objectName()} for slider {slider.objectName()}")
+            factor = float(item['sliderfactor'])
+            if '%' in item['value']:
+                floatval = float(item['value'].replace('%', ''))
+                val = floatval / 100
+            else:
+                val = float(item['value'])
+
+            pctval = int((val / factor) * 100)
+            if self.show_slider_debug:
+                logging.debug(f"read value: {item['value']}  factor: {item['sliderfactor']} slider: {pctval}")
+            n_slider.blockSignals(True)
+            if validvalues is None or validvalues == '':
+                pass
+            else:
+                n_slider.setRange(int(validvalues[0]), int(validvalues[1]))
+            n_slider.setValue(pctval)
+            value_label.setText(str(pctval) + '%')
+            # value_label.setToolTip(f"Actual Value: %{int(val * 100)}")
+            n_slider.valueChanged.connect(self.slider_changed)
+            n_slider.sliderPressed.connect(self.sldDisconnect)
+            n_slider.sliderReleased.connect(self.sldReconnect)
+            self.addWidget(n_slider, i, entry_col, 1, entry_colspan)
+            self.addWidget(value_label, i, val_col, alignment=Qt.AlignVCenter)
+            self.addWidget(sliderfactor, i, fct_col)
+
+            n_slider.blockSignals(False)
 
         if item['datatype'] == 'd_float':
 
