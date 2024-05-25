@@ -647,7 +647,11 @@ class MainWindow(QMainWindow):
         self.version_label.setOpenExternalLinks(True)
 
         self.firmware_label = QLabel()
-        self.firmware_label.setText(f'Rhino Firmware: {HapticEffect.device.get_firmware_version()}')
+        try:
+            f_vers = HapticEffect.device.get_firmware_version()
+        except:
+            f_vers = 'error fetching'
+        self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
 
         self.version_label.setAlignment(Qt.AlignLeft)
         self.firmware_label.setAlignment(Qt.AlignRight)
