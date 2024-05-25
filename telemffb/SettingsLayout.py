@@ -235,10 +235,10 @@ class SettingsLayout(QGridLayout):
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
-            t_purple = QColor("44ab37c8")
+            t_purple = QColor("#44ab37c8")
             checkbox = Toggle(
                 checked_color="#ab37c8",
-                # bar_color=t_purple
+                bar_color=t_purple
             )
 
             # checkbox = AnimatedToggle(
@@ -335,6 +335,7 @@ class SettingsLayout(QGridLayout):
         expand_button.setMinimumWidth(24)
         expand_button.setObjectName(f"ex_{item['name']}")
         expand_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        expand_button.setStyleSheet("QToolButton#expand_button { background-color: rgba(171, 55, 200, 68); }")
         expand_button.clicked.connect(self.expander_clicked)
 
         usb_button_text = f"Button {item['value']}"
