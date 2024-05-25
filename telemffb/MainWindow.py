@@ -25,7 +25,7 @@ import telemffb.xmlutils as xmlutils
 from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.custom_widgets import (ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider,
-                                     SimStatusLabel, vpf_purple)
+                                     NoWheelNumberSlider, SimStatusLabel, vpf_purple)
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
@@ -1234,21 +1234,34 @@ class MainWindow(QMainWindow):
                     slidername = my_slider.objectName().replace('sld_', '')
                     my_slider.blockSignals(True)
 
+                    for a_s in active_settings:
+                        if bool(re.search(a_s, slidername)):
+                            my_slider.setHandleColor("#17c411")
+                            break
+                        else:
+                            my_slider.setHandleColor(vpf_purple)
+                    my_slider.blockSignals(False)
+
+                n_sliders = self.findChildren(NoWheelNumberSlider)
+                for my_slider in n_sliders:
+                    slidername = my_slider.objectName().replace('sld_', '')
+                    my_slider.blockSignals(True)
+
                     if slidername == 'max_elevator_coeff':
                         new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_e)
-                        my_slider.setHandleColor(new_color.name())
-                        # print(new_color)
+                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_e *100)}%")
+                        # print(int(pct_max_e * 100))
                         my_slider.blockSignals(False)
                         continue
                     if slidername == 'max_aileron_coeff':
                         new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_a)
-                        my_slider.setHandleColor(new_color.name())
+                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_a * 100)}%")
                         # print(new_color)
                         my_slider.blockSignals(False)
                         continue
                     if slidername == 'max_rudder_coeff':
                         new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_r)
-                        my_slider.setHandleColor(new_color.name())
+                        my_slider.setHandleColor(new_color.name(), f"{int(pct_max_r * 100)}%")
                         # print(new_color)
                         my_slider.blockSignals(False)
                         continue
