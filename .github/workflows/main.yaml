@@ -40,7 +40,7 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         body_path: latest_release_notes.txt
-        draft: true
+        draft: false
         prerelease: false
         
     - name: upload windows artifact
@@ -60,3 +60,14 @@ jobs:
         branch_name=$(git rev-parse --abbrev-ref HEAD)
         echo "{ \"filename\" : \"${{ steps.upload_release.outputs.browser_download_url }}\", \"date\": \"`date -Iseconds`\", \"version\": \"${commit_id}\" }" > latest.json
         cat latest.json
+
+    - name: Deploy to Server
+      uses: easingthemes/ssh-deploy@main
+      env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-v"
+          SOURCE: "latest.json"
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          TARGET: ${{ secrets.REMOTE_TARGET }}
+          #EXCLUDE: "/dist/, /node_modules/"
