@@ -8,7 +8,7 @@ import telemffb.globals as G
 from telemffb.utils import HiDpiPixmap
 
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
-
+t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
 class NoKeyScrollArea(QScrollArea):
     def __init__(self):

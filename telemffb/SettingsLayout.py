@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
                              QToolButton,QCheckBox,QComboBox,QLineEdit,QFileDialog, QSpinBox)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider)
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple)
 from qtwidgets import Toggle, AnimatedToggle
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile
@@ -235,9 +235,9 @@ class SettingsLayout(QGridLayout):
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
-            t_purple = QColor("#44ab37c8")
+
             checkbox = Toggle(
-                checked_color="#ab37c8",
+                checked_color=vpf_purple,
                 bar_color=t_purple
             )
 
