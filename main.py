@@ -210,8 +210,8 @@ def main():
             
             QPushButton, #styledButton {
                 background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                                  stop: 0 #ab37c8, stop: 0.4 #9a24b5,
-                                                  stop: 0.5 #8e1da8, stop: 1.0 #ab37c8);
+                                  stop: 0 #c174e6, stop: 0.3 #ab37c8,
+                                  stop: 0.7 #8e1da8, stop: 1.0 #6e1d6f);
                 border: 1px solid #6e1d6f;
                 border-radius: 5px;
                 padding: 3px;
@@ -220,8 +220,8 @@ def main():
             }
             QPushButton:disabled {
                 background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                                  stop: 0 #cccccc, stop: 0.4 #bbbbbb,
-                                                  stop: 0.5 #C1ADC6, stop: 1.0 #cccccc);
+                                  stop: 0 #e1e1e1, stop: 0.3 #cccccc,
+                                  stop: 0.7 #bbbbbb, stop: 1.0 #aaaaaa);
                 color: #666666;  /* Set the text color for disabled buttons */
                 border: 1px solid #6e1d6f;
                 border-radius: 5px;
@@ -230,8 +230,8 @@ def main():
             }
             QPushButton:hover, #styledButton:hover {
                 background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                                stop: 0 #d97ed1, stop: 0.4 #d483d4,
-                                                stop: 0.5 #d992da, stop: 1.0 #e4a9e7);
+                                  stop: 0 #e4a9e7, stop: 0.3 #d97ed1,
+                                  stop: 0.7 #d483d4, stop: 1.0 #c74ab8);
             }
 
             QComboBox::down-arrow {

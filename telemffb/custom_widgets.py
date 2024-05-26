@@ -2,7 +2,8 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox
 from PyQt5.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty
-from PyQt5.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent
+from PyQt5.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
+    QLinearGradient
 from PyQt5.QtWidgets import QStyle, QStyleOptionSlider
 
 import telemffb.globals as G
@@ -65,7 +66,7 @@ class NoWheelSlider(QSlider):
         self.handle_color = vpf_purple
         self.handle_height = 20
         self.handle_width = 16
-        self.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        self.setCursor(QCursor(Qt.PointingHandCursor))
         # Apply styles
         self.update_styles()
 
@@ -468,7 +469,7 @@ class StatusLabel(QWidget):
 class SimStatusLabel(QWidget):
     def __init__(self, name : str):
         super().__init__()
-        self.icon_size = QSize(18, 18)
+        self.icon_size = QSize(22, 22)
 
         self._paused_state = False
         self._error_state = False
@@ -482,9 +483,9 @@ class SimStatusLabel(QWidget):
         self.pix = QLabel()
         self.pix.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        enable_color = QColor(255,255,0)
+        enable_color = QColor(255, 235, 0)
         disable_color = QColor(128, 128, 128) # grey
-        active_color = QColor(0, 255, 0)
+        active_color = QColor(23, 196, 17)
         paused_color = QColor(0, 0, 255)
         error_color = QColor(255, 0, 0)
 
@@ -558,26 +559,36 @@ class SimStatusLabel(QWidget):
             self.pix.setPixmap(self.disabled_pixmap)
             self.setToolTip("Sim is disabled")
 
-
     def create_paused_icon(self, color, size):
         pixmap = HiDpiPixmap(size)
         pixmap.fill(Qt.transparent)
 
-        # Draw a circle (optional)
+        # Draw a circle with a gradient for 3D effect
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing, 1)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
-        painter.setBrush(color)
+
+        # Adjust focus point and radius for a stronger 3D effect
+        gradient = QRadialGradient(size.width() / 2, size.height() / 2, size.width() / 2,
+                                   size.width() / 2, size.height() / 2 - size.height() / 4)
+        gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
+        gradient.setColorAt(0.4, color)  # Base color in the middle
+        gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
+
+        painter.setBrush(gradient)
+        painter.setPen(Qt.NoPen)
         painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
 
         # Draw two vertical lines for the pause icon
-        line_length = int(size.width() / 3)
-        line_width = 1
+        line_length = int(size.height() * 0.4)
+        line_width = int(size.width() * 0.15)
+        spacing = int(size.width() * 0.2)
         line1_x = int((size.width() / 2) - 2)
         line2_x = int((size.width() / 2) + 2)
         line_y = int((size.height() - line_length) / 2)
 
-        painter.setPen(QColor(Qt.white))
+        # Draw the white pause lines
+        painter.setPen(QPen(Qt.white, line_width))
         painter.drawLine(line1_x, line_y, line1_x, line_y + line_length)
         painter.drawLine(line2_x, line_y, line2_x, line_y + line_length)
 
@@ -585,18 +596,27 @@ class SimStatusLabel(QWidget):
 
         return pixmap
 
-    def create_colored_icon(self, color, size : QSize):
+    def create_colored_icon(self, color, size: QSize):
         # Create a QPixmap with the specified color and size
         pixmap = HiDpiPixmap(size)
         pixmap.fill(Qt.transparent)
 
-        # Draw a circle (optional)
+        # Draw a circle with a gradient for 3D effect
         painter = QPainter(pixmap)
-
         painter.setRenderHint(QPainter.Antialiasing, 1)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
-        painter.setBrush(color)
-        painter.drawEllipse(QtCore.QRectF(2, 2, size.width() - 4, size.height() - 4))
+
+        # Adjust focus point and radius for a stronger 3D effect
+        gradient = QRadialGradient(size.width() / 2, size.height() / 2, size.width() / 2,
+                                   size.width() / 2, size.height() / 2 - size.height() / 4)
+        gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
+        gradient.setColorAt(0.4, color)  # Base color in the middle
+        gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
+
+        painter.setBrush(gradient)
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+
         painter.end()
 
         return pixmap
@@ -605,23 +625,36 @@ class SimStatusLabel(QWidget):
         pixmap = HiDpiPixmap(size)
         pixmap.fill(Qt.transparent)
 
-        # Draw a circle (optional)
+        # Draw a circle with a gradient for 3D effect
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing, 1)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
-        painter.setBrush(color)
+
+        # Adjust focus point and radius for a stronger 3D effect
+        gradient = QRadialGradient(size.width() / 2, size.height() / 2, size.width() / 2,
+                                   size.width() / 2, size.height() / 2 - size.height() / 4)
+        gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
+        gradient.setColorAt(0.4, color)  # Base color in the middle
+        gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
+
+        painter.setBrush(gradient)
+        painter.setPen(Qt.NoPen)
         painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
 
-        # Draw two vertical lines for the pause icon
-        line_length = int(size.width() / 3)
-        line_width = 1
-        line1_x = int((size.width() / 2) - 2)
-        line2_x = int((size.width() / 2) + 2)
-        line_y = int((size.height() - line_length) / 2)
+        # Draw two diagonal lines for the 'X' icon with shadow
+        line_length = int(size.width() * 0.3)
+        line_width = int(size.width() * 0.15)
+        offset = int((size.width() - line_length) / 2)
 
-        painter.setPen(QColor(Qt.white))
-        painter.drawLine(line1_x, line_y, line2_x, line_y + line_length)
-        painter.drawLine(line2_x, line_y, line1_x, line_y + line_length)
+        line1_start = QPointF(offset, offset)
+        line1_end = QPointF(size.width() - offset, size.height() - offset)
+        line2_start = QPointF(size.width() - offset, offset)
+        line2_end = QPointF(offset, size.height() - offset)
+
+        # Draw the white 'X' lines
+        painter.setPen(QPen(Qt.white, line_width))
+        painter.drawLine(line1_start, line1_end)
+        painter.drawLine(line2_start, line2_end)
 
         painter.end()
 
