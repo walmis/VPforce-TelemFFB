@@ -9,8 +9,7 @@ from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
                              QToolButton,QCheckBox,QComboBox,QLineEdit,QFileDialog, QSpinBox)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple)
-from qtwidgets import Toggle, AnimatedToggle
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, AnimatedToggle)
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile
 
@@ -245,8 +244,8 @@ class SettingsLayout(QGridLayout):
             #     checked_color="#ab37c8",
             #     pulse_checked_color="#44ab37c8"
             # )
-            checkbox.setMaximumSize(QtCore.QSize(40, 25))
-            checkbox.setMinimumSize(QtCore.QSize(40, 25))
+            checkbox.setMaximumSize(QtCore.QSize(45, 30))
+            checkbox.setMinimumSize(QtCore.QSize(45, 30))
             checkbox.setObjectName(f"cb_{item['name']}")
             # checkbox.blockSignals(True)
             if item['value'].lower() == 'false':

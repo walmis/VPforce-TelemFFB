@@ -5,5 +5,3 @@ stransi
 libusb1
 pygetwindow
 requests
-qtwidgets
-qtpy
