@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>620</width>
-    <height>650</height>
+    <height>680</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -19,13 +19,13 @@
   <property name="minimumSize">
    <size>
     <width>620</width>
-    <height>650</height>
+    <height>680</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>620</width>
-    <height>650</height>
+    <height>680</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -60,7 +60,7 @@
    <property name="geometry">
     <rect>
      <x>430</x>
-     <y>610</y>
+     <y>640</y>
      <width>156</width>
      <height>23</height>
     </rect>
@@ -76,7 +76,7 @@
    <property name="geometry">
     <rect>
      <x>21</x>
-     <y>610</y>
+     <y>640</y>
      <width>121</width>
      <height>23</height>
     </rect>
@@ -91,23 +91,10 @@
      <x>20</x>
      <y>31</y>
      <width>261</width>
-     <height>122</height>
+     <height>137</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout">
-    <item row="0" column="1">
-     <widget class="QComboBox" name="logLevel"/>
-    </item>
-    <item row="1" column="1">
-     <widget class="QLineEdit" name="telemTimeout"/>
-    </item>
-    <item row="3" column="0">
-     <widget class="QCheckBox" name="cb_logPrune">
-      <property name="text">
-       <string>Prune Logs (Global):</string>
-      </property>
-     </widget>
-    </item>
     <item row="0" column="0">
      <widget class="QLabel" name="label">
       <property name="text">
@@ -115,19 +102,8 @@
       </property>
      </widget>
     </item>
-    <item row="1" column="0">
-     <widget class="QLabel" name="label_2">
-      <property name="text">
-       <string>Telemetry Timeout (ms):</string>
-      </property>
-     </widget>
-    </item>
-    <item row="2" column="0" colspan="2">
-     <widget class="QCheckBox" name="ignoreUpdate">
-      <property name="text">
-       <string>Disable Update Prompt on Startup</string>
-      </property>
-     </widget>
+    <item row="0" column="1">
+     <widget class="QComboBox" name="logLevel"/>
     </item>
     <item row="4" column="0" colspan="2">
      <layout class="QHBoxLayout" name="horizontalLayout_5">
@@ -219,87 +195,35 @@
       </item>
      </layout>
     </item>
-   </layout>
-  </widget>
-  <widget class="QWidget" name="layoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>30</x>
-     <y>356</y>
-     <width>459</width>
-     <height>82</height>
-    </rect>
-   </property>
-   <layout class="QGridLayout" name="il2_sub_layout">
-    <item row="0" column="0">
-     <widget class="QCheckBox" name="validateIL2">
+    <item row="3" column="0">
+     <widget class="LabeledToggle" name="cb_logPrune">
       <property name="text">
-       <string>Auto IL-2 Telemetry setup</string>
+       <string>Prune Logs (Global):</string>
       </property>
      </widget>
     </item>
     <item row="1" column="0">
-     <layout class="QHBoxLayout" name="horizontalLayout">
-      <item>
-       <widget class="QLabel" name="lab_pathIL2">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="minimumSize">
-         <size>
-          <width>98</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>IL-2 Install Path:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="pathIL2"/>
-      </item>
-      <item>
-       <widget class="QToolButton" name="browseIL2">
-        <property name="text">
-         <string>...</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
+     <widget class="QLabel" name="label_2">
+      <property name="text">
+       <string>Telemetry Timeout (ms):</string>
+      </property>
+     </widget>
     </item>
-    <item row="2" column="0">
-     <layout class="QHBoxLayout" name="horizontalLayout_2">
-      <item>
-       <widget class="QLabel" name="lab_portIL2">
-        <property name="text">
-         <string>IL-2 Telemetry Port:</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLineEdit" name="portIL2"/>
-      </item>
-      <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeType">
-         <enum>QSizePolicy::Fixed</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>279</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-     </layout>
+    <item row="1" column="1">
+     <widget class="QLineEdit" name="telemTimeout"/>
+    </item>
+    <item row="2" column="0" colspan="2">
+     <widget class="LabeledToggle" name="ignoreUpdate">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="text">
+       <string>Disable Update Prompt on Startup</string>
+      </property>
+     </widget>
     </item>
    </layout>
   </widget>
@@ -307,7 +231,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>447</y>
+     <y>453</y>
      <width>581</width>
      <height>16</height>
     </rect>
@@ -372,7 +296,7 @@
    <property name="geometry">
     <rect>
      <x>20</x>
-     <y>460</y>
+     <y>466</y>
      <width>181</width>
      <height>16</height>
     </rect>
@@ -392,7 +316,7 @@
    <property name="geometry">
     <rect>
      <x>30</x>
-     <y>480</y>
+     <y>486</y>
      <width>101</width>
      <height>16</height>
     </rect>
@@ -405,21 +329,24 @@
    <property name="geometry">
     <rect>
      <x>36</x>
-     <y>500</y>
+     <y>506</y>
      <width>184</width>
      <height>48</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_2">
+    <property name="spacing">
+     <number>6</number>
+    </property>
     <item>
-     <widget class="QCheckBox" name="cb_save_geometry">
+     <widget class="LabeledToggle" name="cb_save_geometry">
       <property name="text">
        <string>Restore window position</string>
       </property>
      </widget>
     </item>
     <item>
-     <widget class="QCheckBox" name="cb_save_view">
+     <widget class="LabeledToggle" name="cb_save_view">
       <property name="text">
        <string>Restore last tab view</string>
       </property>
@@ -538,11 +465,46 @@ Minimized:</string>
     <rect>
      <x>313</x>
      <y>74</y>
-     <width>289</width>
-     <height>80</height>
+     <width>284</width>
+     <height>74</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout_2">
+    <item row="0" column="2">
+     <spacer name="horizontalSpacer_2">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="sizeType">
+       <enum>QSizePolicy::Fixed</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>22</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+    <item row="1" column="5">
+     <widget class="QCheckBox" name="cb_min_enable_p">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>15</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="checkable">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
     <item row="0" column="5">
      <widget class="QCheckBox" name="cb_min_enable_j">
       <property name="enabled">
@@ -562,38 +524,6 @@ Minimized:</string>
       </property>
      </widget>
     </item>
-    <item row="0" column="2">
-     <spacer name="horizontalSpacer_2">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <property name="sizeType">
-       <enum>QSizePolicy::Fixed</enum>
-      </property>
-      <property name="sizeHint" stdset="0">
-       <size>
-        <width>22</width>
-        <height>20</height>
-       </size>
-      </property>
-     </spacer>
-    </item>
-    <item row="2" column="4">
-     <spacer name="horizontalSpacer_5">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <property name="sizeType">
-       <enum>QSizePolicy::Fixed</enum>
-      </property>
-      <property name="sizeHint" stdset="0">
-       <size>
-        <width>34</width>
-        <height>20</height>
-       </size>
-      </property>
-     </spacer>
-    </item>
     <item row="0" column="3">
      <widget class="QCheckBox" name="cb_al_enable_j">
       <property name="enabled">
@@ -607,25 +537,6 @@ Minimized:</string>
       </property>
       <property name="text">
        <string/>
-      </property>
-     </widget>
-    </item>
-    <item row="1" column="5">
-     <widget class="QCheckBox" name="cb_min_enable_p">
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>15</width>
-        <height>16777215</height>
-       </size>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="checkable">
-       <bool>true</bool>
       </property>
      </widget>
     </item>
@@ -648,93 +559,6 @@ Minimized:</string>
       </property>
      </widget>
     </item>
-    <item row="2" column="1" alignment="Qt::AlignLeft">
-     <widget class="QLineEdit" name="tb_pid_c">
-      <property name="maximumSize">
-       <size>
-        <width>50</width>
-        <height>16777215</height>
-       </size>
-      </property>
-     </widget>
-    </item>
-    <item row="2" column="3">
-     <widget class="QCheckBox" name="cb_al_enable_c">
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>15</width>
-        <height>16777215</height>
-       </size>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="0" alignment="Qt::AlignLeft">
-     <widget class="QRadioButton" name="rb_master_j">
-      <property name="text">
-       <string>Joystick</string>
-      </property>
-      <property name="checked">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="4">
-     <spacer name="horizontalSpacer_7">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <property name="sizeType">
-       <enum>QSizePolicy::Fixed</enum>
-      </property>
-      <property name="sizeHint" stdset="0">
-       <size>
-        <width>34</width>
-        <height>20</height>
-       </size>
-      </property>
-     </spacer>
-    </item>
-    <item row="1" column="7">
-     <widget class="QCheckBox" name="cb_headless_p">
-      <property name="enabled">
-       <bool>false</bool>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>15</width>
-        <height>16777215</height>
-       </size>
-      </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="checkable">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="2" column="2">
-     <spacer name="horizontalSpacer_3">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <property name="sizeType">
-       <enum>QSizePolicy::Fixed</enum>
-      </property>
-      <property name="sizeHint" stdset="0">
-       <size>
-        <width>22</width>
-        <height>20</height>
-       </size>
-      </property>
-     </spacer>
-    </item>
     <item row="1" column="0" alignment="Qt::AlignLeft">
      <widget class="QRadioButton" name="rb_master_p">
       <property name="text">
@@ -742,57 +566,40 @@ Minimized:</string>
       </property>
      </widget>
     </item>
-    <item row="2" column="0" alignment="Qt::AlignLeft">
-     <widget class="QRadioButton" name="rb_master_c">
-      <property name="text">
-       <string>Colective</string>
+    <item row="1" column="6">
+     <spacer name="horizontalSpacer_10">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
       </property>
-     </widget>
-    </item>
-    <item row="1" column="1" alignment="Qt::AlignLeft">
-     <widget class="QLineEdit" name="tb_pid_p">
-      <property name="maximumSize">
+      <property name="sizeType">
+       <enum>QSizePolicy::Fixed</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
        <size>
-        <width>50</width>
-        <height>16777215</height>
+        <width>28</width>
+        <height>20</height>
        </size>
       </property>
-     </widget>
+     </spacer>
     </item>
-    <item row="0" column="7">
-     <widget class="QCheckBox" name="cb_headless_j">
-      <property name="enabled">
-       <bool>false</bool>
+    <item row="0" column="6">
+     <spacer name="horizontalSpacer_9">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
       </property>
-      <property name="maximumSize">
+      <property name="sizeType">
+       <enum>QSizePolicy::Fixed</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
        <size>
-        <width>15</width>
-        <height>16777215</height>
+        <width>28</width>
+        <height>20</height>
        </size>
       </property>
-      <property name="text">
-       <string/>
-      </property>
-      <property name="checkable">
-       <bool>true</bool>
-      </property>
-     </widget>
+     </spacer>
     </item>
-    <item row="0" column="1" alignment="Qt::AlignLeft">
-     <widget class="QLineEdit" name="tb_pid_j">
-      <property name="maximumSize">
-       <size>
-        <width>50</width>
-        <height>16777215</height>
-       </size>
-      </property>
-      <property name="text">
-       <string>2055</string>
-      </property>
-     </widget>
-    </item>
-    <item row="2" column="5">
-     <widget class="QCheckBox" name="cb_min_enable_c">
+    <item row="1" column="7">
+     <widget class="QCheckBox" name="cb_headless_p">
       <property name="enabled">
        <bool>false</bool>
       </property>
@@ -826,8 +633,37 @@ Minimized:</string>
       </property>
      </spacer>
     </item>
-    <item row="1" column="4">
-     <spacer name="horizontalSpacer_6">
+    <item row="2" column="1" alignment="Qt::AlignLeft">
+     <widget class="QLineEdit" name="tb_pid_c">
+      <property name="maximumSize">
+       <size>
+        <width>50</width>
+        <height>16777215</height>
+       </size>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="7">
+     <widget class="QCheckBox" name="cb_headless_j">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>15</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="checkable">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="2">
+     <spacer name="horizontalSpacer_3">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
@@ -836,11 +672,21 @@ Minimized:</string>
       </property>
       <property name="sizeHint" stdset="0">
        <size>
-        <width>34</width>
+        <width>22</width>
         <height>20</height>
        </size>
       </property>
      </spacer>
+    </item>
+    <item row="1" column="1" alignment="Qt::AlignLeft">
+     <widget class="QLineEdit" name="tb_pid_p">
+      <property name="maximumSize">
+       <size>
+        <width>50</width>
+        <height>16777215</height>
+       </size>
+      </property>
+     </widget>
     </item>
     <item row="1" column="3">
      <widget class="QCheckBox" name="cb_al_enable_p">
@@ -858,8 +704,28 @@ Minimized:</string>
       </property>
      </widget>
     </item>
-    <item row="0" column="6">
-     <spacer name="horizontalSpacer_9">
+    <item row="2" column="0" alignment="Qt::AlignLeft">
+     <widget class="QRadioButton" name="rb_master_c">
+      <property name="text">
+       <string>Colective</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1" alignment="Qt::AlignLeft">
+     <widget class="QLineEdit" name="tb_pid_j">
+      <property name="maximumSize">
+       <size>
+        <width>50</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string>2055</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="4">
+     <spacer name="horizontalSpacer_5">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
@@ -868,14 +734,14 @@ Minimized:</string>
       </property>
       <property name="sizeHint" stdset="0">
        <size>
-        <width>28</width>
+        <width>34</width>
         <height>20</height>
        </size>
       </property>
      </spacer>
     </item>
-    <item row="1" column="6">
-     <spacer name="horizontalSpacer_10">
+    <item row="0" column="4">
+     <spacer name="horizontalSpacer_7">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
@@ -884,7 +750,39 @@ Minimized:</string>
       </property>
       <property name="sizeHint" stdset="0">
        <size>
-        <width>28</width>
+        <width>34</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+    <item row="2" column="3">
+     <widget class="QCheckBox" name="cb_al_enable_c">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>15</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="4">
+     <spacer name="horizontalSpacer_6">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="sizeType">
+       <enum>QSizePolicy::Fixed</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>34</width>
         <height>20</height>
        </size>
       </property>
@@ -905,6 +803,35 @@ Minimized:</string>
        </size>
       </property>
      </spacer>
+    </item>
+    <item row="0" column="0" alignment="Qt::AlignLeft">
+     <widget class="QRadioButton" name="rb_master_j">
+      <property name="text">
+       <string>Joystick</string>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="5">
+     <widget class="QCheckBox" name="cb_min_enable_c">
+      <property name="enabled">
+       <bool>false</bool>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>15</width>
+        <height>16777215</height>
+       </size>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="checkable">
+       <bool>true</bool>
+      </property>
+     </widget>
     </item>
    </layout>
   </widget>
@@ -933,7 +860,7 @@ Minimized:</string>
      </widget>
     </item>
     <item>
-     <widget class="QCheckBox" name="cb_al_enable">
+     <widget class="LabeledToggle" name="cb_al_enable">
       <property name="font">
        <font>
         <weight>50</weight>
@@ -968,112 +895,12 @@ Headless:</string>
     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
    </property>
   </widget>
-  <widget class="QWidget" name="layoutWidget">
-   <property name="geometry">
-    <rect>
-     <x>30</x>
-     <y>276</y>
-     <width>270</width>
-     <height>50</height>
-    </rect>
-   </property>
-   <layout class="QGridLayout" name="gridLayout_3">
-    <item row="0" column="0" colspan="2">
-     <widget class="QCheckBox" name="validateXPLANE">
-      <property name="text">
-       <string>Auto X-Plane setup</string>
-      </property>
-     </widget>
-    </item>
-    <item row="1" column="1">
-     <widget class="QLineEdit" name="pathXPLANE"/>
-    </item>
-    <item row="1" column="2">
-     <widget class="QToolButton" name="browseXPLANE">
-      <property name="text">
-       <string>...</string>
-      </property>
-     </widget>
-    </item>
-    <item row="1" column="0">
-     <widget class="QLabel" name="lab_pathXPLANE">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="minimumSize">
-       <size>
-        <width>98</width>
-        <height>0</height>
-       </size>
-      </property>
-      <property name="text">
-       <string>X-Plane Install Path:</string>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
-  <widget class="QCheckBox" name="enableXPLANE">
-   <property name="geometry">
-    <rect>
-     <x>17</x>
-     <y>251</y>
-     <width>135</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Enable X-Plane Support</string>
-   </property>
-  </widget>
-  <widget class="QCheckBox" name="enableDCS">
-   <property name="geometry">
-    <rect>
-     <x>17</x>
-     <y>205</y>
-     <width>150</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Enable DCS World Support</string>
-   </property>
-  </widget>
-  <widget class="QCheckBox" name="enableIL2">
-   <property name="geometry">
-    <rect>
-     <x>17</x>
-     <y>330</y>
-     <width>168</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Enable IL-2 Sturmovik Support</string>
-   </property>
-  </widget>
-  <widget class="QCheckBox" name="enableMSFS">
-   <property name="geometry">
-    <rect>
-     <x>17</x>
-     <y>228</y>
-     <width>152</width>
-     <height>17</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Enable MSFS 2020 Support</string>
-   </property>
-  </widget>
   <widget class="QLabel" name="label_13">
    <property name="geometry">
     <rect>
      <x>210</x>
-     <y>478</y>
-     <width>151</width>
+     <y>484</y>
+     <width>191</width>
      <height>20</height>
     </rect>
    </property>
@@ -1085,12 +912,15 @@ Headless:</string>
    <property name="geometry">
     <rect>
      <x>222</x>
-     <y>500</y>
+     <y>506</y>
      <width>371</width>
      <height>80</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout_4">
+    <property name="verticalSpacing">
+     <number>6</number>
+    </property>
     <item row="0" column="2">
      <widget class="QToolButton" name="browseVPConfStartup">
       <property name="enabled">
@@ -1102,7 +932,7 @@ Headless:</string>
      </widget>
     </item>
     <item row="0" column="0">
-     <widget class="QCheckBox" name="enableVPConfStartup">
+     <widget class="LabeledToggle" name="enableVPConfStartup">
       <property name="text">
        <string>Load on Startup:</string>
       </property>
@@ -1133,7 +963,7 @@ Headless:</string>
      </widget>
     </item>
     <item row="2" column="0" alignment="Qt::AlignLeft">
-     <widget class="QCheckBox" name="enableVPConfExit">
+     <widget class="LabeledToggle" name="enableVPConfExit">
       <property name="text">
        <string>Load on Exit:</string>
       </property>
@@ -1158,7 +988,7 @@ Headless:</string>
        </spacer>
       </item>
       <item>
-       <widget class="QCheckBox" name="enableVPConfGlobalDefault">
+       <widget class="LabeledToggle" name="enableVPConfGlobalDefault">
         <property name="enabled">
          <bool>false</bool>
         </property>
@@ -1178,7 +1008,7 @@ Headless:</string>
    <property name="geometry">
     <rect>
      <x>21</x>
-     <y>570</y>
+     <y>576</y>
      <width>171</width>
      <height>23</height>
     </rect>
@@ -1187,7 +1017,267 @@ Headless:</string>
     <string>Open Child Instance Settings</string>
    </property>
   </widget>
+  <widget class="QWidget" name="">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>206</y>
+     <width>544</width>
+     <height>244</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout_3">
+    <property name="verticalSpacing">
+     <number>6</number>
+    </property>
+    <item row="0" column="0">
+     <widget class="LabeledToggle" name="enableDCS">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="text">
+       <string>Enable DCS World Support</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="LabeledToggle" name="enableMSFS">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="text">
+       <string>Enable MSFS 2020 Support</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="LabeledToggle" name="enableXPLANE">
+      <property name="text">
+       <string>Enable X-Plane Support</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="0">
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <spacer name="horizontalSpacer_14">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>13</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="LabeledToggle" name="validateXPLANE">
+        <property name="text">
+         <string>Auto X-Plane setup</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="4" column="0">
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+       <spacer name="horizontalSpacer_15">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>13</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="lab_pathXPLANE">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>98</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>X-Plane Install Path:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="pathXPLANE"/>
+      </item>
+      <item>
+       <widget class="QToolButton" name="browseXPLANE">
+        <property name="text">
+         <string>...</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="5" column="0">
+     <widget class="LabeledToggle" name="enableIL2">
+      <property name="text">
+       <string>Enable IL-2 Sturmovik Support</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="0">
+     <layout class="QHBoxLayout" name="horizontalLayout_6">
+      <item>
+       <spacer name="horizontalSpacer_16">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>13</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="LabeledToggle" name="validateIL2">
+        <property name="text">
+         <string>Auto IL-2 Telemetry setup</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="7" column="0">
+     <layout class="QHBoxLayout" name="horizontalLayout_7">
+      <item>
+       <spacer name="horizontalSpacer_17">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>13</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="lab_pathIL2">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>98</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>IL-2 Install Path:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="pathIL2"/>
+      </item>
+      <item>
+       <widget class="QToolButton" name="browseIL2">
+        <property name="text">
+         <string>...</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="8" column="0">
+     <layout class="QHBoxLayout" name="horizontalLayout_8">
+      <item>
+       <spacer name="horizontalSpacer_18">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>13</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="lab_portIL2">
+        <property name="text">
+         <string>IL-2 Telemetry Port:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="portIL2"/>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>279</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>LabeledToggle</class>
+   <extends>QCheckBox</extends>
+   <header>telemffb.custom_widgets</header>
+  </customwidget>
+ </customwidgets>
  <tabstops>
   <tabstop>logLevel</tabstop>
   <tabstop>telemTimeout</tabstop>
