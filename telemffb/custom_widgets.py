@@ -101,7 +101,12 @@ class NoWheelSlider(QSlider):
                 border-radius: 3px;  /* Adjusted border radius */
             }}
             QSlider::handle:horizontal {{
-                background: {self.handle_color};
+                background: qradialgradient(
+                    cx: 0.3, cy: 0.5, fx: 0.3, fy: 0.35, radius: 0.8,
+                    stop: 0.0 #ffffff,
+                    stop: 0.3 {self.handle_color},
+                    stop: 1.0 {QColor(self.handle_color).darker().name()}
+                );
                 border: 1px solid #565a5e;
                 width: {self.handle_width}px;  /* Adjusted handle width */
                 height: {self.handle_height}px;  /* Adjusted handle height */
@@ -682,14 +687,20 @@ class Toggle(QCheckBox):
         if self.isChecked():
             p.setBrush(self._bar_checked_brush)
             p.drawRoundedRect(barRect, rounding, rounding)
-            p.setBrush(self._handle_checked_brush)
-
+            handle_color = self._handle_checked_brush.color()
         else:
             p.setBrush(self._bar_brush)
             p.drawRoundedRect(barRect, rounding, rounding)
-            p.setPen(self._light_grey_pen)
-            p.setBrush(self._handle_brush)
+            handle_color = self._handle_brush.color()
 
+        # Draw the handle with a gradient for 3D effect
+        handleGradient = QRadialGradient(QPointF(xPos - handleRadius / 3, barRect.center().y() - handleRadius / 3),
+                                         handleRadius)
+        handleGradient.setColorAt(0.0, QColor(255, 255, 255, 180))
+        handleGradient.setColorAt(0.6, handle_color)
+        handleGradient.setColorAt(1.0, handle_color.darker())
+
+        p.setBrush(handleGradient)
         p.drawEllipse(
             QPointF(xPos, barRect.center().y()),
             handleRadius, handleRadius)
