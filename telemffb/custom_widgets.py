@@ -569,10 +569,9 @@ class SimStatusLabel(QWidget):
         painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
 
         # Adjust focus point and radius for a stronger 3D effect
-        gradient = QRadialGradient(size.width() / 2, size.height() / 2, size.width() / 2,
-                                   size.width() / 2, size.height() / 2 - size.height() / 4)
+        gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
         gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
-        gradient.setColorAt(0.4, color)  # Base color in the middle
+        gradient.setColorAt(0.35, color)  # Base color in the middle
         gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
 
         painter.setBrush(gradient)
@@ -581,7 +580,7 @@ class SimStatusLabel(QWidget):
 
         # Draw two vertical lines for the pause icon
         line_length = int(size.height() * 0.4)
-        line_width = int(size.width() * 0.15)
+        line_width = int(size.width() * 0.12)
         spacing = int(size.width() * 0.2)
         line1_x = int((size.width() / 2) - 2)
         line2_x = int((size.width() / 2) + 2)
@@ -607,10 +606,9 @@ class SimStatusLabel(QWidget):
         painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
 
         # Adjust focus point and radius for a stronger 3D effect
-        gradient = QRadialGradient(size.width() / 2, size.height() / 2, size.width() / 2,
-                                   size.width() / 2, size.height() / 2 - size.height() / 4)
+        gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
         gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
-        gradient.setColorAt(0.4, color)  # Base color in the middle
+        gradient.setColorAt(0.35, color)  # Base color in the middle
         gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
 
         painter.setBrush(gradient)
@@ -631,10 +629,9 @@ class SimStatusLabel(QWidget):
         painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
 
         # Adjust focus point and radius for a stronger 3D effect
-        gradient = QRadialGradient(size.width() / 2, size.height() / 2, size.width() / 2,
-                                   size.width() / 2, size.height() / 2 - size.height() / 4)
+        gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
         gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
-        gradient.setColorAt(0.4, color)  # Base color in the middle
+        gradient.setColorAt(0.35, color)  # Base color in the middle
         gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
 
         painter.setBrush(gradient)
@@ -643,7 +640,7 @@ class SimStatusLabel(QWidget):
 
         # Draw two diagonal lines for the 'X' icon with shadow
         line_length = int(size.width() * 0.3)
-        line_width = int(size.width() * 0.15)
+        line_width = int(size.width() * 0.12)
         offset = int((size.width() - line_length) / 2)
 
         line1_start = QPointF(offset, offset)
