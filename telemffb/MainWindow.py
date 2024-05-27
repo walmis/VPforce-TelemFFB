@@ -470,11 +470,14 @@ class MainWindow(QMainWindow):
         # Set the main window area height to 0
         self.tab_widget.setMinimumHeight(14)
         style_sheet = """
-                    QTabBar::tab:selected {
-                        background-color: #ab37c8;
-                        color: white;
-                    }
-                """
+        QTabBar::tab:selected {
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                  stop: 0 #dca3f2, stop: 0.2 #c174e6,
+                                  stop: 0.5 #a13fb1, stop: 0.8 #822c94, stop: 1.0 #6b2378);
+;
+            color: white;
+        }
+        """
         self.tab_widget.setStyleSheet(style_sheet)
 
         # Create a horizontal line widget

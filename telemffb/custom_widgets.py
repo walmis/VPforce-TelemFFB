@@ -469,7 +469,7 @@ class StatusLabel(QWidget):
 class SimStatusLabel(QWidget):
     def __init__(self, name : str):
         super().__init__()
-        self.icon_size = QSize(22, 22)
+        self.icon_size = QSize(20, 20)
 
         self._paused_state = False
         self._error_state = False

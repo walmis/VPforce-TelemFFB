@@ -209,30 +209,46 @@ def main():
             QRadioButton::indicator:checked { image: url(:/image/rchecked.png);}
             
             QPushButton, #styledButton {
-                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                  stop: 0 #c174e6, stop: 0.3 #ab37c8,
-                                  stop: 0.7 #8e1da8, stop: 1.0 #6e1d6f);
-                border: 1px solid #6e1d6f;
-                border-radius: 5px;
-                padding: 3px;
-                margin: 1px;
-                color: white;
-            }
-            QPushButton:disabled {
-                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                  stop: 0 #e1e1e1, stop: 0.3 #cccccc,
-                                  stop: 0.7 #bbbbbb, stop: 1.0 #aaaaaa);
-                color: #666666;  /* Set the text color for disabled buttons */
-                border: 1px solid #6e1d6f;
-                border-radius: 5px;
-                padding: 3px;
-                margin: 1px;
-            }
-            QPushButton:hover, #styledButton:hover {
-                background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                  stop: 0 #e4a9e7, stop: 0.3 #d97ed1,
-                                  stop: 0.7 #d483d4, stop: 1.0 #c74ab8);
-            }
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                      stop: 0 #e4a9e7, stop: 0.2 #c174e6,
+                                      stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
+    border: 1px solid #6e1d6f;
+    border-top: 1px solid #c174e6;  /* Light top border for 3D effect */
+    border-left: 1px solid #c174e6;  /* Light left border for 3D effect */
+    border-bottom: 1px solid #5a185a;  /* Dark bottom border for 3D effect */
+    border-right: 1px solid #5a185a;  /* Dark right border for 3D effect */
+    border-radius: 5px;
+    padding: 3px;
+    margin: 1px;
+    color: white;
+}
+QPushButton:disabled {
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                      stop: 0 #e1e1e1, stop: 0.2 #cccccc,
+                                      stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
+    color: #666666;  /* Set the text color for disabled buttons */
+    border: 1px solid #999999;
+    border-top: 1px solid #cccccc;  /* Light top border for 3D effect */
+    border-left: 1px solid #cccccc;  /* Light left border for 3D effect */
+    border-bottom: 1px solid #888888;  /* Dark bottom border for 3D effect */
+    border-right: 1px solid #888888;  /* Dark right border for 3D effect */
+    border-radius: 5px;
+    padding: 3px;
+    margin: 1px;
+}
+QPushButton:hover, #styledButton:hover {
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                      stop: 0 #f0b0f0, stop: 0.2 #d897d8,
+                                      stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
+    border: 1px solid #8e1da8;
+    border-top: 1px solid #d965e3;  /* Light top border for 3D effect */
+    border-left: 1px solid #d965e3;  /* Light left border for 3D effect */
+    border-bottom: 1px solid #761b76;  /* Dark bottom border for 3D effect */
+    border-right: 1px solid #761b76;  /* Dark right border for 3D effect */
+    border-radius: 5px;
+    padding: 3px;
+    margin: 1px;
+}
 
             QComboBox::down-arrow {
                 image: url(:/image/down-down.png);
