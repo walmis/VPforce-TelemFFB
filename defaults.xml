@@ -2308,6 +2308,38 @@
 		<joystick>true</joystick>
 		</defaults>
 	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>755.2</order>
+		<name>decel_scale_factor</name>
+		<prereq>deceleration_effect_enable</prereq>
+		<info>Artificially increase the G forces in the direction of deceleration</info>
+		<displayname>Deceleration Scale Factor</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>10,30</validvalues>
+		<value>1.0</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>755.3</order>
+		<name>decel_invert_force</name>
+		<prereq>deceleration_effect_enable</prereq>
+		<info>Invert the frame of reference (direction of force) for the effect.  I.e. stick moving away from pilot vs. pilot moving towards stick.</info>
+		<displayname>Invert Force</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>760</order>
 		<name>flaps_motion_effect_enabled</name>

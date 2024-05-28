@@ -101,6 +101,8 @@ class AircraftBase(object):
     deceleration_effect_enable = 0
     deceleration_effect_enable_areyoureallysure = 0
     deceleration_max_force = 0.5
+    decel_scale_factor = 1
+    decel_invert_force = False
     ###
 
     enable_hydraulic_loss_effect: bool = False
@@ -548,11 +550,16 @@ class AircraftBase(object):
             return
         avg_y_gs = self.smoother.get_average("y_gs", y_gs, sample_size=8)
         max_gs = self.deceleration_max_force
-        if avg_y_gs < -0.1:
+
+        dir = 180 if not self.decel_invert_force else 0
+
+        if avg_y_gs < -0.03:
             if abs(avg_y_gs) > max_gs:
                 avg_y_gs = -max_gs
-            logging.debug(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
-            effects["decel"].constant(abs(avg_y_gs), 180).start()
+
+            avg_y_gs = utils.clamp(abs(avg_y_gs) * self.decel_scale_factor, 0, 1)
+            logging.info(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
+            effects["decel"].constant(abs(avg_y_gs), direction= dir).start()
         else:
             effects.dispose("decel")
 
