@@ -97,7 +97,10 @@ class NoWheelSlider(QSlider):
             QSlider::groove:horizontal {{
                 border: 1px solid #565a5e;
                 height: 8px;  /* Adjusted groove height */
-                background: {self.groove_color};
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #e6e6e6, stop: 1 #bfbfbf
+                );
                 margin: 0;
                 border-radius: 3px;  /* Adjusted border radius */
             }}
@@ -177,7 +180,7 @@ class NoWheelNumberSlider(QSlider):
         # Apply styles
         self.update_styles()
         #self.pct_max = 0
-        self.value_text = ""  # Add an attribute to store the text to be shown in the handle
+        self.value_text = "%100 "  # Add an attribute to store the text to be shown in the handle
 
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
@@ -203,25 +206,33 @@ class NoWheelNumberSlider(QSlider):
     def update_styles(self):
         # Generate CSS based on color and size properties
         css = f"""
-            QSlider::groove:horizontal {{
-                border: 1px solid #565a5e;
-                height: 8px;  /* Adjusted groove height */
-                background: {self.groove_color};
-                margin: 0;
-                border-radius: 3px;  /* Adjusted border radius */
-            }}
-            QSlider::handle:horizontal {{
-                background: {self.handle_color};
-                border: 1px solid #565a5e;
-                width: {self.handle_width}px;  /* Adjusted handle width */
-                height: {self.handle_height}px;  /* Adjusted handle height */
-                border-radius: {self.handle_height / 4}px;  /* Adjusted border radius */
-                margin-top: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
-                margin-bottom: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
-                margin-left: -1px;  /* Adjusted left margin */
-                margin-right: -1px;  /* Adjusted right margin */
-            }}
-        """
+                    QSlider::groove:horizontal {{
+                        border: 1px solid #565a5e;
+                        height: 8px;  /* Adjusted groove height */
+                        background: qlineargradient(
+                            x1: 0, y1: 0, x2: 0, y2: 1,
+                            stop: 0 #e6e6e6, stop: 1 #bfbfbf
+                        );
+                        margin: 0;
+                        border-radius: 3px;  /* Adjusted border radius */
+                    }}
+                    QSlider::handle:horizontal {{
+                        background: qradialgradient(
+                            cx: 0.3, cy: 0.5, fx: 0.3, fy: 0.35, radius: 0.8,
+                            stop: 0.0 #ffffff,
+                            stop: 0.1 {self.handle_color},  /* Make the shine spot less pronounced */
+                            stop: 1.0 {QColor(self.handle_color).darker().name()}
+                        );
+                        border: 1px solid #565a5e;
+                        width: {self.handle_width}px;  /* Adjusted handle width */
+                        height: {self.handle_height}px;  /* Adjusted handle height */
+                        border-radius: {self.handle_height / 4}px;  /* Adjusted border radius */
+                        margin-top: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
+                        margin-bottom: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
+                        margin-left: -1px;  /* Adjusted left margin */
+                        margin-right: -1px;  /* Adjusted right margin */
+                    }}
+                """
         self.setStyleSheet(css)
 
     def setGrooveColor(self, color):
@@ -274,6 +285,11 @@ class NoWheelNumberSlider(QSlider):
         super(NoWheelNumberSlider, self).paintEvent(event)
         painter = QPainter(self)
 
+        font = painter.font()
+        font.setPointSize(font.pointSize() - 1)  # Decrease the font size by 1 point
+        font.setBold(True)
+        painter.setFont(font)
+
         # Draw the handle with the gradient color
         option = QStyleOptionSlider()
         self.initStyleOption(option)
@@ -293,23 +309,17 @@ class NoWheelNumberSlider(QSlider):
                                                             self.height() - self.handle_height)
             handle_rect.moveTop(handle_y)
 
-        # Calculate the center of the handle rect
-        handle_center = handle_rect.center()
+        # Ensure the painter uses anti-aliasing for smoother text rendering
+        painter.setRenderHint(QPainter.Antialiasing)
 
-        # Calculate the text width and height
-        text_width = painter.fontMetrics().width(self.value_text)
-        text_height = painter.fontMetrics().height()
-
-        # Calculate the top-left position for the text to be centered
-        text_x = handle_center.x() - text_width / 2
-        text_y = handle_center.y() - text_height / 2
-
-        # Set the text position within the handle
-        text_rect = QRect(int(text_x), int(text_y), text_width, text_height)
+        # Calculate the bounding rectangle for the text
+        text_rect = painter.boundingRect(handle_rect, Qt.AlignCenter, self.value_text)
 
         # Draw the text inside the handle
         painter.setPen(Qt.white)
-        painter.drawText(handle_rect, Qt.AlignCenter, self.value_text)
+        painter.drawText(text_rect, Qt.AlignCenter, self.value_text)
+
+        painter.end()
 
     def initStyleOption(self, option):
         option.initFrom(self)
@@ -673,6 +683,10 @@ class Toggle(QCheckBox):
 
         # Save our properties on the object via self, so we can access them later
         # in the paintEvent.
+        self._bar_color = bar_color
+        self._checked_color = checked_color
+        self._handle_color = handle_color
+
         self._bar_brush = QBrush(bar_color)
         self._bar_checked_brush = QBrush(QColor(checked_color).lighter())
 
@@ -714,13 +728,29 @@ class Toggle(QCheckBox):
         trailLength = contRect.width() - 2 * handleRadius
         xPos = contRect.x() + handleRadius + trailLength * self._handle_position
 
+        # Draw the bar with a subtle 3D sunken effect
+        barGradient = QLinearGradient(0, 0, 0, barRect.height())
+        barGradient.setStart(barRect.topLeft())
+        barGradient.setFinalStop(barRect.bottomLeft())
+        barGradient.setColorAt(0.0, self._bar_color.lighter(150))
+        barGradient.setColorAt(0.5, self._bar_color)
+        barGradient.setColorAt(1.0, self._bar_color.darker(150))
+
         if self.isChecked():
-            p.setBrush(self._bar_checked_brush)
-            p.drawRoundedRect(barRect, rounding, rounding)
+            barGradient.setColorAt(0.0, QColor(self._checked_color).lighter(150))
+            barGradient.setColorAt(0.5, QColor(self._checked_color))
+            barGradient.setColorAt(1.0, QColor(self._checked_color).darker(150))
+
+        p.setBrush(QBrush(barGradient))
+        p.drawRoundedRect(barRect, rounding, rounding)
+
+        # Draw the border around the bar
+        p.setPen(QPen(QColor("#565a5e"), 1))
+        p.drawRoundedRect(barRect, rounding, rounding)
+
+        if self.isChecked():
             handle_color = self._handle_checked_brush.color()
         else:
-            p.setBrush(self._bar_brush)
-            p.drawRoundedRect(barRect, rounding, rounding)
             handle_color = self._handle_brush.color()
 
         # Draw the handle with a gradient for 3D effect
