@@ -106,6 +106,10 @@ class Aircraft(AircraftBase):
     raw_x_axis_scale: int = 16384
     raw_y_axis_scale: int = 16384
 
+    aileron_expo: int = 0
+    elevator_expo: int = 0
+    rudder_expo: int = 0
+
     @classmethod
     def set_simconnect(cls, sc):
         cls._simconnect = sc
@@ -220,6 +224,18 @@ class Aircraft(AircraftBase):
             effects["nw_shimmy"].periodic(freq, shimmy, 90).start()
         else:
             effects.dispose("nw_shimmy")
+
+    def expocurve(self,x, k):
+        print (k) ;
+        #expo function y = (1-k)x + K( (1-e^(-ax)) / (1-e^-a))
+        #   x = orig pct_max
+        #   y = new pct_max
+        #   k = expo value 0-1
+        #   a = alpha, controls how much to bend the curve.
+        #       a=8 gives approx 2x increase at 25% orig pct_max with k=0.5, 3x at 25% with k=1
+        expo_a = 8  # alpha
+        return (1 - k) * x + k * (1 - math.exp(-expo_a * x)) / (1 - math.exp(-expo_a))
+
 
     def _update_fbw_flight_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
@@ -692,7 +708,10 @@ class Aircraft(AircraftBase):
 
             max_coeff_y = int(4096*self.max_elevator_coeff)
             ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, max_coeff_y)
-            pct_max_e = ec/max_coeff_y
+
+            #apply expo function
+            pct_max_e = self.expocurve(ec/max_coeff_y,self.elevator_expo)
+
             telem_data["_pct_max_e"] = pct_max_e
             self._ipc_telem["_pct_max_e"] = pct_max_e
             logging.debug(f"Elev Coef: {ec}")
@@ -702,7 +721,10 @@ class Aircraft(AircraftBase):
 
             max_coeff_x = int(4096*self.max_aileron_coeff)
             ac = clamp(int(4096 * aileron_coeff), base_ailer_coeff, max_coeff_x)
-            pct_max_a = ac / max_coeff_x
+
+            #apply expo function
+            pct_max_a = self.expocurve(ac/max_coeff_x,self.aileron_expo)
+
             telem_data["_pct_max_a"] = pct_max_a
             self._ipc_telem["_pct_max_a"] = pct_max_a
             logging.debug(f"Ailer Coef: {ac}")
@@ -751,7 +773,10 @@ class Aircraft(AircraftBase):
                 virtual_rudder_x_offs = 0
             max_coeff_x = int(4096*self.max_rudder_coeff)
             x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, max_coeff_x)
-            pct_max_r = x_coeff / max_coeff_x
+
+            #apply expo function
+            pct_max_r = self.expocurve(x_coeff/max_coeff_x,self.rudder_expo)
+
             telem_data["_pct_max_r"] = pct_max_r
             self._ipc_telem["_pct_max_r"] = pct_max_r
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
