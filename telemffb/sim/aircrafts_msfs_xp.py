@@ -575,6 +575,10 @@ class Aircraft(AircraftBase):
         # a, b, c = 0.5, 0.3, 0.1
         # elevator_coeff = a * (_elev_dyn_pressure ** 2) + b * _elev_dyn_pressure * self.elevator_gain + c * slip_gain
 
+        # apply expo curve
+        elevator_coeff = self.expocurve(elevator_coeff, self.elevator_expo)
+        aileron_coeff = self.expocurve(aileron_coeff, self.aileron_expo)
+
         telem_data["_elev_coeff"] = elevator_coeff
         telem_data["_aile_coeff"] = aileron_coeff
 
@@ -591,6 +595,10 @@ class Aircraft(AircraftBase):
         _rud_dyn_pressure = utils.mix(telem_data["DynPressure"], 0.5 * telem_data["AirDensity"] * _prop_air_vel ** 2,
                                       self.rudder_prop_flow_ratio) * self.dyn_pressure_scale
         rudder_coeff = _rud_dyn_pressure * self.rudder_gain * _slip_gain
+
+        # apply expo curve
+        rudder_coeff = self.expocurve(rudder_coeff, self.rudder_expo)
+
         telem_data["_rud_coeff"] = rudder_coeff
         rud = (slip_angle - rudder_angle) * _dyn_pressure * _slip_gain
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
@@ -708,9 +716,7 @@ class Aircraft(AircraftBase):
 
             max_coeff_y = int(4096*self.max_elevator_coeff)
             ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, max_coeff_y)
-
-            #apply expo function
-            pct_max_e = self.expocurve(ec/max_coeff_y,self.elevator_expo)
+            pct_max_e = ec/max_coeff_y
 
             telem_data["_pct_max_e"] = pct_max_e
             self._ipc_telem["_pct_max_e"] = pct_max_e
@@ -722,8 +728,7 @@ class Aircraft(AircraftBase):
             max_coeff_x = int(4096*self.max_aileron_coeff)
             ac = clamp(int(4096 * aileron_coeff), base_ailer_coeff, max_coeff_x)
 
-            #apply expo function
-            pct_max_a = self.expocurve(ac/max_coeff_x,self.aileron_expo)
+            pct_max_a = ac/max_coeff_x
 
             telem_data["_pct_max_a"] = pct_max_a
             self._ipc_telem["_pct_max_a"] = pct_max_a
@@ -773,9 +778,7 @@ class Aircraft(AircraftBase):
                 virtual_rudder_x_offs = 0
             max_coeff_x = int(4096*self.max_rudder_coeff)
             x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, max_coeff_x)
-
-            #apply expo function
-            pct_max_r = self.expocurve(x_coeff/max_coeff_x,self.rudder_expo)
+            pct_max_r = x_coeff/max_coeff_x
 
             telem_data["_pct_max_r"] = pct_max_r
             self._ipc_telem["_pct_max_r"] = pct_max_r
