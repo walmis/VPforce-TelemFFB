@@ -473,7 +473,14 @@ class StatusLabel(QWidget):
         dot_x = self.label.geometry().right() - 1  # 5 is an arbitrary offset for better alignment
         dot_y = self.label.geometry().center().y() - self.dot_size // 2 + 1
 
-        painter.setBrush(QColor(self.dot_color))
+        # Create a gradient for the dot with a 3D effect
+        gradient = QRadialGradient(dot_x + self.dot_size / 3, dot_y + self.dot_size / 3, self.dot_size / 2)
+        gradient.setColorAt(0, QColor(self.dot_color).lighter(180))  # Increase lightness for stronger highlight
+        gradient.setColorAt(0.35, QColor(self.dot_color))  # Base color in the middle
+        gradient.setColorAt(1, QColor(self.dot_color).darker(200))  # Increase darkness for stronger shadow
+
+        painter.setBrush(gradient)
+        painter.setPen(Qt.NoPen)
         painter.drawEllipse(dot_x, dot_y, self.dot_size, self.dot_size)
 
 class SimStatusLabel(QWidget):
