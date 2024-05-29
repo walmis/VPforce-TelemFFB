@@ -180,7 +180,7 @@ class NoWheelNumberSlider(QSlider):
         # Apply styles
         self.update_styles()
         #self.pct_max = 0
-        self.value_text = "%100 "  # Add an attribute to store the text to be shown in the handle
+        self.value_text = ""  # Add an attribute to store the text to be shown in the handle
 
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
@@ -303,7 +303,7 @@ class NoWheelNumberSlider(QSlider):
         if self.orientation() == Qt.Horizontal:
             handle_x = self.style().sliderPositionFromValue(self.minimum(), self.maximum(), self.value(),
                                                             self.width() - self.handle_width)
-            handle_rect.moveLeft(handle_x + 3)
+            handle_rect.moveLeft(handle_x)
         else:
             handle_y = self.style().sliderPositionFromValue(self.minimum(), self.maximum(), self.value(),
                                                             self.height() - self.handle_height)
