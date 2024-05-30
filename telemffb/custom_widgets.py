@@ -180,7 +180,7 @@ class NoWheelNumberSlider(QSlider):
         # Apply styles
         self.update_styles()
         #self.pct_max = 0
-        self.value_text = "%100 "  # Add an attribute to store the text to be shown in the handle
+        self.value_text = ""  # Add an attribute to store the text to be shown in the handle
 
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
@@ -303,7 +303,7 @@ class NoWheelNumberSlider(QSlider):
         if self.orientation() == Qt.Horizontal:
             handle_x = self.style().sliderPositionFromValue(self.minimum(), self.maximum(), self.value(),
                                                             self.width() - self.handle_width)
-            handle_rect.moveLeft(handle_x + 3)
+            handle_rect.moveLeft(handle_x)
         else:
             handle_y = self.style().sliderPositionFromValue(self.minimum(), self.maximum(), self.value(),
                                                             self.height() - self.handle_height)
@@ -473,7 +473,14 @@ class StatusLabel(QWidget):
         dot_x = self.label.geometry().right() - 1  # 5 is an arbitrary offset for better alignment
         dot_y = self.label.geometry().center().y() - self.dot_size // 2 + 1
 
-        painter.setBrush(QColor(self.dot_color))
+        # Create a gradient for the dot with a 3D effect
+        gradient = QRadialGradient(dot_x + self.dot_size / 3, dot_y + self.dot_size / 3, self.dot_size / 2)
+        gradient.setColorAt(0, QColor(self.dot_color).lighter(180))  # Increase lightness for stronger highlight
+        gradient.setColorAt(0.35, QColor(self.dot_color))  # Base color in the middle
+        gradient.setColorAt(1, QColor(self.dot_color).darker(200))  # Increase darkness for stronger shadow
+
+        painter.setBrush(gradient)
+        painter.setPen(Qt.NoPen)
         painter.drawEllipse(dot_x, dot_y, self.dot_size, self.dot_size)
 
 class SimStatusLabel(QWidget):
