@@ -227,15 +227,19 @@ class Aircraft(AircraftBase):
 
     def expocurve(self,x, k):
         print (k) ;
-        #expo function y = (1-k)x + K( (1-e^(-ax)) / (1-e^-a))
+        #expo function for + k: y = (1-k)x + k( (1-e^(-ax)) / (1-e^-a))
+        #       for negative k: y = (1+k)x + -k(e^(a(x-1))-e^(-a)) / (1-e^(-a))
         #   x = orig pct_max
         #   y = new pct_max
         #   k = expo value 0-1
         #   a = alpha, controls how much to bend the curve.
-        #       a=8 gives approx 2x increase at 25% orig pct_max with k=0.5, 3x at 25% with k=1
-        expo_a = 8  # alpha
-        return (1 - k) * x + k * (1 - math.exp(-expo_a * x)) / (1 - math.exp(-expo_a))
-
+        #       a=5.5 gives approx 2x increase at 25% orig pct_max with k=0.5, 3x at 25% with k=1
+        #               and 1/2x decrease with k=-0.5, 1/3x with k=-1 at 75%
+        expo_a = 5.5  # alpha
+        if k >= 0:
+            return (1 - k) * x + k * (1 - math.exp(-expo_a * x)) / (1 - math.exp(-expo_a))
+        else:
+            return (1 + k) * x + (-k) * (math.exp(expo_a * (x - 1)) - math.exp(-expo_a)) / (1 - math.exp(-expo_a))
 
     def _update_fbw_flight_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
