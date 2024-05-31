@@ -7923,6 +7923,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>pedal_trimming_enabled</name>
+		<model>F-4E-45MC</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>F-4E-45MC</model>
 		<value>JetAircraft</value>
