@@ -565,60 +565,9 @@ class MainWindow(QMainWindow):
 
         self.tab_widget.addTab(self.settings_area, "Settings")
 
-        # self.log_tab_widget = QWidget(self.tab_widget)
-        # self.tab_widget.addTab(self.log_tab_widget, "Log")
-
-        # self.log_widget = QPlainTextEdit(self.log_tab_widget)
-        # self.log_widget.setMaximumBlockCount(20)
-        # self.log_widget.setReadOnly(True)
-        # self.log_widget.setFont(QFont("Courier New"))
-        # self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
-        # self.log_tail_thread = LogTailer(log_file)
-        # def update_log_widget(log_line):
-        #     cursor = self.log_widget.textCursor()
-        #     cursor.movePosition(QTextCursor.End)
-        #     cursor.insertText(log_line)
-        #     self.log_widget.setTextCursor(cursor)
-        #     self.log_widget.ensureCursorVisible()
-        # self.log_tail_thread.log_updated.connect(update_log_widget)
-        # self.log_tail_thread.start()
-
-        # self.clear_button = QPushButton("Clear", self.log_tab_widget)
-        # self.toggle_button = QPushButton("Pause", self.log_tab_widget)
-        # self.open_log_button = QPushButton("Open in Window", self.log_tab_widget)
-
-        # self.clear_button.clicked.connect(self.clear_log_widget)
-        # def toggle_log_tailing():
-        #     if self.log_tail_thread.is_paused():
-        #         self.log_tail_thread.resume()
-        #         self.toggle_button.setText("Pause")
-        #     else:
-        #         self.log_tail_thread.pause()
-        #         self.toggle_button.setText("Resume")
-        # self.toggle_button.clicked.connect(self.toggle_log_tailing)
-        # def show_tail_log_window():
-        #     log_tail_window.move(self.x() + 50, self.y() + 100)
-        #     log_tail_window.show()
-        #     log_tail_window.activateWindow()
-        # self.open_log_button.clicked.connect(show_tail_log_window)
-
         self.tab_widget.addTab(QWidget(), "Hide")
         self.tab_widget.currentChanged.connect(self.switch_window_view)
 
-
-        # log_layout = QVBoxLayout(self.log_tab_widget)
-        # log_layout.addWidget(self.log_widget)
-
-        # button_layout = QHBoxLayout()
-        # button_layout.addWidget(self.clear_button)
-        # button_layout.addWidget(self.toggle_button)
-        # button_layout.addStretch()  # Add stretch to push the next button to the right
-        # button_layout.addWidget(self.open_log_button)
-        # log_layout.addLayout(button_layout)
-
-        # self.log_tab_widget.setLayout(log_layout)
-        ##############
-        #  buttons
 
         # test buttons
         show_clear_reload = False
