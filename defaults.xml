@@ -74,7 +74,7 @@
 		<order>2.2	</order>
 		<name>aileron_expo</name>
 		<displayname>Aileron Expo</displayname>
-		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end, and at 1, 3x force.  Negative values decrease force up to 1/2x. &lt;br&gt;&lt;img src="./image/expo.png"&gt;image&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end, and at 1, 3x force.  Negative values decrease force up to 1/2x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;image&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -113,7 +113,7 @@
 		<order>3.2	</order>
 		<name>elevator_expo</name>
 		<displayname>Elevator Expo</displayname>
-		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end, and at 1, 3x force.  Negative values decrease force up to 1/2x. &lt;br&gt;&lt;img src="./image/expo.png"&gt;image&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end, and at 1, 3x force.  Negative values decrease force up to 1/2x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;image&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -152,7 +152,7 @@
 		<order>4.2	</order>
 		<name>rudder_expo</name>
 		<displayname>Rudder Expo</displayname>
-		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end, and at 1, 3x force.  Negative values decrease force up to 1/2x. &lt;br&gt;&lt;img src="./image/expo.png"&gt;image&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end, and at 1, 3x force.  Negative values decrease force up to 1/2x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;image&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
