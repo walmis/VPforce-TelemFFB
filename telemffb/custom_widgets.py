@@ -506,11 +506,11 @@ class SimStatusLabel(QWidget):
         paused_color = QColor(0, 0, 255)
         error_color = QColor(255, 0, 0)
 
-        self.enabled_pixmap = self.create_colored_icon(enable_color, self.icon_size)
-        self.disabled_pixmap = self.create_x_icon(disable_color, self.icon_size)
-        self.paused_pixmap = self.create_paused_icon(paused_color, self.icon_size)
-        self.active_pixmap = self.create_colored_icon(active_color, self.icon_size)
-        self.error_pixmap = self.create_x_icon(error_color, self.icon_size)
+        self.enabled_pixmap = self.create_status_icon(enable_color, self.icon_size, icon_type="colored")
+        self.disabled_pixmap = self.create_status_icon(disable_color, self.icon_size, icon_type="x")
+        self.active_pixmap = self.create_status_icon(active_color, self.icon_size, icon_type="colored")
+        self.paused_pixmap = self.create_status_icon(paused_color, self.icon_size, icon_type="paused")
+        self.error_pixmap = self.create_status_icon(error_color, self.icon_size, icon_type="x")
 
         h_layout = QtWidgets.QHBoxLayout()
         self.setLayout(h_layout)
@@ -576,99 +576,95 @@ class SimStatusLabel(QWidget):
             self.pix.setPixmap(self.disabled_pixmap)
             self.setToolTip("Sim is disabled")
 
-    def create_paused_icon(self, color, size):
-        pixmap = HiDpiPixmap(size)
+    def create_status_icon(self, color, size: QSize, icon_type="colored"):
+        pixmap = QPixmap(size)
         pixmap.fill(Qt.transparent)
 
-        # Draw a circle with a gradient for 3D effect
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing, 1)
         painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
 
-        # Adjust focus point and radius for a stronger 3D effect
-        gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
-        gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
-        gradient.setColorAt(0.35, color)  # Base color in the middle
-        gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
+        # Define thicknesses
+        outer_black_thickness = 1
+        ring_thickness = 2
+        inner_black_thickness = 1
 
-        painter.setBrush(gradient)
+        total_thickness = outer_black_thickness + ring_thickness + inner_black_thickness
+
+        # Draw the outermost ring with gradient
+        outer_ring_gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
+        outer_ring_color = QColor(30, 30, 30)  # Dark grey for outer ring
+        outer_ring_gradient.setColorAt(0, outer_ring_color.lighter(180))
+        outer_ring_gradient.setColorAt(0.35, outer_ring_color)
+        outer_ring_gradient.setColorAt(1, outer_ring_color.darker(200))
+
+        painter.setBrush(outer_ring_gradient)
         painter.setPen(Qt.NoPen)
-        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+        painter.drawEllipse(0, 0, size.width(), size.height())
 
-        # Draw two vertical lines for the pause icon
-        line_length = int(size.height() * 0.4)
-        line_width = int(size.width() * 0.12)
-        spacing = int(size.width() * 0.2)
-        line1_x = int((size.width() / 2) - 2)
-        line2_x = int((size.width() / 2) + 2)
-        line_y = int((size.height() - line_length) / 2)
+        # Draw the metallic grey ring
+        ring_gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
+        ring_color = QColor(192, 192, 192)  # Metallic grey
+        ring_gradient.setColorAt(0, ring_color.lighter(180))
+        ring_gradient.setColorAt(0.35, ring_color)
+        ring_gradient.setColorAt(1, ring_color.darker(200))
 
-        # Draw the white pause lines
-        painter.setPen(QPen(Qt.white, line_width))
-        painter.drawLine(line1_x, line_y, line1_x, line_y + line_length)
-        painter.drawLine(line2_x, line_y, line2_x, line_y + line_length)
+        painter.setBrush(ring_gradient)
+        painter.drawEllipse(outer_black_thickness, outer_black_thickness, size.width() - 2 * outer_black_thickness,
+                            size.height() - 2 * outer_black_thickness)
 
-        painter.end()
+        # Draw the inner ring with gradient
+        inner_ring_gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
+        inner_ring_color = QColor(100, 100, 100)  # Grey for inner ring
+        inner_ring_gradient.setColorAt(0, inner_ring_color.lighter(180))
+        inner_ring_gradient.setColorAt(0.35, inner_ring_color)
+        inner_ring_gradient.setColorAt(1, inner_ring_color.darker(200))
 
-        return pixmap
+        painter.setBrush(inner_ring_gradient)
+        painter.drawEllipse(outer_black_thickness + ring_thickness, outer_black_thickness + ring_thickness,
+                            size.width() - 2 * (outer_black_thickness + ring_thickness),
+                            size.height() - 2 * (outer_black_thickness + ring_thickness))
 
-    def create_colored_icon(self, color, size: QSize):
-        # Create a QPixmap with the specified color and size
-        pixmap = HiDpiPixmap(size)
-        pixmap.fill(Qt.transparent)
+        # Draw the colored dot
+        dot_gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
+        dot_gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
+        dot_gradient.setColorAt(0.35, color)  # Base color in the middle
+        dot_gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
 
-        # Draw a circle with a gradient for 3D effect
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing, 1)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
-
-        # Adjust focus point and radius for a stronger 3D effect
-        gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
-        gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
-        gradient.setColorAt(0.35, color)  # Base color in the middle
-        gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
-
-        painter.setBrush(gradient)
+        painter.setBrush(dot_gradient)
         painter.setPen(Qt.NoPen)
-        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
+        painter.drawEllipse(total_thickness, total_thickness, size.width() - 2 * total_thickness,
+                            size.height() - 2 * total_thickness)
 
-        painter.end()
+        if icon_type == "paused":
+            # Draw two vertical lines for the pause icon
+            line_length = int(size.height() * 0.4)
+            line_width = int(size.width() * 0.12)
+            spacing = int(size.width() * 0.1)
+            line1_x = int((size.width() / 2) - spacing)
+            line2_x = int((size.width() / 2) + spacing)
+            line_y = int((size.height() - line_length) / 2)
 
-        return pixmap
+            # Draw the white pause lines
+            painter.setPen(QPen(Qt.white, line_width))
+            painter.drawLine(line1_x, line_y, line1_x, line_y + line_length)
+            painter.drawLine(line2_x, line_y, line2_x, line_y + line_length)
 
-    def create_x_icon(self, color, size):
-        pixmap = HiDpiPixmap(size)
-        pixmap.fill(Qt.transparent)
+        elif icon_type == "x":
+            # Draw two diagonal lines for the 'X' icon with shadow
+            line_length = int(size.width() * 0.6)
+            line_width = int(size.width() * 0.12)
+            offset = int((size.width() - line_length) / 2)
 
-        # Draw a circle with a gradient for 3D effect
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing, 1)
-        painter.setRenderHint(QPainter.SmoothPixmapTransform, 1)
+            line1_start = QPointF(total_thickness + offset, total_thickness + offset)
+            line1_end = QPointF(size.width() - total_thickness - offset, size.height() - total_thickness - offset)
+            line2_start = QPointF(size.width() - total_thickness - offset, total_thickness + offset)
+            line2_end = QPointF(total_thickness + offset, size.height() - total_thickness - offset)
 
-        # Adjust focus point and radius for a stronger 3D effect
-        gradient = QRadialGradient(size.width() / 3, size.height() / 3, size.width() / 2)
-        gradient.setColorAt(0, color.lighter(180))  # Increase lightness for stronger highlight
-        gradient.setColorAt(0.35, color)  # Base color in the middle
-        gradient.setColorAt(1, color.darker(200))  # Increase darkness for stronger shadow
-
-        painter.setBrush(gradient)
-        painter.setPen(Qt.NoPen)
-        painter.drawEllipse(2, 2, size.width() - 4, size.height() - 4)
-
-        # Draw two diagonal lines for the 'X' icon with shadow
-        line_length = int(size.width() * 0.3)
-        line_width = int(size.width() * 0.12)
-        offset = int((size.width() - line_length) / 2)
-
-        line1_start = QPointF(offset, offset)
-        line1_end = QPointF(size.width() - offset, size.height() - offset)
-        line2_start = QPointF(size.width() - offset, offset)
-        line2_end = QPointF(offset, size.height() - offset)
-
-        # Draw the white 'X' lines
-        painter.setPen(QPen(Qt.white, line_width))
-        painter.drawLine(line1_start, line1_end)
-        painter.drawLine(line2_start, line2_end)
+            # Draw the white 'X' lines
+            painter.setPen(QPen(Qt.white, line_width))
+            painter.drawLine(line1_start, line1_end)
+            painter.drawLine(line2_start, line2_end)
 
         painter.end()
 
