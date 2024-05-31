@@ -1,9 +1,9 @@
 from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame
 from PyQt5.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty
 from PyQt5.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
-    QLinearGradient
+    QLinearGradient, QFont
 from PyQt5.QtWidgets import QStyle, QStyleOptionSlider
 
 import telemffb.globals as G
@@ -423,7 +423,7 @@ class InfoLabel(QWidget):
 class StatusLabel(QWidget):
     clicked = pyqtSignal(str)
 
-    def __init__(self, parent=None, text='', color: QColor = Qt.yellow, size=8):
+    def __init__(self, parent=None, text='', color: QColor = Qt.yellow, size=10):
         super(StatusLabel, self).__init__(parent)
 
         self.label = QLabel(text)
@@ -473,6 +473,32 @@ class StatusLabel(QWidget):
         dot_x = self.label.geometry().right() - 1  # 5 is an arbitrary offset for better alignment
         dot_y = self.label.geometry().center().y() - self.dot_size // 2 + 1
 
+        # Define thicknesses
+        outer_black_thickness = 1
+        ring_thickness = 2
+        total_thickness = outer_black_thickness + ring_thickness
+
+        # Adjust the size to include the rings
+        total_size = self.dot_size + 2 * total_thickness
+
+        # Draw the outermost black ring
+        painter.setBrush(Qt.black)
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(dot_x - total_thickness, dot_y - total_thickness, total_size, total_size)
+
+        # Draw the metallic grey ring
+        ring_gradient = QRadialGradient(dot_x - total_thickness + total_size / 3,
+                                        dot_y - total_thickness + total_size / 3, total_size / 2)
+        ring_color = QColor(192, 192, 192)  # Metallic grey
+        ring_gradient.setColorAt(0, ring_color.lighter(180))
+        ring_gradient.setColorAt(0.35, ring_color)
+        ring_gradient.setColorAt(1, ring_color.darker(200))
+
+        painter.setBrush(ring_gradient)
+        painter.drawEllipse(dot_x - total_thickness + outer_black_thickness,
+                            dot_y - total_thickness + outer_black_thickness, total_size - 2 * outer_black_thickness,
+                            total_size - 2 * outer_black_thickness)
+
         # Create a gradient for the dot with a 3D effect
         gradient = QRadialGradient(dot_x + self.dot_size / 3, dot_y + self.dot_size / 3, self.dot_size / 2)
         gradient.setColorAt(0, QColor(self.dot_color).lighter(180))  # Increase lightness for stronger highlight
@@ -483,10 +509,12 @@ class StatusLabel(QWidget):
         painter.setPen(Qt.NoPen)
         painter.drawEllipse(dot_x, dot_y, self.dot_size, self.dot_size)
 
+        painter.end()
+
 class SimStatusLabel(QWidget):
     def __init__(self, name : str):
         super().__init__()
-        self.icon_size = QSize(20, 20)
+        self.icon_size = QSize(24, 24)
 
         self._paused_state = False
         self._error_state = False
@@ -494,11 +522,15 @@ class SimStatusLabel(QWidget):
         self._enabled_state = False
 
         self.lbl = QLabel(name)
-        self.lbl.setStyleSheet("padding: 2px")
-        self.lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        # font = QFont("xxxxxx", weight=QFont.Bold)
+        #
+        # # Set the font to the label
+        # self.lbl.setFont(font)
+
+        self.lbl.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
 
         self.pix = QLabel()
-        self.pix.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.pix.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
 
         enable_color = QColor(255, 235, 0)
         disable_color = QColor(128, 128, 128) # grey
@@ -512,10 +544,11 @@ class SimStatusLabel(QWidget):
         self.paused_pixmap = self.create_status_icon(paused_color, self.icon_size, icon_type="paused")
         self.error_pixmap = self.create_status_icon(error_color, self.icon_size, icon_type="x")
 
-        h_layout = QtWidgets.QHBoxLayout()
-        self.setLayout(h_layout)
-        h_layout.addWidget(self.pix)
-        h_layout.addWidget(self.lbl)
+        v_layout = QVBoxLayout()
+        v_layout.setAlignment(Qt.AlignLeft)
+        self.setLayout(v_layout)
+        v_layout.addWidget(self.lbl)
+        v_layout.addWidget(self.pix)
 
         self.update()
 

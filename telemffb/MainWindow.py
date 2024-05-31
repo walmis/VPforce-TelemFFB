@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QButtonGroup, QCheckBox,
                              QComboBox, QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QShortcut, QTabWidget,
-                             QToolButton, QVBoxLayout, QWidget)
+                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy)
 
 import telemffb.globals as G
 import telemffb.utils as utils
@@ -317,15 +317,19 @@ class MainWindow(QMainWindow):
 
         sim_status_area = QWidget()
         status_layout = QHBoxLayout()
+        status_layout.setAlignment(Qt.AlignLeft)
 
         self.dcs_label_icon = SimStatusLabel("DCS")
         self.il2_label_icon = SimStatusLabel("IL2")
         self.msfs_label_icon = SimStatusLabel("MSFS")
-        self.xplane_label_icon = SimStatusLabel("X-Plane")
+        self.xplane_label_icon = SimStatusLabel("X-PLANE")
 
         status_layout.addWidget(self.dcs_label_icon)
+        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Preferred, QSizePolicy.Minimum))
         status_layout.addWidget(self.il2_label_icon)
+        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Preferred, QSizePolicy.Minimum))
         status_layout.addWidget(self.msfs_label_icon)
+        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Preferred, QSizePolicy.Minimum))
         status_layout.addWidget(self.xplane_label_icon)
 
         self.label_icons = {
