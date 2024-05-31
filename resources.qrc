@@ -13,6 +13,7 @@
         <file>image/vpforceicon.png</file>
         <file>image/vpforcelogo.png</file>
         <file>image/vpforcelogo.png</file>
+        <file>image/expo.png</file>
         <!-- Add other image files as needed -->
     </qresource>
 </RCC>
