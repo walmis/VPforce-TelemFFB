@@ -205,79 +205,100 @@ def main():
 
     app.setStyleSheet(
         """
-            QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
-            QRadioButton::indicator:checked { image: url(:/image/rchecked.png);}
-            
-            QPushButton, #styledButton {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                      stop: 0 #e4a9e7, stop: 0.2 #c174e6,
-                                      stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
-    border: 1px solid #6e1d6f;
-    border-top: 1px solid #c174e6;  /* Light top border for 3D effect */
-    border-left: 1px solid #c174e6;  /* Light left border for 3D effect */
-    border-bottom: 1px solid #5a185a;  /* Dark bottom border for 3D effect */
-    border-right: 1px solid #5a185a;  /* Dark right border for 3D effect */
-    border-radius: 5px;
-    padding: 3px;
-    margin: 1px;
-    color: white;
-}
-QPushButton:disabled {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                      stop: 0 #e1e1e1, stop: 0.2 #cccccc,
-                                      stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
-    color: #666666;  /* Set the text color for disabled buttons */
-    border: 1px solid #999999;
-    border-top: 1px solid #cccccc;  /* Light top border for 3D effect */
-    border-left: 1px solid #cccccc;  /* Light left border for 3D effect */
-    border-bottom: 1px solid #888888;  /* Dark bottom border for 3D effect */
-    border-right: 1px solid #888888;  /* Dark right border for 3D effect */
-    border-radius: 5px;
-    padding: 3px;
-    margin: 1px;
-}
-QPushButton:hover, #styledButton:hover {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                      stop: 0 #f0b0f0, stop: 0.2 #d897d8,
-                                      stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
-    border: 1px solid #8e1da8;
-    border-top: 1px solid #d965e3;  /* Light top border for 3D effect */
-    border-left: 1px solid #d965e3;  /* Light left border for 3D effect */
-    border-bottom: 1px solid #761b76;  /* Dark bottom border for 3D effect */
-    border-right: 1px solid #761b76;  /* Dark right border for 3D effect */
-    border-radius: 5px;
-    padding: 3px;
-    margin: 1px;
-}
+        QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
+        QRadioButton::indicator:checked { image: url(:/image/rchecked.png);}
 
-            QComboBox::down-arrow {
-                image: url(:/image/down-down.png);
-            }
+        QPushButton:!pressed, #styledButton:!pressed {
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                              stop: 0 #e4a9e7, stop: 0.2 #c174e6,
+                                              stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
+            border-radius: 5px;
+            padding: 3px;
+            margin: 0px;
+            color: white;
+            border: 1px solid #6e1d6f; /* Existing border */
+            box-shadow: 
+                0px 0px 0px 2px #c174e6,  /* Outer gradient border, lighter */
+                0px 0px 0px 4px #ab37c8,  /* Middle gradient border, darker */
+                0px 0px 0px 6px #5a5a5a;  /* Outermost dark grey border */
+        }
 
-            QComboBox QAbstractItemView {
-                border: 2px solid darkgray;
-                selection-background-color: #ab37c8;
-            }
-            QLineEdit {
-                selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
-            }
-            QPlainTextEdit {
-                selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
-            }
-            QSlider::handle:horizontal {
-                background: #ab37c8; /* Set the handle color */
-                border: 1px solid #565a5e;
-                width: 16px;  /* Adjusted handle width */
-                height: 20px;  /* Adjusted handle height */
-                border-radius: 5px;  /* Adjusted border radius */
-                margin-top: -5px;  /* Negative margin to overlap with groove */
-                margin-bottom: -5px;  /* Negative margin to overlap with groove */
-                margin-left: -1px;  /* Adjusted left margin */
-                margin-right: -1px;  /* Adjusted right margin */
-            }
-            QSlider::handle:horizontal:disabled {
-                background: #888888; /* Set the color of the handle when disabled */
-            }
+        QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                              stop: 0 #e1e1e1, stop: 0.2 #cccccc,
+                                              stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
+            color: #666666;  /* Set the text color for disabled buttons */
+            border-radius: 5px;
+            padding: 3px;
+            margin: 0px;
+            border: 1px solid #999999; /* Existing border */
+            box-shadow: 
+                0px 0px 0px 2px #cccccc,  /* Outer gradient border, lighter */
+                0px 0px 0px 4px #bbbbbb,  /* Middle gradient border, darker */
+                0px 0px 0px 6px #666666;  /* Outermost dark grey border */
+        }
+        
+        QPushButton:pressed, #styledButton:pressed {
+        background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                          stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
+                                          stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7); /* Inverted gradient */
+        border-radius: 5px;
+        padding: 3px;
+        margin: 0px;
+        color: white;
+        border: 1px solid #4e164e; /* Darker border to indicate pressed state */
+        box-shadow: 
+            0px 0px 0px 2px #ab37c8,  /* Outer gradient border, darker */
+            0px 0px 0px 4px #8e1da8,  /* Middle gradient border, darker */
+            0px 0px 0px 6px #3a3a3a;  /* Outermost dark grey border */
+    }
+
+        QPushButton:hover:!pressed, #styledButton:hover:!pressed {
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                              stop: 0 #f0b0f0, stop: 0.2 #d897d8,
+                                              stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
+            border-radius: 5px;
+            padding: 3px;
+            margin: 0px;
+            border: 1px solid #8e1da8; /* Existing border */
+            box-shadow: 
+                0px 0px 0px 2px #d965e3,  /* Outer gradient border, lighter */
+                0px 0px 0px 4px #c07ec0,  /* Middle gradient border, darker */
+                0px 0px 0px 6px #5a5a5a;  /* Outermost dark grey border */
+        }
+
+        QComboBox::down-arrow {
+            image: url(:/image/down-down.png);
+        }
+
+        QComboBox QAbstractItemView {
+            border: 2px solid darkgray;
+            selection-background-color: #ab37c8;
+        }
+
+        QLineEdit {
+            selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
+        }
+
+        QPlainTextEdit {
+            selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
+        }
+
+        QSlider::handle:horizontal {
+            background: #ab37c8; /* Set the handle color */
+            border: 1px solid #565a5e;
+            width: 16px;  /* Adjusted handle width */
+            height: 20px;  /* Adjusted handle height */
+            border-radius: 5px;  /* Adjusted border radius */
+            margin-top: -5px;  /* Negative margin to overlap with groove */
+            margin-bottom: -5px;  /* Negative margin to overlap with groove */
+            margin-left: -1px;  /* Adjusted left margin */
+            margin-right: -1px;  /* Adjusted right margin */
+        }
+
+        QSlider::handle:horizontal:disabled {
+            background: #888888; /* Set the color of the handle when disabled */
+        }
         """
     )
 
