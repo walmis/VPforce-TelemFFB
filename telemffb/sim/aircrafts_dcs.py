@@ -103,7 +103,7 @@ class Aircraft(AircraftBase):
     override_spring_cp0_x = 0
     override_spring_cp0_y = 0
 
-    enable_stick_shaker = 1
+    enable_stick_shaker = False
     stick_shaker_intensity = .5
     stick_shaker_aoa = 22.3
     stick_shaker_frequency = 40
@@ -343,7 +343,8 @@ class Aircraft(AircraftBase):
             return
 
         aoa = telem_data.get('AoA', 0)
-        if aoa > self.stick_shaker_aoa:
+        on_ground = telem_data.get('SimOnGround', True)
+        if aoa > self.stick_shaker_aoa and not on_ground:
             shake = True
         else:
             shake = False
@@ -356,9 +357,6 @@ class Aircraft(AircraftBase):
             dir2 = 270
         else:
             return
-
-
-
 
         if shake:
             freq = self.stick_shaker_frequency

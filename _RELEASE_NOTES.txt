@@ -1,19 +1,26 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
-##  May 24, 2024
+##  May 26, 2024
 ############################################
-## DCS F-4E Maintenance Release
+## Patch 3 - May 26, 2025
+- Fix stick shaker is enabled by default.  Causing it to activate for helicopters (which have no mechanism in UI to turn it off since the effect does not apply to helicopters)
+## Patch 2 - May 25, 2024
+- Fix issue with stick shaker effect playing on ground with DCS F-4E
+## Patch 1 - May 25, 2024
+- Fix issue loading app when device disconnected or configured/default PID is incorrect
+## Release - May 24, 2024
+### DCS F-4E Maintenance Release
 - Added telemetry hooks needed to enable the damage effect
 - Added 'stick/pedal' shaker effect
- - Disabled by default but set-up in F-4E profile to activate at 22.3deg AoA
- - Is only a pedal feature IRL for the F-4E, but can be enabled on joystick and/or pedals
+  - Disabled by default but set-up in F-4E profile to activate at 22.3deg AoA
+  - Is only a pedal feature IRL for the F-4E, but can be enabled on joystick and/or pedals
 - Disabled for default F-4E profile as they conflict with HB's native implementation of each:
- - G-force effect
- - Gear Buffeting
- - Stall Buffeting
- - Speedbrake Buffeting
- - Afterburner Rumble
+  - G-force effect
+  - Gear Buffeting
+  - Stall Buffeting
+  - Speedbrake Buffeting
+  - Afterburner Rumble
 
 ############################################
 ##  May 19, 2024
