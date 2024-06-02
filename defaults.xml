@@ -61,11 +61,11 @@
 		<order>2</order>
 		<name>aileron_gain</name>
 		<MSFS>true</MSFS>
-		<sliderfactor>0.5</sliderfactor>
+		<sliderfactor>0.2</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<displayname>Aileron Gain</displayname>
-		<info>Aileron gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner</info>
+		<info>&lt;html&gt;&lt;body&gt;Aileron gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 	</defaults>
@@ -74,12 +74,12 @@
 		<order>2.2	</order>
 		<name>aileron_expo</name>
 		<displayname>Aileron Expo</displayname>
-		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end, and at 1, 3x force.  Negative values decrease force up to 1/2x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;image&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<sliderfactor>.25</sliderfactor>
-		<validvalues>-2,4</validvalues>
+		<sliderfactor>.1</sliderfactor>
+		<validvalues>-3,5</validvalues>
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
@@ -100,11 +100,11 @@
 		<order>3</order>
 		<name>elevator_gain</name>
 		<MSFS>true</MSFS>
-		<sliderfactor>0.5</sliderfactor>
+		<sliderfactor>0.2</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<displayname>Elevator Gain</displayname>
-		<info>Elevator gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner</info>
+		<info>&lt;html&gt;&lt;body&gt;Elevator gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 	</defaults>
@@ -113,12 +113,12 @@
 		<order>3.2	</order>
 		<name>elevator_expo</name>
 		<displayname>Elevator Expo</displayname>
-		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end, and at 1, 3x force.  Negative values decrease force up to 1/2x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;image&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<sliderfactor>.25</sliderfactor>
-		<validvalues>-2,4</validvalues>
+		<sliderfactor>.1</sliderfactor>
+		<validvalues>-3,5</validvalues>
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
@@ -139,11 +139,11 @@
 		<order>4</order>
 		<name>rudder_gain</name>
 		<MSFS>true</MSFS>
-		<sliderfactor>0.5</sliderfactor>
+		<sliderfactor>0.2</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<datatype>float</datatype>
 		<displayname>Rudder Gain</displayname>
-		<info>Rudder gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner</info>
+		<info>&lt;html&gt;&lt;body&gt;Rudder gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
 	</defaults>
@@ -152,12 +152,12 @@
 		<order>4.2	</order>
 		<name>rudder_expo</name>
 		<displayname>Rudder Expo</displayname>
-		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end, and at 1, 3x force.  Negative values decrease force up to 1/2x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;image&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
-		<sliderfactor>.25</sliderfactor>
-		<validvalues>-2,4</validvalues>
+		<sliderfactor>.1</sliderfactor>
+		<validvalues>-3,5</validvalues>
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
