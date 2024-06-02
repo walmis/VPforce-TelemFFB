@@ -226,8 +226,7 @@ class Aircraft(AircraftBase):
             effects.dispose("nw_shimmy")
 
     def expocurve(self,x, k):
-        print (k) ;
-        #expo function for + k: y = (1-k)x + k( (1-e^(-ax)) / (1-e^-a))
+        # expo function for + k: y = (1-k)x + k( (1-e^(-ax)) / (1-e^-a))
         #       for negative k: y = (1+k)x + -k(e^(a(x-1))-e^(-a)) / (1-e^(-a))
         #   x = orig pct_max
         #   y = new pct_max
@@ -718,8 +717,10 @@ class Aircraft(AircraftBase):
 
                     # logging.debug(f"fto={force_trim_y_offset} | Offset={offs}")
 
-            max_coeff_y = int(4096*self.max_elevator_coeff)
-            ec = clamp(int(4096 * elevator_coeff), base_elev_coeff, max_coeff_y)
+            max_coeff_y = int(4096 * self.max_elevator_coeff)
+            realtime_coeff_y = int(4096 * elevator_coeff)
+            ec = int(utils.scale_clamp(realtime_coeff_y, (base_elev_coeff, 4096), (base_elev_coeff, max_coeff_y)))
+
             pct_max_e = ec/max_coeff_y
 
             telem_data["_pct_max_e"] = pct_max_e
@@ -729,13 +730,15 @@ class Aircraft(AircraftBase):
 
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = ec
 
-            max_coeff_x = int(4096*self.max_aileron_coeff)
-            ac = clamp(int(4096 * aileron_coeff), base_ailer_coeff, max_coeff_x)
+            max_coeff_x = int(4096 * self.max_aileron_coeff)
+            realtime_coeff_x = int(4096 * aileron_coeff)
+            ac = int(utils.scale_clamp(realtime_coeff_x, (base_ailer_coeff, 4096), (base_ailer_coeff, max_coeff_x)))
 
             pct_max_a = ac/max_coeff_x
 
             telem_data["_pct_max_a"] = pct_max_a
             self._ipc_telem["_pct_max_a"] = pct_max_a
+            telem_data['_ac'] = ac
             logging.debug(f"Ailer Coef: {ac}")
 
             self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = ac
@@ -780,13 +783,17 @@ class Aircraft(AircraftBase):
             else:
                 phys_rudder_x_offs = 0
                 virtual_rudder_x_offs = 0
+
             max_coeff_x = int(4096*self.max_rudder_coeff)
-            x_coeff = clamp(int(4096 * rudder_coeff), base_rudder_coeff, max_coeff_x)
-            pct_max_r = x_coeff/max_coeff_x
+            realtime_coeff_x = int(4096 * rudder_coeff)
+            rc = int(utils.scale_clamp(realtime_coeff_x, (base_rudder_coeff, 4096), (base_rudder_coeff, max_coeff_x)))
+
+            pct_max_r = rc/max_coeff_x
 
             telem_data["_pct_max_r"] = pct_max_r
             self._ipc_telem["_pct_max_r"] = pct_max_r
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = x_coeff
+            telem_data['_rc'] = rc
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = rc
             self.spring_x.cpOffset = phys_rudder_x_offs
 
             self._spring_handle.setCondition(self.spring_x)
