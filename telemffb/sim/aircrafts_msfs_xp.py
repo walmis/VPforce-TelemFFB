@@ -111,6 +111,8 @@ class Aircraft(AircraftBase):
     elevator_expo: int = 0
     rudder_expo: int = 0
 
+    vne_override: str = ''
+
     @classmethod
     def set_simconnect(cls, sc):
         cls._simconnect = sc
@@ -568,24 +570,28 @@ class Aircraft(AircraftBase):
 
         # determine standard Q with Vne to get proper gain
         std_air_pressure = 1.225  # kg/m^3
-        if telem_data['src'] == 'XPLANE':
-            vne = telem_data.get('Vne')
-            vs0 = telem_data.get('Vso')
+        if self.vne_override == 0:
+            if telem_data['src'] == 'XPLANE':
+                vne = telem_data.get('Vne')
+                vs0 = telem_data.get('Vso')
+            else:
+                vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
+                vne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
         else:
-            vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
-            vne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
-            telem_data['Vne_kt'] = vne * ms2kt
+            vne = self.vne_override
 
+        telem_data['Vne_kt'] = vne * ms2kt
+        telem_data['Vc_kt'] = (vne / 1.4) * ms2kt
         Qvne = 0.5 * std_air_pressure * vne ** 2
-        Qvc = 0.5 * std_air_pressure * (vne/1.4) ** 2
+        #Qvc = 0.5 * std_air_pressure * (vne/1.4) ** 2
         telem_data['Qvne'] = Qvne * self.dyn_pressure_scale
 
-        newgain = 1/(Qvne * self.dyn_pressure_scale)
-        telem_data['Qvne_gain'] = newgain
+        Q_gain = 1/(Qvne * self.dyn_pressure_scale)
+        telem_data['Qvc_gain'] = Q_gain
 
-        self.elevator_gain = newgain
-        self.aileron_gain = newgain
-        self.rudder_gain = newgain
+        self.elevator_gain = Q_gain
+        self.aileron_gain = Q_gain
+        self.rudder_gain = Q_gain
 
 
         _slip_gain = 1.0 - self.slip_gain * abs(sin(slip_angle))

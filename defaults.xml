@@ -59,19 +59,19 @@
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>2</order>
-		<name>aileron_gain</name>
+		<name>max_aileron_coeff</name>
 		<MSFS>true</MSFS>
-		<sliderfactor>0.2</sliderfactor>
+		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<displayname>Aileron Gain</displayname>
-		<info>&lt;html&gt;&lt;body&gt;Aileron gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<datatype>n_float</datatype>
+		<displayname>Aileron Max Force</displayname>
+		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>2.2	</order>
+		<order>2.2</order>
 		<name>aileron_expo</name>
 		<displayname>Aileron Expo</displayname>
 		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
@@ -84,33 +84,30 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>2.5</order>
-		<name>max_aileron_coeff</name>
-		<MSFS>true</MSFS>
-		<sliderfactor>1</sliderfactor>
+		<order>2.4</order>
+		<name>aileron_gain</name>
+		<sliderfactor>0.2</sliderfactor>
 		<validvalues>0,100</validvalues>
-		<datatype>n_float</datatype>
-		<displayname>Aileron Max Force</displayname>
-		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
+		<datatype>float</datatype>
+		<displayname>Aileron Gain</displayname>
+		<info>&lt;html&gt;&lt;body&gt;Aileron gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>3</order>
-		<name>elevator_gain</name>
+		<name>max_elevator_coeff</name>
 		<MSFS>true</MSFS>
-		<sliderfactor>0.2</sliderfactor>
+		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<displayname>Elevator Gain</displayname>
-		<info>&lt;html&gt;&lt;body&gt;Elevator gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<datatype>n_float</datatype>
+		<displayname>Elevator Max Force</displayname>
+		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>3.2	</order>
+		<order>3.2</order>
 		<name>elevator_expo</name>
 		<displayname>Elevator Expo</displayname>
 		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
@@ -123,33 +120,30 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>3.5</order>
-		<name>max_elevator_coeff</name>
-		<MSFS>true</MSFS>
-		<sliderfactor>1</sliderfactor>
+		<order>3.4</order>
+		<name>elevator_gain</name>
+		<sliderfactor>0.2</sliderfactor>
 		<validvalues>0,100</validvalues>
-		<datatype>n_float</datatype>
-		<displayname>Elevator Max Force</displayname>
-		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
+		<datatype>float</datatype>
+		<displayname>Elevator Gain</displayname>
+		<info>&lt;html&gt;&lt;body&gt;Elevator gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>4</order>
-		<name>rudder_gain</name>
+		<name>max_rudder_coeff</name>
 		<MSFS>true</MSFS>
-		<sliderfactor>0.2</sliderfactor>
+		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-		<displayname>Rudder Gain</displayname>
-		<info>&lt;html&gt;&lt;body&gt;Rudder gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<datatype>n_float</datatype>
+		<displayname>Rudder Max Force</displayname>
+		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>4.2	</order>
+		<order>4.2</order>
 		<name>rudder_expo</name>
 		<displayname>Rudder Expo</displayname>
 		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
@@ -162,16 +156,27 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>4.5</order>
-		<name>max_rudder_coeff</name>
-		<MSFS>true</MSFS>
-		<sliderfactor>1</sliderfactor>
+		<order>4.4</order>
+		<name>rudder_gain</name>
+		<sliderfactor>0.2</sliderfactor>
 		<validvalues>0,100</validvalues>
-		<datatype>n_float</datatype>
-		<displayname>Rudder Max Force</displayname>
-		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<XPLANE>true</XPLANE>
+		<datatype>float</datatype>
+		<displayname>Rudder Gain</displayname>
+		<info>&lt;html&gt;&lt;body&gt;Rudder gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>5</order>
+		<name>vne_override</name>
+		<any>true</any>
+		<info>Override Vne if plane data is incorrect.  Leave blank or delete setting to use sim Vne data &lt;br&gt;&lt;br&gt;Enter Vne True Airspeed (TAS)</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<datatype>anyfloat</datatype>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<unit>kt</unit>
+		<displayname>Vne Override</displayname>
 	</defaults>
 	<defaults>
 		<Grouping>FFB</Grouping>
@@ -2006,19 +2011,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
-		<order>705.1</order>
-		<name>stick_shaker_intensity</name>
-		<prereq>enable_stick_shaker</prereq>
-		<displayname>Stick Shaker Intensity</displayname>
-		<info>Enable stick shaker stall warning device</info>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<validvalues>0,100</validvalues>
-		<value>0.12</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
 		<order>705</order>
 		<name>enable_stick_shaker</name>
 		<displayname>AoA Stick Shaker</displayname>
@@ -2036,6 +2028,19 @@
 		<DCS>true</DCS>
 		<pedals>true</pedals>
 		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Buffeting</Grouping>
+		<order>705.1</order>
+		<name>stick_shaker_intensity</name>
+		<prereq>enable_stick_shaker</prereq>
+		<displayname>Stick Shaker Intensity</displayname>
+		<info>Enable stick shaker stall warning device</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.12</value>
+		<datatype>float</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>Buffeting</Grouping>
@@ -3472,6 +3477,78 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>GliderAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>TurbopropAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>PropellerAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>JetAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>GliderAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>TurbopropAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>PropellerAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>JetAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>AllSettings</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
 	<classdefaults>
 		<name>aircraft_is_spring_centered</name>
 		<type>GliderAircraft</type>
@@ -5931,112 +6008,112 @@
 	<classdefaults>
 		<name>max_elevator_coeff</name>
 		<type>TurbopropAircraft</type>
-		<value>0.5</value>
+		<value>1.0</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_elevator_coeff</name>
 		<type>JetAircraft</type>
-		<value>0.5</value>
+		<value>1.0</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_elevator_coeff</name>
 		<type>PropellerAircraft</type>
-		<value>0.5</value>
+		<value>1.0</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_elevator_coeff</name>
 		<type>GliderAircraft</type>
-		<value>0.3</value>
+		<value>1.0</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_elevator_coeff</name>
 		<type>TurbopropAircraft</type>
-		<value>0.5</value>
+		<value>1.0</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_elevator_coeff</name>
 		<type>JetAircraft</type>
-		<value>0.5</value>
+		<value>1.0</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_elevator_coeff</name>
 		<type>PropellerAircraft</type>
-		<value>0.6</value>
+		<value>1.0</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_elevator_coeff</name>
 		<type>GliderAircraft</type>
-		<value>0.3</value>
+		<value>1.0</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_rudder_coeff</name>
 		<type>TurbopropAircraft</type>
-		<value>0.5</value>
+		<value>1.0</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_rudder_coeff</name>
 		<type>JetAircraft</type>
-		<value>0.6</value>
+		<value>1.0</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_rudder_coeff</name>
 		<type>PropellerAircraft</type>
-		<value>0.4</value>
+		<value>1.0</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_rudder_coeff</name>
 		<type>GliderAircraft</type>
-		<value>0.3</value>
+		<value>1.0</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_rudder_coeff</name>
 		<type>TurbopropAircraft</type>
-		<value>0.7</value>
+		<value>1.0</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_rudder_coeff</name>
 		<type>JetAircraft</type>
-		<value>0.8</value>
+		<value>1.0</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_rudder_coeff</name>
 		<type>PropellerAircraft</type>
-		<value>0.6</value>
+		<value>1.0</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>max_rudder_coeff</name>
 		<type>GliderAircraft</type>
-		<value>0.5</value>
+		<value>1.0</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
