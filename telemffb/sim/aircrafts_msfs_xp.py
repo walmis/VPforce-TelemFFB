@@ -515,9 +515,11 @@ class Aircraft(AircraftBase):
         force_trim_y_offset = self.force_trim_y_offset
 
         _airspeed = incidence_vec.z
-        telem_data["TAS"] = _airspeed
-        telem_data['TAS3'] = _airspeed
+        telem_data["TAS"] = _airspeed   # why not use simvar AIRSPEED TRUE?
+        telem_data['TAS3'] = _airspeed  # what is this for?
+        IAS = telem_data['IAS']
         telem_data['TAS_kt'] = _airspeed * ms2kt
+        telem_data['IAS_kt'] = IAS * ms2kt
 
         base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
         base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
@@ -725,9 +727,8 @@ class Aircraft(AircraftBase):
             if self.aoa_effect_enabled and telem_data.get("ElevDeflPct", 0) != 0 and not max(telem_data.get("WeightOnWheels")):
                 # calculate maximum angle based on current angle and percentage
                 tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
-                tas = telem_data.get("TAS")  # m/s
 
-                speed_factor = utils.scale_clamp(tas, (0, vne), (0.0, 1.0))
+                speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
                 y_offs = _aoa / tot
                 y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
                 y_offs = clamp(y_offs, -1, 1)
@@ -826,9 +827,8 @@ class Aircraft(AircraftBase):
             self.spring_x.cpOffset = phys_rudder_x_offs
 
             self._spring_handle.setCondition(self.spring_x)
-            tas = telem_data.get("TAS")
 
-            speed_factor = utils.scale_clamp(tas, (0, vne), (0.0, 1.0))
+            speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
             rud_force = rud_force * speed_factor
             # telem_data["RudForce"] = rud_force * speed_factor
 
@@ -996,7 +996,7 @@ class Aircraft(AircraftBase):
             retracts = max(retracts)
         if (self.gear_motion_intensity > 0) and (retracts):
             gear = max(telem_data.get("Gear", 0))
-            self._update_landing_gear(gear, telem_data.get("TAS"))
+            self._update_landing_gear(gear, telem_data.get("IAS"))
 
         self._aoa_reduction_force_effect(telem_data)
         if self._sim_is_msfs():
@@ -1043,9 +1043,9 @@ class PropellerAircraft(Aircraft):
         if self._sim_is_msfs():
             if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
                 sp = max(telem_data.get("Spoilers", 0))
-                self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=80*kt2ms, spd_thresh_hi=140*kt2ms )
+                self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=80*kt2ms, spd_thresh_hi=140*kt2ms )
         if self._sim_is_xplane():
-            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("TAS"), spd_thresh=80 * kt2ms)
+            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=80 * kt2ms)
         if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
             self._gforce_effect(telem_data)
         if self.is_collective():
@@ -1072,11 +1072,11 @@ class JetAircraft(Aircraft):
         super().on_telemetry(telem_data)
         #
         if self._sim_is_xplane():
-            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("TAS"), spd_thresh=150*kt2ms)
+            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=150*kt2ms)
         if self._sim_is_msfs():
             if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
                 sp = max(telem_data.get("Spoilers", 0))
-                self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
+                self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
         self._update_jet_engine_rumble(telem_data)
         if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
             self._gforce_effect(telem_data)
@@ -1096,11 +1096,11 @@ class TurbopropAircraft(PropellerAircraft):
 
         super().on_telemetry(telem_data)
         if self._sim_is_xplane():
-            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("TAS"), spd_thresh=120*kt2ms)
+            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=120*kt2ms)
         if self._sim_is_msfs():
             if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
                 sp = max(telem_data.get("Spoilers", 0))
-                self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
+                self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
         if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
             self._gforce_effect(telem_data)
         self._update_jet_engine_rumble(telem_data)
@@ -1228,7 +1228,7 @@ class GliderAircraft(Aircraft):
             if isinstance(sp, list):
                 sp = max(sp)
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-            self._update_spoiler(sp, telem_data.get("TAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
+            self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
         if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
             self._gforce_effect(telem_data)
         if self.is_collective():

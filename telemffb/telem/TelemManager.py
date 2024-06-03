@@ -106,6 +106,8 @@ class TelemManager(QObject, threading.Thread):
                 k = setting['name']
                 v = setting['value']
                 u = setting['unit']
+                if v is None:
+                    v = '0'
                 if u is not None:
                     vu = v + u
                 else:

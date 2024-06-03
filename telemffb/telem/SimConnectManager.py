@@ -136,6 +136,7 @@ class SimConnectManager(threading.Thread):
         SimVar("G", "G FORCE", "Number"),
         SimVarArray("AccBody", "ACCELERATION BODY <>", "feet per second squared", scale=0.031081, keywords=("X", "Y", "Z")), #scale fps/s to g
         SimVar("TAS", "AIRSPEED TRUE", "meter/second"),
+        SimVar("IAS", "AIRSPEED INDICATED", "meter/second"),
         SimVar("GroundSpeed", "GROUND VELOCITY", "meter/second"),
         SimVar("AirDensity", "AMBIENT DENSITY", "kilograms per cubic meter"),
         SimVar("AoA", "INCIDENCE ALPHA", "degrees"),
