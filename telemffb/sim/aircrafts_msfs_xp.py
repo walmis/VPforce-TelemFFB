@@ -37,6 +37,7 @@ rad = 0.0174532925
 ft = 3.28084  # m to ft
 kt = 1.94384  # ms to kt
 kt2ms = 0.514444  # knots to m/s
+ms2kt = 1.943844  # m/s to knot
 
 EFFECT_SQUARE = 3
 EFFECT_SINE = 4
@@ -234,12 +235,14 @@ class Aircraft(AircraftBase):
         #   a = alpha, controls how much to bend the curve.
         #       a=5.5 gives approx 2x increase at 25% orig pct_max with k=0.5, 3x at 25% with k=1
         #               and 1/2x decrease with k=-0.5, 1/3x with k=-1 at 75%
+        newvalue = 0
         expo_a = 5.5  # alpha
         if k >= 0:
-            return (1 - k) * x + k * (1 - math.exp(-expo_a * x)) / (1 - math.exp(-expo_a))
+            newvalue = (1 - k) * x + k * (1 - math.exp(-expo_a * x)) / (1 - math.exp(-expo_a))
         else:
-            return (1 + k) * x + (-k) * (math.exp(expo_a * (x - 1)) - math.exp(-expo_a)) / (1 - math.exp(-expo_a))
-
+            newvalue = (1 + k) * x + (-k) * (math.exp(expo_a * (x - 1)) - math.exp(-expo_a)) / (1 - math.exp(-expo_a))
+        #print(f'expo input:{x} k:{k} output:{newvalue}')
+        return newvalue
     def _update_fbw_flight_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
         if self._sim_is_msfs():
@@ -512,6 +515,7 @@ class Aircraft(AircraftBase):
         _airspeed = incidence_vec.z
         telem_data["TAS"] = _airspeed
         telem_data['TAS3'] = _airspeed
+        telem_data['TAS_kt'] = _airspeed * ms2kt
 
         base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
         base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
@@ -552,6 +556,7 @@ class Aircraft(AircraftBase):
             _elevator_aoa = 0
         telem_data["_elevator_aoa"] = _elevator_aoa
 
+
         # calculate dynamic pressure based on air flow from propeller
         # elevator_prop_flow_ratio defines how much prop wash the elevator receives
         _elev_dyn_pressure = utils.mix(telem_data["DynPressure"], 
@@ -560,6 +565,28 @@ class Aircraft(AircraftBase):
 
         # scale dynamic pressure to FFB friendly values
         _dyn_pressure = telem_data["DynPressure"] * self.dyn_pressure_scale
+
+        # determine standard Q with Vne to get proper gain
+        std_air_pressure = 1.225  # kg/m^3
+        if telem_data['src'] == 'XPLANE':
+            vne = telem_data.get('Vne')
+            vs0 = telem_data.get('Vso')
+        else:
+            vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
+            vne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
+            telem_data['Vne_kt'] = vne * ms2kt
+
+        Qvne = 0.5 * std_air_pressure * vne ** 2
+        Qvc = 0.5 * std_air_pressure * (vne/1.4) ** 2
+        telem_data['Qvne'] = Qvne * self.dyn_pressure_scale
+
+        newgain = 1/(Qvne * self.dyn_pressure_scale)
+        telem_data['Qvne_gain'] = newgain
+
+        self.elevator_gain = newgain
+        self.aileron_gain = newgain
+        self.rudder_gain = newgain
+
 
         _slip_gain = 1.0 - self.slip_gain * abs(sin(slip_angle))
         telem_data["_slip_gain"] = _slip_gain
@@ -693,12 +720,7 @@ class Aircraft(AircraftBase):
                 # calculate maximum angle based on current angle and percentage
                 tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
                 tas = telem_data.get("TAS")  # m/s
-                if telem_data['src'] == 'XPLANE':
-                    vne = telem_data.get('Vne')
-                    vs0 = telem_data.get('Vso')
-                else:
-                    vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
-                    vne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
+
                 speed_factor = utils.scale_clamp(tas, (0, vne), (0.0, 1.0))
                 y_offs = _aoa / tot
                 y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
@@ -729,6 +751,7 @@ class Aircraft(AircraftBase):
             telem_data['_ec'] = ec
 
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = ec
+
 
             max_coeff_x = int(4096 * self.max_aileron_coeff)
             realtime_coeff_x = int(4096 * aileron_coeff)
@@ -798,12 +821,7 @@ class Aircraft(AircraftBase):
 
             self._spring_handle.setCondition(self.spring_x)
             tas = telem_data.get("TAS")
-            if telem_data['src'] == 'XPLANE':
-                vne = telem_data.get('Vne')
-                vs0 = telem_data.get('Vso')
-            else:
-                vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
-                vne = vc * 1.4   # rough estimate that Vne is 1.4x Vc
+
             speed_factor = utils.scale_clamp(tas, (0, vne), (0.0, 1.0))
             rud_force = rud_force * speed_factor
             # telem_data["RudForce"] = rud_force * speed_factor
