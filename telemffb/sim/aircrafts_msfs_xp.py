@@ -38,6 +38,9 @@ ft = 3.28084  # m to ft
 kt = 1.94384  # ms to kt
 kt2ms = 0.514444  # knots to m/s
 ms2kt = 1.943844  # m/s to knot
+vsound = 290.07 # m/s, speed of sound at sea level in ISA condition
+P0 = 101325 # Pa, ISA static pressure at sealevel
+std_air_pressure = 1.225  # kg/m^3
 
 EFFECT_SQUARE = 3
 EFFECT_SINE = 4
@@ -571,19 +574,25 @@ class Aircraft(AircraftBase):
         _dyn_pressure = telem_data["DynPressure"] * self.dyn_pressure_scale
 
         # determine standard Q with Vne to get proper gain
-        std_air_pressure = 1.225  # kg/m^3
+
         if self.vne_override == 0:
             if telem_data['src'] == 'XPLANE':
                 vne = telem_data.get('Vne')
                 vs0 = telem_data.get('Vso')
             else:
-                vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s
-                vne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
+                vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s   Vc is TAS!!
+                telem_data['Vc_kt'] = vc * ms2kt
+                Tvne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
+                # correction from TAS to IAS
+                # https://aviation.stackexchange.com/questions/25801/how-do-you-convert-true-airspeed-to-indicated-airspeed
+                qv= (0.5 * std_air_pressure * (Tvne ** 2))
+                kmNs = ((( qv / P0) + 1) ** (2/7))
+                vne = vsound * sqrt(5 * ( kmNs - 1))
         else:
             vne = self.vne_override
 
         telem_data['Vne_kt'] = vne * ms2kt
-        telem_data['Vc_kt'] = (vne / 1.4) * ms2kt
+
         Qvne = 0.5 * std_air_pressure * vne ** 2
         #Qvc = 0.5 * std_air_pressure * (vne/1.4) ** 2
         telem_data['Qvne'] = Qvne * self.dyn_pressure_scale

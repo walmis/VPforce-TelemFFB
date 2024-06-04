@@ -169,7 +169,7 @@
 		<order>5</order>
 		<name>vne_override</name>
 		<any>true</any>
-		<info>Override Vne if plane data is incorrect.  Leave blank or delete setting to use sim Vne data &lt;br&gt;&lt;br&gt;Enter Vne True Airspeed (TAS)</info>
+		<info>Override Vne if plane data is incorrect.  Leave blank or delete setting to use sim Vne data &lt;br&gt;&lt;br&gt;Enter Vne Airspeed (IAS) where dynamic forces max out</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
