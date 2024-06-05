@@ -632,6 +632,14 @@ local f_telemFFB = {
               mainRotorRPM
             )
 
+          elseif string.find(obj.Name, "OH58", 0, true) then
+            local mainRotorRPM = get_param_handle("BASE_SENSOR_PROPELLER_RPM"):get()
+            stringToSend =
+              string.format(
+              "RotorRPM=%.0f",
+              mainRotorRPM
+            )
+
           elseif obj.Name == "SA342M" or obj.Name == "SA342L" or obj.Name == "SA342Mistral" or obj.Name == "SA342Minigun"
            then -- Gazelle
             -- SA342 Relevent Info (from mainpanel_init.lua):
