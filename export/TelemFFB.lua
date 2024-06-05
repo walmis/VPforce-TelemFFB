@@ -5,6 +5,40 @@ local socket = require("socket")
 local calc_damage = 0
 require("Vector")
 
+local debug = false -- set to true to enable emmylua debugger and show param handles list
+
+-- add debug support, to hook up a lua debugger install EmmyLua VSCode extension
+-- Tutorial vid: https://www.youtube.com/watch?v=ZtAW8RhdLYo
+if debug == true then
+  -- Enable emmy lua debug --
+  local userProfile = os.getenv("USERPROFILE")
+  local emmyluaDllPath
+  
+  if userProfile then
+      local extensionsPath = userProfile .. "/.vscode/extensions"
+      for dir in lfs.dir(extensionsPath) do
+          if dir:match("^tangzx%.emmylua") then
+              emmyluaDllPath = extensionsPath .. "/" .. dir .. "/debugger/emmy/windows/x64/?.dll"
+              break
+          end
+      end
+  end
+  
+  if emmyluaDllPath then
+      log.info("EmmyLua DLL Path: " .. emmyluaDllPath)
+      package.cpath = package.cpath .. ';' .. emmyluaDllPath
+      local dbg = require('emmy_core')
+      log.info("EmmyLua debugger started")
+      dbg.tcpConnect('localhost', 9966)
+  else
+    log.info("EmmyLua Directory Not Found or USERPROFILE not set")
+  end
+
+  -- show param handles list window in DCS
+  show_param_handles_list()
+-----------------------------------
+end
+
 local function scale(x, in_min, in_max, out_min, out_max)
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 end
@@ -17,8 +51,6 @@ local function sock_readable(s)
   end
   return false
 end
-
-
 
 -- Function to calculate air density based on altitude
 function calculateAirDensity(altitude)
@@ -153,6 +185,23 @@ local function dump(var, depth)
   else
           return tostring(var) .. "\n"
   end
+end
+
+local function isFC3Aircraft(name)
+  local fc3 = {
+    ["A-10A"] = true,
+    ["F-15C"] = true,
+    ["MiG-29A"] = true,
+    ["MiG-29S"] = true,
+    ["MiG-29G"] = true,
+    ["Su-27"] = true,
+    ["J-11A"] = true,
+    ["Su-33"] = true,
+    ["Su-25"] = true,
+    ["Su-25T"] = true
+  }
+  
+  return fc3[name] or false
 end
 
 local f_telemFFB = {
@@ -331,6 +380,11 @@ local f_telemFFB = {
 
           if MainPanel ~= nil then
             MainPanel:update_arguments()
+          else
+            if not isFC3Aircraft(obj.Name) then
+              -- main panel is not available, aircraft is gone 
+              return
+            end
           end
 
           local engine = LoGetEngineInfo()
@@ -566,11 +620,25 @@ local f_telemFFB = {
               mainRotorRPM
             )
 
-           elseif obj.Name == "AH-64D_BLK_II" then
+          elseif obj.Name == "AH-64D_BLK_II" then
             damage_vars = {
               61,62,63,65,81,82,116,117,119,120,122,123,125,126,146,148,149,150,151,152,153,154,155,156,157,158,160,
               166,214,215,224,225,226,227,238,242,245,255,256,257,259,264,300,610
             }
+            local mainRotorRPM = get_param_handle("BASE_SENSOR_PROPELLER_RPM"):get()
+            stringToSend =
+              string.format(
+              "RotorRPM=%.0f",
+              mainRotorRPM
+            )
+
+          elseif string.find(obj.Name, "OH58", 0, true) then
+            local mainRotorRPM = get_param_handle("BASE_SENSOR_PROPELLER_RPM"):get()
+            stringToSend =
+              string.format(
+              "RotorRPM=%.0f",
+              mainRotorRPM
+            )
 
           elseif obj.Name == "SA342M" or obj.Name == "SA342L" or obj.Name == "SA342Mistral" or obj.Name == "SA342Minigun"
            then -- Gazelle
@@ -1202,9 +1270,20 @@ local f_telemFFB = {
               WingsPos
             )
           end
+
           if calc_damage == 1 and damage_vars ~= "not supported" then
             damage = getDamage(damage_vars)
           end
+
+          local seat = 0
+
+          if f14 then
+            -- https://discord.com/channels/965234441511383080/1230919462144835674/1247271614471737414
+            seat = MainPanel:get_argument_value(410)
+          else
+            seat = get_param_handle("SEAT"):get()
+          end
+
           local items = {
             {"T", "%.3f", t},
             {"N", "%s", obj.Name},
@@ -1245,7 +1324,27 @@ local f_telemFFB = {
             {"Damage", "%s", damage},
             {"Wind_Kts", "%.2f", wind_velocity * 1.944},
             {"Wind_direction", "%.0f", wind_direction},
+            {"Seat", "%s", seat},
           }
+          
+          -- If debugging, dump draw arguments into the param handles list to find useful telemetry
+          if debug then
+            for i = 1,500 do
+              if MainPanel ~= nil then
+                local val = MainPanel:get_argument_value(i)
+                local h = get_param_handle("MainPanel_arg_".. i)
+                if h:get() > 0 or val > 0 then
+                  h:set(val)
+                end
+              end
+              -- dump model draw args too
+              val = LoGetAircraftDrawArgumentValue(i)
+              local h = get_param_handle("ModelArg_".. i)
+              if h:get() > 0 or val > 0 then
+                h:set(val)
+              end
+            end
+          end
           
           local formattedValues = {}
           for _, item in ipairs(items) do
