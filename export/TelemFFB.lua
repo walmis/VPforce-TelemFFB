@@ -620,11 +620,17 @@ local f_telemFFB = {
               mainRotorRPM
             )
 
-           elseif obj.Name == "AH-64D_BLK_II" then
+          elseif obj.Name == "AH-64D_BLK_II" then
             damage_vars = {
               61,62,63,65,81,82,116,117,119,120,122,123,125,126,146,148,149,150,151,152,153,154,155,156,157,158,160,
               166,214,215,224,225,226,227,238,242,245,255,256,257,259,264,300,610
             }
+            local mainRotorRPM = get_param_handle("BASE_SENSOR_PROPELLER_RPM"):get()
+            stringToSend =
+              string.format(
+              "RotorRPM=%.0f",
+              mainRotorRPM
+            )
 
           elseif obj.Name == "SA342M" or obj.Name == "SA342L" or obj.Name == "SA342Mistral" or obj.Name == "SA342Minigun"
            then -- Gazelle

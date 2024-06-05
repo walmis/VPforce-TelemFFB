@@ -1234,8 +1234,6 @@ class AircraftBase(object):
         if blade_ct is None:
             blade_ct = 2
             rotor = 250
-        if self._sim_is_dcs() and "AH-64" in mod:
-            rotor = 245  # Apache does not have exportable data related to Rotor RPM
 
         self.etl_shake_frequency = (rotor / 75) * blade_ct
         self.overspeed_shake_frequency = self.etl_shake_frequency * 0.75
@@ -1321,8 +1319,6 @@ class AircraftBase(object):
             blade_ct = 2
             rrpm = 250
 
-        if self._sim_is_dcs() and "AH-64" in mod:
-            rrpm = 245  # Apache does not have exportable data related to Rotor RPM
 
         if rrpm < 5:
             effects.dispose("rotor_rpm0-1")
