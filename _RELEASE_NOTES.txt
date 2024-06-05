@@ -1,6 +1,14 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  June 5, 2024
+############################################
+## DCS
+- Telemetry will now stop when user has ejected or pilot is dead
+- Add real rotor RPM for AH-64
+- Add basic support for OH-58D
+
+############################################
 ##  May 26, 2024
 ############################################
 ## Patch 3 - May 26, 2025
