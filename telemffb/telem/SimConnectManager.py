@@ -1,5 +1,6 @@
 from simconnect import *
 from ctypes import byref, cast, sizeof
+from telemffb.utils import dbprint
 import time
 import threading
 import logging
@@ -33,21 +34,6 @@ surface_types = {
     23: "Tarmac",
     24: "Wright flyer track",
 }
-def dbprint(color, msg):
-    reset = '\033[0m'
-    match color:
-        case "red":
-            ccode = '\033[91m'
-        case 'yellow':
-            ccode = '\033[93m'
-        case 'blue':
-            ccode = '\033[94m'
-        case 'green':
-            ccode = '\033[92m'
-        case _:
-            ccode = '\033[0m'
-    print(f"{ccode}{msg}{reset}")
-
 
 class SimVar:
     def __init__(self, name, var, sc_unit, unit=None, datatype=DATATYPE_FLOAT64, scale=None, mutator=None):

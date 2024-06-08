@@ -51,6 +51,21 @@ import telemffb.globals as G
 import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
 
+def dbprint(color, msg):
+    reset = '\033[0m'
+    match color:
+        case "red":
+            ccode = '\033[91m'
+        case 'yellow':
+            ccode = '\033[93m'
+        case 'blue':
+            ccode = '\033[94m'
+        case 'green':
+            ccode = '\033[92m'
+        case _:
+            ccode = '\033[0m'
+    print(f"{ccode}{msg}{reset}")
+
 def overrides(interface_class):
     """Decorator to ensure that a method in a subclass overrides a method in its superclass or interface."""
 
