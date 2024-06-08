@@ -528,6 +528,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             #self.connected_rows.add(row)
 
+            # Set tooltips for each cell
+            for col in range(self.table_widget.columnCount()):
+                cell_item = self.table_widget.item(row, col)
+                if cell_item is not None:
+                    cell_item.setToolTip(cell_item.text())
 
             # make unselectable in not checked
             if not state:
