@@ -30,6 +30,8 @@ master_instance : bool = False
 ipc_instance : 'IPCNetworkThread' = None
 child_instance : bool = None
 
+current_device_config_scope: str = None # add current device config scope to globals for tracking across telemffb modules
+
 # systems settings
 system_settings : 'SystemSettings' = None
 
@@ -40,7 +42,10 @@ args : 'CmdLineArgs' = None
 telem_manager : 'TelemManager' = None
 
 # configurator gains read at startup
-startup_configurator_gains = None
+startup_configurator_gains = None  # Gain object direct from 'device.get_gains'.  Gains get read at TelemFFB startup fallback baseline values.
+vpconf_configurator_gains = None  # Gain object direct from 'device.get_gains'. Updated every time a configurator profile is pushed to the device to use as revert data
+current_configurator_gains = None  # Gain settings table set by gain override dialog.  Updated when gains set/saved in dialog or read from config
+gain_override_dialog = None
 
 sim_listeners : 'SimListenerManager' = None
 

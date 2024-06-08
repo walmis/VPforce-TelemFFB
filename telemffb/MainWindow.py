@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
 
         # notes_url = os.path.join(script_dir, '_RELEASE_NOTES.txt')
         notes_url = utils.get_resource_path('_RELEASE_NOTES.txt')
-        self._current_config_scope = G.device_type
+        G.current_device_config_scope = G.device_type
         self.current_tab_index = 0
 
         if G.system_settings.get('saveLastTab', 0):
@@ -535,7 +535,7 @@ class MainWindow(QMainWindow):
         self.telem_lbl = QLabel('Telemetry:')
         self.effect_lbl = QLabel('Active Effects:')
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
+            self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
         monitor_area_layout.addWidget(self.telem_lbl, 0, 0)
         monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
         monitor_area_layout.addWidget(self.telem_area, 1, 0)
@@ -634,6 +634,7 @@ class MainWindow(QMainWindow):
         if G.system_settings.get('debug', False):
             # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
             self.add_debug_menu()
+        G.gain_override_dialog = ConfiguratorDialog(self) # create configurator gain dialog for use during TelemFFB session and store object in globals
 
 
     def add_instance_log_menu(self):
@@ -813,20 +814,20 @@ class MainWindow(QMainWindow):
 
     def device_logo_click_event(self):
         # print("External function executed on label click")
-        # print(self._current_config_scope)
+        # print(G.current_device_config_scope)
         def check_instance(name):
             return name in G.launched_instances or G.device_type == name
-        if self._current_config_scope == 'joystick':
+        if G.current_device_config_scope == 'joystick':
             if check_instance("pedals"):
                 self.change_config_scope(2)
             elif check_instance("collective"):
                 self.change_config_scope(3)
-        elif self._current_config_scope == 'pedals':
+        elif G.current_device_config_scope == 'pedals':
             if check_instance("collective"):
                 self.change_config_scope(3)
             elif check_instance("joystick"):
                 self.change_config_scope(1)
-        elif self._current_config_scope == 'collective':
+        elif G.current_device_config_scope == 'collective':
             if check_instance("joystick"):
                 self.change_config_scope(1)
             elif check_instance("pedals"):
@@ -885,20 +886,20 @@ class MainWindow(QMainWindow):
         }
 
         xmlutils.update_vars(types[arg], G.userconfig_path, G.defaults_path)
-        self._current_config_scope = types[arg]
+        G.current_device_config_scope = types[arg]
 
-        pixmap = QPixmap(utils.get_device_logo(self._current_config_scope))
+        pixmap = QPixmap(utils.get_device_logo(G.current_device_config_scope))
         self.devicetype_label.setPixmap(pixmap)
         self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
 
         if G.master_instance:
-            self.effect_lbl.setText(f'Active Effects for: {self._current_config_scope}')
+            self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
 
         # for file in os.listdir(log_folder):
-        #     if file.endswith(self._current_config_scope + '_' + current_log_ts):
+        #     if file.endswith(G.current_device_config_scope + '_' + current_log_ts):
         #         self.log_tail_thread.change_log_file(os.path.join(log_folder, file))
         #         pass
-        # log_tail_window.setWindowTitle(f"Log File Monitor ({self._current_config_scope})")
+        # log_tail_window.setWindowTitle(f"Log File Monitor ({G.current_device_config_scope})")
 
         self.update_settings()
 
@@ -1158,8 +1159,8 @@ class MainWindow(QMainWindow):
             active_effects = ""
             active_settings = []
 
-            if G.master_instance and self._current_config_scope != G.device_type:
-                dev = self._current_config_scope
+            if G.master_instance and G.current_device_config_scope != G.device_type:
+                dev = G.current_device_config_scope
                 active_effects = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_effects', '')
                 active_settings = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_settings', [])
             else:

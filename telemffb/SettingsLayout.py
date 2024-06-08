@@ -1,4 +1,4 @@
-
+import json
 import logging
 import os
 
@@ -10,8 +10,9 @@ from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
 
 from telemffb.ButtonPressThread import ButtonPressThread
 from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, AnimatedToggle)
+from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.utils import validate_vpconf_profile
+from telemffb.utils import validate_vpconf_profile, dbprint
 
 from . import globals as G
 from . import xmlutils
@@ -556,6 +557,16 @@ class SettingsLayout(QGridLayout):
         if item['datatype'] == 'button':
             self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
+        if item['datatype'] == 'configurator':
+            configurator_button = QPushButton("Configurator Gains Override")
+            configurator_button.setMinimumWidth(150)
+            configurator_button.setMaximumHeight(25)
+            configurator_button.setObjectName(f"cfg_ovd")
+            configurator_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+            configurator_button.clicked.connect(self.configurator_button_clicked)
+            self.addWidget(configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+
+
         if item['has_expander'] == 'true' and item['prereq'] != '':
             exp_col += 1
         if not rowdisabled:
@@ -745,6 +756,30 @@ class SettingsLayout(QGridLayout):
             the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
             self.reload_caller()
+
+    def configurator_button_clicked(self):
+        """
+        User clicked the configurator gain override settings button.
+        If the current settings scope is not the master device, send the command over IPC to have the child instance
+        pop its dialog window.
+        """
+        if G.master_instance and G.device_type != G.current_device_config_scope:
+            G.ipc_instance.send_broadcast_message(f'SHOW GAIN OVD:{G.current_device_config_scope}')
+        else:
+            # dbprint("red", f"Device = {G.device_type}")
+            # dbprint("green", f"Scope = {G.current_device_config_scope}")
+            G.gain_override_dialog.accepted.connect(self.update_configurator_overrides)
+            G.gain_override_dialog.raise_()
+            G.gain_override_dialog.activateWindow()
+            G.gain_override_dialog.show()
+
+    def update_configurator_overrides(self, gain_dict):
+        """
+        Called when signal received that user saved the configurator gain settings
+        convert dictionary to text string and write to config.
+        """
+        gain_dict_json = json.dumps(gain_dict)
+        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, gain_dict_json, "configurator_gains")
 
     def slider_changed(self):
         setting_name = self.sender().objectName().replace('sld_', '')

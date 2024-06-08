@@ -475,6 +475,13 @@
          </widget>
         </item>
         <item>
+         <widget class="QPushButton" name="b_gainoverrides">
+          <property name="text">
+           <string>Configure Gain Overrides</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QPushButton" name="b_usb_button">
           <property name="text">
            <string>PushButton</string>

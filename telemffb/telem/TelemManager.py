@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import subprocess
@@ -8,6 +9,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 import telemffb.globals as G
 import telemffb.utils as utils
+from telemffb.utils import dbprint
 import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
@@ -305,6 +307,8 @@ class TelemManager(QObject, threading.Thread):
                     if load_global and global_path != G.current_vpconf_profile:
                         logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
                         set_vpconf_profile(global_path, HapticEffect.device.serial)
+                    G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
+
 
                 if params.get('command_runner_enabled', False):
                     if params.get('command_runner_command', '') != '':
@@ -312,6 +316,26 @@ class TelemManager(QObject, threading.Thread):
                             subprocess.Popen(params['command_runner_command'], shell=True)
                         except Exception as e:
                             logging.error(f"Error running Command Executor for model: {e}")
+
+                if params.get('configurator_override_enabled', False):
+                    state = params.get('configurator_gains', 'none')
+                    if state != "none":
+                        state = json.loads(params.get('configurator_gains', '{}'))
+                        G.gain_override_dialog.set_gains_from_state(state)
+                        G.current_configurator_gains = state
+                        # dbprint("green", f"current_gain: {state}")
+                        # dbprint("yellow", f"vpconf_gain: {G.vpconf_configurator_gains}")
+                    else:
+                        # if the override is enabled but gain has not been set, send the last vpconf gain data to ensure
+                        # previous aircraft override gains do not persist.  The last vpconf gain data will either be
+                        # the gain at TelemFFB startup, or the last gain set by a pushed vpconf profile
+                        G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
+                else:
+                    # if the override is NOT enabled. send the last vpconf gain data to ensure
+                    # previous aircraft override gains do not persist.  The last vpconf gain data will either be
+                    # the gain at TelemFFB startup, or the last gain set by a pushed vpconf profile
+                    G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
+
 
                 logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
 
@@ -353,6 +377,7 @@ class TelemManager(QObject, threading.Thread):
                     if load_global and global_path != G.current_vpconf_profile:
                         logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
                         set_vpconf_profile(global_path, HapticEffect.device.serial)
+                    G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
 
                 if params.get('command_runner_enabled', False):
                     if params.get('command_runner_command', '') != '' and 'Enter full path' not in params.get('command_runner_command', ''):
@@ -360,6 +385,24 @@ class TelemManager(QObject, threading.Thread):
                             subprocess.Popen(params['command_runner_command'], shell=True)
                         except Exception as e:
                             logging.error(f"Error running Command Executor for model: {e}")
+
+                if params.get('configurator_override_enabled', False):
+                    state = params.get('configurator_gains', 'none')
+                    if state != "none":
+                        state = json.loads(params.get('configurator_gains', '{}'))
+                        G.gain_override_dialog.set_gains_from_state(state)
+                        G.current_configurator_gains = state
+                        # dbprint("red", f"current_gain: {state}")
+                    else:
+                        # if the override is enabled but gain has not been set, send the last vpconf gain data to ensure
+                        # previous aircraft override gains do not persist.  The last vpconf gain data will either be
+                        # the gain at TelemFFB startup, or the last gain set by a pushed vpconf profile
+                        G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
+                else:
+                    # if the override is NOT enabled. send the last vpconf gain data to ensure
+                    # previous aircraft override gains do not persist.  The last vpconf gain data will either be
+                    # the gain at TelemFFB startup, or the last gain set by a pushed vpconf profile
+                    G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
 
                 if "type" in updated_params:
                     # if user changed type or if new aircraft dialog changed type, update aircraft class

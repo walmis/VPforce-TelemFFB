@@ -1,9 +1,11 @@
 from PyQt5 import QtCore
+from PyQt5.QtCore import pyqtSignal, Qt
 from PyQt5.QtWidgets import QDialog
+import inspect
 
 import telemffb.globals as G
 from telemffb.ui.Ui_ConfiguratorDialog import Ui_ConfiguratorDialog
-
+from telemffb.utils import dbprint
 from .hw.ffb_rhino import (FFB_GAIN_CONSTANT, FFB_GAIN_DAMPER,
                            FFB_GAIN_FRICTION, FFB_GAIN_INERTIA,
                            FFB_GAIN_MASTER, FFB_GAIN_PERIODIC, FFB_GAIN_SPRING,
@@ -12,7 +14,17 @@ from .hw.ffb_rhino import (FFB_GAIN_CONSTANT, FFB_GAIN_DAMPER,
 
 class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
     global dev
+    state = {
+        "master_gain": {"enabled": False, "value": 0},
+        "periodic_gain": {"enabled": False, "value": 0},
+        "spring_gain": {"enabled": False, "value": 0},
+        "damper_gain": {"enabled": False, "value": 0},
+        "inertia_gain": {"enabled": False, "value": 0},
+        "friction_gain": {"enabled": False, "value": 0},
+        "constant_gain": {"enabled": False, "value": 0},
+    }
     cb_states = {'cb_MasterGain': 0,'cb_Spring': 0, 'cb_Periodic': 0, 'cb_Damper': 0, 'cb_Inertia': 0, 'cb_Friction': 0, 'cb_Constant': 0}
+    accepted = pyqtSignal(dict)
 
     def __init__(self, parent=None):
         super(ConfiguratorDialog, self).__init__(parent)
@@ -60,14 +72,79 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.cb_Constant.setCheckState(self.cb_states['cb_Constant'])
 
         self.pb_Revert.clicked.connect(self.revert_gains)
+        self.pb_Revert.setToolTip('Revert the settings to the values learned when TelemFFB was started -or- to the values in the last vpconf profile that was pushed by TelemFFB (if one has been pushed)')
 
-        self.pb_Finish.clicked.connect(self.close)
+        self.pb_Finish.clicked.connect(self.finish)
+        self.pb_Finish.setToolTip('Save the current settings to the configuration')
 
-        self.starting_gains = HapticEffect.device.get_gains()
+        self.pb_Cancel.clicked.connect(self.canceled)
+        self.pb_Cancel.setToolTip('Revert the settings to the current saved config value and close the dialog')
+
+        self.at_show_state = self.construct_setting_table()
+
         self.read_gains()
 
+    def construct_setting_table(self):
+        gains = HapticEffect.device.get_gains()
+        state = {
+            "master_gain": {"enabled": self.cb_MasterGain.isChecked(), "value": gains.master_gain},
+            "periodic_gain": {"enabled": self.cb_Periodic.isChecked(), "value": gains.periodic_gain},
+            "spring_gain": {"enabled": self.cb_Spring.isChecked(), "value": gains.spring_gain},
+            "damper_gain": {"enabled": self.cb_Damper.isChecked(), "value": gains.damper_gain},
+            "inertia_gain": {"enabled": self.cb_Inertia.isChecked(), "value": gains.inertia_gain},
+            "friction_gain": {"enabled": self.cb_Friction.isChecked(), "value": gains.friction_gain},
+            "constant_gain": {"enabled": self.cb_Constant.isChecked(), "value": gains.constant_gain},
+        }
+        return state
+    def closeEvent(self, event):
+        self.hide()
+        event.ignore()
+    def close(self):
+        self.hide()
+
+    def showEvent(self, event):
+        self.raise_()
+        self.activateWindow()
+        self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        super().showEvent(event)
+
+    def show(self):
+        if G.current_configurator_gains is not None and G.current_configurator_gains != {}:
+            self.set_gains_from_state(G.current_configurator_gains)
+        self.read_gains()
+        self.at_show_state = self.construct_setting_table()
+
+        self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.raise_()
+        self.activateWindow()
+        super().show()
+        # dbprint("blue", f"Startup Gains: {self.at_show_state}")
+
+    def canceled(self):
+        if isinstance(self.at_show_state, dict):
+            # dbprint("green", f"Override Dialog Canceled: {self.at_show_state}")
+            self.set_ui_from_state(self.at_show_state)
+            self.read_gains()
+
+        self.close()
+    def finish(self):
+        """
+        constructs the settings dictionary, emits the accepted signal (which is connected to update the setting value
+        in SettingsLayout and updates the G.current_configurator_gains value.
+        """
+        state = self.construct_setting_table()
+        self.accepted.emit(state)
+        G.current_configurator_gains = state
+        self.close()
 
     def cb_toggle(self, state):
+        """
+        If the toggle has been disabled for a given effect type, this method reverts that setting back to the value
+        which has been last configured by a vpconf profile push.  If no vpconf profile has been pushed, the values will
+        be what were on the device when TelemFFB started
+        """
         dev = HapticEffect.device
 
         sender = self.sender()
@@ -75,38 +152,130 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.cb_states[sender_str] = state
 
         if state: return
+
         match sender_str:
             case 'cb_MasterGain':
-                dev.set_gain(FFB_GAIN_MASTER, int(G.startup_configurator_gains.master_gain))
+                dev.set_gain(FFB_GAIN_MASTER, int(G.vpconf_configurator_gains.master_gain))
             case 'cb_Periodic':
-                dev.set_gain(FFB_GAIN_PERIODIC, G.startup_configurator_gains.periodic_gain)
+                dev.set_gain(FFB_GAIN_PERIODIC, G.vpconf_configurator_gains.periodic_gain)
             case 'cb_Spring':
-                dev.set_gain(FFB_GAIN_SPRING, G.startup_configurator_gains.spring_gain)
+                dev.set_gain(FFB_GAIN_SPRING, G.vpconf_configurator_gains.spring_gain)
             case 'cb_Damper':
-                dev.set_gain(FFB_GAIN_DAMPER, G.startup_configurator_gains.damper_gain)
+                dev.set_gain(FFB_GAIN_DAMPER, G.vpconf_configurator_gains.damper_gain)
             case 'cb_Inertia':
-                dev.set_gain(FFB_GAIN_INERTIA, G.startup_configurator_gains.inertia_gain)
+                dev.set_gain(FFB_GAIN_INERTIA, G.vpconf_configurator_gains.inertia_gain)
             case 'cb_Friction':
-                dev.set_gain(FFB_GAIN_FRICTION, G.startup_configurator_gains.friction_gain)
+                dev.set_gain(FFB_GAIN_FRICTION, G.vpconf_configurator_gains.friction_gain)
             case 'sl_Constant':
-                dev.set_gain(FFB_GAIN_CONSTANT, G.startup_configurator_gains.constant_gain)
+                dev.set_gain(FFB_GAIN_CONSTANT, G.vpconf_configurator_gains.constant_gain)
         self.read_gains()
 
 
 
     def revert_gains(self):
-        dev = HapticEffect.device
+        """
+        Sets the gain back to 'G.vpconf_configurator_gains' which holds the gain values from the last time
+        a vpconf profile was pushed to the device (or if no vpconf has been pushed, the gains when TelemFFB started
 
-        dev.set_gain(FFB_GAIN_MASTER, self.starting_gains.master_gain)
-        dev.set_gain(FFB_GAIN_PERIODIC, self.starting_gains.periodic_gain)
-        dev.set_gain(FFB_GAIN_SPRING, self.starting_gains.spring_gain)
-        dev.set_gain(FFB_GAIN_DAMPER, self.starting_gains.damper_gain)
-        dev.set_gain(FFB_GAIN_INERTIA, self.starting_gains.inertia_gain)
-        dev.set_gain(FFB_GAIN_FRICTION, self.starting_gains.friction_gain)
-        dev.set_gain(FFB_GAIN_CONSTANT, self.starting_gains.constant_gain)
+        Disables the UI checkboxes and then reads the gain values again to reset the sliders
+        """
+        dev = HapticEffect.device
+        dev.set_gain(FFB_GAIN_MASTER, G.vpconf_configurator_gains.master_gain)
+        self.cb_MasterGain.setChecked(False)
+        dev.set_gain(FFB_GAIN_PERIODIC, G.vpconf_configurator_gains.periodic_gain)
+        self.cb_Periodic.setChecked(False)
+        dev.set_gain(FFB_GAIN_SPRING, G.vpconf_configurator_gains.spring_gain)
+        self.cb_Spring.setChecked(False)
+        dev.set_gain(FFB_GAIN_DAMPER, G.vpconf_configurator_gains.damper_gain)
+        self.cb_Damper.setChecked(False)
+        dev.set_gain(FFB_GAIN_INERTIA, G.vpconf_configurator_gains.inertia_gain)
+        self.cb_Inertia.setChecked(False)
+        dev.set_gain(FFB_GAIN_FRICTION, G.vpconf_configurator_gains.friction_gain)
+        self.cb_Friction.setChecked(False)
+        dev.set_gain(FFB_GAIN_CONSTANT, G.vpconf_configurator_gains.constant_gain)
+        self.cb_Constant.setChecked(False)
         self.read_gains()
 
+    def set_ui_from_state(self, state):
+        dev = HapticEffect.device
+        caller_frame = inspect.currentframe().f_back
+
+        self.cb_MasterGain.setChecked(state['master_gain']['enabled'])
+        self.sl_MasterGain.setValue(int(state['master_gain']['value']))
+        # dev.set_gain(FFB_GAIN_MASTER, int(state['master_gain']['value']))
+        self.cb_Periodic.setChecked(state['periodic_gain']['enabled'])
+        self.sl_Periodic.setValue(int(state['periodic_gain']['value']))
+        # dev.set_gain(FFB_GAIN_PERIODIC, int(state['periodic_gain']['value']))
+        self.cb_Spring.setChecked(state['spring_gain']['enabled'])
+        self.sl_Spring.setValue(int(state['spring_gain']['value']))
+        # dev.set_gain(FFB_GAIN_SPRING, int(state['spring_gain']['value']))
+        self.cb_Damper.setChecked(state['damper_gain']['enabled'])
+        self.sl_Damper.setValue(int(state['damper_gain']['value']))
+        # dev.set_gain(FFB_GAIN_DAMPER, int(state['damper_gain']['value']))
+        self.cb_Inertia.setChecked(state['inertia_gain']['enabled'])
+        self.sl_Inertia.setValue(int(state['inertia_gain']['value']))
+        # dev.set_gain(FFB_GAIN_INERTIA, int(state['inertia_gain']['value']))
+        self.cb_Friction.setChecked(state['friction_gain']['enabled'])
+        self.sl_Friction.setValue(int(state['friction_gain']['value']))
+        # dev.set_gain(FFB_GAIN_FRICTION, int(state['friction_gain']['value']))
+        self.cb_Constant.setChecked(state['constant_gain']['enabled'])
+        self.sl_Constant.setValue(int(state['constant_gain']['value']))
+        # dev.set_gain(FFB_GAIN_CONSTANT, int(state['constant_gain']['value']))
+
+    def set_gains_from_state(self, state):
+        """
+        Applies the gains held in the user configuration file.  Settings are exported by the 'construct_setting_table'
+        method when user saves the gain config.
+        """
+        dev = HapticEffect.device
+        caller_frame = inspect.currentframe().f_back
+
+        if state['master_gain']['enabled']:
+            self.cb_MasterGain.setChecked(True)
+            self.sl_MasterGain.setValue(int(state['master_gain']['value']))
+            dev.set_gain(FFB_GAIN_MASTER, int(state['master_gain']['value']))
+        if state['periodic_gain']['enabled']:
+            self.cb_Periodic.setChecked(True)
+            self.sl_Periodic.setValue(int(state['periodic_gain']['value']))
+            dev.set_gain(FFB_GAIN_PERIODIC, int(state['periodic_gain']['value']))
+        if state['spring_gain']['enabled']:
+            self.cb_Spring.setChecked(True)
+            self.sl_Spring.setValue(int(state['spring_gain']['value']))
+            dev.set_gain(FFB_GAIN_SPRING, int(state['spring_gain']['value']))
+        if state['damper_gain']['enabled']:
+            self.cb_Damper.setChecked(True)
+            self.sl_Damper.setValue(int(state['damper_gain']['value']))
+            dev.set_gain(FFB_GAIN_DAMPER, int(state['damper_gain']['value']))
+        if state['inertia_gain']['enabled']:
+            self.cb_Inertia.setChecked(True)
+            self.sl_Inertia.setValue(int(state['inertia_gain']['value']))
+            dev.set_gain(FFB_GAIN_INERTIA, int(state['inertia_gain']['value']))
+        if state['friction_gain']['enabled']:
+            self.cb_Friction.setChecked(True)
+            self.sl_Friction.setValue(int(state['friction_gain']['value']))
+            dev.set_gain(FFB_GAIN_FRICTION, int(state['friction_gain']['value']))
+        if state['constant_gain']['enabled']:
+            self.cb_Constant.setChecked(True)
+            self.sl_Constant.setValue(int(state['constant_gain']['value']))
+            dev.set_gain(FFB_GAIN_CONSTANT, int(state['constant_gain']['value']))
+
+
+    def set_gains_from_object(self, gains_object):
+        dev = HapticEffect.device
+
+        dev.set_gain(FFB_GAIN_MASTER, gains_object.master_gain)
+        dev.set_gain(FFB_GAIN_PERIODIC, gains_object.periodic_gain)
+        dev.set_gain(FFB_GAIN_SPRING, gains_object.spring_gain)
+        dev.set_gain(FFB_GAIN_DAMPER, gains_object.damper_gain)
+        dev.set_gain(FFB_GAIN_INERTIA, gains_object.inertia_gain)
+        dev.set_gain(FFB_GAIN_FRICTION, gains_object.friction_gain)
+        dev.set_gain(FFB_GAIN_CONSTANT, gains_object.constant_gain)
+
+
     def set_gain_value(self, value):
+        """
+        Sets the gain value on device in real-time when sliders are adjusted
+        """
         dev = HapticEffect.device
 
         sender = self.sender()
@@ -129,6 +298,9 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
 
 
     def read_gains(self):
+        """
+        Reads the gains from the device gains table and updates the sliders accordingly
+        """
         gains = HapticEffect.device.get_gains()
         self.sl_MasterGain.setValue(gains.master_gain)
         self.sl_Periodic.setValue(gains.periodic_gain)
@@ -141,6 +313,9 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         print(gains)
 
     def update_labels(self):
+        """
+        Updates the slider labels
+        """
         self.lab_MasterGainValue.setText(f"%{self.sl_MasterGain.value()}")
         self.lab_PeriodicValue.setText(f"%{self.sl_Periodic.value()}")
         self.lab_SpringValue.setText(f"%{self.sl_Spring.value()}")

@@ -48,6 +48,7 @@ from telemffb.LogWindow import LogWindow
 from telemffb.MainWindow import MainWindow
 from telemffb.settingsmanager import SettingsWindow
 from telemffb.telem.SimTelemListener import SimListenerManager
+from telemffb.ConfiguratorDialog import ConfiguratorDialog
 #from telemffb.LogTailWindow import LogTailWindow
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
@@ -402,6 +403,7 @@ def main():
     G.ipc_instance.hide_signal.connect(G.main_window.hide)
     G.ipc_instance.showlog_signal.connect(G.log_window.show)
     G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
+    G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.start()
 
     launch_children()
@@ -431,6 +433,11 @@ def main():
     # do some init in the background not blocking the main window first appearance
     @utils.threaded()
     def init_async():
+        try:
+            G.startup_configurator_gains = dev.get_gains()
+        except Exception:
+            logging.exception("Unable to get configurator slider values from device")
+
         if G.system_settings.get('enableVPConfStartup', False):
             try:
                 set_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
@@ -438,7 +445,7 @@ def main():
                 logging.exception("Unable to set VPConfigurator startup profile")
 
         try:
-            G.startup_configurator_gains = dev.get_gains()
+            G.vpconf_configurator_gains = dev.get_gains() # set once here to use as a baseline, regardless of if vpconf was pushed at startup
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
@@ -455,10 +462,17 @@ def main():
     G.sim_listeners.stop_all()
     G.telem_manager.quit()
     if G.system_settings.get('enableVPConfExit', False):
+        ## Push the exit configurator profile if one is configured
         try:
             set_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
+    try:
+        ## Last we push the gains we read at startup as good measure in case they were changed and never reverted by
+        ## a model change
+        G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
+    except:
+        pass
 
 
 def init_logging(log_widget : QPlainTextEdit):

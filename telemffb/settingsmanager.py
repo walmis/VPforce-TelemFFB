@@ -64,6 +64,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")
         self.setWindowIcon(QIcon(":/image/vpforceicon.png"))
         self.b_browse.clicked.connect(self.browse_vpconf_file)
+        self.b_gainoverrides.clicked.connect(self.set_override_gains)
         self.b_update.clicked.connect(self.update_button)
         self.b_deleteModel.clicked.connect(self.delete_model)
         self.slider_float.valueChanged.connect(self.update_textbox)
@@ -584,6 +585,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.l_name.hide()
         self.slider_float.hide()
         self.b_update.hide()
+        self.b_gainoverrides.hide()
         self.drp_valuebox.hide()
         self.tb_value.hide()
         self.b_browse.hide()
@@ -731,6 +733,13 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             case 'path':
                 self.b_browse.show()
                 self.l_value.show()
+            case 'configurator':
+                self.b_gainoverrides.show()
+                self.b_update.show()
+                self.l_value.setMaximumWidth(self.b_update.width())
+                self.l_value.setText(value)
+                self.l_value.setToolTip(value)
+                self.l_value.show()
 
     def cb_enable_setvalue(self):
         mprint("cb_enable_setvalue")
@@ -781,6 +790,21 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     #     if str(value) != '0':
     #         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
     #     self.reload_caller()
+
+    def set_override_gains(self):
+        if self.device != G.device_type:
+            QMessageBox.warning(self, "Error", "To set the gain overrides in the sim/class/offline editor, you must do so from the actual child instance interface.\n\nIn TelemFFB go to Window->Show Child Instance Windows and then open the sim/class/offline editor from the desired device instance., ")
+            return
+        G.gain_override_dialog.show()
+        G.gain_override_dialog.accepted.connect(self.update_gain_overrides)
+
+    def update_gain_overrides(self, gains=None):
+        if gains is not None and isinstance(gains, dict):
+            gains_str = json.dumps(gains)
+            self.l_value.setText(gains_str)
+            self.tb_value.setText(gains_str)
+        self.activateWindow()
+        self.raise_()
 
     def browse_vpconf_file(self):
         current_text = self.tb_value.text()

@@ -18,6 +18,7 @@ class IPCNetworkThread(QThread):
     showlog_signal = pyqtSignal()
     hide_signal = pyqtSignal()
     show_settings_signal = pyqtSignal()
+    show_cfg_ovds_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
 
     def __init__(self, host="127.0.0.1", dstport=0, keepalive_sec=1, missed_keepalive=3):
@@ -139,6 +140,11 @@ class IPCNetworkThread(QThread):
                     if dev == G.device_type:
                         logging.info("Show log command received via IPC")
                         self.showlog_signal.emit()
+                elif msg.startswith('SHOW GAIN OVD:'):
+                    dev = msg.removeprefix('SHOW GAIN OVD:')
+                    if dev == G.device_type:
+                        logging.info("Show configurator overrides command received via IPC")
+                        self.show_cfg_ovds_signal.emit()
                 elif msg == 'SHOW WINDOW':
                     logging.info("Show command received via IPC")
                     self.show_signal.emit()
