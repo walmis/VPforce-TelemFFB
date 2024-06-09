@@ -14,6 +14,44 @@ device = ''
 userconfig_path = ''
 defaults_path = ''
 
+
+def dbprint(color, msg):
+    reset = '\033[0m'
+    match color:
+        case "red":
+            ccode = '\033[91m'
+        case 'yellow':
+            ccode = '\033[93m'
+        case 'blue':
+            ccode = '\033[94m'
+        case 'green':
+            ccode = '\033[92m'
+        case _:
+            ccode = '\033[0m'
+    print(f"{ccode}{msg}{reset}")
+
+
+def try_parse(file_path, max_attempts=3, delay=0.1):
+    """
+    Tries to parse an XML file up to max_attempts times with a delay between attempts.
+
+    :param file_path: Path to the XML file.
+    :param max_attempts: Maximum number of attempts to parse the file.
+    :param delay: Delay (in seconds) between attempts.
+    :return: Parsed XML tree or None if all attempts fail.
+    """
+    attempt = 0
+    while attempt < max_attempts:
+        try:
+            tree = ET.parse(file_path)
+            return tree
+        except ET.ParseError as e:
+            attempt += 1
+            dbprint("yellow", f"Attempt {attempt} failed: {e}")
+            time.sleep(delay)
+    dbprint("red", f"All {max_attempts} attempts to parse the file failed.")
+    return None
+
 def write_userconfig_xml(tree : ET.ElementTree):
     ET.indent(tree, " ")
     tree.write(userconfig_path, "utf-8")
@@ -28,7 +66,7 @@ def update_vars(_device, _userconfig_path, _defaults_path):
 
 def read_xml_file(the_sim, instance_device=''):
     mprint(f"read_xml_file  {the_sim}")
-    tree = ET.parse(defaults_path)
+    tree = try_parse(defaults_path)
     root = tree.getroot()
 
     if instance_device == '':
@@ -92,7 +130,7 @@ def read_xml_file(the_sim, instance_device=''):
 
 def read_anydevice_settings(the_sim):
 
-    tree = ET.parse(defaults_path)
+    tree = try_parse(defaults_path)
     root = tree.getroot()
 
     # Collect data in a list of dictionaries
@@ -109,7 +147,7 @@ def read_anydevice_settings(the_sim):
 
 def read_models(the_sim, the_class=''):
     all_models = ['']
-    tree = ET.parse(defaults_path)
+    tree = try_parse(defaults_path)
     root = tree.getroot()
     if the_class == '':
         def_models =  root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
@@ -127,7 +165,7 @@ def read_models(the_sim, the_class=''):
                 all_models.append(pattern.text)
 
     # create_empty_userxml_file() - handled by TelemFFB on startup via utils.py
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
     if the_class == '':
         usr_models =  root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
@@ -149,7 +187,7 @@ def read_models(the_sim, the_class=''):
 def read_models_data(file_path, sim, full_model_name, alldevices=False, instance_device = ''):
     mprint(f"read_models_data  {file_path}, {sim}, {full_model_name}")
     # runs on both defaults and userconfig xml files
-    tree = ET.parse(file_path)
+    tree = try_parse(file_path)
     root = tree.getroot()
 
     model_data = []
@@ -229,7 +267,7 @@ def read_models_sc_overrides(file_path, full_model_name, source):
     mprint(f"read_models_overrides  {file_path}, {full_model_name}")
     # runs on both defaults and userconfig xml files
     #pass 'all' to get all of them
-    tree = ET.parse(file_path)
+    tree = try_parse(file_path)
     root = tree.getroot()
 
     model_overrides = []
@@ -300,7 +338,7 @@ def update_sc_overrides_with_user(defaults_ovr, user_ovr):
 def erase_sc_override_from_xml(the_model, setting_name):
     mprint(f"erase_override_from_xml   {the_model}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
 
     elements_to_remove = []
@@ -323,7 +361,7 @@ def erase_sc_override_from_xml(the_model, setting_name):
 def write_sc_override_to_xml(the_model, the_var, setting_name, sc_unit='', scale=''):
     mprint(f"write_overrides_to_xml  {the_model}, {the_var}, {setting_name}, {scale}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
     ovr_elem = None
     if the_model == '':
@@ -391,7 +429,7 @@ def write_sc_override_to_xml(the_model, the_var, setting_name, sc_unit='', scale
 
 def read_default_class_data(the_sim, the_class, instance_device=''):
     mprint(f"read_default_class_data  sim {the_sim}, class {the_class}")
-    tree = ET.parse(defaults_path)
+    tree = try_parse(defaults_path)
     root = tree.getroot()
 
     class_data = []
@@ -548,7 +586,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
 
 def read_user_sim_data(the_sim, instance_device=''):
     mprint(f"read_user_sim_data {the_sim}")
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
 
     sim_data = []
@@ -583,7 +621,7 @@ def read_user_sim_data(the_sim, instance_device=''):
 
 def read_user_class_data(the_sim, crafttype, instance_device=''):
     mprint(f"read_user_class_data  {the_sim}, {crafttype}")
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
 
     model_data = []
@@ -663,7 +701,7 @@ def update_data_with_models(defaults_data, model_data, replacetext):
 def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', the_device=''):
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
     model_elem = None
     if the_model == '':
@@ -741,7 +779,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
 def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
     mprint(f"write_class_to_xml  {the_sim}, {the_class}, {the_value}{unit}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
     the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -783,7 +821,7 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
 def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
     mprint(f"write_sim_to_xml {the_sim}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
     the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -857,7 +895,7 @@ def write_converted_to_xml(differences):
 def erase_models_from_xml(the_sim, the_model, setting_name):
     mprint(f"erase_models_from_xml  {the_sim} {the_model}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
     the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -885,7 +923,7 @@ def erase_models_from_xml(the_sim, the_model, setting_name):
 def erase_entire_model_from_xml(the_sim, the_model):
     mprint(f"erase_entire_models_from_xml  {the_sim} {the_model}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
     the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -910,7 +948,7 @@ def erase_entire_model_from_xml(the_sim, the_model):
 def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
     mprint(f"erase_class_from_xml  {the_sim} {the_class}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
     the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -940,7 +978,7 @@ def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
 def erase_sim_from_xml(the_sim, the_value, setting_name):
     mprint(f"erase_sim_from_xml  {the_sim} {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = ET.parse(userconfig_path)
+    tree = try_parse(userconfig_path)
     root = tree.getroot()
     the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -997,7 +1035,7 @@ def sort_elements(tree):    #  unused for now.
 
 
 def read_prereqs():
-    tree = ET.parse(defaults_path)
+    tree = try_parse(defaults_path)
     root = tree.getroot()
 
     # Collect data in a list of dictionaries
@@ -1103,7 +1141,7 @@ def get_craft_attributes(file_path, sim, device):
     craft_attributes = set()
     craft_attributes.add('Aircraft')
 
-    tree = ET.parse(file_path)
+    tree = try_parse(file_path)
     root = tree.getroot()
 
     for defaults_elem in root.findall(f'.//defaults[{sim}="true"][{device}="true"]'):
