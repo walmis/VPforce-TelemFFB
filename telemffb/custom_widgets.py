@@ -1,7 +1,7 @@
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame
 from PyQt5.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
-    QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty
+    QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer
 from PyQt5.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
     QLinearGradient, QFont
 from PyQt5.QtWidgets import QStyle, QStyleOptionSlider
@@ -12,6 +12,7 @@ from telemffb.utils import HiDpiPixmap
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
+
 class NoKeyScrollArea(QScrollArea):
     def __init__(self):
         super().__init__()
@@ -21,22 +22,22 @@ class NoKeyScrollArea(QScrollArea):
 
     def addSlider(self, slider):
         self.sliders.append(slider)
-
-    def keyPressEvent(self, event):
-        # Forward keypress events to all sliders
-        for slider in self.sliders:
-            try:
-                slider.keyPressEvent(event)
-            except:
-                pass
-
-    def keyReleaseEvent(self, event):
-        # Forward keypress events to all sliders
-        for slider in self.sliders:
-            try:
-                slider.keyReleaseEvent(event)
-            except:
-                pass
+    #
+    # def keyPressEvent(self, event):
+    #     # Forward keypress events to all sliders
+    #     for slider in self.sliders:
+    #         try:
+    #             slider.keyPressEvent(event)
+    #         except:
+    #             pass
+    #
+    # def keyReleaseEvent(self, event):
+    #     # Forward keypress events to all sliders
+    #     for slider in self.sliders:
+    #         try:
+    #             slider.keyReleaseEvent(event)
+    #         except:
+    #             pass
 
 
 class SliderWithLabel(QWidget):
@@ -58,7 +59,9 @@ class SliderWithLabel(QWidget):
     def updateLabel(self, value):
         self.label.setText(str(value))
 
+
 class NoWheelSlider(QSlider):
+    delayedValueChanged = pyqtSignal(int)
     def __init__(self, *args, **kwargs):
         super(NoWheelSlider, self).__init__(*args, **kwargs)
         # Default colors
@@ -73,6 +76,17 @@ class NoWheelSlider(QSlider):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
         self.is_mouse_over = False
+        self._delay = 50  # Delay in milliseconds
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._emitDelayedValueChanged)
+        self.valueChanged.connect(self._startTimer)
+
+    def _startTimer(self):
+        self._timer.start(self._delay)
+
+    def _emitDelayedValueChanged(self):
+        self.delayedValueChanged.emit(self.value())
 
     def wheelEvent(self, event):
         if event.modifiers() & Qt.ShiftModifier:
@@ -136,107 +150,31 @@ class NoWheelSlider(QSlider):
         self.update_styles()
 
     def enterEvent(self, event):
-        self.is_mouse_over = True
+        self.setFocus()
 
     def leaveEvent(self, event):
-        self.is_mouse_over = False
+        self.clearFocus()
 
-    def keyPressEvent(self, event):
-
-        if self.is_mouse_over:
-            # self.blockSignals(True)
-            if event.key() == Qt.Key_Left:
-                self.setValue(self.value() - 1)
-            elif event.key() == Qt.Key_Right:
-                self.setValue(self.value() + 1)
-            else:
-                super().keyPressEvent(event)
-        # else:
-        #     super().keyPressEvent(event)
-
-    def keyReleaseEvent(self, event):
-
-        if self.is_mouse_over:
-            self.blockSignals(False)
-            # if event.key() == Qt.Key_Left:
-            #     self.valueChanged.emit(self.value() - 1)
-            # elif event.key() == Qt.Key_Right:
-            #     self.valueChanged.emit(self.value() + 1)
-
-            pass
-        else:
-            super().keyReleaseEvent(event)
+    # def keyPressEvent(self, event):
+    #     if self.is_mouse_over:
+    #         super().keyPressEvent(event)
+    #     else:
+    #         super().keyPressEvent(event)
 
 
-class NoWheelNumberSlider(QSlider):
+    # def keyReleaseEvent(self, event):
+    #
+    #     if self.is_mouse_over:
+    #         self.blockSignals(False)
+    #     else:
+    #         super().keyReleaseEvent(event)
+
+
+class NoWheelNumberSlider(NoWheelSlider):
     def __init__(self, *args, **kwargs):
         super(NoWheelNumberSlider, self).__init__(*args, **kwargs)
-        # Default colors
-        self.groove_color = "#bbb"
-        self.handle_color = vpf_purple
-        self.handle_height = 20
-        self.handle_width = 32
-        self.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        # Apply styles
-        self.update_styles()
-        #self.pct_max = 0
+        self.handle_width = 32  # Different handle width for NoWheelNumberSlider
         self.value_text = ""  # Add an attribute to store the text to be shown in the handle
-
-        self.setFocusPolicy(Qt.StrongFocus)
-        self.setMouseTracking(True)
-        self.is_mouse_over = False
-
-    def wheelEvent(self, event):
-        if event.modifiers() & Qt.ShiftModifier:
-            # Adjust the value by increments of 1
-            current_value = self.value()
-            if event.angleDelta().y() > 0:
-                new_value = current_value + 1
-            elif event.angleDelta().y() < 0:
-                new_value = current_value - 1
-
-            # Ensure the new value is within the valid range
-            new_value = max(self.minimum(), min(self.maximum(), new_value))
-
-            self.setValue(new_value)
-            event.accept()
-        else:
-            event.ignore()
-
-    def update_styles(self):
-        # Generate CSS based on color and size properties
-        css = f"""
-                    QSlider::groove:horizontal {{
-                        border: 1px solid #565a5e;
-                        height: 8px;  /* Adjusted groove height */
-                        background: qlineargradient(
-                            x1: 0, y1: 0, x2: 0, y2: 1,
-                            stop: 0 #e6e6e6, stop: 1 #bfbfbf
-                        );
-                        margin: 0;
-                        border-radius: 3px;  /* Adjusted border radius */
-                    }}
-                    QSlider::handle:horizontal {{
-                        background: qradialgradient(
-                            cx: 0.3, cy: 0.5, fx: 0.3, fy: 0.35, radius: 0.8,
-                            stop: 0.0 #ffffff,
-                            stop: 0.1 {self.handle_color},  /* Make the shine spot less pronounced */
-                            stop: 1.0 {QColor(self.handle_color).darker().name()}
-                        );
-                        border: 1px solid #565a5e;
-                        width: {self.handle_width}px;  /* Adjusted handle width */
-                        height: {self.handle_height}px;  /* Adjusted handle height */
-                        border-radius: {self.handle_height / 4}px;  /* Adjusted border radius */
-                        margin-top: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
-                        margin-bottom: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
-                        margin-left: -1px;  /* Adjusted left margin */
-                        margin-right: -1px;  /* Adjusted right margin */
-                    }}
-                """
-        self.setStyleSheet(css)
-
-    def setGrooveColor(self, color):
-        self.groove_color = color
         self.update_styles()
 
     def setHandleColor(self, color, text=""):
@@ -244,42 +182,6 @@ class NoWheelNumberSlider(QSlider):
         self.value_text = text
         self.update_styles()
         self.update()  # Ensure the slider is repainted to show the new text
-
-    def setHandleHeight(self, height):
-        self.handle_height = height
-        self.update_styles()
-
-    def enterEvent(self, event):
-        self.is_mouse_over = True
-
-    def leaveEvent(self, event):
-        self.is_mouse_over = False
-
-    def keyPressEvent(self, event):
-
-        if self.is_mouse_over:
-            # self.blockSignals(True)
-            if event.key() == Qt.Key_Left:
-                self.setValue(self.value() - 1)
-            elif event.key() == Qt.Key_Right:
-                self.setValue(self.value() + 1)
-            else:
-                super().keyPressEvent(event)
-        # else:
-        #     super().keyPressEvent(event)
-
-    def keyReleaseEvent(self, event):
-
-        if self.is_mouse_over:
-            self.blockSignals(False)
-            # if event.key() == Qt.Key_Left:
-            #     self.valueChanged.emit(self.value() - 1)
-            # elif event.key() == Qt.Key_Right:
-            #     self.valueChanged.emit(self.value() + 1)
-
-            pass
-        else:
-            super().keyReleaseEvent(event)
 
     def paintEvent(self, event):
         super(NoWheelNumberSlider, self).paintEvent(event)
