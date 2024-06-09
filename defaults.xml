@@ -3022,6 +3022,12 @@
 	</sc_overrides>
 	<sc_overrides>
 		<model>A2A Piper PA-24.*</model>
+		<name>PropRPM</name>
+		<var>L:Eng1_PropRPM</var>
+		<sc_unit>number</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>A2A Piper PA-24.*</model>
 		<name>PropThrust</name>
 		<var>L:Eng1_ForceZ</var>
 		<sc_unit>number</sc_unit>
