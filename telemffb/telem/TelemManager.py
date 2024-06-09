@@ -354,6 +354,7 @@ class TelemManager(QObject, threading.Thread):
                     G.settings_mgr.b_getcurrentmodel.click()
 
                 self.aircraftUpdated.emit()
+                # dbprint("red", "Aircraft Updated Emit : #1")
 
             self.currentAircraftName = aircraft_name
 
@@ -418,6 +419,8 @@ class TelemManager(QObject, threading.Thread):
                     self._simconnect._resubscribe()
 
                 self.aircraftUpdated.emit()
+                # dbprint("red", "Aircraft Updated Emit : #2")
+
             try:
                 _tm = time.perf_counter()
                 self.currentAircraft._telem_data = telem_data

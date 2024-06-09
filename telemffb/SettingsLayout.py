@@ -1,6 +1,8 @@
+import inspect
 import json
 import logging
 import os
+import re
 
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
@@ -40,6 +42,7 @@ class SettingsLayout(QGridLayout):
             self.build_rows(result)
         self.device = HapticEffect()
         self.setColumnMinimumWidth(7, 20)
+        self.trigger_form_reload = True
 
     def handleScrollKeyPressEvent(self, event):
         # Forward key events to each slider in the layout
@@ -188,13 +191,18 @@ class SettingsLayout(QGridLayout):
         # print (f"{i} rows with {self.count()} widgets")
 
     def reload_caller(self):
-        # self.mainwindow.settings_area.setUpdatesEnabled(False)
-        # pos = self.mainwindow.settings_area.verticalScrollBar().value()
-        self.reload_layout(None)
-        # QTimer.singleShot(150, lambda: self.mainwindow.set_scrollbar(pos))
-        # self.mainwindow.settings_area.setUpdatesEnabled(True)
+        # caller_frame = inspect.currentframe().f_back
+        # caller_name = caller_frame.f_code.co_name
+        # dbprint("blue", f"RELOAD_CALLER was called by {caller_name}")
+        if not self.trigger_form_reload:
+            self.trigger_form_reload = True  # reset back to true for next iteration
+        else:
+            self.reload_layout(None)
 
     def reload_layout(self, result=None):
+        # stack = inspect.stack()
+        # for frame_info in stack:
+        #     dbprint("green", f"Function {frame_info.function} in {frame_info.filename} at line {frame_info.lineno}")
         self.clear_layout()
         if result is None:
             cls, pat, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
@@ -380,9 +388,9 @@ class SettingsLayout(QGridLayout):
             slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
             # value_label.setToolTip(f"Actual Value: %{int(val * 100)}")
-            slider.valueChanged.connect(self.slider_changed)
-            slider.sliderPressed.connect(self.sldDisconnect)
-            slider.sliderReleased.connect(self.sldReconnect)
+            slider.delayedValueChanged.connect(self.slider_changed)
+            # slider.sliderPressed.connect(self.sldDisconnect)
+            # slider.sliderReleased.connect(self.sldReconnect)
             self.addWidget(slider, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col, alignment=Qt.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
@@ -410,9 +418,9 @@ class SettingsLayout(QGridLayout):
             n_slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
             # value_label.setToolTip(f"Actual Value: %{int(val * 100)}")
-            n_slider.valueChanged.connect(self.slider_changed)
-            n_slider.sliderPressed.connect(self.sldDisconnect)
-            n_slider.sliderReleased.connect(self.sldReconnect)
+            n_slider.delayedValueChanged.connect(self.slider_changed)
+            # n_slider.sliderPressed.connect(self.sldDisconnect)
+            # n_slider.sliderReleased.connect(self.sldReconnect)
             self.addWidget(n_slider, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col, alignment=Qt.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
@@ -433,9 +441,9 @@ class SettingsLayout(QGridLayout):
                 df_slider.setRange(int(validvalues[0]), int(validvalues[1]))
             df_slider.setValue(round(val))
             value_label.setText(str(d_val))
-            df_slider.valueChanged.connect(self.df_slider_changed)
-            df_slider.sliderPressed.connect(self.sldDisconnect)
-            df_slider.sliderReleased.connect(self.df_sldReconnect)
+            df_slider.delayedValueChanged.connect(self.df_slider_changed)
+            # df_slider.sliderPressed.connect(self.sldDisconnect)
+            # df_slider.sliderReleased.connect(self.df_sldReconnect)
             self.addWidget(df_slider, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -458,9 +466,9 @@ class SettingsLayout(QGridLayout):
                 slider.setRange(int(validvalues[0]), int(validvalues[1]))
             slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
-            slider.valueChanged.connect(self.cfg_slider_changed)
-            slider.sliderPressed.connect(self.sldDisconnect)
-            slider.sliderReleased.connect(self.cfg_sldReconnect)
+            slider.delayedValueChanged.connect(self.cfg_slider_changed)
+            # slider.sliderPressed.connect(self.sldDisconnect)
+            # slider.sliderReleased.connect(self.cfg_sldReconnect)
             self.addWidget(slider, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -481,9 +489,9 @@ class SettingsLayout(QGridLayout):
                 d_slider.setRange(int(validvalues[0]), int(validvalues[1]))
             d_slider.setValue(val)
             value_label.setText(str(d_val))
-            d_slider.valueChanged.connect(self.d_slider_changed)
-            d_slider.sliderPressed.connect(self.sldDisconnect)
-            d_slider.sliderReleased.connect(self.d_sldReconnect)
+            d_slider.delayedValueChanged.connect(self.d_slider_changed)
+            # d_slider.sliderPressed.connect(self.sldDisconnect)
+            # d_slider.sliderReleased.connect(self.d_sldReconnect)
             self.addWidget(d_slider, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
@@ -599,6 +607,7 @@ class SettingsLayout(QGridLayout):
         self.parent().parent().parent().addSlider(df_slider)
 
         erase_button = QToolButton()
+        # dbprint("green", f"eb created for: eb_{item['name']}")
         erase_button.setObjectName(f"eb_{item['name']}")
         pixmapi = QStyle.SP_DockWidgetCloseButton
         icon = erase_button.style().standardIcon(pixmapi)
@@ -618,8 +627,20 @@ class SettingsLayout(QGridLayout):
                 erase_button.setIcon(icon)
                 erase_button.setVisible(True)
                 erase_button.setToolTip("Reset to Default")
-
         self.setRowStretch(i, 0)
+
+    def show_erase_button(self):
+        setting_name = self.sender().objectName()
+        # This regex pattern matches any prefix followed by an underscore and captures the rest as the settingname
+        pattern = r'^[^_]+_(.+)$'
+        setting = re.match(pattern, setting_name).group(1)
+        # dbprint("red", f"SETTING: {setting}")
+        eb = self.mainwindow.findChild(QToolButton, f"eb_{setting}")
+        pixmapi = QStyle.SP_DockWidgetCloseButton
+        icon = eb.style().standardIcon(pixmapi)
+        eb.setIcon(icon)
+        eb.setVisible(True)
+        eb.setToolTip("Reset to Default")
 
     def remove_widget(self, olditem):
         widget = olditem.widget()
@@ -628,19 +649,22 @@ class SettingsLayout(QGridLayout):
             self.removeWidget(widget)
 
     def checkbox_changed(self, name, state):
+        self.trigger_form_reload = True
         logging.debug(f"Checkbox {name} changed. New state: {state}")
         value = 'false' if state == 0 else 'true'
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, name)
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def erase_setting(self, name):
+        self.trigger_form_reload = True
         logging.debug(f"Erase {name} clicked")
         xmlutils.erase_models_from_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, name)
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def browse_for_config(self):
+        self.trigger_form_reload = False
         options = QFileDialog.Options()
         # options |= QFileDialog.DontUseNativeDialog
         calling_button = self.sender()
@@ -663,34 +687,42 @@ class SettingsLayout(QGridLayout):
             if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
                 #lprint(f"Selected File: {file_path}")
                 xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, file_path, 'vpconf')
+                self.show_erase_button()
                 if G.settings_mgr.timed_out:
                     self.reload_caller()
 
     def spin_box_changed(self):
+        self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('sb_', '')
         value = str(self.sender().value())
         logging.debug(f"Spin Box {setting_name} changed. New value: {value}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
+        self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def textbox_changed(self):
+        self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('le_', '')
         value = self.sender().text()
         logging.debug(f"Textbox {setting_name} changed. New value: {value}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
+        self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def dropbox_changed(self):
+        self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('db_', '')
         value = self.sender().currentText()
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
+        self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def unit_dropbox_changed(self):
+        self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('ud_', '')
         line_edit_name = 'vle_' + self.sender().objectName().replace('ud_', '')
         line_edit = self.mainwindow.findChild(QLineEdit, line_edit_name)
@@ -700,10 +732,12 @@ class SettingsLayout(QGridLayout):
             value = line_edit.text()
         logging.debug(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name, unit)
+        self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def line_edit_changed(self):
+        self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('vle_', '')
         unit_dropbox_name = 'ud_' + self.sender().objectName().replace('vle_', '')
         unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
@@ -713,10 +747,12 @@ class SettingsLayout(QGridLayout):
         value = self.sender().text()
         logging.debug(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name, unit)
+        self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def expander_clicked(self):
+        self.trigger_form_reload = True
         logging.debug(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
         settingname = self.sender().objectName().replace('ex_', '')
         if self.sender().arrowType() == Qt.RightArrow:
@@ -748,14 +784,16 @@ class SettingsLayout(QGridLayout):
         self.thread.start()
 
     def update_button(self, button_name, value):
+        self.trigger_form_reload = False
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText(str(value))
         if str(value) != '0':
             xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, str(value), button_name)
+            self.show_erase_button()
         else:
             the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def configurator_button_clicked(self):
         """
@@ -774,14 +812,17 @@ class SettingsLayout(QGridLayout):
             G.gain_override_dialog.show()
 
     def update_configurator_overrides(self, gain_dict):
+        self.trigger_form_reload = False
         """
         Called when signal received that user saved the configurator gain settings
         convert dictionary to text string and write to config.
         """
         gain_dict_json = json.dumps(gain_dict)
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, gain_dict_json, "configurator_gains")
+        self.show_erase_button()
 
     def slider_changed(self):
+        self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('sld_', '')
         value_label_name = 'vl_' + self.sender().objectName().replace('sld_', '')
         sliderfactor_name = 'sf_' + self.sender().objectName().replace('sld_', '')
@@ -798,10 +839,12 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
+        self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def cfg_slider_changed(self):
+        self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('sld_', '')
         value_label_name = 'vl_' + self.sender().objectName().replace('sld_', '')
 
@@ -816,10 +859,12 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
+        self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def d_slider_changed(self):
+        self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('dsld_', '')
         value_label_name = 'vl_' + self.sender().objectName().replace('dsld_', '')
         sliderfactor_name = 'sf_' + self.sender().objectName().replace('dsld_', '')
@@ -840,10 +885,12 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
+        self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
     def df_slider_changed(self):
+        self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('dfsld_', '')
         value_label_name = 'vl_' + self.sender().objectName().replace('dfsld_', '')
         sliderfactor_name = 'sf_' + self.sender().objectName().replace('dfsld_', '')
@@ -864,26 +911,27 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
+        self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_caller()
+            self.reload_layout()
 
-    # prevent slider from sending values as you drag
-    def sldDisconnect(self):
-        self.sender().valueChanged.disconnect()
-
-    # reconnect slider after you let go
-    def sldReconnect(self):
-        self.sender().valueChanged.connect(self.slider_changed)
-        self.sender().valueChanged.emit(self.sender().value())
-
-    def cfg_sldReconnect(self):
-        self.sender().valueChanged.connect(self.cfg_slider_changed)
-        self.sender().valueChanged.emit(self.sender().value())
-
-    def d_sldReconnect(self):
-        self.sender().valueChanged.connect(self.d_slider_changed)
-        self.sender().valueChanged.emit(self.sender().value())
-
-    def df_sldReconnect(self):
-        self.sender().valueChanged.connect(self.df_slider_changed)
-        self.sender().valueChanged.emit(self.sender().value())
+    # # prevent slider from sending values as you drag
+    # def sldDisconnect(self):
+    #     self.sender().valueChanged.disconnect()
+    #
+    # # reconnect slider after you let go
+    # def sldReconnect(self):
+    #     self.sender().valueChanged.connect(self.slider_changed)
+    #     self.sender().valueChanged.emit(self.sender().value())
+    #
+    # def cfg_sldReconnect(self):
+    #     self.sender().valueChanged.connect(self.cfg_slider_changed)
+    #     self.sender().valueChanged.emit(self.sender().value())
+    #
+    # def d_sldReconnect(self):
+    #     self.sender().valueChanged.connect(self.d_slider_changed)
+    #     self.sender().valueChanged.emit(self.sender().value())
+    #
+    # def df_sldReconnect(self):
+    #     self.sender().valueChanged.connect(self.df_slider_changed)
+    #     self.sender().valueChanged.emit(self.sender().value())

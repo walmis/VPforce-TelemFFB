@@ -1,3 +1,4 @@
+import inspect
 import json
 import logging
 import os
@@ -964,6 +965,9 @@ class MainWindow(QMainWindow):
         # dialog.exec_()
 
     def update_settings(self):
+        # caller_frame = inspect.currentframe().f_back
+        # caller_name = caller_frame.f_code.co_name
+        # utils.dbprint("yellow", f"UPDATE_SETTINGS was called by {caller_name}")
         self.settings_layout.reload_caller()
 
     # def show_sub_menu(self):
