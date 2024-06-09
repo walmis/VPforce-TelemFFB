@@ -434,7 +434,7 @@ def main():
     @utils.threaded()
     def init_async():
         try:
-            G.startup_configurator_gains = dev.get_gains()
+            G.startup_configurator_gains = dev.get_gains()  # capture the gains at TelemFFB startup before any startup vpconf was pushed
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
@@ -445,7 +445,7 @@ def main():
                 logging.exception("Unable to set VPConfigurator startup profile")
 
         try:
-            G.vpconf_configurator_gains = dev.get_gains() # set once here to use as a baseline, regardless of if vpconf was pushed at startup
+            G.vpconf_configurator_gains = dev.get_gains() # capture the gains here to use as reversion baseline any time a vpconf is pushed
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 

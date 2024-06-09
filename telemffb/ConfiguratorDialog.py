@@ -1,6 +1,8 @@
+import logging
+
 from PyQt5 import QtCore
 from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtWidgets import QDialog
+from PyQt5.QtWidgets import QDialog, QMessageBox
 import inspect
 
 import telemffb.globals as G
@@ -85,7 +87,11 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.read_gains()
 
     def construct_setting_table(self):
-        gains = HapticEffect.device.get_gains()
+        try:
+            gains = HapticEffect.device.get_gains()
+        except Exception as e:
+            logging.warning(f"Error getting gain values from the device: {e}")
+            return
         state = {
             "master_gain": {"enabled": self.cb_MasterGain.isChecked(), "value": gains.master_gain},
             "periodic_gain": {"enabled": self.cb_Periodic.isChecked(), "value": gains.periodic_gain},
@@ -110,6 +116,17 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         super().showEvent(event)
 
     def show(self):
+        dev = HapticEffect.device
+        if dev is None:
+            QMessageBox.warning(self, "Error",
+                                "Device is not connected.  Unable to open real-time gain override dialog")
+            return
+        try:
+            gains = dev.get_gains()
+        except:
+            QMessageBox.warning(self, "Error",
+                                "Error reading gains from device.  Unable to open real-time gain override dialog")
+            return
         if G.current_configurator_gains is not None and G.current_configurator_gains != {}:
             self.set_gains_from_state(G.current_configurator_gains)
         self.read_gains()
@@ -301,7 +318,11 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         """
         Reads the gains from the device gains table and updates the sliders accordingly
         """
-        gains = HapticEffect.device.get_gains()
+        try:
+            gains = HapticEffect.device.get_gains()
+        except Exception as e:
+            logging.warning(f"Error getting gain values from the device: {e}")
+            return
         self.sl_MasterGain.setValue(gains.master_gain)
         self.sl_Periodic.setValue(gains.periodic_gain)
         self.sl_Spring.setValue(gains.spring_gain)
