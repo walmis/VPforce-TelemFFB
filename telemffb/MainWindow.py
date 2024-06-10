@@ -435,7 +435,7 @@ class MainWindow(QMainWindow):
         test_name_lbl.setAlignment(Qt.AlignRight)
         self.test_name = QComboBox()
         self.test_name.setMinimumWidth(100)
-        self.test_name.setEditable(True)
+        self.test_name.setEditable(False)
         test_button = QToolButton()
         test_button.setMaximumWidth(20)
         test_button.setText('>')

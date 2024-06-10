@@ -91,7 +91,7 @@ class NoWheelSlider(QSlider):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setMouseTracking(True)
         self.is_mouse_over = False
-        self._delay = 50  # Delay in milliseconds
+        self._delay = 200  # Delay in milliseconds
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._emitDelayedValueChanged)

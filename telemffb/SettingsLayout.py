@@ -388,7 +388,8 @@ class SettingsLayout(QGridLayout):
             slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
             # value_label.setToolTip(f"Actual Value: %{int(val * 100)}")
-            slider.delayedValueChanged.connect(self.slider_changed)
+            slider.valueChanged.connect(lambda value: self.slider_changed(write=False))  # update label on every change
+            slider.delayedValueChanged.connect(lambda value: self.slider_changed(write=True))  # only write config when delay timer triggers
             # slider.sliderPressed.connect(self.sldDisconnect)
             # slider.sliderReleased.connect(self.sldReconnect)
             self.addWidget(slider, i, entry_col, 1, entry_colspan)
@@ -418,7 +419,8 @@ class SettingsLayout(QGridLayout):
             n_slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
             # value_label.setToolTip(f"Actual Value: %{int(val * 100)}")
-            n_slider.delayedValueChanged.connect(self.slider_changed)
+            n_slider.valueChanged.connect(lambda value: self.slider_changed(write=False))  # update label on every change
+            n_slider.delayedValueChanged.connect(lambda value: self.slider_changed(write=True)) # only write config when delay timer triggers
             # n_slider.sliderPressed.connect(self.sldDisconnect)
             # n_slider.sliderReleased.connect(self.sldReconnect)
             self.addWidget(n_slider, i, entry_col, 1, entry_colspan)
@@ -441,7 +443,8 @@ class SettingsLayout(QGridLayout):
                 df_slider.setRange(int(validvalues[0]), int(validvalues[1]))
             df_slider.setValue(round(val))
             value_label.setText(str(d_val))
-            df_slider.delayedValueChanged.connect(self.df_slider_changed)
+            df_slider.valueChanged.connect(lambda value: self.df_slider_changed(write=False))  # update label on every change
+            df_slider.delayedValueChanged.connect(lambda value: self.df_slider_changed(write=True)) # only write config when delay timer triggers
             # df_slider.sliderPressed.connect(self.sldDisconnect)
             # df_slider.sliderReleased.connect(self.df_sldReconnect)
             self.addWidget(df_slider, i, entry_col, 1, entry_colspan)
@@ -466,7 +469,8 @@ class SettingsLayout(QGridLayout):
                 slider.setRange(int(validvalues[0]), int(validvalues[1]))
             slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
-            slider.delayedValueChanged.connect(self.cfg_slider_changed)
+            slider.valueChanged.connect(lambda value: self.cfg_slider_changed(write=False))  # update label on every change
+            slider.delayedValueChanged.connect(lambda value: self.cfg_slider_changed(write=True)) # only write config when delay timer triggers
             # slider.sliderPressed.connect(self.sldDisconnect)
             # slider.sliderReleased.connect(self.cfg_sldReconnect)
             self.addWidget(slider, i, entry_col, 1, entry_colspan)
@@ -489,7 +493,8 @@ class SettingsLayout(QGridLayout):
                 d_slider.setRange(int(validvalues[0]), int(validvalues[1]))
             d_slider.setValue(val)
             value_label.setText(str(d_val))
-            d_slider.delayedValueChanged.connect(self.d_slider_changed)
+            d_slider.valueChanged.connect(lambda value: self.d_slider_changed(write=False))  # update label on every change
+            d_slider.delayedValueChanged.connect(lambda value: self.d_slider_changed(write=True)) # only write config when delay timer triggers
             # d_slider.sliderPressed.connect(self.sldDisconnect)
             # d_slider.sliderReleased.connect(self.d_sldReconnect)
             self.addWidget(d_slider, i, entry_col, 1, entry_colspan)
@@ -821,7 +826,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, gain_dict_json, "configurator_gains")
         self.show_erase_button()
 
-    def slider_changed(self):
+    def slider_changed(self, write=True):
         self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('sld_', '')
         value_label_name = 'vl_' + self.sender().objectName().replace('sld_', '')
@@ -838,12 +843,13 @@ class SettingsLayout(QGridLayout):
         value_to_save = str(round(value * factor / 100, 4))
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
-        self.show_erase_button()
+        if write:
+            xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
+            self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
-    def cfg_slider_changed(self):
+    def cfg_slider_changed(self, write=True):
         self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('sld_', '')
         value_label_name = 'vl_' + self.sender().objectName().replace('sld_', '')
@@ -858,12 +864,13 @@ class SettingsLayout(QGridLayout):
         value_to_save = str(round(value / 100, 4))
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
-        self.show_erase_button()
+        if write:
+            xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
+            self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
-    def d_slider_changed(self):
+    def d_slider_changed(self, write=True):
         self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('dsld_', '')
         value_label_name = 'vl_' + self.sender().objectName().replace('dsld_', '')
@@ -884,12 +891,13 @@ class SettingsLayout(QGridLayout):
             value_label.setText(value_to_save)
         if self.show_slider_debug:
             logging.debug(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
-        self.show_erase_button()
+        if write:
+            xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
+            self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
-    def df_slider_changed(self):
+    def df_slider_changed(self, write=True):
         self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('dfsld_', '')
         value_label_name = 'vl_' + self.sender().objectName().replace('dfsld_', '')
@@ -910,8 +918,9 @@ class SettingsLayout(QGridLayout):
             value_label.setText(value_to_save)
         if self.show_slider_debug:
             logging.debug(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
-        self.show_erase_button()
+        if write:
+            xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
+            self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
 

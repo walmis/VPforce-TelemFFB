@@ -58,7 +58,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         super(SettingsWindow, self).__init__()
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
         self.device = device
-        self.timed_out = False
+        self.timed_out = True
 
         self.sim = self.current_sim
         self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")
