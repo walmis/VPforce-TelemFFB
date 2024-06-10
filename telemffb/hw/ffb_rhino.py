@@ -25,6 +25,7 @@ import ctypes
 import inspect
 import logging
 import os
+import threading
 import time
 import weakref
 from dataclasses import dataclass
@@ -33,7 +34,7 @@ from typing import List, Self
 import usb1
 from PyQt5.QtCore import QObject, QTimer, QTimerEvent, pyqtSignal
 
-from telemffb.utils import Destroyable, DirectionModulator, clamp, overrides, millis
+from telemffb.utils import Destroyable, DirectionModulator, clamp, overrides, millis, threaded
 
 paths = ["hidapi.dll", "dll/hidapi.dll", os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')]
 for p in paths:
@@ -492,6 +493,39 @@ class FFBRhino(QObject):
         self.startTimer(1) # start Qt timer to read HID reports every 1ms
 
         self.reconnect()
+
+        self._ramp_threads = {}
+        self._stop_flags = {}
+
+    @threaded(daemon=True)
+    def ramp_gain(self, slider_id, start_value, end_value, duration_ms):
+        if slider_id in self._stop_flags:
+            # if existing thread for slider_id, set flag for it to stop so we can restart the new one
+            self._stop_flags[slider_id].set()
+
+        # Create a new stop flag for the new thread
+        stop_flag = threading.Event()
+        self._stop_flags[slider_id] = stop_flag
+
+        self._ramp_threads[slider_id] = threading.current_thread()
+
+        total_distance = end_value - start_value
+        steps = int(duration_ms / 10)  # Number of steps for smoother transition (100 steps per second)
+        step_duration = (duration_ms / steps) / 1000  # Convert step duration to seconds
+        step_size = total_distance / steps
+
+        for i in range(steps):
+            if stop_flag.is_set():
+                return  # Exit if the stop flag is set
+
+            current_value = start_value + step_size * i
+            current_value = round(current_value)
+            self.set_gain(slider_id, current_value)
+            time.sleep(step_duration)
+
+        # Ensure the final value is set
+        if not stop_flag.is_set():
+            self.set_gain(slider_id, end_value)
 
     def reconnect(self):
         if self._dev:

@@ -6,7 +6,10 @@ import telemffb.utils as utils
 from typing import List, Dict
 # from utils import clamp, HighPassFilter, Derivative, Dispenser
 
-from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition
+from telemffb.hw.ffb_rhino import (EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition,
+                                   FFB_GAIN_CONSTANT, FFB_GAIN_DAMPER, FFB_GAIN_FRICTION,
+                                   FFB_GAIN_INERTIA, FFB_GAIN_MASTER, FFB_GAIN_PERIODIC, FFB_GAIN_SPRING)
+import telemffb.globals as G
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
@@ -205,6 +208,7 @@ class AircraftBase(object):
     heli_engine_rumble_intensity = 0.12
 
     smoother = utils.Smoother()
+    constant_force_ramp_time_ms = 1000
     _ipc_telem = {}
     stepper_dict = {}
 
@@ -224,6 +228,8 @@ class AircraftBase(object):
 
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
+
+        self.timed_out = True
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
@@ -1410,6 +1416,7 @@ class AircraftBase(object):
 
     def on_timeout(self):  # override me
         logging.info("Telemetry Timeout, stopping effects")
+        self.timed_out = True
         # effects.foreach(lambda e: e.stop())
         for key, effect in effects.dict.items():
             if self.keep_forces_on_pause:
@@ -1417,5 +1424,12 @@ class AircraftBase(object):
                     continue
             effect.stop()
 
-    def on_telemetry(self, telem_data): 
-        pass
+    def on_telemetry(self, telem_data):
+        if self.timed_out:
+            if G.current_configurator_gains is not None:
+                constant_gain = G.current_configurator_gains['constant_gain']['value']
+            else:
+                constant_gain = G.vpconf_configurator_gains.constant_gain
+            HapticEffect.device.ramp_gain(FFB_GAIN_CONSTANT, 0, constant_gain, self.constant_force_ramp_time_ms)
+            self.timed_out = False
+
