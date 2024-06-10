@@ -59,6 +59,21 @@ class SliderWithLabel(QWidget):
     def updateLabel(self, value):
         self.label.setText(str(value))
 
+class DelayTimerSlider(QSlider):
+    delayedValueChanged = pyqtSignal(int)
+    def __init__(self, *args, **kwargs):
+        super(DelayTimerSlider, self).__init__(*args, **kwargs)
+        self._delay = 150  # Delay in milliseconds
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._emitDelayedValueChanged)
+        self.valueChanged.connect(self._startTimer)
+
+    def _startTimer(self):
+        self._timer.start(self._delay)
+
+    def _emitDelayedValueChanged(self):
+        self.delayedValueChanged.emit(self.value())
 
 class NoWheelSlider(QSlider):
     delayedValueChanged = pyqtSignal(int)

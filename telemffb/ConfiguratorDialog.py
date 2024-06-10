@@ -37,25 +37,25 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
         # self.cb_MasterGain.clicked
         self.sl_MasterGain.valueChanged.connect(self.update_labels)
-        self.sl_MasterGain.valueChanged.connect(self.set_gain_value)
+        self.sl_MasterGain.delayedValueChanged.connect(self.set_gain_value)
 
         self.sl_Periodic.valueChanged.connect(self.update_labels)
-        self.sl_Periodic.valueChanged.connect(self.set_gain_value)
+        self.sl_Periodic.delayedValueChanged.connect(self.set_gain_value)
 
         self.sl_Spring.valueChanged.connect(self.update_labels)
-        self.sl_Spring.valueChanged.connect(self.set_gain_value)
+        self.sl_Spring.delayedValueChanged.connect(self.set_gain_value)
 
         self.sl_Damper.valueChanged.connect(self.update_labels)
-        self.sl_Damper.valueChanged.connect(self.set_gain_value)
+        self.sl_Damper.delayedValueChanged.connect(self.set_gain_value)
 
         self.sl_Inertia.valueChanged.connect(self.update_labels)
-        self.sl_Inertia.valueChanged.connect(self.set_gain_value)
+        self.sl_Inertia.delayedValueChanged.connect(self.set_gain_value)
 
         self.sl_Friction.valueChanged.connect(self.update_labels)
-        self.sl_Friction.valueChanged.connect(self.set_gain_value)
+        self.sl_Friction.delayedValueChanged.connect(self.set_gain_value)
 
         self.sl_Constant.valueChanged.connect(self.update_labels)
-        self.sl_Constant.valueChanged.connect(self.set_gain_value)
+        self.sl_Constant.delayedValueChanged.connect(self.set_gain_value)
 
         self.cb_MasterGain.stateChanged.connect(self.cb_toggle)
         self.cb_Periodic.stateChanged.connect(self.cb_toggle)

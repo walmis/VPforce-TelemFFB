@@ -25,7 +25,7 @@
   <property name="windowTitle">
    <string>Configurator Gain Override</string>
   </property>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>9</x>
@@ -36,7 +36,7 @@
    </property>
    <layout class="QGridLayout" name="gridLayout">
     <item row="4" column="1">
-     <widget class="QSlider" name="sl_Spring">
+     <widget class="DelayTimerSlider" name="sl_Spring">
       <property name="enabled">
        <bool>false</bool>
       </property>
@@ -163,7 +163,7 @@
      </spacer>
     </item>
     <item row="3" column="1">
-     <widget class="QSlider" name="sl_Periodic">
+     <widget class="DelayTimerSlider" name="sl_Periodic">
       <property name="enabled">
        <bool>false</bool>
       </property>
@@ -230,7 +230,7 @@
      </widget>
     </item>
     <item row="5" column="1">
-     <widget class="QSlider" name="sl_Damper">
+     <widget class="DelayTimerSlider" name="sl_Damper">
       <property name="enabled">
        <bool>false</bool>
       </property>
@@ -277,7 +277,7 @@
      </widget>
     </item>
     <item row="8" column="1">
-     <widget class="QSlider" name="sl_Constant">
+     <widget class="DelayTimerSlider" name="sl_Constant">
       <property name="enabled">
        <bool>false</bool>
       </property>
@@ -311,7 +311,7 @@
      </widget>
     </item>
     <item row="2" column="1">
-     <widget class="QSlider" name="sl_MasterGain">
+     <widget class="DelayTimerSlider" name="sl_MasterGain">
       <property name="enabled">
        <bool>false</bool>
       </property>
@@ -415,7 +415,7 @@
      </layout>
     </item>
     <item row="6" column="1">
-     <widget class="QSlider" name="sl_Inertia">
+     <widget class="DelayTimerSlider" name="sl_Inertia">
       <property name="enabled">
        <bool>false</bool>
       </property>
@@ -456,7 +456,7 @@
      </widget>
     </item>
     <item row="7" column="1">
-     <widget class="QSlider" name="sl_Friction">
+     <widget class="DelayTimerSlider" name="sl_Friction">
       <property name="enabled">
        <bool>false</bool>
       </property>
@@ -516,6 +516,13 @@
    </layout>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DelayTimerSlider</class>
+   <extends>QSlider</extends>
+   <header>telemffb.custom_widgets.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections>
   <connection>
