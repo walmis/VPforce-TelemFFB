@@ -475,7 +475,7 @@ class TelemManager(QObject, threading.Thread):
                         self.telemetryTimeout.emit(False)
                         self.timed_out = False
 
-                    G.settings_mgr.timedOut = False
+                    G.settings_mgr.timed_out = False
                     data = self._data
                     self._data = None
                     self.process_data(data)

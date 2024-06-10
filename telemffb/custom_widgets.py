@@ -151,9 +151,11 @@ class NoWheelSlider(QSlider):
 
     def enterEvent(self, event):
         self.setFocus()
+        super().enterEvent(event)  # Call the default handler to ensure normal behavior
 
     def leaveEvent(self, event):
         self.clearFocus()
+        super().leaveEvent(event)  # Call the default handler to ensure normal behavior
 
     # def keyPressEvent(self, event):
     #     if self.is_mouse_over:
