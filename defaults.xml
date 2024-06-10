@@ -140,24 +140,6 @@
 		<datatype>text</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB</Grouping>
-		<order>20</order>
-		<name>constant_force_ramp_time_ms</name>
-		<info>Slowly ramp constant force effects when unpausing or loading into new aircraft.  Avoids rapid onset of constant force effects like elevator droop or runway rumble.</info>
-		<displayname>Constant Force Ramp Time (ms)</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<sliderfactor>100</sliderfactor>
-		<validvalues>0,40</validvalues>
-		<value>1000</value>
-		<datatype>d_int</datatype>
-	</defaults>
-	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>30</order>
 		<name>max_aileron_coeff</name>
