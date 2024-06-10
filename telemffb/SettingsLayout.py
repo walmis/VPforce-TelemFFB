@@ -654,14 +654,14 @@ class SettingsLayout(QGridLayout):
         value = 'false' if state == 0 else 'true'
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, name)
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def erase_setting(self, name):
         self.trigger_form_reload = True
         logging.debug(f"Erase {name} clicked")
         xmlutils.erase_models_from_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, name)
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def browse_for_config(self):
         self.trigger_form_reload = False
@@ -699,7 +699,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def textbox_changed(self):
         self.trigger_form_reload = False
@@ -709,7 +709,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def dropbox_changed(self):
         self.trigger_form_reload = False
@@ -719,7 +719,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def unit_dropbox_changed(self):
         self.trigger_form_reload = False
@@ -734,7 +734,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name, unit)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def line_edit_changed(self):
         self.trigger_form_reload = False
@@ -749,7 +749,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name, unit)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def expander_clicked(self):
         self.trigger_form_reload = True
@@ -793,7 +793,7 @@ class SettingsLayout(QGridLayout):
         else:
             the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def configurator_button_clicked(self):
         """
@@ -841,7 +841,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def cfg_slider_changed(self):
         self.trigger_form_reload = False
@@ -861,7 +861,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def d_slider_changed(self):
         self.trigger_form_reload = False
@@ -887,7 +887,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     def df_slider_changed(self):
         self.trigger_form_reload = False
@@ -913,7 +913,7 @@ class SettingsLayout(QGridLayout):
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
-            self.reload_layout()
+            self.reload_caller()
 
     # # prevent slider from sending values as you drag
     # def sldDisconnect(self):
