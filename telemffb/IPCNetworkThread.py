@@ -148,6 +148,10 @@ class IPCNetworkThread(QThread):
                 elif msg == 'SHOW WINDOW':
                     logging.info("Show command received via IPC")
                     self.show_signal.emit()
+                elif msg.startswith('SHOW WINDOW:'):
+                    dev = msg.removeprefix('SHOW WINDOW:')
+                    if dev == G.device_type:
+                        self.show_signal.emit()
                 elif msg == 'HIDE WINDOW':
                     logging.info("Hide command received via IPC")
                     self.hide_signal.emit()
