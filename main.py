@@ -100,6 +100,8 @@ def main():
 
     G.args = CmdLineArgs.parse()
 
+    G.is_exe = getattr(sys, 'frozen', False)
+
     # script_dir = os.path.dirname(os.path.abspath(__file__))
 
     headless_mode = G.args.headless
@@ -180,16 +182,17 @@ def main():
 
     utils.create_empty_userxml_file(G.userconfig_path)
 
-    if getattr(sys, 'frozen', False):
+    if G.is_exe:
         appmode = 'Executable'
     else:
         appmode = 'Source'
 
     logging.info("**************************************")
     logging.info("**************************************")
-    logging.info(f"*****    TelemFFB starting up from {appmode}:  Args= {G.args.__dict__}")
+    logging.info(f"*****    TelemFFB version {version}: starting up from {appmode}:  Args= {G.args.__dict__}")
     logging.info("**************************************")
     logging.info("**************************************")
+
     if G.args.teleplot:
         logging.info(f"Using {G.args.teleplot} for plotting")
         utils.teleplot.configure(G.args.teleplot)

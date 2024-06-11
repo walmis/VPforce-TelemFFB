@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from subprocess import Popen
     from telemffb.CmdLineArgs import CmdLineArgs
 
+is_exe: bool = False
+
 settings_mgr : 'SettingsWindow' = None
 userconfig_rootpath = None
 userconfig_path = None
