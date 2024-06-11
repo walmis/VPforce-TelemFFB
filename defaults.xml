@@ -2963,6 +2963,22 @@
 		<value>1.0</value>
 		<datatype>float</datatype>
 	</defaults>
+	<defaults>
+		<Grouping>Profile</Grouping>
+		<order>800</order>
+		<name>telemffb_profile</name>
+		<any>true</any>
+		<displayname>TelemFFB Profile</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value></value>
+		<datatype>text</datatype>
+	</defaults>
 	<sc_overrides>
 		<model>FlyInside B206.*</model>
 		<name>EngRPM</name>

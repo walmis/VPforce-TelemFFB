@@ -255,6 +255,52 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False, instance
 
     return model_data, found_pattern
 
+def read_models_from_tffbprofile(the_sim, profilename, pattern):
+    all_models = ['']
+    model_data = []
+    profileRootPath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
+    profile_path = os.path.join(profileRootPath, profilename + '.tffbprofile')
+    try:
+        tree = try_parse(profile_path)
+        root = tree.getroot()
+
+        usr_models =  root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
+                      root.findall(f'.//models[sim="any"][device="{device}"]') + \
+                      root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+                      root.findall(f'.//models[sim="any"][device="any"]')
+
+
+        # Create a dictionary to store models based on unique keys
+        model_dict = {}
+
+        # Process any_models
+        for model_elem in usr_models:
+            model_key = (model_elem.find('model').text, model_elem.find('name').text)
+            model_dict[model_key] = model_elem
+
+        # Process the models
+        for model_elem in model_dict.values():
+            # Assuming 'model' is the element containing the wildcard pattern
+
+            name = model_elem.find('name').text
+            value = model_elem.find('value').text
+            unit_elem = model_elem.find('unit')
+            unit = unit_elem.text if unit_elem is not None else ""
+            saved_device = model_elem.find('device').text
+            model_dict = {
+                'model': pattern,
+                'name': name,
+                'value': value,
+                'unit': unit,
+                'device': saved_device
+            }
+            found_pattern = pattern
+            model_data.append(model_dict)
+
+    except:
+        logging.warning("Couldn't load profile " + profilename)
+
+    return model_data
 
 def read_sc_overrides(aircraft_name):
     def_model_overrides = read_models_sc_overrides(defaults_path, aircraft_name, 'defaults')
@@ -573,6 +619,16 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
         final_result = def_craft_models_result
 
     final_result = [item for item in final_result if item['value'] != '' or item['name'] == 'vpconf']
+
+
+    # read separate profile file
+    profilename = ''
+    for item in final_result:
+        if item['name'] == 'telemffb_profile':
+            profilename = item['value']
+            profile_list = read_models_from_tffbprofile(the_sim,profilename,model_pattern )
+            final_result = update_data_with_models(final_result, profile_list, 'Model (profile)')
+
 
     prereq_list = read_prereqs()
     final_w_prereqs = check_prereq_value(prereq_list, final_result)
@@ -1129,6 +1185,7 @@ def printconfig( sorted_data):
             if item['replaced'] == "Class (user)": replacestring = "UC"
             if item['replaced'] == "Model Default": replacestring = "DM"
             if item['replaced'] == "Model (user)": replacestring = "UM"
+            if item['replaced'] == "Model (profile)": replacestring = "UP"
         spacing = 50 - (len(item['name']) + len(item['value']) + len(item['unit']))
         space = " " * spacing + " # " + replacestring + " # "
 
