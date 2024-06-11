@@ -102,6 +102,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         # Enabling start with windows should force headless mode for children
         self.cb_startToTray.clicked.connect(self.toggle_headless)
+        self.cb_startToTray.clicked.connect(self.toggle_start_mode)
+        self.cb_masterStartMin.clicked.connect(self.toggle_start_mode)
 
 
     def closeEvent(self, event):
@@ -129,11 +131,17 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_min_enable_p.setChecked(False)
             self.cb_min_enable_c.setChecked(False)
 
-    def disable_win_startup(self):
-        self.cb_startWithWindows.setChecked(False)
+    def toggle_start_mode(self, state):
+        """
+        Toggle between 'start to tray' and 'start minimized
+        """
+        sender = self.sender()
+        if not state: return  # only concerned with state changed to enable
+        if sender == self.cb_startToTray:
+            self.cb_masterStartMin.setChecked(False)
+        elif sender == self.cb_masterStartMin:
+            self.cb_startToTray.setChecked(False)
 
-    def disable_start_to_tray(self):
-        self.cb_startToTray.setChecked(False)
 
     def change_master_widgets(self, button):
         if button == self.rb_master_j:
@@ -349,6 +357,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pruneLogsNum': self.tb_logPrune.text(),
             'pruneLogsUnit': self.combo_logPrune.currentText(),
             'startToTray': self.cb_startToTray.isChecked(),
+            'masterStartMin': self.cb_masterStartMin.isChecked(),
             'closeToTray': self.cb_closeToTray.isChecked()
         }
 
@@ -443,6 +452,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_startWithWindows.setText('Start With Windows (EXE Version Only)')
 
         self.cb_startToTray.setChecked(settings_dict.get('startToTray', False))
+
+        self.cb_masterStartMin.setChecked(settings_dict.get('masterStartMin', False))
 
         self.cb_closeToTray.setChecked(settings_dict.get('closeToTray', False))
 

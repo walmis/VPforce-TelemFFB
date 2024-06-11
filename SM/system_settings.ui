@@ -35,7 +35,7 @@
    <property name="geometry">
     <rect>
      <x>6</x>
-     <y>272</y>
+     <y>280</y>
      <width>581</width>
      <height>16</height>
     </rect>
@@ -90,7 +90,7 @@
     <rect>
      <x>17</x>
      <y>40</y>
-     <width>261</width>
+     <width>221</width>
      <height>137</height>
     </rect>
    </property>
@@ -231,7 +231,7 @@
    <property name="geometry">
     <rect>
      <x>7</x>
-     <y>557</y>
+     <y>567</y>
      <width>581</width>
      <height>16</height>
     </rect>
@@ -276,7 +276,7 @@
    <property name="geometry">
     <rect>
      <x>17</x>
-     <y>288</y>
+     <y>298</y>
      <width>151</width>
      <height>16</height>
     </rect>
@@ -296,7 +296,7 @@
    <property name="geometry">
     <rect>
      <x>17</x>
-     <y>570</y>
+     <y>580</y>
      <width>181</width>
      <height>16</height>
     </rect>
@@ -316,7 +316,7 @@
    <property name="geometry">
     <rect>
      <x>27</x>
-     <y>590</y>
+     <y>600</y>
      <width>101</width>
      <height>16</height>
     </rect>
@@ -329,7 +329,7 @@
    <property name="geometry">
     <rect>
      <x>33</x>
-     <y>610</y>
+     <y>620</y>
      <width>184</width>
      <height>48</height>
     </rect>
@@ -357,7 +357,7 @@
   <widget class="QLabel" name="label_10">
    <property name="geometry">
     <rect>
-     <x>312</x>
+     <x>272</x>
      <y>148</y>
      <width>151</width>
      <height>16</height>
@@ -370,10 +370,10 @@
   <widget class="Line" name="line_3">
    <property name="geometry">
     <rect>
-     <x>280</x>
+     <x>240</x>
      <y>13</y>
      <width>20</width>
-     <height>251</height>
+     <height>261</height>
     </rect>
    </property>
    <property name="font">
@@ -393,7 +393,7 @@
    <property name="geometry">
     <rect>
      <x>207</x>
-     <y>588</y>
+     <y>598</y>
      <width>191</width>
      <height>20</height>
     </rect>
@@ -406,7 +406,7 @@
    <property name="geometry">
     <rect>
      <x>219</x>
-     <y>610</y>
+     <y>620</y>
      <width>371</width>
      <height>80</height>
     </rect>
@@ -515,7 +515,7 @@
    <property name="geometry">
     <rect>
      <x>17</x>
-     <y>310</y>
+     <y>320</y>
      <width>544</width>
      <height>244</height>
     </rect>
@@ -767,9 +767,9 @@
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>310</x>
+     <x>270</x>
      <y>41</y>
-     <width>278</width>
+     <width>311</width>
      <height>106</height>
     </rect>
    </property>
@@ -1059,7 +1059,7 @@ Headless:</string>
   <widget class="QLabel" name="labelSystem_2">
    <property name="geometry">
     <rect>
-     <x>310</x>
+     <x>270</x>
      <y>170</y>
      <width>141</width>
      <height>16</height>
@@ -1076,26 +1076,19 @@ Headless:</string>
     <string>Startup:</string>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>310</x>
+     <x>270</x>
      <y>191</y>
-     <width>271</width>
-     <height>81</height>
+     <width>311</width>
+     <height>94</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout_5">
     <property name="verticalSpacing">
      <number>8</number>
     </property>
-    <item row="2" column="0">
-     <widget class="LabeledToggle" name="cb_closeToTray">
-      <property name="text">
-       <string>Closing App Sends to Tray</string>
-      </property>
-     </widget>
-    </item>
     <item row="1" column="0">
      <widget class="LabeledToggle" name="cb_startToTray">
       <property name="text">
@@ -1103,21 +1096,35 @@ Headless:</string>
       </property>
      </widget>
     </item>
-    <item row="0" column="0">
+    <item row="1" column="1">
+     <widget class="LabeledToggle" name="cb_masterStartMin">
+      <property name="text">
+       <string>Start Minimized</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0" colspan="2">
      <widget class="LabeledToggle" name="cb_startWithWindows">
       <property name="text">
        <string>Start with Windows</string>
       </property>
      </widget>
     </item>
+    <item row="2" column="0" colspan="2">
+     <widget class="LabeledToggle" name="cb_closeToTray">
+      <property name="text">
+       <string>Closing App Sends to Tray</string>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>308</x>
+     <x>268</x>
      <y>10</y>
-     <width>291</width>
+     <width>311</width>
      <height>19</height>
     </rect>
    </property>
