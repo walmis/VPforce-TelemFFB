@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+import winreg
 from collections import OrderedDict
 from datetime import datetime
 
@@ -18,7 +19,7 @@ from PyQt5.QtWidgets import (QAction, QApplication, QButtonGroup, QCheckBox,
                              QComboBox, QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QShortcut, QTabWidget,
-                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy)
+                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu)
 
 import telemffb.globals as G
 import telemffb.utils as utils
@@ -637,6 +638,137 @@ class MainWindow(QMainWindow):
             self.add_debug_menu()
         G.gain_override_dialog = ConfiguratorDialog(self) # create configurator gain dialog for use during TelemFFB session and store object in globals
 
+    def add_system_tray(self):
+        self.tray_icon = QSystemTrayIcon(QIcon(":/image/vpforceicon.png"), self)
+        self.tray_icon.setToolTip("VPforce TelemFFB")
+
+        # Create the tray menu
+        tray_menu = QMenu()
+        show_action = QAction("Show Window", self)
+
+        def do_show_main_window(trigger):
+            if isinstance(trigger, QSystemTrayIcon.ActivationReason):
+                if trigger == QSystemTrayIcon.DoubleClick:
+                    self.showNormal()  # Restore the window to its normal state if minimized
+                    self.show()
+                    self.raise_()
+                    self.activateWindow()
+            elif isinstance(trigger, str) and trigger == "show":
+                self.showNormal()  # Restore the window to its normal state if minimized
+                self.show()
+                self.raise_()
+                self.activateWindow()
+            if G.is_exe:
+                start_with_windows_action.setChecked(self.toggle_start_with_windows())
+            start_minimized_action.setChecked(G.system_settings.get('startToTray', False))
+            send_to_tray_action.setChecked(G.system_settings.get('closeToTray', False))
+
+        self.tray_icon.activated.connect(do_show_main_window)
+        show_action.triggered.connect(lambda: do_show_main_window('show'))
+
+        tray_menu.addAction(show_action)
+
+        # Create the "Options" menu
+        options_menu = QMenu("Options", self)
+
+        # Setup Start With Windows menu option
+        if G.is_exe:
+            start_with_windows_action = QAction("Start With Windows", self, checkable=True)
+            start_with_windows_action.setChecked(G.system_settings.get('startWithWindows', False))
+
+            def do_toggle_set_start_with_windows(checked):
+                self.toggle_start_with_windows(checked)
+
+            start_with_windows_action.triggered.connect(lambda checked: do_toggle_set_start_with_windows(checked))
+
+            options_menu.addAction(start_with_windows_action)
+
+        # Setup Start Minimized menu option
+        start_minimized_action = QAction("Start in Tray", self, checkable=True)
+        start_minimized_action.setChecked(G.system_settings.get('startToTray', False))
+
+        def do_toggle_set_start_minimized(checked):
+            G.system_settings.setValue('startToTray', checked)
+
+        start_minimized_action.triggered.connect(lambda checked: do_toggle_set_start_minimized(checked))
+
+        options_menu.addAction(start_minimized_action)
+
+        # Setup Send to Tray menu option
+        send_to_tray_action = QAction("Closing App Sends to Tray", self, checkable=True)
+        send_to_tray_action.setChecked(G.system_settings.get('closeToTray', False))
+
+        def do_toggle_set_send_to_tray(checked):
+            G.system_settings.setValue('closeToTray', checked)
+
+        send_to_tray_action.triggered.connect(lambda checked: do_toggle_set_send_to_tray(checked))
+
+        options_menu.addAction(send_to_tray_action)
+
+        tray_menu.addMenu(options_menu)
+
+        # Create the "Instances" menu
+        if G.launched_instances:
+            show_menu = QMenu("Instances", self)
+            show_child_window_action = {}
+            print(f"LAUNCHED:{G.launched_instances}")
+            for d in ["joystick", "pedals", "collective"]:
+                if d in G.launched_instances:
+                    def do_show_child_window(child=d):
+                        G.ipc_instance.send_broadcast_message(f'SHOW WINDOW:{child}')
+
+                    show_child_window_action[d] = QAction(f'Show {d.capitalize()} Instance', self)
+                    show_child_window_action[d].triggered.connect(lambda _, child=d: do_show_child_window(child))
+                    show_menu.addAction(show_child_window_action[d])
+                    print(f"ADDED: {d}")
+            tray_menu.addMenu(show_menu)
+
+        quit_action = QAction("Quit TelemFFB", self)
+        quit_action.triggered.connect(exit_application)
+        tray_menu.addAction(quit_action)
+
+        self.tray_icon.setContextMenu(tray_menu)
+        # Show the tray icon
+        self.tray_icon.show()
+        if self.isHidden():
+            #  don't show, send message to tray icon that will pop to notify user that TelemFFB is running in Tray
+            icon = QIcon(":/image/vpforceicon.png")
+            G.main_window.tray_icon.showMessage(
+                None,
+                "TelemFFB is running in the system tray.  Double-Click the VPforce Icon to show or right click to set options in the context menu",
+                icon,
+                msecs=1000  # Duration in milliseconds
+            )
+
+    def toggle_start_with_windows(self, set_enabled=None):
+        exe_path = sys.executable
+        reg_key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        reg_key_name = "VPforce TelemFFB"
+
+        try:
+            reg_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_key_path, 0, winreg.KEY_SET_VALUE | winreg.KEY_READ)
+            if set_enabled is None:
+                #if no state defined, just querey and return state
+                try:
+                    value, _ = winreg.QueryValueEx(reg_key, reg_key_name)
+                    winreg.CloseKey(reg_key)
+                    return True
+                except FileNotFoundError:
+                    return False
+            else:
+                if set_enabled:
+                    winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, exe_path)
+                else:
+                    try:
+                        winreg.DeleteValue(reg_key, reg_key_name)
+                    except FileNotFoundError:
+                        pass
+                winreg.CloseKey(reg_key)
+        except FileNotFoundError:
+            if set_enabled:
+                reg_key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_key_path)
+                winreg.SetValueEx(reg_key, reg_key_name, 0, winreg.REG_SZ, exe_path)
+                winreg.CloseKey(reg_key)
 
     def add_instance_log_menu(self):
         self.log_menu.addAction(self.log_window_action)
@@ -789,6 +921,7 @@ class MainWindow(QMainWindow):
         if "collective" in G.launched_instances:
             self.instance_status_row.collective_status_icon.show()
         self.add_instance_log_menu()
+        self.add_system_tray()
 
 
     def clear_log_widget(self):
@@ -918,7 +1051,18 @@ class MainWindow(QMainWindow):
             self.hide()
             event.ignore()
         else:
-            exit_application()
+            if G.system_settings.get('closeToTray', False):
+                self.hide()
+                event.ignore()
+                icon = QIcon(":/image/vpforceicon.png")
+                self.tray_icon.showMessage(
+                    None,
+                    "TelemFFB is running in the system tray.  Double-Click the VPforce Icon to re-show or right click to set options in the context menu",
+                    icon,
+                    msecs=1000  # Duration in milliseconds
+                )
+            else:
+                exit_application()
 
     def load_main_window_geometry(self):
         window_data = G.system_settings.get("WindowData")

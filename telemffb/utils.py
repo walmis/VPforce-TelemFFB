@@ -586,6 +586,8 @@ class SystemSettings(QSettings):
         'pruneLogsNum': 1,
         'pruneLogsUnit': 'Week(s)',
         'ignoreUpdate': False,
+        'startToTray': False,
+        'closeToTray': False,
         'enableDCS': False,
         'enableMSFS': False,
         'enableXPLANE': False,

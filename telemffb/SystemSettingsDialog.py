@@ -100,6 +100,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.buttonChildSettings.setEnabled(True)
             self.buttonChildSettings.clicked.connect(self.launch_child_settings_windows)
 
+        # Enabling start with windows should force headless mode for children
+        self.cb_startToTray.clicked.connect(self.toggle_headless)
 
 
     def closeEvent(self, event):
@@ -116,6 +118,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # Load default settings and update widgets
         # default_settings = utils.get_default_sys_settings()
         self.load_settings(default=True)
+
+    def toggle_headless(self, state):
+        # force headless mode for children
+        if state:
+            self.cb_headless_j.setChecked(True)
+            self.cb_headless_p.setChecked(True)
+            self.cb_headless_c.setChecked(True)
+            self.cb_min_enable_j.setChecked(False)
+            self.cb_min_enable_p.setChecked(False)
+            self.cb_min_enable_c.setChecked(False)
+
+    def disable_win_startup(self):
+        self.cb_startWithWindows.setChecked(False)
+
+    def disable_start_to_tray(self):
+        self.cb_startToTray.setChecked(False)
 
     def change_master_widgets(self, button):
         if button == self.rb_master_j:
@@ -224,6 +242,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.pathIL2.setText(directory)
 
     def toggle_launchmode_cbs(self):
+        """
+        Toggles "start minimized" and "start headless" checkboxes
+        Disables "start to tray" if minimize is selected
+        """
         sender = self.sender()
         if not sender.isChecked():
             return
@@ -233,14 +255,17 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 self.cb_min_enable_j.setChecked(False)
             case 'minimize_j':
                 self.cb_headless_j.setChecked(False)
+                self.cb_startToTray.setChecked(False)
             case 'headless_p':
                 self.cb_min_enable_p.setChecked(False)
             case 'minimize_p':
                 self.cb_headless_p.setChecked(False)
+                self.cb_startToTray.setChecked(False)
             case 'headless_c':
                 self.cb_min_enable_c.setChecked(False)
             case 'minimize_c':
                 self.cb_headless_c.setChecked(False)
+                self.cb_startToTray.setChecked(False)
         logging.debug(f"{sender.objectName()} checked:{sender.isChecked()}")
 
     def validate_settings(self):
@@ -293,6 +318,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         # Create a dictionary with the values of all components
         tp = G.device_type
 
+        if G.is_exe:
+            G.main_window.toggle_start_with_windows(self.cb_startWithWindows.isChecked())
+
         global_settings_dict = {
             "enableDCS": self.enableDCS.isChecked(),
             "enableMSFS": self.enableMSFS.isChecked(),
@@ -319,7 +347,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidCollective': str(self.tb_pid_c.text()),
             'pruneLogs': self.cb_logPrune.isChecked(),
             'pruneLogsNum': self.tb_logPrune.text(),
-            'pruneLogsUnit': self.combo_logPrune.currentText()
+            'pruneLogsUnit': self.combo_logPrune.currentText(),
+            'startToTray': self.cb_startToTray.isChecked(),
+            'closeToTray': self.cb_closeToTray.isChecked()
         }
 
         instance_settings_dict = {
@@ -362,7 +392,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         for k,v in instance_settings_dict.items():
             G.system_settings.setValue(f"{G.device_type}/{k}", v)
-        
 
         if not self.validate_settings():
             return
@@ -405,6 +434,17 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.tb_logPrune.setText(str(settings_dict.get("pruneLogsNum", 1)))
 
         self.combo_logPrune.setCurrentText(settings_dict.get("pruneLogsUnit", "Week(s)"))
+
+        if G.is_exe:
+            self.cb_startWithWindows.setChecked(G.main_window.toggle_start_with_windows())
+        else:
+            self.cb_startWithWindows.setChecked(False)
+            self.cb_startWithWindows.setEnabled(False)
+            self.cb_startWithWindows.setText('Start With Windows (EXE Version Only)')
+
+        self.cb_startToTray.setChecked(settings_dict.get('startToTray', False))
+
+        self.cb_closeToTray.setChecked(settings_dict.get('closeToTray', False))
 
         self.enableDCS.setChecked(settings_dict.get('enableDCS', False))
 
