@@ -210,6 +210,7 @@ def main():
     app.setStyleSheet(
         """
         QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
+        QCheckBox::indicator:checked:disabled {image: url(:/image/disabledcheckbox.png); }
         QRadioButton::indicator:checked { image: url(:/image/rchecked.png);}
 
         QPushButton:!pressed, #styledButton:!pressed {

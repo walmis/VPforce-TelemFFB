@@ -186,32 +186,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_p.setEnabled(al_enabled)
         self.cb_headless_c.setEnabled(al_enabled)
 
-        if al_enabled:
-            style = "QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }"
-        else:
-            style = "QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }"
-
-        self.cb_al_enable.setStyleSheet(style)
-        self.cb_al_enable_j.setStyleSheet(style)
-        self.cb_al_enable_p.setStyleSheet(style)
-        self.cb_al_enable_c.setStyleSheet(style)
-        self.cb_min_enable_j.setStyleSheet(style)
-        self.cb_min_enable_p.setStyleSheet(style)
-        self.cb_min_enable_c.setStyleSheet(style)
-        self.cb_headless_j.setStyleSheet(style)
-        self.cb_headless_p.setStyleSheet(style)
-        self.cb_headless_c.setStyleSheet(style)
-
     def toggle_xplane_widgets(self):
         xplane_enabled = self.enableXPLANE.isChecked()
         self.validateXPLANE.setEnabled(xplane_enabled)
         self.lab_pathXPLANE.setEnabled(xplane_enabled)
         self.pathXPLANE.setEnabled(xplane_enabled)
         self.browseXPLANE.setEnabled(xplane_enabled)
-        if xplane_enabled:
-            self.validateXPLANE.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }")
-        else:
-            self.validateXPLANE.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }")
 
     def toggle_il2_widgets(self):
         # Show/hide IL-2 related widgets based on checkbox state
@@ -223,10 +203,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseIL2.setEnabled(il2_enabled)
         self.lab_portIL2.setEnabled(il2_enabled)
         self.portIL2.setEnabled(il2_enabled)
-        if il2_enabled:
-            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/purplecheckbox.png); }")
-        else:
-            self.validateIL2.setStyleSheet("QCheckBox::indicator:checked {image: url(:/image/disabledcheckbox.png); }")
+
 
     def toggle_log_prune_widgets(self):
         prune = self.cb_logPrune.isChecked()
