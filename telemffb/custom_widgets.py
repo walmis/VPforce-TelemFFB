@@ -629,11 +629,11 @@ class Toggle(QCheckBox):
     _light_grey_pen = QPen(Qt.lightGray)
 
     def __init__(self,
-        parent=None,
-        bar_color=QColor("#44ab37c8"),
-        checked_color="#ab37c8",
-        handle_color=Qt.white,
-        ):
+                 parent=None,
+                 bar_color=QColor("#44ab37c8"),
+                 checked_color="#ab37c8",
+                 handle_color=Qt.white,
+                 disabled_color=Qt.gray):
         super().__init__(parent)
 
         # Save our properties on the object via self, so we can access them later
@@ -641,6 +641,7 @@ class Toggle(QCheckBox):
         self._bar_color = bar_color
         self._checked_color = checked_color
         self._handle_color = handle_color
+        self._disabled_color = QColor(disabled_color)
 
         self._bar_brush = QBrush(bar_color)
         self._bar_checked_brush = QBrush(QColor(checked_color).lighter())
@@ -649,7 +650,6 @@ class Toggle(QCheckBox):
         self._handle_checked_brush = QBrush(QColor(checked_color))
 
         # Setup the rest of the widget.
-
         self.setContentsMargins(8, 0, 8, 0)
         self._handle_position = 0
         self.setMaximumSize(QSize(45, 30))
@@ -664,7 +664,6 @@ class Toggle(QCheckBox):
         return self.contentsRect().contains(pos)
 
     def paintEvent(self, e: QPaintEvent):
-
         contRect = self.contentsRect()
         handleRadius = round(0.24 * contRect.height())
 
@@ -687,14 +686,20 @@ class Toggle(QCheckBox):
         barGradient = QLinearGradient(0, 0, 0, barRect.height())
         barGradient.setStart(barRect.topLeft())
         barGradient.setFinalStop(barRect.bottomLeft())
-        barGradient.setColorAt(0.0, self._bar_color.lighter(150))
-        barGradient.setColorAt(0.5, self._bar_color)
-        barGradient.setColorAt(1.0, self._bar_color.darker(150))
 
-        if self.isChecked():
-            barGradient.setColorAt(0.0, QColor(self._checked_color).lighter(150))
-            barGradient.setColorAt(0.5, QColor(self._checked_color))
-            barGradient.setColorAt(1.0, QColor(self._checked_color).darker(150))
+        if not self.isEnabled():
+            barGradient.setColorAt(0.0, self._disabled_color.lighter(150))
+            barGradient.setColorAt(0.5, self._disabled_color)
+            barGradient.setColorAt(1.0, self._disabled_color.darker(150))
+        else:
+            barGradient.setColorAt(0.0, self._bar_color.lighter(150))
+            barGradient.setColorAt(0.5, self._bar_color)
+            barGradient.setColorAt(1.0, self._bar_color.darker(150))
+
+            if self.isChecked():
+                barGradient.setColorAt(0.0, QColor(self._checked_color).lighter(150))
+                barGradient.setColorAt(0.5, QColor(self._checked_color))
+                barGradient.setColorAt(1.0, QColor(self._checked_color).darker(150))
 
         p.setBrush(QBrush(barGradient))
         p.drawRoundedRect(barRect, rounding, rounding)
@@ -703,7 +708,7 @@ class Toggle(QCheckBox):
         p.setPen(QPen(QColor("#565a5e"), 1))
         p.drawRoundedRect(barRect, rounding, rounding)
 
-        if self.isChecked():
+        if self.isChecked() and self.isEnabled():
             handle_color = self._handle_checked_brush.color()
         else:
             handle_color = self._handle_brush.color()
