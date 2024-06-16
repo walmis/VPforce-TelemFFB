@@ -708,10 +708,14 @@ class AircraftBase(object):
     def _update_canopy(self, canopypos):
 
         # canopypos = self._telem_data.get("canopy_value", 0)
-        if self.anything_has_changed("Canopy", canopypos, delta_ms=300) and self.canopy_motion_intensity > 0 and self.canopy_motion_effect_enabled:
+        if self.anything_has_changed("Canopy", canopypos, delta_ms=100) and self.canopy_motion_intensity > 0 and self.canopy_motion_effect_enabled:
             logging.debug(f"Canopy Pos: {canopypos}")
             effects["canopymovement"].periodic(120, self.canopy_motion_intensity, 0, 3).start()
         else:
+            # play short bump when canopy fully closes, play only once before movement effect is stopped
+            if canopypos == 0 and effects['canopymovement'].started:
+                effects['canopyclunk'].periodic(10, utils.clamp((self.canopy_motion_intensity * 2), 0, 1), 180, effect_type=EFFECT_SQUARE,duration=40).start()
+            # stop movement effect
             effects["canopymovement"].stop(destroy_after=5000)
 
     def _update_landing_gear(self, gearpos, tas):
@@ -719,17 +723,22 @@ class AircraftBase(object):
             self.gear_buffet_speed_low = 0.9 * self.telem_data.get("Vle", 10000) #set stupid high in case of telemetry failure
             self.gear_buffet_speed_high = self.gear_buffet_speed_low * 1.3
 
-
         rumble_freq = self.gear_buffet_freq
 
+        # Gear Motion Effect
         if self.anything_has_changed("gear_value", gearpos, 50) and self.gear_motion_intensity > 0 and self.gear_motion_effect_enabled:
             logging.debug(f"Landing Gear Pos: {gearpos}")
             effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
-            effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 45, 3, phase=120).start()
+            effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 90, 3, phase=120).start()
+            if (gearpos == 0 or gearpos == 1) and self.is_joystick():
+                # Play short, sharp bump when gear fully extended/retracted
+                dir = 0 if gearpos == 0 else 180  # change direction of effect depending on if gear are closed or extended
+                effects['gearclunk'].periodic(10, utils.clamp((self.gear_motion_intensity * 3), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
         else:
             effects.dispose("gearmovement")
             effects.dispose("gearmovement2")
 
+        # Gear Buffeting Effect
         if (tas > self.gear_buffet_speed_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
             # intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
