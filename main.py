@@ -17,6 +17,8 @@
 
 import sys
 
+from PyQt5.QtGui import QIcon
+
 from telemffb.CmdLineArgs import CmdLineArgs
 
 if sys.argv[0].lower().endswith("updater.exe"):
@@ -53,7 +55,7 @@ from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             set_vpconf_profile)
-
+from telemffb.namedmutex import NamedMutex
 resources # used
 
 def send_test_message():
@@ -107,6 +109,26 @@ def main():
     headless_mode = G.args.headless
 
     G.master_instance = not G.args.child
+
+    if G.master_instance:
+        # Attempt to acquire a mutex lock.  If the acquisition fails, another master instance of TelemFFB is already running.
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setWindowTitle("TelemFFB is already running")
+        msg_box.setText(
+            "TelemFFB is already running and cannot be started.  If you don't see the 'VP' icon in the system tray, "
+            "check the task manager for possible hung instances."
+        )
+        msg_box.setWindowIcon(QIcon(':/image/vpforceicon.png'))
+        try:
+            mutex = NamedMutex("VPforce_TelemFFB_Master_Instance", acquired=True, timeout=1)
+            if not mutex.acquired:
+                msg_box.exec_()
+                sys.exit(1)
+        except WindowsError:
+            msg_box.exec_()
+            sys.exit(1)
+
     G.child_instance = G.args.child
 
     G.system_settings = utils.SystemSettings()
@@ -222,10 +244,7 @@ def main():
             margin: 0px;
             color: white;
             border: 1px solid #6e1d6f; /* Existing border */
-            box-shadow: 
-                0px 0px 0px 2px #c174e6,  /* Outer gradient border, lighter */
-                0px 0px 0px 4px #ab37c8,  /* Middle gradient border, darker */
-                0px 0px 0px 6px #5a5a5a;  /* Outermost dark grey border */
+
         }
 
         QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
@@ -237,10 +256,7 @@ def main():
             padding: 3px;
             margin: 0px;
             border: 1px solid #999999; /* Existing border */
-            box-shadow: 
-                0px 0px 0px 2px #cccccc,  /* Outer gradient border, lighter */
-                0px 0px 0px 4px #bbbbbb,  /* Middle gradient border, darker */
-                0px 0px 0px 6px #666666;  /* Outermost dark grey border */
+
         }
         
         QPushButton:pressed, #styledButton:pressed {
@@ -252,11 +268,8 @@ def main():
         margin: 0px;
         color: white;
         border: 1px solid #4e164e; /* Darker border to indicate pressed state */
-        box-shadow: 
-            0px 0px 0px 2px #ab37c8,  /* Outer gradient border, darker */
-            0px 0px 0px 4px #8e1da8,  /* Middle gradient border, darker */
-            0px 0px 0px 6px #3a3a3a;  /* Outermost dark grey border */
-    }
+
+        }
 
         QPushButton:hover:!pressed, #styledButton:hover:!pressed {
             background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
@@ -266,10 +279,7 @@ def main():
             padding: 3px;
             margin: 0px;
             border: 1px solid #8e1da8; /* Existing border */
-            box-shadow: 
-                0px 0px 0px 2px #d965e3,  /* Outer gradient border, lighter */
-                0px 0px 0px 4px #c07ec0,  /* Middle gradient border, darker */
-                0px 0px 0px 6px #5a5a5a;  /* Outermost dark grey border */
+
         }
 
         QComboBox::down-arrow {
