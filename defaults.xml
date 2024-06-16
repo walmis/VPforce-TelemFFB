@@ -1462,7 +1462,7 @@
 		<order>360.2</order>
 		<name>gforce_effect_curvature</name>
 		<prereq>gforce_effect_enable</prereq>
-		<info>Affects the onset characteristics of the G-Force effect.  See manual for details</info>
+		<info>&lt;html&gt;&lt;body&gt;Affects the onset characteristics of the overall effect&lt;br&gt;&lt;img src=":/image/g-force-curve.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<displayname>G Force Curvature</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
