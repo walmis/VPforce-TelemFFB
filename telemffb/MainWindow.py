@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
         self.tray_notifications = {}
 
         self.error_state = False # True='error' key found in telem_data, False=clean telem_data
+        self.error_clean_counter = 0 # counter to use as hysteresis for clearing error condition - not always 'error' from child instance on every loop
         self.timed_out = True
 
         self.show_simvars = False
@@ -1425,15 +1426,22 @@ class MainWindow(QMainWindow):
             is_paused = max(data.get('SimPaused', 0), data.get('Parked', 0))
             error_cond = data.get('error', None)
 
-            if error_cond is None:
-                if self.timed_out or self.error_state:
-                    self.update_sim_indicators(data.get('src'), paused=is_paused)
-                    self.error_state = False
-                    self.timed_out = False
-            elif error_cond is not None and not self.error_state:
-                self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
-                logging.error(error_cond)
-                self.error_state = True
+            if error_cond is None:  # no 'error' key in telemetry
+                if self.timed_out or self.error_state:  # only set status to run if previously timed out or error status was true
+                    if not self.error_clean_counter:  # avoid flapping due to ipc_telem not populating on every frame due to thread timing between instances
+                        self.update_sim_indicators(data.get('src'), paused=False)
+                        self.error_state = False
+                        self.timed_out = False
+                    else:
+                        self.error_clean_counter -= 1  # decrement the counter so that it will reach 0 once error is *truly* cleared
+            elif error_cond is not None:
+                self.error_clean_counter = 5
+                if not self.error_state:  # only set error status once when there is error cond but state is not yet true
+                    self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
+                    logging.error(error_cond)
+                    self.error_state = True
+
+
 
 
             shown_pattern = G.settings_mgr.current_pattern
