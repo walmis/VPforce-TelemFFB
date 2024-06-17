@@ -167,16 +167,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>30.4</order>
-		<name>aileron_gain</name>
-		<info>&lt;html&gt;&lt;body&gt;Aileron gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Aileron Gain</displayname>
-		<sliderfactor>0.2</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
 		<order>40</order>
 		<name>max_elevator_coeff</name>
 		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
@@ -203,16 +193,6 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>40.4</order>
-		<name>elevator_gain</name>
-		<info>&lt;html&gt;&lt;body&gt;Elevator gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Elevator Gain</displayname>
-		<sliderfactor>0.2</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
 		<order>50</order>
 		<name>max_rudder_coeff</name>
 		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
@@ -236,16 +216,6 @@
 		<sliderfactor>.1</sliderfactor>
 		<validvalues>-3,5</validvalues>
 		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>50.4</order>
-		<name>rudder_gain</name>
-		<info>&lt;html&gt;&lt;body&gt;Rudder gain value for use in dynamic forces calculations &lt;br&gt;Higher gain will reach Max sooner&lt;br&gt;&lt;img src=":/image/gain-force.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Rudder Gain</displayname>
-		<sliderfactor>0.2</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
@@ -3320,70 +3290,6 @@
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
-		<name>aileron_gain</name>
-		<type>GliderAircraft</type>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>aileron_gain</name>
-		<type>JetAircraft</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>aileron_gain</name>
-		<type>PropellerAircraft</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>aileron_gain</name>
-		<type>TurbopropAircraft</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>aileron_gain</name>
-		<type>GliderAircraft</type>
-		<value>0.1</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>aileron_gain</name>
-		<type>JetAircraft</type>
-		<value>0.1</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>aileron_gain</name>
-		<type>PropellerAircraft</type>
-		<value>0.1</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>aileron_gain</name>
-		<type>TurbopropAircraft</type>
-		<value>0.1</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-
-	<classdefaults>
-		<name>aileron_gain</name>
-		<type>AllSettings</type>
-		<value>0.5</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
 		<name>aileron_spring_gain</name>
 		<type>GliderAircraft</type>
 		<value>0.25</value>
@@ -4239,69 +4145,6 @@
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
-		<name>elevator_gain</name>
-		<type>GliderAircraft</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>elevator_gain</name>
-		<type>JetAircraft</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>elevator_gain</name>
-		<type>PropellerAircraft</type>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>elevator_gain</name>
-		<type>TurbopropAircraft</type>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>elevator_gain</name>
-		<type>GliderAircraft</type>
-		<value>0.15</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>elevator_gain</name>
-		<type>JetAircraft</type>
-		<value>0.2</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>elevator_gain</name>
-		<type>PropellerAircraft</type>
-		<value>0.15</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>elevator_gain</name>
-		<type>TurbopropAircraft</type>
-		<value>0.2</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>elevator_gain</name>
-		<type>AllSettings</type>
-		<value>0.5</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
 		<name>elevator_prop_flow_ratio</name>
 		<type>PropellerAircraft</type>
 		<value>0.2</value>
@@ -5090,62 +4933,6 @@
 		<value>100</value>
 		<unit>kt</unit>
 		<sim>any</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>gear_motion_effect_enabled</name>
-		<type>GliderAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>gear_motion_effect_enabled</name>
-		<type>JetAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>gear_motion_effect_enabled</name>
-		<type>Helicopter</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>gear_motion_effect_enabled</name>
-		<type>TurbopropAircraft</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>gear_motion_effect_enabled</name>
-		<type>PropellerAircraft</type>
-		<value>true</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>gear_motion_effect_enabled</name>
-		<type>PropellerAircraft</type>
-		<value>true</value>
-		<sim>IL2</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>gear_motion_effect_enabled</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>gear_motion_effect_enabled</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
@@ -6472,69 +6259,6 @@
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
-	<classdefaults>
-		<name>rudder_gain</name>
-		<type>GliderAircraft</type>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>rudder_gain</name>
-		<type>JetAircraft</type>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>rudder_gain</name>
-		<type>PropellerAircraft</type>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>rudder_gain</name>
-		<type>TurbopropAircraft</type>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>rudder_gain</name>
-		<type>GliderAircraft</type>
-		<value>.1</value>
-		<sim>XPLANE</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>rudder_gain</name>
-		<type>JetAircraft</type>
-		<value>.12</value>
-		<sim>XPLANE</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>rudder_gain</name>
-		<type>PropellerAircraft</type>
-		<value>.1</value>
-		<sim>XPLANE</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>rudder_gain</name>
-		<type>TurbopropAircraft</type>
-		<value>.12</value>
-		<sim>XPLANE</sim>
-		<device>pedals</device>
-	</classdefaults>
-	<classdefaults>
-		<name>rudder_gain</name>
-		<type>AllSettings</type>
-		<value>0.5</value>
-		<sim>any</sim>
-		<device>any</device>
-		</classdefaults>
 	<classdefaults>
 		<name>rudder_prop_flow_ratio</name>
 		<type>PropellerAircraft</type>
@@ -9702,26 +9426,12 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>A2A Piper PA-24.*</model>
-		<value>0.14</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>elevator_droop_moment</name>
 		<model>A2A Piper PA-24.*</model>
 		<value>0.2</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 		</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>A2A Piper PA-24.*</model>
-		<value>0.27</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
 	<models>
 		<name>elevator_prop_flow_ratio</name>
 		<model>A2A Piper PA-24.*</model>
@@ -9771,13 +9481,6 @@
 		<unit>in</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>rudder_gain</name>
-		<model>A2A Piper PA-24.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -10005,13 +9708,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Asobo DG1001E Neo.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>aileron_spring_gain</name>
 		<model>Asobo DG1001E Neo.*</model>
 		<value>0.25</value>
@@ -10025,13 +9721,6 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Asobo DG1001E Neo.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</models>
 	<models>
 		<name>elevator_spring_gain</name>
 		<model>Asobo DG1001E Neo.*</model>
@@ -10062,13 +9751,6 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Asobo LS8 18.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>aileron_spring_gain</name>
 		<model>Asobo LS8 18.*</model>
 		<value>0.25</value>
@@ -10079,13 +9761,6 @@
 		<name>aircraft_is_spring_centered</name>
 		<model>Asobo LS8 18.*</model>
 		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Asobo LS8 18.*</model>
-		<value>0.1</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -10126,26 +9801,12 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Asobo Savage Cub.*</model>
-		<value>0.04</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
 		<name>elevator_droop_moment</name>
 		<model>Asobo Savage Cub.*</model>
 		<value>0.2</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Asobo Savage Cub.*</model>
-		<value>0.7</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>Asobo Savage Cub.*</model>
@@ -10196,13 +9857,6 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
-	<models>
-		<name>aileron_gain</name>
-		<model>Beechcraft King Air.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>Beechcraft King Air.*</model>
@@ -10359,20 +10013,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Blackbird Simulations DHC-2.*</model>
-		<value>0.15</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Blackbird Simulations DHC-2.*</model>
-		<value>0.22</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>max_elevator_coeff</name>
 		<model>Blackbird Simulations DHC-2.*</model>
 		<value>0.8</value>
@@ -10385,13 +10025,6 @@
 		<value>0.68</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
-	</models>
-	<models>
-		<name>rudder_gain</name>
-		<model>Blackbird Simulations DHC-2.*</model>
-		<value>0.16</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
 	</models>
 	<models>
 		<name>max_rudder_coeff</name>
@@ -10528,13 +10161,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>rudder_gain</name>
-		<model>Carenado CT182T.*</model>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-		</models>
-	<models>
 		<name>type</name>
 		<model>Carenado CT182T.*</model>
 		<value>PropellerAircraft</value>
@@ -10542,23 +10168,9 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Cessna (172|Skyhawk).*</model>
-		<value>0.08</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>elevator_droop_moment</name>
 		<model>Cessna (172|Skyhawk).*</model>
 		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Cessna (172|Skyhawk).*</model>
-		<value>0.085</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -10606,13 +10218,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>rudder_gain</name>
-		<model>Cessna (172|Skyhawk).*</model>
-		<value>0.15</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
 		<name>type</name>
 		<model>Cessna (172|Skyhawk).*</model>
 		<value>PropellerAircraft</value>
@@ -10620,23 +10225,9 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Cessna 152.*</model>
-		<value>0.13</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>elevator_droop_moment</name>
 		<model>Cessna 152.*</model>
 		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Cessna 152.*</model>
-		<value>0.2</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -10677,33 +10268,12 @@
 		<device>joystick</device>
 	</models>
 	<models>
-		<name>rudder_gain</name>
-		<model>Cessna 152.*</model>
-		<value>0.09</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
 		<name>type</name>
 		<model>Cessna 152.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
-	<models>
-		<name>aileron_gain</name>
-		<model>Cessna( 208B)? Grand Caravan.*</model>
-		<value>0.03</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Cessna( 208B)? Grand Caravan.*</model>
-		<value>0.06</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<model>Cessna( 208B)? Grand Caravan.*</model>
@@ -10748,13 +10318,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>rudder_gain</name>
-		<model>Cessna( 208B)? Grand Caravan.*</model>
-		<value>0.04</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
 		<name>type</name>
 		<model>Cessna( 208B)? Grand Caravan.*</model>
 		<value>TurbopropAircraft</value>
@@ -10776,23 +10339,9 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>DA40 TDI.*</model>
-		<value>0.045</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>buffeting_intensity</name>
 		<model>DA40 TDI.*</model>
 		<value>0.5</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>DA40 TDI.*</model>
-		<value>0.08</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -10819,13 +10368,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>rudder_gain</name>
-		<model>DA40 TDI.*</model>
-		<value>0.09</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
 		<name>type</name>
 		<model>DA40 TDI.*</model>
 		<value>PropellerAircraft</value>
@@ -10833,23 +10375,9 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>DA40-NG.*</model>
-		<value>0.045</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>buffeting_intensity</name>
 		<model>DA40-NG.*</model>
 		<value>0.5</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>DA40-NG.*</model>
-		<value>0.08</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -10874,13 +10402,6 @@
 		<unit>ft</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>rudder_gain</name>
-		<model>DA40-NG.*</model>
-		<value>0.09</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -11114,20 +10635,6 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>DR400.*</model>
-		<value>0.11</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>DR400.*</model>
-		<value>0.18</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>DR400.*</model>
 		<value>0.1</value>
@@ -11216,13 +10723,6 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>elevator_gain</name>
-		<model>Extra 330.*</model>
-		<value>0.22</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>Extra 330.*</model>
 		<value>0.3</value>
@@ -11257,13 +10757,6 @@
 		<unit>ft</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>rudder_gain</name>
-		<model>Extra 330.*</model>
-		<value>0.185</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -11479,13 +10972,6 @@
 		<device>pedals</device>
 	</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Fox2 P42.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<model>Fox2 P42.*</model>
 		<value>0.0</value>
@@ -11592,23 +11078,9 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Mudry Cap 10 C.*</model>
-		<value>0.16</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>ap_following</name>
 		<model>Mudry Cap 10 C.*</model>
 		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Mudry Cap 10 C.*</model>
-		<value>0.18</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -11647,13 +11119,6 @@
 		<unit>ft</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>rudder_gain</name>
-		<model>Mudry Cap 10 C.*</model>
-		<value>0.18</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -11776,13 +11241,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Pitts Asobo*</model>
-		<value>0.04</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>elevator_droop_moment</name>
 		<model>Pitts Asobo*</model>
 		<value>0.3</value>
@@ -11818,13 +11276,6 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
-	<models>
-		<name>aileron_gain</name>
-		<model>Pitts Special S1.*</model>
-		<value>0.04</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
 	<models>
 		<name>elevator_droop_moment</name>
 		<model>Pitts Special S1.*</model>
@@ -11979,20 +11430,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>TBM 930.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>TBM 930.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>engine_rumble_lowrpm_intensity</name>
 		<model>TBM 930.*</model>
 		<value>0.042</value>
@@ -12029,25 +11466,11 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>rudder_gain</name>
-		<model>TBM 930.*</model>
-		<value>0.03</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
 		<name>type</name>
 		<model>TBM 930.*</model>
 		<value>TurbopropAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>aileron_gain</name>
-		<model>Vertigo.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -12057,23 +11480,9 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aileron_gain</name>
-		<model>Wilga.*</model>
-		<value>0.06</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>elevator_droop_moment</name>
 		<model>Wilga.*</model>
 		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_gain</name>
-		<model>Wilga.*</model>
-		<value>0.12</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -12119,13 +11528,6 @@
 		<unit>m</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>rudder_gain</name>
-		<model>Wilga.*</model>
-		<value>0.185</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
 	</models>
 	<models>
 		<name>type</name>
