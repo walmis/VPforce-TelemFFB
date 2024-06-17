@@ -175,6 +175,7 @@ class Aircraft(AircraftBase):
             self._override_pedal_spring(telem_data)
         if self.is_collective():
             self._override_collective_spring(telem_data)
+        self._update_tailhook_effect(telem_data)
         self._update_touchdown_effect(telem_data)
         self._update_stick_shaker(telem_data)
         self.override_spring()

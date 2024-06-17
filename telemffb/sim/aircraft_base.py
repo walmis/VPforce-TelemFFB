@@ -158,6 +158,9 @@ class AircraftBase(object):
     spoiler_motion_effect_enabled: bool = False
     spoiler_buffet_effect_enabled: bool = False
 
+    tailhook_motion_effect_enabled: bool = False
+    tailhook_motion_intensity: float = 0.12
+
     weapon_release_effect_enabled: bool = False
     weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
     weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
@@ -824,6 +827,34 @@ class AircraftBase(object):
             effects.dispose("spoilerbuffet1-2")
             effects.dispose("spoilerbuffet2-1")
             effects.dispose("spoilerbuffet2-2")
+
+    def _update_tailhook_effect(self, telem_data):
+        """
+        Tailhook motion effect:
+            Checks for presense of Tailhook telemetery and type of device.  If effect disabled or intensty set to 0,
+            ensure effect is stopped and abort.
+            Check for change in telemetry over past 'delta_ms' miliseconds.  Delta insures effect doesent flap on
+            some aircraft with slow telemetry updates.
+            When telemetry stops, check if hook is fully deployed or stored and play a short bump. Then stop the effect
+        """
+        hook = telem_data.get('TailHook', None)
+        if hook is None: return
+        if not self.is_joystick(): return
+
+        if not self.tailhook_motion_effect_enabled or not self.tailhook_motion_intensity:
+            effects.dispose('tailhook')
+            return
+
+        if self.anything_has_changed("tailhook_value", hook, delta_ms=200):
+            logging.debug(f"Hook Pos: {hook}")
+            effects["hookmovement"].periodic(180, self.speedbrake_motion_intensity, 0, EFFECT_SAWTOOTHUP).start()
+        else:
+            # play short bump when hook stowed or deployed, change direction based on state.  Only play if movement effect still playing
+            if (hook == 0 or hook ==1) and effects['hookmovement'].started:
+                dir = (1-hook) * 180
+                effects['gearclunk'].periodic(10, utils.clamp((self.gear_motion_intensity * 2), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
+            # stop the effect
+            effects.dispose("hookmovement")
 
     def _update_wind_effect(self, telem_data):
         if not self.is_joystick(): return

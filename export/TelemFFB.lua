@@ -1133,6 +1133,18 @@ local f_telemFFB = {
             local ar = (lr + rr) / 2
             mech["controlsurfaces"]["rudder"]["right"] = ar
 
+            local launch_bar = LoGetAircraftDrawArgumentValue(85)
+            local tail_hook = LoGetAircraftDrawArgumentValue(25)
+            local wing_fold = LoGetAircraftDrawArgumentValue(8)
+            local fuel_boom = LoGetAircraftDrawArgumentValue(22)
+
+            stringToSend = string.format(
+                            "LaunchBar=%.2f;TailHook=%.2f;WingFold=%.2f;FuelBoom=%.2f",
+                            launch_bar,
+                            tail_hook,
+                            wind_direction,
+                            fuel_boom
+                            )
 
           elseif string.find(obj.Name, "F-16", 0, true) then
              damage_vars = {
