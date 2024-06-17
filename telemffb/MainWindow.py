@@ -372,17 +372,14 @@ class MainWindow(QMainWindow):
         sim_status_area.setLayout(status_layout)
 
         rh_status_layout.addWidget(sim_status_area)
-        self.notification_label = QLabel('')
-        # self.notification_label.setMaximumWidth(200)
-        self.notification_label.setWordWrap(True)
-        self.notification_label.hide()
-        self.notification_label.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; color: red;}")
-        rh_status_layout.addWidget(self.notification_label)
 
         rh_status_layout.setAlignment(Qt.AlignRight)
 
         ############
         # current craft
+        self.craft_container = QWidget()
+        self.craft_layout = QVBoxLayout(self.craft_container)
+        self.craft_layout.setAlignment(Qt.AlignLeft)
 
         cur_ac_lbl = QLabel()
         cur_ac_lbl.setText("<b>Current Aircraft:</b>")
@@ -399,15 +396,22 @@ class MainWindow(QMainWindow):
         self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Courier New; }")
         self.cur_pattern.setAlignment(Qt.AlignLeft)
 
-        rh_status_layout.addWidget(cur_ac_lbl)
-        rh_status_layout.addWidget(self.cur_craft)
-        rh_status_layout.addWidget(self.cur_pattern)
-
+        self.craft_layout.addWidget(cur_ac_lbl)
+        self.craft_layout.addWidget(self.cur_craft)
+        self.craft_layout.addWidget(self.cur_pattern)
+        rh_status_layout.addWidget(self.craft_container)
         rh_status_area.setLayout(rh_status_layout)
 
         logo_status_layout.addWidget(rh_status_area)
 
         layout.addLayout(logo_status_layout)
+
+        self.notification_label = QLabel('')
+        self.notification_label.setWordWrap(True)
+        self.notification_label.hide()
+        self.notification_label.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; color: red;}")
+
+        rh_status_layout.addWidget(self.notification_label)
 
         ##################
         #  new craft button
@@ -1228,17 +1232,26 @@ class MainWindow(QMainWindow):
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
                 utils.dbprint('blue', f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
                 self.notification_label.setText(message)
+                # Replace the "current aircraft" label with the message
+                container_height = self.craft_container.height()
+                self.notification_label.setFixedHeight(container_height)
+                self.craft_container.hide()
                 self.notification_label.show()
                 self.pop_tray_notification("Error", message, renew_period= 2)
-                ic.error_message = message
+
+                ic.error_message = message  # set message for instance icon tooltip
+
             elif paused:
                 self.tray_icon.setIcon(QIcon('./image/vpforceicon_paused.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Paused ")
+
             elif not paused:
                 self.tray_icon.setIcon(QIcon('./image/vpforceicon_run.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Running ")
+                # re-show the "current aircraft" label once error cleared
                 self.notification_label.setText('')
                 self.notification_label.hide()
+                self.craft_container.show()
 
         ic.error = error
         ic.paused = paused
