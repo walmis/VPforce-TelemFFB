@@ -375,12 +375,10 @@ class Aircraft(AircraftBase):
         # Since override_spring overtakes DCS spring already, both the TR damper and trim workaround features are not
         # needed and would conflict with the override of the spring effect
         if self.dcs_tr_damper_enabled:
-            logging.error('Override DCS Spring is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
-            self.telem_data['error'] = 1
+            self.flag_error('Override DCS Spring is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
             return
         if self.trim_workaround:
-            logging.error('Override DCS Spring is not compatible with the Trim Workaround feature.  Please disable one or the other.')
-            self.telem_data['error'] = 1
+            self.flag_error('Override DCS Spring is not compatible with the Trim Workaround feature.  Please disable one or the other.')
             return
 
         spring = effects['dcs_spr_override'].spring()

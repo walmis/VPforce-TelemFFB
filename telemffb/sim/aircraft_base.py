@@ -7,6 +7,7 @@ from typing import List, Dict
 # from utils import clamp, HighPassFilter, Derivative, Dispenser
 
 from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition
+from telemffb.globals import master_instance
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
@@ -317,7 +318,14 @@ class AircraftBase(object):
             return True
 
         return False
-    
+
+    def flag_error(self, message):
+        dev = self.telem_data.get('FFBType', 'joystick').capitalize()
+        self.telem_data['error'] = message
+        logging.error(message)
+        if not master_instance:
+            self._ipc_telem['error'] = f"{dev}: {message}"
+
     def is_joystick(self):
         return self._telem_data.get("FFBType", "joystick") == "joystick"
     
@@ -846,8 +854,7 @@ class AircraftBase(object):
         hydraulic_pressure = telem_data.get('HydPress', 1)
 
         if not self.enable_damper_ovd or not self.enable_inertia_ovd or not self.enable_friction_ovd:
-            logging.warning("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
-            self.telem_data["error"] = 1
+            self.flag_error("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
             return False
 
         if hydraulic_sys == 'n/a':
@@ -1311,9 +1318,7 @@ class AircraftBase(object):
             #     vne = ac_perf['Vne']
 
             if vs > vne:
-                #log error if vs speed is configured greater than vne speed and exit
-                logging.error(f"Dynamic pedal forces error: Vs speed ({vs}) is configured with a larger value than Vne ({vne}) - Invalid configuration")
-                telem_data['error'] = 1
+                self.flag_error(f"Dynamic pedal forces error: Vs speed ({vs}) is configured with a larger value than Vne ({vne}) - Invalid configuration")
 
             vs_coeff = utils.clamp(round(self.aircraft_vs_gain*4096), 0, 4096)
             vne_coeff = utils.clamp(round(self.aircraft_vne_gain*4096), 0, 4096)

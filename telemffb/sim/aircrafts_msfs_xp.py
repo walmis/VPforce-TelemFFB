@@ -1129,8 +1129,7 @@ class GliderAircraft(Aircraft):
         if ffb_type != "joystick":
             return
         if self.force_trim_button == 0:
-            logging.warning("Force trim enabled but buttons not configured")
-            telem_data['error'] = 1
+            self.flag_error("Force trim enabled but buttons not configured")
             return
 
         self._spring_handle.name = "dynamic_spring"
@@ -1352,8 +1351,7 @@ class Helicopter(Aircraft):
             if self.force_trim_enabled:
 
                 if self.force_trim_button == 0:
-                    logging.warning("Force trim enabled but buttons not configured")
-                    telem_data['error'] = 1
+                    self.flag_error("Force trim enabled but buttons not configured")
                     return
                 input_data = HapticEffect.device.get_input()
 
@@ -1657,8 +1655,6 @@ class Helicopter(Aircraft):
         if telem_data.get("FFBType") != 'collective':
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
-            # logging.error(
-            #     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
             return
         self._spring_handle.name = "collective_ap_spring"
         # self.damper = effects["collective_damper"].damper()
@@ -1863,9 +1859,8 @@ class HPGHelicopter(Helicopter):
 
         if ffb_type == "joystick":
             if not self.telemffb_controls_axes and not self.local_disable_axis_control:
-                logging.error(
+                self.flag_error(
                     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
-                telem_data['error'] = 1
                 return
             sema_x = telem_data.get("hpgSEMAx", 0)
             sema_y = telem_data.get("hpgSEMAy", 0)
@@ -2084,8 +2079,7 @@ class HPGHelicopter(Helicopter):
         if telem_data.get("FFBType") != 'collective':
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
-            logging.error("Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
-            telem_data['error'] = 1
+            self.flag_error("Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
             return
         self._spring_handle.name = "collective_ap_spring"
         # self.damper = effects["collective_damper"].damper()
