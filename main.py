@@ -445,7 +445,7 @@ def main():
     if not G.system_settings.get("pidJoystick", None):
         G.main_window.open_system_settings_dialog()
 
-    G.telem_manager.telemetryTimeout.connect(lambda state: G.main_window.update_sim_indicators(G.telem_manager.getTelemValue("src"), state))
+    # G.telem_manager.telemetryTimeout.connect(lambda state: G.main_window.update_sim_indicators(G.telem_manager.getTelemValue("src"), state))
 
     # do some init in the background not blocking the main window first appearance
     @utils.threaded()

@@ -440,6 +440,8 @@ class SimStatusLabel(QWidget):
         self._active_state = False
         self._enabled_state = False
 
+        self.error_message = None
+
         self.lbl = QLabel(name)
         # font = QFont("xxxxxx", weight=QFont.Bold)
         #
@@ -461,7 +463,7 @@ class SimStatusLabel(QWidget):
         self.disabled_pixmap = self.create_status_icon(disable_color, self.icon_size, icon_type="x")
         self.active_pixmap = self.create_status_icon(active_color, self.icon_size, icon_type="colored")
         self.paused_pixmap = self.create_status_icon(paused_color, self.icon_size, icon_type="paused")
-        self.error_pixmap = self.create_status_icon(error_color, self.icon_size, icon_type="x")
+        self.error_pixmap = self.create_status_icon(error_color, self.icon_size, icon_type="exclamation")
 
         v_layout = QVBoxLayout()
         v_layout.setAlignment(Qt.AlignLeft)
@@ -498,6 +500,7 @@ class SimStatusLabel(QWidget):
     @active.setter
     def active(self, value):
         if self._active_state != value:
+            self.error_message = None
             self._active_state = value
             self.update()
 
@@ -514,7 +517,8 @@ class SimStatusLabel(QWidget):
     def update(self):
         if self._error_state:
             self.pix.setPixmap(self.error_pixmap)
-            self.setToolTip("Error condition: check log")
+            msg = self.error_message if self.error_message is not None else 'check log'
+            self.setToolTip(f"Error condition: {msg}")
         elif self._paused_state:
             self.pix.setPixmap(self.paused_pixmap)
             self.setToolTip("Telemetry stopped or sim is paused")
@@ -617,6 +621,22 @@ class SimStatusLabel(QWidget):
             painter.setPen(QPen(Qt.white, line_width))
             painter.drawLine(line1_start, line1_end)
             painter.drawLine(line2_start, line2_end)
+
+        elif icon_type == "exclamation":
+
+            # Draw an exclamation mark for the exclamation icon
+            line_length = int(size.height() * 0.4)  # Adjusted to ensure the dot is distinct and separate
+            line_width = int(size.width() * 0.15)
+            dot_radius = int(size.width() * 0.08)  # Adjusted for a smaller dot
+            line_x = int(size.width() / 2)
+            line_y1 = int((size.height() - line_length - dot_radius * 2) / 2)
+            line_y2 = line_y1 + line_length
+
+            # Draw the white exclamation mark
+            painter.setPen(QPen(Qt.white, line_width))
+            painter.drawLine(line_x, line_y1, line_x, line_y2)
+            painter.setBrush(QBrush(Qt.white))
+            painter.drawEllipse(QPointF(line_x, line_y2 + dot_radius + 4), dot_radius, dot_radius)  # Move the dot down
 
         painter.end()
 

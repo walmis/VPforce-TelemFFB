@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import traceback
 import winreg
 from collections import OrderedDict
@@ -42,6 +43,12 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+
+        self.tray_icon = QSystemTrayIcon(self)
+        self.tray_notifications = {}
+
+        self.error_state = False # True='error' key found in telem_data, False=clean telem_data
+        self.timed_out = True
 
         self.show_simvars = False
 
@@ -639,7 +646,7 @@ class MainWindow(QMainWindow):
         G.gain_override_dialog = ConfiguratorDialog(self) # create configurator gain dialog for use during TelemFFB session and store object in globals
 
     def add_system_tray(self):
-        self.tray_icon = QSystemTrayIcon(QIcon(":/image/vpforceicon.png"), self)
+        self.tray_icon.setIcon(QIcon(":/image/vpforceicon.png"))
         self.tray_icon.setToolTip("VPforce TelemFFB")
 
         # Create the tray menu
@@ -1181,14 +1188,46 @@ class MainWindow(QMainWindow):
         if self.perform_update(auto=False):
             QCoreApplication.instance().quit()
 
+    def pop_tray_notification(self, title, message, renew_period):
+            current_time = time.time()
+            notification_key = (title, message)
 
-    def update_sim_indicators(self, source, paused=False, error=False):
+            # Check if the notification was shown within the specified period
+            if notification_key in self.tray_notifications:
+                last_shown_time = self.tray_notifications[notification_key]
+                if current_time - last_shown_time < renew_period:
+                    # Notification was shown recently, do not show again
+                    return
+            # Show the notification
+            icon = QIcon(":/image/vpforceicon.png")
+            self.tray_icon.showMessage(title, message, icon)
+            # Update the last shown time
+            self.tray_notifications[notification_key] = current_time
+
+    def update_sim_indicators(self, source, paused=False, error=False, message=None):
         """Runs on every telemetry frame
         """
         if source is None:
             return
 
         ic = self.label_icons[source]
+
+        if G.master_instance:
+            if error:
+                # error is true and was previously false.  Set sys tray attributes and pop notification
+
+                self.tray_icon.setIcon(QIcon('./image/vpforceicon_error.png'))
+                self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
+                utils.dbprint('blue', f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
+                self.pop_tray_notification("Error", message, renew_period= 2)
+                ic.error_message = message
+            elif paused:
+                self.tray_icon.setIcon(QIcon('./image/vpforceicon_paused.png'))
+                self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Paused ")
+            elif not paused:
+                self.tray_icon.setIcon(QIcon('./image/vpforceicon_run.png'))
+                self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Running ")
+
         ic.error = error
         ic.paused = paused
         ic.active = True
@@ -1262,7 +1301,12 @@ class MainWindow(QMainWindow):
         return QColor(r, g, b, a)
     
     def on_telemetry_timeout(self):
+        # self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
         self.lbl_effects_data.setText("")
+        if not self.error_state:
+            # Only set icon to pause if error condition is not present when pausing
+            self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
+        self.timed_out = True
 
     def on_update_telemetry(self, datadict: dict):
 
@@ -1379,11 +1423,18 @@ class MainWindow(QMainWindow):
                     my_slider.blockSignals(False)
 
             is_paused = max(data.get('SimPaused', 0), data.get('Parked', 0))
-            error_cond = data.get('error', 0)
-            if error_cond:
-                self.update_sim_indicators(data.get('src'), error=True)
-            else:
-                self.update_sim_indicators(data.get('src'), paused=is_paused)
+            error_cond = data.get('error', None)
+
+            if error_cond is None:
+                if self.timed_out or self.error_state:
+                    self.update_sim_indicators(data.get('src'), paused=is_paused)
+                    self.error_state = False
+                    self.timed_out = False
+            elif error_cond is not None and not self.error_state:
+                self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
+                logging.error(error_cond)
+                self.error_state = True
+
 
             shown_pattern = G.settings_mgr.current_pattern
             if G.settings_mgr.current_pattern == '' and data.get('N', '') != '':

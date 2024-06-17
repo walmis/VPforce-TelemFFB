@@ -217,8 +217,8 @@ class TelemManager(QObject, threading.Thread):
             self._ipc_telem_data = G.ipc_instance._ipc_telem
             if self._ipc_telem_data != {}:
                 telem_data.update(self._ipc_telem_data)
-                self._ipc_telem_data = {}
-        # print(items)
+                self._ipc_telem_data.clear()
+
         aircraft_name = telem_data.get("N")
         data_source = telem_data.get("src", None)
         if data_source == "MSFS":

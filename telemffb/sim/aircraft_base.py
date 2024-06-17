@@ -325,7 +325,6 @@ class AircraftBase(object):
     def flag_error(self, message):
         dev = self.telem_data.get('FFBType', 'joystick').capitalize()
         self.telem_data['error'] = message
-        logging.error(message)
         if not master_instance:
             self._ipc_telem['error'] = f"{dev}: {message}"
 
