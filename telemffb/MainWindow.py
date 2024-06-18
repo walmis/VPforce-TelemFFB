@@ -1228,7 +1228,7 @@ class MainWindow(QMainWindow):
             if error:
                 # error is true and was previously false.  Set sys tray attributes and pop notification
 
-                self.tray_icon.setIcon(QIcon('./image/vpforceicon_error.png'))
+                self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
                 utils.dbprint('blue', f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
                 self.notification_label.setText(message)
@@ -1242,11 +1242,11 @@ class MainWindow(QMainWindow):
                 ic.error_message = message  # set message for instance icon tooltip
 
             elif paused:
-                self.tray_icon.setIcon(QIcon('./image/vpforceicon_paused.png'))
+                self.tray_icon.setIcon(QIcon(':/image/vpforceicon_paused.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Paused ")
 
             elif not paused:
-                self.tray_icon.setIcon(QIcon('./image/vpforceicon_run.png'))
+                self.tray_icon.setIcon(QIcon(':/image/vpforceicon_run.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Running ")
                 # re-show the "current aircraft" label once error cleared
                 self.notification_label.setText('')

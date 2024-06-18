@@ -11,6 +11,9 @@
         <file>image/rchecked.png</file>
         <file>image/vpforceicon.ico</file>
         <file>image/vpforceicon.png</file>
+        <file>image/vpforceicon_error.png</file>
+        <file>image/vpforceicon_run.png</file>
+        <file>image/vpforceicon_paused.png</file>
         <file>image/vpforcelogo.png</file>
         <file>image/expo.png</file>
         <file>image/gain-force.png</file>
