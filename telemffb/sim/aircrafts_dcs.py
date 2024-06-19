@@ -141,7 +141,7 @@ class Aircraft(AircraftBase):
         except:
             pass
 
-        if not self.damage_enable_cmd_sent:
+        if not self.damage_enable_cmd_sent and self.damage_effect_enabled:
             self.send_commands([f"enableGetDamage({int(self.damage_effect_enabled)})"])
             logging.info(f"Sending <enableGetDamage({int(self.damage_effect_enabled)}) to DCS")
             self.damage_enable_cmd_sent = 1
