@@ -633,6 +633,16 @@ local f_telemFFB = {
             )
 
           elseif string.find(obj.Name, "OH58", 0, true) then
+            damage_vars = {
+              147,148,149,150,151,152,155,156,158,159,160,166,169,170,215,225,245
+            }
+            local hyd_state = MainPanel:get_argument_value(162) -- hydraulics switch
+            if hyd_state == 0 then
+              -- switch turned off
+              hydraulicPressure = "false"
+            else
+              hydraulicPressure = "true"
+            end
             local mainRotorRPM = get_param_handle("BASE_SENSOR_PROPELLER_RPM"):get()
             stringToSend =
               string.format(
