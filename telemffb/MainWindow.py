@@ -211,7 +211,7 @@ class MainWindow(QMainWindow):
         utilities_menu.addAction(self.reset_user_config_action)
 
         self.vpconf_action = QAction("Launch VPforce Configurator", self)
-        self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf(HapticEffect.device.serial))
+        self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf())
         utilities_menu.addAction(self.vpconf_action)
 
         # Add settings converter
