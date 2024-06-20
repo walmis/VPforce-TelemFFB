@@ -46,6 +46,7 @@ class MainWindow(QMainWindow):
 
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_notifications = {}
+        self.new_craft_notification_sent = False
 
         self.error_state = False # True='error' key found in telem_data, False=clean telem_data
         self.error_clean_counter = 0 # counter to use as hysteresis for clearing error condition - not always 'error' from child instance on every loop
@@ -752,11 +753,10 @@ class MainWindow(QMainWindow):
         if self.isHidden():
             #  don't show, send message to tray icon that will pop to notify user that TelemFFB is running in Tray
             icon = QIcon(":/image/vpforceicon.png")
-            G.main_window.tray_icon.showMessage(
+            self.pop_tray_notification(
                 None,
                 "TelemFFB is running in the system tray.  Double-Click the VPforce Icon to show or right click to set options in the context menu",
-                icon,
-                msecs=1000  # Duration in milliseconds
+                5
             )
 
     def toggle_start_with_windows(self, set_enabled=None):
@@ -1073,12 +1073,10 @@ class MainWindow(QMainWindow):
             if G.system_settings.get('closeToTray', False):
                 self.hide()
                 event.ignore()
-                icon = QIcon(":/image/vpforceicon.png")
-                self.tray_icon.showMessage(
+                self.pop_tray_notification(
                     None,
                     "TelemFFB is running in the system tray.  Double-Click the VPforce Icon to re-show or right click to set options in the context menu",
-                    icon,
-                    msecs=1000  # Duration in milliseconds
+                    5
                 )
             else:
                 exit_application()
@@ -1215,6 +1213,8 @@ class MainWindow(QMainWindow):
             self.tray_icon.showMessage(title, message, icon)
             # Update the last shown time
             self.tray_notifications[notification_key] = current_time
+            self.tray_icon.messageClicked.connect(self.show)
+
 
     def update_sim_indicators(self, source, paused=False, error=False, message=None):
         """Runs on every telemetry frame
@@ -1470,10 +1470,21 @@ class MainWindow(QMainWindow):
 
             shown_pattern = G.settings_mgr.current_pattern
             if G.settings_mgr.current_pattern == '' and data.get('N', '') != '':
-                shown_pattern = 'Using defaults'
-                self.new_craft_button.show()
+                if not self.new_craft_notification_sent:
+                    shown_pattern = 'Using defaults'
+                    self.new_craft_button.show()
+                    if G.master_instance:
+                        self.pop_tray_notification(
+                            "** New Aircraft Found **",
+                            f"No profile was found for the aircraft\n{data.get('N')}\n\nClick to open TelemFFB.",
+                            10,
+                        )
+                        self.new_craft_notification_sent = True
+
+
             else:
                 self.new_craft_button.hide()
+                self.new_craft_notification_sent = False
 
             self.cur_craft.setText(data['N'])
             self.cur_pattern.setText(f'Matched: <span style="font-family: Consolas, monospace;font-size: 14px">"{shown_pattern}"</span> ')
