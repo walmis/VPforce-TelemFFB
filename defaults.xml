@@ -2470,6 +2470,30 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>595</order>
+		<name>fuelboom_motion_effect_enabled</name>
+		<info>Effect while fuel boom/door  is deploying/retracting</info>
+		<displayname>Fuel Boom/Door Motion</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>595.1</order>
+		<name>fuelboom_motion_intensity</name>
+		<prereq>fuelboom_motion_effect_enabled</prereq>
+		<info>Effect while fuel boom/door  is deploying/retracting</info>
+		<displayname>Fuel Boom/Door Motion</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.12</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>Buffeting</Grouping>
 		<order>600</order>
 		<name>gear_buffet_effect_enabled</name>
@@ -2872,6 +2896,32 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>695</order>
+		<name>tailhook_motion_effect_enabled</name>
+		<info>Effect while tailhook is deploying/retracting</info>
+		<displayname>Tailhook Motion</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>695.1</order>
+		<name>tailhook_motion_intensity</name>
+		<prereq>tailhook_motion_effect_enabled</prereq>
+		<info>Effect while tailhook is deploying/retracting</info>
+		<displayname>Tailhook Motion</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.12</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
 		<order>700</order>
 		<name>uncoordinated_turn_effect_enabled</name>
@@ -2894,6 +2944,30 @@
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>705</order>
+		<name>wingfold_motion_effect_enabled</name>
+		<info>Effect while wing-fold  is deploying/retracting</info>
+		<displayname>Wing Fold Motion</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Movement</Grouping>
+		<order>705.1</order>
+		<name>wingfold_motion_intensity</name>
+		<prereq>wingfold_motion_effect_enabled</prereq>
+		<info>Effect while wing-fold  is deploying/retracting</info>
+		<displayname>Wing Fold Motion</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.10</value>
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
@@ -4874,6 +4948,13 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
+		<name>fuelboom_motion_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
 		<name>gear_buffet_effect_enabled</name>
 		<type>AllSettings</type>
 		<value>true</value>
@@ -6736,6 +6817,13 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
+		<name>tailhook_motion_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
 		<name>telemffb_controls_axes</name>
 		<type>AllSettings</type>
 		<value>true</value>
@@ -7193,6 +7281,13 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
+	<classdefaults>
+		<name>wingfold_motion_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
 	<classdefaults>
 		<name>wind_effect_enabled</name>
 		<type>AllSettings</type>

@@ -439,7 +439,7 @@ local f_telemFFB = {
               MainPanel:get_argument_value(282)
               )
 
-            -- Mi-8MTV2  sends to SimShaker
+            -- Mi-8MTV2  sends to TelemFFB
             stringToSend =
               string.format(
               "RotorRPM=%.0f;PanShake=%s",
@@ -478,7 +478,7 @@ local f_telemFFB = {
             local rightDoor = MainPanel:get_argument_value(422)
             --local doors = string.format("%.2f~%.2f", MainPanel:get_argument_value(420), MainPanel:get_argument_value(422))
             local deadPilot = MainPanel:get_argument_value(248)
-            -- UH-1H  sends to SimShaker
+            -- UH-1H  sends to TelemFFB
             local LeftGear = LoGetAircraftDrawArgumentValue(104)
             local NoseGear = LoGetAircraftDrawArgumentValue(104)
             local RightGear = LoGetAircraftDrawArgumentValue(104)
@@ -589,7 +589,7 @@ local f_telemFFB = {
             local APUoilP = MainPanel:get_argument_value(168)
             local APUvalve = MainPanel:get_argument_value(162)
             local APU = string.format("%.1f~%.1f", APUvalve, APUoilP)
-            -- Ka-50  sends to SimShaker
+            -- Ka-50  sends to TelemFFB
             stringToSend =
               string.format(
               "RotorRPM=%.0f;APU=%s",
@@ -677,7 +677,7 @@ local f_telemFFB = {
 
             local StatusString =
               RAltimeterOnOff .. "~" .. RAltimeterFlagPanne .. "~" .. RAltimeterFlagMA .. "~" .. RAltimeterTest
-            -- Gazelle  sends to SimShaker
+            -- Gazelle  sends to TelemFFB
             stringToSend =
               string.format(
               "RotorRPM=%.0f;RadarAltimeterMeter=%.2f;RAltimeterStatus=%s",
@@ -732,7 +732,7 @@ local f_telemFFB = {
             )
             local LandingGearGreenLight = MainPanel:get_argument_value(80)
             local WEPwire = MainPanel:get_argument_value(190)
-            -- P-51D sends to SimShaker
+            -- P-51D sends to TelemFFB
             stringToSend =
               string.format(
               "PanShake=%s;GreenLight=%.1f;MP-WEP=%.2f~%.2f;ActualRPM=%s",
@@ -764,7 +764,7 @@ local f_telemFFB = {
               MainPanel:get_argument_value(206)
             )
             local MW = MainPanel:get_argument_value(106)
-            -- FW-190D9 sends to SimShaker
+            -- FW-190D9 sends to TelemFFB
             stringToSend =
               string.format(
               "PanShake=%s;MP-MW=%.2f~%.2f;ActualRPM=%s",
@@ -794,7 +794,7 @@ local f_telemFFB = {
               MainPanel:get_argument_value(206)
             )
             local MW = MainPanel:get_argument_value(106)
-            -- FW-190D9 sends to SimShaker
+            -- FW-190D9 sends to TelemFFB
             stringToSend =
               string.format(
               "PanShake=%s;MP-MW=%.2f~%.2f;ActualRPM=%s",
@@ -823,7 +823,7 @@ local f_telemFFB = {
               MainPanel:get_argument_value(1489)
             )
             local MW = MainPanel:get_argument_value(1)
-            -- Bf-109K-4 sends to SimShaker
+            -- Bf-109K-4 sends to TelemFFB
             stringToSend =
               string.format(
               "PanelShake=%s;MP-MW=%.2f~%.2f;ActualRPM=%s",
@@ -853,7 +853,7 @@ local f_telemFFB = {
               MainPanel:get_argument_value(143),
               MainPanel:get_argument_value(142)
             )
-            -- SPITFIRE sends to SimShaker
+            -- SPITFIRE sends to TelemFFB
             stringToSend =
               string.format(
               "PanShake=%s;ActualRPM=%s",
@@ -921,7 +921,8 @@ local f_telemFFB = {
             local FlapsPos = MainPanel:get_argument_value(653)
             local Canopy = MainPanel:get_argument_value(7)
             local APU = MainPanel:get_argument_value(13)
-            -- A-10C  sends to SimShaker
+            local fuel_boom = LoGetAircraftDrawArgumentValue(22)
+            -- A-10C  sends to TelemFFB
             damage_vars = {
               65,81,134,135,136,144,146,147,148,150,153,154,161,167,213,214,215,216,217,219,223,224,225,226,227,229,
               233,235,237,239,241,244,247,248,249,266,267
@@ -932,17 +933,19 @@ local f_telemFFB = {
 
             stringToSend =
               string.format(
-              "Flaps=%.2f;Canopy=%.2f;APU=%.2f",
+              "Flaps=%.2f;Canopy=%.2f;APU=%.2f;FuelBoom=%2f",
               FlapsPos,
               Canopy,
-              APU
+              APU,
+              fuel_boom
             )
             elseif obj.Name == "A-10C_2" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local FlapsPos = MainPanel:get_argument_value(653)
             local Canopy = MainPanel:get_argument_value(7)
             local APU = MainPanel:get_argument_value(13)
-            -- A-10C  sends to SimShaker
+            local fuel_boom = LoGetAircraftDrawArgumentValue(22)
+            -- A-10C  sends to TelemFFB
             damage_vars = {
               65,81,134,135,136,144,146,147,148,150,153,154,161,167,213,214,215,216,217,219,223,224,225,226,227,229,
               233,235,237,239,241,244,247,248,249,266,267
@@ -953,10 +956,11 @@ local f_telemFFB = {
 
             stringToSend =
               string.format(
-              "Flaps=%.2f;Canopy=%.2f;APU=%.2f",
+              "Flaps=%.2f;Canopy=%.2f;APU=%.2f;FuelBoom=%2f",
               FlapsPos,
               Canopy,
-              APU
+              APU,
+              fuel_boom
             )
           elseif obj.Name == "MiG-21Bis" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -976,7 +980,7 @@ local f_telemFFB = {
               236,244,245,246,249,253,254,254,255,256,256,257,257,259,260,260,261,261,264,265,266,267,268,289,290,291,
               292,296,298,299,300,301,301,302,303,304,305,306
             }
-            -- MiG-21Bis sends to SimShaker
+            -- MiG-21Bis sends to TelemFFB
             stringToSend =
               string.format(
               "Flaps=%.2f;Canopy=%.1f;SPS=%.1f",
@@ -1026,14 +1030,14 @@ local f_telemFFB = {
                 65,82,134,135,136,148,149,150,152,153,154,155,156,157,158,159,183,185,213,214,214,215,216,220,222,223,
                 224,224,225,226,230,232,238,240,244,245,246,248,271,296,298,299,300,301,302
               }
-            -- M-2000C sends to SimShaker
+            -- M-2000C sends to TelemFFB
             stringToSend =
               string.format(
               "PanShake=%s", PanelShake
             )
           elseif obj.Name == "AV8BNA" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
-            -- AV8BNA sends to SimShaker
+            -- AV8BNA sends to TelemFFB
             damage_vars = {
               65,82,134,135,136,137,144,147,148,149,150,151,153,154,155,156,157,158,159,160,161,162,166,167,168,171,
               177,183,213,214,215,216,217,218,220,221,223,224,225,226,227,228,230,231,237,239,244,245,246,248,250,
@@ -1057,6 +1061,7 @@ local f_telemFFB = {
             local hp2 = hp2_1 + hp2_2 + hp2_3
 
             hydraulicPressure = string.format("%.3f~%.3f", hp1, hp2)
+            local fuel_boom = LoGetAircraftDrawArgumentValue(22)
 
 
             -- local flt = GetDevice(28)
@@ -1067,11 +1072,12 @@ local f_telemFFB = {
 
             stringToSend =
               string.format(
-              "AileronTrim=%.3f;RudderTrim=%.3f;StickX=%.3f;StickY=%.3f;dbg_recv_cmds=%s",
+              "AileronTrim=%.3f;RudderTrim=%.3f;StickX=%.3f;StickY=%.3f;FuelBoom=%2f;dbg_recv_cmds=%s",
               AileronTrim,
               RudderTrim,
               stickX,
               stickY,
+              fuel_boom,
               self.dbg_recv_cmds
             )
 
@@ -1125,13 +1131,22 @@ local f_telemFFB = {
                 end
                 -- log.info("additionalData:"..additionalData)
               end
-
-              -- F-14 sends to SimShaker
+              local fuel_boom = LoGetAircraftDrawArgumentValue(22)
+              local tail_hook = LoGetAircraftDrawArgumentValue(1305)
+              local launch_bar = LoGetAircraftDrawArgumentValue(85)
+              local wing_l = LoGetAircraftDrawArgumentValue(404)
+              local wing_r = LoGetAircraftDrawArgumentValue(405)
+              local wing_fold = wing_l + wing_r / 2
+              -- F-14 sends to TelemFFB
               stringToSend =
                 string.format(
-                "%s;Spoilers=%s",
+                "%s;Spoilers=%s;FuelBoom=%2f;TailHook=%2f;LaunchBar=%2f;WingFold=%2f",
                 additionalData,
-                f14_DLC_Spoiler
+                f14_DLC_Spoiler,
+                fuel_boom,
+                tail_hook,
+                launch_bar,
+                wing_fold
                 )
           elseif string.find(obj.Name, "FA-18", 0, true) then
             damage_vars = {
@@ -1152,7 +1167,7 @@ local f_telemFFB = {
                             "LaunchBar=%.2f;TailHook=%.2f;WingFold=%.2f;FuelBoom=%.2f",
                             launch_bar,
                             tail_hook,
-                            wind_direction,
+                            wing_fold,
                             fuel_boom
                             )
 
@@ -1161,6 +1176,13 @@ local f_telemFFB = {
               65,135,136,137,146,148,152,152,153,154,156,157,158,160,183,185,213,214,215,216,220,223,224,225,226,230,
               237,238,239,240,241,242,243,247,298,299
             }
+            local fuel_boom = LoGetAircraftDrawArgumentValue(22)
+            local tail_hook = LoGetAircraftDrawArgumentValue(25)
+            stringToSend = string.format(
+                            "FuelBoom=%2f;TailHook=%.2f",
+                            fuel_boom,
+                            tail_hook
+                            )
           elseif string.find(obj.Name, "F-15ESE", 0, true) then
             damage_vars = {
               65,134,136,137,146,148,149,150,152,153,154,157,158,160,161,162,163,166,167,168,169,183,213,214,215,216,
@@ -1168,12 +1190,24 @@ local f_telemFFB = {
               428,428
             }
             hydraulicPressure = string.format("%.3f~%.3f", MainPanel:get_argument_value(389), MainPanel:get_argument_value(390))
+            local fuel_boom = LoGetAircraftDrawArgumentValue(22)
+            local tail_hook = LoGetAircraftDrawArgumentValue(25)
+            stringToSend = string.format(
+                            "FuelBoom=%2f;TailHook=%.2f",
+                            fuel_boom,
+                            tail_hook
+                            )
 
           elseif string.find(obj.Name, "F-5", 0, true) then
             damage_vars = {
               65,134,135,136,146,148,152,153,154,156,157,158,159,160,161,162,163,166,167,168,169,183,185,213,214,215,
               216,217,220,223,224,225,226,227,230,238,240,242,247,265,266,267,270,272,296,297,298,299
             }
+            local tail_hook = LoGetAircraftDrawArgumentValue(25)
+            stringToSend = string.format(
+                            "TailHook=%.2f",
+                            tail_hook
+                            )
           elseif string.find(obj.Name, "F-86", 0, true) then
             damage_vars = {
               65,147,148,149,150,152,153,154,156,157,158,183,185,213,214,215,216,217,223,224,225,226,227,233,234,235,
@@ -1214,10 +1248,22 @@ local f_telemFFB = {
             damage_vars = {
               3200,3201,3202,3203,3204,3205,3206,3207,3208,3209,3210,3211,3212,3213,3214,3215,3216,3217,3218,3219,3220
             }
+            local fuel_boom = LoGetAircraftDrawArgumentValue(22)
+            local tail_hook = LoGetAircraftDrawArgumentValue(2020)
+            stringToSend = string.format(
+                            "FuelBoom=%2f;TailHook=%.2f",
+                            fuel_boom,
+                            tail_hook
+                            )
           elseif string.find(obj.Name, "A-4E-C", 0, true) then
             damage_vars = {
               600,601,602,603,605,606,607,608,609,610,611,612,613,614,615
             }
+            local tail_hook = LoGetAircraftDrawArgumentValue(25)
+            stringToSend = string.format(
+                            "TailHook=%.2f",
+                            tail_hook
+                            )
 -------------------------------------------------------------------------------------------------------------------------------------------------------
           else -- FC3 Planes
             if obj.Name == "MiG-29A" or obj.Name == "MiG-29S" or obj.Name == "MiG-29G" then
@@ -1236,6 +1282,13 @@ local f_telemFFB = {
                 226,216,231,221,224,214,229,219,230,220,225,215,228,218,244,241,243,242,235,233,236,234,
                 239,237,240,238,248,247,159,156,148,152,134,136,135,135
               }
+                local fuel_boom = LoGetAircraftDrawArgumentValue(22)
+                local tail_hook = LoGetAircraftDrawArgumentValue(25)
+                stringToSend = string.format(
+                                "FuelBoom=%2f;TailHook=%.2f",
+                                fuel_boom,
+                                tail_hook
+                                )
             elseif obj.Name == "Su-25" then
               damage_vars = {
                 146,296,297,65,134,153,167,161,266,135,267,136,226,216,225,215,228,218,242,243,236,234,240,247,248,81
@@ -1256,6 +1309,13 @@ local f_telemFFB = {
                 146,296,297,65 ,298,301,249,265,154,153,167,161,169,163,267,266,168,162,183,223,213,226,216,224,214,225,
                 215,228,218,244,241,243,242,240,238,248,247,158,157,148,147,152
               }
+              local fuel_boom = LoGetAircraftDrawArgumentValue(22)
+              local tail_hook = LoGetAircraftDrawArgumentValue(25)
+              stringToSend = string.format(
+                                "FuelBoom=%2f;TailHook=%.2f",
+                                fuel_boom,
+                                tail_hook
+                                )
 
             end
 
@@ -1281,16 +1341,16 @@ local f_telemFFB = {
                       "~" .. tostring(MCP.GearFailure) .. "~" .. tostring(MCP.MFDFailure) .. "~" ..tostring(MCP.HUDFailure) ..
                       "~" .. tostring(MCP.HelmetFailure) .. "~" .. tostring(MCP.FuelTankDamage)
             log.info("TELEMFFB TREATING THIS AS AN FC3 AIRCRAFT: >" .. obj.Name .. "<")
-            -- FC3 Plane sends to SimShaker
-            stringToSend =
-              string.format(
-              "MCPState=%s;DragChute=%.2f;Flaps=%.2f;Canopy=%.2f;Wings=%.2f",
-              MCPState,
-              DragChuteState,
-              FlapsPos,
-              CanopyPos,
-              WingsPos
-            )
+            -- FC3 Plane sends to TelemFFB
+            --stringToSend =
+            --  string.format(
+            --  "MCPState=%s;DragChute=%.2f;Flaps=%.2f;Canopy=%.2f;Wings=%.2f",
+            --  MCPState,
+            --  DragChuteState,
+            --  FlapsPos,
+            --  CanopyPos,
+            --  WingsPos
+            --)
           end
 
           if calc_damage == 1 and damage_vars ~= "not supported" then

@@ -161,6 +161,12 @@ class AircraftBase(object):
     tailhook_motion_effect_enabled: bool = False
     tailhook_motion_intensity: float = 0.12
 
+    fuelboom_motion_effect_enabled: bool = False
+    fuelboom_motion_intensity: float = 0.12
+
+    wingfold_motion_effect_enabled: bool = False
+    wingfold_motion_intensity: float = 0.10
+
     weapon_release_effect_enabled: bool = False
     weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
     weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
@@ -832,7 +838,7 @@ class AircraftBase(object):
         Tailhook motion effect:
             Checks for presense of Tailhook telemetery and type of device.  If effect disabled or intensty set to 0,
             ensure effect is stopped and abort.
-            Check for change in telemetry over past 'delta_ms' miliseconds.  Delta insures effect doesent flap on
+            Check for change in telemetry over past 'delta_ms' miliseconds.  Delta insures effect doesn't flap on
             some aircraft with slow telemetry updates.
             When telemetry stops, check if hook is fully deployed or stored and play a short bump. Then stop the effect
         """
@@ -841,19 +847,78 @@ class AircraftBase(object):
         if not self.is_joystick(): return
 
         if not self.tailhook_motion_effect_enabled or not self.tailhook_motion_intensity:
-            effects.dispose('tailhook')
+            effects.dispose('hookmovement')
             return
 
         if self.anything_has_changed("tailhook_value", hook, delta_ms=200):
             logging.debug(f"Hook Pos: {hook}")
-            effects["hookmovement"].periodic(180, self.speedbrake_motion_intensity, 0, EFFECT_SAWTOOTHUP).start()
+            effects["hookmovement"].periodic(160, self.tailhook_motion_intensity, 0, EFFECT_SAWTOOTHUP).start()
         else:
             # play short bump when hook stowed or deployed, change direction based on state.  Only play if movement effect still playing
             if (hook == 0 or hook ==1) and effects['hookmovement'].started:
                 dir = (1-hook) * 180
-                effects['gearclunk'].periodic(10, utils.clamp((self.gear_motion_intensity * 2), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
+                effects['clunk'].periodic(10, utils.clamp((self.tailhook_motion_intensity * 2), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
             # stop the effect
             effects.dispose("hookmovement")
+
+    def _update_fuelboom_effect(self, telem_data):
+        """
+        Fuel Boom motion effect:
+            Checks for presense of FuelBoom telemetery and type of device.  If effect disabled or intensty set to 0,
+            ensure effect is stopped and abort.
+            Check for change in telemetry over past 'delta_ms' miliseconds.  Delta insures effect doesn't flap on
+            some aircraft with slow telemetry updates.
+            When telemetry stops, check if boom is fully deployed or stored and play a short bump. Then stop the effect
+        """
+        boom = telem_data.get('FuelBoom', None)
+        if boom is None: return
+        if not self.is_joystick(): return
+
+        if not self.fuelboom_motion_effect_enabled or not self.fuelboom_motion_intensity:
+            effects.dispose('boommovement')
+            return
+
+        if self.anything_has_changed("fuelboom_value", boom, delta_ms=200):
+            logging.debug(f"Boom Pos: {boom}")
+            effects["boommovement"].periodic(150, self.fuelboom_motion_intensity, 0, EFFECT_SAWTOOTHDOWN).start()
+        else:
+            # play short bump when boom stowed or deployed, change direction based on state.  Only play if movement effect still playing
+            if (boom == 0 or boom ==1) and effects['boommovement'].started:
+                dir = (1-boom) * 180
+                effects['clunk'].periodic(10, utils.clamp((self.fuelboom_motion_intensity * 2), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
+            # stop the effect
+            effects.dispose("boommovement")
+
+    def _update_wingfold_effect(self, telem_data):
+        """
+        Wing Fold motion effect:
+            Checks for presense of WingFold telemetery and type of device.  If effect disabled or intensty set to 0,
+            ensure effect is stopped and abort.
+            Check for change in telemetry over past 'delta_ms' miliseconds.  Delta insures effect doesn't flap on
+            some aircraft with slow telemetry updates.
+            When telemetry stops, check if wing is fully deployed or stored and play a short bump. Then stop the effect
+        """
+        wing = telem_data.get('WingFold', None)
+        if wing is None: return
+        if not self.is_joystick(): return
+        on_ground = telem_data.get('SimOnGround', 0)
+        if not self.wingfold_motion_effect_enabled or not self.wingfold_motion_intensity or not on_ground:
+            effects.dispose('wingfoldmovement_1')
+            effects.dispose('wingfoldmovement_2')
+            return
+
+        if self.anything_has_changed("wingfold_value", wing, delta_ms=200):
+            logging.debug(f"Wing Pos: {wing}")
+            effects["wingfoldmovement_1"].periodic(100, self.wingfold_motion_intensity, 45, EFFECT_SAWTOOTHDOWN).start()
+            effects["wingfoldmovement_2"].periodic(100, self.wingfold_motion_intensity, 225, EFFECT_SAWTOOTHDOWN, phase=90).start()
+        else:
+            # play short back and forth bump when wings are fully deployed or stowed  Only play if movement effect still playing
+            if (wing == 0 or wing ==1) and effects['wingfoldmovement_1'].started:
+                effects['wingfoldclunk1'].periodic(10, utils.clamp((self.wingfold_motion_intensity * 2), 0, 1), 90, effect_type=EFFECT_SQUARE,duration=100).start()
+                effects['wingfoldclunk2'].periodic(10, utils.clamp((self.wingfold_motion_intensity * 2), 0, 1), 270, effect_type=EFFECT_SQUARE,duration=250, phase=180).start()
+            # stop the effect
+            effects.dispose("wingfoldmovement_1")
+            effects.dispose("wingfoldmovement_2")
 
     def _update_wind_effect(self, telem_data):
         if not self.is_joystick(): return
