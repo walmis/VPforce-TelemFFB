@@ -211,12 +211,30 @@ class SettingsLayout(QGridLayout):
             self.build_rows(result)
 
     def clear_layout(self):
-        while self.count():
-            item = self.takeAt(0)
+        layout = self.layout()
+        if layout is not None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
+                else:
+                    sub_layout = item.layout()
+                    if sub_layout:
+                        self._clear_sub_layout(sub_layout)
+                        sub_layout.deleteLater()
+
+    def _clear_sub_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
             widget = item.widget()
             if widget:
-                self.removeWidget(widget)
                 widget.deleteLater()
+            else:
+                sub_layout = item.layout()
+                if sub_layout:
+                    self._clear_sub_layout(sub_layout)
+                    sub_layout.deleteLater()
 
     def generate_settings_row(self, item, i, rowdisabled=False):
         self.setRowMinimumHeight(i, 25)
