@@ -152,6 +152,12 @@ class NoWheelSlider(QSlider):
         """
         self.setStyleSheet(css)
 
+    def increase_single_step(self):
+        self.setValue(self.value() + self.singleStep())
+
+    def decrease_single_step(self):
+        self.setValue(self.value() - self.singleStep())
+
     def setGrooveColor(self, color):
         self.groove_color = color
         self.update_styles()
@@ -172,19 +178,7 @@ class NoWheelSlider(QSlider):
         self.clearFocus()
         super().leaveEvent(event)  # Call the default handler to ensure normal behavior
 
-    # def keyPressEvent(self, event):
-    #     if self.is_mouse_over:
-    #         super().keyPressEvent(event)
-    #     else:
-    #         super().keyPressEvent(event)
 
-
-    # def keyReleaseEvent(self, event):
-    #
-    #     if self.is_mouse_over:
-    #         self.blockSignals(False)
-    #     else:
-    #         super().keyReleaseEvent(event)
 
 
 class NoWheelNumberSlider(NoWheelSlider):

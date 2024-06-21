@@ -8,7 +8,7 @@ from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QCursor, QIcon, QColor
 from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
-                             QToolButton,QCheckBox,QComboBox,QLineEdit,QFileDialog, QSpinBox)
+                             QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
 from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, AnimatedToggle)
@@ -324,6 +324,49 @@ class SettingsLayout(QGridLayout):
         df_slider.setOrientation(QtCore.Qt.Horizontal)
         df_slider.setObjectName(f"dfsld_{item['name']}")
 
+        m_butt = QPushButton("-")
+        m_butt.setFixedSize(14, 14)
+        m_butt.setStyleSheet("""
+            QPushButton {
+                font-size: 16px;  /* Adjust the font size */
+                font-family: Cascadia Code;
+                font-weight: bold;
+                color: black;
+                padding: 0px;
+                border: none;  /* Remove any border */
+                margin: 0px;   /* Remove any margin */
+                background-color: transparent;  /* Transparent background */
+            }
+            QPushButton:hover {
+                background-color: #ddd;  /* Optional: Change background on hover */
+            }
+            QPushButton:pressed {
+                background-color: #bbb;  /* Optional: Change background on press */
+            }
+        """)
+
+        # Create the "+" button
+        p_butt = QPushButton("+")
+        p_butt.setFixedSize(14, 14)
+        p_butt.setStyleSheet("""
+            QPushButton {
+                font-size: 16px;  /* Adjust the font size */
+                font-family: Cascadia Code;
+                font-weight: bold;
+                color: black;
+                padding: 0px;
+                border: none;  /* Remove any border */
+                margin: 0px;   /* Remove any margin */
+                background-color: transparent;  /* Transparent background */
+            }
+            QPushButton:hover {
+                background-color: #ddd;  /* Optional: Change background on hover */
+            }
+            QPushButton:pressed {
+                background-color: #bbb;  /* Optional: Change background on press */
+            }
+        """)
+
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
         # unit?
@@ -387,12 +430,16 @@ class SettingsLayout(QGridLayout):
                 slider.setRange(int(validvalues[0]), int(validvalues[1]))
             slider.setValue(pctval)
             value_label.setText(str(pctval) + '%')
-            # value_label.setToolTip(f"Actual Value: %{int(val * 100)}")
+
             slider.valueChanged.connect(lambda value: self.slider_changed(write=False))  # update label on every change
             slider.delayedValueChanged.connect(lambda value: self.slider_changed(write=True))  # only write config when delay timer triggers
-            # slider.sliderPressed.connect(self.sldDisconnect)
-            # slider.sliderReleased.connect(self.sldReconnect)
-            self.addWidget(slider, i, entry_col, 1, entry_colspan)
+            sl_layout = QHBoxLayout()
+            m_butt.clicked.connect(slider.decrease_single_step)
+            p_butt.clicked.connect(slider.increase_single_step)
+            sl_layout.addWidget(m_butt)
+            sl_layout.addWidget(slider)
+            sl_layout.addWidget(p_butt)
+            self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col, alignment=Qt.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
 
@@ -423,7 +470,13 @@ class SettingsLayout(QGridLayout):
             n_slider.delayedValueChanged.connect(lambda value: self.slider_changed(write=True)) # only write config when delay timer triggers
             # n_slider.sliderPressed.connect(self.sldDisconnect)
             # n_slider.sliderReleased.connect(self.sldReconnect)
-            self.addWidget(n_slider, i, entry_col, 1, entry_colspan)
+            sl_layout = QHBoxLayout()
+            m_butt.clicked.connect(n_slider.decrease_single_step)
+            p_butt.clicked.connect(n_slider.increase_single_step)
+            sl_layout.addWidget(m_butt)
+            sl_layout.addWidget(n_slider)
+            sl_layout.addWidget(p_butt)
+            self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col, alignment=Qt.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
 
@@ -445,9 +498,13 @@ class SettingsLayout(QGridLayout):
             value_label.setText(str(d_val))
             df_slider.valueChanged.connect(lambda value: self.df_slider_changed(write=False))  # update label on every change
             df_slider.delayedValueChanged.connect(lambda value: self.df_slider_changed(write=True)) # only write config when delay timer triggers
-            # df_slider.sliderPressed.connect(self.sldDisconnect)
-            # df_slider.sliderReleased.connect(self.df_sldReconnect)
-            self.addWidget(df_slider, i, entry_col, 1, entry_colspan)
+            sl_layout = QHBoxLayout()
+            m_butt.clicked.connect(df_slider.decrease_single_step)
+            p_butt.clicked.connect(df_slider.increase_single_step)
+            sl_layout.addWidget(m_butt)
+            sl_layout.addWidget(df_slider)
+            sl_layout.addWidget(p_butt)
+            self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
             df_slider.blockSignals(False)
@@ -471,9 +528,13 @@ class SettingsLayout(QGridLayout):
             value_label.setText(str(pctval) + '%')
             slider.valueChanged.connect(lambda value: self.cfg_slider_changed(write=False))  # update label on every change
             slider.delayedValueChanged.connect(lambda value: self.cfg_slider_changed(write=True)) # only write config when delay timer triggers
-            # slider.sliderPressed.connect(self.sldDisconnect)
-            # slider.sliderReleased.connect(self.cfg_sldReconnect)
-            self.addWidget(slider, i, entry_col, 1, entry_colspan)
+            sl_layout = QHBoxLayout()
+            m_butt.clicked.connect(slider.decrease_single_step)
+            p_butt.clicked.connect(slider.increase_single_step)
+            sl_layout.addWidget(m_butt)
+            sl_layout.addWidget(slider)
+            sl_layout.addWidget(p_butt)
+            self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
 
@@ -495,9 +556,13 @@ class SettingsLayout(QGridLayout):
             value_label.setText(str(d_val))
             d_slider.valueChanged.connect(lambda value: self.d_slider_changed(write=False))  # update label on every change
             d_slider.delayedValueChanged.connect(lambda value: self.d_slider_changed(write=True)) # only write config when delay timer triggers
-            # d_slider.sliderPressed.connect(self.sldDisconnect)
-            # d_slider.sliderReleased.connect(self.d_sldReconnect)
-            self.addWidget(d_slider, i, entry_col, 1, entry_colspan)
+            sl_layout = QHBoxLayout()
+            m_butt.clicked.connect(d_slider.decrease_single_step)
+            p_butt.clicked.connect(d_slider.increase_single_step)
+            sl_layout.addWidget(m_butt)
+            sl_layout.addWidget(d_slider)
+            sl_layout.addWidget(p_butt)
+            self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
             self.addWidget(value_label, i, val_col)
             self.addWidget(sliderfactor, i, fct_col)
 
