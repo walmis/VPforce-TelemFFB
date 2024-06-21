@@ -140,98 +140,6 @@
 		<datatype>text</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>30</order>
-		<name>max_aileron_coeff</name>
-		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
-		<displayname>Aileron Max Force</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>n_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>30.2</order>
-		<name>aileron_expo</name>
-		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Aileron Expo</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>.1</sliderfactor>
-		<validvalues>-3,5</validvalues>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>40</order>
-		<name>max_elevator_coeff</name>
-		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
-		<displayname>Elevator Max Force</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>n_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>40.2</order>
-		<name>elevator_expo</name>
-		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Elevator Expo</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>.1</sliderfactor>
-		<validvalues>-3,5</validvalues>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>50</order>
-		<name>max_rudder_coeff</name>
-		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
-		<displayname>Rudder Max Force</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>n_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>50.2</order>
-		<name>rudder_expo</name>
-		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Rudder Expo</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<sliderfactor>.1</sliderfactor>
-		<validvalues>-3,5</validvalues>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>60</order>
-		<name>vne_override</name>
-		<info>Override Vne if plane data is incorrect.  Leave blank or delete setting to use sim Vne data &lt;br&gt;&lt;br&gt;Enter Vne Airspeed (IAS) where dynamic forces max out</info>
-		<any>true</any>
-		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Override&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<validvalues>m/s,kt,mph,kph</validvalues>
-		<datatype>anyfloat</datatype>
-		<unit>kt</unit>
-	</defaults>
-	<defaults>
 		<Grouping>FFB</Grouping>
 		<order>70</order>
 		<name>center_spring_on_pause</name>
@@ -283,7 +191,7 @@
 		<name>damper_force</name>
 		<prereq>enable_damper_ovd</prereq>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
-		<displayname>Damper</displayname>
+		<displayname>Damper Effect</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -317,7 +225,7 @@
 		<name>inertia_force</name>
 		<prereq>enable_inertia_ovd</prereq>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
-		<displayname>Inertia</displayname>
+		<displayname>Inertia Effect</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -351,7 +259,7 @@
 		<name>friction_force</name>
 		<prereq>enable_friction_ovd</prereq>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
-		<displayname>Friction</displayname>
+		<displayname>Friction Effect</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -528,6 +436,98 @@
 		<DCS>true</DCS>
 		<pedals>true</pedals>
 		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>161</order>
+		<name>max_aileron_coeff</name>
+		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
+		<displayname>Aileron Max Force</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>n_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>162</order>
+		<name>aileron_expo</name>
+		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<displayname>Aileron Expo</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>.1</sliderfactor>
+		<validvalues>-3,5</validvalues>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>163</order>
+		<name>max_elevator_coeff</name>
+		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
+		<displayname>Elevator Max Force</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>n_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>164</order>
+		<name>elevator_expo</name>
+		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<displayname>Elevator Expo</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>.1</sliderfactor>
+		<validvalues>-3,5</validvalues>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>165</order>
+		<name>max_rudder_coeff</name>
+		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
+		<displayname>Rudder Max Force</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>n_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>166</order>
+		<name>rudder_expo</name>
+		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<displayname>Rudder Expo</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<sliderfactor>.1</sliderfactor>
+		<validvalues>-3,5</validvalues>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>167</order>
+		<name>vne_override</name>
+		<info>Override Vne if plane data is incorrect.  Leave blank or delete setting to use sim Vne data &lt;br&gt;&lt;br&gt;Enter Vne Airspeed (IAS) where dynamic forces max out</info>
+		<any>true</any>
+		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Override&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<datatype>anyfloat</datatype>
+		<unit>kt</unit>
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
