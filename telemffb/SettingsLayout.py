@@ -259,6 +259,8 @@ class SettingsLayout(QGridLayout):
             order_lbl.setMaximumWidth(30)
             self.addWidget(order_lbl, i, ord_col)
 
+        erase_button = QPushButton() # Create erase button at beginning so behavior can be modified per widget type if necessary
+
         # booleans get a checkbox
         if item['datatype'] == 'bool':
 
@@ -649,6 +651,7 @@ class SettingsLayout(QGridLayout):
             browse_button.blockSignals(True)
             browse_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
             browse_button.setMinimumWidth(150)
+            browse_button.setObjectName('path_vpconf')
             if item['value'] == '-':
                 browse_button.setText('Browse...')
             else:
@@ -671,13 +674,21 @@ class SettingsLayout(QGridLayout):
             self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
         if item['datatype'] == 'configurator':
-            configurator_button = QPushButton("Configurator Gains Override")
-            configurator_button.setMinimumWidth(150)
-            configurator_button.setMaximumHeight(25)
-            configurator_button.setObjectName(f"cfg_ovd")
-            configurator_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-            configurator_button.clicked.connect(self.configurator_button_clicked)
-            self.addWidget(configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+            self.configurator_button = QPushButton("Configure Gain Overrides")
+
+            try:
+                gaindict = json.loads(item['value'])
+                self.configurator_button = QPushButton("Edit Gain Overrides")
+            except:
+                pass
+
+            self.configurator_button.setMinimumWidth(150)
+            self.configurator_button.setMaximumHeight(25)
+            self.configurator_button.setObjectName(f"config_{item['name']}")
+            self.configurator_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+            self.configurator_button.clicked.connect(self.configurator_button_clicked)
+            erase_button.clicked.connect(G.gain_override_dialog.clear_toggles)
+            self.addWidget(self.configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
 
         if item['has_expander'] == 'true' and item['prereq'] != '':
@@ -718,7 +729,7 @@ class SettingsLayout(QGridLayout):
         icon.addPixmap(resized_pixmap)
 
         # Create the erase button
-        erase_button = QPushButton()
+
         erase_button.setObjectName(f"eb_{item['name']}")
         erase_button.setMaximumSize(20, 20)
         erase_button.setMinimumSize(20, 20)
@@ -813,7 +824,8 @@ class SettingsLayout(QGridLayout):
             if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
                 #lprint(f"Selected File: {file_path}")
                 xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, file_path, 'vpconf')
-                self.show_erase_button()
+
+                self.show_erase_button('config_vpconf')
                 if G.settings_mgr.timed_out:
                     self.reload_caller()
 
@@ -945,7 +957,8 @@ class SettingsLayout(QGridLayout):
         """
         gain_dict_json = json.dumps(gain_dict)
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, gain_dict_json, "configurator_gains")
-        self.show_erase_button()
+        self.show_erase_button("config_configurator_gains")
+        self.configurator_button.setText("Edit Gain Overrides")
 
     def slider_changed(self, write=True):
         self.trigger_form_reload = False
