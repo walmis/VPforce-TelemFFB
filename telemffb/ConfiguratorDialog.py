@@ -143,6 +143,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         if isinstance(self.at_show_state, dict):
             # dbprint("green", f"Override Dialog Canceled: {self.at_show_state}")
             self.set_ui_from_state(self.at_show_state)
+            self.set_gains_from_state(self.at_show_state)
             self.read_gains()
 
         self.close()
@@ -188,6 +189,15 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.read_gains()
 
 
+    def clear_toggles(self):
+        self.cb_MasterGain.setChecked(False)
+        self.cb_Periodic.setChecked(False)
+        self.cb_Spring.setChecked(False)
+        self.cb_Damper.setChecked(False)
+        self.cb_Inertia.setChecked(False)
+        self.cb_Friction.setChecked(False)
+        self.cb_Constant.setChecked(False)
+        G.current_configurator_gains = self.construct_setting_table()
 
     def revert_gains(self):
         """
