@@ -6,7 +6,7 @@ import re
 
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QCursor, QIcon, QColor
+from PyQt5.QtGui import QCursor, QIcon, QColor, QPixmap
 from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
@@ -404,7 +404,24 @@ class SettingsLayout(QGridLayout):
         expand_button.setMinimumWidth(24)
         expand_button.setObjectName(f"ex_{item['name']}")
         expand_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        expand_button.setStyleSheet("QToolButton#expand_button { background-color: rgba(171, 55, 200, 68); }")
+        expand_button.setStyleSheet("""
+            QToolButton {
+                font-size: 16px;  /* Adjust the font size */
+                font-family: Cascadia Code;
+                font-weight: bold;
+                color: black;
+                padding: 0px;
+                border: none;  /* Remove any border */
+                margin: 0px;   /* Remove any margin */
+                background-color: transparent;  /* Transparent background */
+            }
+            QToolButton:hover {
+                background-color: #ddd;  /* Optional: Change background on hover */
+            }
+            QToolButton:pressed {
+                background-color: #bbb;  /* Optional: Change background on press */
+            }
+        """)
         expand_button.clicked.connect(self.expander_clicked)
 
         usb_button_text = f"Button {item['value']}"
@@ -694,16 +711,21 @@ class SettingsLayout(QGridLayout):
         self.parent().parent().parent().addSlider(d_slider)
         self.parent().parent().parent().addSlider(df_slider)
 
-        erase_button = QToolButton()
-        # dbprint("green", f"eb created for: eb_{item['name']}")
+        # erase_button = QToolButton()
+        icon = QIcon()
+        pixmap = QPixmap(":/image/delete_button.png")
+        resized_pixmap = pixmap.scaled(15, 15, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        icon.addPixmap(resized_pixmap)
+
+        # Create the erase button
+        erase_button = QPushButton()
         erase_button.setObjectName(f"eb_{item['name']}")
-        pixmapi = QStyle.SP_DockWidgetCloseButton
-        icon = erase_button.style().standardIcon(pixmapi)
-
-        erase_button.clicked.connect(lambda _, name=item['name']: self.erase_setting(name))
-        erase_button.setIcon(QIcon())
-
+        erase_button.setMaximumSize(20, 20)
+        erase_button.setMinimumSize(20, 20)
+        erase_button.setIcon(icon)
+        erase_button.setIconSize(resized_pixmap.rect().size())
         erase_button.setToolTip("")
+        erase_button.clicked.connect(lambda _, name=item['name']: self.erase_setting(name))
         self.addWidget(erase_button, i, erase_col)
         sp_retain = erase_button.sizePolicy()
         sp_retain.setRetainSizeWhenHidden(True)
@@ -712,10 +734,27 @@ class SettingsLayout(QGridLayout):
         erase_button.setVisible(False)
         if item['replaced'] == 'Model (user)':
             if item['name'] != 'type':  # dont erase type on mainwindow settings
-                erase_button.setIcon(icon)
                 erase_button.setVisible(True)
                 erase_button.setToolTip("Reset to Default")
         self.setRowStretch(i, 0)
+        erase_button.setStyleSheet("""
+            QPushButton {
+                font-size: 16px;  /* Adjust the font size */
+                font-family: Arial Black;
+                font-weight: bold;
+                color: black;
+                padding: 0px;
+                border: none;  /* Remove any border */
+                margin: 0px;   /* Remove any margin */
+                background-color: transparent;  /* Transparent background */
+            }
+            QPushButton:hover {
+                background-color: #ddd;  /* Optional: Change background on hover */
+            }
+            QPushButton:pressed {
+                background-color: #bbb;  /* Optional: Change background on press */
+            }
+        """)
 
     def show_erase_button(self):
         setting_name = self.sender().objectName()
@@ -723,10 +762,7 @@ class SettingsLayout(QGridLayout):
         pattern = r'^[^_]+_(.+)$'
         setting = re.match(pattern, setting_name).group(1)
         # dbprint("red", f"SETTING: {setting}")
-        eb = self.mainwindow.findChild(QToolButton, f"eb_{setting}")
-        pixmapi = QStyle.SP_DockWidgetCloseButton
-        icon = eb.style().standardIcon(pixmapi)
-        eb.setIcon(icon)
+        eb = self.mainwindow.findChild(QPushButton, f"eb_{setting}")
         eb.setVisible(True)
         eb.setToolTip("Reset to Default")
 

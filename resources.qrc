@@ -15,9 +15,11 @@
         <file>image/vpforceicon_run.png</file>
         <file>image/vpforceicon_paused.png</file>
         <file>image/vpforcelogo.png</file>
+        <file>image/delete_button.png</file>
         <file>image/expo.png</file>
         <file>image/gain-force.png</file>
         <file>image/g-force-curve.png</file>
+        <file>image/dcs_seat_id.png</file>
         <!-- Add other image files as needed -->
     </qresource>
 </RCC>
