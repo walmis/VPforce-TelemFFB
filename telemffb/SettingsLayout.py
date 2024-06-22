@@ -687,7 +687,7 @@ class SettingsLayout(QGridLayout):
             self.configurator_button.setObjectName(f"config_{item['name']}")
             self.configurator_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
             self.configurator_button.clicked.connect(self.configurator_button_clicked)
-            erase_button.clicked.connect(G.gain_override_dialog.clear_toggles)
+            erase_button.clicked.connect(self.erase_configurator_overrides)
             self.addWidget(self.configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
 
@@ -948,6 +948,14 @@ class SettingsLayout(QGridLayout):
             G.gain_override_dialog.raise_()
             G.gain_override_dialog.activateWindow()
             G.gain_override_dialog.show()
+
+    def erase_configurator_overrides(self):
+        if G.master_instance and G.device_type != G.current_device_config_scope:
+            G.ipc_instance.send_broadcast_message(f'ERASE GAIN OVD:{G.current_device_config_scope}')
+        else:
+            print("I DID IT!!!!!!!!!!!!!")
+            G.gain_override_dialog.revert_gains()
+            G.gain_override_dialog.reset_to_vpconf()
 
     def update_configurator_overrides(self, gain_dict):
         self.trigger_form_reload = False

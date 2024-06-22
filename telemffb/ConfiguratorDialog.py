@@ -189,7 +189,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.read_gains()
 
 
-    def clear_toggles(self):
+    def reset_to_vpconf(self):
         self.cb_MasterGain.setChecked(False)
         self.cb_Periodic.setChecked(False)
         self.cb_Spring.setChecked(False)
@@ -197,6 +197,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.cb_Inertia.setChecked(False)
         self.cb_Friction.setChecked(False)
         self.cb_Constant.setChecked(False)
+        self.set_gains_from_object(G.vpconf_configurator_gains)
         G.current_configurator_gains = self.construct_setting_table()
 
     def revert_gains(self):

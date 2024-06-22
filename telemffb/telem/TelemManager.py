@@ -307,8 +307,8 @@ class TelemManager(QObject, threading.Thread):
                     if load_global and global_path != G.current_vpconf_profile:
                         logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
                         set_vpconf_profile(global_path, HapticEffect.device.serial)
-                    G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
-
+                        G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
+                    # utils.dbprint("red", f"Gains: {G.vpconf_configurator_gains}")
 
                 if params.get('command_runner_enabled', False):
                     if params.get('command_runner_command', '') != '':
@@ -378,8 +378,8 @@ class TelemManager(QObject, threading.Thread):
                     if load_global and global_path != G.current_vpconf_profile:
                         logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
                         set_vpconf_profile(global_path, HapticEffect.device.serial)
-                    G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
-
+                        G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
+                    # utils.dbprint("blue", f"Gains: {G.vpconf_configurator_gains}")
                 if params.get('command_runner_enabled', False):
                     if params.get('command_runner_command', '') != '' and 'Enter full path' not in params.get('command_runner_command', ''):
                         try:
