@@ -78,6 +78,7 @@ class DelayTimerSlider(QSlider):
 class NoWheelSlider(QSlider):
     delayedValueChanged = pyqtSignal(int)
     def __init__(self, *args, **kwargs):
+
         super(NoWheelSlider, self).__init__(*args, **kwargs)
         # Default colors
         self.groove_color = "#bbb"
@@ -97,6 +98,7 @@ class NoWheelSlider(QSlider):
         self._timer.timeout.connect(self._emitDelayedValueChanged)
         self.valueChanged.connect(self._startTimer)
 
+        self.setMinimumHeight(int(self.handle_height * self.devicePixelRatioF()) + 10)
     def _startTimer(self):
         self._timer.start(self._delay)
 
@@ -125,7 +127,7 @@ class NoWheelSlider(QSlider):
         css = f"""
             QSlider::groove:horizontal {{
                 border: 1px solid #565a5e;
-                height: 8px;  /* Adjusted groove height */
+                height: {int(8 * self.devicePixelRatioF())}px;  /* Adjusted groove height */
                 background: qlineargradient(
                     x1: 0, y1: 0, x2: 0, y2: 1,
                     stop: 0 #e6e6e6, stop: 1 #bfbfbf
@@ -141,11 +143,11 @@ class NoWheelSlider(QSlider):
                     stop: 1.0 {QColor(self.handle_color).darker().name()}
                 );
                 border: 1px solid #565a5e;
-                width: {self.handle_width}px;  /* Adjusted handle width */
-                height: {self.handle_height}px;  /* Adjusted handle height */
-                border-radius: {self.handle_height / 4}px;  /* Adjusted border radius */
-                margin-top: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
-                margin-bottom: -{self.handle_height / 4}px;  /* Negative margin to overlap with groove */
+                width: {int(self.handle_width * self.devicePixelRatioF())}px;  /* Adjusted handle width */
+                height: {int(self.handle_height * self.devicePixelRatioF())}px;  /* Adjusted handle height */
+                border-radius: {int(self.handle_height / 4 * self.devicePixelRatioF())}px;  /* Adjusted border radius */
+                margin-top: -{int(self.handle_height / 4 * self.devicePixelRatioF())}px;  /* Negative margin to overlap with groove */
+                margin-bottom: -{int(self.handle_height / 4 * self.devicePixelRatioF())}px;  /* Negative margin to overlap with groove */
                 margin-left: -1px;  /* Adjusted left margin */
                 margin-right: -1px;  /* Adjusted right margin */
             }}
@@ -177,8 +179,6 @@ class NoWheelSlider(QSlider):
     def leaveEvent(self, event):
         self.clearFocus()
         super().leaveEvent(event)  # Call the default handler to ensure normal behavior
-
-
 
 
 class NoWheelNumberSlider(NoWheelSlider):
@@ -292,7 +292,7 @@ class InfoLabel(QWidget):
         # icon_img = os.path.join(script_dir, "image/information.png")
         icon_img = ":/image/information.png"
         self.pixmap = HiDpiPixmap(icon_img)
-        self.icon_label.setPixmap(self.pixmap.scaledToHeight(self.text_label.sizeHint().height()))  # Adjust the height as needed
+        self.icon_label.setPixmap(self.pixmap.scaled(12, 12, Qt.KeepAspectRatio, Qt.SmoothTransformation))  # Adjust the height as needed
         self.icon_label.setVisible(False)
 
         # Layout to align the text label and icon
