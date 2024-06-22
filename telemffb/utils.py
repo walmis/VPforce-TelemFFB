@@ -147,6 +147,7 @@ class EffectTranslator:
         "canopymovement": ["Canopy Motion", "canopy_motion_intensity"],
         "collective_ap_spring": ["Collective AP/Lock Spring Force", "collective_ap_spring_gain"],
         "collective_damper": ["Collective Dampening Force", "collective_dampening_gain"],
+        "cp_ovd_spring": ["Co-Pilot/RIO Override Spring", "cp_spr_override_spring_gain"],
         "crit_aoa": ["AoA Reduction Force", "aoa_reduction_max_force"],
         "cm": ["Countermeasure Deployment", "cm_vibration_intensity"],
         "cyclic_spring": ["Cyclic Spring Force", "cyclic_spring_gain"],

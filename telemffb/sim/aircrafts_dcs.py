@@ -103,6 +103,13 @@ class Aircraft(AircraftBase):
     override_spring_cp0_x = 0
     override_spring_cp0_y = 0
 
+    cp_spr_override_enabled = False
+    cp_spr_override_pilot_seat_id = 0
+    cp_spr_override_spring_gain = 0
+    cp_spr_override_button_enabled = False
+    cp_spr_override_button = 0
+    cp_spr_override_active = False
+
     enable_stick_shaker = False
     stick_shaker_intensity = .5
     stick_shaker_aoa = 22.3
@@ -155,9 +162,11 @@ class Aircraft(AircraftBase):
         if telem_data.get("N") == None:
             return
 
-        self._decel_effect(telem_data)
+        if not self.cp_spr_override_active:
+            self._update_runway_rumble(telem_data)
+            self._decel_effect(telem_data)
+
         self._update_buffeting(telem_data)
-        self._update_runway_rumble(telem_data)
         self._update_cm_weapons(telem_data)
         hyd_loss = self._update_hydraulic_loss_effect(telem_data)
         if not hyd_loss: 
@@ -181,6 +190,7 @@ class Aircraft(AircraftBase):
         self._update_touchdown_effect(telem_data)
         self._update_stick_shaker(telem_data)
         self.override_spring()
+        self.override_copilot_spring(telem_data)
 
     @overrides(AircraftBase)
     def on_event(self, event, *args):
@@ -369,6 +379,55 @@ class Aircraft(AircraftBase):
             effects['stick_shaker1'].destroy()
             effects['stick_shaker2'].destroy()
 
+    def override_copilot_spring(self, telem_data):
+        if not self.is_joystick():return
+
+
+        seat = telem_data.get("Seat", 0)
+        if seat == self.cp_spr_override_pilot_seat_id or not self.cp_spr_override_enabled:
+            effects['cp_ovd_spring'].stop()
+            self.cp_spr_override_active = False
+            # self.spring.stop()
+            return
+
+
+        if self.cp_spr_override_button_enabled:
+
+            if self.cp_spr_override_button == 0:
+                self.flag_error("Please bind a button to the Co-Pilot/RIO spring override setting or disable the button control option")
+                effects['cp_ovd_spring'].stop()
+                self.cp_spr_override_active = False
+                return
+            if self.override_spring_enabled:
+                self.flag_error("Co-Pilot/RIO Spring Override is not compatible with \"DCS Spring Override\"\n  Please disable one or the other")
+                effects['cp_ovd_spring'].stop()
+                self.cp_spr_override_active = False
+                return
+            if self.dcs_tr_damper_enabled:
+                self.flag_error('Co-Pilot/RIO Spring Override is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
+                self.cp_spr_override_active = False
+                effects['cp_ovd_spring'].stop()
+                return
+            if self.trim_workaround:
+                self.flag_error('Co-Pilot/RIO Spring Override is not compatible with the Trim Workaround feature.  Please disable one or the other.')
+                self.cp_spr_override_active = False
+                effects['cp_ovd_spring'].stop()
+                return
+
+            input_data = HapticEffect.device.get_input()
+            override_pressed = input_data.isButtonPressed(self.cp_spr_override_button)
+
+            if not override_pressed:
+                effects['cp_ovd_spring'].stop()
+                self.cp_spr_override_active = False
+                return
+
+        coeff = int(self.cp_spr_override_spring_gain * 4096)
+        self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = coeff
+        self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = coeff
+        effects['cp_ovd_spring'].spring(coeff, coeff).start(override=True)
+        self.cp_spr_override_active = True
+
     def override_spring(self):
         if not self.is_joystick(): return
         if not self.override_spring_enabled:
@@ -382,6 +441,9 @@ class Aircraft(AircraftBase):
             return
         if self.trim_workaround:
             self.flag_error('Override DCS Spring is not compatible with the Trim Workaround feature.  Please disable one or the other.')
+            return
+        if self.cp_spr_override_enabled:
+            self.flag_error('Override DCS Spring is not compatible with the Co-Pilot/RIO Spring Override feature.  Please disable one or the other.')
             return
 
         spring = effects['dcs_spr_override'].spring()
@@ -513,7 +575,8 @@ class PropellerAircraft(Aircraft):
             vne = self.aircraft_vne_speed
             # print(f"Got Vs0={vs0}, Vne={vne}")
             self._update_aoa_effect(telem_data, minspeed=vs0, maxspeed=vne)
-        self._gforce_effect(telem_data)
+        if not self.cp_spr_override_active:
+            self._gforce_effect(telem_data)
 
 
 
@@ -538,8 +601,8 @@ class JetAircraft(Aircraft):
         self._update_ab_effect(telem_data)
         if self.aoa_reduction_effect_enabled:
             self._aoa_reduction_force_effect(telem_data)
-        if self.gforce_effect_enable:
-            super()._gforce_effect(telem_data)
+        if not self.cp_spr_override_active:
+            self._gforce_effect(telem_data)
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""

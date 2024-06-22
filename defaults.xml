@@ -60,7 +60,7 @@
 		<Grouping>System</Grouping>
 		<order>5</order>
 		<name>vpconf</name>
-		<info>Load a specific .vpconf file (created with VPForce Configurator)&lt;br&gt;&lt;br&gt;When using this function, it will remain active until set again by another sim, class, or model setting</info>
+		<info>Load a specific .vpconf file (created with VPForce Configurator)&lt;br&gt;&lt;br&gt;When using this function, it will remain active until set again by another sim, class, or model setting, or is defaulted back to "Global Default" profile  from System Settings</info>
 		<displayname>Configurator File</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -93,6 +93,7 @@
 		<order>10.1</order>
 		<name>configurator_gains</name>
 		<prereq>configurator_override_enabled</prereq>
+		<info>Directly modify the per-effect type  gain values on the VPforce device.&lt;br&gt;&lt;br&gt;Please read the manual to understand how it works and how it interacts with the "Configurator File" feature (these gains will override any pushed in a configurator profile)</info>
 		<displayname>Override Configurator Sliders</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -848,6 +849,67 @@
 	</defaults>
 	<defaults>
 		<Grouping>Spring Override</Grouping>
+		<order>271</order>
+		<name>cp_spr_override_enabled</name>
+		<info>Will temporarily override the spring gain on the joystick when the user is *not* sitting in the Pilot seat.</info>
+		<displayname>Co-Pilot/RIO Spring Override</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>271.2</order>
+		<name>cp_spr_override_pilot_seat_id</name>
+		<prereq>cp_spr_override_enabled</prereq>
+		<info>Seat ID when sitting in Pilot's seat.  Effect will beome active any time the Seat ID does not match this ID value&lt;br&gt;See the Telemetry monitor page to get the proper value when sitting in the pilots seat&lt;br&gt;&lt;img src=":/image/dcs_seat_id.png"&gt;&lt;/&gt;</info>
+		<displayname>Pilot Seat ID</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<validvalues>0,1,2,3,4</validvalues>
+		<value>0</value>
+		<datatype>list</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>272</order>
+		<name>cp_spr_override_spring_gain</name>
+		<prereq>cp_spr_override_enabled</prereq>
+		<info>Spring gain while effect is active</info>
+		<displayname>Spring Gain</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>273</order>
+		<name>cp_spr_override_button_enabled</name>
+		<prereq>cp_spr_override_enabled</prereq>
+		<info>Only activate override if button is held (must configure button in resulting setting once this setting is enabled)</info>
+		<displayname>Only on Button Press</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>274</order>
+		<name>cp_spr_override_button</name>
+		<prereq>cp_spr_override_button_enabled</prereq>
+		<info>Click to configure the override button</info>
+		<displayname>Override Button</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
 		<order>280</order>
 		<name>override_spring_enabled</name>
 		<info>Override the spring effect set by DCS&lt;br&gt;&lt;br&gt;Warning: If you enable this for an official DCS module that has FFB Support, all DCS generated spring effects will cease to function, including dynamic forces and trim.&lt;br&gt;&lt;br&gt;Note: Not compatible with 'Trim Workaround' or 'Trim Release Damper' features</info>
@@ -1339,7 +1401,7 @@
 		<order>350</order>
 		<name>enable_hydraulic_loss_effect</name>
 		<info>Simulate high damper forces when hydraulic pressure is low/0&lt;br&gt;** REQUIRES damper/inertia/friction overrides to be enabled **</info>
-		<displayname>Low Hydraulic Pressure Effect ( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
+		<displayname>Low Hydraulic Pressure Effect&lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
