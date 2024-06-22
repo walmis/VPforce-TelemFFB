@@ -1230,7 +1230,7 @@ class MainWindow(QMainWindow):
 
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
-                utils.dbprint('blue', f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
+                # utils.dbprint('blue', f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
                 self.notification_label.setText(message)
                 # Replace the "current aircraft" label with the message
                 container_height = self.craft_container.height()

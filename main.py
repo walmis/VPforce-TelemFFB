@@ -464,6 +464,7 @@ def main():
 
         try:
             G.vpconf_configurator_gains = dev.get_gains() # capture the gains here to use as reversion baseline any time a vpconf is pushed
+            # utils.dbprint("green", f"Gains: {G.vpconf_configurator_gains}")
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 

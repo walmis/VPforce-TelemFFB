@@ -342,7 +342,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.sl_Friction.setValue(gains.friction_gain)
         self.sl_Constant.setValue(gains.constant_gain)
         # self.update_labels()
-        print(gains)
+        # print(gains)
 
     def update_labels(self):
         """

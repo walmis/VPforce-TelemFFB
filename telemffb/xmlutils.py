@@ -47,7 +47,7 @@ def try_parse(file_path, max_attempts=3, delay=0.1):
             return tree
         except ET.ParseError as e:
             attempt += 1
-            dbprint("yellow", f"Attempt {attempt} failed: {e}")
+            # dbprint("yellow", f"Attempt {attempt} failed: {e}")
             time.sleep(delay)
     dbprint("red", f"All {max_attempts} attempts to parse the file failed.")
     return None

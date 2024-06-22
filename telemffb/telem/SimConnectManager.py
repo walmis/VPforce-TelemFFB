@@ -453,7 +453,7 @@ class SimConnectManager(threading.Thread):
                             else:
                                 data[var.name] = val
                         except:
-                            dbprint("red", "**DEBUG*** Exception parsing SC FRAME")
+                            # dbprint("red", "**DEBUG*** Exception parsing SC FRAME")
                             continue
 
                     # if not self._sim_paused and not data["Parked"] and not data["Slew"]:     # fixme: figure out why simstart/stop and sim events dont work right
@@ -472,7 +472,7 @@ class SimConnectManager(threading.Thread):
                         self._stop_state = False
                         self.emit_packet(data)
                 else:
-                    dbprint("green", f"**DEBUG*** got dispatch for OLD request: {recv.dwRequestID} defID: {recv.dwDefineID} | currrent defID: {self.def_id}")
+                    # dbprint("green", f"**DEBUG*** got dispatch for OLD request: {recv.dwRequestID} defID: {recv.dwDefineID} | currrent defID: {self.def_id}")
                     pass
             else:
                 logging.warning(f"Received unknown simconnect message: {recv}")

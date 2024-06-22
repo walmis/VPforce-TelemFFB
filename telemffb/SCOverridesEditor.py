@@ -194,7 +194,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         # Get the row number from the current item
         if self.current_name != '':
             name = self.current_name
-            print(f"\nerase row: {self.current_name}    pattern: {G.settings_mgr.current_pattern}  name: {name}")
+            # print(f"\nerase row: {self.current_name}    pattern: {G.settings_mgr.current_pattern}  name: {name}")
             self.tableWidget.blockSignals(True)
             self.pb_delete.setEnabled(False)
             xmlutils.erase_sc_override_from_xml(G.settings_mgr.current_pattern,name)
