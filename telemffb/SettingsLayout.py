@@ -345,7 +345,7 @@ class SettingsLayout(QGridLayout):
         df_slider.setObjectName(f"dfsld_{item['name']}")
 
         m_butt = QPushButton("-")
-        m_butt.setFixedSize(14, 14)
+        m_butt.setFixedSize(20, 20)
         m_butt.setStyleSheet("""
             QPushButton {
                 font-size: 16px;  /* Adjust the font size */
@@ -367,7 +367,7 @@ class SettingsLayout(QGridLayout):
 
         # Create the "+" button
         p_butt = QPushButton("+")
-        p_butt.setFixedSize(14, 14)
+        p_butt.setFixedSize(20, 20)
         p_butt.setStyleSheet("""
             QPushButton {
                 font-size: 16px;  /* Adjust the font size */
@@ -731,8 +731,8 @@ class SettingsLayout(QGridLayout):
         # Create the erase button
 
         erase_button.setObjectName(f"eb_{item['name']}")
-        erase_button.setMaximumSize(20, 20)
-        erase_button.setMinimumSize(20, 20)
+        erase_button.setMaximumSize(25, 25)
+        erase_button.setMinimumSize(25, 25)
         erase_button.setIcon(icon)
         erase_button.setIconSize(resized_pixmap.rect().size())
         erase_button.setToolTip("")
