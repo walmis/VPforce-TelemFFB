@@ -1,6 +1,39 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  June 22, 2024
+############################################
+## QoL Improvements
+- New system tray implementation (see manual)
+  - TelemFFB can now be sent to system tray on startup and/or close button.  Window can be recalled by double-clicking the tray icon or from the icon right-click context menu
+  - System tray icon color indicates simulator run/pause/error state like the existing status icons
+  - Configuration errors (such as enabling MSFS force trim and having no binding configured) now present the error message in the UI, and generate a system tray notification for easier recognition of the issue.
+- Real-time settings usability improvements
+  - Values update in near real-time when manipulating sliders
+  - Manipulating sliders no longer causes a form re-load
+  - -/+ buttons added to left/right of slider for single step adjustments
+    - Shift+Scroll wheel or left/right up/down arrow keys while hovering mouse of the slider is also supported
+- Minor UI overhaul
+  - Look and feel updates with on/off sliders in lieu of checkboxes and improved icons.
+## General
+- Configurator effect slider overrides (see manual)
+  - Now you can directly modify, in real-time, the slider gain setting for any of the effect types *without* creating and pushing a separate vpconf file
+  - Can be overridden on a per Sim/Aircraft Class/Specific Aircraft basis
+- Minor enhancement to gear and canopy movement effects.  You will feel a bump/clunk when the gear fully extend/retract or when the canopy (when applicable) closes
+## MSFS
+- Improved/Simplified settings for adjusting dynamic spring forces (see manual)
+  - Prior "Gain" setting is removed and the "Max Force" setting is now affixed to the aircraft "Vne" speed (learned via telemetry) while maintaining true dynamic forces based on aerodynamic conditions.
+  - "Expo" adjustment to adjust the rate at which the force falls off at low speeds.
+  - RTFM for the best experience using these new settings.
+## DCS
+- Added tail-hook movement effect (supported on a/c with tailhooks)
+- Added wing-fold effect (F/A-18, F-14)
+- Added fuel-boom effect (supported on all a/c with fuel boom/door)
+- Added Co-Pilot/RIO Spring Override feature
+  - Can temporarily override/disable spring force when user has moved away from pilots seat.  Optionally can bind a button that must also be held down.
+  - Note that seat data is not available at this time for some aircraft (like the F-4E).
+
+############################################
 ##  June 5, 2024
 ############################################
 ## DCS
