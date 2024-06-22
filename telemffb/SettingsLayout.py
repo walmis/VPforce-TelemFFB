@@ -756,8 +756,10 @@ class SettingsLayout(QGridLayout):
             }
         """)
 
-    def show_erase_button(self):
-        setting_name = self.sender().objectName()
+    def show_erase_button(self, setting_name=None):
+        if setting_name is None:
+            setting_name = self.sender().objectName()
+
         # This regex pattern matches any prefix followed by an underscore and captures the rest as the settingname
         pattern = r'^[^_]+_(.+)$'
         setting = re.match(pattern, setting_name).group(1)
@@ -913,7 +915,7 @@ class SettingsLayout(QGridLayout):
         the_button.setText(str(value))
         if str(value) != '0':
             xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, str(value), button_name)
-            self.show_erase_button()
+            self.show_erase_button(setting_name=f'pb_{button_name}')
         else:
             the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
