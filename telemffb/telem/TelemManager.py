@@ -299,6 +299,7 @@ class TelemManager(QObject, threading.Thread):
                     # Load the vpconf configurator file specified for the model, only if it is not the current
                     # one loaded
                     set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                        G.vpconf_configurator_gains = HapticEffect.device.get_gains()
                 else:
                     # If the current model does not have a vpconf specified, check whether the global default is
                     # configured and enabled.  If so, load that vpconf profile
@@ -370,6 +371,8 @@ class TelemManager(QObject, threading.Thread):
                         # Load the vpconf configurator file specified for the model, only if it is not the current
                         # one loaded
                         set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                        G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
+
                 else:
                     # If the current model does not have a vpconf specified, check whether the global default is
                     # configured and enabled.  If so, load that vpconf profile
