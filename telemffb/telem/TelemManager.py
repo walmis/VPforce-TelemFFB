@@ -295,10 +295,11 @@ class TelemManager(QObject, threading.Thread):
                         logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
                         Class = module.Aircraft
 
-                if "vpconf" in params and G.current_vpconf_profile != params.get('vpconf', None):
-                    # Load the vpconf configurator file specified for the model, only if it is not the current
-                    # one loaded
-                    set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                if "vpconf" in params:
+                    if G.current_vpconf_profile != params.get('vpconf', None):
+                        # Load the vpconf configurator file specified for the model, only if it is not the current
+                        # one loaded
+                        set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
                         G.vpconf_configurator_gains = HapticEffect.device.get_gains()
                 else:
                     # If the current model does not have a vpconf specified, check whether the global default is
