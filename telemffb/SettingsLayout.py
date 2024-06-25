@@ -647,25 +647,25 @@ class SettingsLayout(QGridLayout):
             # dropbox.currentTextChanged.connect(self.dropbox_changed)
 
         if item['datatype'] == 'path':
-            browse_button = QPushButton()
-            browse_button.blockSignals(True)
-            browse_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-            browse_button.setMinimumWidth(150)
-            browse_button.setObjectName('path_vpconf')
+            self.vpconf_brose_button = QPushButton()
+            self.vpconf_brose_button.blockSignals(True)
+            self.vpconf_brose_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+            self.vpconf_brose_button.setMinimumWidth(150)
+            self.vpconf_brose_button.setObjectName('path_vpconf')
             if item['value'] == '-':
-                browse_button.setText('Browse...')
+                self.vpconf_brose_button.setText('Browse...')
             else:
                 fname = os.path.basename(item['value'])
                 button_text = fname
-                browse_button.setToolTip(item['value'])
+                self.vpconf_brose_button.setToolTip(item['value'])
                 # p_length = len(item['value'])
                 # if p_length > 45:
                 #     button_text = f"{button_text[:40]}...{button_text[-25:]}"
-                browse_button.setText(button_text)
-            browse_button.blockSignals(False)
-            browse_button.setMaximumHeight(25)
-            browse_button.clicked.connect(self.browse_for_config)
-            self.addWidget(browse_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+                self.vpconf_brose_button.setText(button_text)
+            self.vpconf_brose_button.blockSignals(False)
+            self.vpconf_brose_button.setMaximumHeight(25)
+            self.vpconf_brose_button.clicked.connect(self.browse_for_config)
+            self.addWidget(self.vpconf_brose_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
         if item['datatype'] == 'int' or item['datatype'] == 'anyfloat':
             self.addWidget(line_edit, i, entry_col, 1, entry_colspan)
@@ -826,6 +826,7 @@ class SettingsLayout(QGridLayout):
                 xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, file_path, 'vpconf')
 
                 self.show_erase_button('config_vpconf')
+                self.vpconf_brose_button.setText(os.path.basename(file_path))
                 if G.settings_mgr.timed_out:
                     self.reload_caller()
 
