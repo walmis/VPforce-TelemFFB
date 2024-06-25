@@ -3,6 +3,10 @@ This is not an exhaustive change log (see github for that).  This file only outl
 ############################################
 ##  June 22, 2024
 ############################################
+# Hotpatch 1 June 25, 2024
+ - Fix vpconf/gain override profile loading issue when switching between aircraft
+ - Fix vpconf profile issue when subsequent aircraft use same vpconf file
+ - Fix vpconf browse button not updating text
 ## QoL Improvements
 - New system tray implementation (see manual)
   - TelemFFB can now be sent to system tray on startup and/or close button.  Window can be recalled by double-clicking the tray icon or from the icon right-click context menu
