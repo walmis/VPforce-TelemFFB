@@ -1001,6 +1001,11 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if self.model_type != '':
 
             self.reload_table()
+            models = xmlutils.read_models(self.drp_sim.currentText(), self.model_type)
+            self.drp_models.blockSignals(True)
+            self.drp_models.clear()
+            self.drp_models.addItems(models)
+            self.drp_models.blockSignals(False)
 
             lprint(
                 f"\nclass change for: {self.sim}  model: ---  pattern: {self.model_pattern}  class: {self.model_type}  device:{self.device}\n")
