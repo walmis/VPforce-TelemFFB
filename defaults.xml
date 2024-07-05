@@ -7614,6 +7614,58 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>rotor_blade_count</name>
+		<model>CH-47F</model>
+		<value>3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>CH-47F</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>CH-47F</model>
+		<value>16</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>CH-47F</model>
+		<value>24</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>CH-47F</model>
+		<value>0.25</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>CH-47F</model>
+		<value>170</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>CH-47F</model>
+		<value>Helicopter</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>aircraft_vne_speed</name>
 		<model>F-14.*</model>
 		<value>700</value>
