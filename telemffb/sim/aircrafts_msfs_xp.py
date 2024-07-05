@@ -1346,9 +1346,9 @@ class Helicopter(Aircraft):
 
         # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
         self._spring_handle.name = "cyclic_spring"
-
+        force_trim_active = telem_data.get('ForceTrimSW', True)  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
         if ffb_type == "joystick":
-            if self.force_trim_enabled:
+            if self.force_trim_enabled and force_trim_active:
 
                 if self.force_trim_button == 0:
                     self.flag_error("Force trim enabled but buttons not configured")
@@ -1507,7 +1507,7 @@ class Helicopter(Aircraft):
                     pos_y_pos = y_pos * y_scale
                     self.send_xp_command(f'AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}')
 
-                if self.cyclic_spring_init or not self.force_trim_enabled:
+                if self.cyclic_spring_init or not (self.force_trim_enabled and force_trim_active):
                     if self._sim_is_msfs():
                         if self.enable_custom_x_axis:
                             x_var = self.custom_x_axis
@@ -1552,7 +1552,7 @@ class Helicopter(Aircraft):
             self.spring_y.cpOffset = int(self.cpO_y) + self.cyclic_physical_trim_y_offs
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
-            if self.force_trim_enabled:
+            if self.force_trim_enabled and force_trim_active:
                 self._spring_handle.start()
 
     def _update_cyclic_trim(self, telem_data):

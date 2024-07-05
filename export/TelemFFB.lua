@@ -650,8 +650,25 @@ local f_telemFFB = {
               mainRotorRPM
             )
 
-          elseif obj.Name == "SA342M" or obj.Name == "SA342L" or obj.Name == "SA342Mistral" or obj.Name == "SA342Minigun"
-           then -- Gazelle
+          elseif string.find(obj.Name, "CH-47F") then
+            --damage_vars = {
+            --  147,148,149,150,151,152,155,156,158,159,160,166,169,170,215,225,245
+            --}
+            --local hyd_state = MainPanel:get_argument_value(162) -- hydraulics switch
+            --if hyd_state == 0 then
+              -- switch turned off
+              --hydraulicPressure = "false"
+            --else
+            --  hydraulicPressure = "true"
+            --end
+            local mainRotorRPM = get_param_handle("BASE_SENSOR_PROPELLER_RPM"):get()
+            stringToSend =
+              string.format(
+              "RotorRPM=%.0f",
+              mainRotorRPM
+            )
+
+          elseif string.find(obj.Name, "SA342", 0, true)then -- Gazelle
             -- SA342 Relevent Info (from mainpanel_init.lua):
             -- Rotor_RPM.input				= {0,		50,		100,	150,	200,	250,	262,	316.29,	361.05,	387,	400,	450}
             -- Rotor_RPM.output			= {0.096,	0.191,	0.283,	0.374,	0.461,	0.549,	0.57,	0.665,	0.748,	0.802,	0.811,	0.904}
@@ -678,6 +695,37 @@ local f_telemFFB = {
             local StatusString =
               RAltimeterOnOff .. "~" .. RAltimeterFlagPanne .. "~" .. RAltimeterFlagMA .. "~" .. RAltimeterTest
             -- Gazelle  sends to TelemFFB
+
+            local sa342payload = LoGetPayloadInfo()
+              -- OH-6A, like the UH1 only has cannon info in payload block.  use getShellCount to pull out the applicable data and write it into the CannonShells telemetry
+
+              local additional_shells_1 = getShellCount(sa342payload, "4.6.10.46") -- HMP400
+              local additional_shells_2 = getShellCount(sa342payload, "4.6.10.134") -- GIAT
+              CannonShells = CannonShells + additional_shells_1 + additional_shells_2
+              stations = LoGetPayloadInfo().Stations
+              PayloadInfo = "empty"
+              temparray = {}
+
+              for i_st, st in pairs(stations) do
+                  -- we want to re-write the payload block without the canon data which contains the cannon rounds.  This is so
+                  -- the "payload release" effect does not play while canons are firing.
+                  local name = LoGetNameByType(st.weapon.level1,st.weapon.level2,st.weapon.level3,st.weapon.level4);
+                  id = string.format( "%d.%d.%d.%d", st.weapon.level1, st.weapon.level2, st.weapon.level3, st.weapon.level4)
+                  if id ~= "4.6.10.46" and id ~= "4.6.10.134" and id ~= "0.0.0.0" then
+                      temparray[#temparray + 1] =
+                        string.format(
+                        "%s-%d.%d.%d.%d*%d",
+                        name,
+                        st.weapon.level1,
+                        st.weapon.level2,
+                        st.weapon.level3,
+                        st.weapon.level4,
+                        st.count
+                        )
+                      PayloadInfo = table.concat(temparray, "~")
+                  end
+              end
+
             stringToSend =
               string.format(
               "RotorRPM=%.0f;RadarAltimeterMeter=%.2f;RAltimeterStatus=%s",
