@@ -1,4 +1,13 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+############################################
+##  July 5, 2024
+############################################
+## DCS
+- SA342 - Capture pylon mounted cannon shell count such that it activates the gunfire effect when fired
+- CH-47F - Add basic support
+## MSFS
+- Default profile for Taog UH-1 + variants
+- Enable in-cockpit toggling of force trim for a/c such as Taog UH-1 with FT switch. (requires force trim feature enabled in DCS)
 
 ############################################
 ##  June 22, 2024
