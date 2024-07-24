@@ -486,14 +486,14 @@ void SendAxisPosition() {
     if (overrideJoystick) {
         float jx = axisDataMap["jx"];
         float jy = axisDataMap["jy"];
-
+ 
         XPLMSetDataf(gRollRatio, jx);
         XPLMSetDataf(gPitchRatio, jy);
         //DebugLog("Send Axis: x=" + FloatToString(jx, 4) + ", y=" + FloatToString(jy, 4));
     }
     if (overridePedals) {
         float px = axisDataMap["px"];
-
+ 
         XPLMSetDataf(gYawRatio, px);
     }
     if (overrideCollective) {
