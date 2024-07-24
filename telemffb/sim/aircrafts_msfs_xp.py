@@ -575,7 +575,7 @@ class Aircraft(AircraftBase):
 
         # determine standard Q with Vne to get proper gain
 
-        if self.vne_override == 0:
+        if not self.vne_override:
             if telem_data['src'] == 'XPLANE':
                 vne = telem_data.get('Vne')
                 vs0 = telem_data.get('Vso')
