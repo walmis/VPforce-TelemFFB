@@ -954,7 +954,6 @@ class SettingsLayout(QGridLayout):
         if G.master_instance and G.device_type != G.current_device_config_scope:
             G.ipc_instance.send_broadcast_message(f'ERASE GAIN OVD:{G.current_device_config_scope}')
         else:
-            print("I DID IT!!!!!!!!!!!!!")
             G.gain_override_dialog.revert_gains()
             G.gain_override_dialog.reset_to_vpconf()
 
