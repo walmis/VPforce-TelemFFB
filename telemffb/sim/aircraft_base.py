@@ -1245,16 +1245,16 @@ class AircraftBase(object):
             effects.dispose("je_rumble_2_2")
             return
         
-        r1_modulation = utils.sine_point_in_time(2, 30000)
-        r2_modulation = utils.sine_point_in_time(2, 22500, phase_offset_deg=0)
+        r1_modulation = utils.sine_point_in_time(3, 60000)
+        r2_modulation = utils.sine_point_in_time(2, 42500, phase_offset_deg=0)
         intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
         intensity = utils.clamp(intensity, 0, 1)
         rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
         rt_freq2 = round(rt_freq + median_modulation, 4)
-        effects["je_rumble_1_1"].periodic(rt_freq, intensity, 0, effect_index).start()
-        effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
-        effects["je_rumble_2_1"].periodic(rt_freq2, intensity, 90, effect_index, phase=phase_offset).start()
-        effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset+30).start()
+        effects["je_rumble_1_1"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
+        # effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
+        effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
+        # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset+30).start()
         logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
 
 
