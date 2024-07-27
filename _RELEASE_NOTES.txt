@@ -1,5 +1,16 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
+##  July 26, 2024
+############################################
+## General
+- Avoid playing decel or g-force effect if telemetry is spiking violently (aka crash)
+- Tone down oscillation transition/timing for jet engine rumble effect
+## X-Plane
+- Fix X-Plane plugin to support new IAS based auto-gain
+## IL-2
+- Fix weapons/buffet effects to play on correct axis for pedals
+
+############################################
 ##  July 5, 2024
 ############################################
 ## DCS
@@ -7,7 +18,7 @@ This is not an exhaustive change log (see github for that).  This file only outl
 - CH-47F - Add basic support
 ## MSFS
 - Default profile for Taog UH-1 + variants
-- Enable in-cockpit toggling of force trim for a/c such as Taog UH-1 with FT switch. (requires force trim feature enabled in DCS)
+- Enable in-cockpit toggling of force trim for a/c such as Taog UH-1 with FT switch. (requires force trim feature enabled in TelemFFB)
 
 ############################################
 ##  June 22, 2024
