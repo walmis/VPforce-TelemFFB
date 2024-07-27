@@ -427,6 +427,7 @@ class TelemManager(QObject, threading.Thread):
 
             try:
                 _tm = time.perf_counter()
+                self.currentAircraft._last_telem_data = self.currentAircraft._telem_data.copy() # Keep copy of last data for frame-to-frame comparison
                 self.currentAircraft._telem_data = telem_data
                 self.currentAircraft.on_telemetry(telem_data)
                 telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"

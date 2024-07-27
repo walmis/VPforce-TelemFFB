@@ -227,6 +227,7 @@ class AircraftBase(object):
         self._changes = {}
         self._change_counter = {}
         self._telem_data = {}
+        self._last_telem_data = {}
         self._ipc_telem = {}
         self.hydraulic_factor = 0.000
         #clear any existing effects
@@ -484,8 +485,18 @@ class AircraftBase(object):
         #     return
         if self._sim_is("DCS") or self._sim_is("IL2"):
             gs: float = telem_data.get("ACCs")[1]
+            y_gs = telem_data.get("ACCs", 0)[0]
+            last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
         elif self._sim_is("MSFS"):
             gs: float = telem_data.get("G")
+            y_gs = telem_data.get("AccBody")[2]
+            last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
+
+        delta_y = y_gs - last_y_gs
+        if abs(delta_y) > 3:  # Check deceleration G's.. If the per-frame rate of change is greater than 3-Gs, we have likely  crashed and telemetry is violently spiking.. do not play effect:
+            effects.dispose("gforce")
+            return
+
 
         #gs = self.smoother.get_average("gs", gs, window_size=10)
 
@@ -551,13 +562,21 @@ class AircraftBase(object):
             return
 
         if self._sim_is("DCS") or self._sim_is("IL2"):
-            y_gs = telem_data.get("ACCs")[0]
+            y_gs = telem_data.get("ACCs", 0)[0]
+            last_y_gs = self._last_telem_data.get("ACCs", [0,0,0])[0]
         elif self._sim_is("MSFS"):
             y_gs = telem_data.get("AccBody")[2]
+            last_y_gs = self._last_telem_data.get("AccBody", [0,0,0])[2]
         elif self._sim_is_xplane():
             y_gs = -telem_data.get("Gaxil")
+            last_y_gs = self._last_telem_data.get("Gaxil", 0)
+        delta_y = abs(y_gs) - abs(last_y_gs)
         if not self.anything_has_changed("decel", y_gs):
             return
+
+        if abs(delta_y) > 3:  # If the per-frame rate of change is greater than 3 Gs, we have likely crashed and telemetry is violently spiking.. do not play effect:
+            return
+
         if not sum(telem_data.get("WeightOnWheels")):
             effects.dispose("decel")
             return
@@ -569,12 +588,13 @@ class AircraftBase(object):
 
         dir = 180 if not self.decel_invert_force else 0
 
-        if avg_y_gs < -0.03:
+        wow = sum(telem_data.get("WeightOnWheels"), 0)
+        if (avg_y_gs < -0.03 < 500) and wow:  # Don't play effect for very small, or very large (crash) force values, or no weight on wheels
             if abs(avg_y_gs) > max_gs:
                 avg_y_gs = -max_gs
 
             avg_y_gs = utils.clamp(abs(avg_y_gs) * self.decel_scale_factor, 0, 1)
-            logging.info(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
+            logging.debug(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
             effects["decel"].constant(abs(avg_y_gs), direction= dir).start()
         else:
             effects.dispose("decel")
