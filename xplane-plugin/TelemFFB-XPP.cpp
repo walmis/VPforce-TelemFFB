@@ -71,6 +71,7 @@ static XPLMDataRef gVelAcf_x = XPLMFindDataRef("sim/flightmodel/forces/vx_acf_ax
 static XPLMDataRef gVelAcf_y = XPLMFindDataRef("sim/flightmodel/forces/vy_acf_axis");                   // m/s � float � v6.60+
 static XPLMDataRef gVelAcf_z = XPLMFindDataRef("sim/flightmodel/forces/vz_acf_axis");                   // m/s � float � v6.60+
 static XPLMDataRef gTAS = XPLMFindDataRef("sim/flightmodel/position/true_airspeed");                    // m/s � float � v6.60+
+static XPLMDataRef gIAS = XPLMFindDataRef("sim/flightmodel/position/indicated_airspeed");               // m/s � float � v6.60+
 static XPLMDataRef gAirDensity = XPLMFindDataRef("sim/weather/rho");                                    // kg/cu m float � v6.60+
 static XPLMDataRef gDynPress = XPLMFindDataRef("sim/flightmodel/misc/Qstatic");                         // psf � float � v6.60+
 static XPLMDataRef gPropThrust = XPLMFindDataRef("sim/flightmodel/engine/POINT_thrust");                // newtons � float[16] � v6.60+
@@ -324,6 +325,7 @@ void CollectTelemetryData()
     telemetryData["Gside"] = FloatToString(XPLMGetDataf(gGs_side), 3);
 
     telemetryData["TAS"] = FloatToString(XPLMGetDataf(gTAS), 3);
+    telemetryData["IAS"] = FloatToString(XPLMGetDataf(gIAS) * kt_2_mps, 3); //convert from kt t m/s to match with gTAS
     telemetryData["AirDensity"] = FloatToString(XPLMGetDataf(gAirDensity), 3);
     telemetryData["DynPressure"] = FloatToString(XPLMGetDataf(gDynPress), 3);
     telemetryData["AoA"] = FloatToString(XPLMGetDataf(gAoA), 3);

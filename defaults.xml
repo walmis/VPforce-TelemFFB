@@ -524,6 +524,7 @@
 		<any>true</any>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Override&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<validvalues>m/s,kt,mph,kph</validvalues>
@@ -2463,7 +2464,7 @@
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
-		<value>0.6</value>
+		<value>0.35</value>
 		<datatype>float</datatype>
 		</defaults>
 	<defaults>
@@ -7778,7 +7779,7 @@
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
-		<model>F-16</model>
+		<model>F-16C_50</model>
 		<value>915</value>
 		<unit>kt</unit>
 		<sim>DCS</sim>
@@ -7786,7 +7787,7 @@
 	</models>
 	<models>
 		<name>aircraft_vs_speed</name>
-		<model>F-16</model>
+		<model>F-16C_50</model>
 		<value>140</value>
 		<unit>kt</unit>
 		<sim>DCS</sim>
@@ -7810,6 +7811,13 @@
 		<name>runway_rumble_intensity</name>
 		<model>F-16C_50</model>
 		<value>3.0</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gforce_effect_enable</name>
+		<model>F-16C_50</model>
+		<value>false</value>
 		<sim>DCS</sim>
 		<device>any</device>
 	</models>
