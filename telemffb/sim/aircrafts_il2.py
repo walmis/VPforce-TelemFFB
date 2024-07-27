@@ -132,13 +132,14 @@ class Aircraft(AircraftBase):
         bombs = telem.get("Bombs")
         gun = telem.get("Gun")
         rockets = telem.get("Rockets")
+        direction = 90 if self.is_pedals() else 0
         if self.anything_has_changed("Bombs", bombs):
-            effects["bombs"].periodic(10, self.il2_weapon_release_intensity, 0,effect_type=EFFECT_SAWTOOTHUP, duration=80).start(force=True)
+            effects["bombs"].periodic(10, self.il2_weapon_release_intensity, direction,effect_type=EFFECT_SAWTOOTHUP, duration=80).start(force=True)
         elif not self.anything_has_changed("Bombs", bombs, delta_ms=160):
             effects["bombs"].stop()
 
         if self.anything_has_changed("Gun", gun) and not self.gun_is_firing:
-            effects["gunfire"].periodic(canon_hz, self.il2_weapon_release_intensity, 0, effect_type=EFFECT_SQUARE).start(force=True)
+            effects["gunfire"].periodic(canon_hz, self.il2_weapon_release_intensity, direction, effect_type=EFFECT_SQUARE).start(force=True)
             self.gun_is_firing = 1
             logging.debug(f"Gunfire={self.il2_weapon_release_intensity}")
         elif not self.anything_has_changed("Gun", gun, delta_ms=100):
@@ -147,7 +148,7 @@ class Aircraft(AircraftBase):
             self.gun_is_firing = 0
 
         if self.anything_has_changed("Rockets", rockets):
-            effects["rockets"].periodic(50, self.il2_weapon_release_intensity, 0, effect_type=EFFECT_SQUARE, duration=80).start(force=True)
+            effects["rockets"].periodic(50, self.il2_weapon_release_intensity, direction, effect_type=EFFECT_SQUARE, duration=80).start(force=True)
         if not self.anything_has_changed("Rockets", rockets, delta_ms=160):
             effects["rockets"].stop()
     def _update_runway_rumble(self, telem_data):
@@ -159,12 +160,13 @@ class Aircraft(AircraftBase):
             effects.dispose("runway0")
             effects.dispose("runway1")
     def _update_buffeting(self, telem_data: dict):
+        direction = 90 if self.is_pedals() else 0
         freq = telem_data.get("BuffetFrequency", 0)
         amp = utils.clamp(telem_data.get("BuffetAmplitude", 0) * self.il2_buffeting_factor, 0.0, 1.0)
         amp2 = utils.clamp(amp * 1.4, 0, 1)
         if amp:
-            effects["il2_buffet"].periodic(freq, amp, 0, effect_type=EFFECT_SINE).start()
-            effects["il2_buffet2"].periodic(freq * 1.5, amp2, 0, effect_type=EFFECT_SINE, phase=90).start()
+            effects["il2_buffet"].periodic(freq, amp, direction, effect_type=EFFECT_SINE).start()
+            effects["il2_buffet2"].periodic(freq * 1.5, amp2, direction + 180, effect_type=EFFECT_SINE, phase=90).start()
 
         else:
             effects.dispose("il2_buffet")
