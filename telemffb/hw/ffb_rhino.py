@@ -1,17 +1,17 @@
-# 
+#
 # This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
 # Copyright (c) 2023 Valmantas Palikša.
-# 
-# This program is free software: you can redistribute it and/or modify  
-# it under the terms of the GNU General Public License as published by  
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, version 3.
 #
-# This program is distributed in the hope that it will be useful, but 
-# WITHOUT ANY WARRANTY; without even the implied warranty of 
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU 
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 # General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License 
+# You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
@@ -88,6 +88,8 @@ EFFECT_DAMPER = 9
 EFFECT_INERTIA = 10
 EFFECT_FRICTION = 11
 EFFECT_CUSTOM = 12
+EFFECT_DETENT = 13
+EFFECT_SPRING_ADJUSTER = 14
 
 PERIODIC_EFFECTS = [EFFECT_SQUARE,EFFECT_SINE,EFFECT_TRIANGLE,EFFECT_SAWTOOTHUP,EFFECT_SAWTOOTHDOWN]
 
@@ -125,7 +127,9 @@ effect_names = {
     9: "Damper",
     10: "Inertia",
     11: "Friction",
-    12: "Custom"
+    12: "Custom",
+    13: "Detent",
+    14: "SpringAdjuster",
 }
 
 
@@ -198,6 +202,20 @@ class FFBReport_SetConstantForce(BaseStructure):
     _defaults_ = { "reportId": HID_REPORT_ID_SET_CONSTANT_FORCE }
 
 class FFBReport_SetCondition(BaseStructure):
+    """
+    Represents the structure of the SET_CONDITION HID report.
+
+    Attributes:
+        reportId (int): The report ID.
+        effectBlockIndex (int): The effect block index.
+        parameterBlockOffset (int): The parameter block offset. This identifies the axis
+        cpOffset (int): The centerPoint offset, in the range from -4096 to 4096.
+        positiveCoefficient (int): The positive coefficient, in the range from -4096 to 4096.
+        negativeCoefficient (int): The negative coefficient, in the range from -4096 to 4096.
+        positiveSaturation (int): The positive saturation, in the range from 0 to 4096.
+        negativeSaturation (int): The negative saturation, in the range from 0 to 4096.
+        deadBand (int): The dead band, in the range from 0 to 4096.
+    """
     reportId: int
     effectBlockIndex: int
     parameterBlockOffset: int
@@ -211,15 +229,75 @@ class FFBReport_SetCondition(BaseStructure):
     _pack_ = 1
     _fields_ = [("reportId", ctypes.c_uint8),
                 ("effectBlockIndex", ctypes.c_uint8), 
-                ("parameterBlockOffset", ctypes.c_uint8), # bits: 0..3=parameterBlockOffset, 4..5=instance1, 6..7=instance2
-                ("cpOffset", ctypes.c_int16), # -4096..4096
-                ("positiveCoefficient", ctypes.c_int16), # -4096..4096
-                ("negativeCoefficient", ctypes.c_int16), # -4096..4096
-                ("positiveSaturation", ctypes.c_uint16), # 0..4096
-                ("negativeSaturation", ctypes.c_uint16), # 0..4096
-                ("deadBand", ctypes.c_uint16) # 0..4096
+                ("parameterBlockOffset", ctypes.c_uint8), 
+                ("cpOffset", ctypes.c_int16), 
+                ("positiveCoefficient", ctypes.c_int16), 
+                ("negativeCoefficient", ctypes.c_int16), 
+                ("positiveSaturation", ctypes.c_uint16), 
+                ("negativeSaturation", ctypes.c_uint16), 
+                ("deadBand", ctypes.c_uint16)
                ]
     _defaults_ = { "reportId": HID_REPORT_ID_SET_CONDITION }
+
+    def set_coefficient(self, coefficient: (int|float)):
+        """
+        Sets the positive and negative coefficients based on the input coefficient value.
+
+        Args:
+            coefficient (int|float): The coefficient value to set. If it's a float, it's converted to an integer by multiplying it by 4096.
+
+        Returns:
+            None
+        """
+        if isinstance(coefficient, float):
+            coefficient: int = int(coefficient * 4096)
+        self.positiveCoefficient = coefficient
+        self.negativeCoefficient = coefficient
+
+    def set_coefficients(self, positive, negative):
+        """
+        Sets the positive and negative coefficients of the object.
+
+        Args:
+            positive (int): The positive coefficient value.
+            negative (int): The negative coefficient value.
+
+        Returns:
+            None
+        """
+        self.positiveCoefficient = positive
+        self.negativeCoefficient = negative
+
+class FFBReport_SetEnvelope(BaseStructure):
+    """
+    Represents the structure of the SET_ENVELOPE HID report.
+
+    Attributes:
+        reportId (int): The report ID.
+        effectBlockIndex (int): The effect block index.
+        attackLevel (int): The attack level, relative to the baseline, in the range from 0 through 4096.
+        fadeLevel (int): The fade level, relative to the baseline, in the range from 0 through 4096.
+        attackTime (int): The time, in milliseconds, to reach the sustain level.
+        fadeTime (int): The time, in milliseconds, to reach the fade level.
+    """
+
+    reportId: int               # uint8_t reportId
+    effectBlockIndex: int       # uint8_t effectBlockIndex
+    attackLevel: int            # uint16_t attackLevel
+    fadeLevel: int              # uint16_t fadeLevel
+    attackTime: int             # uint16_t attackTime
+    fadeTime: int               # uint16_t fadeTime
+
+    _pack_ = 1
+    _fields_ = [
+        ("reportId", ctypes.c_uint8),        # uint8_t reportId
+        ("effectBlockIndex", ctypes.c_uint8),# uint8_t effectBlockIndex
+        ("attackLevel", ctypes.c_uint16),    # uint16_t attackLevel
+        ("fadeLevel", ctypes.c_uint16),      # uint16_t fadeLevel
+        ("attackTime", ctypes.c_uint16),     # uint16_t attackTime
+        ("fadeTime", ctypes.c_uint16)        # uint16_t fadeTime
+    ]
+    _defaults_ = { "reportId": HID_REPORT_ID_SET_ENVELOPE }
 
 class FFBReport_BlockFree(BaseStructure):
     _pack_ = 1
@@ -422,8 +500,14 @@ class FFBEffectHandle:
     
     def setCondition(self, cond : FFBReport_SetCondition):
         cond.effectBlockIndex = self.effect_id
-        cond.positiveCoefficient = clamp(cond.positiveCoefficient, -4096, 4096)
-        cond.negativeCoefficient = clamp(cond.negativeCoefficient, -4096, 4096)
+        # spring adjuster can go full 16bits
+        # maximum gain increase is 32767/4096 = 7.5
+        if self.type == EFFECT_SPRING_ADJUSTER:
+            cond.positiveCoefficient = clamp(cond.positiveCoefficient, -32768, 32767)
+            cond.negativeCoefficient = clamp(cond.negativeCoefficient, -32768, 32767)
+        else:
+            cond.positiveCoefficient = clamp(cond.positiveCoefficient, -4096, 4096)
+            cond.negativeCoefficient = clamp(cond.negativeCoefficient, -4096, 4096)
         data = bytes(cond)
         if self._data_changed(f"setCondition{cond.parameterBlockOffset}", data):
             self.ffb.write(data)
@@ -473,6 +557,7 @@ class FFBRhino(QObject):
         self.info : DeviceInfo = None
         self.firmware_version : str = None
         self._button_state : int = 0
+        self._prev_hats = 0xFFFF
 
         if not path:
             devs = FFBRhino.enumerate(pid)
@@ -565,10 +650,26 @@ class FFBRhino(QObject):
 
             QTimer.singleShot(1000, do_reconnect)
             
+    def _process_hats(self, hats):
+        if hats != self._prev_hats:
+            hats_changed = hats ^ self._prev_hats
+            for i in range(4):
+                mask = 0xF << (i * 4)
+                if hats_changed & mask:
+                    val = (hats >> (i * 4)) & 0xF
+                    prev_val = (self._prev_hats >> (i * 4)) & 0xF
+
+                    if val != 0xF:
+                        b = 0x80 | (i << 4) | val
+                        self.buttonPressed.emit(b)
+                    else:
+                        b = 0x80 | (i << 4) | prev_val
+                        self.buttonReleased.emit(b)
+            self._prev_hats = hats
 
     def on_hid_report_received(self, report_id):
         if report_id == HID_REPORT_ID_INPUT:
-            report = self.get_input()
+            report: FFBReport_Input = self.get_input()
 
             btns: int = report.Button | (report.ButtonAux << 32)
 
@@ -587,6 +688,8 @@ class FFBRhino(QObject):
                 diff = diff >> 1
                 btns = btns >> 1
                 prev = prev >> 1
+
+            self._process_hats(report.hats)
 
         elif report_id == HID_REPORT_ID_PID_STATE_REPORT:
             report = self.get_report(HID_REPORT_ID_PID_STATE_REPORT)
@@ -687,12 +790,12 @@ class HapticEffect(Destroyable):
     device : FFBRhino = None
 
     def __init__(self):
-       self.name = None
-       self._stopped_time : int = 0
-       self._h_effect : FFBEffectHandle = None
-       self.modulator = None
-       self.effect_type = None
-       self._conds = {}
+        self.name = None
+        self._stopped_time : int = 0
+        self._h_effect : FFBEffectHandle = None
+        self.modulator = None
+        self.effect_type = None
+        self._conds = {}
 
     def __repr__(self):
         return f"HapticEffect({self._h_effect})"
@@ -707,22 +810,28 @@ class HapticEffect(Destroyable):
         logging.info(f"Successfully opened HID '{cls.device.info.path.decode('utf-8')}'")
 
         return cls.device
-    
+
     def setCondition(self, cond : FFBReport_SetCondition) -> Self:
-        assert(self.effect_type in [EFFECT_SPRING, EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION])
+        assert self.effect_type in [
+            EFFECT_SPRING,
+            EFFECT_DAMPER,
+            EFFECT_INERTIA,
+            EFFECT_FRICTION,
+            EFFECT_SPRING_ADJUSTER,
+        ]
 
         if not self._h_effect:
             self._conditional_effect(self.effect_type)
-        
+
         self._h_effect.setCondition(cond)
 
         return self
-    
+
     def _conditional_effect(self, effect_type, coef_x = None, coef_y= None) -> Self:
         if not self._h_effect:
             self._h_effect = self.device.create_effect(effect_type)
             self.effect_type = effect_type
-            if not self._h_effect: 
+            if not self._h_effect:
                 return self
             self._h_effect.setEffect() # initialize defaults
 
@@ -739,18 +848,21 @@ class HapticEffect(Destroyable):
             self._h_effect.setCondition(cond_y)
 
         return self
-    
+
     def inertia(self, coef_x = None, coef_y = None):
         return self._conditional_effect(EFFECT_INERTIA, coef_x, coef_y)
-    
+
     def damper(self, coef_x = None, coef_y = None):
         return self._conditional_effect(EFFECT_DAMPER, coef_x, coef_y)
-    
+
     def friction(self, coef_x = None, coef_y = None):
         return self._conditional_effect(EFFECT_FRICTION, coef_x, coef_y) 
-    
+
     def spring(self, coef_x = None, coef_y = None):
         return self._conditional_effect(EFFECT_SPRING, coef_x, coef_y) 
+    
+    def spring_adjuster(self, coef_x = 4096, coef_y = 4096):
+        return self._conditional_effect(EFFECT_SPRING_ADJUSTER, coef_x, coef_y) 
 
     def periodic(self, frequency, magnitude:float, direction:float, *args, effect_type=EFFECT_SINE, duration=0, **kwargs):
         if not self._h_effect:
@@ -758,8 +870,8 @@ class HapticEffect(Destroyable):
             self.effect_type = effect_type
             if not self._h_effect: 
                 return self
-        
-        if type(direction) == type and issubclass(direction, DirectionModulator):
+
+        if isinstance(direction, type) and issubclass(direction, DirectionModulator):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
@@ -780,7 +892,7 @@ class HapticEffect(Destroyable):
             self.effect_type = EFFECT_CONSTANT
             if not self._h_effect: return self
 
-        if type(direction) == type and issubclass(direction, DirectionModulator):
+        if isinstance(direction, type) and issubclass(direction, DirectionModulator):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
@@ -804,7 +916,7 @@ class HapticEffect(Destroyable):
             self._stopped_time = 0
 
         return self
-    
+
     def stop(self, destroy_after : int = 10000):
         """Stop active effect
 
