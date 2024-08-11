@@ -1081,6 +1081,16 @@ class MainWindow(QMainWindow):
             else:
                 exit_application()
 
+    def is_valid_geometry(self, x, y):
+        '''
+        Check whether proposed window position is valid on any active screen
+        '''
+        for screen in QApplication.screens():
+            screen_geometry = screen.availableGeometry()
+            if screen_geometry.contains(x, y):
+                return True
+        return False
+
     def load_main_window_geometry(self):
         window_data = G.system_settings.get("WindowData")
         # print(window_data)
@@ -1105,6 +1115,13 @@ class MainWindow(QMainWindow):
             win_pos = window_data_dict.get('WindowPosition', {})
             win_x = win_pos.get('x', 100)
             win_y = win_pos.get('y', 100)
+
+            # Validate the saved position
+            if not self.is_valid_geometry(win_x, win_y):
+                # If the position is invalid, move to the default position
+                logging.info(f'Saved window geometry is invalid, resetting window position to default.')
+                win_x, win_y = 100, 100
+
             self.move(win_x, win_y)
 
     def force_sim_aircraft(self):
