@@ -650,10 +650,13 @@ local f_telemFFB = {
               mainRotorRPM
             )
 
-          elseif string.find(obj.Name, "CH-47F") then
-            --damage_vars = {
-            --  147,148,149,150,151,152,155,156,158,159,160,166,169,170,215,225,245
-            --}
+          elseif string.find(obj.Name, "CH-47F", 0, true) then
+            damage_vars = {
+              65, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128,
+              128, 130, 131, 132, 146, 148, 149, 150, 152, 153, 154, 155, 156, 157, 158,
+              159, 160, 161, 166,167, 185, 188, 189, 222, 230, 231, 233, 235, 250, 252,
+              266, 267, 296, 297, 298, 299, 300, 301
+            }
             --local hyd_state = MainPanel:get_argument_value(162) -- hydraulics switch
             --if hyd_state == 0 then
               -- switch turned off
