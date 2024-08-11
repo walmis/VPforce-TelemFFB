@@ -830,14 +830,14 @@ class AircraftBase(object):
                 spoiler = sum(spoiler) / len(spoiler)
 
         if self.spoiler_motion_intensity > 0 and self.spoiler_motion_intensity > 0 and self.spoiler_motion_effect_enabled:
-            if self.anything_has_changed("Spoilers", spoiler):
+            if self.anything_has_changed("Spoilers", spoiler, delta_ms=50):
                 logging.debug(f"Spoilers Pos: {spoiler}")
                 effects["spoilermovement"].periodic(118, self.spoiler_motion_intensity, 0, 4).start()
                 effects["spoilermovement2"].periodic(118, self.spoiler_motion_intensity, 90, 4).start()
             else:
                 logging.debug("Destroying Spoiler Effects")
-                effects.dispose("spoilermovement")
-                effects.dispose("spoilermovement2")
+                effects["spoilermovement"].stop(1000)
+                effects["spoilermovement2"].stop(1000)
 
         if tas > spd_thresh_low and spoiler > .1 and self.spoiler_buffet_intensity > 0 and self.spoiler_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
@@ -848,10 +848,10 @@ class AircraftBase(object):
             effects["spoilerbuffet2-1"].periodic(14, realtime_intensity, 90, 4).start()
             effects["spoilerbuffet2-2"].periodic(18, realtime_intensity, 90, 4).start()
         else:
-            effects.dispose("spoilerbuffet1-1")
-            effects.dispose("spoilerbuffet1-2")
-            effects.dispose("spoilerbuffet2-1")
-            effects.dispose("spoilerbuffet2-2")
+            effects["spoilerbuffet1-1"].stop(1000)
+            effects["spoilerbuffet1-2"].stop(1000)
+            effects["spoilerbuffet2-1"].stop(1000)
+            effects["spoilerbuffet2-2"].stop(1000)
 
     def _update_tailhook_effect(self, telem_data):
         """
