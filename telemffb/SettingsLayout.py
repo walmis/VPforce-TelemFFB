@@ -913,12 +913,18 @@ class SettingsLayout(QGridLayout):
             self.reload_caller()
 
     def usb_button_clicked(self):
+        if G.master_instance and G.device_type != G.current_device_config_scope:
+            # button is being bound for non master device
+            target_device = G.current_device_config_scope
+        else:
+            target_device = None
+
         button_name = self.sender().objectName().replace('pb_', '')
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText("Push a button! ")
         # listen for button loop
         # Start a thread to fetch button press with a timeout
-        self.thread = ButtonPressThread(self.device, self.sender())
+        self.thread = ButtonPressThread(self.device, self.sender(), target_device)
         self.thread.button_pressed.connect(self.update_button)
         self.thread.start()
 
