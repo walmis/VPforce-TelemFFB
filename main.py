@@ -421,6 +421,9 @@ def main():
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
     G.ipc_instance.start()
 
+    HapticEffect.device.buttonPressed.connect(G.main_window.get_active_buttons)
+    HapticEffect.device.buttonReleased.connect(G.main_window.get_active_buttons)
+
     launch_children()
 
     # log_tail_window = LogTailWindow(window)

@@ -31,6 +31,9 @@ launched_instances : Dict[str, 'ChildPopen'] = {}
 master_instance : bool = False
 ipc_instance : 'IPCNetworkThread' = None
 child_instance : bool = None
+active_buttons: list = []
+master_buttons: list = []
+child_buttons: dict = {}
 
 current_device_config_scope: str = None # add current device config scope to globals for tracking across telemffb modules
 

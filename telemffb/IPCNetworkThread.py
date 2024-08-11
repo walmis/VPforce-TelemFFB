@@ -100,7 +100,10 @@ class IPCNetworkThread(QThread):
         for fromaddr in self._child_addrs.values():
             if fromaddr:
                 encoded_data = message.encode("utf-8")
-                self._socket.sendto(encoded_data, fromaddr)
+                try:
+                    self._socket.sendto(encoded_data, fromaddr)
+                except OSError as e:
+                    logging.warning(f"Error sending IPC frame: {e}")
 
     def _send_keepalive(self):
 
@@ -185,6 +188,17 @@ class IPCNetworkThread(QThread):
                 elif msg.startswith("LOADCONFIG:"):
                     path = msg.removeprefix("LOADCONFIG:")
                     load_custom_userconfig(path)
+                elif msg.startswith("MASTER_BUTTONS:"):
+                    payload = msg.removeprefix("MASTER_BUTTONS:")
+                    G.master_buttons = json.loads(payload)
+                    # print(f"MB: {G.master_buttons}")
+                elif msg.startswith("BUTTONS:"):
+                    payload = msg.removeprefix("BUTTONS:").split("_")
+                    dev = payload[0]
+                    btns = json.loads(payload[1])
+                    G.child_buttons[dev] = btns
+                    # print(G.child_buttons)
+
                 else:
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")
 

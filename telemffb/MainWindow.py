@@ -658,6 +658,18 @@ class MainWindow(QMainWindow):
             self.add_debug_menu()
         G.gain_override_dialog = ConfiguratorDialog(self) # create configurator gain dialog for use during TelemFFB session and store object in globals
 
+    def get_active_buttons(self):
+        input_data = HapticEffect.device.get_input()
+        if input_data is not None:
+            btns = input_data.getPressedButtons()
+            if btns != G.active_buttons:
+                # only send if pressed buttons has changed
+                G.active_buttons = btns
+                if G.master_instance:
+                    G.ipc_instance.send_broadcast_message(f"MASTER_BUTTONS:{G.active_buttons}")
+                else:
+                    G.ipc_instance.send_message(f"BUTTONS:{G.device_type}_{G.active_buttons}")
+
     def add_system_tray(self):
         self.tray_icon.setIcon(QIcon(":/image/vpforceicon.png"))
         self.tray_icon.setToolTip("VPforce TelemFFB")
