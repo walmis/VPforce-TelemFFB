@@ -324,13 +324,36 @@ class FFBReport_Input(BaseStructure):
 
     # get if button is pressed, buttons start from 1
     def isButtonPressed(self, button_number):
-        assert(button_number > 0)
-        btns = self.Button | (self.ButtonAux<<32)
-        return (btns & (1<<(button_number-1))) != 0
+        assert (button_number > 0)
+
+        # Check regular buttons
+        btns = self.Button | (self.ButtonAux << 32)
+        if (btns & (1 << (button_number - 1))) != 0:
+            return True
+
+        # Check hat switches
+        for i in range(4):
+            hat_position = (self.hats >> (i * 4)) & 0xF
+            if hat_position != 0xF:
+                b = 0x80 | (i << 4) | hat_position
+                if button_number == b:
+                    return True
+
+        return False
 
     def getPressedButtons(self):
         btns = self.Button | (self.ButtonAux << 32)
+
+        # Collect regular buttons
         pressed = [i + 1 for i in range(64) if (btns & (1 << i)) != 0]
+
+        # Collect hat switch positions as button numbers
+        for i in range(4):
+            hat_position = (self.hats >> (i * 4)) & 0xF
+            if hat_position != 0xF:
+                b = 0x80 | (i << 4) | hat_position
+                pressed.append(b)
+
         return pressed
 
     # get main X and Y axis in range [-1.0 .. 1.0]
