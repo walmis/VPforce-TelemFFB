@@ -11,6 +11,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     
+    - name: Install Specific Setuptools Version
+      run: |
+        python -m pip install setuptools==71.1.0 # Avoid issue https://github.com/pypa/setuptools/issues/4518 in v72.x 
+    
     - name: Create Version file
       run: |
         echo VERSION = \"`git describe --always --abbrev=8 --dirty --tags`\" > version.py
