@@ -114,7 +114,7 @@ class Aircraft(AircraftBase):
     elevator_expo: int = 0
     rudder_expo: int = 0
 
-    vne_override: str = ''
+    vne_override: int = 0
 
     @classmethod
     def set_simconnect(cls, sc):
@@ -1617,7 +1617,8 @@ class Helicopter(Aircraft):
                     # dont start sending position until physical pedals have centered
                     self.pedals_init = 1
                     logging.info("Pedals Initialized")
-                    self._spring_handle.stop()
+                    if not self.pedal_force_trim_enabled:
+                        self._spring_handle.stop()
                 else:
                     if self._sim_is_msfs():
                         if self.enable_custom_x_axis:
@@ -1627,6 +1628,20 @@ class Helicopter(Aircraft):
 
                         self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
                     return
+
+            if self.pedal_force_trim_enabled:
+                if not self._spring_handle.started:
+                    self._spring_handle.start()
+
+                if not self._update_pedal_force_trim(telem_data):
+                    spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
+                    self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
+
+                self._spring_handle.setCondition(self.spring_x)
+            else:
+                if self._spring_handle.started:
+                    self._spring_handle.stop()
+
 
             self.last_pedal_x = phys_x
 

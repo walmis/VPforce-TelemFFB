@@ -298,7 +298,7 @@ class Aircraft(AircraftBase):
         x, y = input_data.axisXY()
         telem_data["X"] = x
 
-        pedal_pos = -telem_data.get('controlsurfaces_rudder_right')
+        pedal_pos = -telem_data.get('controlsurfaces_rudder_right',0)
         # trim signal needs to be slow to avoid positive feedback
         lp_x = LPFs.get("x", 5)
         # estimate trim from real stick position and virtual stick position

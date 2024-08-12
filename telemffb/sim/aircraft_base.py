@@ -7,7 +7,8 @@ from typing import List, Dict
 # from utils import clamp, HighPassFilter, Derivative, Dispenser
 
 from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition
-from telemffb.globals import master_instance
+import telemffb.globals as G
+from telemffb.globals import master_instance, master_buttons
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
@@ -33,7 +34,10 @@ EFFECT_TRIANGLE = 5
 EFFECT_SAWTOOTHUP = 6
 EFFECT_SAWTOOTHDOWN = 7
 
+
 class AircraftBase(object):
+    cpO_x = 0
+    cpO_y = 0
     aoa_buffet_freq = 13
 
     buffeting_intensity: float = 0.2  # peak AoA buffeting intensity  0 to disable
@@ -205,6 +209,14 @@ class AircraftBase(object):
     pedal_trimming_enabled = False
     pedal_spring_gain = 1.0
     pedal_dampening_gain = 0
+
+    pedal_force_trim_enabled: bool = False
+    pedal_ft_use_master_buttons: bool = False
+    pedal_ft_release_button: int = 0
+    pedal_ft_reset_button: int = 0
+    pedal_ft_damper_enabled: bool = False
+    pedal_ft_damper_force: float = 0.0
+    pedal_trim_reset_complete: bool = False
 
     etl_start_speed = 6.0 # m/s
     etl_stop_speed = 22.0 # m/s
@@ -1395,6 +1407,49 @@ class AircraftBase(object):
             effects.dispose("rotor_rpm0-1")
             effects.dispose("rotor_rpm1-1")
 
+    def check_master_button_press(self, button):
+        # print(f"Checking {button} against {master_buttons}")
+        return button in G.master_buttons
+
+    def _update_pedal_force_trim(self, telem_data):
+        if not self.is_pedals(): return
+
+        input_data = HapticEffect.device.get_input()
+        phys_x, phys_y = input_data.axisXY()
+
+        if self.pedal_ft_use_master_buttons:
+            force_trim_pressed = self.check_master_button_press(self.pedal_ft_release_button) if self.pedal_ft_release_button else False
+
+            trim_reset_pressed = self.check_master_button_press(self.pedal_ft_reset_button) if self.pedal_ft_reset_button else False
+        else:
+
+            force_trim_pressed = input_data.isButtonPressed(self.pedal_ft_release_button) if self.pedal_ft_release_button else False
+
+            trim_reset_pressed = input_data.isButtonPressed(self.pedal_ft_reset_button) if self.pedal_ft_reset_button else False
+        if force_trim_pressed:
+
+            if self.pedal_ft_damper_enabled:
+                self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = round(self.pedal_ft_damper_force * 4096)
+            else:
+                self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = 0
+
+            self.cpO_x = round(phys_x * 4096)
+            self.spring_x.cpOffset = self.cpO_x
+            return True
+
+        if trim_reset_pressed or not self.pedal_trim_reset_complete:
+            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = 4096
+            self.cpO_x = self.step_value_over_time("center_x", self.cpO_x, 1000, 0)
+
+            self.spring_x.cpOffset = self.cpO_x
+
+            if self.cpO_x == 0:
+                self.pedal_trim_reset_complete = True
+            else:
+                self.pedal_trim_reset_complete = False
+            return True
+        return False
+
     def _override_pedal_spring(self, telem_data):
         if not self.is_pedals(): return
 
@@ -1404,20 +1459,28 @@ class AircraftBase(object):
         ## 1=spring disabled
         ## 2=static spring enabled using "pedal_spring_gain" spring setting
         ## 3=dynamic spring enabled.  Based on "pedal_spring_gain"
-        if self.pedal_spring_mode == 0:
+
+        if self.pedal_spring_mode == "Sim Default" or self.pedal_spring_mode == 0:
+            if effects['pedal_spring'].started:
+                effects["pedal_spring"].stop()
             return
-        elif self.pedal_spring_mode == 'No Spring':
+
+        if self.pedal_spring_mode == 'No Spring' and not self.pedal_force_trim_enabled:
             self.spring_x.positiveCoefficient = 0
             self.spring_x.negativeCoefficient = 0
 
-        elif self.pedal_spring_mode == 'Static Spring':
-            spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
-            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
+        elif self.pedal_spring_mode == 'Static Spring' or self.pedal_force_trim_enabled:
+            if self.pedal_force_trim_enabled:
+                if not self._update_pedal_force_trim(telem_data):
+                    spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
+                    self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
+            else:
+                spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
+                self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
+                if self.pedal_trimming_enabled:
+                    self._update_pedal_trim(telem_data)
 
-            if self.pedal_trimming_enabled:
-                self._update_pedal_trim(telem_data)
-
-        elif self.pedal_spring_mode == 'Dynamic Spring':
+        elif self.pedal_spring_mode == 'Dynamic Spring' and not self.pedal_force_trim_enabled:
             tas = telem_data.get("TAS", 0)
             # ac_perf = self.get_aircraft_perf(telem_data)
             # if self.aircraft_vs_speed:
