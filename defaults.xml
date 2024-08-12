@@ -384,8 +384,8 @@
 		<order>140.5</order>
 		<name>force_trim_button</name>
 		<prereq>force_trim_enabled</prereq>
-		<info>Button # to hold to release spring while moving axis&lt;br&gt;&lt;br&gt;**Cannot be set from the collective context of the master instace**&lt;br&gt;&lt;br&gt;Must be set from the actual collective instance of TelemFFB</info>
-		<displayname>Trim Release Button (must use collective instance to set)</displayname>
+		<info>Button # to hold to release spring while moving axis</info>
+		<displayname>Trim Release Button</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -730,6 +730,101 @@
 	</defaults>
 	<defaults>
 		<Grouping>SpringCenter</Grouping>
+		<order>255</order>
+		<name>pedal_force_trim_enabled</name>
+		<info>Enable static spring and allow binding of force trim button for pedals</info>
+		<displayname>Pedal Force Trim (Overrides Pedal Mode)</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>255.2</order>
+		<name>pedal_ft_use_master_buttons</name>
+		<prereq>pedal_force_trim_enabled</prereq>
+		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from pedals (use loopback app).</info>
+		<displayname>Use buttons from master device</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>255.3</order>
+		<name>pedal_ft_release_button</name>
+		<prereq>pedal_force_trim_enabled</prereq>
+		<displayname>Trim Release Button</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>255.4</order>
+		<name>pedal_ft_reset_button</name>
+		<prereq>pedal_force_trim_enabled</prereq>
+		<displayname>Trim Reset Button</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>0</value>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>255.5</order>
+		<name>pedal_spring_gain</name>
+		<prereq>pedal_force_trim_enabled</prereq>
+		<info>Percent of spring setting in VPForce Configurator</info>
+		<displayname>Pedal Spring Gain</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>256</order>
+		<name>pedal_ft_damper_enabled</name>
+		<prereq>pedal_force_trim_enabled</prereq>
+		<info>Enable dampening force while trim release is pressed</info>
+		<displayname>Trim Release Damper</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>256.1</order>
+		<name>pedal_ft_damper_force</name>
+		<prereq>pedal_ft_damper_enabled</prereq>
+		<info>Enable dampening force while trim release is pressed</info>
+		<displayname>Trim Release Damper</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
 		<order>260</order>
 		<name>pedal_mode_dummy</name>
 		<displayname>Pedal Mode Settings</displayname>
@@ -749,7 +844,7 @@
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
-		<validvalues>No Spring,Static Spring,Dynamic Spring</validvalues>
+		<validvalues>Sim Default,No Spring,Static Spring,Dynamic Spring</validvalues>
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
@@ -763,6 +858,7 @@
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
+		<value>.75</value>
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
@@ -6146,6 +6242,20 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
+		<name>pedal_force_trim_enabled</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>pedal_force_trim_enabled</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
 		<name>pedal_spring_gain</name>
 		<type>Helicopter</type>
 		<value>0.3</value>
@@ -7658,6 +7768,20 @@
 		<unit>kt</unit>
 		<sim>DCS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>deceleration_max_force</name>
+		<model>CH-47F</model>
+		<value>0.1</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>CH-47F</model>
+		<value>0.1</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
