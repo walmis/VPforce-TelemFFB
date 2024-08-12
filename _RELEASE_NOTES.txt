@@ -1,4 +1,17 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+
+############################################
+##  August 11, 2024
+############################################
+## General
+- Avoid placing TelemFFB window off screen if saved location is from a disconnected monitor
+- Button binds in TelemFFB now support PoV Hats when "use hats as buttons" is disabled in configurator
+## DCS
+- Add rotor RPM + damage telemetry for CH-47
+## DCS/MSFS/X-Plane
+- Add Hardware Force Trim for pedals in Helos
+
+
 ############################################
 ##  July 26, 2024
 ############################################
