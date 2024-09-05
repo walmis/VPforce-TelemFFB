@@ -584,6 +584,7 @@ class SystemSettings(QSettings):
         'enableVPConfExit': False,
         'enableVPConfGlobalDefault': False,
         'pathVPConfExit': '',
+        'enableResetGainsExit': False,
     }
 
     globl_sys_dict = {

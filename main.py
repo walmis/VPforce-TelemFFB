@@ -490,12 +490,13 @@ def main():
             set_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
-    try:
-        ## Last we push the gains we read at startup as good measure in case they were changed and never reverted by
-        ## a model change
-        G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
-    except:
-        pass
+    if G.system_settings.get('enableResetGainsExit', False):
+        try:
+            ## Last we push the gains we read at startup as good measure in case they were changed and never reverted by
+            ## a model change
+            G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
+        except:
+            pass
 
 
 def init_logging(log_widget : QPlainTextEdit):

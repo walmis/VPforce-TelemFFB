@@ -371,7 +371,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "pathVPConfStartup": self.pathVPConfStartup.text(),
             "enableVPConfExit": self.enableVPConfExit.isChecked(),
             "pathVPConfExit": self.pathVPConfExit.text(),
-            "enableVPConfGlobalDefault": self.enableVPConfGlobalDefault.isChecked()
+            "enableVPConfGlobalDefault": self.enableVPConfGlobalDefault.isChecked(),
+            "enableResetGainsExit": self.enableResetGainsExit.isChecked(),
         }
 
         key_list = [
@@ -509,6 +510,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableVPConfExit.setChecked(settings_dict.get('enableVPConfExit', False))
         self.pathVPConfExit.setText(settings_dict.get('pathVPConfExit', ''))
         self.enableVPConfGlobalDefault.setChecked(settings_dict.get('enableVPConfGlobalDefault', False))
+        self.enableResetGainsExit.setChecked(settings_dict.get('enableResetGainsExit', False))
 
 
         self.toggle_al_widgets()
