@@ -35,6 +35,8 @@ active_buttons: list = []
 master_buttons: list = []
 child_buttons: dict = {}
 
+force_reload_aircraft_trigger: bool = False
+
 current_device_config_scope: str = None # add current device config scope to globals for tracking across telemffb modules
 
 # systems settings

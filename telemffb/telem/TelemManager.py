@@ -296,11 +296,12 @@ class TelemManager(QObject, threading.Thread):
                         Class = module.Aircraft
 
                 if "vpconf" in params:
-                    if G.current_vpconf_profile != params.get('vpconf', None):
+                    if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
                         # Load the vpconf configurator file specified for the model, only if it is not the current
                         # one loaded
                         set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
                         G.vpconf_configurator_gains = HapticEffect.device.get_gains()
+                        G.force_reload_aircraft_trigger = False
                 else:
                     # If the current model does not have a vpconf specified, check whether the global default is
                     # configured and enabled.  If so, load that vpconf profile
@@ -368,11 +369,12 @@ class TelemManager(QObject, threading.Thread):
                 self.currentAircraft.apply_settings(updated_params)
 
                 if "vpconf" in params:
-                    if G.current_vpconf_profile != params.get('vpconf', None):
+                    if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
                         # Load the vpconf configurator file specified for the model, only if it is not the current
                         # one loaded
                         set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
                         G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
+                        G.force_reload_aircraft_trigger = False
 
                 else:
                     # If the current model does not have a vpconf specified, check whether the global default is

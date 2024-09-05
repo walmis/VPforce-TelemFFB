@@ -14,6 +14,7 @@ class IPCNetworkThread(QThread):
     message_received = pyqtSignal(str)
     exit_signal = pyqtSignal(str)
     restart_sim_signal = pyqtSignal(str)
+    reload_aircraft_signal = pyqtSignal()
     show_signal = pyqtSignal()
     showlog_signal = pyqtSignal()
     hide_signal = pyqtSignal()
@@ -139,6 +140,8 @@ class IPCNetworkThread(QThread):
                     self.exit_signal.emit("Received QUIT signal from master instance.  Running exit/cleanup function.")
                 elif msg == 'RESTART SIMS':
                     self.restart_sim_signal.emit('Restart Sims')
+                elif msg == "RELOAD AIRCRAFT":
+                    self.reload_aircraft_signal.emit()
                 elif msg.startswith('SHOW LOG:'):
                     dev = msg.removeprefix('SHOW LOG:')
                     if dev == G.device_type:

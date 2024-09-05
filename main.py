@@ -419,6 +419,7 @@ def main():
     G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
     G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
+    G.ipc_instance.reload_aircraft_signal.connect(G.main_window.force_reload_aircraft)
     G.ipc_instance.start()
 
     HapticEffect.device.buttonPressed.connect(G.main_window.get_active_buttons)

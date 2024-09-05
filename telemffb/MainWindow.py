@@ -215,6 +215,10 @@ class MainWindow(QMainWindow):
         self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf())
         utilities_menu.addAction(self.vpconf_action)
 
+        reload_action = QAction('Force Reload Aircraft (Ctrl+Shift+R)', self)
+        reload_action.triggered.connect(self.force_reload_aircraft)
+        utilities_menu.addAction(reload_action)
+
         # Add settings converter
         _legacy_override_file = utils.get_legacy_override_file()
         if _legacy_override_file is not None:
@@ -651,8 +655,12 @@ class MainWindow(QMainWindow):
 
         # Load Stored Geomoetry
         self.load_main_window_geometry()
-        shortcut = QShortcut(QKeySequence('Alt+D'), self)
-        shortcut.activated.connect(self.add_debug_menu)
+        debug_shortcut = QShortcut(QKeySequence('Alt+D'), self)
+        debug_shortcut.activated.connect(self.add_debug_menu)
+
+        reload_shortcut = QShortcut(QKeySequence('Ctrl+Shift+R'), self)
+        reload_shortcut.activated.connect(self.force_reload_aircraft)
+
         if G.system_settings.get('debug', False):
             # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
             self.add_debug_menu()
@@ -839,6 +847,13 @@ class MainWindow(QMainWindow):
             f"X-Plane : {xplane_status}\n\n"
             "Enable or Disable in System -> System Settings"
         )
+    def force_reload_aircraft(self):
+        G.force_reload_aircraft_trigger = True
+        G.telem_manager.currentAircraftName = None
+        logging.info("Force Reload (Ctrl+Shift+R) initiated.  Reloading config and re-pushing configurator file (if applicable)")
+        if G.master_instance:
+            G.ipc_instance.send_broadcast_message("RELOAD AIRCRAFT")
+
 
     def add_debug_menu(self):
         # debug mode
