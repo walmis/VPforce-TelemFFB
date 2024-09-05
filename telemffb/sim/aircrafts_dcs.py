@@ -623,6 +623,10 @@ class Helicopter(Aircraft):
         self._update_vrs_effect(telem_data)
         self.update_tr_damper()
 
+        if not self.cp_spr_override_active:
+            self._gforce_effect(telem_data)
+
+
     def update_tr_damper(self):
         if not self.is_joystick(): return
         if not self.dcs_tr_damper_enabled: return
