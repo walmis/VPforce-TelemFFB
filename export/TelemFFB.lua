@@ -670,6 +670,35 @@ local f_telemFFB = {
               "RotorRPM=%.0f",
               mainRotorRPM
             )
+            local ch47payload = LoGetPayloadInfo()
+              -- OH-6A, like the UH1 only has cannon info in payload block.  use getShellCount to pull out the applicable data and write it into the CannonShells telemetry
+
+              local additional_shells_1 = getShellCount(ch47payload, "4.6.10.0") -- Door Gunners
+              -- local additional_shells_2 = getShellCount(ch47payload, "4.6.10.134") -- GIAT
+              CannonShells = CannonShells + additional_shells_1
+              stations = LoGetPayloadInfo().Stations
+              PayloadInfo = "empty"
+              temparray = {}
+
+              for i_st, st in pairs(stations) do
+                  -- we want to re-write the payload block without the canon data which contains the cannon rounds.  This is so
+                  -- the "payload release" effect does not play while canons are firing.
+                  local name = LoGetNameByType(st.weapon.level1,st.weapon.level2,st.weapon.level3,st.weapon.level4);
+                  id = string.format( "%d.%d.%d.%d", st.weapon.level1, st.weapon.level2, st.weapon.level3, st.weapon.level4)
+                  if id ~= "4.6.10.0" then
+                      temparray[#temparray + 1] =
+                        string.format(
+                        "%s-%d.%d.%d.%d*%d",
+                        name,
+                        st.weapon.level1,
+                        st.weapon.level2,
+                        st.weapon.level3,
+                        st.weapon.level4,
+                        st.count
+                        )
+                      PayloadInfo = table.concat(temparray, "~")
+                  end
+              end
 
           elseif string.find(obj.Name, "SA342", 0, true)then -- Gazelle
             -- SA342 Relevent Info (from mainpanel_init.lua):
