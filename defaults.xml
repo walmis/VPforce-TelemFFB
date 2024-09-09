@@ -1571,6 +1571,166 @@
 		<value>0.2</value>
 		<datatype>float</datatype>
 	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>355</order>
+		<name>new_gforce_effect_enable</name>
+		<info>Alternate G Force Effec - Enabling will override legacy G Force Effect&lt;br&gt;&lt;br&gt;See manual for details</info>
+		<displayname>G Force Effect **New**</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>355.2</order>
+		<name>new_gforce_effect_max_intensity</name>
+		<prereq>new_gforce_effect_enable</prereq>
+		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
+		<displayname>Maximum Intensity</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.8</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>355.3</order>
+		<name>new_gforce_min_gs</name>
+		<prereq>new_gforce_effect_enable</prereq>
+		<info>G loading where effect will start</info>
+		<displayname>Start Gs</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>10,30</validvalues>
+		<value>1.1</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>355.4</order>
+		<name>new_gforce_max_gs</name>
+		<prereq>new_gforce_effect_enable</prereq>
+		<info>G loading where effect will max out</info>
+		<displayname>Maximum Gs</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>40,100</validvalues>
+		<value>5</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>355.5</order>
+		<name>new_gforce_effect_deflection_factor</name>
+		<prereq>new_gforce_effect_enable</prereq>
+		<info>Y Axis deflection that will result in %100 of calculated force based on current g loading and min/max settings</info>
+		<displayname>Y-Axis Max Point</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<validvalues>50,100</validvalues>
+		<value>1.0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>356</order>
+		<name>new_gforce_enable_neg_gs</name>
+		<prereq>new_gforce_effect_enable</prereq>
+		<info>Enable effect for negative Gs</info>
+		<displayname>Enable Negative Gs</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>356.2</order>
+		<name>new_gforce_effect_max_intensity_neg</name>
+		<prereq>new_gforce_enable_neg_gs</prereq>
+		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
+		<displayname>Maximum Intensity (Neg)</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.8</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>356.3</order>
+		<name>new_gforce_min_gs_neg</name>
+		<prereq>new_gforce_enable_neg_gs</prereq>
+		<info>G loading where effect will start</info>
+		<displayname>Start Gs (Neg)</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>-30,10</validvalues>
+		<value>0.9</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>356.4</order>
+		<name>new_gforce_max_gs_neg</name>
+		<prereq>new_gforce_enable_neg_gs</prereq>
+		<info>G loading where effect will max out</info>
+		<displayname>Maximum Gs (Neg)</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>-100,-20</validvalues>
+		<value>-4.0</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>356.5</order>
+		<name>new_gforce_effect_deflection_factor_neg</name>
+		<prereq>new_gforce_enable_neg_gs</prereq>
+		<info>Y Axis deflection that will result in %100 of calculated force based on current g loading and min/max settings</info>
+		<displayname>Y-Axis Max Point (Neg)</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<validvalues>-100,-50</validvalues>
+		<value>-1.0</value>
+		<datatype>negfloat</datatype>
+	</defaults>
 	<defaults><Grouping>G Force</Grouping><order>360</order><name>gforce_effect_enable</name><info>See manual for details</info><displayname>G Force Effect</displayname><DCS>true</DCS><IL2>true</IL2><joystick>true</joystick><datatype>bool</datatype></defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
@@ -5202,6 +5362,237 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>AllSettings</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs</name>
+		<type>PropellerAircraft</type>
+		<value>5.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs</name>
+		<type>JetAircraft</type>
+		<value>7.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs</name>
+		<type>PropellerAircraft</type>
+		<value>5.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs</name>
+		<type>JetAircraft</type>
+		<value>7.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs_neg</name>
+		<type>PropellerAircraft</type>
+		<value>-3.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs_neg</name>
+		<type>JetAircraft</type>
+		<value>-4.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs_neg</name>
+		<type>PropellerAircraft</type>
+		<value>-3.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs_neg</name>
+		<type>JetAircraft</type>
+		<value>-4.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
 		<name>gforce_effect_curvature</name>
 		<type>JetAircraft</type>
 		<value>2.5</value>
@@ -5252,6 +5643,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>gforce_effect_enable</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_enable</name>
 		<type>JetAircraft</type>
 		<value>true</value>
 		<sim>IL2</sim>
@@ -5282,6 +5680,13 @@
 		<name>gforce_effect_max_intensity</name>
 		<type>PropellerAircraft</type>
 		<value>0.8</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_effect_max_intensity</name>
+		<type>Helicopter</type>
+		<value>0.4</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -5322,6 +5727,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>gforce_max_gs</name>
+		<type>Helicopter</type>
+		<value>10.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_max_gs</name>
 		<type>JetAircraft</type>
 		<value>7.0</value>
 		<sim>IL2</sim>
@@ -5352,6 +5764,13 @@
 		<name>gforce_min_gs</name>
 		<type>PropellerAircraft</type>
 		<value>1.4</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>gforce_min_gs</name>
+		<type>Helicopter</type>
+		<value>1.5</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -7677,13 +8096,6 @@
 		<name>runway_rumble_intensity</name>
 		<model>AV8BNA</model>
 		<value>2.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>trim_workaround</name>
-		<model>AV8BNA</model>
-		<value>true</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</models>
