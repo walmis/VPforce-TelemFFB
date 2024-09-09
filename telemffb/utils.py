@@ -168,6 +168,7 @@ class EffectTranslator:
         "gearmovement": ["Gear Motion", "gear_motion_intensity"],
         "gearmovement2": ["Gear Motion", "gear_motion_intensity"],
         "gforce": ["G-Force Loading", "gforce_effect_max_intensity"],
+        "new_gforce": ["G-Force Loading V2", "new_gforce_effect_max_intensity"],
         "gunfire": ["Gunfire Rumble", "gun_vibration_intensity"],
         "hit": ["Aircraft Hit Event", ""],
         "je_rumble_1_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],

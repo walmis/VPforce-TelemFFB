@@ -293,7 +293,6 @@ class PropellerAircraft(Aircraft):
         self.update_piston_engine_rumble(telem_data)
         if self.is_joystick():
             self.override_elevator_droop(telem_data)
-        if self.gforce_effect_enable:
             self._gforce_effect(telem_data)
 
 
@@ -326,7 +325,7 @@ class JetAircraft(Aircraft):
 
         self._update_jet_engine_rumble(telem_data)
 
-        if self.gforce_effect_enable:
+        if self.is_joystick():
             self._gforce_effect(telem_data)
 
 

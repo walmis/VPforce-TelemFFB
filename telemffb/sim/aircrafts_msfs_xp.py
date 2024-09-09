@@ -262,16 +262,6 @@ class Aircraft(AircraftBase):
 
                 elev_trim = telem_data.get("ElevTrimPct", 0)
 
-                # derivative_hz = 5  # derivative lpf filter -3db Hz
-                # derivative_k = 0.1  # derivative gain value, or damping ratio
-                #
-                # d_elev_trim = getattr(self, "_d_elev_trim", None)
-                # if not d_elev_trim: d_elev_trim = self._d_elev_trim = utils.Derivative(derivative_hz)
-                # d_elev_trim.lpf.cutoff_freq_hz = derivative_hz
-                #
-                # elev_trim_deriv = - d_elev_trim.update(elev_trim) * derivative_k
-                #
-                # elev_trim += elev_trim_deriv
                 elev_trim = self.dampener.dampen_value(elev_trim, '_elev_trim', derivative_hz=5, derivative_k=0.15)
 
                 # print(f"raw:{raw_elev_trim}, smooth:{elev_trim}")
@@ -299,18 +289,6 @@ class Aircraft(AircraftBase):
                         aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
                         elevator_pos = telem_data.get("APPitchServo", 0)
                         phys_stick_y_offs = int(elevator_pos*4096)
-
-
-                    # derivative_hz = 5  # derivative lpf filter -3db Hz
-                    # derivative_k = 0.1  # derivative gain value, or damping ratio
-                    #
-                    # d_aileron_pos = getattr(self, "_d_aileron_pos", None)
-                    # if not d_aileron_pos: d_aileron_pos = self._d_aileron_pos = utils.Derivative(derivative_hz)
-                    # d_aileron_pos.lpf.cutoff_freq_hz = derivative_hz
-                    #
-                    # aileron_pos_deriv = - d_aileron_pos.update(aileron_pos) * derivative_k
-                    #
-                    # aileron_pos += aileron_pos_deriv
 
 
                     phys_stick_x_offs = int(aileron_pos * 4096)
@@ -1055,8 +1033,7 @@ class PropellerAircraft(Aircraft):
                 self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=80*kt2ms, spd_thresh_hi=140*kt2ms )
         if self._sim_is_xplane():
             self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=80 * kt2ms)
-        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
-            self._gforce_effect(telem_data)
+        self.new_gforce_effect(telem_data)
         if self.is_collective():
             self._override_collective_spring()
 
@@ -1087,8 +1064,7 @@ class JetAircraft(Aircraft):
                 sp = max(telem_data.get("Spoilers", 0))
                 self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
         self._update_jet_engine_rumble(telem_data)
-        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
-            self._gforce_effect(telem_data)
+        self.new_gforce_effect(telem_data)
         self._update_ab_effect(telem_data)
         if self.is_collective():
             self._override_collective_spring()
@@ -1110,8 +1086,8 @@ class TurbopropAircraft(PropellerAircraft):
             if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
                 sp = max(telem_data.get("Spoilers", 0))
                 self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
-        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
-            self._gforce_effect(telem_data)
+        self.new_gforce_effect(telem_data)
+
         self._update_jet_engine_rumble(telem_data)
         if self.is_collective():
             self._override_collective_spring()
@@ -1237,8 +1213,8 @@ class GliderAircraft(Aircraft):
                 sp = max(sp)
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
-        if self.aircraft_is_fbw or telem_data.get("ACisFBW"):
-            self._gforce_effect(telem_data)
+        self.new_gforce_effect(telem_data)
+
         if self.is_collective():
             self._override_collective_spring()
 class Helicopter(Aircraft):

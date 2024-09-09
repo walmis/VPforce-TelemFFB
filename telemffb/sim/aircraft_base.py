@@ -88,13 +88,21 @@ class AircraftBase(object):
 
     ####
     #### Beta effects - set to 1 to enable
-    gforce_effect_invert_force = 0  # 0=disabled(default),1=enabled (case where "180" degrees does not equal "away from pilot")
     gforce_effect_enable = 0
     gforce_effect_enable_areyoureallysure = 0
     gforce_effect_curvature = 2.2
     gforce_effect_max_intensity = 1.0
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
+
+    new_gforce_effect_enable = False
+    new_gforce_min_gs = 1.1  # G's where the effect starts playing
+    new_gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
+    new_gforce_effect_deflection_factor = 1.0
+    new_gforce_enable_neg_gs = False
+    new_gforce_min_gs_neg = 0.9
+    new_gforce_max_gs_neg = -4
+    new_gforce_effect_deflection_factor_neg = 1.0
 
     gear_motion_effect_enabled: bool = True
     gear_motion_intensity: float = 0.12
@@ -476,11 +484,98 @@ class AircraftBase(object):
             effects.dispose("runway0")
             effects.dispose("runway1")
 
+    def new_gforce_effect(self, telem_data):
+        if not self.is_joystick() or not self.new_gforce_effect_enable:
+            effects.dispose("new_gforce")
+            return
+
+        if sum(telem_data.get("WeightOnWheels")):
+            effects.dispose("new_gforce")
+            return
+        if not telem_data.get("TAS", 0):
+            effects.dispose("new_gforce")
+            return
+
+        gmin = self.new_gforce_min_gs
+        gmin_neg = self.new_gforce_min_gs_neg
+        gmax = self.new_gforce_max_gs
+        gmax_neg = self.new_gforce_max_gs_neg
+
+
+        if self._sim_is("DCS") or self._sim_is("IL2"):
+            gs: float = telem_data.get("ACCs")[1]
+            y_gs = telem_data.get("ACCs", 0)[0]
+            last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
+        elif self._sim_is("MSFS") or self._sim_is('XPLANE'):
+            gs: float = telem_data.get("G")
+            y_gs = telem_data.get("AccBody")[2]
+            last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
+
+        delta_y = y_gs - last_y_gs
+        if abs(delta_y) > 3:  # Check deceleration G's.. If the per-frame rate of change is greater than 3-Gs, we have likely  crashed and telemetry is violently spiking.. do not play effect:
+            effects.dispose("new_gforce")
+            return
+
+        logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
+
+        if gmin_neg < gs < gmin:
+            effects["new_gforce"].stop()
+            return
+
+        input_data = HapticEffect.device.get_input()
+        x, y = input_data.axisXY()
+        derivative_hz = 5  # derivative lpf filter -3db Hz
+        derivative_k = 0.1  # derivative gain value, or damping ratio
+
+        dGs = getattr(self, "_dGs", None)
+        if not dGs: dGs = self._dGs = utils.Derivative(derivative_hz)
+        dGs.lpf.cutoff_freq_hz = derivative_hz
+        if gs > 1 and y > 0:
+            direction = 180
+            g_factor = utils.scale_clamp(gs, (gmin, gmax), (0,1))
+
+            g_deriv = - dGs.update(g_factor) * derivative_k
+            g_factor += g_deriv
+
+            deflection_factor = utils.scale_clamp(abs(y), (0, self.new_gforce_effect_deflection_factor), (0, 1))
+        elif gs < 1 and y < 0 and self.new_gforce_enable_neg_gs:
+            direction = 0
+            g_factor = utils.scale_clamp(gs, (gmin_neg, gmax_neg), (0,1))
+
+            g_deriv = - dGs.update(g_factor) * derivative_k
+            g_factor += g_deriv
+
+            deflection_factor = utils.scale_clamp(abs(y), (0, abs(self.new_gforce_effect_deflection_factor_neg)), (0, 1))
+        else:
+            effects["new_gforce"].stop()
+            return
+
+        telem_data['g_factor_raw'] = g_factor
+
+        telem_data['g_deflection'] = deflection_factor
+
+        telem_data['g_y'] = y
+
+        g_factor = g_factor * deflection_factor
+
+        telem_data['g_factor'] = g_factor
+
+        effects["new_gforce"].constant(g_factor, direction).start()
+
+        logging.debug(f"G's = {gs} | gfactor = {g_factor}")
+
     def _gforce_effect(self, telem_data):
+        if self.new_gforce_effect_enable:
+            effects.dispose("gforce")
+            self.new_gforce_effect(telem_data)
+            return
+        else:
+            effects.dispose("new_gforce")
+
         if not self.is_joystick() or not self.gforce_effect_enable:
             effects.dispose("gforce")
             return
-        
+
         if sum(telem_data.get("WeightOnWheels")):
             effects.dispose("gforce")
             return
@@ -488,13 +583,10 @@ class AircraftBase(object):
             effects.dispose("gforce")
             return
 
-        # gforce_effect_enable = 1
-        gneg = -1.0
         gmin = self.gforce_min_gs
         gmax = self.gforce_max_gs
         direction = 180
-        # if not gforce_effect_enable:
-        #     return
+
         if self._sim_is("DCS") or self._sim_is("IL2"):
             gs: float = telem_data.get("ACCs")[1]
             y_gs = telem_data.get("ACCs", 0)[0]
@@ -509,17 +601,12 @@ class AircraftBase(object):
             effects.dispose("gforce")
             return
 
-
-        #gs = self.smoother.get_average("gs", gs, window_size=10)
-
         logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
         if gs < gmin:
             effects["gforce"].stop()
             # effects.dispose("gforce_damper")
             return
-        # g_factor = round(utils.scale(z_gs, (gmin, gmax), (0, self.gforce_effect_max_intensity)), 4)
-        if self.gforce_effect_invert_force: 
-            direction = 0
+
         g_factor = round(utils.non_linear_scaling(gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
 
         derivative_hz = 5 # derivative lpf filter -3db Hz
@@ -530,16 +617,20 @@ class AircraftBase(object):
         dGs.lpf.cutoff_freq_hz = derivative_hz
 
         g_deriv = - dGs.update(g_factor) * derivative_k
-        
-        #telem_data["g_deriv"] = g_deriv # uncomment to debug derivative
-        #telem_data["g_factor"] = g_factor # uncomment to debug derivative
-        g_factor += g_deriv 
-        #telem_data["g_factor'"] = g_factor # uncomment to debug derivative
+
+        g_factor += g_deriv
 
         g_factor = utils.clamp(g_factor, 0.0, 1.0)
-        effects["gforce"].constant(g_factor, direction).start()
-        #  effects["gforce_damper"].damper(coef_y=1024).start()
 
+        # if self.gforce_effect_enable_deflection_factor:
+        #     input_data = HapticEffect.device.get_input()
+        #     x, y = input_data.axisXY()
+        #     deflection_factor = utils.scale_clamp(y, (0, self.gforce_effect_deflection_factor), (0, 1))
+        #     telem_data['g_deflection'] = deflection_factor
+        #     telem_data['g_y'] = y
+        #     g_factor = g_factor * deflection_factor
+
+        effects["gforce"].constant(g_factor, direction).start()
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def _aoa_reduction_force_effect(self, telem_data):
