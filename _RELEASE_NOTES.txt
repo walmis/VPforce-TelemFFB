@@ -1,6 +1,20 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
-
-
+############################################
+##  September 8, 2024
+############################################
+## General
+- Configurator gains learned at startup no longer restored upon exit unless enabled in system settings
+## DCS
+- CH47 - Enable door gunner to trigger weapons effect
+- Add G-Force effect as optional for helicopters (was not previously available)
+## DCS/IL2/MSFS/XPLANE
+- New G-Force effect for fixed wing aircraft
+ - The original effect worked OK, but the "curvature" of the applied force would often lead to oscillations or a jerky feeling
+ - The new effect uses a linear calculation based on the min/max G settings to determine the primary force factor
+  - The physical stick deflection is then used as a factor to determine the final applied force.  For any given g-loading, "the harder you are pulling, the more force you will feel"
+  - The range of stick deflection that results in %100 applied force is adjustable
+  - Allows for negative G effect also.
+ - For DCS/IL2, If both the *new* and *old* effects are enabled at the same time, the new effect takes precedence.  The legacy effect was not previously available for MSFS/XPLANE.
 ############################################
 ##  August 11, 2024
 ############################################
