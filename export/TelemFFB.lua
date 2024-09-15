@@ -1517,6 +1517,9 @@ local f_telemFFB = {
           local formattedValues = {}
           for _, item in ipairs(items) do
             local value = item[3]
+            if type(value) == "boolean" then
+              value = value and 1 or 0
+            end
             if value ~= nil then
               local formattedValue = string.format(item[2], value)
               table.insert(formattedValues, item[1] .. "=" .. formattedValue)
