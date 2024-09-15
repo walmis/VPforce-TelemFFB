@@ -5883,6 +5883,13 @@
 		</classdefaults>
 	<classdefaults>
 		<name>hands_off_deadzone</name>
+		<type>SASHelicopter</type>
+		<value>0.02</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>hands_off_deadzone</name>
 		<type>HPGHelicopter</type>
 		<value>0.02</value>
 		<sim>MSFS</sim>
@@ -5895,6 +5902,13 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
+	<classdefaults>
+		<name>hands_on_deadzone</name>
+		<type>SASHelicopter</type>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
 	<classdefaults>
 		<name>hands_on_deadzone</name>
 		<type>HPGHelicopter</type>

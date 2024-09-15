@@ -2309,10 +2309,10 @@ class SASHelicopter(Helicopter):
         master_exceeds_threshold = x_exceeds_threshold or y_exceeds_threshold
 
         result = {
-            "master_result": False,
-            "x_result": False,
+            "master_result": master_exceeds_threshold,
+            "x_result": x_exceeds_threshold,
             "x_deviation": deviation_x,
-            "y_result": False,
+            "y_result": y_exceeds_threshold,
             "y_deviation": deviation_y,
         }
 
