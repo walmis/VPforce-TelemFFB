@@ -268,6 +268,7 @@ class Ui_SettingsWindow(object):
         self.drp_class.setItemText(4, _translate("SettingsWindow", "GliderAircraft"))
         self.drp_class.setItemText(5, _translate("SettingsWindow", "Helicopter"))
         self.drp_class.setItemText(6, _translate("SettingsWindow", "HPGHelicopter"))
+        self.drp_class.setItemText(6, _translate("SettingsWindow", "SASHelicopter"))
         self.l_mode.setText(_translate("SettingsWindow", "Model"))
         self.label_6.setText(_translate("SettingsWindow", "Model"))
         self.label_3.setText(_translate("SettingsWindow", "Edit Mode:"))

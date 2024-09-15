@@ -315,7 +315,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         match self.sim:
 
             case 'DCS':
-                for disable in [ 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter']:
+                for disable in [ 'TurbopropAircraft', 'GliderAircraft', 'HPGHelicopter', 'SASHelicopter']:
                     lprint(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
                 for enable in ['PropellerAircraft', 'JetAircraft', 'Helicopter']:
@@ -323,7 +323,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'IL2':
-                for disable in ['TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter']:
+                for disable in ['TurbopropAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter','SASHelicopter']:
                     lprint(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
                 for enable in ['PropellerAircraft', 'JetAircraft']:
@@ -331,12 +331,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'MSFS':
-                for enable in ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter']:
+                for enable in ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter', 'SASHelicopter']:
                     lprint(f"enable {enable}")
                     self.drp_class.model().item(self.drp_class.findText(enable)).setEnabled(True)
 
             case 'XPLANE':
-                for disable in ['HPGHelicopter']:
+                for disable in ['HPGHelicopter', 'SASHelicopter']:
                     lprint(f"disable {disable}")
                     self.drp_class.model().item(self.drp_class.findText(disable)).setEnabled(False)
                 for enable in ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter']:
@@ -1170,10 +1170,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def skip_bad_combos(self, craft):
         if self.sim == 'DCS' and craft == 'HPGHelicopter': return True
+        if self.sim == 'DCS' and craft == 'SASHelicopter': return True
         if self.sim == 'DCS' and craft == 'TurbopropAircraft': return True
         if self.sim == 'DCS' and craft == 'GliderAircraft': return True
         if self.sim == 'IL2' and craft == 'GliderAircraft': return True
         if self.sim == 'IL2' and craft == 'HPGHelicopter': return True
+        if self.sim == 'IL2' and craft == 'SASHelicopter': return True
         if self.sim == 'IL2' and craft == 'Helicopter': return True
         if self.sim == 'IL2' and craft == 'TurbopropAircraft': return True
         if self.sim == 'XPLANE' and craft == 'HPGHelicopter': return True
@@ -1263,7 +1265,7 @@ class UserModelDialog(QDialog):
             case 'IL2':
                 classes = ["PropellerAircraft", "JetAircraft"]
             case 'MSFS':
-                classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter']
+                classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter', 'SASHelicopter']
             case 'XPLANE':
                 classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter']
 
