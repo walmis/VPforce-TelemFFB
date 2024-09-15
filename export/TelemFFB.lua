@@ -296,8 +296,11 @@ local f_telemFFB = {
           local drawSpeedBrake = LoGetAircraftDrawArgumentValue(21)
           local drawRefuelBoom = LoGetAircraftDrawArgumentValue(22)
           local engine = LoGetEngineInfo()
+          local shakeAmplitude = LoGetShakeAmplitude()
 
           local MCP = LoGetMCPState()
+          local isAPEnabled = MCP.AutopilotOn
+
           local hydraulicPressureSim = string.format("%.3f~%.3f", engine.HydraulicPressure.left, engine.HydraulicPressure.right)
 
           local damage = "not enabled"
@@ -376,7 +379,8 @@ local f_telemFFB = {
           local AirDensity = calculateAirDensity(altAsl)
           local DynamicPressure = 0.5 * AirDensity * tas^2 -- kg/ms^2
 
-          local calculated_IAS = get_indicated_airspeed(calculated_TAS, AirDensity)
+          -- unused
+          -- local calculated_IAS = get_indicated_airspeed(calculated_TAS, AirDensity)
 
           if MainPanel ~= nil then
             MainPanel:update_arguments()
@@ -1487,6 +1491,8 @@ local f_telemFFB = {
             {"Wind_Kts", "%.2f", wind_velocity * 1.944},
             {"Wind_direction", "%.0f", wind_direction},
             {"Seat", "%s", seat},
+            {"ShakeAmplitude", "%s", shakeAmplitude},
+            {"APEnabled", "%s", isAPEnabled}
           }
           
           -- If debugging, dump draw arguments into the param handles list to find useful telemetry
