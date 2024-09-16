@@ -3578,6 +3578,18 @@
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
+		<model>Simfocus B407.*</model>
+		<name>SEMAx</name>
+		<var>L:FFB_SEMA_PCT_X</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Simfocus B407.*</model>
+		<name>SEMAy</name>
+		<var>L:FFB_SEMA_PCT_Y</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
 		<model>UH-1H.*</model>
 		<name>ForceTrimSW</name>
 		<var>L:switchForceTrim</var>
@@ -8049,8 +8061,24 @@
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
+		<name>vrs_vs_max</name>
+		<type>SASHelicopter</type>
+		<value>500</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
 		<name>vrs_vs_onset</name>
 		<type>Helicopter</type>
+		<value>350</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_vs_onset</name>
+		<type>SASHelicopter</type>
 		<value>350</value>
 		<unit>fpm</unit>
 		<sim>any</sim>
@@ -10881,6 +10909,58 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>Simfocus B407.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>Simfocus B407.*</model>
+		<value>8</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>Simfocus B407.*</model>
+		<value>13</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>Simfocus B407.*</model>
+		<value>60</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>Simfocus B407.*</model>
+		<value>4</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>Simfocus B407.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Simfocus B407.*</model>
+		<value>SASHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>cyclic_spring_gain</name>
 		<model>Bell 429.*</model>

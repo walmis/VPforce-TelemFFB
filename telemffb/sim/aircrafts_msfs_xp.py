@@ -2218,8 +2218,8 @@ class HPGHelicopter(Helicopter):
 
 
 class SASHelicopter(Helicopter):
-    sema_x_max = 5
-    sema_y_max = 5
+    sema_x_max = 1
+    sema_y_max = 1
     sema_yaw_max = 5
     afcs_step_size = 2
     collective_init = 0
@@ -2227,7 +2227,7 @@ class SASHelicopter(Helicopter):
     collective_dampening_gain = 0
     collective_spring_coeff_y = 0
     hands_on_deadzone = 0.1
-    hands_off_deadzone = 0.02
+    hands_off_deadzone = 0.05
     feet_on_deadzone = 0.05
     feet_off_deadzone = 0.03
     hands_on_active = 0
@@ -2328,44 +2328,48 @@ class SASHelicopter(Helicopter):
         if ffb_type == "joystick":
             if not self.telemffb_controls_axes and not self.local_disable_axis_control:
                 self.flag_error(
-                    "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
+                    "Aircraft is configured as class SASHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
                 return
-            sema_x = telem_data.get("hpgSEMAx", 0)
-            sema_y = telem_data.get("hpgSEMAy", 0)
+            sema_x = telem_data.get("SEMAx", 0)
+            sema_y = telem_data.get("SEMAy", 0)
 
-            # sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=500)
-            # sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
-            sema_x_avg = sema_x
-            sema_y_avg = sema_y
+            sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=1000)
+            sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=1000)
+            # sema_x_avg = sema_x
+            # sema_y_avg = sema_y
 
             if not trim_reset:
                 sx = round(abs(sema_x_avg), 3)
                 sy = round(abs(sema_y_avg), 3)
-                if 100 >= sx >= 50:
-                    self.afcsx_step_size = 5
-                elif 49.999 > sx >= 20:
-                    self.afcsx_step_size = 3
-                elif 19.999 > sx >= 10:
-                    self.afcsx_step_size = 2
-                elif 9.999 > sx >= 5:
-                    self.afcsx_step_size = 1
-                elif 4.999 > sx >= 0:
-                    self.afcsx_step_size = 1
-                else:
-                    self.afcsx_step_size = 0
 
-                if 100 >= sy >= 50:
-                    self.afcsy_step_size = 5
-                elif 49.999 > sy >= 20:
-                    self.afcsy_step_size = 3
-                elif 19.999 > sy >= 10:
-                    self.afcsy_step_size = 2
-                elif 9.999 > sx >= 5:
-                    self.afcsy_step_size = 1
-                elif 4.999 > sy >= 0:
-                    self.afcsy_step_size = 1
-                else:
-                    self.afcsy_step_size = 0
+                #if 100 >= sx >= 50:
+                    #self.afcsx_step_size = 5
+                #elif 49.999 > sx >= 20:
+                    #self.afcsx_step_size = 3
+                #elif 19.999 > sx >= 10:
+                    #self.afcsx_step_size = 2
+                #elif 9.999 > sx >= 5:
+                    #self.afcsx_step_size = 1
+                #elif 4.999 > sx >= 0:
+                    #self.afcsx_step_size = 1
+                #else:
+                    #self.afcsx_step_size = 0
+
+                #if 100 >= sy >= 50:
+                    #self.afcsy_step_size = 5
+                #elif 49.999 > sy >= 20:
+                    #self.afcsy_step_size = 3
+                #elif 19.999 > sy >= 10:
+                    #self.afcsy_step_size = 2
+                #elif 9.999 > sx >= 5:
+                    #self.afcsy_step_size = 1
+                #elif 4.999 > sy >= 0:
+                    #self.afcsy_step_size = 1
+                #else:
+                    #self.afcsy_step_size = 0
+
+                self.afcsx_step_size = sx * 0.25
+                self.afcsy_step_size = sy * 0.50
 
                 if not (self.hands_on_x_active or self.hands_on_active):
                     if abs(sema_x_avg) > self.sema_x_max:
