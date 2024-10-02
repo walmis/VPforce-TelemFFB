@@ -7682,6 +7682,34 @@
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
+		<type>HPGHelicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>HPGHelicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>SASHelicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>SASHelicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
 		<type>GliderAircraft</type>
 		<value>false</value>
 		<sim>XPLANE</sim>
