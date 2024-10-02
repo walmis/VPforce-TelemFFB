@@ -73,6 +73,18 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.buttonBox.rejected.connect(self.hide)
         self.clear_propmgr()
         self.backup_userconfig()
+        self.drp_sim.addItem('DCS')
+        self.drp_sim.addItem('IL2')
+        self.drp_sim.addItem('MSFS')
+        self.drp_sim.addItem('XPLANE')
+        self.drp_class.addItem('')
+        self.drp_class.addItem('PropellerAircraft')
+        self.drp_class.addItem('TurbopropAircraft')
+        self.drp_class.addItem('JetAircraft')
+        self.drp_class.addItem('GliderAircraft')
+        self.drp_class.addItem('Helicopter')
+        self.drp_class.addItem('HPGHelicopter')
+        self.drp_class.addItem('SASHelicopter')
         self.drp_device.addItem('any')
         self.drp_device.addItem('joystick')
         self.drp_device.addItem('pedals')
@@ -1179,6 +1191,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if self.sim == 'IL2' and craft == 'Helicopter': return True
         if self.sim == 'IL2' and craft == 'TurbopropAircraft': return True
         if self.sim == 'XPLANE' and craft == 'HPGHelicopter': return True
+        if self.sim == 'XPLANE' and craft == 'SASHelicopter': return True
 
         return False
 
