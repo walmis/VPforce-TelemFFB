@@ -194,7 +194,7 @@ def main():
 
     version = utils.get_version()
 
-    min_firmware_version = 'v1.0.15'
+    min_firmware_version = 'v1.0.16'
 
     dev_serial = None
 
