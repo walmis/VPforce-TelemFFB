@@ -802,6 +802,9 @@ class AircraftBase(object):
                 # Init random number for effect direction
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
+                if self.is_pedals():
+                    random_weapon_release_direction = random.choice([90, 270])
+
                 logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
                 effects["payload_rel"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
@@ -815,6 +818,8 @@ class AircraftBase(object):
                 # Init random number for effect direction
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
+                if self.is_pedals():
+                    random_weapon_release_direction = random.choice([90, 270])
                 logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
                 effects["gunfire"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
@@ -828,6 +833,8 @@ class AircraftBase(object):
                 # Init random number for effect direction
                 random.seed(time.perf_counter())
                 random_weapon_release_direction = random.randint(0, 359)
+                if self.is_pedals():
+                    random_weapon_release_direction = random.choice([90, 270])
                 logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
                 effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
             else:
@@ -840,7 +847,8 @@ class AircraftBase(object):
         # flapspos = data.get("Flaps")
         if self.anything_has_changed("Flaps", flapspos, delta_ms=100) and self.flaps_motion_intensity > 0 and self.flaps_motion_effect_enabled:
             logging.debug(f"Flaps Pos: {flapspos}")
-            effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, 0, 3).start()
+            direction = 90 if self.is_pedals() else 0
+            effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, direction, 3).start()
         else:
             effects["flapsmovement"].stop(destroy_after=5000)
 
@@ -849,7 +857,8 @@ class AircraftBase(object):
         # canopypos = self._telem_data.get("canopy_value", 0)
         if self.anything_has_changed("Canopy", canopypos, delta_ms=100) and self.canopy_motion_intensity > 0 and self.canopy_motion_effect_enabled:
             logging.debug(f"Canopy Pos: {canopypos}")
-            effects["canopymovement"].periodic(120, self.canopy_motion_intensity, 0, 3).start()
+            direction = 90 if self.is_pedals() else 0
+            effects["canopymovement"].periodic(120, self.canopy_motion_intensity, direction, 3).start()
         else:
             # play short bump when canopy fully closes, play only once before movement effect is stopped
             if canopypos == 0 and effects['canopymovement'].started:
@@ -896,7 +905,8 @@ class AircraftBase(object):
 
         if self.anything_has_changed("speedbrakes_value", spdbrk, 50) and self.speedbrake_motion_intensity > 0 and self.speedbrake_motion_effect_enabled:
             logging.debug(f"Speedbrake Pos: {spdbrk}")
-            effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, 0, 3).start()
+            direction = 90 if self.is_pedals() else 0
+            effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, direction, 3).start()
         else:
             effects.dispose("speedbrakemovement")
 
@@ -975,7 +985,8 @@ class AircraftBase(object):
 
         if self.anything_has_changed("tailhook_value", hook, delta_ms=200):
             logging.debug(f"Hook Pos: {hook}")
-            effects["hookmovement"].periodic(160, self.tailhook_motion_intensity, 0, EFFECT_SAWTOOTHUP).start()
+            direction = 90 if self.is_pedals() else 0
+            effects["hookmovement"].periodic(160, self.tailhook_motion_intensity, direction, EFFECT_SAWTOOTHUP).start()
         else:
             # play short bump when hook stowed or deployed, change direction based on state.  Only play if movement effect still playing
             if (hook == 0 or hook ==1) and effects['hookmovement'].started:
@@ -1003,7 +1014,8 @@ class AircraftBase(object):
 
         if self.anything_has_changed("fuelboom_value", boom, delta_ms=200):
             logging.debug(f"Boom Pos: {boom}")
-            effects["boommovement"].periodic(150, self.fuelboom_motion_intensity, 0, EFFECT_SAWTOOTHDOWN).start()
+            direction = 90 if self.is_pedals() else 0
+            effects["boommovement"].periodic(150, self.fuelboom_motion_intensity, direction, EFFECT_SAWTOOTHDOWN).start()
         else:
             # play short bump when boom stowed or deployed, change direction based on state.  Only play if movement effect still playing
             if (boom == 0 or boom ==1) and effects['boommovement'].started:
