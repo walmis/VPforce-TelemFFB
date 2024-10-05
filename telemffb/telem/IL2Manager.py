@@ -236,6 +236,7 @@ class IL2Manager():
         if self.ac_name != "":
             self.telem_data["N"] = self.ac_name
         self.telem_data['TAS'] = self.state.indicated_air_speed_metres_second
+        self.telem_data['IAS'] = self.state.indicated_air_speed_metres_second
         self.telem_data['AGL'] = self.state.above_ground_level_metres
         self.telem_data['RPM'] = self.state.rpm
         self.telem_data["MaxRPM"] = self.engine_maxrpm
