@@ -39,7 +39,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,HPGHelicopter,GliderAircraft</validvalues>
+		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,HPGHelicopter,GliderAircraft,SASHelicopter</validvalues>
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
@@ -3578,6 +3578,18 @@
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
+		<model>Simfocus B407.*</model>
+		<name>SEMAx</name>
+		<var>L:FFB_SEMA_PCT_X</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<model>Simfocus B407.*</model>
+		<name>SEMAy</name>
+		<var>L:FFB_SEMA_PCT_Y</var>
+		<sc_unit>Percent Over 100</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
 		<model>UH-1H.*</model>
 		<name>ForceTrimSW</name>
 		<var>L:switchForceTrim</var>
@@ -4230,6 +4242,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>collective_ap_spring_gain</name>
+		<type>SASHelicopter</type>
+		<value>1.0</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>collective_ap_spring_gain</name>
 		<type>HPGHelicopter</type>
 		<value>1.0</value>
 		<sim>MSFS</sim>
@@ -4314,6 +4333,13 @@
 	<classdefaults>
 		<name>cyclic_spring_gain</name>
 		<type>Helicopter</type>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>cyclic_spring_gain</name>
+		<type>SASHelicopter</type>
 		<value>0.8</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
@@ -4691,6 +4717,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>engine_jet_rumble_enabled</name>
+		<type>SASHelicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>engine_jet_rumble_enabled</name>
 		<type>HPGHelicopter</type>
 		<value>true</value>
 		<sim>MSFS</sim>
@@ -4761,6 +4794,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>engine_rotor_rumble_enabled</name>
+		<type>SASHelicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>engine_rotor_rumble_enabled</name>
 		<type>HPGHelicopter</type>
 		<value>true</value>
 		<sim>MSFS</sim>
@@ -4824,6 +4864,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>etl_effect_enable</name>
+		<type>SASHelicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>etl_effect_enable</name>
 		<type>HPGHelicopter</type>
 		<value>true</value>
 		<sim>MSFS</sim>
@@ -4854,6 +4901,13 @@
 		<name>etl_effect_intensity</name>
 		<type>Helicopter</type>
 		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>etl_effect_intensity</name>
+		<type>SASHelicopter</type>
+		<value>0.15</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
@@ -4896,6 +4950,14 @@
 	</classdefaults>
 	<classdefaults>
 		<name>etl_start_speed</name>
+		<type>SASHelicopter</type>
+		<value>8</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>etl_start_speed</name>
 		<type>HPGHelicopter</type>
 		<value>8</value>
 		<unit>m/s</unit>
@@ -4928,6 +4990,14 @@
 	<classdefaults>
 		<name>etl_stop_speed</name>
 		<type>Helicopter</type>
+		<value>16</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>etl_stop_speed</name>
+		<type>SASHelicopter</type>
 		<value>16</value>
 		<unit>m/s</unit>
 		<sim>MSFS</sim>
@@ -5126,6 +5196,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>force_trim_button</name>
+		<type>SASHelicopter</type>
+		<value>0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_button</name>
 		<type>HPGHelicopter</type>
 		<value>0</value>
 		<sim>MSFS</sim>
@@ -5175,6 +5252,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>force_trim_enabled</name>
+		<type>SASHelicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_enabled</name>
 		<type>HPGHelicopter</type>
 		<value>true</value>
 		<sim>MSFS</sim>
@@ -5235,6 +5319,13 @@
 		<value>0</value>
 		<sim>MSFS</sim>
 		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>force_trim_reset_button</name>
+		<type>SASHelicopter</type>
+		<value>0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>force_trim_reset_button</name>
@@ -5804,6 +5895,13 @@
 		</classdefaults>
 	<classdefaults>
 		<name>hands_off_deadzone</name>
+		<type>SASHelicopter</type>
+		<value>0.02</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>hands_off_deadzone</name>
 		<type>HPGHelicopter</type>
 		<value>0.02</value>
 		<sim>MSFS</sim>
@@ -5816,6 +5914,13 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
+	<classdefaults>
+		<name>hands_on_deadzone</name>
+		<type>SASHelicopter</type>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
 	<classdefaults>
 		<name>hands_on_deadzone</name>
 		<type>HPGHelicopter</type>
@@ -5972,6 +6077,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>jet_engine_rumble_intensity</name>
+		<type>SASHelicopter</type>
+		<value>0.01</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>jet_engine_rumble_intensity</name>
 		<type>HPGHelicopter</type>
 		<value>0.01</value>
 		<sim>MSFS</sim>
@@ -6035,6 +6147,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>joystick_trim_follow_gain_physical_x</name>
+		<type>SASHelicopter</type>
+		<value>0.4</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_trim_follow_gain_physical_x</name>
 		<type>HPGHelicopter</type>
 		<value>0.4</value>
 		<sim>MSFS</sim>
@@ -6119,6 +6238,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>joystick_trim_follow_gain_physical_y</name>
+		<type>SASHelicopter</type>
+		<value>0.4</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_trim_follow_gain_physical_y</name>
 		<type>HPGHelicopter</type>
 		<value>0.4</value>
 		<sim>MSFS</sim>
@@ -6198,6 +6324,13 @@
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<type>Helicopter</type>
 		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_trim_follow_gain_virtual_x</name>
+		<type>SASHelicopter</type>
+		<value>0.3</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -6282,6 +6415,13 @@
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<type>Helicopter</type>
 		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<type>SASHelicopter</type>
+		<value>0.3</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
@@ -6581,6 +6721,13 @@
 		</classdefaults>
 	<classdefaults>
 		<name>overspeed_effect_enable</name>
+		<type>SASHelicopter</type>
+		<value>True</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_effect_enable</name>
 		<type>HPGHelicopter</type>
 		<value>True</value>
 		<sim>MSFS</sim>
@@ -6609,6 +6756,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>overspeed_shake_intensity</name>
+		<type>SASHelicopter</type>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_intensity</name>
 		<type>HPGHelicopter</type>
 		<value>0.2</value>
 		<sim>MSFS</sim>
@@ -6633,6 +6787,14 @@
 		<name>overspeed_shake_start</name>
 		<type>Helicopter</type>
 		<value>120</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>overspeed_shake_start</name>
+		<type>SASHelicopter</type>
+		<value>155</value>
 		<unit>kt</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
@@ -6700,6 +6862,13 @@
 		<type>PropellerAircraft</type>
 		<value>1.0</value>
 		<sim>IL2</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>pedal_spring_gain</name>
+		<type>SASHelicopter</type>
+		<value>0.1</value>
+		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
@@ -6864,6 +7033,13 @@
 		<name>rotor_blade_count</name>
 		<type>Helicopter</type>
 		<value>2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>rotor_blade_count</name>
+		<type>SASHelicopter</type>
+		<value>4</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
@@ -7506,6 +7682,34 @@
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
+		<type>HPGHelicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>HPGHelicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>SASHelicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>SASHelicopter</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
 		<type>GliderAircraft</type>
 		<value>false</value>
 		<sim>XPLANE</sim>
@@ -7641,6 +7845,13 @@
 		<name>type</name>
 		<type>Helicopter</type>
 		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>SASHelicopter</type>
+		<value>SASHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
@@ -7807,6 +8018,13 @@
 	</classdefaults>
 	<classdefaults>
 		<name>vrs_effect_enable</name>
+		<type>SASHelicopter</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_effect_enable</name>
 		<type>HPGHelicopter</type>
 		<value>true</value>
 		<sim>MSFS</sim>
@@ -7831,6 +8049,13 @@
 		<type>Helicopter</type>
 		<value>0.12</value>
 		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_effect_intensity</name>
+		<type>SASHelicopter</type>
+		<value>0.12</value>
+		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
@@ -7864,8 +8089,24 @@
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
+		<name>vrs_vs_max</name>
+		<type>SASHelicopter</type>
+		<value>500</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
 		<name>vrs_vs_onset</name>
 		<type>Helicopter</type>
+		<value>350</value>
+		<unit>fpm</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vrs_vs_onset</name>
+		<type>SASHelicopter</type>
 		<value>350</value>
 		<unit>fpm</unit>
 		<sim>any</sim>
@@ -10696,6 +10937,58 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>Simfocus B407.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>Simfocus B407.*</model>
+		<value>8</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>Simfocus B407.*</model>
+		<value>13</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>Simfocus B407.*</model>
+		<value>60</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>Simfocus B407.*</model>
+		<value>4</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>Simfocus B407.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Simfocus B407.*</model>
+		<value>SASHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>cyclic_spring_gain</name>
 		<model>Bell 429.*</model>

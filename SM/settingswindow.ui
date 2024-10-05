@@ -48,21 +48,6 @@
         <property name="editable">
          <bool>false</bool>
         </property>
-        <item>
-         <property name="text">
-          <string>DCS</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>IL2</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>MSFS</string>
-         </property>
-        </item>
        </widget>
       </item>
       <item row="1" column="3">
@@ -92,43 +77,7 @@
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QComboBox" name="drp_class">
-        <item>
-         <property name="text">
-          <string/>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>PropellerAircraft</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>TurbopropAircraft</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>JetAircraft</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>GliderAircraft</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>Helicopter</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>HPGHelicopter</string>
-         </property>
-        </item>
-       </widget>
+       <widget class="QComboBox" name="drp_class"/>
       </item>
       <item row="1" column="5">
        <spacer name="horizontalSpacer">
