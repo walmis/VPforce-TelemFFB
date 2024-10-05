@@ -12195,6 +12195,56 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>SUPER DECATHLON.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>SUPER DECATHLON.*</model>
+		<value>-0.48</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_physical_y</name>
+		<model>SUPER DECATHLON.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aileron_expo</name>
+		<model>SUPER DECATHLON.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_expo</name>
+		<model>SUPER DECATHLON.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>invert_ap_x_axis</name>
+		<model>SUPER DECATHLON.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>vne_override</name>
+		<model>SUPER DECATHLON.*</model>
+		<value>160</value>
+		<unit>mph</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>engine_rumble_lowrpm_intensity</name>
 		<model>TBM 930.*</model>
 		<value>0.042</value>
