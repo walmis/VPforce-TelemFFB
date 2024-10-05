@@ -1330,16 +1330,76 @@ class Helicopter(Aircraft):
                     self.flag_error("Force trim enabled but buttons not configured")
                     return
                 input_data = HapticEffect.device.get_input()
+                if self.cyclic_spring_init:
+                    force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
+                else:
+                    force_trim_pressed = False
 
-                force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
                 if self.force_trim_reset_button > 0:
                     trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
                 else:
                     trim_reset_pressed = False
+
+                self.tr_state_change = False
+
+                if self.anything_has_changed('ft_tracker', force_trim_pressed):
+                    self.tr_state_change = True
+
                 x, y = input_data.axisXY()
                 telem_data['phys_x'] = x
                 telem_data['phys_y'] = y
-                if force_trim_pressed:
+
+                if not self.cyclic_spring_init:
+                    # print("CYCLIC INIT LOOP")
+                    self.cyclic_center = [0, 0]
+
+                    input_data = HapticEffect.device.get_input()
+
+
+                    # force_trim_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
+                    phys_x, phys_y = input_data.axisXY()
+                    telem_data['phys_x'] = phys_x
+                    telem_data['phys_y'] = phys_y
+                    self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                    self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
+
+                    self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
+                    self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
+
+                    if telem_data.get("SimOnGround", 1):
+                        self.cpO_x = 0
+                        self.cpO_y = 0
+                        self.last_pos_x_pos = 0
+                        self.last_pos_y_pos = 0
+                    else:
+                        self.cpO_x = round(self.last_device_x * 4096)
+                        self.cpO_y = round(self.last_device_y * 4096)
+                        # utils.dbprint('yellow', f"CyclicInit - cpOy={self.cpO_y} cpOx={self.cpO_x}")
+
+                    self.spring_x.cpOffset = self.cpO_x
+                    self.spring_y.cpOffset = self.cpO_y
+                    self._spring_handle.setCondition(self.spring_x)
+                    self._spring_handle.setCondition(self.spring_y)
+                    self._spring_handle.start()
+                    if (self.cpO_x/4096 - 0.15 < phys_x < self.cpO_x/4096 + 0.15) and (self.cpO_y/4096 - 0.15 < phys_y < self.cpO_y/4096 + 0.15):
+                        #dont start sending position until physical stick has centered
+                        self.cyclic_spring_init = 1
+                        logging.info("Cyclic Spring Initialized")
+                    else:
+                        if self._sim_is_msfs():
+                            if self.enable_custom_x_axis:
+                                x_var = self.custom_x_axis
+                            else:
+                                x_var = 'AXIS_CYCLIC_LATERAL_SET'
+                            if self.enable_custom_y_axis:
+                                y_var = self.custom_y_axis
+                            else:
+                                y_var = 'AXIS_CYCLIC_LONGITUDINAL_SET'
+
+                            self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
+                            self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
+                        return
+                elif force_trim_pressed:
                     gain = int(self.trim_release_spring_gain * 4096)
                     self.spring_x.positiveCoefficient = gain
                     self.spring_x.negativeCoefficient = gain
@@ -1355,7 +1415,8 @@ class Helicopter(Aircraft):
 
                     self.cyclic_center = [x, y]
 
-                    logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}, gain:{gain}")
+                    if self.tr_state_change:
+                        logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}, gain:{gain}")
 
                     self.cyclic_trim_release_active = 1
                     if self._sim_is_msfs():
@@ -1377,7 +1438,9 @@ class Helicopter(Aircraft):
 
                     self.cyclic_center = [x, y]
 
-                    logging.debug(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
+                    if self.tr_state_change:
+                        logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
+
                     if self._sim_is_msfs():
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
@@ -1411,54 +1474,7 @@ class Helicopter(Aircraft):
 
                     logging.info("Trim Reset Pressed")
 
-                elif not self.cyclic_spring_init:
-                    self.cyclic_center = [0, 0]
 
-                    input_data = HapticEffect.device.get_input()
-
-
-                    # force_trim_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
-                    phys_x, phys_y = input_data.axisXY()
-                    telem_data['phys_x'] = phys_x
-                    telem_data['phys_y'] = phys_y
-                    self.spring_x.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
-                    self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient
-
-                    self.spring_y.positiveCoefficient = clamp(int(4096 * self.cyclic_spring_gain), 0, 4096)
-                    self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient
-
-                    if telem_data.get("SimOnGround", 1):
-                        self.cpO_x = 0
-                        self.cpO_y = 0
-                        self.last_pos_x_pos = 0
-                        self.last_pos_y_pos = 0
-                    else:
-                        self.cpO_x = round(self.last_device_x * 4096)
-                        self.cpO_y = round(self.last_device_y * 4096)
-
-                    self.spring_x.cpOffset = self.cpO_x
-                    self.spring_y.cpOffset = self.cpO_y
-                    self._spring_handle.setCondition(self.spring_x)
-                    self._spring_handle.setCondition(self.spring_y)
-                    self._spring_handle.start()
-                    if (self.cpO_x/4096 - 0.15 < phys_x < self.cpO_x/4096 + 0.15) and (self.cpO_y/4096 - 0.15 < phys_y < self.cpO_y/4096 + 0.15):
-                        #dont start sending position until physical stick has centered
-                        self.cyclic_spring_init = 1
-                        logging.info("Cyclic Spring Initialized")
-                    else:
-                        if self._sim_is_msfs():
-                            if self.enable_custom_x_axis:
-                                x_var = self.custom_x_axis
-                            else:
-                                x_var = 'AXIS_CYCLIC_LATERAL_SET'
-                            if self.enable_custom_y_axis:
-                                y_var = self.custom_y_axis
-                            else:
-                                y_var = 'AXIS_CYCLIC_LONGITUDINAL_SET'
-
-                            self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
-                            self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
-                        return
 
                 telem_data["StickXY"] = [x, y]
                 telem_data["StickXY_offset"] = self.cyclic_center
@@ -1778,6 +1794,7 @@ class HPGHelicopter(Helicopter):
 
     def on_timeout(self):
         super().on_timeout()
+        self.cyclic_spring_init = 0
         self.collective_init = 0
         self.pedals_init = 0
 
@@ -1846,7 +1863,10 @@ class HPGHelicopter(Helicopter):
         ffb_type = telem_data.get("FFBType", "joystick")
         ap_active = telem_data.get("APMaster", 0)
         # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
-        trim_reset = telem_data.get("hpgTrimRelease", 0)
+        if self.cyclic_spring_init:
+            trim_reset = telem_data.get("hpgTrimRelease", 0)
+        else:
+            trim_reset = False
 
         if ffb_type == "joystick":
             if not self.telemffb_controls_axes and not self.local_disable_axis_control:
