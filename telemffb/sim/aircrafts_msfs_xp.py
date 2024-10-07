@@ -2316,8 +2316,8 @@ class SASHelicopter(Helicopter):
             sema_x = telem_data.get("SEMAx", 0)
             sema_y = telem_data.get("SEMAy", 0)
 
-            sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=1000)
-            sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=1000)
+            sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=100)
+            sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=100)
             # sema_x_avg = sema_x
             # sema_y_avg = sema_y
 
