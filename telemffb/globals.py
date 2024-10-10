@@ -26,6 +26,7 @@ main_window : 'MainWindow' = None
 device_type : str = None
 device_usbpid : str = None
 device_usbvidpid : str = None # "FFFF:2055"
+device_ident : str = None #Joystick, Pedals, etc.. as set in configurator
 
 launched_instances : Dict[str, 'ChildPopen'] = {}
 master_instance : bool = False
