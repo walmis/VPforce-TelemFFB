@@ -1,4 +1,17 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+
+############################################
+##  October 6,, 2024
+############################################
+## General
+- Updated many effects to work properly with pedals axis.  "Direction" was hard coded for y axis which does not exist for pedals.
+## DCS
+- Remove bad damage telemetry from Mi-24 causing random activation of the damage effect
+## MSFS
+- Fix issue that would cause trouble with cyclic spring initialization when the sim freezes or pauses while the trim release button is being held.
+- Improve AFCS following logic for HPGHelicopter class
+- New 'SASHelicopter' class to support 2-axis SAS that will be supported on upcoming 'heliSAS' mods from SimFocus.
+
 ############################################
 ##  September 8, 2024
 ############################################

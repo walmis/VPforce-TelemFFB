@@ -1735,23 +1735,42 @@ def validate_vpconf_profile(file, pid=None, dev_type=None, silent=False, window=
     except:
         if not silent:
             QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+        else:
+            logging.error(f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
         return False
     cfg_pid = config_data.get('config', {}).get('usb_pid', 'unknown')
     if cfg_pid == 'unknown':
         if not silent:
             QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+        else:
+            logging.error(f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
         return False
+    passed = True
     cfg_pid = int(format(cfg_pid, 'x'))
     cfg_serial = config_data.get('serial_number', 'unknown')
     cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
     if cfg_serial == 'unknown':
-        return False
-    if cfg_pid == pid:
-        return True
-    else:
+        passed = False
+        msg = f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}"
         if not silent:
-            QMessageBox.warning(window, "Wrong Device", f"The VPforce Configurator file you selected does not match the device you are trying to assign it to\n\nFile={file}\n\nThis instance is currently configuring:\n{dev_type}\npid= {pid}\n\nThe chosen profile is for\npid= {cfg_pid}\nname= {cfg_device_name}\nserial= {cfg_serial}")
-        return False
+            QMessageBox.warning(window, "Error",msg)
+        else:
+            logging.error(f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+    if cfg_pid != pid:
+        passed = False
+        msg = f"The VPforce Configurator file you selected does not match the device you are trying to assign it to\n\nFile={file}\n\nThis instance is currently configuring:\n{dev_type}\npid= {pid}\n\nThe chosen profile is for\npid= {cfg_pid}\nname= {cfg_device_name}\nserial= {cfg_serial}"
+        if not silent:
+            QMessageBox.warning(window, "Wrong Device", msg)
+        else:
+            logging.error(msg)
+    if cfg_device_name != G.device_ident:
+        passed = False
+        msg = f"The VPforce Configurator file {file} contains a device ident >{cfg_device_name}< that is different from the device currently connected >{G.device_ident}<  This will cause USB to disconnect."
+        if not silent:
+            QMessageBox.warning(window, "Wrong Device", msg)
+        else:
+            logging.error(msg)
+    return passed
 
 
 class LoggingFilter(logging.Filter):
