@@ -307,8 +307,23 @@ class FFBReport_BlockFree(BaseStructure):
     _defaults_ = { "reportId": HID_REPORT_ID_BLOCK_FREE } 
 
 class FFBReport_Input(BaseStructure):
+    X: int
+    Y: int
+    Z: int
+    Rz: int
+    Ry: int
+    Rx: int
+    Slider: int
+    Button0_31: int
+    Button32_47: int
+    hats: int
+    Button48_63: int
+    CP_offsetX: int
+    CP_offsetY: int
+
     _pack_ = 1
-    _fields_ = [("reportId", ctypes.c_uint8), # = 1
+    _fields_ = [
+                ("reportId", ctypes.c_uint8), # = 1
                 ("X", ctypes.c_int16),
                 ("Y", ctypes.c_int16),
                 ("Z", ctypes.c_int16),
@@ -316,18 +331,36 @@ class FFBReport_Input(BaseStructure):
                 ("Ry", ctypes.c_uint8),
                 ("Rx", ctypes.c_uint8),
                 ("Slider", ctypes.c_uint8),
-                ("Button", ctypes.c_uint32),
-                ("ButtonAux", ctypes.c_uint16),
+                ("Button0_31", ctypes.c_uint32),
+                ("Button32_47", ctypes.c_uint16),
                 ("hats", ctypes.c_uint16),
+                ("Button48_63", ctypes.c_uint16), # added in fw v1.0.17
+                ("CP_offsetX", ctypes.c_int16), # added in fw v1.0.17
+                ("CP_offsetY", ctypes.c_int16), # added in fw v1.0.17
                ]
     _defaults_ = {}
 
     # get if button is pressed, buttons start from 1
-    def isButtonPressed(self, button_number):
+    def isButtonPressed(self, button_number) -> bool:
+        """
+        Checks if a button is pressed.
+
+        Args:
+            button_number (int): The button number to check. Buttons start from 1.
+
+        Returns:
+            bool: True if the button is pressed, False otherwise.
+
+        Note: The function checks both regular buttons and hat switches. For hat
+        switches, the button number is calculated as 0x80 | (i << 4) | hat_position,
+        where i is the hat switch index (0-3) and hat_position is the position of
+        the switch (0-8).
+        """
+
         assert (button_number > 0)
 
         # Check regular buttons
-        btns = self.Button | (self.ButtonAux << 32)
+        btns = self.buttons
         if (btns & (1 << (button_number - 1))) != 0:
             return True
 
@@ -341,8 +374,20 @@ class FFBReport_Input(BaseStructure):
 
         return False
 
-    def getPressedButtons(self):
-        btns = self.Button | (self.ButtonAux << 32)
+    def getPressedButtons(self) -> List[int]:
+        """
+        Returns a list of pressed button numbers.
+
+        The function returns a list of integers in the range of 1 to 80, where
+        1-64 are regular buttons and 0x80-0xCF are hat switch positions. The
+        hat switch positions are calculated as 0x80 | (i << 4) | hat_position,
+        where i is the hat switch index (0-3) and hat_position is the position
+        of the switch (0-8).
+
+        :return: A list of pressed button numbers.
+        :rtype: list
+        """
+        btns = self.buttons
 
         # Collect regular buttons
         pressed = [i + 1 for i in range(64) if (btns & (1 << i)) != 0]
@@ -356,9 +401,31 @@ class FFBReport_Input(BaseStructure):
 
         return pressed
 
+    @property
+    def buttons(self) -> int:
+        """
+        Returns the status of all buttons as a single 64-bit integer.
+
+        The least significant bit corresponds to button 1, the next bit to
+        button 2, and so on. A set bit indicates a pressed button.
+
+        :return: The status of all buttons as a 64-bit integer.
+        :rtype: int
+        """
+        return  self.Button0_31 | (self.Button32_47 << 32) | (self.Button48_63 << 48)
+
     # get main X and Y axis in range [-1.0 .. 1.0]
-    def axisXY(self):
+    def axisXY(self) -> tuple[float, float]:
+        """
+        Returns the main X and Y axis values as a tuple of two floats in the range [-1.0 .. 1.0]
+        """
         return (self.X/4096.0, self.Y/4096.0)
+    
+    def CP_XY(self) -> tuple[float, float]:
+        """
+        Returns the center point offset as a tuple of two floats in the range [-1.0 .. 1.0]
+        """
+        return (self.CP_offsetX/4096.0, self.CP_offsetY/4096.0)
 
 class FFBReport_PIDStatus_Input(BaseStructure):
     _pack_ = 1
