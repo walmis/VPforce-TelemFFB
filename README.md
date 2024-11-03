@@ -168,6 +168,16 @@ optional arguments:
 
 Note: If you have multiple VPForce FFB Enabled devices (Rhino, DIY Pedals, etc) it is possible to run multiple instances of TelemFFB if you specify the VID:PID when launching.  You can use the config file option to tune the effects for each peripheral in separate config files
 
+### Linux 
+
+The program can run on linux with some cavats
+
+- IL2 is unsupported
+- Selecting VPForce profiles is unsupported
+- Finding a master instance is unsupported. Make sure to not start multiple instances
+
+the `LOCALAPPDATA` environment variable needs to be set. Set it to a path where you want configurations to be stored
+
 ## Contributing and Development
 If you're interested in contributing to the project, feel free to submit pull requests or open issues on the Github page. Your feedback and suggestions are always welcome!
 <br>

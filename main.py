@@ -56,7 +56,8 @@ from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             set_vpconf_profile)
-from telemffb.namedmutex import NamedMutex
+if os.name != "posix":
+    from telemffb.namedmutex import NamedMutex
 resources # used
 
 def send_test_message():
@@ -113,7 +114,7 @@ def main():
 
     G.master_instance = not G.args.child
 
-    if G.master_instance:
+    if G.master_instance and os.name != 'posix':
         # Attempt to acquire a mutex lock.  If the acquisition fails, another master instance of TelemFFB is already running.
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Warning)

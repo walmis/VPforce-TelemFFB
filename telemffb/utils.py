@@ -49,7 +49,8 @@ import select
 import logging
 import sys
 
-import winreg
+if os.name != 'posix':
+    import winreg
 import socket
 import time
 import zlib
@@ -67,7 +68,8 @@ from PyQt5.QtWidgets import QFileDialog, QMessageBox
 import stransi
 
 import telemffb.globals as G
-import telemffb.winpaths as winpaths
+if os.name != 'posix':
+    import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
 
 def dbprint(color, msg, instance=None):
@@ -566,35 +568,39 @@ def create_support_bundle(userconfig_rootpath):
 
 
 def read_all_system_settings():
-    REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
+    if os.name == "posix":
+        print("Reading system settings from registry is not supported on linux")
+        return {}
+    else:
+        REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
 
-    settings_dict = {}
+        settings_dict = {}
 
-    try:
-        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
-
-        # Iterate through all values in the registry key
-        index = 0
-        while True:
-            try:
-                name, value, _ = winreg.EnumValue(registry_key, index)
-                settings_dict[name] = value
-                index += 1
-            except WindowsError as e:
-                # Break when there are no more values
-                if e.winerror == 259:  # ERROR_NO_MORE_ITEMS
-                    break
-    except WindowsError:
-        # Handle errors (key not found, etc.)
-        pass
-    finally:
         try:
-            winreg.CloseKey(registry_key)
-        except UnboundLocalError:
-            # Handle case where registry_key is not defined
-            pass
+            registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
 
-    return settings_dict
+            # Iterate through all values in the registry key
+            index = 0
+            while True:
+                try:
+                    name, value, _ = winreg.EnumValue(registry_key, index)
+                    settings_dict[name] = value
+                    index += 1
+                except WindowsError as e:
+                    # Break when there are no more values
+                    if e.winerror == 259:  # ERROR_NO_MORE_ITEMS
+                        break
+        except WindowsError:
+            # Handle errors (key not found, etc.)
+            pass
+        finally:
+            try:
+                winreg.CloseKey(registry_key)
+            except UnboundLocalError:
+                # Handle case where registry_key is not defined
+                pass
+
+        return settings_dict
 
 
 class SystemSettings(QSettings):
@@ -1394,6 +1400,8 @@ def install_xplane_plugin(path, window):
 
 
 def install_export_lua(window):
+    if os.name == "posix":
+        logging.error("Installing export lua on linux must be done manually")
     saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
     logging.info(f"Found Saved Games directory: {saved_games}")
 
@@ -1651,6 +1659,9 @@ class FetchLatestVersion(QThread):
 
 
 def launch_vpconf(serial=None):
+    if os.name == "posix":
+        logging.error("Launching vpconf profile on posix is unsupported")
+        return
     vpconf_path = winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
     # serial = HapticEffect.device.serial
 
@@ -1845,6 +1856,9 @@ def load_custom_userconfig(new_path=""):
 
 
 def set_vpconf_profile(config_filepath, serial):
+    if os.name == "posix":
+        logging.error("Setting vpconf profile on posix is unsupported")
+        return
     vpconf_path = winreg_get("SOFTWARE\\VPforce\\RhinoFFB", "path")
     # serial = HapticEffect.device.serial
 

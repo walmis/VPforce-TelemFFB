@@ -27,7 +27,8 @@ import subprocess
 import sys
 import time
 import traceback
-import winreg
+if os.name != 'posix':
+    import winreg
 from collections import OrderedDict
 from datetime import datetime
 
@@ -799,6 +800,9 @@ class MainWindow(QMainWindow):
             )
 
     def toggle_start_with_windows(self, set_enabled=None):
+        if os.name == "posix":
+            logging.error("Toggling start with windows is unsupported on posix")
+            return
         exe_path = sys.executable
         reg_key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         reg_key_name = "VPforce TelemFFB"
