@@ -326,8 +326,8 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         """
         self.gain_x = self.sl_x_mastergain.value()
         self.gain_y = self.sl_y_mastergain.value()
-        self.lab_x_mastergain.setText(f"Axis Master Gain: %{self.gain_x}")
-        self.lab_y_mastergain.setText(f"Axis Master Gain: %{self.gain_y}")
+        self.lab_x_mastergain.setText(f"%{self.gain_x}")
+        self.lab_y_mastergain.setText(f"%{self.gain_y}")
         self.lab_x.adjustSize()
         self.lab_y.adjustSize()
 
