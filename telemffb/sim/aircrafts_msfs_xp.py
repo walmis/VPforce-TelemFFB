@@ -52,7 +52,7 @@ import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import (FFBReport_Input, FFBReport_SetCondition,
                                    HapticEffect)
-from telemffb.sim.aircraft_base import AircraftBase, HPFs, LPFs, effects
+from telemffb.sim.aircraft_base import AircraftBase, HPFs, LPFs, effects, perftracker
 from telemffb.utils import Derivative, Dispenser, HighPassFilter, clamp, overrides
 from telemffb.util.conversions import *
 
@@ -2130,7 +2130,12 @@ class HPGHelicopter(Helicopter):
         deviation_x = abs(phys_x - ref_x) / 4096
         deviation_y = abs(phys_y - ref_y) / 4096
 
+        raw_deviation_x = phys_x - ref_x
+        raw_deviation_y = phys_y - ref_y
+
         # Check if either phys_x or phys_y exceeds the threshold
+        # x_exceeds_threshold = abs(round(deviation_x, 2)) > percent
+        # y_exceeds_threshold = abs(round(deviation_y, 2)) > percent
         x_exceeds_threshold = abs(phys_x - ref_x) > threshold
         y_exceeds_threshold = abs(phys_y - ref_y) > threshold
         master_exceeds_threshold = x_exceeds_threshold or y_exceeds_threshold
@@ -2139,10 +2144,13 @@ class HPGHelicopter(Helicopter):
             "master_result": master_exceeds_threshold,
             "x_result": x_exceeds_threshold,
             "x_deviation": deviation_x,
+            "x_deviation_raw": raw_deviation_x,
             "y_result": y_exceeds_threshold,
             "y_deviation": deviation_y,
-        }
+            "y_deviation_raw": raw_deviation_y,
 
+        }
+        # utils.dbprint('yellow', f"x:{round(deviation_x, 3)}, y:{round(deviation_y, 3)}")
         return result
     
     def msfs_update_heli_controls(self, telem_data):
@@ -2167,60 +2175,8 @@ class HPGHelicopter(Helicopter):
             sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=100)
             #sema_x_avg = sema_x
             #sema_y_avg = sema_y
-
-            if not trim_reset:
-                sx = round(abs(sema_x_avg), 3)
-                sy = round(abs(sema_y_avg), 3)
-
-                #if 100 >= sx >= 50:
-                    #self.afcsx_step_size = 5
-                #elif 49.999 > sx >= 20:
-                    #self.afcsx_step_size = 3
-                #elif 19.999 > sx >= 10:
-                    #self.afcsx_step_size = 2
-                #elif 9.999 > sx >= 5:
-                    #self.afcsx_step_size = 1
-                #elif 4.999 > sx >= 0:
-                    #self.afcsx_step_size = 1
-                #else:
-                    #self.afcsx_step_size = 0
-
-
-                #if 100 >= sy >= 50:
-                    #self.afcsy_step_size = 5
-                #elif 49.999 > sy >= 20:
-                    #self.afcsy_step_size = 3
-                #elif 19.999 > sy >= 10:
-                    #self.afcsy_step_size = 2
-                #elif 9.999 > sx >= 5:
-                    #self.afcsy_step_size = 1
-                #elif 4.999 > sy >= 0:
-                    #self.afcsy_step_size = 1
-                #else:
-                    #self.afcsy_step_size = 0
-
-                self.afcsx_step_size = sx * 0.25
-                self.afcsy_step_size = sy * 0.25
-
-
-                if not (self.hands_on_x_active or self.hands_on_active):
-                    if sema_x_avg > 0:
-                        self.cpO_x -= self.afcsx_step_size
-                    elif sema_x_avg < 0:
-                        self.cpO_x += self.afcsx_step_size
-
-                if not (self.hands_on_y_active or self.hands_on_active):
-                    if sema_y_avg > 0:
-                        self.cpO_y -= self.afcsy_step_size
-                    elif sema_y_avg < 0:
-                        self.cpO_y += self.afcsy_step_size
-
-            self.spring_x.cpOffset = round(self.cpO_x)
-            self.spring_y.cpOffset = round(self.cpO_y)
-            self._spring_handle.setCondition(self.spring_x)
-            self._spring_handle.setCondition(self.spring_y)
-
             # hands_off_deadzone = 0.02
+
             if telem_data.get("hpgHandsOnCyclic", 0):
                 hands_on_dict = self.check_hands_on(self.hands_off_deadzone)
             else:
@@ -2228,8 +2184,88 @@ class HPGHelicopter(Helicopter):
             hands_on_either = hands_on_dict["master_result"]
             hands_on_x = hands_on_dict["x_result"]
             dev_x = hands_on_dict["x_deviation"]
+            dev_x_raw = hands_on_dict["x_deviation_raw"]
             hands_on_y = hands_on_dict["y_result"]
             dev_y = hands_on_dict["y_deviation"]
+            dev_y_raw = hands_on_dict["y_deviation_raw"]
+
+            if not trim_reset:
+
+
+
+                sx = round(abs(sema_x_avg), 3)
+                sy = round(abs(sema_y_avg), 3)
+
+                self.afcsx_step_size = sx * 0.25
+                self.afcsy_step_size = sy * 0.25
+
+                ias = telem_data.get('IAS', 0) #Indicated Airspeed in m/s
+
+                self.afcs_followup_trim_rate = 500
+                dt = perftracker.get_time_delta('hpg_perf_tracker')
+
+                followup_trim_state = telem_data.get('hpgFollowupTrimMode', 1)
+
+                match followup_trim_state:
+                    case 0: # Both
+                        activate_followup_trim = True
+                    case 1:  # Off
+                        activate_followup_trim = False
+                    case 2:  # Hover
+                        if ias < 40 * kt2ms:
+                            activate_followup_trim = True
+                        else:
+                            activate_followup_trim = False
+                    case 3:  # Cruise
+                        if ias > 40 * kt2ms:
+                            activate_followup_trim = True
+                        else:
+                            activate_followup_trim = False
+                    case _:
+                            activate_followup_trim = False
+
+                # disabled for testing on ground
+                # if telem_data.get('SimOnGround', 1):
+                #     activate_followup_trim = False
+
+
+
+                followup_trim_step_size = round(self.afcs_followup_trim_rate * dt) # multiply trim rate by frametime to provide reasonably consistent rate regardless of inter-loop timing.
+
+
+
+                if not (self.hands_on_x_active or self.hands_on_active):
+                    # self.afcsx_step_size = -self.afcsx_step_size if self.hands_on_x_active else self.afcsx_step_size
+                    if sema_x_avg > 0:
+                        self.cpO_x -= self.afcsx_step_size
+                    elif sema_x_avg < 0:
+                        self.cpO_x += self.afcsx_step_size
+                elif activate_followup_trim and (hands_on_x and self.hands_on_active):
+                    if dev_x_raw > 0:
+                        self.cpO_x += followup_trim_step_size
+                    elif dev_x_raw < 0:
+                        self.cpO_x -= followup_trim_step_size
+
+
+
+                if not (self.hands_on_y_active or self.hands_on_active):
+                    # self.afcsy_step_size = -self.afcsy_step_size if self.hands_on_y_active else self.afcsy_step_size
+                    if sema_y_avg > 0:
+                        self.cpO_y -= self.afcsy_step_size
+                    elif sema_y_avg < 0:
+                        self.cpO_y += self.afcsy_step_size
+                elif activate_followup_trim and (hands_on_y and self.hands_on_active):
+                    if dev_y_raw > 0:
+                        self.cpO_y += followup_trim_step_size
+                    elif dev_y_raw < 0:
+                        self.cpO_y -= followup_trim_step_size
+
+            self.spring_x.cpOffset = round(self.cpO_x)
+            self.spring_y.cpOffset = round(self.cpO_y)
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.setCondition(self.spring_y)
+
+
             if self.send_individual_hands_on:
                 if hands_on_x:
                     self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 1, units="number")
@@ -2323,22 +2359,8 @@ class HPGHelicopter(Helicopter):
             sema_yaw = telem_data.get("hpgSEMAyaw", 0)
 
             sema_yaw_avg = self.smoother.get_rolling_average('s_sema_yaw', sema_yaw, window_ms=100)
-            # sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=500)
 
             sx = round(abs(sema_yaw_avg), 3)
-
-            # if 100 >= sx >= 50:
-            #     self.afcsx_step_size = 6
-            # elif 49.999 > sx >= 20:
-            #     self.afcsx_step_size = 4
-            # elif 19.999 > sx >= 10:
-            #     self.afcsx_step_size = 3
-            # elif 9.999 > sx >= 5:
-            #     self.afcsx_step_size = 1
-            # elif 4.999 > sx >= 0:
-            #     self.afcsx_step_size = 1
-            # else:
-            #     self.afcsx_step_size = 0
 
             self.afcsx_step_size = sx * 0.5
 
