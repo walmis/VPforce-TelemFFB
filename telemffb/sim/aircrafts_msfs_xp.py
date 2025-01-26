@@ -2063,6 +2063,7 @@ class HPGHelicopter(Helicopter):
     send_individual_hands_on = 0
     vrs_effect_enable: bool = True
     vrs_effect_intensity = 0
+    afcs_followup_trim_rate = 100
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -2075,6 +2076,8 @@ class HPGHelicopter(Helicopter):
         self.hands_on_x_active = 0
         self.hands_on_y_active = 0
         self.feet_on_active = 0
+        self.followup_trim_accumulator = 0.0
+        self.tracker_var = False
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
@@ -2201,8 +2204,22 @@ class HPGHelicopter(Helicopter):
 
                 ias = telem_data.get('IAS', 0) #Indicated Airspeed in m/s
 
-                self.afcs_followup_trim_rate = 500
+                self.afcs_followup_trim_rate = 100
                 dt = perftracker.get_time_delta('hpg_perf_tracker')
+
+                telem_data['hpg_perf_tracker'] = round(dt, 6)
+
+                followup_trim_step_size_raw = self.afcs_followup_trim_rate * dt  # multiply trim rate by frametime to provide reasonably consistent rate regardless of inter-loop timing.
+
+                self.followup_trim_accumulator += followup_trim_step_size_raw  # accumulate fractional steps
+
+                followup_trim_step_size = int(self.followup_trim_accumulator)  # extract integer portion of step size to use on this loop
+
+                self.followup_trim_accumulator -= followup_trim_step_size  # subtract the applied integer value from the accumulation
+
+                telem_data['hpg_followup_step_size'] = followup_trim_step_size
+                telem_data['hpg_followup_step_size_raw'] = followup_trim_step_size_raw
+                telem_data['hpg_followup_trim_accum'] = self.followup_trim_accumulator
 
                 followup_trim_state = telem_data.get('hpgFollowupTrimMode', 1)
 
@@ -2212,28 +2229,17 @@ class HPGHelicopter(Helicopter):
                     case 1:  # Off
                         activate_followup_trim = False
                     case 2:  # Hover
-                        if ias < 40 * kt2ms:
-                            activate_followup_trim = True
-                        else:
-                            activate_followup_trim = False
+                        activate_followup_trim = True if ias < 40 * kt2ms else False
                     case 3:  # Cruise
-                        if ias > 40 * kt2ms:
-                            activate_followup_trim = True
-                        else:
-                            activate_followup_trim = False
+                        activate_followup_trim = True if ias > 40 * kt2ms else False
                     case _:
-                            activate_followup_trim = False
+                        activate_followup_trim = False
 
                 # disabled for testing on ground
                 # if telem_data.get('SimOnGround', 1):
                 #     activate_followup_trim = False
 
-
-
-                followup_trim_step_size = round(self.afcs_followup_trim_rate * dt) # multiply trim rate by frametime to provide reasonably consistent rate regardless of inter-loop timing.
-
-
-
+                #trimmed = False
                 if not (self.hands_on_x_active or self.hands_on_active):
                     # self.afcsx_step_size = -self.afcsx_step_size if self.hands_on_x_active else self.afcsx_step_size
                     if sema_x_avg > 0:
@@ -2255,10 +2261,18 @@ class HPGHelicopter(Helicopter):
                     elif sema_y_avg < 0:
                         self.cpO_y += self.afcsy_step_size
                 elif activate_followup_trim and (hands_on_y and self.hands_on_active):
+                    # trimmed = True
                     if dev_y_raw > 0:
                         self.cpO_y += followup_trim_step_size
                     elif dev_y_raw < 0:
                         self.cpO_y -= followup_trim_step_size
+
+                # if trimmed and not self.tracker_var:
+                #     logging.info("Trimming Started")
+                #     self.tracker_var = True
+                # elif not trimmed and self.tracker_var:
+                #     logging.info("Trimming Stopped")
+                #     self.tracker_var = False
 
             self.spring_x.cpOffset = round(self.cpO_x)
             self.spring_y.cpOffset = round(self.cpO_y)
