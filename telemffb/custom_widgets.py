@@ -959,22 +959,26 @@ class InstanceStatusRow(QWidget):
         self.joystick_status_icon = StatusLabel(None, 'Joystick:', Qt.yellow, 8)
         self.pedals_status_icon = StatusLabel(None, 'Pedals:', Qt.yellow, 8)
         self.collective_status_icon = StatusLabel(None, 'Collective:', Qt.yellow, 8)
+        self.trimwheel_status_icon = StatusLabel(None, 'Trim Wheel:', Qt.yellow, 8)
 
         self.status_icons = {
             "joystick" : self.joystick_status_icon,
             "pedals" : self.pedals_status_icon,
-            "collective" : self.collective_status_icon
+            "collective" : self.collective_status_icon,
+            "trimwheel" : self.trimwheel_status_icon
         }
 
         self.master_status_icon.clicked.connect(self.change_config_scope)
         self.joystick_status_icon.clicked.connect(self.change_config_scope)
         self.pedals_status_icon.clicked.connect(self.change_config_scope)
         self.collective_status_icon.clicked.connect(self.change_config_scope)
+        self.trimwheel_status_icon.clicked.connect(self.change_config_scope)
 
         self.instance_status_row.addWidget(self.master_status_icon)
         self.instance_status_row.addWidget(self.joystick_status_icon)
         self.instance_status_row.addWidget(self.pedals_status_icon)
         self.instance_status_row.addWidget(self.collective_status_icon)
+        self.instance_status_row.addWidget(self.trimwheel_status_icon)
         self.joystick_status_icon.hide()
         self.pedals_status_icon.hide()
         self.collective_status_icon.hide()

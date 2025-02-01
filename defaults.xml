@@ -39,6 +39,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,HPGHelicopter,GliderAircraft,SASHelicopter</validvalues>
 		<datatype>list</datatype>
 	</defaults>
@@ -53,7 +54,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,HPGHelicopter,GliderAircraft</validvalues>
+		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,GliderAircraft</validvalues>
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
@@ -85,6 +86,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -102,6 +104,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<validvalues>none</validvalues>
 		<value>none</value>
 		<datatype>configurator</datatype>
@@ -167,6 +170,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -183,6 +187,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -200,6 +205,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
@@ -217,6 +223,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -234,6 +241,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
@@ -251,6 +259,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -268,6 +277,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
@@ -1222,6 +1232,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1236,6 +1247,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1251,6 +1263,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1278,6 +1291,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<trimwheel></trimwheel>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
 		<datatype>float</datatype>
@@ -1407,6 +1421,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1438,6 +1453,19 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
+		<order>320.2</order>
+		<name>custom_y_axis</name>
+		<prereq>enable_custom_y_axis</prereq>
+		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
+		<displayname>Custom Simconnect Y Var Name</displayname>
+		<MSFS>true</MSFS>
+		<trimwheel>true</trimwheel>
+		<validvalues>AXIS_ELEV_TRIM_SET,L:INPUT_TRIM_AXIS,DO_NOT_SEND</validvalues>
+		<value>AXIS_ELEV_TRIM_SET</value>
+		<datatype>anylist</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
 		<order>320.3</order>
 		<name>raw_y_axis_scale</name>
 		<prereq>enable_custom_y_axis</prereq>
@@ -1461,6 +1489,7 @@
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1557,6 +1586,7 @@
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<trimwheel>true</trimwheel>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
@@ -1568,6 +1598,7 @@
 		<displayname>Invert Aileron Autopilot Axis</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
+		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -3450,6 +3481,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value></value>
 		<datatype>text</datatype>
 	</defaults>
@@ -4266,6 +4298,27 @@
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>ap_following</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>ap_following</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>ap_following</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
 	</classdefaults>
 	<classdefaults>
 		<name>ap_following</name>
@@ -7747,7 +7800,112 @@
 		<type>AllSettings</type>
 		<value>true</value>
 		<sim>any</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>AllSettings</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>SASHelicopter</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>HPGHelicopter</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>Helicopter</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>collective</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>SASHelicopter</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>HPGHelicopter</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>telemffb_controls_axes</name>
+		<type>Helicopter</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
 		</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
@@ -7950,14 +8108,42 @@
 		<type>JetAircraft</type>
 		<value>JetAircraft</value>
 		<sim>any</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>JetAircraft</type>
+		<value>JetAircraft</value>
+		<sim>any</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>JetAircraft</type>
+		<value>JetAircraft</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
 	</classdefaults>
 	<classdefaults>
 		<name>type</name>
 		<type>PropellerAircraft</type>
 		<value>PropellerAircraft</value>
 		<sim>any</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>PropellerAircraft</type>
+		<value>PropellerAircraft</value>
+		<sim>any</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>PropellerAircraft</type>
+		<value>PropellerAircraft</value>
+		<sim>any</sim>
+		<device>trimwheel</device>
 	</classdefaults>
 	<classdefaults>
 		<name>type</name>
@@ -7982,31 +8168,73 @@
 	</classdefaults>
 	<classdefaults>
 		<name>type</name>
+		<type>GliderAircraft</type>
+		<value>GliderAircraft</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
 		<type>Helicopter</type>
 		<value>Helicopter</value>
 		<sim>MSFS</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>Helicopter</type>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>Helicopter</type>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
 	</classdefaults>
 	<classdefaults>
 		<name>type</name>
 		<type>SASHelicopter</type>
 		<value>SASHelicopter</value>
 		<sim>MSFS</sim>
-		<device>any</device>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>SASHelicopter</type>
+		<value>SASHelicopter</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>SASHelicopter</type>
+		<value>SASHelicopter</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
 	</classdefaults>
 	<classdefaults>
 		<name>type</name>
 		<type>HPGHelicopter</type>
 		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
-		<device>any</device>
+		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>type</name>
-		<type>JetAircraft</type>
-		<value>JetAircraft</value>
+		<type>HPGHelicopter</type>
+		<value>HPGHelicopter</value>
 		<sim>MSFS</sim>
-		<device>joystick</device>
+		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>HPGHelicopter</type>
+		<value>HPGHelicopter</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
 	</classdefaults>
 	<classdefaults>
 		<name>type</name>
@@ -8021,6 +8249,13 @@
 		<value>TurbopropAircraft</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>type</name>
+		<type>TurbopropAircraft</type>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
 	</classdefaults>
 	<classdefaults>
 		<name>type</name>

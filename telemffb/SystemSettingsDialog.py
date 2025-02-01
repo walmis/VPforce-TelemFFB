@@ -46,6 +46,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.master_button_group.addButton(self.rb_master_j, id=1)
         self.master_button_group.addButton(self.rb_master_p, id=2)
         self.master_button_group.addButton(self.rb_master_c, id=3)
+        self.master_button_group.addButton(self.rb_master_t, id=4)
 
         # Add tooltips
         self.validateDCS.setToolTip('If enabled, TelemFFB will automatically install the necessary export script and update the DCS export.lua file')
@@ -96,6 +97,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.tb_pid_j.setValidator(int_validator)
         self.tb_pid_p.setValidator(int_validator)
         self.tb_pid_c.setValidator(int_validator)
+        self.tb_pid_t.setValidator(int_validator)
 
         self.cb_min_enable_j.setObjectName('minimize_j')
         self.cb_min_enable_j.clicked.connect(self.toggle_launchmode_cbs)
@@ -103,6 +105,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_min_enable_p.clicked.connect(self.toggle_launchmode_cbs)
         self.cb_min_enable_c.setObjectName('minimize_c')
         self.cb_min_enable_c.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_min_enable_t.setObjectName('minimize_t')
+        self.cb_min_enable_t.clicked.connect(self.toggle_launchmode_cbs)
 
         self.cb_headless_j.setObjectName('headless_j')
         self.cb_headless_j.clicked.connect(self.toggle_launchmode_cbs)
@@ -110,6 +114,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_p.clicked.connect(self.toggle_launchmode_cbs)
         self.cb_headless_c.setObjectName('headless_c')
         self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_headless_t.setObjectName('headless_t')
+        self.cb_headless_t.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
         if (G.master_instance and G.launched_instances) or G.child_instance:
@@ -150,9 +156,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_headless_j.setChecked(True)
             self.cb_headless_p.setChecked(True)
             self.cb_headless_c.setChecked(True)
+            self.cb_headless_t.setChecked(True)
             self.cb_min_enable_j.setChecked(False)
             self.cb_min_enable_p.setChecked(False)
             self.cb_min_enable_c.setChecked(False)
+            self.cb_min_enable_t.setChecked(False)
 
     def toggle_start_mode(self, state):
         """
@@ -180,6 +188,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_al_enable_p.setVisible(True)
             self.cb_min_enable_p.setVisible(True)
             self.cb_headless_p.setVisible(True)
+            self.cb_al_enable_t.setVisible(True)
+            self.cb_min_enable_t.setVisible(True)
+            self.cb_headless_t.setVisible(True)
         elif button == self.rb_master_p:
             self.cb_al_enable_p.setChecked(False)
             self.cb_al_enable_p.setVisible(False)
@@ -193,6 +204,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_al_enable_j.setVisible(True)
             self.cb_min_enable_j.setVisible(True)
             self.cb_headless_j.setVisible(True)
+            self.cb_al_enable_t.setVisible(True)
+            self.cb_min_enable_t.setVisible(True)
+            self.cb_headless_t.setVisible(True)
         elif button == self.rb_master_c:
             self.cb_al_enable_c.setChecked(False)
             self.cb_al_enable_c.setVisible(False)
@@ -206,6 +220,25 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.cb_al_enable_p.setVisible(True)
             self.cb_min_enable_p.setVisible(True)
             self.cb_headless_p.setVisible(True)
+            self.cb_al_enable_t.setVisible(True)
+            self.cb_min_enable_t.setVisible(True)
+            self.cb_headless_t.setVisible(True)
+        elif button == self.rb_master_t:
+            self.cb_al_enable_t.setChecked(False)
+            self.cb_al_enable_t.setVisible(False)
+            self.cb_min_enable_t.setChecked(False)
+            self.cb_min_enable_t.setVisible(False)
+            self.cb_headless_c.setChecked(False)
+            self.cb_headless_c.setVisible(False)
+            self.cb_al_enable_j.setVisible(True)
+            self.cb_min_enable_j.setVisible(True)
+            self.cb_headless_j.setVisible(True)
+            self.cb_al_enable_p.setVisible(True)
+            self.cb_min_enable_p.setVisible(True)
+            self.cb_headless_p.setVisible(True)
+            self.cb_al_enable_c.setVisible(True)
+            self.cb_min_enable_c.setVisible(True)
+            self.cb_headless_c.setVisible(True)
 
     def toggle_vpconf_startup(self):
         vpconf_startup_enabled = self.enableVPConfStartup.isChecked()
@@ -228,12 +261,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_al_enable_j.setEnabled(al_enabled)
         self.cb_al_enable_p.setEnabled(al_enabled)
         self.cb_al_enable_c.setEnabled(al_enabled)
+        self.cb_al_enable_t.setEnabled(al_enabled)
         self.cb_min_enable_j.setEnabled(al_enabled)
         self.cb_min_enable_p.setEnabled(al_enabled)
         self.cb_min_enable_c.setEnabled(al_enabled)
+        self.cb_min_enable_t.setEnabled(al_enabled)
         self.cb_headless_j.setEnabled(al_enabled)
         self.cb_headless_p.setEnabled(al_enabled)
         self.cb_headless_c.setEnabled(al_enabled)
+        self.cb_headless_t.setEnabled(al_enabled)
 
     def toggle_xplane_widgets(self):
         xplane_enabled = self.enableXPLANE.isChecked()
@@ -303,6 +339,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             case 'minimize_c':
                 self.cb_headless_c.setChecked(False)
                 self.cb_startToTray.setChecked(False)
+            case 'headless_t':
+                self.cb_min_enable_t.setChecked(False)
+            case 'minimize_t':
+                self.cb_headless_t.setChecked(False)
+                self.cb_startToTray.setChecked(False)
         logging.debug(f"{sender.objectName()} checked:{sender.isChecked()}")
 
     def validate_settings(self):
@@ -314,6 +355,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 val_entry = self.tb_pid_p.text()
             case 3:
                 val_entry = self.tb_pid_c.text()
+            case 4:
+                val_entry = self.tb_pid_t.text()
         if self.cb_al_enable.isChecked() and not (self.cb_al_enable_j.isChecked() or self.cb_al_enable_p.isChecked() or self.cb_al_enable_c.isChecked()):
             QMessageBox.warning(self, "Config Error", "Auto Launching is enabled but no devices are configured for auto launch.  Please enable a device or disable auto launching")
             return False
@@ -331,6 +374,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if self.cb_al_enable_p.isChecked() and self.tb_pid_p.text() == '':
             r = self.tb_pid_p.text()
             QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the pedals device or disable auto-launch')
+            return False
+        if self.cb_al_enable_t.isChecked() and self.tb_pid_t.text() == '':
+            r = self.tb_pid_t.text()
+            QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the trim wheel device or disable auto-launch')
             return False
         if self.validateXPLANE.isChecked():
             pth = os.path.join(self.pathXPLANE.text(), 'resources')
@@ -375,15 +422,19 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'autolaunchJoystick': self.cb_al_enable_j.isChecked(),
             'autolaunchPedals': self.cb_al_enable_p.isChecked(),
             'autolaunchCollective': self.cb_al_enable_c.isChecked(),
+            'autolaunchTrimWheel': self.cb_al_enable_t.isChecked(),
             'startMinJoystick': self.cb_min_enable_j.isChecked(),
             'startMinPedals': self.cb_min_enable_p.isChecked(),
             'startMinCollective': self.cb_min_enable_c.isChecked(),
+            'startMinTrimWheel': self.cb_min_enable_t.isChecked(),
             'startHeadlessJoystick': self.cb_headless_j.isChecked(),
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
+            'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
             'pidJoystick': str(self.tb_pid_j.text()),
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
+            'pidTrimWheel': str(self.tb_pid_t.text()),
             'pruneLogs': self.cb_logPrune.isChecked(),
             'pruneLogsNum': self.tb_logPrune.text(),
             'pruneLogsUnit': self.combo_logPrune.currentText(),
@@ -411,15 +462,19 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'autolaunchJoystick',
             'autolaunchPedals',
             'autolaunchCollective',
+            'autolaunchTrimWheel',
             'startMinJoystick',
             'startMinPedals',
             'startMinCollective',
+            'startMinTrimWheel',
             'startHeadlessJoystick',
             'startHeadlessPedals',
             'startHeadlessCollective',
+            'startHeadlessTrimWheel',
             'pidJoystick',
             'pidPedals',
             'pidCollective',
+            'pidTrimWheel',
         ]
         saved_al_dict = {}
         for key in key_list:
@@ -529,14 +584,17 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_al_enable_j.setChecked(settings_dict.get('autolaunchJoystick', False))
         self.cb_al_enable_p.setChecked(settings_dict.get('autolaunchPedals', False))
         self.cb_al_enable_c.setChecked(settings_dict.get('autolaunchCollective', False))
+        self.cb_al_enable_t.setChecked(settings_dict.get('autolaunchTrimWheel', False))
 
         self.cb_min_enable_j.setChecked(settings_dict.get('startMinJoystick', False))
         self.cb_min_enable_p.setChecked(settings_dict.get('startMinPedals', False))
         self.cb_min_enable_c.setChecked(settings_dict.get('startMinCollective', False))
+        self.cb_min_enable_t.setChecked(settings_dict.get('startMinTrimWheel', False))
 
         self.cb_headless_j.setChecked(settings_dict.get('startHeadlessJoystick', False))
         self.cb_headless_p.setChecked(settings_dict.get('startHeadlessPedals', False))
         self.cb_headless_c.setChecked(settings_dict.get('startHeadlessCollective', False))
+        self.cb_headless_t.setChecked(settings_dict.get('startHeadlessTrimWheel', False))
 
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
@@ -557,15 +615,19 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'autolaunchJoystick': self.cb_al_enable_j.isChecked(),
             'autolaunchPedals': self.cb_al_enable_p.isChecked(),
             'autolaunchCollective': self.cb_al_enable_c.isChecked(),
+            'autolaunchTrimWheel': self.cb_al_enable_t.isChecked(),
             'startMinJoystick': self.cb_min_enable_j.isChecked(),
             'startMinPedals': self.cb_min_enable_p.isChecked(),
             'startMinCollective': self.cb_min_enable_c.isChecked(),
+            'startMinTrimWheel': self.cb_min_enable_t.isChecked(),
             'startHeadlessJoystick': self.cb_headless_j.isChecked(),
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
+            'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
             'pidJoystick': str(self.tb_pid_j.text()),
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
+            'pidTrimWheel': str(self.tb_pid_t.text()),
         }
 
     def browse_vpconf(self, mode):

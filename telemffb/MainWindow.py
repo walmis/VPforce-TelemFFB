@@ -131,6 +131,9 @@ class MainWindow(QMainWindow):
             case 'collective':
                 x_pos = 50
                 y_pos = 70
+            case 'trimwheel':
+                x_pos = 40
+                y_pos = 30
 
         self.setGeometry(x_pos, y_pos, 530, 700)
         version = utils.get_version()
@@ -200,6 +203,9 @@ class MainWindow(QMainWindow):
                 case 'collective':
                     x_pos = 50
                     y_pos = 70
+                case 'trimwheel':
+                    x_pos = 40
+                    y_pos = 30
             self.setGeometry(x_pos, y_pos, 530, 700)
 
         reset_geometry.triggered.connect(do_reset_window_size)
@@ -1036,9 +1042,13 @@ class MainWindow(QMainWindow):
                 self.change_config_scope(2)
             elif check_instance("collective"):
                 self.change_config_scope(3)
+            elif check_instance("trimwheel"):
+                self.change_config_scope(4)
         elif G.current_device_config_scope == 'pedals':
             if check_instance("collective"):
                 self.change_config_scope(3)
+            elif check_instance("trimwheel"):
+                self.change_config_scope(4)
             elif check_instance("joystick"):
                 self.change_config_scope(1)
         elif G.current_device_config_scope == 'collective':
@@ -1046,6 +1056,15 @@ class MainWindow(QMainWindow):
                 self.change_config_scope(1)
             elif check_instance("pedals"):
                 self.change_config_scope(2)
+            elif check_instance("trimwheel"):
+                self.change_config_scope(4)
+        elif G.current_device_config_scope == 'trimwheel':
+            if check_instance("joystick"):
+                self.change_config_scope(1)
+            elif check_instance("pedals"):
+                self.change_config_scope(2)
+            elif check_instance("collective"):
+                self.change_config_scope(3)
 
     def update_version_result(self, vers, url):
         self.latest_version = vers
@@ -1090,13 +1109,15 @@ class MainWindow(QMainWindow):
             if 'joystick' in _arg: arg = 1
             elif 'pedals' in _arg: arg = 2
             elif 'collective' in _arg: arg = 3
+            elif 'trimwheel' in _arg: arg = 4
         else:
             arg = _arg
 
         types = {
             1 : "joystick",
             2 : "pedals",
-            3 : "collective"
+            3 : "collective",
+            4 : "trimwheel"
         }
 
         xmlutils.update_vars(types[arg], G.userconfig_path, G.defaults_path)
@@ -1218,14 +1239,17 @@ class MainWindow(QMainWindow):
         """Set default window position based on device type"""
         match G.device_type:
             case 'joystick':
-                x_pos = 150
+                x_pos = 160
                 y_pos = 130
             case 'pedals':
-                x_pos = 100
+                x_pos = 110
                 y_pos = 100
             case 'collective':
-                x_pos = 50
+                x_pos = 60
                 y_pos = 70
+            case 'trimwheel':
+                x_pos = 10
+                y_pos = 40
                 
         self.setGeometry(x_pos, y_pos, 530, 700)
 
@@ -1402,6 +1426,7 @@ class MainWindow(QMainWindow):
                 self.cb_joystick.setVisible(True)
                 self.cb_pedals.setVisible(True)
                 self.cb_collective.setVisible(True)
+                self.cb_trimwheel.setVisible(True)
                 match G.device_type:
                     case 'joystick':
                         self.cb_joystick.setChecked(True)
@@ -1409,6 +1434,8 @@ class MainWindow(QMainWindow):
                         self.cb_pedals.setChecked(True)
                     case 'collective':
                         self.cb_collective.setChecked(True)
+                    case 'trimwheel':
+                        self.cb_trimwheel.setChecked(True)
 
             try:
                 h = self.tab_sizes[str(index)]['height']

@@ -90,6 +90,7 @@ def launch_children():
         utils.check_launch_instance("joystick", master_port)
         utils.check_launch_instance("pedals", master_port)
         utils.check_launch_instance("collective", master_port)
+        utils.check_launch_instance("trimwheel", master_port)
 
     except Exception:
         logging.exception("Error during Auto-Launch sequence")
@@ -148,7 +149,7 @@ def main():
     # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
     _vpf_logo = ":/image/vpforcelogo.png"
     if G.args.device is None:
-        mapping = {1: "joystick", 2: "pedals", 3: "collective"}
+        mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
         master_rb = G.system_settings.get('masterInstance', 1)
         
         try:
@@ -183,11 +184,12 @@ def main():
 
     # need to determine if someone has auto-launch enabled but has started an instance with -D
     # The 'masterInstance' reg key holds the radio button index of the configured master instance
-    # 1=joystick, 2=pedals, 3=collective
+    # 1=joystick, 2=pedals, 3=collective, 4=trimwheel
     index_dict = {
         'joystick': 1,
         'pedals': 2,
-        'collective': 3
+        'collective': 3,
+        'trimwheel': 4
     }
     master_index = G.system_settings.get('masterInstance', 1)
     if index_dict[G.device_type] == master_index:

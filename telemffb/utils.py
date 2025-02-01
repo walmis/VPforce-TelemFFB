@@ -1861,6 +1861,8 @@ def get_device_logo(dev_type :str):
             _device_logo = ':/image/logo_p.png'
         case 'collective':
             _device_logo = ':/image/logo_c.png'
+        case 'trimwheel':
+            _device_logo = ':/image/logo_t.png'
         case _:
             _device_logo = ':/image/logo_j.png'
     return _device_logo
