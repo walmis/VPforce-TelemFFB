@@ -357,7 +357,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 val_entry = self.tb_pid_c.text()
             case 4:
                 val_entry = self.tb_pid_t.text()
-        if self.cb_al_enable.isChecked() and not (self.cb_al_enable_j.isChecked() or self.cb_al_enable_p.isChecked() or self.cb_al_enable_c.isChecked()):
+        if self.cb_al_enable.isChecked() and not (self.cb_al_enable_j.isChecked() or self.cb_al_enable_p.isChecked() or self.cb_al_enable_c.isChecked()  or self.cb_al_enable_t.isChecked()):
             QMessageBox.warning(self, "Config Error", "Auto Launching is enabled but no devices are configured for auto launch.  Please enable a device or disable auto launching")
             return False
         if val_entry == '':
@@ -578,6 +578,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.tb_pid_p.setText(str(settings_dict.get('pidPedals', '')))
 
         self.tb_pid_c.setText(str(settings_dict.get('pidCollective', '')))
+
+        self.tb_pid_t.setText(str(settings_dict.get('pidTrimWheel', '')))
 
         self.cb_al_enable.setChecked(settings_dict.get('autolaunchMaster', False))
 
