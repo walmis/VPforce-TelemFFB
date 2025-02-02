@@ -401,6 +401,9 @@ class AircraftBase(object):
     def is_collective(self):
         return self._telem_data.get("FFBType") == "collective"
 
+    def is_trimwheel(self):
+        return self._telem_data.get("FFBType") == "trimwheel"
+
 
     def anything_has_changed(self, item: str, value, delta_ms=0):
         """track if any parameter, given as key "item" has changed between two consecutive calls of the function

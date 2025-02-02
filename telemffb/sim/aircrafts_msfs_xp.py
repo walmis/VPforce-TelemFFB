@@ -135,6 +135,12 @@ class Aircraft(AircraftBase):
 
     vne_override: int = 0
 
+    trimwheel_init = 0
+    trimwheel_ap_spring_gain = 1
+    trimwheel_dampening_gain = 0
+    trimwheel_spring_coeff_y = 0
+    last_trimwheel_y = None
+
     @classmethod
     def set_simconnect(cls, sc):
         cls._simconnect = sc
@@ -267,6 +273,7 @@ class Aircraft(AircraftBase):
             newvalue = (1 + k) * x + (-k) * (math.exp(expo_a * (x - 1)) - math.exp(-expo_a)) / (1 - math.exp(-expo_a))
         #print(f'expo input:{x} k:{k} output:{newvalue}')
         return newvalue
+
     def _update_fbw_flight_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
         if self._sim_is_msfs():
@@ -870,7 +877,90 @@ class Aircraft(AircraftBase):
 
             self.const_force.constant(rud_force, 270).start()
             self._spring_handle.start()
-            
+
+    def _update_trimwheel(self, telem_data):
+        if not self.is_trimwheel():
+            return
+        if not self.telemffb_controls_axes and not self.local_disable_axis_control:
+            return
+        input_data = HapticEffect.device.get_input()
+        phys_x, phys_y = input_data.axisXY()
+
+        telem_data['phys_y'] = phys_y
+        if not self.trimwheel_init:
+            self._spring_handle.name = "trimwheel_ap_spring"
+            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
+            if self._sim_is_msfs():
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_ELEV_TRIM_SET'
+                    y_range = 16384
+
+            elif self.last_trimwheel_y is None:
+                # Air start or new aircraft.  Use current physical position as init point
+                self.cpO_y = round(4096 * phys_y)
+            else:
+                # In air, previously paused.  Use stored collective position to init point
+                self.cpO_y = round(4096 * self.last_collective_y)
+
+            self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = 4096
+
+            self.spring_y.cpOffset = self.cpO_y
+
+            self._spring_handle.setCondition(self.spring_y)
+            # self.damper.damper(coef_y=int(4096*self.trimwheel_dampening_gain)).start()
+            self._spring_handle.start(override=True)
+            # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
+            if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
+                # dont start sending position until physical stick has centered
+                self.trimwheel_init = 1
+                logging.info("Trim WHeel Initialized")
+            else:
+                if self._sim_is_msfs():
+                    self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
+
+                return
+        self.last_trimwheel_y = phys_y
+
+        self._spring_handle.name = "trimwheel_ap_spring"
+
+        self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
+        # print(self.cpO_y)
+        self.spring_y.cpOffset = self.cpO_y
+
+        # self.damper.damper(coef_y=int(4096*self.trimwheel_dampening_gain)).start()
+        self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(
+            self.trimwheel_spring_coeff_y / 2)
+
+        self._spring_handle.setCondition(self.spring_y)
+        self._spring_handle.start(override=True)
+
+        if self._sim_is_xplane():    # unknown if this works
+            pos_y_pos = utils.scale(phys_y, (-1, 1), (1, 0))
+            if self.trimwheel_init:
+                self.send_xp_command(f'AXIS:cy={round(pos_y_pos, 5)}')
+
+        if self._sim_is_msfs():
+            if self.enable_custom_y_axis:
+                y_var = self.custom_y_axis
+                y_range = self.raw_y_axis_scale
+            else:
+                y_var = 'AXIS_ELEV_TRIM_SET'
+                y_range = 16384
+
+            pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+
+            if y_range != 1:
+                pos_y_pos = -int(pos_y_pos)
+            else:
+                pos_y_pos = round(pos_y_pos, 5)
+
+            if self.trimwheel_init:
+                self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                self.last_pos_y_pos = pos_y_pos
+
     def _update_stick_shaker(self, telem_data):
         if not self._sim_is_msfs():
             return
@@ -895,6 +985,10 @@ class Aircraft(AircraftBase):
     def toggle_xp_control(self):
         if self.telem_data.get('FFBType', '') == 'collective':
             # issues with axis override for collectve
+            return
+
+        if self.telem_data.get('FFBType', '') == 'trimwheel':
+            # not implemented
             return
 
         if not getattr(self, "_socket", None):
@@ -988,6 +1082,7 @@ class Aircraft(AircraftBase):
         self._update_runway_rumble(telem_data)
         self._update_buffeting(telem_data)
         self._update_flight_controls(telem_data)
+        self._update_trimwheel(telem_data)
         self._decel_effect(telem_data)
         self._update_touchdown_effect(telem_data)
         if self._sim_is_xplane():
@@ -1261,16 +1356,18 @@ class Helicopter(Aircraft):
     last_device_y = 0
     last_pos_y_pos = 0
     last_pos_x_pos = 0
-    last_collective_y = None
-    last_pedal_x = 0
+
     collective_init = 0
     collective_ap_spring_gain = 1
     collective_dampening_gain = 0
     collective_spring_coeff_y = 0
+    last_collective_y = None
+
     pedals_init = 0
     pedal_spring_gain = 1
     pedal_dampening_gain = 1
     pedal_spring_coeff_x = 0
+    last_pedal_x = 0
 
     joystick_trim_follow_gain_physical_x = 0.3
     joystick_trim_follow_gain_virtual_x = 0.2
