@@ -883,6 +883,12 @@ class Aircraft(AircraftBase):
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
             return
+        ap_active = 0
+        if self._sim_is_msfs():
+            ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_xplane():
+            ap_active = telem_data.get("APServos", 0)
+
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
 
@@ -902,8 +908,8 @@ class Aircraft(AircraftBase):
                 # Air start or new aircraft.  Use current physical position as init point
                 self.cpO_y = round(4096 * phys_y)
             else:
-                # In air, previously paused.  Use stored collective position to init point
-                self.cpO_y = round(4096 * self.last_collective_y)
+                # In air, previously paused.  Use stored position to init point
+                self.cpO_y = round(4096 * self.last_trimwheel_y)
 
             self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = 4096
 
@@ -916,50 +922,59 @@ class Aircraft(AircraftBase):
             if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
                 # dont start sending position until physical stick has centered
                 self.trimwheel_init = 1
-                logging.info("Trim WHeel Initialized")
+                logging.info("Trim Wheel Initialized")
             else:
                 if self._sim_is_msfs():
-                    self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
+                    self._simconnect.send_event_to_msfs(y_var, self.last_trimwheel_y)
 
                 return
         self.last_trimwheel_y = phys_y
 
-        self._spring_handle.name = "trimwheel_ap_spring"
+        if ap_active == 0:
 
-        self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
-        # print(self.cpO_y)
-        self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.cpOffset = self.cpO_y
 
-        # self.damper.damper(coef_y=int(4096*self.trimwheel_dampening_gain)).start()
-        self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = round(
-            self.trimwheel_spring_coeff_y / 2)
+            # self.damper.damper(coef_y=0).start()
+            self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = round(4096 * utils.clamp(self.trimwheel_ap_spring_gain, 0, 1))
 
-        self._spring_handle.setCondition(self.spring_y)
-        self._spring_handle.start(override=True)
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.start(override=True)
 
-        if self._sim_is_xplane():    # unknown if this works
-            pos_y_pos = utils.scale(phys_y, (-1, 1), (1, 0))
-            if self.trimwheel_init:
-                self.send_xp_command(f'AXIS:cy={round(pos_y_pos, 5)}')
+            if self._sim_is_xplane():  # unknown if this works
+                pos_y_pos = utils.scale(phys_y, (-1, 1), (1, 0))
+                if self.trimwheel_init:
+                    self.send_xp_command(f'AXIS:cy={round(pos_y_pos, 5)}')
 
-        if self._sim_is_msfs():
-            if self.enable_custom_y_axis:
-                y_var = self.custom_y_axis
-                y_range = self.raw_y_axis_scale
-            else:
-                y_var = 'AXIS_ELEV_TRIM_SET'
-                y_range = 16384
+            if self._sim_is_msfs():
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_ELEV_TRIM_SET'
+                    y_range = 16384
 
-            pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+                pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
 
-            if y_range != 1:
-                pos_y_pos = -int(pos_y_pos)
-            else:
-                pos_y_pos = round(pos_y_pos, 5)
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
 
-            if self.trimwheel_init:
-                self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
-                self.last_pos_y_pos = pos_y_pos
+                if self.trimwheel_init:
+                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    self.last_pos_y_pos = pos_y_pos
+
+        else:
+            trimwheel_pos = telem_data.get("ElevTrimPct", 0)
+
+            trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+            self.cpO_y = round(utils.scale(trimwheel_pos,(0, 1), (4096, -4096)))
+            self.spring_y.cpOffset = self.cpO_y
+            # self.damper.damper(coef_y=0).start()
+            self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = round(4096 * utils.clamp(self.trimwheel_ap_spring_gain, 0, 1))
+
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.start(override=True)
 
     def _update_stick_shaker(self, telem_data):
         if not self._sim_is_msfs():
@@ -1184,6 +1199,7 @@ class JetAircraft(Aircraft):
         self._update_ab_effect(telem_data)
         if self.is_collective():
             self._override_collective_spring()
+
 class TurbopropAircraft(PropellerAircraft):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -1207,6 +1223,7 @@ class TurbopropAircraft(PropellerAircraft):
         self._update_jet_engine_rumble(telem_data)
         if self.is_collective():
             self._override_collective_spring()
+
 class GliderAircraft(Aircraft):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -1333,6 +1350,7 @@ class GliderAircraft(Aircraft):
 
         if self.is_collective():
             self._override_collective_spring()
+
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
     buffeting_intensity = 0.0
@@ -1916,8 +1934,6 @@ class HPGHelicopter(Helicopter):
         }
 
         return result
-
-
 
     def check_hands_on(self, percent):
         input_data = HapticEffect.device.get_input()

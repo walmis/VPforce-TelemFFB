@@ -982,6 +982,7 @@ class InstanceStatusRow(QWidget):
         self.joystick_status_icon.hide()
         self.pedals_status_icon.hide()
         self.collective_status_icon.hide()
+        self.trimwheel_status_icon.hide()
 
         self.instance_status_row.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
         self.instance_status_row.setSpacing(10)
