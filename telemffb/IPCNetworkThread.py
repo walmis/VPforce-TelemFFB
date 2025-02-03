@@ -65,7 +65,8 @@ class IPCNetworkThread(QThread):
         self._child_active = {
             'joystick': None,
             'pedals': None,
-            'collective': None
+            'collective': None,
+            'trimwheel': None
         }
 
         # Initialize socket

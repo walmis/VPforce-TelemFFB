@@ -1006,6 +1006,8 @@ class MainWindow(QMainWindow):
             self.instance_status_row.pedals_status_icon.show()
         if "collective" in G.launched_instances:
             self.instance_status_row.collective_status_icon.show()
+        if 'trimwheel' in G.launched_instances:
+            self.instance_status_row.trimwheel_status_icon.show()
         self.add_instance_log_menu()
         self.add_system_tray()
 
@@ -1104,12 +1106,11 @@ class MainWindow(QMainWindow):
         self.perform_update(auto=True)
 
     def change_config_scope(self, _arg):
-
         if isinstance(_arg, str):
             if 'joystick' in _arg: arg = 1
             elif 'pedals' in _arg: arg = 2
             elif 'collective' in _arg: arg = 3
-            elif 'trimwheel' in _arg: arg = 4
+            elif 'trim wheel' in _arg: arg = 4
         else:
             arg = _arg
 
