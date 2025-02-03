@@ -896,15 +896,8 @@ class Aircraft(AircraftBase):
         telem_data['phys_y'] = phys_y
         if not self.trimwheel_init:
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
-            if self._sim_is_msfs():
-                if self.enable_custom_y_axis:
-                    y_var = self.custom_y_axis
-                    y_range = self.raw_y_axis_scale
-                else:
-                    y_var = 'AXIS_ELEV_TRIM_SET'
-                    y_range = 16384
 
-            elif self.last_trimwheel_y is None:
+            if self.last_trimwheel_y is None:
                 # Air start or new aircraft.  Use current physical position as init point
                 self.cpO_y = round(4096 * phys_y)
             else:
