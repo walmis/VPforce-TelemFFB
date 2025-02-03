@@ -1054,12 +1054,12 @@ class MainWindow(QMainWindow):
             elif check_instance("joystick"):
                 self.change_config_scope(1)
         elif G.current_device_config_scope == 'collective':
-            if check_instance("joystick"):
+            if check_instance("trimwheel"):
+                self.change_config_scope(4)
+            elif check_instance("joystick"):
                 self.change_config_scope(1)
             elif check_instance("pedals"):
                 self.change_config_scope(2)
-            elif check_instance("trimwheel"):
-                self.change_config_scope(4)
         elif G.current_device_config_scope == 'trimwheel':
             if check_instance("joystick"):
                 self.change_config_scope(1)
