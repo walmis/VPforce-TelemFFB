@@ -792,7 +792,7 @@ class MainWindow(QMainWindow):
             show_menu = QMenu("Instances", self)
             show_child_window_action = {}
             print(f"LAUNCHED:{G.launched_instances}")
-            for d in ["joystick", "pedals", "collective"]:
+            for d in ["joystick", "pedals", "collective", 'trimwheel']:
                 if d in G.launched_instances:
                     def do_show_child_window(child=d):
                         G.ipc_instance.send_broadcast_message(f'SHOW WINDOW:{child}')
@@ -855,7 +855,7 @@ class MainWindow(QMainWindow):
             self.child_log_menu = self.log_menu.addMenu('Open Child Logs')
 
             self.log_action = {}
-            for d in ["joystick", "pedals", "collective"]:
+            for d in ["joystick", "pedals", "collective", 'trimwheel']:
                 if d in G.launched_instances:
                     def do_show_child_log(child=d):
                         G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
