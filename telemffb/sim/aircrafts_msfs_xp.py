@@ -891,10 +891,10 @@ class Aircraft(AircraftBase):
 
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
+        self._spring_handle.name = "trimwheel_ap_spring"
 
         telem_data['phys_y'] = phys_y
         if not self.trimwheel_init:
-            self._spring_handle.name = "trimwheel_ap_spring"
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
             if self._sim_is_msfs():
                 if self.enable_custom_y_axis:
@@ -924,13 +924,16 @@ class Aircraft(AircraftBase):
                 self.trimwheel_init = 1
                 logging.info("Trim Wheel Initialized")
             else:
-                if self._sim_is_msfs():
-                    self._simconnect.send_event_to_msfs(y_var, self.last_trimwheel_y)
-
+                # if self._sim_is_msfs():
+                #     self._simconnect.send_event_to_msfs(y_var, self.last_trimwheel_y)
                 return
         self.last_trimwheel_y = phys_y
 
         if ap_active == 0:
+            trimwheel_pos = telem_data.get("ElevTrimPct", 0)
+
+            # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+            self.cpO_y = round(utils.scale(trimwheel_pos, (-1, 1), (-4096, 4096)))
 
             self.spring_y.cpOffset = self.cpO_y
 
@@ -967,8 +970,8 @@ class Aircraft(AircraftBase):
         else:
             trimwheel_pos = telem_data.get("ElevTrimPct", 0)
 
-            trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
-            self.cpO_y = round(utils.scale(trimwheel_pos,(0, 1), (4096, -4096)))
+            # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+            self.cpO_y = round(utils.scale(trimwheel_pos,(-1, 1), (-4096, 4096)))
             self.spring_y.cpOffset = self.cpO_y
             # self.damper.damper(coef_y=0).start()
             self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = round(4096 * utils.clamp(self.trimwheel_ap_spring_gain, 0, 1))
@@ -1126,6 +1129,8 @@ class Aircraft(AircraftBase):
             super().on_timeout()
 
         self.cyclic_spring_init = 0
+        self.trimwheel_init = 0
+
 
         self.const_force.stop()
         self._spring_handle.stop()
