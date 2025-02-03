@@ -1094,13 +1094,16 @@ class Aircraft(AircraftBase):
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
 
+        if self.is_trimwheel():
+            self._update_trimwheel(telem_data)
+            return
+
         hyd_loss = self._update_hydraulic_loss_effect(telem_data)
         if not hyd_loss: self._update_ffb_forces(telem_data)
         self._update_stick_shaker(telem_data)
         self._update_runway_rumble(telem_data)
         self._update_buffeting(telem_data)
         self._update_flight_controls(telem_data)
-        self._update_trimwheel(telem_data)
         self._decel_effect(telem_data)
         self._update_touchdown_effect(telem_data)
         if self._sim_is_xplane():
@@ -1162,6 +1165,9 @@ class PropellerAircraft(Aircraft):
 
         super().on_telemetry(telem_data)
 
+        if self.is_trimwheel():
+            return
+
         self.update_piston_engine_rumble(telem_data)
         if self._sim_is_msfs():
             if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
@@ -1193,6 +1199,9 @@ class JetAircraft(Aircraft):
 
         super().on_telemetry(telem_data)
         #
+        if self.is_trimwheel():
+            return
+
         if self._sim_is_xplane():
             self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=150*kt2ms)
         if self._sim_is_msfs():
@@ -1217,6 +1226,9 @@ class TurbopropAircraft(PropellerAircraft):
         telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
+        if self.is_trimwheel():
+            return
+
         if self._sim_is_xplane():
             self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=120*kt2ms)
         if self._sim_is_msfs():
@@ -1341,6 +1353,9 @@ class GliderAircraft(Aircraft):
         telem_data["AircraftClass"] = "GliderAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
+        if self.is_trimwheel():
+            return
+
         if self.force_trim_enabled:
             self._update_force_trim(telem_data, x_axis=self.aileron_force_trim, y_axis=self.elevator_force_trim)
         if self._sim_is_msfs():
@@ -1419,6 +1434,9 @@ class Helicopter(Aircraft):
         telem_data["AircraftClass"] = "Helicopter"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
+
+        if self.is_trimwheel():
+            return
 
         self._update_heli_controls(telem_data)
         self._update_collective(telem_data)
