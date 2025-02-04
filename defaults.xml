@@ -542,6 +542,17 @@
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
+		<order>145</order>
+		<name>trimwheel_axis_invert</name>
+		<info>Enable if trim wheel axis moves the wrong way</info>
+		<displayname>Elevator Trim Axis Invert</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<trimwheel>true</trimwheel>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
 		<order>150</order>
 		<name>trim_workaround</name>
 		<info>Apply artificial trim movement - only for aircraft that do not support native FFB trim&lt;b&gt;&lt;b&gt;(AV8B, Mig-19)</info>
@@ -1325,7 +1336,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<trimwheel></trimwheel>
+		<trimwheel>true</trimwheel>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
 		<datatype>float</datatype>
@@ -1508,6 +1519,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<validvalues>1,256,4096,16384</validvalues>
 		<value>16384</value>
 		<datatype>list</datatype>
@@ -5632,6 +5644,34 @@
 		<name>trimwheel_use_master_buttons</name>
 		<type>GliderAircraft</type>
 		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_axis_invert</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_axis_invert</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_axis_invert</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_axis_invert</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
 		<sim>MSFS</sim>
 		<device>trimwheel</device>
 	</classdefaults>

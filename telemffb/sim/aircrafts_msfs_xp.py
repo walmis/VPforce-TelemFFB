@@ -138,7 +138,7 @@ class Aircraft(AircraftBase):
     trimwheel_init = 0
     trimwheel_ap_spring_gain = 1
     trimwheel_dampening_gain = 0
-    trimwheel_spring_coeff_y = 0
+    trimwheel_spring_coeff_y = 0  # not used
     last_trimwheel_y = None
     trim_active = False
 
@@ -930,6 +930,7 @@ class Aircraft(AircraftBase):
 
             # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
             self.cpO_y = round(utils.scale(trimwheel_pos, (-1, 1), (-4096, 4096)))
+            telem_data['_tw_cpO_y'] = self.cpO_y
 
             self.spring_y.cpOffset = self.cpO_y
 
@@ -956,11 +957,15 @@ class Aircraft(AircraftBase):
                 phys_x, phys_y = input_data.axisXY()
 
                 pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
-
+                telem_data['_tw_phys_y_pos'] = phys_y
+                telem_data['_tw_pos_y_pos'] = pos_y_pos
                 if y_range != 1:
                     pos_y_pos = -int(pos_y_pos)
                 else:
                     pos_y_pos = round(pos_y_pos, 5)
+
+                if self.trimwheel_axis_invert:
+                    pos_y_pos = -pos_y_pos
 
                 if self.check_button_press(self.trimwheel_elev_up_button, self.trimwheel_use_master_buttons) or self.check_button_press(self.trimwheel_elev_dn_button, self.trimwheel_use_master_buttons):
                     self.trim_active = True
@@ -976,7 +981,7 @@ class Aircraft(AircraftBase):
                 if not self.trim_active:
                     self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
                 self.last_pos_y_pos = pos_y_pos
-
+                telem_data['_tw_last'] = self.last_pos_y_pos
 
         else:
             trimwheel_pos = telem_data.get("ElevTrimPct", 0)

@@ -270,6 +270,7 @@ class AircraftBase(object):
     trimwheel_elev_up_button: int = 0
     trimwheel_elev_dn_button: int = 0
     trimwheel_use_master_buttons: bool = False
+    trimwheel_axis_invert: bool = False
 
     last_device_x = None
     last_device_y = None
