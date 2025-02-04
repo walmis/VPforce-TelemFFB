@@ -140,6 +140,7 @@ class Aircraft(AircraftBase):
     trimwheel_dampening_gain = 0
     trimwheel_spring_coeff_y = 0
     last_trimwheel_y = None
+    trim_active = False
 
     @classmethod
     def set_simconnect(cls, sc):
@@ -232,6 +233,8 @@ class Aircraft(AircraftBase):
         self.max_rudder_coeff = 0.5
 
         self.xplane_axis_override_active = False
+
+        self.trimwheel_init = False
 
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
@@ -949,6 +952,9 @@ class Aircraft(AircraftBase):
                     y_var = 'AXIS_ELEV_TRIM_SET'
                     y_range = 16384
 
+                input_data = HapticEffect.device.get_input()
+                phys_x, phys_y = input_data.axisXY()
+
                 pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
 
                 if y_range != 1:
@@ -956,9 +962,21 @@ class Aircraft(AircraftBase):
                 else:
                     pos_y_pos = round(pos_y_pos, 5)
 
-                if self.trimwheel_init:
+                if self.check_button_press(9, check_master=True) or self.check_button_press(11, check_master=True):
+                    self.trim_active = True
+                    return
+
+                delta = round(phys_y - trimwheel_pos, 5)
+                # utils.dbprint('yellow', f"delta: {delta}")
+                telem_data["TRIM_DELTA"] = delta
+                if self.trim_active:
+                    if abs(delta) <= 0.003:
+                        self.trim_active = False
+
+                if not self.trim_active:
                     self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
-                    self.last_pos_y_pos = pos_y_pos
+                self.last_pos_y_pos = pos_y_pos
+
 
         else:
             trimwheel_pos = telem_data.get("ElevTrimPct", 0)
