@@ -267,6 +267,9 @@ class AircraftBase(object):
     collective_ft_ovd_cp0_y = 4096
     collective_ft_use_master_buttons: bool = False
 
+    trimwheel_elev_up_button: int = 0
+    trimwheel_elev_dn_button: int = 0
+    trimwheel_use_master_buttons: bool = False
 
     last_device_x = None
     last_device_y = None

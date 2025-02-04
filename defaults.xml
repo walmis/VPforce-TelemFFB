@@ -401,6 +401,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
+		<value>0</value>
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
@@ -505,6 +506,39 @@
 		<order>141.9</order>
 		<name>collective_ft_ovd_trim_rate</name>
 		<displayname>Trim Slew Rate</displayname>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>142</order>
+		<name>trimwheel_use_master_buttons</name>
+		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from trim wheel (or  loopback app).</info>
+		<displayname>Use buttons from Master device</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<trimwheel>true</trimwheel>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>143</order>
+		<name>trimwheel_elev_up_button</name>
+		<info>Button # to hold for nose up elevator trim</info>
+		<displayname>Elevator Trim Nose Up Button</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<trimwheel>true</trimwheel>
+		<datatype>button</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Basic</Grouping>
+		<order>144</order>
+		<name>trimwheel_elev_dn_button</name>
+		<info>Button # to hold for nose down elevator trim</info>
+		<displayname>Elevator Trim Nose Down Button</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<trimwheel>true</trimwheel>
+		<datatype>button</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
@@ -3780,20 +3814,6 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
-		<name>aileron_force_trim</name>
-		<type>GliderAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>aileron_force_trim</name>
-		<type>GliderAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
 		<name>aileron_expo</name>
 		<type>GliderAircraft</type>
 		<value>0.2</value>
@@ -3847,6 +3867,20 @@
 		<type>TurbopropAircraft</type>
 		<value>0.1</value>
 		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>aileron_force_trim</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>aileron_force_trim</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
@@ -3919,78 +3953,6 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
-	<classdefaults>
-		<name>vne_override</name>
-		<type>GliderAircraft</type>
-		<value></value>
-		<unit>kt</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>vne_override</name>
-		<type>TurbopropAircraft</type>
-		<value></value>
-		<unit>kt</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>vne_override</name>
-		<type>PropellerAircraft</type>
-		<value></value>
-		<unit>kt</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>vne_override</name>
-		<type>JetAircraft</type>
-		<value></value>
-		<unit>kt</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>vne_override</name>
-		<type>GliderAircraft</type>
-		<value></value>
-		<unit>kt</unit>
-		<sim>XPLANE</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>vne_override</name>
-		<type>TurbopropAircraft</type>
-		<value></value>
-		<unit>kt</unit>
-		<sim>XPLANE</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>vne_override</name>
-		<type>PropellerAircraft</type>
-		<value></value>
-		<unit>kt</unit>
-		<sim>XPLANE</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>vne_override</name>
-		<type>JetAircraft</type>
-		<value></value>
-		<unit>kt</unit>
-		<sim>XPLANE</sim>
-		<device>any</device>
-	</classdefaults>
-	<classdefaults>
-		<name>vne_override</name>
-		<type>AllSettings</type>
-		<value></value>
-		<unit>kt</unit>
-		<sim>any</sim>
-		<device>any</device>
-	</classdefaults>
 	<classdefaults>
 		<name>aircraft_is_spring_centered</name>
 		<type>GliderAircraft</type>
@@ -4698,20 +4660,6 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
-		<name>elevator_force_trim</name>
-		<type>GliderAircraft</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>elevator_force_trim</name>
-		<type>GliderAircraft</type>
-		<value>true</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
 		<name>elevator_expo</name>
 		<type>GliderAircraft</type>
 		<value>0.2</value>
@@ -4765,6 +4713,20 @@
 		<type>TurbopropAircraft</type>
 		<value>0.1</value>
 		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>elevator_force_trim</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>elevator_force_trim</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
@@ -5560,6 +5522,174 @@
 		<value>99</value>
 		<sim>any</sim>
 		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>TurbopropAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>PropellerAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>JetAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>GliderAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>TurbopropAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>PropellerAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>JetAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>GliderAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>TurbopropAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>PropellerAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>JetAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>GliderAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>TurbopropAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>PropellerAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>JetAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>GliderAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
 		</classdefaults>
 	<classdefaults>
 		<name>fuelboom_motion_effect_enabled</name>
@@ -5644,237 +5774,6 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>AllSettings</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>IL2</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>IL2</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>TurbopropAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>GliderAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>TurbopropAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_effect_enable</name>
-		<type>GliderAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>IL2</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>IL2</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>TurbopropAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>GliderAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>TurbopropAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_enable_neg_gs</name>
-		<type>GliderAircraft</type>
-		<value>false</value>
-		<sim>XPLANE</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_max_gs</name>
-		<type>PropellerAircraft</type>
-		<value>5.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_max_gs</name>
-		<type>JetAircraft</type>
-		<value>7.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_max_gs</name>
-		<type>PropellerAircraft</type>
-		<value>5.0</value>
-		<sim>IL2</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_max_gs</name>
-		<type>JetAircraft</type>
-		<value>7.0</value>
-		<sim>IL2</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_max_gs_neg</name>
-		<type>PropellerAircraft</type>
-		<value>-3.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_max_gs_neg</name>
-		<type>JetAircraft</type>
-		<value>-4.0</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_max_gs_neg</name>
-		<type>PropellerAircraft</type>
-		<value>-3.0</value>
-		<sim>IL2</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
-		<name>new_gforce_max_gs_neg</name>
-		<type>JetAircraft</type>
-		<value>-4.0</value>
-		<sim>IL2</sim>
-		<device>joystick</device>
-	</classdefaults>
 	<classdefaults>
 		<name>gforce_effect_curvature</name>
 		<type>JetAircraft</type>
@@ -6882,6 +6781,237 @@
 		<value>1.0</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>AllSettings</type>
+		<value>false</value>
+		<sim>any</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_effect_enable</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_enable_neg_gs</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>XPLANE</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs</name>
+		<type>PropellerAircraft</type>
+		<value>5.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs</name>
+		<type>JetAircraft</type>
+		<value>7.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs</name>
+		<type>PropellerAircraft</type>
+		<value>5.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs</name>
+		<type>JetAircraft</type>
+		<value>7.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs_neg</name>
+		<type>PropellerAircraft</type>
+		<value>-3.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs_neg</name>
+		<type>JetAircraft</type>
+		<value>-4.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs_neg</name>
+		<type>PropellerAircraft</type>
+		<value>-3.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>new_gforce_max_gs_neg</name>
+		<type>JetAircraft</type>
+		<value>-4.0</value>
+		<sim>IL2</sim>
+		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>nosewheel_shimmy</name>
@@ -8384,6 +8514,78 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
+		<name>vne_override</name>
+		<type>GliderAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>TurbopropAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>PropellerAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>JetAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>GliderAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>TurbopropAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>PropellerAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>JetAircraft</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>vne_override</name>
+		<type>AllSettings</type>
+		<value></value>
+		<unit>kt</unit>
+		<sim>any</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
 		<name>vrs_effect_enable</name>
 		<type>Helicopter</type>
 		<value>false</value>
@@ -8501,13 +8703,6 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
-		<name>wingfold_motion_effect_enabled</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</classdefaults>
-	<classdefaults>
 		<name>wind_effect_enabled</name>
 		<type>AllSettings</type>
 		<value>true</value>
@@ -8528,6 +8723,13 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
+	<classdefaults>
+		<name>wingfold_motion_effect_enabled</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</classdefaults>
 <models>
 		<name>type</name>
 		<model>A-10A.*</model>

@@ -962,7 +962,7 @@ class Aircraft(AircraftBase):
                 else:
                     pos_y_pos = round(pos_y_pos, 5)
 
-                if self.check_button_press(9, check_master=True) or self.check_button_press(11, check_master=True):
+                if self.check_button_press(self.trimwheel_elev_up_button, self.trimwheel_use_master_buttons) or self.check_button_press(self.trimwheel_elev_dn_button, self.trimwheel_use_master_buttons):
                     self.trim_active = True
                     return
 
