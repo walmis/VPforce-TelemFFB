@@ -895,6 +895,18 @@ class Aircraft(AircraftBase):
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
         self._spring_handle.name = "trimwheel_ap_spring"
+        trim_pos = telem_data.get('ElevTrim')
+        trim_limit_down = telem_data.get('ElevTrimDnLmt')
+        trim_limit_up = telem_data.get('ElevTrimUpLmt')
+        trim_limit_neutral = telem_data.get('ElevTrimNeutral')
+        if phys_y > 0:
+            trimwheel_pos = utils.scale(trim_pos, (trim_limit_neutral, trim_limit_up), (0, 1))
+        else:
+            trimwheel_pos = utils.scale(trim_pos, (-trim_limit_down, trim_limit_neutral), (-1, 0))
+
+        telem_data['trimwheel_pos_calc'] = trimwheel_pos
+
+        # print(f"Linear:{round(phys_y, 4)}, Curved:{round(trimwheel_pos, 4)}")
 
         telem_data['phys_y'] = phys_y
         if not self.trimwheel_init:
@@ -926,7 +938,7 @@ class Aircraft(AircraftBase):
         self.last_trimwheel_y = phys_y
 
         if ap_active == 0:
-            trimwheel_pos = telem_data.get("ElevTrimPct", 0)
+            # trimwheel_pos = telem_data.get("ElevTrimPct", 0)
 
             # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
             self.cpO_y = round(utils.scale(trimwheel_pos, (-1, 1), (-4096, 4096)))
@@ -954,18 +966,20 @@ class Aircraft(AircraftBase):
                     y_range = 16384
 
                 input_data = HapticEffect.device.get_input()
-                phys_x, phys_y = input_data.axisXY()
+                # phys_x, phys_y = input_data.axisXY()
 
                 pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
                 telem_data['_tw_phys_y_pos'] = phys_y
+                telem_data['_tw_phys_y_pos_neg'] = -phys_y
                 telem_data['_tw_pos_y_pos'] = pos_y_pos
                 if y_range != 1:
                     pos_y_pos = -int(pos_y_pos)
                 else:
                     pos_y_pos = round(pos_y_pos, 5)
 
-                if self.trimwheel_axis_invert:
-                    pos_y_pos = -pos_y_pos
+                # if self.trimwheel_axis_invert:
+                #     pos_y_pos = -pos_y_pos
+                #     phys_y = -phys_y
 
                 if self.check_button_press(self.trimwheel_elev_up_button, self.trimwheel_use_master_buttons) or self.check_button_press(self.trimwheel_elev_dn_button, self.trimwheel_use_master_buttons):
                     self.trim_active = True
@@ -979,13 +993,19 @@ class Aircraft(AircraftBase):
                         self.trim_active = False
 
                 if not self.trim_active:
-                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    # self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    # phys_y = -phys_y if self.trimwheel_axis_invert else phys_y
+                    if phys_y > 0:
+                        pos_y_pos = utils.scale(phys_y,(0, 1), (trim_limit_neutral, trim_limit_up))
+                    else:
+                        pos_y_pos = utils.scale(phys_y,(-1, 0), (-trim_limit_down, trim_limit_neutral))
+
+                    pos_y_pos = pos_y_pos * .01745
+                    self._simconnect.set_simdatum_to_msfs('ELEVATOR TRIM POSITION', pos_y_pos, units='radians')
                 self.last_pos_y_pos = pos_y_pos
                 telem_data['_tw_last'] = self.last_pos_y_pos
 
         else:
-            trimwheel_pos = telem_data.get("ElevTrimPct", 0)
-
             # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
             self.cpO_y = round(utils.scale(trimwheel_pos,(-1, 1), (-4096, 4096)))
             self.spring_y.cpOffset = self.cpO_y
