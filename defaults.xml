@@ -508,7 +508,7 @@
 		<displayname>Trim Slew Rate</displayname>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<Grouping>TrimWheel</Grouping>
 		<order>142</order>
 		<name>trimwheel_use_master_buttons</name>
 		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from trim wheel (or  loopback app).</info>
@@ -519,7 +519,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<Grouping>TrimWheel</Grouping>
 		<order>143</order>
 		<name>trimwheel_elev_up_button</name>
 		<info>Button # to hold for nose up elevator trim</info>
@@ -530,7 +530,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<Grouping>TrimWheel</Grouping>
 		<order>144</order>
 		<name>trimwheel_elev_dn_button</name>
 		<info>Button # to hold for nose down elevator trim</info>
@@ -539,17 +539,6 @@
 		<XPLANE>true</XPLANE>
 		<trimwheel>true</trimwheel>
 		<datatype>button</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Basic</Grouping>
-		<order>145</order>
-		<name>trimwheel_axis_invert</name>
-		<info>Enable if trim wheel axis moves the wrong way</info>
-		<displayname>Elevator Trim Axis Invert</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<trimwheel>true</trimwheel>
-		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>Basic</Grouping>
@@ -1404,6 +1393,30 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
+		<Grouping>TrimWheel</Grouping>
+		<order>300.75</order>
+		<name>trimwheel_axis_invert</name>
+		<prereq>trimwheel_use_axis</prereq>
+		<info>Enable if trim wheel axis moves the wrong way</info>
+		<displayname>Elevator Trim Axis Invert</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<trimwheel>true</trimwheel>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>TrimWheel</Grouping>
+		<order>300.74</order>
+		<name>trimwheel_use_axis</name>
+		<prereq>telemffb_controls_axes</prereq>
+		<info>Enable to use Axis control (vs direct trim surface manipulating)</info>
+		<displayname>Use Axis instead of Direct</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<trimwheel>true</trimwheel>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>Axis Control</Grouping>
 		<order>310</order>
 		<name>enable_custom_x_axis</name>
@@ -1466,6 +1479,17 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>320</order>
+		<name>enable_custom_y_axis</name>
+		<prereq>trimwheel_use_axis</prereq>
+		<info>Custom Simconnect Variable - use "VARNAME" for simvars or "L:VARNAME" for LVARS</info>
+		<displayname>Custom Simconnect Y Variable</displayname>
+		<MSFS>true</MSFS>
 		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
@@ -1520,7 +1544,7 @@
 		<joystick>true</joystick>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
-		<validvalues>1,256,4096,16384</validvalues>
+		<validvalues>1,100,256,4096,16384</validvalues>
 		<value>16384</value>
 		<datatype>list</datatype>
 	</defaults>
@@ -5536,202 +5560,6 @@
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>trimwheel_use_master_buttons</name>
-		<type>TurbopropAircraft</type>
-		<value>true</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_use_master_buttons</name>
-		<type>PropellerAircraft</type>
-		<value>true</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_use_master_buttons</name>
-		<type>JetAircraft</type>
-		<value>true</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_use_master_buttons</name>
-		<type>GliderAircraft</type>
-		<value>true</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_up_button</name>
-		<type>TurbopropAircraft</type>
-		<value>99</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_up_button</name>
-		<type>PropellerAircraft</type>
-		<value>99</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_up_button</name>
-		<type>JetAircraft</type>
-		<value>99</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_up_button</name>
-		<type>GliderAircraft</type>
-		<value>99</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_dn_button</name>
-		<type>TurbopropAircraft</type>
-		<value>99</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_dn_button</name>
-		<type>PropellerAircraft</type>
-		<value>99</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_dn_button</name>
-		<type>JetAircraft</type>
-		<value>99</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_dn_button</name>
-		<type>GliderAircraft</type>
-		<value>99</value>
-		<sim>XPLANE</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_use_master_buttons</name>
-		<type>TurbopropAircraft</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_use_master_buttons</name>
-		<type>PropellerAircraft</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_use_master_buttons</name>
-		<type>JetAircraft</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_use_master_buttons</name>
-		<type>GliderAircraft</type>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_axis_invert</name>
-		<type>TurbopropAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_axis_invert</name>
-		<type>PropellerAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_axis_invert</name>
-		<type>JetAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_axis_invert</name>
-		<type>GliderAircraft</type>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_up_button</name>
-		<type>TurbopropAircraft</type>
-		<value>99</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_up_button</name>
-		<type>PropellerAircraft</type>
-		<value>99</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_up_button</name>
-		<type>JetAircraft</type>
-		<value>99</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_up_button</name>
-		<type>GliderAircraft</type>
-		<value>99</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_dn_button</name>
-		<type>TurbopropAircraft</type>
-		<value>99</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_dn_button</name>
-		<type>PropellerAircraft</type>
-		<value>99</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_dn_button</name>
-		<type>JetAircraft</type>
-		<value>99</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-	</classdefaults>
-	<classdefaults>
-		<name>trimwheel_elev_dn_button</name>
-		<type>GliderAircraft</type>
-		<value>99</value>
-		<sim>MSFS</sim>
-		<device>trimwheel</device>
-		</classdefaults>
-	<classdefaults>
 		<name>fuelboom_motion_effect_enabled</name>
 		<type>JetAircraft</type>
 		<value>false</value>
@@ -8080,14 +7908,14 @@
 	<classdefaults>
 		<name>trim_following</name>
 		<type>GliderAircraft</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
 		<type>GliderAircraft</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -8122,30 +7950,58 @@
 	<classdefaults>
 		<name>trim_following</name>
 		<type>PropellerAircraft</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
 		<type>PropellerAircraft</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
 		<type>TurbopropAircraft</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
 		<type>TurbopropAircraft</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trim_following</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
@@ -8178,14 +8034,14 @@
 	<classdefaults>
 		<name>trim_following</name>
 		<type>GliderAircraft</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>XPLANE</sim>
 		<device>joystick</device>
 	</classdefaults>
 	<classdefaults>
 		<name>trim_following</name>
 		<type>GliderAircraft</type>
-		<value>false</value>
+		<value>true</value>
 		<sim>XPLANE</sim>
 		<device>pedals</device>
 	</classdefaults>
@@ -8273,6 +8129,230 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
+	<classdefaults>
+		<name>trimwheel_axis_invert</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_axis_invert</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_axis_invert</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_axis_invert</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>TurbopropAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>PropellerAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>JetAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>GliderAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>TurbopropAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>PropellerAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>JetAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_dn_button</name>
+		<type>GliderAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+		</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>TurbopropAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>PropellerAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>JetAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>GliderAircraft</type>
+		<value>99</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>TurbopropAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>PropellerAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>JetAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_elev_up_button</name>
+		<type>GliderAircraft</type>
+		<value>99</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_axis</name>
+		<type>TurbopropAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_axis</name>
+		<type>PropellerAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_axis</name>
+		<type>JetAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_axis</name>
+		<type>GliderAircraft</type>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
+	<classdefaults>
+		<name>trimwheel_use_master_buttons</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</classdefaults>
 	<classdefaults>
 		<name>type</name>
 		<type>JetAircraft</type>
@@ -12092,6 +12172,76 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>trimwheel_use_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>enable_custom_y_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>custom_y_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>L:INPUT_TRIM_AXIS</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>raw_y_axis_scale</name>
+		<model>DA42-TDI.*</model>
+		<value>100</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>trimwheel_axis_invert</name>
+		<model>DA42-TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>trimwheel_use_axis</name>
+		<model>DA42-VI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>enable_custom_y_axis</name>
+		<model>DA42-VI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>custom_y_axis</name>
+		<model>DA42-VI.*</model>
+		<value>L:INPUT_TRIM_AXIS</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>raw_y_axis_scale</name>
+		<model>DA42-VI.*</model>
+		<value>100</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>trimwheel_axis_invert</name>
+		<model>DA42-VI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
 		<name>enable_custom_x_axis</name>
 		<model>DA42-VI.*</model>
 		<value>true</value>
@@ -12686,6 +12836,20 @@
 		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Just Flight PA28.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>trimwheel_axis_invert</name>
+		<model>Just Flight PA28.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
 	</models>
 	<models>
 		<name>etl_effect_intensity</name>
