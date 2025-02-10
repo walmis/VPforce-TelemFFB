@@ -914,8 +914,9 @@ class Aircraft(AircraftBase):
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
 
             if self.last_trimwheel_y is None:
-                # Air start or new aircraft.  Use current physical position as init point
-                self.cpO_y = round(4096 * phys_y)
+                # Air start or new aircraft.  Use sim defined trim setpoint as init point
+                trimwheel_pos = telem_data["ElevTrimPct"]
+                self.cpO_y = round(4096 * trimwheel_pos)
             else:
                 # In air, previously paused.  Use stored position to init point
                 self.cpO_y = round(4096 * self.last_trimwheel_y)
