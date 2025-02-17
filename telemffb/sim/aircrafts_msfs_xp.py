@@ -530,6 +530,9 @@ class Aircraft(AircraftBase):
         IAS = telem_data['IAS']
         telem_data['TAS_kt'] = _airspeed * ms2kt
         telem_data['IAS_kt'] = IAS * ms2kt
+        # show acc in m/s
+        telem_data['AccBody_ms'] = [x * 9.80665 for x in telem_data['AccBody']]
+
 
         base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
         base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
@@ -897,8 +900,9 @@ class Aircraft(AircraftBase):
         self._spring_handle.name = "trimwheel_ap_spring"
         if not self.trimwheel_use_axis:
             trim_pos = telem_data.get('ElevTrim')
-            trim_limit_down = telem_data.get('ElevTrimDnLmt')
             trim_limit_up = telem_data.get('ElevTrimUpLmt')
+            #trim_limit_down = telem_data.get('ElevTrimDnLmt')
+            trim_limit_down = trim_limit_up
             trim_limit_neutral = telem_data.get('ElevTrimNeutral')
             if phys_y > 0:
                 trimwheel_pos = utils.scale(trim_pos, (trim_limit_neutral, trim_limit_up), (0, 1))

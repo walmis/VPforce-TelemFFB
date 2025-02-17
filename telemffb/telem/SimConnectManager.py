@@ -152,7 +152,7 @@ class SimConnectManager(threading.Thread):
         SimVar("ElevDeflPct", "ELEVATOR DEFLECTION PCT", "Percent Over 100"),
         SimVar("ElevTrim", "ELEVATOR TRIM POSITION", "degrees"),
         SimVar("ElevTrimPct", "ELEVATOR TRIM PCT", "Percent Over 100"),
-        SimVar("ElevTrimDnLmt", "ELEVATOR TRIM DOWN LIMIT", "degrees"),
+        #SimVar("ElevTrimDnLmt", "ELEVATOR TRIM DOWN LIMIT", "degrees"),       # crashes sim flying helis
         SimVar("ElevTrimUpLmt", "ELEVATOR TRIM UP LIMIT", "degrees"),
         SimVar("ElevTrimNeutral", "ELEVATOR TRIM NEUTRAL", "degrees"),
         SimVar("AileronDefl", "AILERON AVERAGE DEFLECTION", "degrees"),
@@ -207,8 +207,7 @@ class SimConnectManager(threading.Thread):
         SimVar("HydSys", "HYDRAULIC SYSTEM INTEGRITY", "Percent Over 100"),
         SimVar("_IS IN RTC", "IS IN RTC", "bool"),
         SimVar("_IS AVATAR", "IS AVATAR", "bool"),
-        SimVar("_IS AIRCRAFT", "IS AIRCRAFT", "bool"),
-
+        SimVar("_IS AIRCRAFT", "IS AIRCRAFT", "bool")
     ]
 
     def __init__(self):
