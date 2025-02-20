@@ -152,9 +152,11 @@ class SimConnectManager(threading.Thread):
         SimVar("ElevDeflPct", "ELEVATOR DEFLECTION PCT", "Percent Over 100"),
         SimVar("ElevTrim", "ELEVATOR TRIM POSITION", "degrees"),
         SimVar("ElevTrimPct", "ELEVATOR TRIM PCT", "Percent Over 100"),
-        #SimVar("ElevTrimDnLmt", "ELEVATOR TRIM DOWN LIMIT", "degrees"),       # crashes sim flying helis
+        SimVar("ElevTrimDnLmt", "ELEVATOR TRIM DOWN LIMIT", "degrees"),
         SimVar("ElevTrimUpLmt", "ELEVATOR TRIM UP LIMIT", "degrees"),
         SimVar("ElevTrimNeutral", "ELEVATOR TRIM NEUTRAL", "degrees"),
+        SimVar("ElevTrimMax", "ELEVATOR TRIM MAX", "degrees"),  #2024 only (up)
+        SimVar("ElevTrimMin", "ELEVATOR TRIM MIN", "degrees"),  #2024 only (down)
         SimVar("AileronDefl", "AILERON AVERAGE DEFLECTION", "degrees"),
         SimVarArray("AileronDeflPctLR", "AILERON <> DEFLECTION PCT", keywords=("LEFT", "RIGHT"), unit="Percent Over 100"),
         SimVar("AileronTrim", "AILERON TRIM", "degrees"),

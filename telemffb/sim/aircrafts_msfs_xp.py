@@ -900,14 +900,23 @@ class Aircraft(AircraftBase):
         self._spring_handle.name = "trimwheel_ap_spring"
         if not self.trimwheel_use_axis:
             trim_pos = telem_data.get('ElevTrim')
-            trim_limit_up = telem_data.get('ElevTrimUpLmt')
-            #trim_limit_down = telem_data.get('ElevTrimDnLmt')
-            trim_limit_down = trim_limit_up
+
+            trim_limit_max = telem_data.get('ElevTrimMax')
+            if trim_limit_max == None:
+                trim_limit_max = telem_data.get('ElevTrimUpLmt')
+
+            trim_limit_min = telem_data.get('ElevTrimMin')
+            if trim_limit_min == None:
+                trim_limit_min = telem_data.get('ElevTrimDnLmt')
+                #trim_limit_min = -trim_limit_max
             trim_limit_neutral = telem_data.get('ElevTrimNeutral')
-            if phys_y > 0:
-                trimwheel_pos = utils.scale(trim_pos, (trim_limit_neutral, trim_limit_up), (0, 1))
-            else:
-                trimwheel_pos = utils.scale(trim_pos, (-trim_limit_down, trim_limit_neutral), (-1, 0))
+            # linear scale
+            trimwheel_pos = utils.scale(trim_pos, (trim_limit_min, trim_limit_max), (-1, 1))
+
+       #     if phys_y > 0:
+       #         trimwheel_pos = utils.scale(trim_pos, (trim_limit_neutral, trim_limit_up), (0, 1))
+       #     else:
+       #         trimwheel_pos = utils.scale(trim_pos, (-trim_limit_down, trim_limit_neutral), (-1, 0))
 
             telem_data['trimwheel_pos_calc'] = trimwheel_pos
 
@@ -1004,10 +1013,12 @@ class Aircraft(AircraftBase):
                             phys_y = -phys_y
                         self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
                     else:
-                        if phys_y > 0:
-                            pos_y_pos = utils.scale(phys_y,(0, 1), (trim_limit_neutral, trim_limit_up))
-                        else:
-                            pos_y_pos = utils.scale(phys_y,(-1, 0), (-trim_limit_down, trim_limit_neutral))
+
+                        pos_y_pos = utils.scale(phys_y, (-1, 1), (trim_limit_min, trim_limit_max))
+                    #    if phys_y > 0:
+                    #        pos_y_pos = utils.scale(phys_y,(0, 1), (trim_limit_neutral, trim_limit_up))
+                    #    else:
+                    #        pos_y_pos = utils.scale(phys_y,(-1, 0), (-trim_limit_down, trim_limit_neutral))
 
                         pos_y_pos = pos_y_pos * .01745
                         self._simconnect.set_simdatum_to_msfs('ELEVATOR TRIM POSITION', pos_y_pos, units='radians')
