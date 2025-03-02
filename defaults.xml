@@ -8850,6 +8850,12 @@
 		<sim>DCS</sim>
 		<device>joystick</device>
 	</classdefaults>
+	<models>
+		<name>type</name>
+		<model>allsettings</model>
+		<value>AllSettings</value>
+		<device>any</device>
+	</models>
 <models>
 		<name>type</name>
 		<model>A-10A.*</model>
@@ -9898,65 +9904,71 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>aircraft_vne_speed</name>
-		<model>P-47D.*</model>
-		<value>425</value>
-		<unit>kt</unit>
+		<name>cm_vibration_intensity</name>
+		<model>OH58.*</model>
+		<value>0.15</value>
 		<sim>DCS</sim>
-		<device>pedals</device>
+		<device>joystick</device>
 	</models>
 	<models>
-		<name>aircraft_vs_speed</name>
-		<model>P-47D.*</model>
-		<value>94</value>
-		<unit>kt</unit>
-		<sim>DCS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>P-47D.*</model>
-		<value>PropellerAircraft</value>
+		<name>etl_effect_intensity</name>
+		<model>OH58.*</model>
+		<value>0.3</value>
 		<sim>DCS</sim>
 		<device>any</device>
 	</models>
 	<models>
-		<name>aircraft_vne_speed</name>
-		<model>P-51D</model>
-		<value>438</value>
+		<name>etl_start_speed</name>
+		<model>OH58.*</model>
+		<value>15</value>
 		<unit>kt</unit>
 		<sim>DCS</sim>
-		<device>pedals</device>
+		<device>any</device>
 	</models>
 	<models>
-		<name>aircraft_vs_speed</name>
-		<model>P-51D</model>
-		<value>87</value>
+		<name>etl_stop_speed</name>
+		<model>OH58.*</model>
+		<value>25</value>
 		<unit>kt</unit>
 		<sim>DCS</sim>
-		<device>pedals</device>
+		<device>any</device>
 	</models>
 	<models>
-		<name>buffeting_intensity</name>
-		<model>P-51D</model>
-		<value>0.0</value>
+		<name>overspeed_shake_intensity</name>
+		<model>OH58.*</model>
+		<value>0.25</value>
 		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
+		<device>any</device>
+	</models>
 	<models>
-		<name>runway_rumble_intensity</name>
-		<model>P-51D</model>
+		<name>overspeed_shake_start</name>
+		<model>OH58.*</model>
+		<value>60</value>
+		<unit>m/s</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>OH58.*</model>
+		<value>4</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_threshold</name>
+		<model>OH58.*</model>
 		<value>1.0</value>
 		<sim>DCS</sim>
-		<device>joystick</device>
-		</models>
+		<device>any</device>
+	</models>
 	<models>
 		<name>type</name>
-		<model>P-51D</model>
-		<value>PropellerAircraft</value>
+		<model>OH58.*</model>
+		<value>Helicopter</value>
 		<sim>DCS</sim>
 		<device>any</device>
-		</models>
+	</models>
 	<models>
 		<name>cm_vibration_intensity</name>
 		<model>OH-6A</model>
@@ -10024,71 +10036,65 @@
 		<device>joystick</device>
 	</models>
 	<models>
-		<name>cm_vibration_intensity</name>
-		<model>OH58.*</model>
-		<value>0.15</value>
-		<sim>DCS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>OH58.*</model>
-		<value>0.3</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>OH58.*</model>
-		<value>15</value>
+		<name>aircraft_vne_speed</name>
+		<model>P-47D.*</model>
+		<value>425</value>
 		<unit>kt</unit>
 		<sim>DCS</sim>
-		<device>any</device>
+		<device>pedals</device>
 	</models>
 	<models>
-		<name>etl_stop_speed</name>
-		<model>OH58.*</model>
-		<value>25</value>
+		<name>aircraft_vs_speed</name>
+		<model>P-47D.*</model>
+		<value>94</value>
 		<unit>kt</unit>
 		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>OH58.*</model>
-		<value>0.25</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>OH58.*</model>
-		<value>60</value>
-		<unit>m/s</unit>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>rotor_blade_count</name>
-		<model>OH58.*</model>
-		<value>4</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>hydraulic_loss_threshold</name>
-		<model>OH58.*</model>
-		<value>1.0</value>
-		<sim>DCS</sim>
-		<device>any</device>
+		<device>pedals</device>
 	</models>
 	<models>
 		<name>type</name>
-		<model>OH58.*</model>
-		<value>Helicopter</value>
+		<model>P-47D.*</model>
+		<value>PropellerAircraft</value>
 		<sim>DCS</sim>
 		<device>any</device>
 	</models>
+	<models>
+		<name>aircraft_vne_speed</name>
+		<model>P-51D</model>
+		<value>438</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>aircraft_vs_speed</name>
+		<model>P-51D</model>
+		<value>87</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>P-51D</model>
+		<value>0.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>P-51D</model>
+		<value>1.0</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>P-51D</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+		</models>
 	<models>
 		<name>cm_vibration_intensity</name>
 		<model>SA342.*</model>
@@ -11011,6 +11017,79 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>.*103 Solo.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>.*C-17.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>.*C-17.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>205-A1B.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>205-A1B.*</model>
+		<value>2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>205-A1B.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>205-A1B.*</model>
+		<value>10</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>205-A1B.*</model>
+		<value>20</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>205-A1B.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>205-A1B.*</model>
+		<value>60</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>etl_effect_intensity</name>
 		<model>222B.*</model>
 		<value>0.1</value>
@@ -11059,6 +11138,20 @@
 		<name>type</name>
 		<model>222B.*</model>
 		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>340 .*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>404 Titan.*</model>
+		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -11128,6 +11221,27 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>type</name>
+		<model>737.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>787-10.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>A10C Thunderbolt.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>elevator_droop_moment</name>
 		<model>A2A Piper PA-24.*</model>
 		<value>0.2</value>
@@ -11188,6 +11302,27 @@
 		<name>type</name>
 		<model>A2A Piper PA-24.*</model>
 		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>A310.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>A320neo.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>A330.*</model>
+		<value>JetAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -11410,6 +11545,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>Asobo Cessna Citation.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>aileron_spring_gain</name>
 		<model>Asobo DG1001E Neo.*</model>
 		<value>0.25</value>
@@ -11524,6 +11666,49 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>engine_rumble_lowrpm_intensity</name>
+		<model>Asobo TBM 930.*</model>
+		<value>0.042</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Asobo TBM 930.*</model>
+		<value>-0.48</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Asobo TBM 930.*</model>
+		<value>0.34</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Asobo TBM 930.*</model>
+		<value>0.34</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Asobo TBM 930.*</model>
+		<value>7.57</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Asobo TBM 930.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>Asobo XCub</model>
 		<value>0.65</value>
@@ -11546,6 +11731,13 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>type</name>
+		<model>AT802.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>ap_following</name>
 		<model>Aviat Husky A-1C.*</model>
 		<value>false</value>
@@ -11559,6 +11751,71 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>elevator_droop_moment</name>
+		<model>Aviat Pitts S2.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>flaps_motion_effect_enabled</name>
+		<model>Aviat Pitts S2.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Aviat Pitts S2.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Aviat Pitts S2.*</model>
+		<value>84</value>
+		<unit>in</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Aviat Pitts S2.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Beech Baron G58.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Beechcraft Bonanza.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Beechcraft Bonanza.*</model>
+		<value>80</value>
+		<unit>in</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Beechcraft Bonanza.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>Beechcraft King Air.*</model>
@@ -11634,58 +11891,6 @@
 		<device>any</device>
 		</models>
 	<models>
-		<name>etl_effect_intensity</name>
-		<model>Simfocus B407.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>Simfocus B407.*</model>
-		<value>8</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>Simfocus B407.*</model>
-		<value>13</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>Simfocus B407.*</model>
-		<value>60</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>rotor_blade_count</name>
-		<model>Simfocus B407.*</model>
-		<value>4</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>Simfocus B407.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Simfocus B407.*</model>
-		<value>SASHelicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
 		<name>cyclic_spring_gain</name>
 		<model>Bell 429.*</model>
 		<value>0.6</value>
@@ -11752,6 +11957,79 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>etl_effect_intensity</name>
+		<model>Bell 47J.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>Bell 47J.*</model>
+		<value>5</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>Bell 47J.*</model>
+		<value>10</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_intensity</name>
+		<model>Bell 47J.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>Bell 47J.*</model>
+		<value>45</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>Bell 47J.*</model>
+		<value>2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>Bell 47J.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Bell 47J.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>force_trim_enabled</name>
+		<model>Bell 47J.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>Bell 47J.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Blackbird Simulations DHC-2.*</model>
 		<value>PropellerAircraft</value>
@@ -11786,6 +12064,13 @@
 		<value>0.63</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Boeing 747-400.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>aircraft_is_fbw</name>
@@ -11915,12 +12200,190 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>elevator_droop_moment</name>
+		<model>C172SP.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>invert_ap_x_axis</name>
+		<model>C172SP.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>C172SP.*</model>
+		<value>0.55</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>C172SP.*</model>
+		<value>0.38</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>C172SP.*</model>
+		<value>0.48</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>C172SP.*</model>
+		<value>0.4</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>C172SP.*</model>
+		<value>80</value>
+		<unit>in</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>C172SP.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>C188 Agtruck.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_x</name>
+		<model>C208B.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>C208B.*</model>
+		<value>-1.2</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>C208B.*</model>
+		<value>0.19</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>C208B.*</model>
+		<value>0.43</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>C208B.*</model>
+		<value>0.44</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>C208B.*</model>
+		<value>108</value>
+		<unit>in</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>trimwheel_use_axis</name>
+		<model>C208B.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>C208B.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>C400 Corvalis.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>C408 SkyCourier.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cabri G2.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Carenado CT182T.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>elevator_droop_moment</name>
+		<model>CARENADO YMF-5.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>flaps_motion_effect_enabled</name>
+		<model>CARENADO YMF-5.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>CARENADO YMF-5.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>CARENADO YMF-5.*</model>
+		<value>84</value>
+		<unit>in</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>CARENADO YMF-5.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>elevator_droop_moment</name>
 		<model>Cessna (172|Skyhawk).*</model>
@@ -12029,6 +12492,70 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>elevator_droop_moment</name>
+		<model>Cessna C152.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Cessna C152.*</model>
+		<value>-0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Cessna C152.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Cessna C152.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Cessna C152.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Cessna C152.*</model>
+		<value>5.9</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cessna C152.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cessna C195.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cessna Citation CJ4.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<model>Cessna( 208B)? Grand Caravan.*</model>
 		<value>0.5</value>
@@ -12079,6 +12606,55 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>CGS Hawk Arrow II.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>CGS Hawk Arrow II.*</model>
+		<value>0.65</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>CGS Hawk Arrow II.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>CH47D.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Cirrus SR22T.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>CL415.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Classic XCub.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>Cockspur C162.*</model>
 		<value>-0.25</value>
@@ -12092,6 +12668,13 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>type</name>
+		<model>Curtiss JN-4.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>buffeting_intensity</name>
 		<model>DA40 TDI.*</model>
@@ -12305,13 +12888,6 @@
 		<device>joystick</device>
 	</models>
 	<models>
-		<name>type</name>
-		<model>DA42-VI.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
 		<name>trimwheel_use_axis</name>
 		<model>DA42-TDI.*</model>
 		<value>true</value>
@@ -12345,6 +12921,97 @@
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>trimwheel</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>DA42-TDI.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_x_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>L:INPUT_AILERON</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>raw_x_axis_scale</name>
+		<model>DA42-TDI.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_x_axis_scale</name>
+		<model>DA42-TDI.*</model>
+		<value>1.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_y_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_y_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>L:INPUT_ELEVATOR</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>raw_y_axis_scale</name>
+		<model>DA42-TDI.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_x_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>L:INPUT_RUDDER</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>raw_x_axis_scale</name>
+		<model>DA42-TDI.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>invert_ap_x_axis</name>
+		<model>DA42-TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>DA42-VI.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
 	</models>
 	<models>
 		<name>trimwheel_use_axis</name>
@@ -12454,90 +13121,6 @@
 	<models>
 		<name>invert_ap_x_axis</name>
 		<model>DA42-VI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>DA42-TDI.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>enable_custom_x_axis</name>
-		<model>DA42-TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>custom_x_axis</name>
-		<model>DA42-TDI.*</model>
-		<value>L:INPUT_AILERON</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>raw_x_axis_scale</name>
-		<model>DA42-TDI.*</model>
-		<value>1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>joystick_x_axis_scale</name>
-		<model>DA42-TDI.*</model>
-		<value>1.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>enable_custom_y_axis</name>
-		<model>DA42-TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>custom_y_axis</name>
-		<model>DA42-TDI.*</model>
-		<value>L:INPUT_ELEVATOR</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>raw_y_axis_scale</name>
-		<model>DA42-TDI.*</model>
-		<value>1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>enable_custom_x_axis</name>
-		<model>DA42-TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>custom_x_axis</name>
-		<model>DA42-TDI.*</model>
-		<value>L:INPUT_RUDDER</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>raw_x_axis_scale</name>
-		<model>DA42-TDI.*</model>
-		<value>1</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>DA42-TDI.*</model>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
@@ -12549,6 +13132,233 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>type</name>
+		<model>DC Designs Stearman.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aileron_spring_gain</name>
+		<model>DG LS8.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aircraft_is_spring_centered</name>
+		<model>DG LS8.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>elevator_spring_gain</name>
+		<model>DG LS8.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>DG LS8.*</model>
+		<value>GliderAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aileron_spring_gain</name>
+		<model>DG-1001-E Neo.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>aircraft_is_spring_centered</name>
+		<model>DG-1001-E Neo.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>elevator_spring_gain</name>
+		<model>DG-1001-E Neo.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>DG-1001-E Neo.*</model>
+		<value>5.2</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>DG-1001-E Neo.*</model>
+		<value>GliderAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>DHC-2.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>DHC-2.*</model>
+		<value>8.5</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>DHC-2.*</model>
+		<value>0.8</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>DHC-2.*</model>
+		<value>0.68</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>DHC-2.*</model>
+		<value>0.63</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>DHC-6-300.*</model>
+		<value>0.35</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>DHC-6-300.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>Diamond DA40NG.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Diamond DA40NG.*</model>
+		<value>-0.11</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>nosewheel_shimmy</name>
+		<model>Diamond DA40NG.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Diamond DA40NG.*</model>
+		<value>6.1352</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Diamond DA40NG.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_x_axis</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>L:INPUT_RUDDER</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>raw_x_axis_scale</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>joystick_x_axis_scale</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>1.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_y_axis</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_y_axis</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>L:INPUT_ELEVATOR</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>raw_y_axis_scale</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>invert_ap_x_axis</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Diamond DV20.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>elevator_droop_moment</name>
 		<model>DoubleEnder.*</model>
@@ -12631,6 +13441,113 @@
 		<name>type</name>
 		<model>DR400.*</model>
 		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>elevator_droop_moment</name>
+		<model>Draco X.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_prop_flow_ratio</name>
+		<model>Draco X.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Draco X.*</model>
+		<value>0.45</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Draco X.*</model>
+		<value>0.37</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Draco X.*</model>
+		<value>0.43</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Draco X.*</model>
+		<value>0.66</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Draco X.*</model>
+		<value>2.65</value>
+		<unit>m</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Draco X.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Edge540 v3.*</model>
+		<value>0.3</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Edge540 v3.*</model>
+		<value>0.23</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Edge540 v3.*</model>
+		<value>0.27</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_rudder_coeff</name>
+		<model>Edge540 v3.*</model>
+		<value>0.36</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Edge540 v3.*</model>
+		<value>6.5</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Edge540 v3.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>ES30.*</model>
+		<value>TurbopropAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -12730,6 +13647,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>FA18E.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>cyclic_spring_gain</name>
 		<model>FCP SA 342.*</model>
 		<value>0.6</value>
@@ -12785,6 +13709,21 @@
 		<name>type</name>
 		<model>FCP SA 342.*</model>
 		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Flight Design CT.*</model>
+		<value>5.66</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Flight Design CT.*</model>
+		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -12964,6 +13903,48 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>type</name>
+		<model>Grumman Goose G21A.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>H125.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>HU-16 Albatross.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Jetson One.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>JMB Aviation VL3.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Joby.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>joystick_ap_following</name>
 		<model>Juice Goose.*</model>
 		<value>false</value>
@@ -13020,6 +14001,28 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>King Air C90.*</model>
+		<value>-0.2</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>King Air C90.*</model>
+		<value>8.8</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>King Air C90.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Kodiak 100.*</model>
 		<value>TurbopropAircraft</value>
@@ -13036,8 +14039,57 @@
 	</models>
 	<models>
 		<name>type</name>
+		<model>L-39 Albatros.*</model>
+		<value>JetAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
 		<model>Lama SA315B.*</model>
 		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Magni M24.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aileron_expo</name>
+		<model>Magni M24.*</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_expo</name>
+		<model>Magni M24.*</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Magni M24.*</model>
+		<value>0.65</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_droop_moment</name>
+		<model>Magni M24.*</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Microsoft Vision Jet.*</model>
+		<value>JetAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -13102,6 +14154,142 @@
 		<name>type</name>
 		<model>Mudry Cap 10 C.*</model>
 		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>MXS-R.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>North American T-6 Texan.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>NXCub.*</model>
+		<value>0.6</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>NXCub.*</model>
+		<value>6.66</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>NXCub.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Optica:.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>P51 Mustang.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>raw_x_axis_scale</name>
+		<model>PC-12.*</model>
+		<value>1</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>invert_ap_x_axis</name>
+		<model>PC-12.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>PC-12.*</model>
+		<value>8.75</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>ap_following</name>
+		<model>PC-12.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>PC-12.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>engine_rumble_lowrpm_intensity</name>
+		<model>PC21.*</model>
+		<value>0.042</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>PC21.*</model>
+		<value>-0.48</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>PC21.*</model>
+		<value>0.34</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>PC21.*</model>
+		<value>0.34</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>PC21.*</model>
+		<value>7.57</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>PC21.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>PC-24.*</model>
+		<value>JetAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -13291,6 +14479,63 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>Powrachute Sky Rascal.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>R66 Turbine.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Robin CAP10.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Robin DR400.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Robin DR400.*</model>
+		<value>0.29</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Robin DR400.*</model>
+		<value>0.62</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Robin DR400.*</model>
+		<value>5.77</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Robin DR400.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>etl_effect_intensity</name>
 		<model>Robinson R44.*</model>
 		<value>0.2</value>
@@ -13350,11 +14595,46 @@
 		</models>
 	<models>
 		<name>type</name>
+		<model>S12-G:.*</model>
+		<value>GliderAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>S-64F.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
 		<model>Savage Grravel.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>type</name>
+		<model>Savage Norden:.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Schweizer S300CBi.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Seastar.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
 	<models>
 		<name>etl_effect_intensity</name>
 		<model>Shrike Simulations 530F.*</model>
@@ -13404,6 +14684,72 @@
 		<name>type</name>
 		<model>Shrike Simulations 530F.*</model>
 		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>Simfocus B407.*</model>
+		<value>0.25</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>Simfocus B407.*</model>
+		<value>8</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>Simfocus B407.*</model>
+		<value>13</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>Simfocus B407.*</model>
+		<value>60</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>Simfocus B407.*</model>
+		<value>4</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>Simfocus B407.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Simfocus B407.*</model>
+		<value>SASHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Skyship600.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Spirit of St.Louis.*</model>
+		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -13458,6 +14804,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>Taurus M:.*</model>
+		<value>GliderAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>engine_rumble_lowrpm_intensity</name>
 		<model>TBM 930.*</model>
 		<value>0.042</value>
@@ -13547,58 +14900,6 @@
 	<models>
 		<name>overspeed_shake_start</name>
 		<model>UH-1H.*</model>
-		<value>60</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>205-A1B.*</model>
-		<value>Helicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>rotor_blade_count</name>
-		<model>205-A1B.*</model>
-		<value>2</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>205-A1B.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>205-A1B.*</model>
-		<value>10</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>205-A1B.*</model>
-		<value>20</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>205-A1B.*</model>
-		<value>0.2</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>205-A1B.*</model>
 		<value>60</value>
 		<unit>m/s</unit>
 		<sim>MSFS</sim>
@@ -13612,6 +14913,20 @@
 		<device>any</device>
 		</models>
 	<models>
+		<name>type</name>
+		<model>Virus SW Pipistrel.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Volocity Microsoft.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>elevator_droop_moment</name>
 		<model>Wilga.*</model>
 		<value>0.25</value>
@@ -13671,505 +14986,13 @@
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>XCub.*</model>
-		<value>0.6</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-		</models>
-	<models>
-		<name>elevator_droop_moment</name>
-		<model>C172SP.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>C172SP.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>C172SP.*</model>
-		<value>0.55</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_aileron_coeff</name>
-		<model>C172SP.*</model>
-		<value>0.38</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>C172SP.*</model>
-		<value>0.48</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_rudder_coeff</name>
-		<model>C172SP.*</model>
-		<value>0.4</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>C172SP.*</model>
-		<value>80</value>
-		<unit>in</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>C172SP.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>buffeting_intensity</name>
-		<model>Diamond DA40NG.*</model>
-		<value>0.5</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Diamond DA40NG.*</model>
-		<value>-0.11</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>nosewheel_shimmy</name>
-		<model>Diamond DA40NG.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>Diamond DA40NG.*</model>
-		<value>6.1352</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Diamond DA40NG.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>elevator_droop_moment</name>
-		<model>Draco X.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_prop_flow_ratio</name>
-		<model>Draco X.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Draco X.*</model>
-		<value>0.45</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_aileron_coeff</name>
-		<model>Draco X.*</model>
-		<value>0.37</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>Draco X.*</model>
-		<value>0.43</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_rudder_coeff</name>
-		<model>Draco X.*</model>
-		<value>0.66</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>Draco X.*</model>
-		<value>2.65</value>
-		<unit>m</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Draco X.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Magni M24.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>aileron_expo</name>
-		<model>Magni M24.*</model>
-		<value>0.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>elevator_expo</name>
-		<model>Magni M24.*</model>
-		<value>0.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>Magni M24.*</model>
 		<value>0.65</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
 	<models>
-		<name>elevator_droop_moment</name>
-		<model>Magni M24.*</model>
-		<value>0.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>engine_rumble_lowrpm_intensity</name>
-		<model>PC21.*</model>
-		<value>0.042</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>PC21.*</model>
-		<value>-0.48</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_aileron_coeff</name>
-		<model>PC21.*</model>
-		<value>0.34</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>PC21.*</model>
-		<value>0.34</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>prop_diameter</name>
-		<model>PC21.*</model>
-		<value>7.57</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>PC21.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>DHC-2.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>DHC-2.*</model>
-		<value>8.5</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>DHC-2.*</model>
-		<value>0.8</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_aileron_coeff</name>
-		<model>DHC-2.*</model>
-		<value>0.68</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_rudder_coeff</name>
-		<model>DHC-2.*</model>
-		<value>0.63</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Beechcraft Bonanza.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>Beechcraft Bonanza.*</model>
-		<value>80</value>
-		<unit>in</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Beechcraft Bonanza.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>aileron_spring_gain</name>
-		<model>DG LS8.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>aircraft_is_spring_centered</name>
-		<model>DG LS8.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>elevator_spring_gain</name>
-		<model>DG LS8.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>DG LS8.*</model>
-		<value>GliderAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>raw_x_axis_scale</name>
-		<model>PC-12.*</model>
-		<value>1</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>PC-12.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>PC-12.*</model>
-		<value>8.75</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>ap_following</name>
-		<model>PC-12.*</model>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>PC-12.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>S12-G:.*</model>
-		<value>GliderAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Zlin Shock Ultra.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Microsoft Vision Jet.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>787-10.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Taurus M:.*</model>
-		<value>GliderAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Edge540 v3.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_aileron_coeff</name>
-		<model>Edge540 v3.*</model>
-		<value>0.23</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>Edge540 v3.*</model>
-		<value>0.27</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_rudder_coeff</name>
-		<model>Edge540 v3.*</model>
-		<value>0.36</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>Edge540 v3.*</model>
-		<value>6.5</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Edge540 v3.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Spirit of St.Louis.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>aileron_spring_gain</name>
-		<model>DG-1001-E Neo.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>aircraft_is_spring_centered</name>
-		<model>DG-1001-E Neo.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>elevator_spring_gain</name>
-		<model>DG-1001-E Neo.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>DG-1001-E Neo.*</model>
-		<value>5.2</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>DG-1001-E Neo.*</model>
-		<value>GliderAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>.*103 Solo.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Cessna C195.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>NXCub.*</model>
-		<value>0.6</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>NXCub.*</model>
+		<model>XCub.*</model>
 		<value>6.66</value>
 		<unit>ft</unit>
 		<sim>MSFS</sim>
@@ -14177,168 +15000,11 @@
 	</models>
 	<models>
 		<name>type</name>
-		<model>NXCub.*</model>
+		<model>XCub.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_x</name>
-		<model>C208B.*</model>
-		<value>0.5</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>C208B.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_aileron_coeff</name>
-		<model>C208B.*</model>
-		<value>0.19</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>C208B.*</model>
-		<value>0.43</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_rudder_coeff</name>
-		<model>C208B.*</model>
-		<value>0.44</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>C208B.*</model>
-		<value>108</value>
-		<unit>in</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>C208B.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>elevator_droop_moment</name>
-		<model>CARENADO YMF-5.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>flaps_motion_effect_enabled</name>
-		<model>CARENADO YMF-5.*</model>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>CARENADO YMF-5.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>CARENADO YMF-5.*</model>
-		<value>84</value>
-		<unit>in</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>CARENADO YMF-5.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>PC-24.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Boeing 747-400.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>404 Titan.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>C400 Corvalis.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>North American T-6 Texan.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Volocity Microsoft.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>MXS-R.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>Flight Design CT.*</model>
-		<value>5.66</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Flight Design CT.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>340 .*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
+		</models>
 	<models>
 		<name>elevator_droop_moment</name>
 		<model>Zlin Aviation Savage Cub.*</model>
@@ -14362,628 +15028,11 @@
 	</models>
 	<models>
 		<name>type</name>
-		<model>Beech Baron G58.*</model>
+		<model>Zlin Shock Ultra.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
-	<models>
-		<name>type</name>
-		<model>Savage Norden:.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Virus SW Pipistrel.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Robin DR400.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_aileron_coeff</name>
-		<model>Robin DR400.*</model>
-		<value>0.29</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>Robin DR400.*</model>
-		<value>0.62</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>Robin DR400.*</model>
-		<value>5.77</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Robin DR400.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>C408 SkyCourier.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>elevator_droop_moment</name>
-		<model>Aviat Pitts S2.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>flaps_motion_effect_enabled</name>
-		<model>Aviat Pitts S2.*</model>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Aviat Pitts S2.*</model>
-		<value>0.1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>Aviat Pitts S2.*</model>
-		<value>84</value>
-		<unit>in</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Aviat Pitts S2.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>A320neo.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>enable_custom_x_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>custom_x_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>L:INPUT_RUDDER</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>raw_x_axis_scale</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>1</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>joystick_x_axis_scale</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>1.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>enable_custom_y_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>custom_y_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>L:INPUT_ELEVATOR</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>raw_y_axis_scale</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>A10C Thunderbolt.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>elevator_droop_moment</name>
-		<model>Cessna C152.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Cessna C152.*</model>
-		<value>-0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_aileron_coeff</name>
-		<model>Cessna C152.*</model>
-		<value>0.25</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>Cessna C152.*</model>
-		<value>0.5</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_rudder_coeff</name>
-		<model>Cessna C152.*</model>
-		<value>0.5</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>Cessna C152.*</model>
-		<value>5.9</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Cessna C152.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Powrachute Sky Rascal.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>L-39 Albatros.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>DHC-6-300.*</model>
-		<value>0.35</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>DHC-6-300.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>C188 Agtruck.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>CGS Hawk Arrow II.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>DC Designs Stearman.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Optica:.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Jetson One.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>A310.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>A330.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>ES30.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>AT802.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>FA18E.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Skyship600.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Cessna Citation CJ4.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Curtiss JN-4.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>.*C-17.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Robin CAP10.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Diamond DV20.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>King Air C90.*</model>
-		<value>-0.2</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>King Air C90.*</model>
-		<value>8.8</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>King Air C90.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Grumman Goose G21A.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>JMB Aviation VL3.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>737.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Seastar.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>.*C-17.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>P51 Mustang.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Joby.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Cirrus SR22T.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>engine_rumble_lowrpm_intensity</name>
-		<model>Asobo TBM 930.*</model>
-		<value>0.042</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>joystick_trim_follow_gain_virtual_y</name>
-		<model>Asobo TBM 930.*</model>
-		<value>-0.48</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_aileron_coeff</name>
-		<model>Asobo TBM 930.*</model>
-		<value>0.34</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>max_elevator_coeff</name>
-		<model>Asobo TBM 930.*</model>
-		<value>0.34</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>prop_diameter</name>
-		<model>Asobo TBM 930.*</model>
-		<value>7.57</value>
-		<unit>ft</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Asobo TBM 930.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>HU-16 Albatross.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>CL415.*</model>
-		<value>TurbopropAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Asobo Cessna Citation.*</model>
-		<value>JetAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_effect_intensity</name>
-		<model>Bell 47J.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>Bell 47J.*</model>
-		<value>5</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>Bell 47J.*</model>
-		<value>10</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>Bell 47J.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>Bell 47J.*</model>
-		<value>45</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>rotor_blade_count</name>
-		<model>Bell 47J.*</model>
-		<value>2</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>Bell 47J.*</model>
-		<value>0.5</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Bell 47J.*</model>
-		<value>Helicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>force_trim_enabled</name>
-		<model>Bell 47J.*</model>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>enable_custom_x_axis</name>
-		<model>Bell 47J.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>R66 Turbine.*</model>
-		<value>Helicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Schweizer S300CBi.*</model>
-		<value>Helicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>H125.*</model>
-		<value>Helicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>S-64F.*</model>
-		<value>Helicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>Cabri G2.*</model>
-		<value>Helicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>XCub.*</model>
-		<value>PropellerAircraft</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-		</models>
 	<models>
 		<name>type</name>
 		<model>.*Piper PA-18 Super Cub</model>
@@ -15143,12 +15192,6 @@
 		<model>Van's RV-10.*</model>
 		<value>PropellerAircraft</value>
 		<sim>XPLANE</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
-		<model>allsettings</model>
-		<value>AllSettings</value>
 		<device>any</device>
 	</models>
 </TelemFFB>
