@@ -1,5 +1,11 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
+##  March 9, 2025
+############################################
+## MSFS 2024
+- Use simvar CAMERA STATE to avoid playing telemetry while in menus (pause unless value is 2-5).  Workaround required due to simconnect pause state bugs in FS2024
+
+############################################
 ##  January 1, 2025
 ############################################
 ## General
