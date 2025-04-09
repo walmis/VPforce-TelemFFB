@@ -473,7 +473,10 @@ def main():
     if G.master_instance:
         G.main_window.setup_master_instance()
 
-    if not G.system_settings.get("pidJoystick", None):
+    if (not G.system_settings.get("pidJoystick", None) and
+        not G.system_settings.get("pidPedals", None) and
+        not G.system_settings.get("pidCollective", None) and
+        not G.system_settings.get("pidTrimWheel", None) ):
         G.main_window.open_system_settings_dialog()
 
     # G.telem_manager.telemetryTimeout.connect(lambda state: G.main_window.update_sim_indicators(G.telem_manager.getTelemValue("src"), state))
