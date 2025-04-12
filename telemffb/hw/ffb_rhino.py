@@ -332,6 +332,8 @@ class FFBReport_Input(BaseStructure):
     Button48_63: int
     CP_offsetX: int
     CP_offsetY: int
+    ForceX: int # force output (sping + friction), for improved hands-on detection
+    ForceY: int
 
     _pack_ = 1
     _fields_ = [
@@ -349,6 +351,8 @@ class FFBReport_Input(BaseStructure):
                 ("Button48_63", ctypes.c_uint16), # added in fw v1.0.17
                 ("CP_offsetX", ctypes.c_int16), # added in fw v1.0.17
                 ("CP_offsetY", ctypes.c_int16), # added in fw v1.0.17
+                ("ForceX", ctypes.c_int16), # added in fw v1.0.17b13
+                ("ForceY", ctypes.c_int16), # added in fw v1.0.17b13
                ]
     _defaults_ = {}
 
@@ -442,6 +446,12 @@ class FFBReport_Input(BaseStructure):
         cpY = self.CP_offsetY/4096.0 if self.CP_offsetY <= 4096.0 else None
         
         return (cpX, cpY)
+    
+    def forceXY(self) -> tuple[float, float]:
+        """
+        Returns the force X and Y values as a tuple of two floats in the range [-1.0 .. 1.0]
+        """
+        return (self.ForceX / 4096.0, self.ForceY / 4096.0)
 
     def CP_scaled_axisXY(self) -> tuple[float, float]:
         """
