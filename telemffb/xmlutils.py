@@ -482,7 +482,7 @@ def write_sc_override_to_xml(the_model, the_var, setting_name, sc_unit='', scale
                                    ("model", the_model),
                                    ("var", the_var),
                                    ("sc_unit", sc_unit),
-                                   ("scale", scale)]:
+                                   ("scale", str(scale))]:
                     ET.SubElement(overrides, tag).text = value
 
             # Write the modified XML back to the file
