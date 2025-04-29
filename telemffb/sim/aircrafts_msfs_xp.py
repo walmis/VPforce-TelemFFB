@@ -1477,6 +1477,7 @@ class Helicopter(Aircraft):
 
     pedals_init = 0
     pedal_spring_gain = 1
+    hpg_pedal_spring_gain = 1
     pedal_dampening_gain = 1
     pedal_spring_coeff_x = 0
     last_pedal_x = 0
@@ -2225,7 +2226,7 @@ class HPGHelicopter(Helicopter):
                     self.cpO_x = round(4096 * self.last_pedal_x)
 
                 self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(
-                    4096 * utils.clamp(self.pedal_spring_gain, 0, 1))
+                    4096 * utils.clamp(self.hpg_pedal_spring_gain, 0, 1))
 
                 self.spring_x.cpOffset = self.cpO_x
 
@@ -2275,6 +2276,7 @@ class HPGHelicopter(Helicopter):
             telem_data['_cp0_x'] = self.cpO_x
 
             self.spring_x.cpOffset = round(self.cpO_x)
+            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(4096 * utils.clamp(self.hpg_pedal_spring_gain, 0, 1))
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.start()
 
