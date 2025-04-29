@@ -219,6 +219,11 @@ class Aircraft(AircraftBase):
         self.joystick_trim_follow_gain_virtual_y = 0.2
         self.rudder_trim_follow_gain_physical_x = 1.0
         self.rudder_trim_follow_gain_virtual_x = 0.2
+        self.joystick_ap_y_follow_axis = False
+        self.joystick_ap_follow_gain_physical_x = 1.0
+        self.joystick_ap_follow_gain_physical_y = 0.5
+        self.joystick_ap_follow_gain_virtual_x = 1.0
+        self.joystick_ap_follow_gain_virtual_y = 0.5
 
         self.enable_stick_shaker = 0
         self.stick_shaker_intensity = 0
@@ -310,8 +315,21 @@ class Aircraft(AircraftBase):
                     if self._sim_is_msfs():
                         aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
                         elevator_pos = telem_data.get("ElevDeflPct", 0)
-                        aileron_pos = aileron_pos[0]
+                        elev_trim = telem_data.get("ElevTrimPct", 0)
+                        elev_trim = self.dampener.dampen_value(elev_trim, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+                        elev_trim = clamp(elev_trim * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                        virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+                        phys_stick_y_offs = int(elev_trim * 4096)
+
+                        aileron_pos = clamp(aileron_pos[0] * self.joystick_ap_follow_gain_physical_x, -1, 1)
                         aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+                        virtual_stick_x_offs = aileron_pos - (aileron_pos * self.joystick_ap_follow_gain_virtual_x)
+                        if self.joystick_ap_y_follow_axis:
+                            elevator_pos = clamp(elevator_pos * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                            virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_ap_follow_gain_virtual_y)
+                            phys_stick_y_offs = round(elevator_pos * 4096)
+
+
 
                     if self._sim_is_xplane():
                         aileron_pos = telem_data.get("APRollServo", 0)
