@@ -1690,8 +1690,6 @@
 		<prereq>ap_following</prereq>
 		<info>Amount of physical movement of the stick that is transmitted to the sim</info>
 		<displayname>AP Roll Virtual Gain</displayname>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
@@ -1703,8 +1701,6 @@
 		<prereq>ap_following</prereq>
 		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
 		<displayname>Invert Aileron Autopilot Axis</displayname>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1728,8 +1724,6 @@
 		<prereq>ap_following</prereq>
 		<info>Amount of physical movement of the stick that is transmitted to the sim</info>
 		<displayname>AP Pitch Virtual Gain</displayname>
-		<MSFS>true</MSFS>
-		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
@@ -11812,13 +11806,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>ap_following</name>
-		<model>Aviat Husky A-1C.*</model>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
 		<name>type</name>
 		<model>Aviat Husky A-1C.*</model>
 		<value>PropellerAircraft</value>
@@ -12281,13 +12268,6 @@
 		<device>joystick</device>
 	</models>
 	<models>
-		<name>invert_ap_x_axis</name>
-		<model>C172SP.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<model>C172SP.*</model>
 		<value>0.55</value>
@@ -12462,13 +12442,6 @@
 		<name>elevator_droop_moment</name>
 		<model>Cessna (172|Skyhawk).*</model>
 		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>Cessna (172|Skyhawk).*</model>
-		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
@@ -12871,13 +12844,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>invert_ap_x_axis</name>
-		<model>DA40-XLS.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>enable_custom_x_axis</name>
 		<model>DA40-XLS.*</model>
 		<value>true</value>
@@ -13074,13 +13040,6 @@
 		<device>pedals</device>
 	</models>
 	<models>
-		<name>invert_ap_x_axis</name>
-		<model>DA42-TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>type</name>
 		<model>DA42-VI.*</model>
 		<value>PropellerAircraft</value>
@@ -13191,13 +13150,6 @@
 		<value>1</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
-	</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>DA42-VI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -13364,67 +13316,40 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>buffeting_intensity</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>-0.11</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>nosewheel_shimmy</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>prop_diameter</name>
+		<model>Diamond DA40TDI.*</model>
+		<value>6.1352</value>
+		<unit>ft</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Diamond DA40TDI.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>enable_custom_x_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>custom_x_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>L:INPUT_RUDDER</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>raw_x_axis_scale</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>1</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>joystick_x_axis_scale</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>1.0</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>enable_custom_y_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>custom_y_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>L:INPUT_ELEVATOR</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>raw_y_axis_scale</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>1</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>Diamond DA40TDI.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -14019,7 +13944,7 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>joystick_ap_following</name>
+		<name>ap_following</name>
 		<model>Juice Goose.*</model>
 		<value>false</value>
 		<sim>MSFS</sim>
@@ -14168,13 +14093,6 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>invert_ap_x_axis</name>
-		<model>Milviz 310R.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>type</name>
 		<model>Milviz 310R.*</model>
 		<value>PropellerAircraft</value>
@@ -14182,11 +14100,11 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>ap_following</name>
-		<model>Mudry Cap 10 C.*</model>
-		<value>false</value>
+		<name>type</name>
+		<model>Blackbird 310R.*</model>
+		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
-		<device>joystick</device>
+		<device>any</device>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_virtual_y</name>
@@ -14289,26 +14207,12 @@
 		<device>pedals</device>
 	</models>
 	<models>
-		<name>invert_ap_x_axis</name>
-		<model>PC-12.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
 		<name>prop_diameter</name>
 		<model>PC-12.*</model>
 		<value>8.75</value>
 		<unit>ft</unit>
 		<sim>MSFS</sim>
 		<device>any</device>
-	</models>
-	<models>
-		<name>ap_following</name>
-		<model>PC-12.*</model>
-		<value>false</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -14422,13 +14326,6 @@
 		<value>1</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
-	</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>Pilatus PC-12.*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
 	</models>
 	<models>
 		<name>prop_diameter</name>
@@ -14859,13 +14756,6 @@
 		<name>elevator_expo</name>
 		<model>SUPER DECATHLON.*</model>
 		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>invert_ap_x_axis</name>
-		<model>SUPER DECATHLON.*</model>
-		<value>true</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
 	</models>
