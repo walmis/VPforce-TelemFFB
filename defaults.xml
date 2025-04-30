@@ -1673,44 +1673,23 @@
 	<defaults>
 		<Grouping>Axis Control</Grouping>
 		<order>340.2</order>
-		<name>joystick_ap_follow_gain_physical_x</name>
+		<name>joystick_ap_x_follow_deadzone</name>
 		<prereq>ap_following</prereq>
-		<info>Amount of aileron surface deflection translated into physical movement of the stick</info>
-		<displayname>AP Roll Physical Gain</displayname>
+		<info>Axis position will not be sent when AP is engaged until physical control exceeds deadzone</info>
+		<displayname>    Roll Deadzone</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
-		<validvalues>0,200</validvalues>
-		<value>1.0</value>
+		<validvalues>0,25</validvalues>
+		<value>0</value>
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
 		<order>340.3</order>
-		<name>joystick_ap_follow_gain_virtual_x</name>
+		<name>joystick_ap_follow_gain_physical_x</name>
 		<prereq>ap_following</prereq>
-		<info>Amount of physical movement of the stick that is transmitted to the sim</info>
-		<displayname>AP Roll Virtual Gain</displayname>
-		<validvalues>0,100</validvalues>
-		<value>0</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>340.4</order>
-		<name>invert_ap_x_axis</name>
-		<prereq>ap_following</prereq>
-		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
-		<displayname>Invert Aileron Autopilot Axis</displayname>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Axis Control</Grouping>
-		<order>340.5</order>
-		<name>joystick_ap_follow_gain_physical_y</name>
-		<prereq>ap_following</prereq>
-		<info>Amount of elevator trim deflection translated into physical movement of the stick</info>
-		<displayname>AP Pitch Physical Gain</displayname>
+		<info>Amount of aileron surface deflection translated into physical movement of the stick</info>
+		<displayname>    AP Roll Physical Gain</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<validvalues>0,200</validvalues>
@@ -1719,22 +1698,68 @@
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
-		<order>340.6</order>
-		<name>joystick_ap_follow_gain_virtual_y</name>
+		<order>340.4</order>
+		<name>joystick_ap_follow_gain_virtual_x</name>
 		<prereq>ap_following</prereq>
 		<info>Amount of physical movement of the stick that is transmitted to the sim</info>
-		<displayname>AP Pitch Virtual Gain</displayname>
+		<displayname>    AP Roll Virtual Gain</displayname>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
+		<order>340.5</order>
+		<name>invert_ap_x_axis</name>
+		<prereq>ap_following</prereq>
+		<info>If aircraft becomes unstable with AP Following and wants to flip inverted, try this option</info>
+		<displayname>    Invert Aileron Autopilot Axis</displayname>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>340.6</order>
+		<name>joystick_ap_y_follow_deadzone</name>
+		<prereq>ap_following</prereq>
+		<info>Axis position will not be sent when AP is engaged until physical control exceeds deadzone</info>
+		<displayname>    Pitch Deadzone</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>0,25</validvalues>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
 		<order>340.7</order>
+		<name>joystick_ap_follow_gain_physical_y</name>
+		<prereq>ap_following</prereq>
+		<info>Amount of elevator trim deflection translated into physical movement of the stick</info>
+		<displayname>    AP Pitch Physical Gain</displayname>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>0,200</validvalues>
+		<value>1.0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>340.8</order>
+		<name>joystick_ap_follow_gain_virtual_y</name>
+		<prereq>ap_following</prereq>
+		<info>Amount of physical movement of the stick that is transmitted to the sim</info>
+		<displayname>    AP Pitch Virtual Gain</displayname>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Axis Control</Grouping>
+		<order>340.9</order>
 		<name>joystick_ap_y_follow_axis</name>
 		<prereq>ap_following</prereq>
 		<info>Elevator AP will attempt to follow the axis position rather than the trim value</info>
-		<displayname>AP Pitch - Follow axis instead of trim</displayname>
+		<displayname>    AP Pitch - Follow axis instead of trim</displayname>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<value>false</value>
@@ -6529,6 +6554,62 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
+	<classdefaults>
+		<name>joystick_ap_x_follow_deadzone</name>
+		<type>JetAircraft</type>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_ap_x_follow_deadzone</name>
+		<type>PropellerAircraft</type>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_ap_x_follow_deadzone</name>
+		<type>TurbopropAircraft</type>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_ap_x_follow_deadzone</name>
+		<type>GilderAircraft</type>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_ap_y_follow_deadzone</name>
+		<type>JetAircraft</type>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_ap_y_follow_deadzone</name>
+		<type>PropellerAircraft</type>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_ap_y_follow_deadzone</name>
+		<type>TurbopropAircraft</type>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
+	<classdefaults>
+		<name>joystick_ap_y_follow_deadzone</name>
+		<type>GilderAircraft</type>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</classdefaults>
 	<classdefaults>
 		<name>joystick_x_axis_scale</name>
 		<type>AllSettings</type>

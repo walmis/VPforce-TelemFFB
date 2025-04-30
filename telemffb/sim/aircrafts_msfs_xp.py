@@ -224,6 +224,8 @@ class Aircraft(AircraftBase):
         self.joystick_ap_follow_gain_physical_y = 0.5
         self.joystick_ap_follow_gain_virtual_x = 1.0
         self.joystick_ap_follow_gain_virtual_y = 0.5
+        self.joystick_ap_x_follow_deadzone = 0.05
+        self.joystick_ap_y_follow_deadzone = 0.05
 
         self.enable_stick_shaker = 0
         self.stick_shaker_intensity = 0
@@ -283,6 +285,8 @@ class Aircraft(AircraftBase):
         return newvalue
 
     def _update_fbw_flight_controls(self, telem_data):
+        ap_send_flag_x = True
+        ap_send_flag_y = True
         ffb_type = telem_data.get("FFBType", "joystick")
         if self._sim_is_msfs():
             ap_active = telem_data.get("APMaster", 0)
@@ -314,22 +318,34 @@ class Aircraft(AircraftBase):
                     phys_x, phys_y = input_data.axisXY()
                     if self._sim_is_msfs():
                         aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
-                        elevator_pos = telem_data.get("ElevDeflPct", 0)
-                        elev_trim = telem_data.get("ElevTrimPct", 0)
-                        elev_trim = self.dampener.dampen_value(elev_trim, '_elev_trim', derivative_hz=5, derivative_k=0.15)
-                        elev_trim = clamp(elev_trim * self.joystick_ap_follow_gain_physical_y, -1, 1)
-                        virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
-                        phys_stick_y_offs = int(elev_trim * 4096)
+                        telem_data['phys_x_aileron'] = aileron_pos[0]
+                        if self.joystick_ap_y_follow_axis:
+                            elevator_pos = telem_data.get("ElevDeflPct", 0)
+                        else:
+                            elevator_pos = telem_data.get("ElevTrimPct", 0)
+
+                        elevator_pos = telem_data.get("ElevTrimPct", 0)
+                        elevator_pos = self.dampener.dampen_value(elevator_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+                        elevator_pos = clamp(elevator_pos * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                        virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_trim_follow_gain_virtual_y)
+                        phys_stick_y_offs = int(elevator_pos * 4096)
+
 
                         aileron_pos = clamp(aileron_pos[0] * self.joystick_ap_follow_gain_physical_x, -1, 1)
-                        aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+                        # aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
                         virtual_stick_x_offs = aileron_pos - (aileron_pos * self.joystick_ap_follow_gain_virtual_x)
-                        if self.joystick_ap_y_follow_axis:
-                            elevator_pos = clamp(elevator_pos * self.joystick_ap_follow_gain_physical_y, -1, 1)
-                            virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_ap_follow_gain_virtual_y)
-                            phys_stick_y_offs = round(elevator_pos * 4096)
+
+                        # if self.joystick_ap_y_follow_axis:
+                        #     elevator_pos = clamp(elevator_pos * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                        #     virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_ap_follow_gain_virtual_y)
+                        #     phys_stick_y_offs = round(elevator_pos * 4096)
+
+                        ap_send_flag_x = True if abs(phys_x - aileron_pos) > self.joystick_ap_x_follow_deadzone else False
+                        ap_send_flag_y = True if abs(phys_y - elevator_pos) > self.joystick_ap_y_follow_deadzone else False
 
 
+                        telem_data["phys_x_send_flag"] = ap_send_flag_x
+                        telem_data["phys_y_send_flag"] = ap_send_flag_y
 
                     if self._sim_is_xplane():
                         aileron_pos = telem_data.get("APRollServo", 0)
@@ -357,7 +373,8 @@ class Aircraft(AircraftBase):
                 telem_data['phys_y'] = phys_y
                 x_pos = phys_x - virtual_stick_x_offs
                 y_pos = phys_y - virtual_stick_y_offs
-
+                telem_data['phys_x_pos'] = x_pos
+                telem_data['phys_y_pos'] = y_pos
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
                 if self._sim_is_xplane():
@@ -391,8 +408,19 @@ class Aircraft(AircraftBase):
                     else:
                         pos_y_pos = round(pos_y_pos, 5)
 
-                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    # Only send axis position if "send flags" are true
+                    # "send_flags" will be false if autopilot is engaged and physical control is within deadzone
+                    # once deadzone is breached for an axis, position will be sent
+                    # if AP is not active, flags are always True
+                    if ap_send_flag_x:
+                        self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                    else:
+                        self._simconnect.send_event_to_msfs(x_var, 0)
+                    if ap_send_flag_y:
+                        self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    else:
+                        self._simconnect.send_event_to_msfs(y_var, 0)
+
             # update spring data
             if self.ap_following and ap_active:
                 y_coeff = 4096
