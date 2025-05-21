@@ -1556,6 +1556,7 @@ class MainWindow(QMainWindow):
             pct_max_a = data.get('_pct_max_a', 0)
             pct_max_e = data.get('_pct_max_e', 0)
             pct_max_r = data.get('_pct_max_r', 0)
+            pct_steer_f = data.get('_pct_steer_f', 0)
             qcolor_green = QColor("#17c411")
             qcolor_grey = QColor("grey")
             if window_mode == 1:
@@ -1592,6 +1593,12 @@ class MainWindow(QMainWindow):
                     if slidername == 'max_rudder_coeff':
                         new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_max_r)
                         my_slider.setHandleColor(new_color.name(), f"{int(pct_max_r * 100)}%")
+                        # print(new_color)
+                        my_slider.blockSignals(False)
+                        continue
+                    if slidername == 'steering_friction_intensity':
+                        new_color = self.interpolate_color(qcolor_grey, qcolor_green, pct_steer_f)
+                        my_slider.setHandleColor(new_color.name(), f"{int(pct_steer_f * 100)}%")
                         # print(new_color)
                         my_slider.blockSignals(False)
                         continue
