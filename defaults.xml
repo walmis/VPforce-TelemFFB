@@ -214,7 +214,7 @@
 		<Grouping>FFB</Grouping>
 		<order>100</order>
 		<name>enable_inertia_ovd</name>
-		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<info>Apply inertia to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Inertia Override</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -232,7 +232,7 @@
 		<order>100.1</order>
 		<name>inertia_force</name>
 		<prereq>enable_inertia_ovd</prereq>
-		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<info>Apply inertia to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Inertia Effect</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -250,7 +250,7 @@
 		<Grouping>FFB</Grouping>
 		<order>110</order>
 		<name>enable_friction_ovd</name>
-		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<info>Apply friction to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Friction Override</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -268,7 +268,7 @@
 		<order>110.1</order>
 		<name>friction_force</name>
 		<prereq>enable_friction_ovd</prereq>
-		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<info>Apply friction to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<displayname>Friction Effect</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -1406,11 +1406,11 @@
 	</defaults>
 	<defaults>
 		<Grouping>TrimWheel</Grouping>
-		<order>300.75</order>
-		<name>trimwheel_axis_invert</name>
-		<prereq>trimwheel_use_axis</prereq>
-		<info>Enable if trim wheel axis moves the wrong way</info>
-		<displayname>Elevator Trim Axis Invert</displayname>
+		<order>300.74</order>
+		<name>trimwheel_use_axis</name>
+		<prereq>telemffb_controls_axes</prereq>
+		<info>Enable to use Axis control (vs direct trim surface manipulating)</info>
+		<displayname>Use Axis instead of Direct</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<trimwheel>true</trimwheel>
@@ -1418,11 +1418,11 @@
 	</defaults>
 	<defaults>
 		<Grouping>TrimWheel</Grouping>
-		<order>300.74</order>
-		<name>trimwheel_use_axis</name>
-		<prereq>telemffb_controls_axes</prereq>
-		<info>Enable to use Axis control (vs direct trim surface manipulating)</info>
-		<displayname>Use Axis instead of Direct</displayname>
+		<order>300.75</order>
+		<name>trimwheel_axis_invert</name>
+		<prereq>trimwheel_use_axis</prereq>
+		<info>Enable if trim wheel axis moves the wrong way</info>
+		<displayname>Elevator Trim Axis Invert</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<trimwheel>true</trimwheel>
@@ -1841,6 +1841,62 @@
 		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>352</order>
+		<name>steering_friction</name>
+		<info>Enable pedal friction for steering gear wheel&lt;br&gt;** REQUIRES friction overrides to be enabled **</info>
+		<displayname>Steering Friction &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>352.1</order>
+		<name>steering_friction_intensity</name>
+		<prereq>steering_friction</prereq>
+		<info>Max intensity of steering friction (% of configurator value)&lt;br&gt;** REQUIRES friction override to be enabled **</info>
+		<displayname>Steering Friction &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<trimwheel>1</trimwheel>
+		<validvalues>0,100</validvalues>
+		<value>0.8</value>
+		<datatype>n_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>352.2</order>
+		<name>steering_friction_expo</name>
+		<prereq>steering_friction</prereq>
+		<info>&lt;html&gt;&lt;body&gt;Controls decay rate of friction with speed.&lt;br&gt;0 = linear, gradual decay, -1.0 = very quick decay&lt;/body&gt;&lt;/html&gt;</info>
+		<displayname>Steering Friction Expo</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>-9,0</validvalues>
+		<value>-0.4</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>352.3</order>
+		<name>steering_friction_spring</name>
+		<prereq>steering_friction_RESERVED_UNUSED</prereq>
+		<info>Strength of steering gear spring</info>
+		<displayname>Steering Gear Spring</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>0.5</value>
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
@@ -3363,6 +3419,7 @@
 		<Grouping>Movement</Grouping>
 		<order>650.1</order>
 		<name>nosewheel_shimmy_intensity</name>
+		<prereq>nosewheel_shimmy</prereq>
 		<info>Max intensity of shimmy effect</info>
 		<displayname>Nosewheel Shimmy</displayname>
 		<MSFS>true</MSFS>

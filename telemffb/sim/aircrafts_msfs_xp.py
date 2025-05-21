@@ -107,6 +107,11 @@ class Aircraft(AircraftBase):
     nosewheel_shimmy_min_speed = 7
     nosewheel_shimmy_min_brakes = 0.6
 
+    steering_friction = 0
+    steering_friction_intensity = 0.8
+    steering_friction_spring = 0.5 #currently unused
+    steering_friction_expo = -0.4
+
     force_trim_enabled = 0
     cyclic_spring_gain = 1.0
     force_trim_button = 0
@@ -265,6 +270,37 @@ class Aircraft(AircraftBase):
             effects["nw_shimmy"].periodic(freq, shimmy, 90).start()
         else:
             effects.dispose("nw_shimmy")
+
+    def update_steering_friction_effect(self, telem_data):
+
+        if not self.enable_friction_ovd:
+            self.flag_error(
+                "Steering Friction effect enabled but friction override not enabled")
+            return False
+        on_ground = telem_data.get("SimOnGround", 0)
+        wos = telem_data.get("WeightOnWheels", [0])[0]  # center steering wheel only
+        gs = telem_data.get("GroundSpeed", 0)
+        #csa = telem_data.get("CenterSteerAngle", 0)
+
+        if not wos or not on_ground:
+            effects["steering_friction"].destroy()
+            self.friction_coeff = int(self.friction_force * 4096)
+            return False
+
+        # scale gs 0-40kt to 1-0
+        scalespeed = utils.scale(gs, (0, 20), (1, 0))
+        efriction = self.expocurve(scalespeed * self.steering_friction, self.steering_friction_expo)
+
+        #logging.info(f"wos {wos}  gs {gs}  efriction {efriction}")
+
+        self.friction_coeff = utils.clamp(int(efriction * 4096), int(self.friction_force * 4096), 4096)
+        telem_data["_pct_steer_f"] = self.friction_coeff/4096
+        self._ipc_telem["_pct_steer_f"] = self.friction_coeff/4096
+
+        effects["friction"].destroy()
+        if not effects["steering_friction"].started or self.anything_has_changed('_steering_friction', self.friction_coeff):
+            effects["steering_friction"].friction(self.friction_coeff, self.friction_coeff).start()
+        return True
 
     def expocurve(self,x, k):
         # expo function for + k: y = (1-k)x + k( (1-e^(-ax)) / (1-e^-a))
@@ -1228,6 +1264,8 @@ class Aircraft(AircraftBase):
         if self._sim_is_msfs():
             if self.nosewheel_shimmy and telem_data.get("FFBType") == "pedals" and not telem_data.get("IsTaildragger", 0):
                 self._update_nosewheel_shimmy(telem_data)
+            if self.steering_friction and telem_data.get("FFBType") == "pedals":
+                self.update_steering_friction_effect(telem_data)
 
     def on_timeout(self):
         if not effects["pause_spring"].started:
