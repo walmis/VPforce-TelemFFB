@@ -233,6 +233,7 @@ class EffectTranslator:
         "spoilerbuffet2-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
         "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
         "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
+        "steering_friction": ["Steering Friction", "steering_friction_intensity"],
         "stick_shaker" : ["Stick Shaker","stick_shaker_intensity"],
         "stick_shaker1" : ["Stick Shaker","stick_shaker_intensity"],
         "stick_shaker2" : ["Stick Shaker","stick_shaker_intensity"],
@@ -992,6 +993,28 @@ def average(l):
     if not l:
         return 0
     return sum(l) / float(len(l))
+
+
+def polar_to_cartesian_deg(angle_deg, magnitude):
+    angle_rad = math.radians(angle_deg)
+    x = magnitude * math.cos(angle_rad)
+    y = magnitude * math.sin(angle_rad)
+    return x, y
+
+
+def add_vectors_deg(angle1_deg, mag1, angle2_deg, mag2):
+    x1, y1 = polar_to_cartesian_deg(angle1_deg, mag1)
+    x2, y2 = polar_to_cartesian_deg(angle2_deg, mag2)
+
+    x_sum = x1 + x2
+    y_sum = y1 + y2
+
+    # Convert back to polar
+    magnitude = math.hypot(x_sum, y_sum)
+    angle_deg = math.degrees(math.atan2(y_sum, x_sum))
+
+    return angle_deg, magnitude
+
 
 
 class LowPassFilter:

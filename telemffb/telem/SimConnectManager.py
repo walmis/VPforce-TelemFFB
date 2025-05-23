@@ -209,7 +209,8 @@ class SimConnectManager(threading.Thread):
         SimVar("HydSys", "HYDRAULIC SYSTEM INTEGRITY", "Percent Over 100"),
         SimVar("_IS IN RTC", "IS IN RTC", "bool"),
         SimVar("_IS AVATAR", "IS AVATAR", "bool"),
-        SimVar("_IS AIRCRAFT", "IS AIRCRAFT", "bool")
+        SimVar("_IS AIRCRAFT", "IS AIRCRAFT", "bool"),
+        SimVar("CenterSteerAnglePct", "CONTACT POINT STEER ANGLE PCT", "percent over 100"),
     ]
 
     def __init__(self):
