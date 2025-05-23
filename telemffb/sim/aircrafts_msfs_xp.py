@@ -289,7 +289,7 @@ class Aircraft(AircraftBase):
 
         # scale gs 0-40kt to 1-0
         scalespeed = utils.scale(gs, (0, 20), (1, 0))
-        efriction = self.expocurve(scalespeed * self.steering_friction, self.steering_friction_expo)
+        efriction = self.expocurve(scalespeed * self.steering_friction_intensity, self.steering_friction_expo)
 
         #logging.info(f"wos {wos}  gs {gs}  efriction {efriction}")
 
@@ -929,6 +929,29 @@ class Aircraft(AircraftBase):
             self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = rc
             self.spring_x.cpOffset = phys_rudder_x_offs
 
+
+            # add spring force from steering wheel on ground
+            # should this be dependent on friction?  doesn't need to be.
+
+            if self.steering_friction:
+                on_ground = telem_data.get("SimOnGround", 0)
+                wos = telem_data.get("WeightOnWheels", [0])[0]  # center steering wheel only
+                gs = telem_data.get("GroundSpeed", 0)
+                csa = telem_data.get("CenterSteerAnglePct", 0)
+
+                if wos and on_ground:
+                    rudder_angle = 30  #assumed rudder travel
+                    dynamic_angle = phys_rudder_x_offs*rudder_angle/4096
+                    dynamic_force = rc/4096
+                    steer_angle = csa*rudder_angle
+                    steer_force = self.steering_friction_spring/40  # dont need a strong spring
+                    result_angle_percent, result_mag = utils.add_vectors_deg(dynamic_angle, dynamic_force, steer_angle, steer_force)
+
+                    #logging.info(f"angle {result_angle_percent:.3f} mag {result_mag:.1f}  ofs {phys_rudder_x_offs/136:.1f}  rc {rc}  st angle {steer_angle:.1f} ")
+                    self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = int(utils.clamp(result_mag*4096,0,4096))
+                    self.spring_x.cpOffset = int(utils.clamp((result_angle_percent/rudder_angle)*4096,-4096,4096))
+
+
             self._spring_handle.setCondition(self.spring_x)
 
             speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
@@ -1266,6 +1289,9 @@ class Aircraft(AircraftBase):
                 self._update_nosewheel_shimmy(telem_data)
             if self.steering_friction and telem_data.get("FFBType") == "pedals":
                 self.update_steering_friction_effect(telem_data)
+            if not self.steering_friction:
+                effects["steering_friction"].destroy()
+
 
     def on_timeout(self):
         if not effects["pause_spring"].started:
