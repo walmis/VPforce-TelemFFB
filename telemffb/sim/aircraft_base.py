@@ -298,6 +298,8 @@ class AircraftBase(object):
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
+        self.friction_effect_overridden: bool = False
+
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
         This function creates an entry in the  stepper dictionary which can be used to track the progress of driving a
@@ -1207,14 +1209,14 @@ class AircraftBase(object):
             if effects['inertia'].started:
                 effects["inertia"].destroy()
 
-        if self.enable_friction_ovd:
-            if self.anything_has_changed('friction_value', self.friction_force) or not effects['friction'].started:
+        if not self.friction_effect_overridden:
+            if self.enable_friction_ovd:
                 force = utils.clamp(self.friction_force, 0.0, 1.0)
+                effects['friction'].name = 'friction'
                 effects["friction"].friction(int(4096*force), int(4096*force)).start()
-        else:
-            if effects['friction'].started:
-                effects["friction"].destroy()
-
+            else:
+                if effects['friction'].started:
+                    effects["friction"].destroy()
 
     ########################################
     ######                            ######
