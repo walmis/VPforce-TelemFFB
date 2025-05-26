@@ -507,11 +507,11 @@ class AircraftBase(object):
             effects.dispose("runway1")
             return
 
-        WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # left, nose, right - wheels
+        WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # nose, left, right - wheels
         # get high pass filters for wheel shock displacement data and update with latest data
         hp_f_cutoff_hz = 3
-        v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[1])) * self.runway_rumble_intensity
-        v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[0] - WoW[2]) * self.runway_rumble_intensity
+        v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[0])) * self.runway_rumble_intensity
+        v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[1] - WoW[2]) * self.runway_rumble_intensity
 
         v1 = utils.clamp_minmax(v1, 0.5)
         v2 = utils.clamp_minmax(v2, 0.5)
