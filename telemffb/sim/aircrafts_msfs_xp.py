@@ -272,11 +272,21 @@ class Aircraft(AircraftBase):
             effects.dispose("nw_shimmy")
 
     def update_steering_friction_effect(self, telem_data):
+        if not self.steering_friction:
+            if self.friction_effect_overridden and effects['friction'].name == 'steering_friction':
+                # If effect is disabled but was previously active, clean up and pass override control back to base friction effect
+                utils.dbprint("purple", self.friction_effect_overridden, instance='pedals')
+                self.friction_effect_overridden = False
+                effects['friction'].name = 'none'
+                effects["friction"].destroy()
+                return
+            return  # Hit this return if effect is simply disabled
 
         if not self.enable_friction_ovd:
             self.flag_error(
                 "Steering Friction effect enabled but friction override not enabled")
-            return False
+            return
+
         on_ground = telem_data.get("SimOnGround", 0)
         wos = telem_data.get("WeightOnWheels", [0])[0]  # center steering wheel only
         gs = telem_data.get("GroundSpeed", 0)
@@ -288,26 +298,31 @@ class Aircraft(AircraftBase):
             # scale gs 0-40kt to 1-0
             scalespeed = utils.scale(gs, (0, 20), (1, 0))
             efriction = self.expocurve(scalespeed * self.steering_friction_intensity, self.steering_friction_expo)
-
             # logging.info(f"wos {wos}  gs {gs}  efriction {efriction}")
 
-            self.friction_coeff = utils.clamp(int(efriction * 4096), int(self.friction_force * 4096), 4096)
+            base_friction_coeff = int(self.friction_force * 4096)  # calculate coefficient of base effect setting as baseline
+            usable_friction_range = 4096 - base_friction_coeff  # usable coefficient for this effect
+            friction_coeff_add = int(usable_friction_range * efriction)  # ammount to add based on efriction calculation
+
+            friction_force = clamp((base_friction_coeff + friction_coeff_add), 0, 4096)
+
+            # self.friction_coeff = utils.clamp(int(efriction * 4096), int(self.friction_force * 4096), 4096)
+
             if surface == "Water":
-                self.friction_coeff *= wr
-            telem_data["_pct_steer_f"] = self.friction_coeff / 4096
-            self._ipc_telem["_pct_steer_f"] = self.friction_coeff / 4096
+                friction_force *= wr
 
-            effects["friction"].destroy()
-            if not effects["steering_friction"].started or self.anything_has_changed('_steering_friction',
-                                                                                     self.friction_coeff):
-                effects["steering_friction"].friction(self.friction_coeff, self.friction_coeff).start()
-            return True
+            telem_data["_pct_steer_f"] = friction_coeff_add / usable_friction_range
+            self._ipc_telem["_pct_steer_f"] = friction_coeff_add / usable_friction_range
+
+            self.friction_effect_overridden = True
+
+            effects["friction"].name = "steering_friction"
+            effects["friction"].friction(friction_force, friction_force).start()
         else:
-            effects["steering_friction"].destroy()
-            self.friction_coeff = int(self.friction_force * 4096)
-            return False
-
-
+            # clean up and pass control back to base effect when wheel no longer on ground
+            if self.friction_effect_overridden and effects['friction'].name == 'steering_friction':
+                self.friction_effect_overridden = False
+                effects["friction"].destroy()
 
     def expocurve(self,x, k):
         # expo function for + k: y = (1-k)x + k( (1-e^(-ax)) / (1-e^-a))
@@ -1320,10 +1335,8 @@ class Aircraft(AircraftBase):
         if self._sim_is_msfs():
             if self.nosewheel_shimmy and telem_data.get("FFBType") == "pedals" and not telem_data.get("IsTaildragger", 0):
                 self._update_nosewheel_shimmy(telem_data)
-            if self.steering_friction and telem_data.get("FFBType") == "pedals":
+            if self.is_pedals():
                 self.update_steering_friction_effect(telem_data)
-            if not self.steering_friction:
-                effects["steering_friction"].destroy()
 
 
     def on_timeout(self):
