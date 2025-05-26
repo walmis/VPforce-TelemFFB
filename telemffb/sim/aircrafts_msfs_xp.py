@@ -945,13 +945,17 @@ class Aircraft(AircraftBase):
                 wos = telem_data.get("WeightOnWheels", [0])[0]  # center steering wheel only
                 gs = telem_data.get("GroundSpeed", 0)
                 csa = telem_data.get("CenterSteerAnglePct", 0)
+                wr = telem_data.get("WaterRudderExt", 0)  # percent of rudder extension
+                surface = telem_data.get("SurfaceType", 0)
 
-                if wos and on_ground:
+                if on_ground and (wos or surface == "Water"):
                     rudder_angle = 30  #assumed rudder travel
                     dynamic_angle = phys_rudder_x_offs*rudder_angle/4096
                     dynamic_force = rc/4096
                     steer_angle = csa*rudder_angle
                     steer_force = self.steering_friction_spring/40  # dont need a strong spring
+                    if surface == "Water":
+                        steer_force *= wr
                     result_angle_percent, result_mag = utils.add_vectors_deg(dynamic_angle, dynamic_force, steer_angle, steer_force)
 
                     #logging.info(f"angle {result_angle_percent:.3f} mag {result_mag:.1f}  ofs {phys_rudder_x_offs/136:.1f}  rc {rc}  st angle {steer_angle:.1f} ")
