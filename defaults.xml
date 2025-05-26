@@ -4214,6 +4214,60 @@
 		<var>L:switchForceTrim</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
+		<sc_overrides>
+			<name>WeightOnWheels:0</name>
+			<model>C208B.*</model>
+			<var>CONTACT POINT COMPRESSION:5</var>
+			<sc_unit>Percent Over 100</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>WeightOnWheels:1</name>
+			<model>C208B.*</model>
+			<var>CONTACT POINT COMPRESSION:6</var>
+			<sc_unit>Percent Over 100</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>WeightOnWheels:2</name>
+			<model>C208B.*</model>
+			<var>CONTACT POINT COMPRESSION:7</var>
+			<sc_unit>Percent Over 100</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>WeightOnWheels:0</name>
+			<model>C172SP.*</model>
+			<var>CONTACT POINT COMPRESSION:5</var>
+			<sc_unit>Percent Over 100</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>WeightOnWheels:1</name>
+			<model>C172SP.*</model>
+			<var>CONTACT POINT COMPRESSION:6</var>
+			<sc_unit>Percent Over 100</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>WeightOnWheels:2</name>
+			<model>C172SP.*</model>
+			<var>CONTACT POINT COMPRESSION:7</var>
+			<sc_unit>Percent Over 100</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>WeightOnWheels:0</name>
+			<model>Icon A5.*</model>
+			<var>CONTACT POINT COMPRESSION:2</var>
+			<sc_unit>Percent Over 100</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>WeightOnWheels:1</name>
+			<model>Icon A5.*</model>
+			<var>CONTACT POINT COMPRESSION:3</var>
+			<sc_unit>Percent Over 100</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>WeightOnWheels:2</name>
+			<model>Icon A5.*</model>
+			<var>CONTACT POINT COMPRESSION:4</var>
+			<sc_unit>Percent Over 100</sc_unit>
+		</sc_overrides>
 		<classdefaults>
 			<name>adv_spr_override_enabled</name>
 			<type>PropellerAircraft</type>
@@ -14390,6 +14444,48 @@
 	<models>
 		<name>type</name>
 		<model>HU-16 Albatross.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aileron_expo</name>
+		<model>Icon A5.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_expo</name>
+		<model>Icon A5.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_physical_y</name>
+		<model>Icon A5.*</model>
+		<value>0.38</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Icon A5.*</model>
+		<value>0.34</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Icon A5.*</model>
+		<value>0.65</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Icon A5.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>

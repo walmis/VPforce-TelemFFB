@@ -109,7 +109,7 @@ class Aircraft(AircraftBase):
 
     steering_friction = 0
     steering_friction_intensity = 0.8
-    steering_friction_spring = 0.5 #currently unused
+    steering_friction_spring = 0.5
     steering_friction_expo = -0.4
 
     force_trim_enabled = 0
@@ -281,26 +281,33 @@ class Aircraft(AircraftBase):
         wos = telem_data.get("WeightOnWheels", [0])[0]  # center steering wheel only
         gs = telem_data.get("GroundSpeed", 0)
         #csa = telem_data.get("CenterSteerAngle", 0)
+        wr = telem_data.get("WaterRudderExt", 0) # percent of rudder extension
+        surface = telem_data.get("SurfaceType", 0)
 
-        if not wos or not on_ground:
+        if on_ground and (wos or surface == "Water"):
+            # scale gs 0-40kt to 1-0
+            scalespeed = utils.scale(gs, (0, 20), (1, 0))
+            efriction = self.expocurve(scalespeed * self.steering_friction_intensity, self.steering_friction_expo)
+
+            # logging.info(f"wos {wos}  gs {gs}  efriction {efriction}")
+
+            self.friction_coeff = utils.clamp(int(efriction * 4096), int(self.friction_force * 4096), 4096)
+            if surface == "Water":
+                self.friction_coeff *= wr
+            telem_data["_pct_steer_f"] = self.friction_coeff / 4096
+            self._ipc_telem["_pct_steer_f"] = self.friction_coeff / 4096
+
+            effects["friction"].destroy()
+            if not effects["steering_friction"].started or self.anything_has_changed('_steering_friction',
+                                                                                     self.friction_coeff):
+                effects["steering_friction"].friction(self.friction_coeff, self.friction_coeff).start()
+            return True
+        else:
             effects["steering_friction"].destroy()
             self.friction_coeff = int(self.friction_force * 4096)
             return False
 
-        # scale gs 0-40kt to 1-0
-        scalespeed = utils.scale(gs, (0, 20), (1, 0))
-        efriction = self.expocurve(scalespeed * self.steering_friction_intensity, self.steering_friction_expo)
 
-        #logging.info(f"wos {wos}  gs {gs}  efriction {efriction}")
-
-        self.friction_coeff = utils.clamp(int(efriction * 4096), int(self.friction_force * 4096), 4096)
-        telem_data["_pct_steer_f"] = self.friction_coeff/4096
-        self._ipc_telem["_pct_steer_f"] = self.friction_coeff/4096
-
-        effects["friction"].destroy()
-        if not effects["steering_friction"].started or self.anything_has_changed('_steering_friction', self.friction_coeff):
-            effects["steering_friction"].friction(self.friction_coeff, self.friction_coeff).start()
-        return True
 
     def expocurve(self,x, k):
         # expo function for + k: y = (1-k)x + k( (1-e^(-ax)) / (1-e^-a))

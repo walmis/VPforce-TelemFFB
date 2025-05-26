@@ -211,6 +211,7 @@ class SimConnectManager(threading.Thread):
         SimVar("_IS AVATAR", "IS AVATAR", "bool"),
         SimVar("_IS AIRCRAFT", "IS AIRCRAFT", "bool"),
         SimVar("CenterSteerAnglePct", "CONTACT POINT STEER ANGLE PCT", "percent over 100"),
+        SimVar("WaterRudderExt", "WATER LEFT RUDDER EXTENDED", "percent over 100"),
     ]
 
     def __init__(self):
