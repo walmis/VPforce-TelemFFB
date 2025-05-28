@@ -213,6 +213,15 @@ class Aircraft(AircraftBase):
         self._update_touchdown_effect(telem_data)
         self._update_stick_shaker(telem_data)
         self.override_spring()
+
+        if self.adv_spr_override_enabled:
+            if self.override_spring_enabled:
+                self.flag_error("Advanced Spring is incompatible with 'DCS Spring Override', please disable one or the other")
+            elif self.adv_spr_gains == 'none':
+                self.flag_error('Please open and configure the advanced spring gain settings')
+            else:
+                self.modify_game_spring()
+
         self.override_copilot_spring(telem_data)
 
     @overrides(AircraftBase)

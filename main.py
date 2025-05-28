@@ -458,6 +458,7 @@ def main():
     G.ipc_instance.hide_signal.connect(G.main_window.hide)
     G.ipc_instance.showlog_signal.connect(G.log_window.show)
     G.ipc_instance.show_settings_signal.connect(G.main_window.open_system_settings_dialog)
+    G.ipc_instance.show_adv_spr_signal.connect(G.main_window.settings_layout.advanced_spring_button_clicked)
     G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
     G.ipc_instance.reload_aircraft_signal.connect(G.main_window.force_reload_aircraft)

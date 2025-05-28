@@ -30,8 +30,9 @@ from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, AnimatedToggle)
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle)
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
+from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile, dbprint, HiDpiPixmap
 
@@ -62,6 +63,8 @@ class SettingsLayout(QGridLayout):
         self.device = HapticEffect()
         self.setColumnMinimumWidth(7, 20)
         self.trigger_form_reload = True
+        self.advanced_spring_settings = None
+        self.adv_spr_dialog = None
 
     def handleScrollKeyPressEvent(self, event):
         # Forward key events to each slider in the layout
@@ -692,6 +695,18 @@ class SettingsLayout(QGridLayout):
         if item['datatype'] == 'button':
             self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
 
+        if item['datatype'] == 'advspr':
+            self.advanced_spring_settings = item['value']
+            b_txt = 'Configure Settings' if item['value'] == "none" else "Edit Settings"
+            # print(f"ADVANCED SPRING {self.advanced_spring_settings}")
+            self.adv_spr_button = QPushButton(b_txt)
+            self.adv_spr_button.setMinimumWidth(150)
+            self.adv_spr_button.setMinimumHeight(25)
+            self.adv_spr_button.setObjectName(f"advspr_{item['name']}")
+            self.adv_spr_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+            self.adv_spr_button.clicked.connect(lambda: self.advanced_spring_button_clicked(self.advanced_spring_settings))
+            self.addWidget(self.adv_spr_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+
         if item['datatype'] == 'configurator':
             self.configurator_button = QPushButton("Configure Gain Overrides")
 
@@ -958,6 +973,19 @@ class SettingsLayout(QGridLayout):
             the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
             self.reload_caller()
+    def advanced_spring_button_clicked(self, value=None):
+        if value is None:
+            value = self.advanced_spring_settings
+        if G.master_instance and G.device_type != G.current_device_config_scope:
+            G.ipc_instance.send_broadcast_message(f'SHOW ADV SPR:{G.current_device_config_scope}')
+        else:
+            if self.adv_spr_dialog is None:
+                self.adv_spr_dialog = AdvancedSpringDialog(parent=G.main_window, settings=value, device=G.current_device_config_scope)
+                self.adv_spr_dialog.setWindowFlags(Qt.Window)
+                self.adv_spr_dialog.accepted.connect(self.update_advanced_spring_gains)
+                self.adv_spr_dialog.show()
+            else:
+                self.adv_spr_dialog.show()
 
     def configurator_button_clicked(self):
         """

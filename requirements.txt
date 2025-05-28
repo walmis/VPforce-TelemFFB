@@ -5,3 +5,5 @@ stransi
 libusb1
 pygetwindow
 requests
+numpy
+scipy

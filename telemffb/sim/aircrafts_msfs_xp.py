@@ -812,33 +812,42 @@ class Aircraft(AircraftBase):
 
 
                     # logging.debug(f"fto={force_trim_y_offset} | Offset={offs}")
+            if self.adv_spr_override_enabled:
+                if self.adv_spr_gains == 'none':
+                    self.flag_error('Please open and configure the advanced spring gain settings')
+                else:
+                    gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.get('IAS', 0))
+                    self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = round(4096 * gains.get('y', 0))
+                    self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(4096 * gains.get('x', 0))
+            else:
+                max_coeff_y = int(4096 * self.max_elevator_coeff)
+                realtime_coeff_y = int(4096 * elevator_coeff)
+                ec = int(utils.scale_clamp(realtime_coeff_y, (base_elev_coeff, 4096), (base_elev_coeff, max_coeff_y)))
 
-            max_coeff_y = int(4096 * self.max_elevator_coeff)
-            realtime_coeff_y = int(4096 * elevator_coeff)
-            ec = int(utils.scale_clamp(realtime_coeff_y, (base_elev_coeff, 4096), (base_elev_coeff, max_coeff_y)))
+                pct_max_e = ec/max_coeff_y
 
-            pct_max_e = ec/max_coeff_y
-
-            telem_data["_pct_max_e"] = pct_max_e
-            self._ipc_telem["_pct_max_e"] = pct_max_e
-            logging.debug(f"Elev Coef: {ec}")
-            telem_data['_ec'] = ec
-
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = ec
+                telem_data["_pct_max_e"] = pct_max_e
+                self._ipc_telem["_pct_max_e"] = pct_max_e
+                logging.debug(f"Elev Coef: {ec}")
+                telem_data['_ec'] = ec
 
 
-            max_coeff_x = int(4096 * self.max_aileron_coeff)
-            realtime_coeff_x = int(4096 * aileron_coeff)
-            ac = int(utils.scale_clamp(realtime_coeff_x, (base_ailer_coeff, 4096), (base_ailer_coeff, max_coeff_x)))
 
-            pct_max_a = ac/max_coeff_x
+                self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = ec
 
-            telem_data["_pct_max_a"] = pct_max_a
-            self._ipc_telem["_pct_max_a"] = pct_max_a
-            telem_data['_ac'] = ac
-            logging.debug(f"Ailer Coef: {ac}")
 
-            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = ac
+                max_coeff_x = int(4096 * self.max_aileron_coeff)
+                realtime_coeff_x = int(4096 * aileron_coeff)
+                ac = int(utils.scale_clamp(realtime_coeff_x, (base_ailer_coeff, 4096), (base_ailer_coeff, max_coeff_x)))
+
+                pct_max_a = ac/max_coeff_x
+
+                telem_data["_pct_max_a"] = pct_max_a
+                self._ipc_telem["_pct_max_a"] = pct_max_a
+                telem_data['_ac'] = ac
+                logging.debug(f"Ailer Coef: {ac}")
+
+                self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = ac
 
             # update spring data
             self._spring_handle.setCondition(self.spring_y)
@@ -881,16 +890,26 @@ class Aircraft(AircraftBase):
                 phys_rudder_x_offs = 0
                 virtual_rudder_x_offs = 0
 
-            max_coeff_x = int(4096*self.max_rudder_coeff)
-            realtime_coeff_x = int(4096 * rudder_coeff)
-            rc = int(utils.scale_clamp(realtime_coeff_x, (base_rudder_coeff, 4096), (base_rudder_coeff, max_coeff_x)))
 
-            pct_max_r = rc/max_coeff_x
+            if self.adv_spr_override_enabled:
+                if self.adv_spr_gains == 'none':
+                    self.flag_error('Please open and configure the advanced spring gain settings')
+                else:
+                    gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.get('IAS', 0))
+                    # print(f"gains: {gains}")
+                    self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(4096 * gains.get('x', 0))
+            else:
+                max_coeff_x = int(4096*self.max_rudder_coeff)
+                realtime_coeff_x = int(4096 * rudder_coeff)
+                rc = int(utils.scale_clamp(realtime_coeff_x, (base_rudder_coeff, 4096), (base_rudder_coeff, max_coeff_x)))
 
-            telem_data["_pct_max_r"] = pct_max_r
-            self._ipc_telem["_pct_max_r"] = pct_max_r
-            telem_data['_rc'] = rc
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = rc
+                pct_max_r = rc/max_coeff_x
+
+                telem_data["_pct_max_r"] = pct_max_r
+                self._ipc_telem["_pct_max_r"] = pct_max_r
+                telem_data['_rc'] = rc
+                self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = rc
+
             self.spring_x.cpOffset = phys_rudder_x_offs
 
             self._spring_handle.setCondition(self.spring_x)

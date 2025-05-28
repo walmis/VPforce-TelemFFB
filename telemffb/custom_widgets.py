@@ -18,12 +18,17 @@
 
 
 from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
+    QComboBox, QMessageBox, QMenu, QPushButton
 from PyQt5.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer
 from PyQt5.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
     QLinearGradient, QFont
 from PyQt5.QtWidgets import QStyle, QStyleOptionSlider
+
+import numpy as np
+from scipy.interpolate import make_interp_spline, interp1d
+from scipy.interpolate import Akima1DInterpolator
 
 import telemffb.globals as G
 from telemffb.utils import HiDpiPixmap
@@ -1000,3 +1005,674 @@ class InstanceStatusRow(QWidget):
             status_icon.set_dot_color(Qt.red)
         else:
             status_icon.set_dot_color(Qt.yellow)
+
+
+class CurveWidget(QWidget):
+    def __init__(self, parent=None, unit=None, base_unit=None):
+        super().__init__(parent)
+        # Default: 0% at 0 knots and 100% at 500 knots
+        self.points = [QPointF(0, 0), QPointF(1, 100)]
+        self.interaction_radius = 8
+        self.dragging_point = None
+        self.right_clicked_point = None
+        self.smooth_curve_enabled = False
+        self.x_min = 0
+        self.x_max = 100
+        # self.x_scale = 100  # Default range in base unit
+        self.point_radius = 3
+        self.margin = 50
+
+        self.margin_top = 20  # Reduced space at the top
+        self.margin_bottom = 30  # Reduced space at the bottom
+        self.margin_left = 50  # Retain enough space for Y-axis labels
+        self.margin_right = 20  # Minimal margin on the right
+
+        self.setMinimumSize(400, 300)
+        self.setWindowTitle("Curve Editor")
+
+        # Units setup
+        self.current_unit = unit
+        self.base_unit = base_unit
+
+        # message label
+        self.msg_label = QLabel(self)
+        self.msg_label.setStyleSheet("background-color: white; border: 1px solid black;")
+        self.msg_label.move(60, 40)
+        self.msg_label.hide()
+
+        self.coordinate_label = QLabel(self)
+        self.coordinate_label.setStyleSheet("background-color: white; border: 1px solid black;")
+        self.coordinate_label.setAlignment(Qt.AlignCenter)
+        self.coordinate_label.setFixedSize(120, 20)  # Adjust size as needed
+        self.coordinate_label.hide()  # Initially hidden
+
+        self.test_point = None
+        self.last_valid_position = None
+        self._enabled = True  # Internal state to track enabled/disabled status
+
+        self.x_label_text = "X:"
+        self.y_label_text = "Y:"
+
+    def setEnabled(self, enabled: bool):
+        """Enable or disable the widget."""
+        self._enabled = enabled
+        super().setEnabled(enabled)
+        self.update()  # Trigger a repaint to reflect the new state
+
+    def isEnabled(self):
+        """Check if the widget is enabled."""
+        return self._enabled
+
+    def apply_disabled_overlay(self, painter):
+        """Draw a semi-transparent overlay to indicate the widget is disabled."""
+        painter.save()
+        painter.setBrush(QColor(200, 200, 200, 128))  # Gray with 50% transparency
+        painter.setPen(Qt.NoPen)
+        rect = self.rect()
+        painter.drawRect(rect)
+        painter.restore()
+
+
+
+    def toggle_smooth_curve(self, state):
+        """Toggles smooth curve drawing, ensuring bounds are checked and the checkbox state is consistent."""
+        toggle = self.sender()
+        if not state:
+            self.smooth_curve_enabled = False
+            # self.msg_label.hide()  # Hide any error messages
+            self.update()
+            return
+
+        if len(self.points) < 4:
+            self.msg_label.setText("Error: Need at least 4 points for smooth mode.")
+            self.msg_label.show()
+            QTimer.singleShot(3000, self.msg_label.hide)
+            QTimer.singleShot(300, lambda: toggle.setChecked(False)) # Force the toggle to unchecked
+
+            return
+
+        # Validate the entire curve for smooth mode
+        x_values = [p.x() for p in self.points]
+        y_values = [p.y() for p in self.points]
+
+        try:
+            akima = Akima1DInterpolator(x_values, y_values)
+            x_smooth = np.linspace(min(x_values), max(x_values), 500)
+            y_smooth = akima(x_smooth)
+            # Check bounds
+            if np.min(y_smooth) < 0 or np.max(y_smooth) > 100:
+                self.msg_label.setText("Error: Smooth curve would exceed bounds.")
+                self.msg_label.show()
+                QTimer.singleShot(3000, self.msg_label.hide)
+                QTimer.singleShot(300, lambda: toggle.setChecked(False))  # Force the toggle to unchecked
+
+                return
+        except Exception as e:
+            self.msg_label.setText(f"Error: Cannot enable smooth curve ({e}).")
+            self.msg_label.show()
+            QTimer.singleShot(300, lambda: toggle.setChecked(False))  # Force the toggle to unchecked
+
+            # self.smooth_toggle.setChecked(False)  # Force the toggle to unchecked
+            return
+
+        # Enable smooth curve mode
+        self.smooth_curve_enabled = True
+        self.msg_label.hide()  # Hide any error messages
+        self.update()
+
+    # def get_force_for_speed(self, speed):
+    #     """Returns the output force (y) for a given input speed (x) based on the current curve."""
+    #     if not self.points:
+    #         raise ValueError("No points defined in the curve.")
+    #
+    #     x_values = [p.x() for p in self.points]
+    #     y_values = [p.y() for p in self.points]
+    #
+    #     if speed <= x_values[0]:
+    #         # Speed is below the first point
+    #         return 0  # Return 0% force
+    #     elif speed >= x_values[-1]:
+    #         # Speed is above the last point
+    #         return 100  # Return 100% force
+    #
+    #     force = 0  # Default value
+    #
+    #     if self.smooth_curve_enabled:
+    #         # Use smooth Akima interpolation if enabled
+    #         try:
+    #             if len(x_values) < 3:
+    #                 # Not enough points for Akima, fallback to linear
+    #                 interpolation = interp1d(x_values, y_values, bounds_error=False,
+    #                                          fill_value=(y_values[0], y_values[-1]))
+    #                 force = float(interpolation(speed))
+    #             else:
+    #                 akima = Akima1DInterpolator(x_values, y_values)
+    #                 force = float(akima(speed))
+    #         except Exception as e:
+    #             raise ValueError(f"Error in smooth interpolation: {e}")
+    #     else:
+    #         # Linear interpolation for the current points
+    #         interpolation = interp1d(x_values, y_values, bounds_error=False,
+    #                                  fill_value=(y_values[0], y_values[-1]))
+    #         force = float(interpolation(speed))
+    #
+    #     # Clamp the force to the range [0, 100]
+    #     return max(0, min(100, force))
+
+    # def decrease_x_scale(self):
+    #     """Decrease the x-axis scale by 100 knots, but not below the highest point's x value."""
+    #     max_x_value = max(p.x() for p in self.points)  # Get the highest x value among the points
+    #     self.x_scale = max(max(100, max_x_value), self.x_scale - 100)  # Ensure scale doesn't go below max x value
+    #     self.update()
+
+    def highlight_dragged_point(self, painter):
+        """Highlights the point currently being dragged."""
+        painter.setPen(QPen(Qt.red, 2))  # Red outline
+        painter.setBrush(QColor(255, 255, 0))  # Yellow fill
+
+        # Convert the dragged point to widget space
+        dragged_widget_point = self.map_to_widget_space(self.dragging_point)
+
+        # Draw the highlighted point with a larger size
+        painter.drawEllipse(
+            QRectF(
+                dragged_widget_point.x() - self.point_radius * 1.5,
+                dragged_widget_point.y() - self.point_radius * 1.5,
+                3 * self.point_radius,
+                3 * self.point_radius,
+            )
+        )
+
+    def draw_crosshairs(self, x_value, y_value):
+        if not self.isEnabled():
+            return
+        """
+        Draw crosshairs on the graph at the specified x and y.
+        Args:
+            x_value (float):.
+            y_value (float):.
+        """
+
+        x_value = max(self.x_min, min(self.x_max, x_value))
+
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        x = rect.left() + ((x_value - self.x_min) / (self.x_max - self.x_min)) * rect.width()
+        y = rect.top() + (1 - y_value / 100.0) * rect.height()
+
+        # Set crosshair position and store gain and speed for label
+        self.crosshair_position = QPointF(x, y)
+        self.crosshair_y = y_value
+        self.crosshair_x = x_value
+        self.update()  # Trigger repaint
+
+    def clear_crosshairs(self):
+        """
+        Clear the crosshairs from the graph.
+        """
+        self.crosshair_position = None
+        self.crosshair_y = None
+        self.crosshair_x = None
+        self.update()  # Trigger repaint
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        self.draw_grid(painter)
+        self.draw_axis_labels(painter)
+        if self.smooth_curve_enabled:
+            self.draw_smooth_curve(painter)
+        else:
+            self.draw_curve(painter)
+
+        # Highlight the dragged point
+        if self.dragging_point is not None:
+            self.highlight_dragged_point(painter)
+
+        # Draw the crosshairs if position is set
+        if hasattr(self, 'crosshair_position') and self.crosshair_position is not None:
+            painter.setPen(QPen(QColor("#ab37c8"), 2, Qt.DashLine))  # Red dashed lines for crosshairs
+            rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+
+            # Draw vertical and horizontal crosshair lines
+            painter.drawLine(int(self.crosshair_position.x()), rect.top(),
+                             int(self.crosshair_position.x()), rect.bottom())  # Vertical line
+            painter.drawLine(rect.left(), int(self.crosshair_position.y()),
+                             rect.right(), int(self.crosshair_position.y()))  # Horizontal line
+
+        # Draw the live speed and gain label at the center top of the graph
+        if hasattr(self, 'crosshair_x') and self.crosshair_x is not None and hasattr(self, 'crosshair_y'):
+            rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+            label_text = f"{self.x_label_text} {self.crosshair_x:.1f} {self.current_unit}, {self.y_label_text} {self.crosshair_y:.1f}%"
+            label_x = rect.left() + (rect.width() // 2) - (len(label_text) * 3)  # Center horizontally
+            label_y = rect.top() - 5  # Fixed position slightly above the graph area
+
+            painter.setPen(QPen(Qt.black))  # Black text color
+            painter.setFont(QFont('Arial', 10, QFont.Bold))  # Bold font for visibility
+            painter.drawText(label_x, label_y, label_text)
+
+        # Apply disabled overlay if the widget is disabled
+        if not self._enabled:
+            self.apply_disabled_overlay(painter)
+
+    def draw_grid(self, painter):
+        """Draws the grid lines."""
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)  # Adjust to ensure margin
+        painter.setPen(QPen(Qt.lightGray, 1, Qt.DotLine))
+
+        # Draw horizontal grid lines (Y-axis 0% to 100%)
+        for i in range(0, 11):
+            y = int(rect.top() + i * rect.height() / 10)  # Cast to int
+            painter.drawLine(rect.left(), y, rect.right(), y)
+
+        # Draw vertical grid lines (X-axis controlled by x_scale)
+        for i in range(0, 11):
+            x = int(rect.left() + i * rect.width() / 10)  # Cast to int
+            painter.drawLine(x, rect.top(), x, rect.bottom())
+
+    def draw_axis_labels(self, painter, x_unit=None, integer=True, sign=None):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        font = QFont()
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QPen(Qt.black))
+        if x_unit is None:
+            x_unit = ''
+
+        for i in range(0, 11):
+            y = int(rect.top() + i * rect.height() / 10)
+            painter.drawText(rect.left() - self.margin_left + 15, y + 5, f"{100 - i * 10}%")
+
+        for i in range(0, 11):
+            x = int(rect.left() + i * rect.width() / 10)
+            x_val = self.x_min + (self.x_max - self.x_min) * i / 10
+            x_val = round(x_val, 1)
+            if integer:
+                # print(f"int{x_val}")
+                x_val=round(x_val)
+            outsign = sign if sign is not None and x_val != 0 else ''
+            painter.drawText(x - 10, rect.bottom() + self.margin_bottom // 2, f"{outsign}{x_val}{x_unit}")
+
+
+    def draw_curve(self, painter):
+        """Draws the curve and points (linear segments)."""
+        painter.setPen(QPen(Qt.blue, 2))
+
+        # Convert points into widget space
+        widget_points = [self.map_to_widget_space(p) for p in self.points]
+
+        # Draw the lines between points
+        for i in range(len(widget_points) - 1):
+            painter.drawLine(widget_points[i], widget_points[i + 1])
+
+        # Draw the control points
+        for point in widget_points:
+            painter.setBrush(QColor(255, 0, 0))
+            painter.drawEllipse(QRectF(
+                point.x() - self.point_radius,
+                point.y() - self.point_radius,
+                2 * self.point_radius,
+                2 * self.point_radius
+            ))
+
+    def draw_smooth_curve(self, painter):
+        """Draws a smooth curve using Akima interpolation."""
+        if len(self.points) < 4:
+            # Fallback to linear interpolation or a simple curve
+            self.draw_curve(painter)
+            return
+
+        painter.setPen(QPen(Qt.blue, 2))
+
+        # Extract x and y values from points
+        x_values = [p.x() for p in self.points]
+        y_values = [p.y() for p in self.points]
+
+        # Create smooth x and y values using Akima interpolation
+        x_smooth = np.linspace(min(x_values), max(x_values), 500)
+        try:
+            akima = Akima1DInterpolator(x_values, y_values)
+            y_smooth = akima(x_smooth)
+        except Exception as e:
+            QMessageBox.warning(self, "Interpolation Error", f"Error creating Akima interpolation: {e}")
+            self.draw_curve(painter)
+            return
+
+        # Convert to widget coordinates
+        widget_smooth_points = [self.map_to_widget_space(QPointF(x, y)) for x, y in zip(x_smooth, y_smooth)]
+
+        # Draw smooth curve
+        for i in range(len(widget_smooth_points) - 1):
+            painter.drawLine(widget_smooth_points[i], widget_smooth_points[i + 1])
+
+        # Draw control points
+        for point in [self.map_to_widget_space(p) for p in self.points]:
+            painter.setBrush(QColor(255, 0, 0))
+            painter.drawEllipse(QRectF(
+                point.x() - self.point_radius,
+                point.y() - self.point_radius,
+                2 * self.point_radius,
+                2 * self.point_radius
+            ))
+
+    def map_to_widget_space(self, point):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        x = rect.left() + ((point.x() - self.x_min) / (self.x_max - self.x_min)) * rect.width()
+        y = rect.top() + (1 - point.y() / 100.0) * rect.height()
+        return QPointF(x, y)
+
+    def map_from_widget_space(self, point):
+        rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
+        x = self.x_min + ((point.x() - rect.left()) / rect.width()) * (self.x_max - self.x_min)
+        y = (1 - (point.y() - rect.top()) / rect.height()) * 100
+        return QPointF(x, y)
+
+
+
+    def check_smooth_curve_bounds(self, new_pos, index):
+        """Check if the smooth curve will exceed bounds (0-100%) when a point is moved."""
+        # Copy points and apply the new position
+        projected_points = self.points.copy()
+        projected_points[index] = new_pos
+        x_values = [p.x() for p in projected_points]
+        y_values = [p.y() for p in projected_points]
+
+        # Ensure points are sorted by X
+        sorted_indices = np.argsort(x_values)
+        x_values = np.array(x_values)[sorted_indices]
+        y_values = np.array(y_values)[sorted_indices]
+
+        try:
+            # Use Akima interpolation to evaluate smoothness
+            akima = Akima1DInterpolator(x_values, y_values)
+            x_smooth = np.linspace(min(x_values), max(x_values), 100)  # Reduce resolution for performance
+            y_smooth = akima(x_smooth)
+        except Exception as e:
+            # If interpolation fails, log the issue and reject the move
+            print(f"Akima interpolation error: {e}")
+            return False
+
+        # Allow slight tolerance (epsilon) to avoid numerical instability
+        epsilon = 0.1  # Tolerance in percentage
+        y_min_allowed = 0 - epsilon
+        y_max_allowed = 100 + epsilon
+
+        # Check bounds with relaxed tolerance
+        if np.min(y_smooth) < y_min_allowed or np.max(y_smooth) > y_max_allowed:
+            return False  # Curve exceeds bounds
+        return True  # Curve is within acceptable bounds
+
+    def mousePressEvent(self, event):
+        clicked_widget_point = event.pos()  # This is in widget space
+
+        if event.button() == Qt.RightButton:
+            for i, p in enumerate(self.points):
+                point_on_screen = self.map_to_widget_space(p)
+                if (point_on_screen - clicked_widget_point).manhattanLength() < self.interaction_radius:
+                    self.right_clicked_point = p
+                    if i not in [0, len(self.points) - 1]:
+                        self.show_context_menu(event.pos())
+                    break
+            else:
+                # No point clicked: add new one
+                new_data_point = self.map_from_widget_space(clicked_widget_point)
+                self.add_new_point(new_data_point)
+
+        elif event.button() == Qt.LeftButton:
+            for p in self.points:
+                point_on_screen = self.map_to_widget_space(p)
+                if (point_on_screen - clicked_widget_point).manhattanLength() < self.interaction_radius:
+                    self.dragging_point = p
+                    self.update()
+                    break
+
+    def mouseMoveEvent(self, event):
+        pos = event.pos()
+        if self.dragging_point is not None:
+            if self.last_valid_position is None:
+                self.last_valid_position = QPointF(self.dragging_point)
+
+            index = self.points.index(self.dragging_point)
+            new_pos = self.map_from_widget_space(pos)
+            valid_move = True
+
+            x_lower = min(self.x_min, self.x_max)
+            x_upper = max(self.x_min, self.x_max)
+
+            if index == 0:
+                # First point: allow movement along X=0 or Y=0
+                if new_pos.x() <= x_lower:
+                    new_pos.setX(x_lower)  # Lock X to min
+                    new_pos.setY(max(0, min(100, new_pos.y())))  # Allow vertical movement (Y-axis)
+                elif new_pos.y() <= 0:
+                    new_pos.setY(0)  # Lock Y to 0
+                    new_pos.setX(max(x_lower, min(self.points[1].x() - 0.01, new_pos.x())))  # Allow horizontal movement (X-axis)
+                else:
+                    valid_move = False
+
+                if self.smooth_curve_enabled:
+                    valid_move = valid_move and self.check_smooth_curve_bounds(new_pos, index)
+
+            elif index == len(self.points) - 1:
+                # Last point: allow movement along X=max or Y=100
+                if new_pos.x() >= x_upper:
+                    new_pos.setX(x_upper)  # Lock X to max
+                    new_pos.setY(max(0, min(100, new_pos.y())))  # Allow vertical movement (Y-axis)
+                elif new_pos.y() >= 100:
+                    new_pos.setY(100)  # Lock Y to 100
+                    new_pos.setX(
+                        max(self.points[-2].x() + 0.01,
+                            min(x_upper, new_pos.x()))  # Allow horizontal movement (X-axis)
+                    )
+                else:
+                    valid_move = False
+
+                if self.smooth_curve_enabled:
+                    valid_move = valid_move and self.check_smooth_curve_bounds(new_pos, index)
+
+            else:
+                # Intermediate points: ensure proper bounds and prevent overlap
+                new_x = max(self.points[index - 1].x() + 0.01, min(self.points[index + 1].x() - 0.01, new_pos.x()))
+                new_y = max(0, min(100, new_pos.y()))
+                proposed_pos = QPointF(new_x, new_y)
+
+                if self.smooth_curve_enabled:
+                    valid_move = self.check_smooth_curve_bounds(proposed_pos, index)
+                else:
+                    valid_move = True
+
+                if valid_move:
+                    new_pos = proposed_pos
+
+            if valid_move:
+                self.dragging_point.setX(new_pos.x())
+                self.dragging_point.setY(new_pos.y())
+                self.last_valid_position = QPointF(self.dragging_point)  # Save the last valid position
+                self.msg_label.hide()  # Hide any error message
+            else:
+                # For first and last points, silently block invalid moves
+                if self.last_valid_position is not None:
+                    self.dragging_point.setX(self.last_valid_position.x())
+                    self.dragging_point.setY(self.last_valid_position.y())
+
+                if index != 0 and index != len(self.points) - 1:
+                    if not self.msg_label.isVisible():
+                        self.msg_label.setText("Error: Further movement would exceed curve bounds.")
+                        self.msg_label.show()
+                        QTimer.singleShot(3000, self.msg_label.hide)
+
+            # Update the coordinate label with the current position of the dragging point
+            rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)  # Graph area
+            self.coordinate_label.setText(f"{self.dragging_point.x():.2f} {self.current_unit}, %{self.dragging_point.y():.2f}")
+            self.coordinate_label.move(
+                rect.right() - self.coordinate_label.width() - 1,
+                rect.bottom() - self.coordinate_label.height() - 1
+            )
+            self.coordinate_label.show()
+            self.update()
+
+    def mouseReleaseEvent(self, event):
+        if self.dragging_point is not None:
+            # Restore last valid position if bounds were violated
+            if self.last_valid_position and self.smooth_curve_enabled:
+                self.dragging_point.setX(self.last_valid_position.x())
+                self.dragging_point.setY(self.last_valid_position.y())
+            self.dragging_point = None
+            self.last_valid_position = None  # Reset last valid position
+            self.coordinate_label.hide()  # Hide the coordinate label
+            self.update()
+
+    def show_context_menu(self, pos):
+        """Shows a context menu for deleting points."""
+        context_menu = QMenu(self)
+        delete_action = context_menu.addAction("Delete Point")
+        action = context_menu.exec_(self.mapToGlobal(pos))
+
+        if action == delete_action:
+            # Prevent deletion if smooth mode is enabled and only 4 points remain
+            if self.smooth_curve_enabled and len(self.points) <= 4:
+                self.msg_label.setText("Error: Cannot delete more points with smooth mode enabled.")
+                self.msg_label.show()
+                QTimer.singleShot(3000, self.msg_label.hide)
+            else:
+                self.points.remove(self.right_clicked_point)
+                self.update()
+
+    def add_new_point(self, new_point):
+        """Add a new point and maintain order, ensuring the first point stays at y=0."""
+        if not (min(self.x_min, self.x_max) <= new_point.x() <= max(self.x_min, self.x_max)):
+            return  # Disallow point outside range
+
+        # Temporarily add the new point and check bounds
+        projected_points = self.points + [new_point]
+        projected_points.sort(key=lambda p: p.x())  # Ensure points are ordered by x (speed)
+
+        if self.smooth_curve_enabled:
+            # Check bounds using Akima interpolation
+            x_values = [p.x() for p in projected_points]
+            y_values = [p.y() for p in projected_points]
+
+            try:
+                akima = Akima1DInterpolator(x_values, y_values)
+                x_smooth = np.linspace(min(x_values), max(x_values), 500)
+                y_smooth = akima(x_smooth)
+            except Exception:
+                self.msg_label.setText("Error: Invalid smooth curve with this point.")
+                self.msg_label.show()
+                return
+
+            if np.min(y_smooth) < 0 or np.max(y_smooth) > 100:
+                # Reject point if bounds exceeded
+                self.msg_label.setText("Error: Adding this point would exceed curve bounds.")
+                self.msg_label.show()
+                QTimer.singleShot(3000, self.msg_label.hide)
+                return
+        else:
+            # In linear mode, ensure Y is within 0 to 100
+            if new_point.y() < 0 or new_point.y() > 100:
+                self.msg_label.setText("Error: Adding this point would exceed bounds.")
+                self.msg_label.show()
+                QTimer.singleShot(3000, self.msg_label.hide)
+                return
+
+        # Ensure the first point remains affixed at y=0
+        self.points[0].setY(0)
+        self.points.append(new_point)
+        self.points.sort(key=lambda p: p.x())  # Ensure points are ordered by x (speed)
+        self.update()
+
+    def to_dict(self):
+        return {
+            "x_min": round(self.x_min, 2),
+            "x_max": round(self.x_max, 2),
+            "points": [{"x": round(p.x(), 2), "y": round(p.y(), 2)} for p in self.points],
+            "smooth_curve_enabled": self.smooth_curve_enabled,
+            "current_unit": self.current_unit,
+        }
+
+    def from_dict(self, data):
+        self.x_min = data.get("x_min", 0)
+        self.x_max = data.get("x_max", 100)
+        self.points = [QPointF(p["x"], p["y"]) for p in data.get("points", [{"x": 0, "y": 0}, {"x": 100, "y": 100}])]
+        self.smooth_curve_enabled = data.get("smooth_curve_enabled", False)
+        self.current_unit = data.get("current_unit", "kt")
+        self.update()
+
+
+    def clear_points(self):
+        """Resets the points to the default values."""
+        self.points = [QPointF(self.x_min, 0), QPointF(self.x_max, 100)]  # Default 0% at 0 knots and 100%
+        # self.test_point = None  # Clear the test point when resetting
+        self.update()
+
+
+class SpringCurveWidget(CurveWidget):
+    UNIT_CONVERSIONS = {
+        "kt": 1.94384,
+        "mph": 2.23694,
+        "kph": 3.6,
+        "m/s": 1.0,
+    }
+    def __init__(self, parent=None, unit='kt', base_unit='m/s'):
+        super().__init__(parent)
+        self.points = [QPointF(0, 0), QPointF(500, 100)]
+        self.x_min = 0
+        self.x_max = 500
+        self.current_unit = unit
+        self.base_unit = base_unit
+        self.setWindowTitle("Spring Force Curve Editor")
+        self.x_label_text = "Speed:"
+        self.y_label_text = "Gain:"
+
+    def draw_crosshairs(self, speed_mps, gain):
+        if not self.isEnabled():
+            return
+        """
+        Draw crosshairs on the graph at the specified speed and gain.
+        Args:
+            speed_mps (float): The airspeed in m/s.
+            gain (float): The percentage gain.
+        """
+        if self.msg_label.isVisible() and self.msg_label.text() == 'Please save a configuration before enabling live view':
+            self.msg_label.hide()
+
+        # Convert speed to current units
+        current_conversion = self.UNIT_CONVERSIONS[self.current_unit]
+        speed_converted = speed_mps * current_conversion
+
+        super().draw_crosshairs(speed_converted, gain)
+
+    def update_airspeed_range(self, increment):
+        """
+        Adjust the x-axis range by increasing or decreasing x_max.
+        Keeps x_min fixed at 0, and scales all X points proportionally.
+        """
+        current_range = self.x_max - self.x_min
+        new_x_max = max(100, self.x_max + increment)
+
+        scale_factor = new_x_max / current_range
+
+        for point in self.points:
+            point.setX(point.x() * scale_factor)
+
+        self.x_max = new_x_max
+        self.update()
+
+    def change_unit(self, new_unit):
+        """Change the unit of the x-axis and update points and labels."""
+        if new_unit == self.current_unit:
+            return
+
+        # Conversion factors
+        current_conversion = self.UNIT_CONVERSIONS[self.current_unit]
+        new_conversion = self.UNIT_CONVERSIONS[new_unit]
+        conversion_factor = current_conversion / new_conversion
+
+        # Update points and x_scale
+        self.points = [
+            QPointF(p.x() * conversion_factor, p.y()) for p in self.points
+        ]
+        self.x_max *= conversion_factor
+        self.x_min *= conversion_factor
+
+        self.current_unit = new_unit
+        self.update()
+

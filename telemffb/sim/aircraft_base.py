@@ -267,11 +267,27 @@ class AircraftBase(object):
     collective_ft_ovd_cp0_y = 4096
     collective_ft_use_master_buttons: bool = False
 
+    adv_spr_override_enabled: bool = False
+    adv_spr_gains: str = 'none'
+    gforce_effect_adv_curve: str = 'none'
     trimwheel_elev_up_button: int = 0
     trimwheel_elev_dn_button: int = 0
     trimwheel_use_master_buttons: bool = False
     trimwheel_axis_invert: bool = False
     trimwheel_use_axis: bool = False
+
+    override_spring_trim_down: int = 0
+    override_spring_trim_left: int = 0
+    override_spring_trim_up: int = 0
+    override_spring_trim_right: int = 0
+    override_spring_trim_rate: int = 200
+    override_spring_cp0_x: int = 0
+    override_spring_cp0_y: int = 0
+    adv_spr_g_effect: bool = False
+    adv_spr_g_pos_start: float = 1.2
+    adv_spr_g_pos_max: float = 10
+    adv_spr_g_max_offset: float = 1.0
+    g_y_offset: int = 0
 
     last_device_x = None
     last_device_y = None
@@ -1763,6 +1779,83 @@ class AircraftBase(object):
         spring.setCondition(self.spring_y)
         # ensure spring is started with override = true
         spring.start(override=True)
+
+    def modify_game_spring(self):
+        ## Currently hard-overrides game spring.. will break trimming, dynamic center, etc...
+        gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.get('IAS', 0))
+        # print(f"Gains: {gains}")
+        # adjuster = effects['spr_adjuster'].spring_adjuster()
+        adjuster = effects['adv_spring'].spring()
+        self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = round(4096 * gains.get('y', 0))
+        self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(4096 * gains.get('x', 0))
+
+        dt = perftracker.get_time_delta('override_spring_perf')
+
+        trim_step_size = self.override_spring_trim_rate * dt
+        # trim_step_size = 200 * dt
+
+        self.telem_data['_ovrd_spr_step'] = trim_step_size
+        self.telem_data['_ovrd_spr_dt'] = dt
+        # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
+        # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
+        input_data = HapticEffect.device.get_input()
+        x, y = input_data.axisXY()
+        current_buttons = input_data.getPressedButtons()
+
+        if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
+        # if 3 in current_buttons:
+            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+            # print("TRIM DOWN")
+            if self.override_spring_cp0_y - trim_step_size < -4096:
+                self.override_spring_cp0_y = -4096
+            else:
+                self.override_spring_cp0_y -= trim_step_size
+            self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+        elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
+        # elif 5 in current_buttons:
+            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+            # print("TRIM UP")
+            if self.override_spring_cp0_y + trim_step_size > 4096:
+                self.override_spring_cp0_y = 4096
+            else:
+                self.override_spring_cp0_y += trim_step_size
+            self.spring_y.cpOffset = round(self.override_spring_cp0_y)
+
+        if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
+        # if 6 in current_buttons:
+            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+            # print("TRIM LEFT")
+            if self.override_spring_cp0_x - trim_step_size < -4096:
+                self.override_spring_cp0_x = -4096
+            else:
+                self.override_spring_cp0_x -= trim_step_size
+            self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+        elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
+        # elif 4 in current_buttons:
+            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+            # print("TRIM RIGHT")
+            if self.override_spring_cp0_x + trim_step_size > 4096:
+                self.override_spring_cp0_x = 4096
+            else:
+                self.override_spring_cp0_x += trim_step_size
+            self.spring_x.cpOffset = round(self.override_spring_cp0_x)
+
+        # if self.adv_spr_g_effect:
+        if False:
+            # g_scale_min = 1.2
+            # g_scale_max = 9
+            # print(self.telem_data.get('ACCs', 0)[1])
+            g_factor = utils.scale_clamp(self.telem_data.get('ACCs')[1], (self.adv_spr_g_pos_start, self.adv_spr_g_pos_max), (0,self.adv_spr_g_max_offset))
+            self.g_y_offset = round(g_factor * -4096)
+        else:
+            self.g_y_offset = 0
+
+        self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]
+        self.spring_y.cpOffset = round(self.override_spring_cp0_y + self.g_y_offset)
+
+        adjuster.setCondition(self.spring_y)
+        adjuster.setCondition(self.spring_x)
+        adjuster.start(override=True)
 
     def on_event(self):
         pass

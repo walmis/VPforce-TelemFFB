@@ -59,6 +59,9 @@ import json
 import ssl
 import xml.etree.ElementTree as ET
 
+import numpy as np
+from scipy.interpolate import interp1d, Akima1DInterpolator
+
 from PyQt5.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings
 from PyQt5.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
 
@@ -882,6 +885,77 @@ def sine_point_in_time(amplitude, period_ms, phase_offset_deg=0):
     # print(f"Amp:{amplitude}     |Freq:{frequency_hz}     |Offset:{phase_offset_deg}        |Val:{value}")
 
     return value
+
+
+def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
+    """Interpolates the Y value given curve data and input x value."""
+    points = curve_dict.get("points", [])
+    smooth_curve_enabled = curve_dict.get("smooth_curve_enabled", False)
+
+    # Extract x and y values from points
+    x_values = np.array([p["x"] for p in points]) / conversion_factor  # Convert on factor
+    y_values = np.array([p["y"] for p in points])
+
+    # Handle out-of-bounds x_values
+    if input_x <= x_values[0]:
+        return y_values[0]
+    if input_x >= x_values[-1]:
+        return y_values[-1]
+
+    # Perform interpolation
+    if smooth_curve_enabled:
+        if len(x_values) < 4:
+            # Fallback to linear interpolation for insufficient points
+            interpolation = interp1d(x_values, y_values, bounds_error=False,
+                                     fill_value=(y_values[0], y_values[-1]))
+        else:
+            interpolation = Akima1DInterpolator(x_values, y_values)
+    else:
+        interpolation = interp1d(x_values, y_values, bounds_error=False,
+                                 fill_value=(y_values[0], y_values[-1]))
+
+    return float(interpolation(input_x))
+
+
+
+def get_gain_from_speed(json_string, input_airspeed_ms):
+    """
+    Interpolates the % force input airspeed and the advanced spring curve settings passed.
+
+    Args:
+        json_string (str): JSON-encoded string containing x and y curve dictionaries, units, and scale.
+        input_airspeed_ms (float): The airspeed in m/s for which to calculate the interpolated values.
+
+    Returns:
+        dict: A dictionary containing the interpolated X and Y gain values as a factor (0...1).
+    """
+    # Unit conversion factors
+    UNIT_CONVERSIONS = {
+        "kt": 1.94384,
+        "mph": 2.23694,
+        "kph": 3.6,
+        "m/s": 1.0,
+    }
+
+    # Parse JSON string
+    settings = json.loads(json_string)
+
+    # Extract curves and units
+    curve_x = settings.get("curve_x", {})
+    curve_y = settings.get("curve_y", {})
+    gain_x = settings.get('gain_x')/100
+    gain_y = settings.get('gain_y')/100
+    units = settings.get("units", "m/s")  # Default to m/s if units not specified
+
+    # Conversion factor to m/s
+    conversion_factor = UNIT_CONVERSIONS[units]
+
+    # Interpolate X and Y values
+    # print(f"x:{gain_x}, y:{gain_y}")
+    interpolated_x = round(float(interpolate_curve_y_point(curve_x, input_airspeed_ms, conversion_factor) / 100) * gain_x, 3)
+    interpolated_y = round(float(interpolate_curve_y_point(curve_y, input_airspeed_ms, conversion_factor) / 100) * gain_y, 3)
+
+    return {"x": interpolated_x, "y": interpolated_y}
 
 
 def pressure_from_altitude(altitude_m):
