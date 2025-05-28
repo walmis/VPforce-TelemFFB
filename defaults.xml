@@ -2042,7 +2042,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB Effect</Grouping>
-		<order>352</order>
+		<order>5150</order>
 		<name>steering_friction</name>
 		<info>Enable pedal friction for steering gear wheel&lt;br&gt;** REQUIRES friction overrides to be enabled **</info>
 		<displayname>Steering Friction &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
@@ -2054,7 +2054,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB Effect</Grouping>
-		<order>352.1</order>
+		<order>5150.1</order>
 		<name>steering_friction_intensity</name>
 		<prereq>steering_friction</prereq>
 		<info>Max intensity of steering friction (% of configurator value)&lt;br&gt;** REQUIRES friction override to be enabled **</info>
@@ -2069,7 +2069,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB Effect</Grouping>
-		<order>352.2</order>
+		<order>5150.2</order>
 		<name>steering_friction_expo</name>
 		<prereq>steering_friction</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Controls decay rate of friction with speed.&lt;br&gt;0 = linear, gradual decay, -1.0 = very quick decay&lt;/body&gt;&lt;/html&gt;</info>
@@ -2084,7 +2084,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB Effect</Grouping>
-		<order>352.3</order>
+		<order>5150.3</order>
 		<name>steering_friction_spring</name>
 		<prereq>steering_friction</prereq>
 		<info>Strength of steering gear spring</info>
