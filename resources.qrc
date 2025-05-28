@@ -3,6 +3,15 @@
     <qresource>
         <file>image/disabledcheckbox.png</file>
         <file>image/down-down.png</file>
+        <file>image/up-up.png</file>
+        <file>image/down-down_grey.png</file>
+        <file>image/up-up_grey.png</file>
+        <file>image/up_arrow.png</file>
+        <file>image/down_arrow.png</file>
+        <file>image/left_grey.png</file>
+        <file>image/left-left_grey.png</file>
+        <file>image/right_grey.png</file>
+        <file>image/right-right_grey.png</file>
         <file>image/information.png</file>
         <file>image/logo_c.png</file>
         <file>image/logo_j.png</file>
@@ -16,6 +25,7 @@
         <file>image/vpforceicon_run.png</file>
         <file>image/vpforceicon_paused.png</file>
         <file>image/vpforcelogo.png</file>
+        <file>image/DEVlogo.png</file>
         <file>image/delete_button.png</file>
         <file>image/expo.png</file>
         <file>image/gain-force.png</file>

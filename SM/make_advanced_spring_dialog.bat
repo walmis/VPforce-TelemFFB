@@ -1,0 +1,1 @@
+pyuic5 advanced_spring.ui -o ../telemffb/ui/Ui_AdvancedSpring.py
