@@ -51,9 +51,11 @@ class SettingsLayout(QGridLayout):
     bump_up = True              # set to false for no row bumping up
 
     all_sliders = []
-
+    incrvalue = 1
     def __init__(self, parent=None, mainwindow=None):
         super(SettingsLayout, self).__init__(parent)
+        self.exclusive_list = []
+        self.parent_expander_dict = {}
         result = None
         if G.settings_mgr.current_sim != 'nothing':
             a, b, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
@@ -288,7 +290,12 @@ class SettingsLayout(QGridLayout):
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
-
+            # print(f"Exclusive: >{item['exclusive_with']}<")
+            if item['exclusive_with'] != '':
+                pair = [item['name'],item['exclusive_with']]
+                if not pair in self.exclusive_list:
+                    self.exclusive_list.append(pair)
+            # print(item)
             checkbox = Toggle(
                 checked_color=vpf_purple,
                 bar_color=t_purple
@@ -834,10 +841,29 @@ class SettingsLayout(QGridLayout):
             widget.deleteLater()
             self.removeWidget(widget)
 
+    def enforce_exclusives(self, name, state, exclusive_list):
+        """Used to force disable bool settings that are mutually exclusive with others"""
+        if state != 2:
+            # we are only interested in bool settings that have been enabled (state = 2)
+            return
+        for pair in exclusive_list:  # Iterate through prebuilt exclusivity list to find one matching this call
+            a = pair[0]  # This is the enforcing setting
+            b = pair[1]  # This is the setting(s) which need to be disabled if 'a' is enabled (comma separated)
+            if a == name:  # Find if there is pair that matches this function call
+                disable_list = b.split(',')
+                a_widget = self.mainwindow.findChild(Toggle, f"cb_{name}") # find enforcing Toggle widget
+                if a_widget.isChecked():
+                    for b_widget in disable_list:
+                        widget = self.mainwindow.findChild(Toggle, f"cb_{b_widget}")  # find subordinate widget
+                        # print(f"WIDGET-{b_widget}: {widget}")
+                        if widget is not None:
+                            widget.setChecked(False) # force setting to disable for subordinate widget
+
     def checkbox_changed(self, name, state):
         self.trigger_form_reload = True
         logging.debug(f"Checkbox {name} changed. New state: {state}")
         value = 'false' if state == 0 else 'true'
+        self.enforce_exclusives(name, state, self.exclusive_list)  # Check for and enforce exclusive settings
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, name)
         if G.settings_mgr.timed_out:
             self.reload_caller()
