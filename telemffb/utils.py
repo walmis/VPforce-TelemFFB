@@ -167,6 +167,7 @@ class EffectTranslator:
         "ab_rumble_2_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
         "ab_rumble_2_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
         "aoa": ["AoA Effect", "aoa_effect_gain"],
+        "ap_spring": ["Autopilot Spring", ""],
         "buffeting": ["AoA\\Stall Buffeting", "buffeting_intensity"],
         "bombs": ["Bomb Release", "weapon_release_intensity"],
         "canopymovement": ["Canopy Motion", "canopy_motion_intensity"],
@@ -916,6 +917,18 @@ def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
 
     return float(interpolation(input_x))
 
+
+def get_gain_from_gs(json_string, input_gs):
+    settings = json.loads(json_string)
+    curve_pos = settings.get("curve_pos", {})
+    curve_neg = settings.get("curve_neg", {})
+    gain_pos = settings.get('gain_pos') / 100
+    gain_neg = settings.get('gain_neg') / 100
+
+    interpolated_pos = round(float(interpolate_curve_y_point(curve_pos, input_gs) / 100) * gain_pos, 3)
+    interpolated_neg = round(float(interpolate_curve_y_point(curve_neg, input_gs) / 100) * gain_neg, 3)
+
+    return {"pos": interpolated_pos, "neg": interpolated_neg}
 
 
 def get_gain_from_speed(json_string, input_airspeed_ms):

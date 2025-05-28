@@ -109,11 +109,14 @@ class AircraftBase(object):
     ####
     #### Beta effects - set to 1 to enable
     gforce_effect_enable = 0
-    gforce_effect_enable_areyoureallysure = 0
     gforce_effect_curvature = 2.2
     gforce_effect_max_intensity = 1.0
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
+    gforce_effect_legacy_enabled = False
+    gforce_effect_advanced_enabled = False
+    gforce_effect_advanced_curve = {}
+    gforce_current_factor: float = 0.0
 
     new_gforce_effect_enable = False
     new_gforce_effect_center_deadzone = 0
@@ -313,6 +316,8 @@ class AircraftBase(object):
 
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
+        self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
@@ -664,35 +669,66 @@ class AircraftBase(object):
             return
 
         logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
-        if gs < gmin:
-            effects["gforce"].stop()
-            # effects.dispose("gforce_damper")
+
+        if self.gforce_effect_legacy_enabled:
+            if gs < gmin:
+                effects["gforce"].stop()
+                # effects.dispose("gforce_damper")
+                return
+            g_factor = round(utils.non_linear_scaling(gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
+
+            derivative_hz = 5  # derivative lpf filter -3db Hz
+            derivative_k = 0.1  # derivative gain value, or damping ratio
+
+            dGs = getattr(self, "_dGs", None)
+            if not dGs: dGs = self._dGs = utils.Derivative(derivative_hz)
+            dGs.lpf.cutoff_freq_hz = derivative_hz
+
+            g_deriv = - dGs.update(g_factor) * derivative_k
+
+            g_factor += g_deriv
+        elif self.gforce_effect_advanced_enabled:
+            if self.gforce_effect_adv_curve == 'none':
+                self.flag_error('Please Configure the Advanced G-Force Effect Settings')
+                effects.dispose('gforce_spr')
+                return
+            settings = utils.json.loads(self.gforce_effect_adv_curve)
+            gains = utils.get_gain_from_gs(self.gforce_effect_adv_curve, abs(gs))
+            if gs >= 0:
+                g_factor = gains.get('pos')
+            else:
+                if settings.get('enable_neg'):
+                    g_factor = -gains.get('neg')
+                else:
+                    effects.dispose('gforce_spr')
+                    return
+            if not g_factor:
+                effects.dispose('gforce_spr')
+                return
+            adjuster = effects['gforce_spr'].spring_adjuster()
+            adjuster_cpOy = int(-g_factor*4096)
+            self.spring_adjuster_y.cpOffset = adjuster_cpOy
+            self.spring_adjuster_y.positiveCoefficient = self.spring_adjuster_y.negativeCoefficient = 4096
+            adjuster.setCondition(self.spring_adjuster_y)
+            adjuster.start()
+            return
+            # utils.dbprint("red", f"ADV_G: Force={g_factor}, Dir: {direction}, setting:{settings.get('enable_neg')}")
+
+        else:
+            effects.dispose("gforce")
             return
 
-        g_factor = round(utils.non_linear_scaling(gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
-
-        derivative_hz = 5 # derivative lpf filter -3db Hz
-        derivative_k = 0.1 # derivative gain value, or damping ratio
-
-        dGs = getattr(self, "_dGs", None)
-        if not dGs: dGs = self._dGs = utils.Derivative(derivative_hz)
-        dGs.lpf.cutoff_freq_hz = derivative_hz
-
-        g_deriv = - dGs.update(g_factor) * derivative_k
-
-        g_factor += g_deriv
-
+        # target_g_factor = utils.clamp(g_factor, 0.0, 1.0)
+        # delta_g_factor = self.gforce_current_factor - target_g_factor
+        # self.telem_data['_delta_g_factor'] = delta_g_factor
+        # self.gforce_current_factor += (abs(delta_g_factor) * 0.5)
+        # self.gforce_current_factor = utils.clamp(self.gforce_current_factor, 0, 1)
+        # effects["gforce"].constant(self.gforce_current_factor, direction).start()
+        
         g_factor = utils.clamp(g_factor, 0.0, 1.0)
 
-        # if self.gforce_effect_enable_deflection_factor:
-        #     input_data = HapticEffect.device.get_input()
-        #     x, y = input_data.axisXY()
-        #     deflection_factor = utils.scale_clamp(y, (0, self.gforce_effect_deflection_factor), (0, 1))
-        #     telem_data['g_deflection'] = deflection_factor
-        #     telem_data['g_y'] = y
-        #     g_factor = g_factor * deflection_factor
-
         effects["gforce"].constant(g_factor, direction).start()
+
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def _aoa_reduction_force_effect(self, telem_data):

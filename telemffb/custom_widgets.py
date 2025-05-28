@@ -303,7 +303,7 @@ class ClickLogo(QLabel):
 
 
 class InfoLabel(QWidget):
-    def __init__(self, text=None, tooltip=None, parent=None):
+    def __init__(self, parent=None, text=None, tooltip=None):
         super(InfoLabel, self).__init__(parent)
 
         # Text label
@@ -793,11 +793,13 @@ class LabeledToggle(QWidget):
 
         self.toggle = Toggle(self)
         self.label = QLabel(label, self)
+        self.label.setAlignment(Qt.AlignVCenter)  # Ensure the label is vertically centered
 
         layout = QHBoxLayout(self)
         layout.addWidget(self.toggle)
         layout.addWidget(self.label)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(1)
         self.setLayout(layout)
 
         self.toggle.stateChanged.connect(self.stateChanged)  # Forward the stateChanged signal
@@ -1674,5 +1676,69 @@ class SpringCurveWidget(CurveWidget):
         self.x_min *= conversion_factor
 
         self.current_unit = new_unit
+        self.update()
+
+
+class GForceCurveWidget(CurveWidget):
+    UNIT_CONVERSIONS = {
+    }
+
+    def __init__(self, parent=None, unit='gs', base_unit='gs', x_min=0, x_max=10):
+        super().__init__(parent)
+        self.points = [QPointF(0, 0), QPointF(10, 100)]
+        self.x_min = x_min
+        self.x_max = x_max
+        self.current_unit = unit
+        self.base_unit = base_unit
+        self.setWindowTitle("G-Force Effect Curve Editor")
+        self.x_label_text = "G Force:"
+        self.y_label_text = "Effect Force:"
+        self.update()
+        self.negative_instance = False
+
+    def draw_crosshairs(self, gs, gain):
+        if not self.isEnabled():
+            return
+        """
+        Draw crosshairs on the graph at the specified speed and gain.
+        Args:
+            speed_mps (float): The airspeed in m/s.
+            gain (float): The percentage gain.
+        """
+        if self.msg_label.isVisible() and self.msg_label.text() == 'Please save a configuration before enabling live view':
+            self.msg_label.hide()
+
+        # # Convert speed to current units
+        # current_conversion = self.UNIT_CONVERSIONS[self.current_unit]
+        # speed_converted = speed_mps * current_conversion
+
+        super().draw_crosshairs(gs, gain)
+
+    def draw_axis_labels(self, painter, x_unit=None, integer=False, sign=None):
+        if self.negative_instance:
+            sign = '-'
+        super().draw_axis_labels(painter, "g", integer=False, sign=sign)
+
+    def update_x_range(self, new_x_min=None, new_x_max=None):
+        """
+        Dynamically updates the x-axis range and rescales all X points proportionally.
+        """
+        new_x_min = self.x_min if new_x_min is None else new_x_min
+        new_x_max = self.x_max if new_x_max is None else new_x_max
+
+        old_range = self.x_max - self.x_min
+        new_range = new_x_max - new_x_min
+
+        if old_range == 0 or new_range == 0:
+            return  # Avoid division by zero
+
+        # Rescale points
+        for point in self.points:
+            normalized_x = (point.x() - self.x_min) / old_range
+            rescaled_x = new_x_min + normalized_x * new_range
+            point.setX(rescaled_x)
+
+        self.x_min = new_x_min
+        self.x_max = new_x_max
         self.update()
 
