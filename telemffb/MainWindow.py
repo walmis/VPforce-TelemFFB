@@ -335,7 +335,7 @@ class MainWindow(QMainWindow):
         self.vpflogo_label = QLabel(self.logo_stack)
         self.devicetype_label = ClickLogo(self.logo_stack)
         self.devicetype_label.clicked.connect(self.device_logo_click_event)
-        pixmap = HiDpiPixmap(":/image/vpforcelogo.png")
+        pixmap = HiDpiPixmap(G.vpf_logo)
         pixmap = pixmap._scaled(271, 115, aspectRatioMode=QtCore.Qt.KeepAspectRatio, transformMode=QtCore.Qt.SmoothTransformation)
 
         pixmap2 = HiDpiPixmap(utils.get_device_logo(G.device_type))
