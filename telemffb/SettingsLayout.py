@@ -340,7 +340,8 @@ class SettingsLayout(QGridLayout):
             unit_dropbox.setDisabled(rowdisabled)
 
         # everything has a name, except for things that have a checkbox *and* slider
-        label = InfoLabel(f"{item['displayname']}")
+        label = InfoLabel(text=f"{item['displayname']}")
+        label.setObjectName(f'namelabel_{item["name"]}')
         label.setToolTip(item['info'])
         label.setMinimumHeight(20)
         label.setMinimumWidth(20)
@@ -823,6 +824,32 @@ class SettingsLayout(QGridLayout):
             }
         """)
 
+        if item['has_expander'].lower() == 'true':
+            # These are top level config sections that have an expander button but do not have any ".1" sliders
+            label.text_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+            label.text_label.setOpenExternalLinks(False)
+            label.text_label.setText(f'<a href="#">{item["displayname"]}</a>')
+            label.text_label.setToolTip('Click to Expand')
+            label.text_label.linkActivated.connect(expand_button.click)
+
+        if item['order'][-2:] == '.1':
+            # For ".1" config objects, they take the place of the parent setting in the row when enabled so #we
+            # need to find the expander button from the prerequisite object
+            parent = item['prereq']
+            parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
+            if parent_expand_button is not None:
+                label.text_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+                label.text_label.setOpenExternalLinks(False)
+                label.text_label.setText(f'<a href="#">{item["displayname"]}</a>')
+                label.text_label.linkActivated.connect(lambda href, parent_name=parent: self.expander_hyperlink_clicked(parent_name))
+
+    def expander_hyperlink_clicked(self, parent):
+        # dbprint("red", f"EXPANDER: {parent}")
+        parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
+        if parent_expand_button is not None:
+            parent_expand_button.click()
+
+    # expander.click()
     def show_erase_button(self, setting_name=None):
         if setting_name is None:
             setting_name = self.sender().objectName()
@@ -832,8 +859,11 @@ class SettingsLayout(QGridLayout):
         setting = re.match(pattern, setting_name).group(1)
         # dbprint("red", f"SETTING: {setting}")
         eb = self.mainwindow.findChild(QPushButton, f"eb_{setting}")
-        eb.setVisible(True)
-        eb.setToolTip("Reset to Default")
+        if eb is not None:
+            eb.setVisible(True)
+            eb.setToolTip("Reset to Default")
+        else:
+            logging.info(f"Can't find erase button for '{setting}'.  Probably child device being configured via master")
 
     def remove_widget(self, olditem):
         widget = olditem.widget()
