@@ -284,7 +284,7 @@ class Aircraft(AircraftBase):
         #print(f'expo input:{x} k:{k} output:{newvalue}')
         return newvalue
 
-    def _update_fbw_flight_controls(self, telem_data):
+    def _update_fbw_flight_controls(self, telem_data, ap=False):
         ap_send_flag_x = True
         ap_send_flag_y = True
         ffb_type = telem_data.get("FFBType", "joystick")
@@ -293,7 +293,9 @@ class Aircraft(AircraftBase):
         if self._sim_is_xplane():
             ap_active = telem_data.get("APServos", 0)
 
-        self._spring_handle.name = "fbw_spring"
+        spr_name = "ap_spring" if ap else "fbw_spring"
+        self._spring_handle.name = spr_name
+
         if ffb_type == "joystick":
 
             if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -553,7 +555,7 @@ class Aircraft(AircraftBase):
 
         if self.telemffb_controls_axes and self.ap_following and ap_active and self.use_fbw_for_ap_follow:
             logging.debug("FBW Setting enabled, running fbw_flight_controls")
-            self._update_fbw_flight_controls(telem_data)
+            self._update_fbw_flight_controls(telem_data, ap=True)
             effects["dynamic_spring"].stop()
             return
         else:
@@ -571,6 +573,7 @@ class Aircraft(AircraftBase):
         force_trim_y_offset = self.force_trim_y_offset
 
         _airspeed = incidence_vec.z
+        _airspeed = telem_data['IAS']
         telem_data["TAS"] = _airspeed   # why not use simvar AIRSPEED TRUE?
         telem_data['TAS3'] = _airspeed  # what is this for?
         IAS = telem_data['IAS']
