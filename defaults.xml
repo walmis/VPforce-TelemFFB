@@ -3367,6 +3367,21 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>7300.4</order>
+		<name>decel_airborne_disable</name>
+		<prereq>deceleration_effect_enable</prereq>
+		<info>Disable effect while airborne</info>
+		<displayname>Disable while Airborne</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<value>true</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
 		<Grouping>Movement</Grouping>
 		<order>7400</order>
 		<name>flaps_motion_effect_enabled</name>

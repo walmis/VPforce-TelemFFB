@@ -140,6 +140,7 @@ class AircraftBase(object):
     deceleration_max_force = 0.5
     decel_scale_factor = 1
     decel_invert_force = False
+    decel_airborne_disable: bool = True
     ###
 
     enable_hydraulic_loss_effect: bool = False
@@ -780,7 +781,7 @@ class AircraftBase(object):
         if abs(delta_y) > 3:  # If the per-frame rate of change is greater than 3 Gs, we have likely crashed and telemetry is violently spiking.. do not play effect:
             return
 
-        if not sum(telem_data.get("WeightOnWheels")):
+        if not sum(telem_data.get("WeightOnWheels")) and self.decel_airborne_disable:
             effects.dispose("decel")
             return
         if not telem_data.get("TAS", 0):
@@ -791,7 +792,7 @@ class AircraftBase(object):
 
         dir = 180 if not self.decel_invert_force else 0
 
-        wow = sum(telem_data.get("WeightOnWheels"), 0)
+        wow = True if not self.decel_airborne_disable else sum(telem_data.get("WeightOnWheels"), 0)
         if (avg_y_gs < -0.03 < 500) and wow:  # Don't play effect for very small, or very large (crash) force values, or no weight on wheels
             if abs(avg_y_gs) > max_gs:
                 avg_y_gs = -max_gs
