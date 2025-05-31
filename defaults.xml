@@ -4027,402 +4027,264 @@
 		<datatype>text</datatype>
 	</defaults>
 	<sc_overrides>
-		<model>FlyInside B206.*</model>
 		<name>EngRPM</name>
+		<model>FlyInside B206.*</model>
 		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>FlyInside B206.*</model>
 		<name>RotorRPM</name>
+		<model>FlyInside B206.*</model>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
 		<scale>3.25</scale>
 	</sc_overrides>
 	<sc_overrides>
-		<model>FlyInside B206.*</model>
 		<name>HydSys</name>
+		<model>FlyInside B206.*</model>
 		<var>L:Aircraft.Hydraulics.Enabled</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>FlyInside - B206.*</model>
 		<name>EngRPM</name>
+		<model>FlyInside - B206.*</model>
 		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>FlyInside - B206.*</model>
 		<name>RotorRPM</name>
+		<model>FlyInside - B206.*</model>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
 		<scale>3.25</scale>
 	</sc_overrides>
 	<sc_overrides>
-		<model>FlyInside - B206.*</model>
 		<name>HydSys</name>
+		<model>FlyInside - B206.*</model>
 		<var>L:Aircraft.Hydraulics.Enabled</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>FlyInside B47.*</model>
 		<name>EngRPM</name>
+		<model>FlyInside B47.*</model>
 		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>FlyInside B47.*</model>
 		<name>RotorRPM</name>
+		<model>FlyInside B47.*</model>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
 		<scale>3.00</scale>
 	</sc_overrides>
 	<sc_overrides>
-		<model>A2A Piper PA-24.*</model>
 		<name>APMaster</name>
+		<model>A2A Piper PA-24.*</model>
 		<var>L:ApDisableAileron</var>
 		<sc_unit>Enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>A2A Piper PA-24.*</model>
 		<name>PropRPM</name>
+		<model>A2A Piper PA-24.*</model>
 		<var>L:Eng1_PropRPM</var>
 		<sc_unit>number</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>A2A Piper PA-24.*</model>
 		<name>PropThrust</name>
+		<model>A2A Piper PA-24.*</model>
 		<var>L:Eng1_ForceZ</var>
 		<sc_unit>number</sc_unit>
 		<scale>4.45</scale>
 	</sc_overrides>
 	<sc_overrides>
-		<model>A2A Piper PA-24.*</model>
 		<name>AccBody:0</name>
+		<model>A2A Piper PA-24.*</model>
 		<var>L:FM_BodyAccelerationX</var>
 		<sc_unit>number</sc_unit>
 		<scale>0.102</scale>
 	</sc_overrides>
 	<sc_overrides>
-		<model>A2A Piper PA-24.*</model>
 		<name>AccBody:1</name>
+		<model>A2A Piper PA-24.*</model>
 		<var>L:FM_BodyAccelerationY</var>
 		<sc_unit>number</sc_unit>
 		<scale>0.102</scale>
 	</sc_overrides>
 	<sc_overrides>
-		<model>A2A Piper PA-24.*</model>
 		<name>AccBody:2</name>
+		<model>A2A Piper PA-24.*</model>
 		<var>L:FM_BodyAccelerationZ</var>
 		<sc_unit>number</sc_unit>
 		<scale>0.102</scale>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgSEMAx</name>
+		<model>Airbus H145.*</model>
 		<var>L:DEBUG_SEMA_PCT_X</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgSEMAy</name>
+		<model>Airbus H145.*</model>
 		<var>L:DEBUG_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgSEMAyaw</name>
+		<model>Airbus H145.*</model>
 		<var>L:DEBUG_SEMA_PCT_YAW</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgAfcsMaster</name>
+		<model>Airbus H145.*</model>
 		<var>L:H145_SDK_AFCS_MASTER</var>
 		<sc_unit>number</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgTrimRelease</name>
+		<model>Airbus H145.*</model>
 		<var>L:H145_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgCollectiveRelease</name>
+		<model>Airbus H145.*</model>
 		<var>L:H145_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgCollectiveAfcsMode</name>
+		<model>Airbus H145.*</model>
 		<var>L:H145_SDK_AFCS_MODE_COLLECTIVE</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgHandsOnCyclic</name>
+		<model>Airbus H145.*</model>
 		<var>L:FFB_HANDS_ON_CYCLIC</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgFeetOnPedals</name>
+		<model>Airbus H145.*</model>
 		<var>L:FFB_FEET_ON_PEDALS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgHandsOnCyclic</name>
+		<model>Airbus H145.*</model>
 		<var>L:H145_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgVRSDatum</name>
+		<model>Airbus H145.*</model>
 		<var>L:DEBUG_VRS2_DATUM</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H145.*</model>
 		<name>hpgVRSIsInVRS</name>
+		<model>Airbus H145.*</model>
 		<var>L:DEBUG_VRS2_IS_IN_VRS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgSEMAx</name>
+		<model>Airbus H160.*</model>
 		<var>L:DEBUG_SEMA_PCT_X</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgSEMAy</name>
+		<model>Airbus H160.*</model>
 		<var>L:DEBUG_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgSEMAyaw</name>
+		<model>Airbus H160.*</model>
 		<var>L:DEBUG_SEMA_PCT_YAW</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgAfcsMaster</name>
+		<model>Airbus H160.*</model>
 		<var>L:H160_SDK_AFCS_MASTER</var>
 		<sc_unit>number</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgTrimRelease</name>
+		<model>Airbus H160.*</model>
 		<var>L:H160_SDK_AFCS_CYCLIC_TRIM_IS_RELEASED</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgCollectiveRelease</name>
+		<model>Airbus H160.*</model>
 		<var>L:H160_SDK_AFCS_COLLECTIVE_TRIM_IS_RELEASED</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgCollectiveAfcsMode</name>
+		<model>Airbus H160.*</model>
 		<var>L:H160_SDK_AFCS_MODE_COLLECTIVE</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgHandsOnCyclic</name>
+		<model>Airbus H160.*</model>
 		<var>L:FFB_HANDS_ON_CYCLIC</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgFeetOnPedals</name>
+		<model>Airbus H160.*</model>
 		<var>L:FFB_FEET_ON_PEDALS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgHandsOnCyclic</name>
+		<model>Airbus H160.*</model>
 		<var>L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgVRSDatum</name>
+		<model>Airbus H160.*</model>
 		<var>L:DEBUG_VRS2_DATUM</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Airbus H160.*</model>
 		<name>hpgVRSIsInVRS</name>
+		<model>Airbus H160.*</model>
 		<var>L:DEBUG_VRS2_IS_IN_VRS</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Simfocus B407.*</model>
 		<name>SEMAx</name>
+		<model>Simfocus B407.*</model>
 		<var>L:FFB_SEMA_PCT_X</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
-		<model>Simfocus B407.*</model>
 		<name>SEMAy</name>
+		<model>Simfocus B407.*</model>
 		<var>L:FFB_SEMA_PCT_Y</var>
 		<sc_unit>Percent Over 100</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
+		<name>ForceTrimSW</name>
 		<model>UH-1H.*</model>
-		<name>ForceTrimSW</name>
 		<var>L:switchForceTrim</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
 		<sc_overrides>
+		<name>ForceTrimSW</name>
 		<model>205-A1B.*</model>
-		<name>ForceTrimSW</name>
 		<var>L:switchForceTrim</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
-		<sc_overrides>
-			<name>WeightOnWheels:0</name>
-			<model>C208B.*</model>
-			<var>CONTACT POINT COMPRESSION:5</var>
-			<sc_unit>Percent Over 100</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>WeightOnWheels:1</name>
-			<model>C208B.*</model>
-			<var>CONTACT POINT COMPRESSION:6</var>
-			<sc_unit>Percent Over 100</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>WeightOnWheels:2</name>
-			<model>C208B.*</model>
-			<var>CONTACT POINT COMPRESSION:7</var>
-			<sc_unit>Percent Over 100</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>WeightOnWheels:0</name>
-			<model>C172SP.*</model>
-			<var>CONTACT POINT COMPRESSION:5</var>
-			<sc_unit>Percent Over 100</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>WeightOnWheels:1</name>
-			<model>C172SP.*</model>
-			<var>CONTACT POINT COMPRESSION:6</var>
-			<sc_unit>Percent Over 100</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>WeightOnWheels:2</name>
-			<model>C172SP.*</model>
-			<var>CONTACT POINT COMPRESSION:7</var>
-			<sc_unit>Percent Over 100</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>WeightOnWheels:0</name>
-			<model>Icon A5.*</model>
-			<var>CONTACT POINT COMPRESSION:2</var>
-			<sc_unit>Percent Over 100</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>WeightOnWheels:1</name>
-			<model>Icon A5.*</model>
-			<var>CONTACT POINT COMPRESSION:3</var>
-			<sc_unit>Percent Over 100</sc_unit>
-		</sc_overrides>
-		<sc_overrides>
-			<name>WeightOnWheels:2</name>
-			<model>Icon A5.*</model>
-			<var>CONTACT POINT COMPRESSION:4</var>
-			<sc_unit>Percent Over 100</sc_unit>
-		</sc_overrides>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>PropellerAircraft</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>PropellerAircraft</type>
-			<value>false</value>
-			<sim>DCS</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>PropellerAircraft</type>
-			<value>false</value>
-			<sim>IL2</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>PropellerAircraft</type>
-			<value>false</value>
-			<sim>XPLANE</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>JetAircraft</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>JetAircraft</type>
-			<value>false</value>
-			<sim>DCS</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>JetAircraft</type>
-			<value>false</value>
-			<sim>IL2</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>JetAircraft</type>
-			<value>false</value>
-			<sim>XPLANE</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>GliderAircraft</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>GliderAircraft</type>
-			<value>false</value>
-			<sim>XPLANE</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>TurbopropAircraft</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>any</device>
-		</classdefaults>
-		<classdefaults>
-			<name>adv_spr_override_enabled</name>
-			<type>TurbopropAircraft</type>
-			<value>false</value>
-			<sim>XPLANE</sim>
-			<device>any</device>
-	</classdefaults>
 	<classdefaults>
 		<name>afterburner_effect_enabled</name>
 		<type>JetAircraft</type>
