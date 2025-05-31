@@ -44,6 +44,7 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.device_type = device
         self.current_settings = None
         self.init_settings = None
+        self.effect_mode: str = 'constant'
         self.current_settings_dict = {}
         self.default_settings = ('{'
                                  '"curve_pos": {"x_min": 1.0, "x_max": 10, "points": [{"x": 1.5, "y": 0.0}, {"x": 10.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "gs"},'
@@ -53,6 +54,7 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
                                  ' "gain_neg": 100,'
                                  ' "units": "gs",'
                                  ' "scale": 10'
+                                 ' "mode": constant'
                                  '}'
                                  )
 
@@ -60,20 +62,6 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.retranslateUi(self)
         self.setWindowTitle(f"Advanced G-Force Effect Configuration ({self.device_type.capitalize()})")
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
-        #
-        # self.pb_copy_up.setIcon(QIcon(":/image/up_arrow.png"))
-        # self.pb_copy_up.setText('')
-        # self.pb_copy_up.setMinimumWidth(25)
-        # self.pb_copy_up.setToolTip('Copy Negative settings up to Positive')
-        # self.pb_copy_up.clicked.connect(lambda: self.copy_y_to_x())
-        self.pb_copy_up.hide()
-        #
-        # self.pb_copy_down.setIcon(QIcon(":/image/down_arrow.png"))
-        # self.pb_copy_down.setText('')
-        # self.pb_copy_down.setMinimumWidth(25)
-        # self.pb_copy_down.setToolTip('Copy Positive settings down to Negative')
-        # self.pb_copy_down.clicked.connect(lambda: self.copy_x_to_y())
-        self.pb_copy_down.hide()
         self.pb_saveclose.setToolTip('Save setting and close dialog')
         self.pb_saveclose.clicked.connect(lambda: self.save_curve_settings(close=True))
 
@@ -90,6 +78,21 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.tog_live_view.stateChanged.connect(self.toggle_live_view)
 
         self.curve_neg.negative_instance = True
+
+        self.lab_pos_gain_label.setText("Maximum Positive G Offset")
+        self.lab_pos_gain_label.setToolTip(
+            "Sets the maximum amount that the spring offset can shift based on the curve settings below")
+        self.lab_neg_gain_label.setText("Maximum Negative G Offset")
+        self.lab_neg_gain_label.setToolTip(
+            "Sets the maximum amount that the spring offset can shift based on the curve settings below")
+
+        self.lab_effect_mode.setText("<b>Effect Force Mode:</b>")
+        self.lab_effect_mode.setToolTip("Switch between a constant force effect or a shifting spring center point")
+
+        self.modeButtonGroup.setId(self.rb_constant, 1)
+        self.modeButtonGroup.setId(self.rb_offset, 2)
+
+        self.modeButtonGroup.buttonClicked[int].connect(self.toggle_effect_mode)
 
         #
         if settings != "none" and settings is not None:
@@ -120,22 +123,32 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.sb_pos_max.valueChanged.connect(lambda value: self.update_x_max(value, self.curve_pos))
         self.sb_neg_max.valueChanged.connect(lambda value: self.update_x_max(value, self.curve_neg))
 
-        self.lab_pos_gain_label.setText("Maximum Positive G Offset")
-        self.lab_pos_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
-        self.lab_neg_gain_label.setText("Maximum Negative G Offset")
-        self.lab_neg_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
+    def toggle_effect_mode(self, b_id):
+        if b_id == 1:  # Constant
+            self.effect_mode = "constant"
+            self.lab_pos_gain_label.setText("Maximum Positive G Force")
+            self.lab_pos_gain_label.setToolTip("Sets the maximum amount of constant force generated based on the curve settings below")
+            self.lab_neg_gain_label.setText("Maximum Negative G Force")
+            self.lab_neg_gain_label.setToolTip("Sets the maximum amount of constant force generated based on the curve settings below")
+        if b_id == 2:  # Offset
+            self.effect_mode = "offset"
+            self.lab_pos_gain_label.setText("Maximum Positive G Offset")
+            self.lab_pos_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
+            self.lab_neg_gain_label.setText("Maximum Negative G Offset")
+            self.lab_neg_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
 
     def load_default_settings(self):
         self.init_settings = self.default_settings
         self.load_curve_settings(self.init_settings)
+
     def update_x_max(self, value, widget):
         widget.update_x_range(new_x_max=value)
 
     def toggle_negative_settings(self):
         bool_val = self.cb_enable_negative.isChecked()
         self.curve_neg.setEnabled(bool_val)
-        self.pb_copy_up.setEnabled(bool_val)
-        self.pb_copy_down.setEnabled(bool_val)
+        # self.pb_copy_up.setEnabled(bool_val)
+        # self.pb_copy_down.setEnabled(bool_val)
         self.sl_neg_mastergain.setEnabled(bool_val)
         self.cb_neg_smoothcurve.setEnabled(bool_val)
         self.pb_neg_reset.setEnabled(bool_val)
@@ -179,7 +192,11 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
             self.curve_neg.msg_label.hide()
 
     def draw_live_view(self, data):
-        gs = data.get("ACCs")[1]
+        gs = data.get("ACCs", None)
+        if gs is None:
+            gs = data.get('G')
+        else:
+            gs = gs[1]
         current_gains = G.telem_manager.currentAircraft.gforce_effect_adv_curve
         if current_gains == "none":
             self.curve_pos.msg_label.setText('Please save a configuration before enabling live view')
@@ -225,9 +242,11 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
             "gain_neg": self.sl_neg_mastergain.value(),
             "enable_neg": self.cb_enable_negative.isChecked(),
             "units": self.current_unit,
-            "scale": self.x_scale
+            "scale": self.x_scale,
+            "mode": self.effect_mode
         }
         json_string = json.dumps(settings)
+        G.telem_manager.currentAircraft.adv_g_settings_dict = settings
         self.current_settings = json_string
         self.accepted.emit(json_string)
         if close:
@@ -256,6 +275,16 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
 
                 self.x_scale = settings.get('scale', 10)
                 self.current_unit = settings.get('units', "g")
+                self.effect_mode = settings.get('mode', 'constant')
+                if self.effect_mode == 'constant':
+                    print("DID CONSTANT")
+                    self.rb_constant.click()
+                    self.rb_constant.click()
+                    self.rb_constant.click()
+                elif self.effect_mode == 'offset':
+                    print("DID OFFSET")
+                    self.rb_offset.click()
+
                 # self.cb_airspeed_unit.setCurrentText(self.current_unit)
                 self.update_slider_labels()
                 self.current_settings_dict = settings

@@ -311,6 +311,8 @@ class AircraftBase(object):
         self._telem_data = {}
         self._last_telem_data = {}
         self._ipc_telem = {}
+        self.adv_g_settings_dict: dict = {}
+
         self.hydraulic_factor = 0.000
         #clear any existing effects
         effects.clear()
@@ -319,6 +321,7 @@ class AircraftBase(object):
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
+        self.adjuster = effects['adjuster'].spring_adjuster()
 
         self.friction_effect_overridden: bool = False
 
@@ -653,15 +656,11 @@ class AircraftBase(object):
             effects.dispose("gforce")
             return
 
-        gmin = self.gforce_min_gs
-        gmax = self.gforce_max_gs
-        direction = 180
-
         if self._sim_is("DCS") or self._sim_is("IL2"):
             gs: float = telem_data.get("ACCs")[1]
             y_gs = telem_data.get("ACCs", 0)[0]
             last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
-        elif self._sim_is("MSFS"):
+        elif self._sim_is("MSFS") or self._sim_is("XPLANE"):
             gs: float = telem_data.get("G")
             y_gs = telem_data.get("AccBody")[2]
             last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
@@ -674,6 +673,9 @@ class AircraftBase(object):
         logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
 
         if self.gforce_effect_legacy_enabled:
+            gmin = self.gforce_min_gs
+            gmax = self.gforce_max_gs
+            direction = 180
             if gs < gmin:
                 effects["gforce"].stop()
                 # effects.dispose("gforce_damper")
@@ -690,49 +692,62 @@ class AircraftBase(object):
             g_deriv = - dGs.update(g_factor) * derivative_k
 
             g_factor += g_deriv
+
+            g_factor = utils.clamp(g_factor, 0.0, 1.0)
+
+            effects["gforce"].constant(g_factor, direction).start()
+
+            logging.debug(f"G's = {gs} | gfactor = {g_factor}")
+
         elif self.gforce_effect_advanced_enabled:
             if self.gforce_effect_adv_curve == 'none':
                 self.flag_error('Please Configure the Advanced G-Force Effect Settings')
-                effects.dispose('gforce_spr')
+                effects.dispose('adv_gforce_constant')
                 return
-            settings = utils.json.loads(self.gforce_effect_adv_curve)
+            if self.adv_g_settings_dict == {}:
+                self.adv_g_settings_dict = utils.json.loads(self.gforce_effect_adv_curve)
+
             gains = utils.get_gain_from_gs(self.gforce_effect_adv_curve, abs(gs))
+
+            mode = self.adv_g_settings_dict.get('mode', 'constant')
+
+
+
             if gs >= 0:
                 g_factor = gains.get('pos')
+                direction = 180
             else:
-                if settings.get('enable_neg'):
+                if self.adv_g_settings_dict.get('enable_neg'):
                     g_factor = -gains.get('neg')
+                    direction = 0
                 else:
+                    effects.dispose('gforce')
                     effects.dispose('gforce_spr')
                     return
+
             if not g_factor:
+                effects.dispose('gforce')
                 effects.dispose('gforce_spr')
                 return
-            adjuster = effects['gforce_spr'].spring_adjuster()
-            adjuster_cpOy = int(-g_factor*4096)
-            self.spring_adjuster_y.cpOffset = adjuster_cpOy
-            self.spring_adjuster_y.positiveCoefficient = self.spring_adjuster_y.negativeCoefficient = 4096
-            adjuster.setCondition(self.spring_adjuster_y)
-            adjuster.start()
-            return
-            # utils.dbprint("red", f"ADV_G: Force={g_factor}, Dir: {direction}, setting:{settings.get('enable_neg')}")
+            if mode == 'constant':
+                g_factor = utils.clamp(g_factor, 0.0, 1.0)
+                effects["gforce"].constant(g_factor, direction).start()
+
+            elif mode == 'offset':
+                adjuster_cpOy = int(-g_factor*4096)
+                self.adjuster.name = 'gforce_spr'
+                self.spring_adjuster_y.cpOffset = adjuster_cpOy
+                # self.spring_adjuster_y.positiveCoefficient = self.spring_adjuster_y.negativeCoefficient = 4096
+                self.spring_adjuster_y.negativeSaturation = self.spring_adjuster_y.positiveSaturation = 4096
+                self.spring_adjuster_x.negativeSaturation = self.spring_adjuster_x.positiveSaturation = 4096
+                self.adjuster.setCondition(self.spring_adjuster_y)
+                self.adjuster.setCondition(self.spring_adjuster_x)
+                self.adjuster.start()
 
         else:
             effects.dispose("gforce")
             return
 
-        # target_g_factor = utils.clamp(g_factor, 0.0, 1.0)
-        # delta_g_factor = self.gforce_current_factor - target_g_factor
-        # self.telem_data['_delta_g_factor'] = delta_g_factor
-        # self.gforce_current_factor += (abs(delta_g_factor) * 0.5)
-        # self.gforce_current_factor = utils.clamp(self.gforce_current_factor, 0, 1)
-        # effects["gforce"].constant(self.gforce_current_factor, direction).start()
-        
-        g_factor = utils.clamp(g_factor, 0.0, 1.0)
-
-        effects["gforce"].constant(g_factor, direction).start()
-
-        logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def _aoa_reduction_force_effect(self, telem_data):
         if not self.aoa_reduction_effect_enabled:
