@@ -259,7 +259,10 @@ class Ui_AdvancedSpringDialog(object):
         self.pb_saveclose.setObjectName("pb_saveclose")
         self.horizontalLayout_3.addWidget(self.pb_saveclose)
         self.gridLayout.addLayout(self.horizontalLayout_3, 6, 1, 1, 1)
-        self.gridLayout_2.addLayout(self.gridLayout, 0, 0, 1, 1)
+        self.gridLayout_2.addLayout(self.gridLayout, 1, 0, 1, 1)
+        self.label_4 = QtWidgets.QLabel(AdvancedSpringDialog)
+        self.label_4.setObjectName("label_4")
+        self.gridLayout_2.addWidget(self.label_4, 0, 0, 1, 1)
 
         self.retranslateUi(AdvancedSpringDialog)
         QtCore.QMetaObject.connectSlotsByName(AdvancedSpringDialog)
@@ -289,6 +292,7 @@ class Ui_AdvancedSpringDialog(object):
         self.lab_x.setText(_translate("AdvancedSpringDialog", "<html><head/><body><p><span style=\" color:#ab37c8;\">X</span></p></body></html>"))
         self.pb_cancel.setText(_translate("AdvancedSpringDialog", "Cancel"))
         self.pb_revert.setText(_translate("AdvancedSpringDialog", "Revert"))
-        self.pb_save.setText(_translate("AdvancedSpringDialog", "Save"))
+        self.pb_save.setText(_translate("AdvancedSpringDialog", "Apply"))
         self.pb_saveclose.setText(_translate("AdvancedSpringDialog", "Save && Close"))
+        self.label_4.setText(_translate("AdvancedSpringDialog", "<html><head/><body><p><span style=\" font-weight:600;\">Usage:</span> Right click to add point <span style=\" font-weight:600;\">|</span>  Left click to drag point <span style=\" font-weight:600;\">|</span>  Right click  point to delete</p></body></html>"))
 from telemffb.custom_widgets import LabeledToggle, SpringCurveWidget, Toggle

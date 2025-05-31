@@ -1069,7 +1069,7 @@ class SettingsLayout(QGridLayout):
                 self.adv_spr_dialog.accepted.connect(self.update_advanced_spring_gains)
                 self.adv_spr_dialog.show()
             else:
-                self.adv_spr_dialog.show()
+                self.adv_spr_dialog.showme(settings=value)
 
     def configurator_button_clicked(self):
         """

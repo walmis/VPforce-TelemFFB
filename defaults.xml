@@ -590,7 +590,7 @@
 		<order>1860</order>
 		<name>dummy_basic_spring_settings</name>
 		<exclusive_with>adv_spr_override_enabled,aircraft_is_fbw</exclusive_with>
-		<displayname>Basic Spring Settings</displayname>
+		<displayname>Dynamic Spring Settings</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -1342,7 +1342,7 @@
 		<Grouping>Spring Override</Grouping>
 		<order>4550.10</order>
 		<name>adv_spr_use_game_trim</name>
-		<exclusive_with>adv_spr_use_hardware_trim,adv_spr_use_game_trim</exclusive_with>
+		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
 		<prereq>adv_spr_override_enabled</prereq>
 		<displayname>Use Game Trim</displayname>
 		<DCS>true</DCS>
@@ -1421,48 +1421,6 @@
 		<validvalues>0,1000</validvalues>
 		<value>200</value>
 		<datatype>d_int</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Spring Override</Grouping>
-		<order>4550.30</order>
-		<name>adv_spr_g_effect</name>
-		<exclusive_with>adv_spr_use_game_trim</exclusive_with>
-		<prereq>adv_spr_use_hardware_trim</prereq>
-		<displayname>Test G Effect</displayname>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Spring Override</Grouping>
-		<order>4550.31</order>
-		<name>adv_spr_g_pos_start</name>
-		<prereq>adv_spr_g_effect</prereq>
-		<displayname>Start G Value</displayname>
-		<sliderfactor>0.1</sliderfactor>
-		<validvalues>10,30</validvalues>
-		<value>1.2</value>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Spring Override</Grouping>
-		<order>4550.32</order>
-		<name>adv_spr_g_pos_max</name>
-		<prereq>adv_spr_g_effect</prereq>
-		<displayname>Max G Value</displayname>
-		<sliderfactor>0.1</sliderfactor>
-		<validvalues>40,100</validvalues>
-		<value>7.0</value>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Spring Override</Grouping>
-		<order>4550.33</order>
-		<name>adv_spr_g_max_offset</name>
-		<prereq>adv_spr_g_effect</prereq>
-		<displayname>Max Offset %</displayname>
-		<validvalues>0,100</validvalues>
-		<value>0.8</value>
-		<datatype>float</datatype>
 	</defaults>
 	<defaults>
 		<Grouping>Axis Control</Grouping>
@@ -2099,10 +2057,98 @@
 	<defaults>
 		<Grouping>G Force</Grouping>
 		<order>5200</order>
+		<name>gforce_effect_master</name>
+		<info>Master control for all G Effects</info>
+		<displayname>G-Force Effect</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<value>true</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>5210</order>
+		<name>gforce_effect_enable</name>
+		<exclusive_with>new_gforce_effect_enable,gforce_effect_advanced_enabled</exclusive_with>
+		<prereq>gforce_effect_master</prereq>
+		<info>See manual for details</info>
+		<displayname>G Force Effect (Legacy)</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>5210.22</order>
+		<name>gforce_effect_max_intensity</name>
+		<prereq>gforce_effect_enable</prereq>
+		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
+		<displayname>G Force Effect</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>1.0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>5210.23</order>
+		<name>gforce_effect_curvature</name>
+		<prereq>gforce_effect_enable</prereq>
+		<info>&lt;html&gt;&lt;body&gt;Affects the onset characteristics of the overall effect&lt;br&gt;&lt;img src=":/image/g-force-curve.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<displayname>G Force Curvature</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>10,30</validvalues>
+		<value>2.1</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>5210.24</order>
+		<name>gforce_min_gs</name>
+		<prereq>gforce_effect_enable</prereq>
+		<info>G loading where effect will start</info>
+		<displayname>Minimum Gs</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>10,30</validvalues>
+		<value>1.0</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>5210.25</order>
+		<name>gforce_max_gs</name>
+		<prereq>gforce_effect_enable</prereq>
+		<info>G loading where effect will max out</info>
+		<displayname>Maximum Gs</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>40,100</validvalues>
+		<value>7.0</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>G Force</Grouping>
+		<order>5220</order>
 		<name>new_gforce_effect_enable</name>
-		<exclusive_with>gforce_effect_enable</exclusive_with>
+		<exclusive_with>gforce_effect_advanced_enabled,gforce_effect_enable</exclusive_with>
+		<prereq>gforce_effect_master</prereq>
 		<info>Alternate G Force Effec - Enabling will override legacy G Force Effect&lt;br&gt;&lt;br&gt;See manual for details</info>
-		<displayname>G Force Effect **New**</displayname>
+		<displayname>G Force Effect (Legacy **New**)</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2113,7 +2159,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5200.2</order>
+		<order>5220.2</order>
 		<name>new_gforce_effect_max_intensity</name>
 		<prereq>new_gforce_effect_enable</prereq>
 		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
@@ -2129,7 +2175,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5200.3</order>
+		<order>5220.3</order>
 		<name>new_gforce_min_gs</name>
 		<prereq>new_gforce_effect_enable</prereq>
 		<info>G loading where effect will start</info>
@@ -2146,7 +2192,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5200.4</order>
+		<order>5220.4</order>
 		<name>new_gforce_max_gs</name>
 		<prereq>new_gforce_effect_enable</prereq>
 		<info>G loading where effect will max out</info>
@@ -2163,7 +2209,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5200.5</order>
+		<order>5220.5</order>
 		<name>new_gforce_effect_deflection_factor</name>
 		<prereq>new_gforce_effect_enable</prereq>
 		<info>Y Axis deflection that will result in %100 of calculated force based on current g loading and min/max settings</info>
@@ -2179,7 +2225,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5300</order>
+		<order>5230</order>
 		<name>new_gforce_enable_neg_gs</name>
 		<prereq>new_gforce_effect_enable</prereq>
 		<info>Enable effect for negative Gs</info>
@@ -2194,7 +2240,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5300.2</order>
+		<order>5230.2</order>
 		<name>new_gforce_effect_max_intensity_neg</name>
 		<prereq>new_gforce_enable_neg_gs</prereq>
 		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
@@ -2210,7 +2256,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5300.3</order>
+		<order>5230.3</order>
 		<name>new_gforce_min_gs_neg</name>
 		<prereq>new_gforce_enable_neg_gs</prereq>
 		<info>G loading where effect will start</info>
@@ -2227,7 +2273,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5300.4</order>
+		<order>5230.4</order>
 		<name>new_gforce_max_gs_neg</name>
 		<prereq>new_gforce_enable_neg_gs</prereq>
 		<info>G loading where effect will max out</info>
@@ -2244,7 +2290,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5300.5</order>
+		<order>5230.5</order>
 		<name>new_gforce_effect_deflection_factor_neg</name>
 		<prereq>new_gforce_enable_neg_gs</prereq>
 		<info>Y Axis deflection that will result in %100 of calculated force based on current g loading and min/max settings</info>
@@ -2258,96 +2304,13 @@
 		<value>-1.0</value>
 		<datatype>negfloat</datatype>
 	</defaults>
-	<defaults><Grouping>G Force</Grouping><order>5400</order><name>gforce_effect_enable</name><exclusive_with>new_gforce_effect_enable</exclusive_with><info>See manual for details</info><displayname>G Force Effect</displayname><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><IL2>true</IL2><joystick>true</joystick><value>false</value><datatype>bool</datatype></defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5400.2</order>
-		<name>gforce_effect_legacy_enabled</name>
-		<exclusive_with>gforce_effect_advanced_enabled</exclusive_with>
-		<prereq>gforce_effect_enable</prereq>
-		<displayname>Legacy Settings</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>G Force</Grouping>
-		<order>5400.22</order>
-		<name>gforce_effect_max_intensity</name>
-		<prereq>gforce_effect_legacy_enabled</prereq>
-		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
-		<displayname>G Force Effect</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<validvalues>0,100</validvalues>
-		<value>1.0</value>
-		<datatype>float</datatype>
-		</defaults>
-	<defaults>
-		<Grouping>G Force</Grouping>
-		<order>5400.23</order>
-		<name>gforce_effect_curvature</name>
-		<prereq>gforce_effect_legacy_enabled</prereq>
-		<info>&lt;html&gt;&lt;body&gt;Affects the onset characteristics of the overall effect&lt;br&gt;&lt;img src=":/image/g-force-curve.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>G Force Curvature</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<sliderfactor>0.1</sliderfactor>
-		<validvalues>10,30</validvalues>
-		<value>2.1</value>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>G Force</Grouping>
-		<order>5400.24</order>
-		<name>gforce_min_gs</name>
-		<prereq>gforce_effect_legacy_enabled</prereq>
-		<info>G loading where effect will start</info>
-		<displayname>Minimum Gs</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<sliderfactor>0.1</sliderfactor>
-		<validvalues>10,30</validvalues>
-		<value>1.0</value>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>G Force</Grouping>
-		<order>5400.25</order>
-		<name>gforce_max_gs</name>
-		<prereq>gforce_effect_legacy_enabled</prereq>
-		<info>G loading where effect will max out</info>
-		<displayname>Maximum Gs</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<sliderfactor>0.1</sliderfactor>
-		<validvalues>40,100</validvalues>
-		<value>7.0</value>
-		<datatype>d_float</datatype>
-		</defaults>
-	<defaults>
-		<Grouping>G Force</Grouping>
-		<order>5400.3</order>
+		<order>5230</order>
 		<name>gforce_effect_advanced_enabled</name>
-		<exclusive_with>gforce_effect_legacy_enabled</exclusive_with>
-		<prereq>gforce_effect_enable</prereq>
-		<displayname>Advanced Settings</displayname>
+		<exclusive_with>new_gforce_effect_enable,gforce_effect_enable</exclusive_with>
+		<prereq>gforce_effect_master</prereq>
+		<displayname>Advanced G Force Effect</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2358,7 +2321,7 @@
 	</defaults>
 	<defaults>
 		<Grouping>G Force</Grouping>
-		<order>5400.31</order>
+		<order>5230.2</order>
 		<name>gforce_effect_adv_curve</name>
 		<prereq>gforce_effect_advanced_enabled</prereq>
 		<displayname>Advanced</displayname>

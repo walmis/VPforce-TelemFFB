@@ -145,14 +145,14 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         self.pb_x_reset.clicked.connect(lambda: self.reset_curve('x'))
         self.pb_y_reset.clicked.connect(lambda: self.reset_curve('y'))
 
-    def showEvent(self, event):
+    def showme(self, settings = None):
         if self.current_settings is not None:
             self.init_settings = self.current_settings
+        if settings is not None:
+            self.load_curve_settings(settings)
+        self.show()
 
-        # self.raise_()
-        # self.activateWindow()
-        # self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
-        # self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+    def showEvent(self, event):
         super().showEvent(event)
 
     def closeEvent(self, event):
@@ -228,34 +228,37 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         """
         Load settings from a JSON-formatted string and apply them to both curve widgets.
         """
+        if json_string == 'none':
+            json_string = self.default_settings
         try:
             settings = json.loads(json_string)
-            if "curve_x" in settings and "curve_y" in settings:
-                self.curve_x.from_dict(settings["curve_x"])
-                self.cb_x_smoothcurve.setChecked(settings['curve_x']['smooth_curve_enabled'])
-                self.gain_x = settings.get('gain_x', 100)
-                self.sl_x_mastergain.setValue(settings['gain_x'])
 
-                self.curve_y.from_dict(settings["curve_y"])
-                self.cb_y_smoothcurve.setChecked(settings['curve_y']['smooth_curve_enabled'])
-                self.gain_y = settings.get('gain_y', 100)
-                self.sl_y_mastergain.setValue(settings['gain_y'])
-
-
-
-                self.x_scale = settings.get('scale', 500)
-                self.current_unit = settings.get('units', "kt")
-                self.cb_airspeed_unit.setCurrentText(self.current_unit)
-                self.update_slider_labels()
-
-            else:
-                raise ValueError("Invalid JSON format: Missing 'curve_x' or 'curve_y' keys.")
         except json.JSONDecodeError as e:
             print(f"Error decoding JSON: {e}")
             raise ValueError("Invalid JSON string.")
         except Exception as e:
             print(f"Error loading curve settings: {e}")
             raise
+
+        G.telem_manager.currentAircraft.adv_spr_settings_dict = settings
+        if "curve_x" in settings and "curve_y" in settings:
+            self.curve_x.from_dict(settings["curve_x"])
+            self.cb_x_smoothcurve.setChecked(settings['curve_x']['smooth_curve_enabled'])
+            self.gain_x = settings.get('gain_x', 100)
+            self.sl_x_mastergain.setValue(settings['gain_x'])
+
+            self.curve_y.from_dict(settings["curve_y"])
+            self.cb_y_smoothcurve.setChecked(settings['curve_y']['smooth_curve_enabled'])
+            self.gain_y = settings.get('gain_y', 100)
+            self.sl_y_mastergain.setValue(settings['gain_y'])
+
+            self.x_scale = settings.get('scale', 500)
+            self.current_unit = settings.get('units', "kt")
+            self.cb_airspeed_unit.setCurrentText(self.current_unit)
+            self.update_slider_labels()
+
+        else:
+            raise ValueError("Invalid JSON format: Missing 'curve_x' or 'curve_y' keys.")
 
     def manual_entry_dialog(self):
         """

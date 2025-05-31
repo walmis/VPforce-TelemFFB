@@ -106,14 +106,13 @@ class AircraftBase(object):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
-    ####
-    #### Beta effects - set to 1 to enable
-    gforce_effect_enable = 0
+    gforce_effect_master: bool = False
+    gforce_effect_enable: bool = False
+    gforce_effect_invert_force = 0  # case where "180" degrees does not equal "away from pilot"
     gforce_effect_curvature = 2.2
     gforce_effect_max_intensity = 1.0
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
-    gforce_effect_legacy_enabled = False
     gforce_effect_advanced_enabled = False
     gforce_effect_advanced_curve = {}
     gforce_current_factor: float = 0.0
@@ -273,6 +272,8 @@ class AircraftBase(object):
 
     adv_spr_override_enabled: bool = False
     adv_spr_gains: str = 'none'
+    adv_spr_use_hardware_trim: bool = False
+    adv_spr_use_game_trim: bool = True
     gforce_effect_adv_curve: str = 'none'
     trimwheel_elev_up_button: int = 0
     trimwheel_elev_dn_button: int = 0
@@ -287,10 +288,7 @@ class AircraftBase(object):
     override_spring_trim_rate: int = 200
     override_spring_cp0_x: int = 0
     override_spring_cp0_y: int = 0
-    adv_spr_g_effect: bool = False
-    adv_spr_g_pos_start: float = 1.2
-    adv_spr_g_pos_max: float = 10
-    adv_spr_g_max_offset: float = 1.0
+
     g_y_offset: int = 0
 
     last_device_x = None
@@ -312,6 +310,7 @@ class AircraftBase(object):
         self._last_telem_data = {}
         self._ipc_telem = {}
         self.adv_g_settings_dict: dict = {}
+        self.adv_spr_settings_dict: dict = {}
 
         self.hydraulic_factor = 0.000
         #clear any existing effects
@@ -495,6 +494,7 @@ class AircraftBase(object):
     ######  Generic Aircraft Effects  ######
     ######                            ######
     ########################################
+
     def _update_touchdown_effect(self, telem_data):
         """Generates a g-based force upon landing or as a result of large bumps"""
 
@@ -557,7 +557,7 @@ class AircraftBase(object):
             effects.dispose("runway1")
 
     def new_gforce_effect(self, telem_data):
-        if not self.is_joystick() or not self.new_gforce_effect_enable:
+        if not self.is_joystick() or not self.new_gforce_effect_enable or not self.gforce_effect_master:
             effects.dispose("new_gforce")
             return
         if sum(telem_data.get("WeightOnWheels")):
@@ -637,15 +637,20 @@ class AircraftBase(object):
         effects["new_gforce"].constant(g_factor, direction).start()
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
-    def _gforce_effect(self, telem_data):
+    def _gforce_effect(self, telem_data, adv_spr=False):
+        if not self.gforce_effect_master:
+            effects.dispose('gforce')
+            effects.dispose('new_gforce')
+            return
         if self.new_gforce_effect_enable:
+            # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
             effects.dispose("gforce")
             self.new_gforce_effect(telem_data)
             return
         else:
             effects.dispose("new_gforce")
 
-        if not self.is_joystick() or not self.gforce_effect_enable:
+        if not self.is_joystick():
             effects.dispose("gforce")
             return
 
@@ -672,7 +677,7 @@ class AircraftBase(object):
 
         logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
 
-        if self.gforce_effect_legacy_enabled:
+        if self.gforce_effect_enable:
             gmin = self.gforce_min_gs
             gmax = self.gforce_max_gs
             direction = 180
@@ -711,8 +716,6 @@ class AircraftBase(object):
 
             mode = self.adv_g_settings_dict.get('mode', 'constant')
 
-
-
             if gs >= 0:
                 g_factor = gains.get('pos')
                 direction = 180
@@ -735,9 +738,13 @@ class AircraftBase(object):
 
             elif mode == 'offset':
                 adjuster_cpOy = int(-g_factor*4096)
+
+                if adv_spr:
+                    # If being called by advanced spring effect, don't apply adjuster offset here, return offset value and let the advanced spring adjuster effect do it
+                    return adjuster_cpOy
+
                 self.adjuster.name = 'gforce_spr'
                 self.spring_adjuster_y.cpOffset = adjuster_cpOy
-                # self.spring_adjuster_y.positiveCoefficient = self.spring_adjuster_y.negativeCoefficient = 4096
                 self.spring_adjuster_y.negativeSaturation = self.spring_adjuster_y.positiveSaturation = 4096
                 self.spring_adjuster_x.negativeSaturation = self.spring_adjuster_x.positiveSaturation = 4096
                 self.adjuster.setCondition(self.spring_adjuster_y)
@@ -1835,81 +1842,46 @@ class AircraftBase(object):
         spring.start(override=True)
 
     def modify_game_spring(self):
-        ## Currently hard-overrides game spring.. will break trimming, dynamic center, etc...
         gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.get('IAS', 0))
-        # print(f"Gains: {gains}")
-        # adjuster = effects['spr_adjuster'].spring_adjuster()
-        adjuster = effects['adv_spring'].spring()
-        self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = round(4096 * gains.get('y', 0))
-        self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(4096 * gains.get('x', 0))
 
-        dt = perftracker.get_time_delta('override_spring_perf')
+        self.adjuster.name = 'adv_spr'
+        self.spring_adjuster_y.positiveCoefficient = self.spring_adjuster_y.negativeCoefficient = round(4096 * gains.get('y', 0))
+        self.spring_adjuster_x.positiveCoefficient = self.spring_adjuster_x.negativeCoefficient = round(4096 * gains.get('x', 0))
 
-        trim_step_size = self.override_spring_trim_rate * dt
-        # trim_step_size = 200 * dt
+        if self.adv_spr_use_hardware_trim:
+            dt = perftracker.get_time_delta('override_spring_perf')
+            trim_step_size = self.override_spring_trim_rate * dt
+            # trim_step_size = 200 * dt
+            self.telem_data['_ovrd_spr_step'] = trim_step_size
+            self.telem_data['_ovrd_spr_dt'] = dt
+            # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
+            # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
+            input_data = HapticEffect.device.get_input()
+            x, y = input_data.axisXY()
+            current_buttons = input_data.getPressedButtons()
 
-        self.telem_data['_ovrd_spr_step'] = trim_step_size
-        self.telem_data['_ovrd_spr_dt'] = dt
-        # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
-        # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
-        input_data = HapticEffect.device.get_input()
-        x, y = input_data.axisXY()
-        current_buttons = input_data.getPressedButtons()
-
-        if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
-        # if 3 in current_buttons:
-            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
-            # print("TRIM DOWN")
-            if self.override_spring_cp0_y - trim_step_size < -4096:
-                self.override_spring_cp0_y = -4096
-            else:
+            if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
                 self.override_spring_cp0_y -= trim_step_size
-            self.spring_y.cpOffset = round(self.override_spring_cp0_y)
-        elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
-        # elif 5 in current_buttons:
-            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
-            # print("TRIM UP")
-            if self.override_spring_cp0_y + trim_step_size > 4096:
-                self.override_spring_cp0_y = 4096
-            else:
+            elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
                 self.override_spring_cp0_y += trim_step_size
-            self.spring_y.cpOffset = round(self.override_spring_cp0_y)
 
-        if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
-        # if 6 in current_buttons:
-            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
-            # print("TRIM LEFT")
-            if self.override_spring_cp0_x - trim_step_size < -4096:
-                self.override_spring_cp0_x = -4096
-            else:
+            if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
                 self.override_spring_cp0_x -= trim_step_size
-            self.spring_x.cpOffset = round(self.override_spring_cp0_x)
-        elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
-        # elif 4 in current_buttons:
-            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
-            # print("TRIM RIGHT")
-            if self.override_spring_cp0_x + trim_step_size > 4096:
-                self.override_spring_cp0_x = 4096
-            else:
+            elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
                 self.override_spring_cp0_x += trim_step_size
-            self.spring_x.cpOffset = round(self.override_spring_cp0_x)
 
-        # if self.adv_spr_g_effect:
-        if False:
-            # g_scale_min = 1.2
-            # g_scale_max = 9
-            # print(self.telem_data.get('ACCs', 0)[1])
-            g_factor = utils.scale_clamp(self.telem_data.get('ACCs')[1], (self.adv_spr_g_pos_start, self.adv_spr_g_pos_max), (0,self.adv_spr_g_max_offset))
-            self.g_y_offset = round(g_factor * -4096)
-        else:
-            self.g_y_offset = 0
+            self.override_spring_cp0_x = round(utils.clamp(self.override_spring_cp0_x, -4096, 4096))
+            self.override_spring_cp0_y = round(utils.clamp(self.override_spring_cp0_y, -4096, 4096))
 
+        offset = self._gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
+        self.g_y_offset = offset if offset is not None else 0
         self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]
-        self.spring_y.cpOffset = round(self.override_spring_cp0_y + self.g_y_offset)
+        self.spring_adjuster_y.cpOffset = round(self.override_spring_cp0_y + self.g_y_offset)
+        self.spring_adjuster_x.cpOffset = round(self.override_spring_cp0_x)
 
-        adjuster.setCondition(self.spring_y)
-        adjuster.setCondition(self.spring_x)
-        adjuster.start(override=True)
+        self.adjuster.setCondition(self.spring_adjuster_y)
+        self.adjuster.setCondition(self.spring_adjuster_x)
+        self.adjuster.start()
 
     def on_event(self):
         pass
