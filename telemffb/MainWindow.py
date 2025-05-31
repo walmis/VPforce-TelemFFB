@@ -161,13 +161,8 @@ class MainWindow(QMainWindow):
         self.menu = menubar
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
-        self.menu.setStyleSheet("""
-            QMenuBar { background-color: #f0f0f0; } 
-            QMenu::item {background-color: transparent;}
-            QMenu::item:selected { color: #ffffff; background-color: "#ab37c8"; } 
-        """)
-        # Add the "System" menu and its sub-option
 
+        # Add the "System" menu and its sub-option
         system_menu = self.menu.addMenu('&System')
 
         system_settings_action = QAction('System Settings', self)

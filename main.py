@@ -248,6 +248,7 @@ def main():
         # or QtWidgets.QApplication.exit(0)
     sys.excepthook = excepthook
 
+    G.useDarkMode = G.system_settings.get('useDarkmode', False)
     app.setStyleSheet(
         """
         /*QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
@@ -277,7 +278,7 @@ def main():
             border: 1px solid #999999; /* Existing border */
 
         }
-        
+
         QPushButton:pressed, #styledButton:pressed {
         background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                                           stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
@@ -334,8 +335,109 @@ def main():
         QSlider::handle:horizontal:disabled {
             background: #888888; /* Set the color of the handle when disabled */
         }
+
+        QSlider::groove:horizontal {
+            border: 1px solid #565a5e;
+            height: 8px;  /* Adjusted groove height */
+            background: qlineargradient(
+                x1: 0, y1: 0, x2: 0, y2: 1,
+                stop: 0 #e6e6e6, stop: 1 #bfbfbf
+            );
+            margin: 0;
+            border-radius: 3px;  /* Adjusted border radius */
+        }
+
+        QMenuBar {
+            background-color: #f0f0f0;
+        }
+        
+        QMenu::item {
+            background-color: transparent;
+        }
+        
+        QMenu::item:selected {
+            color: #ffffff;
+            background-color: "#ab37c8";
+        }
+
         """
     )
+    if G.useDarkMode:
+        app.setStyleSheet(
+            """
+            QWidget {
+                background-color: #2b2b2b;
+                color: #dddddd;
+                selection-background-color: #5e3c88; /* for consistency */
+            }
+
+            QFrame {
+                background-color: #2b2b2b;
+                color: #dddddd;
+            }
+
+            /* QMenuBar styling */
+            QMenuBar {
+                background-color: #2b2b2b;
+                color: #dddddd;
+            }
+                        
+            QMenuBar::item:selected {
+                background-color: #444444;
+                color: white;
+            }
+            
+            QMenuBar::item:pressed {
+                background-color: #ab37c8;
+                color: white;
+            }
+            
+            /* QMenu (the dropdown menu) */
+            QMenu {
+                background-color: #2b2b2b;
+                color: #dddddd;
+                border: 1px solid #444444;
+            }
+            
+            QMenu::item {
+                padding: 6px 20px;
+                background-color: transparent;
+            }
+            
+            QMenu::item:selected {
+                background-color: #ab37c8;
+                color: white;
+            }
+            
+            QComboBox {
+                background-color: #3a3a3a;
+                color: white;
+                border: 1px solid #999;
+            }
+            
+            QComboBox QAbstractItemView {
+                background-color: #2b2b2b;
+            }
+
+            
+            QLineEdit, QPlainTextEdit, QTextEdit {
+                background-color: #3a3a3a;
+                color: #ffffff;
+            }
+
+            QSlider::handle:horizontal:disabled {
+                background: #888888; /* Set the color of the handle when disabled */
+            }
+            
+            QSlider::groove:horizontal {
+                border: 1px solid #333333;
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #5a5a5a, stop: 1 #3e3e3e
+                );
+            }
+            """
+        )
 
 
     G.log_window = LogWindow()

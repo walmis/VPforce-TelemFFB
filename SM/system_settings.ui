@@ -42,40 +42,14 @@
          </item>
          <item>
           <layout class="QGridLayout" name="gridLayout">
-           <item row="0" column="0">
-            <widget class="QLabel" name="label">
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_2">
              <property name="text">
-              <string>System Logging Level:</string>
+              <string>Telemetry Timeout (ms):</string>
              </property>
             </widget>
            </item>
-           <item row="2" column="0" colspan="2">
-            <widget class="LabeledToggle" name="ignoreUpdate">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="text">
-              <string>Disable Update Prompt on Startup</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <widget class="QComboBox" name="logLevel"/>
-           </item>
-           <item row="1" column="1">
-            <widget class="QLineEdit" name="telemTimeout"/>
-           </item>
-           <item row="3" column="0">
-            <widget class="LabeledToggle" name="cb_logPrune">
-             <property name="text">
-              <string>Prune Logs (Global):</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="0" colspan="2">
+           <item row="5" column="0" colspan="2">
             <layout class="QHBoxLayout" name="horizontalLayout_5">
              <item>
               <spacer name="horizontalSpacer_12">
@@ -165,10 +139,43 @@
              </item>
             </layout>
            </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="label_2">
+           <item row="0" column="0">
+            <widget class="QLabel" name="label">
              <property name="text">
-              <string>Telemetry Timeout (ms):</string>
+              <string>System Logging Level:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="logLevel"/>
+           </item>
+           <item row="3" column="0" colspan="2">
+            <widget class="LabeledToggle" name="ignoreUpdate">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="text">
+              <string>Disable Update Prompt on Startup</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLineEdit" name="telemTimeout"/>
+           </item>
+           <item row="4" column="0">
+            <widget class="LabeledToggle" name="cb_logPrune">
+             <property name="text">
+              <string>Prune Logs (Global):</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0" colspan="2">
+            <widget class="LabeledToggle" name="useDarkmode">
+             <property name="text">
+              <string>Dark Mode</string>
              </property>
             </widget>
            </item>

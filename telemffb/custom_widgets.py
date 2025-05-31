@@ -144,16 +144,6 @@ class NoWheelSlider(QSlider):
     def update_styles(self):
         # Generate CSS based on color and size properties
         css = f"""
-            QSlider::groove:horizontal {{
-                border: 1px solid #565a5e;
-                height: 8px;  /* Adjusted groove height */
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #e6e6e6, stop: 1 #bfbfbf
-                );
-                margin: 0;
-                border-radius: 3px;  /* Adjusted border radius */
-            }}
             QSlider::handle:horizontal {{
                 background: qradialgradient(
                     cx: 0.3, cy: 0.5, fx: 0.3, fy: 0.35, radius: 0.8,

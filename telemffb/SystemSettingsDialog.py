@@ -440,7 +440,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pruneLogsUnit': self.combo_logPrune.currentText(),
             'startToTray': self.cb_startToTray.isChecked(),
             'masterStartMin': self.cb_masterStartMin.isChecked(),
-            'closeToTray': self.cb_closeToTray.isChecked()
+            'closeToTray': self.cb_closeToTray.isChecked(),
+            'useDarkmode': self.useDarkmode.isChecked()
         }
 
         instance_settings_dict = {
@@ -475,6 +476,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidPedals',
             'pidCollective',
             'pidTrimWheel',
+            'useDarkmode'
         ]
         saved_al_dict = {}
         for key in key_list:
@@ -524,6 +526,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.telemTimeout.setText(str(settings_dict.get('telemTimeout', 200)))
 
         self.ignoreUpdate.setChecked(settings_dict.get('ignoreUpdate', False))
+
+        self.useDarkmode.setChecked(settings_dict.get('useDarkmode', False))
 
         self.cb_logPrune.setChecked(settings_dict.get('pruneLogs', False))
 
