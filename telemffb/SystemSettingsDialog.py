@@ -118,6 +118,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_t.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
+        # only allow dark mode if debug menu visible
+        self.useDarkmode.setVisible(G.system_settings.get('debug', False))
+
         if (G.master_instance and G.launched_instances) or G.child_instance:
             self.labelSystem.setText("System (Per Instance):")
             self.labelLaunch.setText("Launch Options (Global):")
