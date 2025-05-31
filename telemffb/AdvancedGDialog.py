@@ -79,22 +79,9 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
 
         self.curve_neg.negative_instance = True
 
-        self.lab_pos_gain_label.setText("Maximum Positive G Offset")
-        self.lab_pos_gain_label.setToolTip(
-            "Sets the maximum amount that the spring offset can shift based on the curve settings below")
-        self.lab_neg_gain_label.setText("Maximum Negative G Offset")
-        self.lab_neg_gain_label.setToolTip(
-            "Sets the maximum amount that the spring offset can shift based on the curve settings below")
-
         self.lab_effect_mode.setText("<b>Effect Force Mode:</b>")
         self.lab_effect_mode.setToolTip("Switch between a constant force effect or a shifting spring center point")
 
-        self.modeButtonGroup.setId(self.rb_constant, 1)
-        self.modeButtonGroup.setId(self.rb_offset, 2)
-
-        self.modeButtonGroup.buttonClicked[int].connect(self.toggle_effect_mode)
-
-        #
         if settings != "none" and settings is not None:
             self.init_settings = settings
             self.load_curve_settings(self.init_settings)
@@ -102,6 +89,20 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
             self.init_settings = self.default_settings
             self.load_curve_settings(self.init_settings)
 
+        if self.effect_mode == 'constant':
+            self.lab_pos_gain_label.setText("Maximum Positive G Force")
+            self.lab_pos_gain_label.setToolTip(
+                "Sets the maximum amount of constant force generated based on the curve settings below")
+            self.lab_neg_gain_label.setText("Maximum Negative G Force")
+            self.lab_neg_gain_label.setToolTip(
+                "Sets the maximum amount of constant force generated based on the curve settings below")
+        elif self.effect_mode == 'offset':
+            self.lab_pos_gain_label.setText("Maximum Positive G Offset")
+            self.lab_pos_gain_label.setToolTip(
+                "Sets the maximum amount that the spring offset can shift based on the curve settings below")
+            self.lab_neg_gain_label.setText("Maximum Negative G Offset")
+            self.lab_neg_gain_label.setToolTip(
+                "Sets the maximum amount that the spring offset can shift based on the curve settings below")
         self.toggle_negative_settings()
 
         self.cb_enable_negative.clicked.connect(self.toggle_negative_settings)
@@ -123,19 +124,34 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.sb_pos_max.valueChanged.connect(lambda value: self.update_x_max(value, self.curve_pos))
         self.sb_neg_max.valueChanged.connect(lambda value: self.update_x_max(value, self.curve_neg))
 
-    def toggle_effect_mode(self, b_id):
-        if b_id == 1:  # Constant
-            self.effect_mode = "constant"
-            self.lab_pos_gain_label.setText("Maximum Positive G Force")
-            self.lab_pos_gain_label.setToolTip("Sets the maximum amount of constant force generated based on the curve settings below")
-            self.lab_neg_gain_label.setText("Maximum Negative G Force")
-            self.lab_neg_gain_label.setToolTip("Sets the maximum amount of constant force generated based on the curve settings below")
-        if b_id == 2:  # Offset
-            self.effect_mode = "offset"
-            self.lab_pos_gain_label.setText("Maximum Positive G Offset")
-            self.lab_pos_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
-            self.lab_neg_gain_label.setText("Maximum Negative G Offset")
-            self.lab_neg_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
+        self.cb_offset.clicked.connect(self.enable_offset)
+        self.cb_constant.clicked.connect(self.enable_constant)
+
+    def enable_constant(self, state):
+        if state is False:
+            self.cb_offset.setChecked(True)
+            self.enable_offset(True)
+            return  # don't allow user to turn off checkbox.  Only enabling other option can disable the other option
+        # if b_id == 1:  # Constant
+        self.effect_mode = "constant"
+        self.cb_offset.setChecked(False)
+        self.lab_pos_gain_label.setText("Maximum Positive G Force")
+        self.lab_pos_gain_label.setToolTip("Sets the maximum amount of constant force generated based on the curve settings below")
+        self.lab_neg_gain_label.setText("Maximum Negative G Force")
+        self.lab_neg_gain_label.setToolTip("Sets the maximum amount of constant force generated based on the curve settings below")
+
+    def enable_offset(self, state):
+        if state is False:
+            self.cb_constant.setChecked(True)
+            self.enable_constant(True)
+            return  # don't allow user to turn off checkbox.  Only enabling other option can disable the other option
+        # if b_id == 2:  # Offset
+        self.effect_mode = "offset"
+        self.cb_constant.setChecked(False)
+        self.lab_pos_gain_label.setText("Maximum Positive G Offset")
+        self.lab_pos_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
+        self.lab_neg_gain_label.setText("Maximum Negative G Offset")
+        self.lab_neg_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
 
     def load_default_settings(self):
         self.init_settings = self.default_settings
@@ -220,10 +236,6 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
                 gain_neg = gain_neg * (100/self.sl_pos_mastergain.value()) # convert back to %100 reference gain so it follows curve line
             self.curve_neg.draw_crosshairs(abs(gs), gain_neg*100)
 
-        # # print(f"gains: {current_gains}")
-        # for axis, gain in zip([self.curve_pos, self.curve_neg], ['pos', 'neg']):
-        #     axis.draw_crosshairs(gs, gains.get(gain, 0)*100)
-
     def cancel_curve_settings(self):
         self.revert_curve_settings()
         self.save_curve_settings(close=True)
@@ -277,13 +289,11 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
                 self.current_unit = settings.get('units', "g")
                 self.effect_mode = settings.get('mode', 'constant')
                 if self.effect_mode == 'constant':
-                    print("DID CONSTANT")
-                    self.rb_constant.click()
-                    self.rb_constant.click()
-                    self.rb_constant.click()
+                    self.cb_constant.setChecked(True)
+                    self.cb_offset.setChecked(False)
                 elif self.effect_mode == 'offset':
-                    print("DID OFFSET")
-                    self.rb_offset.click()
+                    self.cb_offset.setChecked(True)
+                    self.cb_constant.setChecked(False)
 
                 # self.cb_airspeed_unit.setCurrentText(self.current_unit)
                 self.update_slider_labels()

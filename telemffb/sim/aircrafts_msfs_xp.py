@@ -1338,6 +1338,9 @@ class Aircraft(AircraftBase):
             if self.is_pedals():
                 self.update_steering_friction_effect(telem_data)
 
+        self._gforce_effect(telem_data)
+
+
 
     def on_timeout(self):
         if not effects["pause_spring"].started:
@@ -1387,7 +1390,7 @@ class PropellerAircraft(Aircraft):
                 self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=80*kt2ms, spd_thresh_hi=140*kt2ms )
         if self._sim_is_xplane():
             self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=80 * kt2ms)
-        self.new_gforce_effect(telem_data)
+        self._gforce_effect(telem_data)
         if self.is_collective():
             self._override_collective_spring()
 
@@ -1421,7 +1424,7 @@ class JetAircraft(Aircraft):
                 sp = max(telem_data.get("Spoilers", 0))
                 self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
         self._update_jet_engine_rumble(telem_data)
-        self.new_gforce_effect(telem_data)
+        self._gforce_effect(telem_data)
         self._update_ab_effect(telem_data)
         if self.is_collective():
             self._override_collective_spring()
@@ -1447,7 +1450,7 @@ class TurbopropAircraft(PropellerAircraft):
             if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
                 sp = max(telem_data.get("Spoilers", 0))
                 self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
-        self.new_gforce_effect(telem_data)
+        self._gforce_effect(telem_data)
 
         self._update_jet_engine_rumble(telem_data)
         if self.is_collective():
@@ -1578,7 +1581,7 @@ class GliderAircraft(Aircraft):
                 sp = max(sp)
         if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
             self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
-        self.new_gforce_effect(telem_data)
+        self._gforce_effect(telem_data)
 
         if self.is_collective():
             self._override_collective_spring()
@@ -1660,7 +1663,7 @@ class Helicopter(Aircraft):
         self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
         self._update_vrs_effect(telem_data)
 
-        self.new_gforce_effect(telem_data)
+        self._gforce_effect(telem_data)
 
     def _update_heli_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")

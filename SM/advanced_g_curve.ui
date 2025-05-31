@@ -468,59 +468,76 @@
          </item>
         </layout>
        </item>
-       <item row="2" column="1">
-        <layout class="QHBoxLayout" name="horizontalLayout_17">
-         <item alignment="Qt::AlignLeft">
-          <widget class="InfoLabel" name="lab_effect_mode" native="true"/>
-         </item>
-         <item alignment="Qt::AlignLeft">
-          <widget class="QRadioButton" name="rb_constant">
-           <property name="text">
-            <string>Constant Force</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-           <attribute name="buttonGroup">
-            <string notr="true">modeButtonGroup</string>
-           </attribute>
-          </widget>
-         </item>
-         <item alignment="Qt::AlignLeft">
-          <widget class="QRadioButton" name="rb_offset">
-           <property name="text">
-            <string>Spring Offset</string>
-           </property>
-           <attribute name="buttonGroup">
-            <string notr="true">modeButtonGroup</string>
-           </attribute>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer_8">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-        </layout>
-       </item>
        <item row="2" column="0">
         <layout class="QHBoxLayout" name="horizontalLayout">
          <item>
           <widget class="LabeledToggle" name="tog_live_view">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
            <property name="text">
             <string>Live View</string>
            </property>
           </widget>
          </item>
         </layout>
+       </item>
+       <item row="1" column="0">
+        <layout class="QHBoxLayout" name="horizontalLayout_17">
+         <item alignment="Qt::AlignLeft">
+          <widget class="InfoLabel" name="lab_effect_mode" native="true">
+           <property name="minimumSize">
+            <size>
+             <width>20</width>
+             <height>0</height>
+            </size>
+           </property>
+          </widget>
+         </item>
+         <item alignment="Qt::AlignLeft">
+          <widget class="LabeledToggle" name="cb_constant">
+           <property name="text">
+            <string>Constant Force</string>
+           </property>
+          </widget>
+         </item>
+         <item alignment="Qt::AlignLeft">
+          <widget class="LabeledToggle" name="cb_offset">
+           <property name="text">
+            <string>Spring Offset</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="1" column="2">
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="3" column="2">
+        <spacer name="horizontalSpacer_8">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </item>
@@ -561,7 +578,4 @@
  </customwidgets>
  <resources/>
  <connections/>
- <buttongroups>
-  <buttongroup name="modeButtonGroup"/>
- </buttongroups>
 </ui>

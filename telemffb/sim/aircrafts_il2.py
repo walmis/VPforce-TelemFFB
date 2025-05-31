@@ -112,15 +112,7 @@ class Aircraft(AircraftBase):
     jet_engine_rumble_intensity = 0.12      # peak intensity for jet engine rumble effect
     jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
 
-    ####
-    #### Beta effects - set to 1 to enable
-    gforce_effect_invert_force = 0  # case where "180" degrees does not equal "away from pilot"
-    gforce_effect_enable = 0
-    gforce_effect_enable_areyoureallysure = 0
-    gforce_effect_curvature = 2.2
-    gforce_effect_max_intensity = 1.0
-    gforce_min_gs = 1.5  # G's where the effect starts playing
-    gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
+
 
     gun_is_firing = 0
     damage_effect_enabled: bool = False
