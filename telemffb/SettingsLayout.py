@@ -379,46 +379,86 @@ class SettingsLayout(QGridLayout):
 
         m_butt = QPushButton("-")
         m_butt.setFixedSize(20, 20)
-        m_butt.setStyleSheet("""
-            QPushButton {
-                font-size: 16px;  /* Adjust the font size */
-                font-family: Cascadia Code;
-                font-weight: bold;
-                color: black;
-                padding: 0px;
-                border: none;  /* Remove any border */
-                margin: 0px;   /* Remove any margin */
-                background-color: transparent;  /* Transparent background */
-            }
-            QPushButton:hover {
-                background-color: #ddd;  /* Optional: Change background on hover */
-            }
-            QPushButton:pressed {
-                background-color: #bbb;  /* Optional: Change background on press */
-            }
-        """)
+        if G.useDarkMode:
+            m_butt.setStyleSheet("""
+                QPushButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: #ab37c8;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QPushButton:hover {
+                    background-color: #666;  /* Optional: Change background on hover */
+                }
+                QPushButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
+        else:
+            m_butt.setStyleSheet("""
+                QPushButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: black;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QPushButton:hover {
+                    background-color: #ddd;  /* Optional: Change background on hover */
+                }
+                QPushButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
 
         # Create the "+" button
         p_butt = QPushButton("+")
         p_butt.setFixedSize(20, 20)
-        p_butt.setStyleSheet("""
-            QPushButton {
-                font-size: 16px;  /* Adjust the font size */
-                font-family: Cascadia Code;
-                font-weight: bold;
-                color: black;
-                padding: 0px;
-                border: none;  /* Remove any border */
-                margin: 0px;   /* Remove any margin */
-                background-color: transparent;  /* Transparent background */
-            }
-            QPushButton:hover {
-                background-color: #ddd;  /* Optional: Change background on hover */
-            }
-            QPushButton:pressed {
-                background-color: #bbb;  /* Optional: Change background on press */
-            }
-        """)
+        if G.useDarkMode:
+            p_butt.setStyleSheet("""
+                QPushButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: #ab37c8;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QPushButton:hover {
+                    background-color: #666;  /* Optional: Change background on hover */
+                }
+                QPushButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
+        else:
+            p_butt.setStyleSheet("""
+                QPushButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: black;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QPushButton:hover {
+                    background-color: #ddd;  /* Optional: Change background on hover */
+                }
+                QPushButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
@@ -439,24 +479,44 @@ class SettingsLayout(QGridLayout):
         expand_button.setMinimumWidth(24)
         expand_button.setObjectName(f"ex_{item['name']}")
         expand_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        expand_button.setStyleSheet("""
-            QToolButton {
-                font-size: 16px;  /* Adjust the font size */
-                font-family: Cascadia Code;
-                font-weight: bold;
-                color: black;
-                padding: 0px;
-                border: none;  /* Remove any border */
-                margin: 0px;   /* Remove any margin */
-                background-color: transparent;  /* Transparent background */
-            }
-            QToolButton:hover {
-                background-color: #ddd;  /* Optional: Change background on hover */
-            }
-            QToolButton:pressed {
-                background-color: #bbb;  /* Optional: Change background on press */
-            }
-        """)
+        if G.useDarkMode:
+            expand_button.setStyleSheet("""
+                QToolButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: #ab37c8;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QToolButton:hover {
+                    background-color: #666;  /* Optional: Change background on hover */
+                }
+                QToolButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
+        else:
+            expand_button.setStyleSheet("""
+                QToolButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: black;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QToolButton:hover {
+                    background-color: #ddd;  /* Optional: Change background on hover */
+                }
+                QToolButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
         expand_button.clicked.connect(self.expander_clicked)
 
         usb_button_text = f"Button {item['value']}"
@@ -828,7 +888,10 @@ class SettingsLayout(QGridLayout):
             # These are top level config sections that have an expander button but do not have any ".1" sliders
             label.text_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
             label.text_label.setOpenExternalLinks(False)
-            label.text_label.setText(f'<a href="#">{item["displayname"]}</a>')
+            if G.useDarkMode:
+                label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{item["displayname"]}</a>')
+            else:
+                label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{item["displayname"]}</a>')
             label.text_label.setToolTip('Click to Expand')
             label.text_label.linkActivated.connect(expand_button.click)
 
@@ -840,7 +903,10 @@ class SettingsLayout(QGridLayout):
             if parent_expand_button is not None:
                 label.text_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
                 label.text_label.setOpenExternalLinks(False)
-                label.text_label.setText(f'<a href="#">{item["displayname"]}</a>')
+                if G.useDarkMode:
+                    label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{item["displayname"]}</a>')
+                else:
+                    label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{item["displayname"]}</a>')
                 label.text_label.linkActivated.connect(lambda href, parent_name=parent: self.expander_hyperlink_clicked(parent_name))
 
     def expander_hyperlink_clicked(self, parent):

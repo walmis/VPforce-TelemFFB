@@ -18,7 +18,7 @@
 
 import sys
 
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QColor
 
 from telemffb.CmdLineArgs import CmdLineArgs
 
@@ -97,21 +97,16 @@ def launch_children():
 
 
 def main():
-    QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True) #enable highdpi scaling
-    QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)  #use highdpi icons
-    
+    #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute. AA_EnableHighDpiScaling, True) #enable highdpi scaling
+    #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)  #use highdpi icons
+
+
+
     dev : FFBRhino = None
 
     app = QApplication(sys.argv)
     app.setStyle('Fusion')  # Set Fusion style
 
-    # Create and set custom palette with accent color
-    palette = app.palette()
-    accent_color = QtGui.QColor('#9430ad')
-    palette.setColor(palette.Highlight, accent_color)
-    palette.setColor(palette.HighlightedText, QtGui.QColor('white'))
-    palette.setColor(palette.Link, accent_color)
-    app.setPalette(palette)
 
     G.args = CmdLineArgs.parse()
 
@@ -145,6 +140,39 @@ def main():
     G.child_instance = G.args.child
 
     G.system_settings = utils.SystemSettings()
+    G.useDarkMode = G.system_settings.get('useDarkmode', False)
+
+    # Create and set custom palette with accent color
+    palette = app.palette()
+    accent_color = QtGui.QColor('#9430ad')
+    palette.setColor(palette.Highlight, accent_color)
+    palette.setColor(palette.HighlightedText, QtGui.QColor('white'))
+    palette.setColor(palette.Link, accent_color)
+    app.setPalette(palette)
+
+    if G.useDarkMode:
+        # Base colors
+        palette.setColor(palette.Window, QColor(53, 53, 53))
+        palette.setColor(palette.WindowText, QtGui.QColor('white'))
+        palette.setColor(palette.Base, QColor(35, 35, 35))
+        palette.setColor(palette.AlternateBase, QColor(53, 53, 53))
+        palette.setColor(palette.ToolTipBase, QtGui.QColor('white'))
+        palette.setColor(palette.ToolTipText, QtGui.QColor('white'))
+        palette.setColor(palette.Text, QtGui.QColor('white'))
+        palette.setColor(palette.Button, QColor(53, 53, 53))
+        palette.setColor(palette.ButtonText, QtGui.QColor('white'))
+        palette.setColor(palette.BrightText, QtGui.QColor('red'))
+
+        # Link colors
+        palette.setColor(palette.Link, QColor(42, 130, 218))
+        palette.setColor(palette.Highlight, QColor(42, 130, 218))
+        palette.setColor(palette.HighlightedText, QtGui.QColor('black'))
+
+        # Disabled
+        palette.setColor(palette.Disabled, palette.Text, QColor(127, 127, 127))
+        palette.setColor(palette.Disabled, palette.ButtonText, QColor(127, 127, 127))
+
+        app.setPalette(palette)
 
     # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
     _vpf_logo = ":/image/vpforcelogo.png"
@@ -266,142 +294,95 @@ def main():
         # or QtWidgets.QApplication.exit(0)
     sys.excepthook = excepthook
 
-    G.useDarkMode = G.system_settings.get('useDarkmode', False)
-    app.setStyleSheet(
-        """
-        /*QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
-        QCheckBox::indicator:checked:disabled {image: url(:/image/disabledcheckbox.png); }
-        QRadioButton::indicator:checked { image: url(:/image/rchecked.png);}*/
-
-        QPushButton:!pressed, #styledButton:!pressed {
-            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                              stop: 0 #e4a9e7, stop: 0.2 #c174e6,
-                                              stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
-            border-radius: 5px;
-            padding: 3px;
-            margin: 0px;
-            color: white;
-            border: 1px solid #6e1d6f; /* Existing border */
-
-        }
-
-        QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
-            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                              stop: 0 #e1e1e1, stop: 0.2 #cccccc,
-                                              stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
-            color: #666666;  /* Set the text color for disabled buttons */
-            border-radius: 5px;
-            padding: 3px;
-            margin: 0px;
-            border: 1px solid #999999; /* Existing border */
-
-        }
-
-        QPushButton:pressed, #styledButton:pressed {
-        background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                          stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
-                                          stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7); /* Inverted gradient */
-        border-radius: 5px;
-        padding: 3px;
-        margin: 0px;
-        color: white;
-        border: 1px solid #4e164e; /* Darker border to indicate pressed state */
-
-        }
-
-        QPushButton:hover:!pressed, #styledButton:hover:!pressed {
-            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                              stop: 0 #f0b0f0, stop: 0.2 #d897d8,
-                                              stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
-            border-radius: 5px;
-            padding: 3px;
-            margin: 0px;
-            border: 1px solid #8e1da8; /* Existing border */
-
-        }
-
-        /*
-        QComboBox::down-arrow {
-            image: url(:/image/down-down.png);
-        }
-
-        QComboBox QAbstractItemView {
-            border: 2px solid darkgray;
-            selection-background-color: #ab37c8;
-        }
-*/
-        QLineEdit {
-            selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
-        }
-
-        QPlainTextEdit {
-            selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
-        }
-
-        QSlider::handle:horizontal {
-            background: #ab37c8; /* Set the handle color */
-            border: 1px solid #565a5e;
-            width: 16px;  /* Adjusted handle width */
-            height: 20px;  /* Adjusted handle height */
-            border-radius: 5px;  /* Adjusted border radius */
-            margin-top: -5px;  /* Negative margin to overlap with groove */
-            margin-bottom: -5px;  /* Negative margin to overlap with groove */
-            margin-left: -1px;  /* Adjusted left margin */
-            margin-right: -1px;  /* Adjusted right margin */
-        }
-
-        QSlider::handle:horizontal:disabled {
-            background: #888888; /* Set the color of the handle when disabled */
-        }
-
-        QSlider::groove:horizontal {
-            border: 1px solid #565a5e;
-            height: 8px;  /* Adjusted groove height */
-            background: qlineargradient(
-                x1: 0, y1: 0, x2: 0, y2: 1,
-                stop: 0 #e6e6e6, stop: 1 #bfbfbf
-            );
-            margin: 0;
-            border-radius: 3px;  /* Adjusted border radius */
-        }
-
-        QMenuBar {
-            background-color: #f0f0f0;
-        }
-        
-        QMenu::item {
-            background-color: transparent;
-        }
-        
-        QMenu::item:selected {
-            color: #ffffff;
-            background-color: "#ab37c8";
-        }
-
-        """
-    )
     if G.useDarkMode:
         app.setStyleSheet(
             """
-            QWidget {
-                background-color: #2b2b2b;
-                color: #dddddd;
-                selection-background-color: #5e3c88; /* for consistency */
+            QPushButton:!pressed, #styledButton:!pressed {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                                  stop: 0 #e4a9e7, stop: 0.2 #c174e6,
+                                                  stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
+                border-radius: 5px;
+                padding: 3px;
+                margin: 0px;
+                color: white;
+                border: 1px solid #6e1d6f; /* Existing border */
+    
+            }
+    
+            QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                                  stop: 0 #e1e1e1, stop: 0.2 #cccccc,
+                                                  stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
+                color: #666666;  /* Set the text color for disabled buttons */
+                border-radius: 5px;
+                padding: 3px;
+                margin: 0px;
+                border: 1px solid #999999; /* Existing border */
+    
+            }
+    
+            QPushButton:pressed, #styledButton:pressed {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                                  stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
+                                                  stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7); /* Inverted gradient */
+                border-radius: 5px;
+                padding: 3px;
+                margin: 0px;
+                color: white;
+                border: 1px solid #4e164e; /* Darker border to indicate pressed state */
+            }
+    
+            QPushButton:hover:!pressed, #styledButton:hover:!pressed {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                                  stop: 0 #f0b0f0, stop: 0.2 #d897d8,
+                                                  stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
+                border-radius: 5px;
+                padding: 3px;
+                margin: 0px;
+                border: 1px solid #8e1da8; /* Existing border */
+    
+            }
+            
+             QLineEdit, QPlainTextEdit, QTextEdit {
+                background-color: #3a3a3a;
+                color: #ffffff;
+                selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
+            }
+            
+            QSlider::handle:horizontal {
+                background: #ab37c8; /* Set the handle color */
+                border: 1px solid #565a5e;
+                width: 16px;  /* Adjusted handle width */
+                height: 20px;  /* Adjusted handle height */
+                border-radius: 5px;  /* Adjusted border radius */
+                margin-top: -5px;  /* Negative margin to overlap with groove */
+                margin-bottom: -5px;  /* Negative margin to overlap with groove */
+                margin-left: -1px;  /* Adjusted left margin */
+                margin-right: -1px;  /* Adjusted right margin */
+            }
+    
+            QSlider::handle:horizontal:disabled {
+                background: #888888; /* Set the color of the handle when disabled */
+            }
+                        
+            QSlider::groove:horizontal {
+                border: 1px solid #333333;
+                height: 8px;  /* Adjusted groove height */
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 0, y2: 1,
+                    stop: 0 #5a5a5a, stop: 1 #3e3e3e
+                );
+            margin: 0;
+            border-radius: 3px;  /* Adjusted border radius */
             }
 
-            QFrame {
-                background-color: #2b2b2b;
-                color: #dddddd;
-            }
-
-            /* QMenuBar styling */
             QMenuBar {
                 background-color: #2b2b2b;
                 color: #dddddd;
             }
                         
             QMenuBar::item:selected {
-                background-color: #444444;
+                background-color: #ab37c8;
                 color: white;
             }
             
@@ -426,37 +407,165 @@ def main():
                 background-color: #ab37c8;
                 color: white;
             }
+ /*                       
+            QWidget {
+                background-color: #2b2b2b;
+                color: #dddddd;
+                selection-background-color: #5e3c88; /* for consistency */
+            }
+*/
+            QFrame {
+                background-color: #2b2b2b;
+                color: #dddddd;
+            }
             
             QComboBox {
                 background-color: #3a3a3a;
                 color: white;
                 border: 1px solid #999;
             }
-            
+           
             QComboBox QAbstractItemView {
                 background-color: #2b2b2b;
             }
 
+            QCheckBox {
+                color: white; /* Text color */
+                spacing: 5px;
+            }
+            
+            QCheckBox::indicator {
+                border: 1px solid #888;
+                background-color: transparent;
+                border-radius: 3px;
+            }
+            
+            QCheckBox::indicator:checked {
+                background-color: #ab37c8; /* Checked box color */
+                border: 1px solid #c174e6;
+            }
+            
+            QCheckBox::indicator:unchecked:hover {
+                border: 1px solid #ab37c8;
+            }
+            
+            QCheckBox::indicator:disabled {
+                background-color: #444;
+                border: 1px solid #666;
+            }
+
+            """
+        )
+    else:
+        app.setStyleSheet(
+            """
+            /*QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
+            QCheckBox::indicator:checked:disabled {image: url(:/image/disabledcheckbox.png); }
+            QRadioButton::indicator:checked { image: url(:/image/rchecked.png);}*/
+
+            QPushButton:!pressed, #styledButton:!pressed {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                                  stop: 0 #e4a9e7, stop: 0.2 #c174e6,
+                                                  stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
+                border-radius: 5px;
+                padding: 3px;
+                margin: 0px;
+                color: white;
+                border: 1px solid #6e1d6f; /* Existing border */
+
+            }
+
+            QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                                  stop: 0 #e1e1e1, stop: 0.2 #cccccc,
+                                                  stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
+                color: #666666;  /* Set the text color for disabled buttons */
+                border-radius: 5px;
+                padding: 3px;
+                margin: 0px;
+                border: 1px solid #999999; /* Existing border */
+
+            }
+
+            QPushButton:pressed, #styledButton:pressed {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                                  stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
+                                                  stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7); /* Inverted gradient */
+                border-radius: 5px;
+                padding: 3px;
+                margin: 0px;
+                color: white;
+                border: 1px solid #4e164e; /* Darker border to indicate pressed state */
+
+            }
+
+            QPushButton:hover:!pressed, #styledButton:hover:!pressed {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                                  stop: 0 #f0b0f0, stop: 0.2 #d897d8,
+                                                  stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
+                border-radius: 5px;
+                padding: 3px;
+                margin: 0px;
+                border: 1px solid #8e1da8; /* Existing border */
+            }
+
+            /*
+            QComboBox::down-arrow {
+                image: url(:/image/down-down.png);
+            }
+
+            QComboBox QAbstractItemView {
+                border: 2px solid darkgray;
+                selection-background-color: #ab37c8;
+            }
+            */
             
             QLineEdit, QPlainTextEdit, QTextEdit {
-                background-color: #3a3a3a;
-                color: #ffffff;
+                selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
+            }
+
+            QSlider::handle:horizontal {
+                background: #ab37c8; /* Set the handle color */
+                border: 1px solid #565a5e;
+                width: 16px;  /* Adjusted handle width */
+                height: 20px;  /* Adjusted handle height */
+                border-radius: 5px;  /* Adjusted border radius */
+                margin-top: -5px;  /* Negative margin to overlap with groove */
+                margin-bottom: -5px;  /* Negative margin to overlap with groove */
+                margin-left: -1px;  /* Adjusted left margin */
+                margin-right: -1px;  /* Adjusted right margin */
             }
 
             QSlider::handle:horizontal:disabled {
                 background: #888888; /* Set the color of the handle when disabled */
             }
-            
+
             QSlider::groove:horizontal {
-                border: 1px solid #333333;
+                border: 1px solid #565a5e;
+                height: 8px;  /* Adjusted groove height */
                 background: qlineargradient(
                     x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #5a5a5a, stop: 1 #3e3e3e
+                    stop: 0 #e6e6e6, stop: 1 #bfbfbf
                 );
+                margin: 0;
+                border-radius: 3px;  /* Adjusted border radius */
             }
+
+            QMenuBar {
+                background-color: #f0f0f0;
+            }
+
+            QMenu::item {
+                background-color: transparent;
+            }
+
+            QMenu::item:selected {
+                color: #ffffff;
+                background-color: "#ab37c8";
+            }
+
             """
         )
-
 
     G.log_window = LogWindow()
     init_logging(G.log_window.widget)

@@ -365,12 +365,15 @@ class StatusLabel(QWidget):
         layout.addWidget(self.label)
 
     def enterEvent(self, event):
-        # Set the label to be blue and underlined when the mouse enters
-        self.label.setStyleSheet("QLabel { padding-right: 5px; color: blue; text-decoration: underline; }")
+        # Set the label to be purple and underlined when the mouse enters
+        self.label.setStyleSheet("QLabel { padding-right: 5px; color: #ab37c8; text-decoration: underline; }")
 
     def leaveEvent(self, event):
         # Set the label back to its original style when the mouse leaves
-        self.label.setStyleSheet("QLabel { padding-right: 5px; color: black; text-decoration: none; }")
+        if G.useDarkMode:
+            self.label.setStyleSheet("QLabel { padding-right: 5px; color: white; text-decoration: none; }")
+        else:
+            self.label.setStyleSheet("QLabel { padding-right: 5px; color: black; text-decoration: none; }")
 
     def mousePressEvent(self, event):
         if self._clickable:
