@@ -239,8 +239,9 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         except Exception as e:
             print(f"Error loading curve settings: {e}")
             raise
-
-        G.telem_manager.currentAircraft.adv_spr_settings_dict = settings
+        if hasattr(G.telem_manager.currentAircraft, 'adv_spr_settings_dict'):
+            # Only update the aircraft on load if telem_manager is active.  Else will throw error when offline
+            G.telem_manager.currentAircraft.adv_spr_settings_dict = settings
         if "curve_x" in settings and "curve_y" in settings:
             self.curve_x.from_dict(settings["curve_x"])
             self.cb_x_smoothcurve.setChecked(settings['curve_x']['smooth_curve_enabled'])

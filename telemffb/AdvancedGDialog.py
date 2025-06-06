@@ -258,7 +258,9 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
             "mode": self.effect_mode
         }
         json_string = json.dumps(settings)
-        G.telem_manager.currentAircraft.adv_g_settings_dict = settings
+        if hasattr(G.telem_manager.currentAircraft, 'adv_spr_settings_dict'):
+            # Only update the aircraft on load if telem_manager is active.  Else will throw error when offline
+            G.telem_manager.currentAircraft.adv_g_settings_dict = settings
         self.current_settings = json_string
         self.accepted.emit(json_string)
         if close:
