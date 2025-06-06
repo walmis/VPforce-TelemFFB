@@ -785,47 +785,90 @@ class AircraftBase(object):
         else:
             effects.dispose("crit_aoa")
         return
-    
+
     def _decel_effect(self, telem_data):
-        if not self.deceleration_effect_enable or not self.is_joystick(): 
+        if not self.deceleration_effect_enable or not self.is_joystick():
             effects.dispose("decel")
             return
 
+        wow = sum(telem_data.get("WeightOnWheels"), 0)
+        if not wow and self.decel_airborne_disable:
+            # When off ground, dispose effect and return
+            effects.dispose('decel')
+            return
+
         if self._sim_is("DCS") or self._sim_is("IL2"):
-            y_gs = telem_data.get("ACCs", 0)[0]
-            last_y_gs = self._last_telem_data.get("ACCs", [0,0,0])[0]
+            if self.decel_airborne_disable:
+                # We are on the ground, calculate using G vectors
+                y_gs = telem_data.get("ACCs", 0)[0]
+                last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
+
+            else:
+                # we are in the air, calculate G vector from rate of change of velocity since DCS Y g vector is world orientation
+
+                # if telem_data.get('speedbrakes_value', 0) <= 0.1:
+                #     # don't play decel effect while in the air unless the airbrake is deployed
+                #     effects.dispose("decel")
+                #     return
+
+                dt = perftracker.get_time_delta('decel')
+                speed = telem_data.get('TAS')
+
+                if not hasattr(self, 'last_speed'):
+                    self.last_speed = speed
+                if not hasattr(self, 'last_y_gs'):
+                    self.last_y_gs = 0
+                last_speed = self.last_speed
+                self.last_speed = speed
+
+                accel_g = 0
+                if last_speed is not None and dt > 0:
+                    delta_v = speed - last_speed
+                    acceleration = delta_v / dt  # m/s²
+                    accel_g = acceleration / 9.81  # convert to Gs
+
+                self.telem_data['decel_g'] = accel_g
+
+                y_gs = accel_g
+                last_y_gs = self.last_y_gs
+                self.last_y_gs = y_gs
+
         elif self._sim_is("MSFS"):
             y_gs = telem_data.get("AccBody")[2]
-            last_y_gs = self._last_telem_data.get("AccBody", [0,0,0])[2]
+            last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
+
         elif self._sim_is_xplane():
             y_gs = -telem_data.get("Gaxil")
             last_y_gs = self._last_telem_data.get("Gaxil", 0)
         delta_y = abs(y_gs) - abs(last_y_gs)
+
         if not self.anything_has_changed("decel", y_gs):
             return
 
         if abs(delta_y) > 3:  # If the per-frame rate of change is greater than 3 Gs, we have likely crashed and telemetry is violently spiking.. do not play effect:
             return
 
-        if not sum(telem_data.get("WeightOnWheels")) and self.decel_airborne_disable:
-            effects.dispose("decel")
-            return
         if not telem_data.get("TAS", 0):
             effects.dispose("decel")
             return
         avg_y_gs = self.smoother.get_average("y_gs", y_gs, sample_size=8)
+
+        self.telem_data['decel_g_smooth'] = avg_y_gs
+
         max_gs = self.deceleration_max_force
 
         dir = 180 if not self.decel_invert_force else 0
 
-        wow = True if not self.decel_airborne_disable else sum(telem_data.get("WeightOnWheels"), 0)
-        if (avg_y_gs < -0.03 < 500) and wow:  # Don't play effect for very small, or very large (crash) force values, or no weight on wheels
+        if (avg_y_gs < -0.03 < 500):  # Don't play effect for very small, or very large (crash) force values, or no weight on wheels
             if abs(avg_y_gs) > max_gs:
                 avg_y_gs = -max_gs
 
             avg_y_gs = utils.clamp(abs(avg_y_gs) * self.decel_scale_factor, 0, 1)
+            if self._sim_is_dcs():
+                sb = telem_data.get('speedbrakes_value')
+                avg_y_gs = avg_y_gs * sb
             logging.debug(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
-            effects["decel"].constant(abs(avg_y_gs), direction= dir).start()
+            effects["decel"].constant(abs(avg_y_gs), direction=dir).start()
         else:
             effects.dispose("decel")
 
