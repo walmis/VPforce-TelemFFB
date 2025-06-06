@@ -118,6 +118,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_t.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
+        # only allow dark mode if debug menu visible
+        self.useDarkmode.setVisible(G.system_settings.get('debug', False))
+
         if (G.master_instance and G.launched_instances) or G.child_instance:
             self.labelSystem.setText("System (Per Instance):")
             self.labelLaunch.setText("Launch Options (Global):")
@@ -440,7 +443,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pruneLogsUnit': self.combo_logPrune.currentText(),
             'startToTray': self.cb_startToTray.isChecked(),
             'masterStartMin': self.cb_masterStartMin.isChecked(),
-            'closeToTray': self.cb_closeToTray.isChecked()
+            'closeToTray': self.cb_closeToTray.isChecked(),
+            'useDarkmode': self.useDarkmode.isChecked()
         }
 
         instance_settings_dict = {
@@ -475,6 +479,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidPedals',
             'pidCollective',
             'pidTrimWheel',
+            'useDarkmode'
         ]
         saved_al_dict = {}
         for key in key_list:
@@ -524,6 +529,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.telemTimeout.setText(str(settings_dict.get('telemTimeout', 200)))
 
         self.ignoreUpdate.setChecked(settings_dict.get('ignoreUpdate', False))
+
+        self.useDarkmode.setChecked(settings_dict.get('useDarkmode', False))
 
         self.cb_logPrune.setChecked(settings_dict.get('pruneLogs', False))
 

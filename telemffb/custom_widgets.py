@@ -149,16 +149,6 @@ class NoWheelSlider(QSlider):
     def update_styles(self):
         # Generate CSS based on color and size properties
         css = f"""
-            QSlider::groove:horizontal {{
-                border: 1px solid #565a5e;
-                height: 8px;  /* Adjusted groove height */
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #e6e6e6, stop: 1 #bfbfbf
-                );
-                margin: 0;
-                border-radius: 3px;  /* Adjusted border radius */
-            }}
             QSlider::handle:horizontal {{
                 background: qradialgradient(
                     cx: 0.3, cy: 0.5, fx: 0.3, fy: 0.35, radius: 0.8,
@@ -375,12 +365,15 @@ class StatusLabel(QWidget):
         layout.addWidget(self.label)
 
     def enterEvent(self, event):
-        # Set the label to be blue and underlined when the mouse enters
-        self.label.setStyleSheet("QLabel { padding-right: 5px; color: blue; text-decoration: underline; }")
+        # Set the label to be purple and underlined when the mouse enters
+        self.label.setStyleSheet("QLabel { padding-right: 5px; color: #ab37c8; text-decoration: underline; }")
 
     def leaveEvent(self, event):
         # Set the label back to its original style when the mouse leaves
-        self.label.setStyleSheet("QLabel { padding-right: 5px; color: black; text-decoration: none; }")
+        if G.useDarkMode:
+            self.label.setStyleSheet("QLabel { padding-right: 5px; color: white; text-decoration: none; }")
+        else:
+            self.label.setStyleSheet("QLabel { padding-right: 5px; color: black; text-decoration: none; }")
 
     def mousePressEvent(self, event):
         if self._clickable:

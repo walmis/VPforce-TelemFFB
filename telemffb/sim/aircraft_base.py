@@ -324,6 +324,10 @@ class AircraftBase(object):
 
         self.friction_effect_overridden: bool = False
 
+        self.friction_effect_overridden: bool = False
+
+        self.friction_effect_overridden: bool = False
+
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
         This function creates an entry in the  stepper dictionary which can be used to track the progress of driving a

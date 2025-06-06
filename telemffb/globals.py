@@ -85,3 +85,5 @@ release_version_str: str = "Vx.x.x"
 dev_build : bool = True # when True, build versions will use 'dev_build_str' as the version string and will not look for updates
 dev_userconfig: bool = True  # will use/create userconfig.xml in root when True (dev_build must also be true)
 dev_build_str: str = "DEV_BUILD"
+
+useDarkMode : bool = False

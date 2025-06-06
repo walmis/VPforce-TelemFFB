@@ -504,19 +504,35 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             # Check if replaced is an empty string and set text color accordingly
             for item in [grouping_item, displayname_item, value_item, info_item, replaced_item]:  #colorizing device_item puts in in 1st column
-                match data_dict['replaced']:
-                    case 'Sim Default':
-                        item.setForeground(QtGui.QColor('darkblue'))
-                    case 'Sim (user)':
-                        item.setForeground(QtGui.QColor('blue'))
-                    case 'Class Default':
-                        item.setForeground(QtGui.QColor('darkGreen'))
-                    case 'Class (user)':
-                        item.setForeground(QtGui.QColor('green'))
-                    case 'Model Default':
-                        item.setForeground(QtGui.QColor('darkMagenta'))
-                    case 'Model (user)':
-                        item.setForeground(QtGui.QColor('magenta'))
+                if G.useDarkMode:
+                    match data_dict['replaced']:
+                        case 'Sim Default':
+                            item.setForeground(QtGui.QColor('#6ca0ff'))  # Light blue
+                        case 'Sim (user)':
+                            item.setForeground(QtGui.QColor('#89caff'))  # Lighter blue
+                        case 'Class Default':
+                            item.setForeground(QtGui.QColor('#6cff9f'))  # Light green
+                        case 'Class (user)':
+                            item.setForeground(QtGui.QColor('#aaffc3'))  # Pale green
+                        case 'Model Default':
+                            item.setForeground(QtGui.QColor('#ff90ff'))  # Light magenta
+                        case 'Model (user)':
+                            item.setForeground(QtGui.QColor('#ffb3ff'))  # Pale magenta
+
+                else:
+                    match data_dict['replaced']:
+                        case 'Sim Default':
+                            item.setForeground(QtGui.QColor('darkblue'))
+                        case 'Sim (user)':
+                            item.setForeground(QtGui.QColor('blue'))
+                        case 'Class Default':
+                            item.setForeground(QtGui.QColor('darkGreen'))
+                        case 'Class (user)':
+                            item.setForeground(QtGui.QColor('green'))
+                        case 'Model Default':
+                            item.setForeground(QtGui.QColor('darkMagenta'))
+                        case 'Model (user)':
+                            item.setForeground(QtGui.QColor('magenta'))
                 if data_dict['grouping'] == 'Debug':
                     item.setForeground(QtGui.QColor('red'))
 
@@ -540,7 +556,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             self.table_widget.setRowCount(list_length)
 
             self.table_widget.insertRow(row)
-            self.table_widget.setItem(row, 0, item)
+            self.table_widget.setItem(row, 0, replaced_item)
             try:
                 self.table_widget.setCellWidget(row, 0, checkbox)
             except Exception as e:

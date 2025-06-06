@@ -161,13 +161,8 @@ class MainWindow(QMainWindow):
         self.menu = menubar
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
-        self.menu.setStyleSheet("""
-            QMenuBar { background-color: #f0f0f0; } 
-            QMenu::item {background-color: transparent;}
-            QMenu::item:selected { color: #ffffff; background-color: "#ab37c8"; } 
-        """)
-        # Add the "System" menu and its sub-option
 
+        # Add the "System" menu and its sub-option
         system_menu = self.menu.addMenu('&System')
 
         system_settings_action = QAction('System Settings', self)
@@ -507,18 +502,22 @@ class MainWindow(QMainWindow):
         self.cb_joystick = QCheckBox('Joystick')
         self.cb_pedals = QCheckBox('Pedals')
         self.cb_collective = QCheckBox('Collective')
+        self.cb_trimwheel = QCheckBox('Trim Wheel')
 
         self.config_scope_row = QHBoxLayout()
         self.configmode_group.addButton(self.cb_joystick, 1)
         self.configmode_group.addButton(self.cb_pedals, 2)
         self.configmode_group.addButton(self.cb_collective, 3)
+        self.configmode_group.addButton(self.cb_trimwheel, 4)
         self.configmode_group.buttonClicked.connect(self.change_config_scope)
         self.config_scope_row.addWidget(self.cb_joystick)
         self.config_scope_row.addWidget(self.cb_pedals)
         self.config_scope_row.addWidget(self.cb_collective)
+        self.config_scope_row.addWidget(self.cb_trimwheel)
         self.cb_joystick.setVisible(False)
         self.cb_pedals.setVisible(False)
         self.cb_collective.setVisible(False)
+        self.cb_trimwheel.setVisible(False)
 
         layout.addLayout(self.config_scope_row)
 
@@ -1110,7 +1109,7 @@ class MainWindow(QMainWindow):
             if 'joystick' in _arg: arg = 1
             elif 'pedals' in _arg: arg = 2
             elif 'collective' in _arg: arg = 3
-            elif 'trim wheel' in _arg: arg = 4
+            elif 'trimwheel' in _arg: arg = 4
         else:
             arg = _arg
 
