@@ -1190,6 +1190,7 @@
 		<Grouping>Spring Override</Grouping>
 		<order>4400</order>
 		<name>override_spring_enabled</name>
+		<exclusive_with>adv_spr_override_enabled</exclusive_with>
 		<info>Override the spring effect set by DCS&lt;br&gt;&lt;br&gt;Warning: If you enable this for an official DCS module that has FFB Support, all DCS generated spring effects will cease to function, including dynamic forces and trim.&lt;br&gt;&lt;br&gt;Note: Not compatible with 'Trim Workaround' or 'Trim Release Damper' features</info>
 		<displayname>Override DCS Spring</displayname>
 		<DCS>true</DCS>
@@ -1318,6 +1319,7 @@
 		<Grouping>Spring Override</Grouping>
 		<order>4550</order>
 		<name>adv_spr_override_enabled</name>
+		<exclusive_with>override_spring_enabled</exclusive_with>
 		<displayname>Advanced Spring Override</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -4248,6 +4250,90 @@
 		<var>L:switchForceTrim</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>DCS</sim>
+			<device>any</device>
+		</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>DCS</sim>
+			<device>any</device>
+		</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>IL2</sim>
+			<device>any</device>
+		</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>IL2</sim>
+			<device>any</device>
+	</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>TurbopropAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>GliderAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+	</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>TurbopropAircraft</type>
+			<value>false</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults>
+		<classdefaults>
+			<name>adv_spr_override_enabled</name>
+			<type>GliderAircraft</type>
+			<value>false</value>
+			<sim>XPLANE</sim>
+			<device>any</device>
+	</classdefaults>
 	<classdefaults>
 		<name>afterburner_effect_enabled</name>
 		<type>JetAircraft</type>
