@@ -90,7 +90,15 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.parent_window = parent
         # Load settings from the registry and update widget states
         self.current_al_dict = {}
+
+        # only allow dark mode if debug menu visible
+        # self.useDarkmode.setVisible(G.system_settings.get('debug', False))
+        self.themeButtonGroup.setId(self.rb_LightTheme, 0)
+        self.themeButtonGroup.setId(self.rb_DarkTheme, 1)
+        self.themeButtonGroup.setId(self.rb_SystemTheme, 2)
+
         self.load_settings()
+
         int_validator = QIntValidator()
         self.tb_logPrune.setValidator(int_validator)
         self.telemTimeout.setValidator(int_validator)
@@ -118,10 +126,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_t.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
 
-        # only allow dark mode if debug menu visible
-        self.useDarkmode.setVisible(G.system_settings.get('debug', False))
-        self.useDarkmode.stateChanged.connect(self.toggle_theme_option)
-        self.toggle_theme_option(self.useDarkmode.isChecked())
+
+
 
         if (G.master_instance and G.launched_instances) or G.child_instance:
             self.labelSystem.setText("System (Per Instance):")
@@ -139,11 +145,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_startToTray.clicked.connect(self.toggle_start_mode)
         self.cb_masterStartMin.clicked.connect(self.toggle_start_mode)
 
-    def toggle_theme_option(self, state):
-        if state:
-            self.useWindowsTheme.setVisible(True)
-        else:
-            self.useWindowsTheme.setVisible(False)
+
 
     def closeEvent(self, event):
         self.hide()
@@ -451,8 +453,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'startToTray': self.cb_startToTray.isChecked(),
             'masterStartMin': self.cb_masterStartMin.isChecked(),
             'closeToTray': self.cb_closeToTray.isChecked(),
-            'useDarkmode': self.useDarkmode.isChecked(),
-            'useWindowsTheme': self.useWindowsTheme.isChecked()
+            'themeId': self.themeButtonGroup.checkedId(),
         }
 
         instance_settings_dict = {
@@ -487,8 +488,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidPedals',
             'pidCollective',
             'pidTrimWheel',
-            'useDarkmode',
-            'useWindowsTheme'
+            'themeId'
         ]
         saved_al_dict = {}
         for key in key_list:
@@ -539,9 +539,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.ignoreUpdate.setChecked(settings_dict.get('ignoreUpdate', False))
 
-        self.useDarkmode.setChecked(settings_dict.get('useDarkmode', False))
+        themeID = settings_dict.get('themeId', 2)
 
-        self.useWindowsTheme.setChecked(settings_dict.get('useWindowsTheme', False))
+        self.themeButtonGroup.button(themeID).setChecked(True)
+
+
+        # self.useDarkmode.setChecked(settings_dict.get('useDarkmode', False))
+        #
+        # self.useWindowsTheme.setChecked(settings_dict.get('useWindowsTheme', False))
 
         self.cb_logPrune.setChecked(settings_dict.get('pruneLogs', False))
 

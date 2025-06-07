@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>616</width>
-    <height>922</height>
+    <height>928</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -41,19 +41,21 @@
          </item>
          <item>
           <layout class="QGridLayout" name="gridLayout">
-           <item row="1" column="0">
-            <widget class="QLabel" name="label_2">
-             <property name="text">
-              <string>Telemetry Timeout (ms):</string>
-             </property>
-            </widget>
+           <item row="2" column="0" colspan="2">
+            <layout class="QHBoxLayout" name="horizontalLayout_14"/>
            </item>
-           <item row="5" column="0">
+           <item row="4" column="0">
             <widget class="LabeledToggle" name="cb_logPrune">
              <property name="text">
               <string>Prune Logs (Global):</string>
              </property>
             </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="logLevel"/>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLineEdit" name="telemTimeout"/>
            </item>
            <item row="0" column="0">
             <widget class="QLabel" name="label">
@@ -62,14 +64,7 @@
              </property>
             </widget>
            </item>
-           <item row="2" column="0" colspan="2">
-            <widget class="LabeledToggle" name="useDarkmode">
-             <property name="text">
-              <string>Dark Mode</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="0" colspan="2">
+           <item row="3" column="0" colspan="2">
             <widget class="LabeledToggle" name="ignoreUpdate">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -82,10 +77,14 @@
              </property>
             </widget>
            </item>
-           <item row="0" column="1">
-            <widget class="QComboBox" name="logLevel"/>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_2">
+             <property name="text">
+              <string>Telemetry Timeout (ms):</string>
+             </property>
+            </widget>
            </item>
-           <item row="6" column="0" colspan="2">
+           <item row="5" column="0" colspan="2">
             <layout class="QHBoxLayout" name="horizontalLayout_5">
              <item>
               <spacer name="horizontalSpacer_12">
@@ -175,13 +174,21 @@
              </item>
             </layout>
            </item>
-           <item row="1" column="1">
-            <widget class="QLineEdit" name="telemTimeout"/>
+          </layout>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="verticalLayout_2">
+           <item>
+            <widget class="QLabel" name="labelTheme">
+             <property name="text">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700; text-decoration: underline;&quot;&gt;Theme (Global):&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+            </widget>
            </item>
-           <item row="3" column="0" colspan="2">
-            <layout class="QHBoxLayout" name="horizontalLayout_14">
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_15">
              <item>
-              <spacer name="uw_spacer">
+              <spacer name="horizontalSpacer_3">
                <property name="orientation">
                 <enum>Qt::Horizontal</enum>
                </property>
@@ -190,18 +197,57 @@
                </property>
                <property name="sizeHint" stdset="0">
                 <size>
-                 <width>13</width>
-                 <height>0</height>
+                 <width>12</width>
+                 <height>20</height>
                 </size>
                </property>
               </spacer>
              </item>
              <item>
-              <widget class="LabeledToggle" name="useWindowsTheme">
+              <widget class="QRadioButton" name="rb_LightTheme">
                <property name="text">
-                <string>Follow Windows Theme</string>
+                <string>Light</string>
                </property>
+               <attribute name="buttonGroup">
+                <string notr="true">themeButtonGroup</string>
+               </attribute>
               </widget>
+             </item>
+             <item>
+              <widget class="QRadioButton" name="rb_DarkTheme">
+               <property name="text">
+                <string>Dark</string>
+               </property>
+               <attribute name="buttonGroup">
+                <string notr="true">themeButtonGroup</string>
+               </attribute>
+              </widget>
+             </item>
+             <item>
+              <widget class="QRadioButton" name="rb_SystemTheme">
+               <property name="text">
+                <string>System</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+               <attribute name="buttonGroup">
+                <string notr="true">themeButtonGroup</string>
+               </attribute>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_2">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
              </item>
             </layout>
            </item>
@@ -1320,4 +1366,7 @@ Headless:</string>
  </tabstops>
  <resources/>
  <connections/>
+ <buttongroups>
+  <buttongroup name="themeButtonGroup"/>
+ </buttongroups>
 </ui>

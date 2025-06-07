@@ -140,13 +140,18 @@ def main():
     G.child_instance = G.args.child
 
     G.system_settings = utils.SystemSettings()
-    G.useDarkMode = G.system_settings.get('useDarkmode', False)
-    theme_mode = G.system_settings.get('useWindowsTheme', False)
-    windows_mode = app.styleHints().colorScheme()
-    if not G.useDarkMode:
-        app.styleHints().setColorScheme(Qt.ColorScheme.Light)
-    else:
-        if theme_mode:
+
+    theme_setting = G.system_settings.get('themeId', 2)
+
+    match theme_setting:
+        case 0: # Light Mode
+            app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+            G.useDarkMode = False
+        case 1: # Dark Mode
+            app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+            G.useDarkMode = True
+        case 2: # System Controlled
+            windows_mode = app.styleHints().colorScheme()
             if windows_mode == Qt.ColorScheme.Light:
                 app.styleHints().setColorScheme(Qt.ColorScheme.Light)
                 G.useDarkMode = False
