@@ -595,7 +595,6 @@
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
@@ -5124,6 +5123,62 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults>
+	<classdefaults>
+		<name>dummy_basic_spring_settings</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dummy_basic_spring_settings</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dummy_basic_spring_settings</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dummy_basic_spring_settings</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dummy_basic_spring_settings</name>
+		<type>PropellerAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dummy_basic_spring_settings</name>
+		<type>JetAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dummy_basic_spring_settings</name>
+		<type>TurbopropAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
+	<classdefaults>
+		<name>dummy_basic_spring_settings</name>
+		<type>GliderAircraft</type>
+		<value>true</value>
+		<sim>XPLANE</sim>
+		<device>any</device>
+	</classdefaults>
 	<classdefaults>
 		<name>elevator_droop_enabled</name>
 		<type>PropellerAircraft</type>
