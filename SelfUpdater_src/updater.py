@@ -8,9 +8,9 @@ import urllib
 import requests
 import os
 from zipfile import ZipFile
-from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QPixmap, QIcon
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QProgressBar, QPushButton, QLabel, QWidget, QHBoxLayout, QCheckBox, QMessageBox
+from PyQt6.QtCore import QThread, pyqtSignal, Qt
+from PyQt6.QtGui import QPixmap, QIcon
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QProgressBar, QPushButton, QLabel, QWidget, QHBoxLayout, QCheckBox, QMessageBox
 import argparse
 import subprocess
 import sys
@@ -217,7 +217,7 @@ class App(QMainWindow):
         version_layout = QHBoxLayout()
 
         self.version_label = QLabel(f"Current Installed Version: {g_current_version}\n\nLatest Available Version: {g_latest_version}")
-        self.version_label.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        self.version_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
         version_layout.addWidget(self.version_label)
         icon_path = os.path.join(g_application_path, "image/vpforceicon.png")
         self.setWindowIcon(QIcon(icon_path))
@@ -225,7 +225,7 @@ class App(QMainWindow):
         image_label = QLabel(self)
         pixmap = QPixmap(icon_path)  # Replace with the path to your image
         image_label.setPixmap(pixmap)
-        image_label.setAlignment(Qt.AlignVCenter | Qt.AlignCenter)
+        image_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignCenter)
         version_layout.addWidget(image_label)
 
         # Add the row layout to the main layout
@@ -252,7 +252,7 @@ class App(QMainWindow):
         checkbox_layout = QVBoxLayout()
         checkbox_layout.addWidget(self.launch_checkbox)
         checkbox_layout.addWidget(self.release_notes_checkbox)
-        checkbox_layout.setAlignment(Qt.AlignLeft)
+        checkbox_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         layout.addLayout(checkbox_layout)
         layout.addStretch(1)
@@ -380,7 +380,7 @@ def main():
     # print(f"debugpath={args.debugpath}")
 
     check_runtime()
-    app.exec_()
+    app.exec()
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@
 
 from typing import TYPE_CHECKING, Dict
 if TYPE_CHECKING:
-    from PyQt5.QtCore import QSettings
+    # from PyQt5.QtCore import QSettings
     from .LogWindow import LogWindow
     from .IPCNetworkThread import IPCNetworkThread
     from .utils import SystemSettings, ChildPopen
@@ -82,7 +82,7 @@ log_window : 'LogWindow' = None
 vpf_logo: str = ":/image/vpforcelogo.png"
 release_version : bool = False
 release_version_str: str = "Vx.x.x"
-dev_build : bool = True # when True, build versions will use 'dev_build_str' as the version string and will not look for updates
+dev_build : bool = False # when True, build versions will use 'dev_build_str' as the version string and will not look for updates
 dev_userconfig: bool = True  # will use/create userconfig.xml in root when True (dev_build must also be true)
 dev_build_str: str = "DEV_BUILD"
 
