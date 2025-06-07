@@ -21,9 +21,9 @@ import telemffb.globals as G
 import telemffb.utils as utils
 
 
-from PyQt5.QtCore import QRegExp
-from PyQt5.QtGui import QIntValidator, QRegExpValidator
-from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QListWidget, QMessageBox, QPushButton, QVBoxLayout
+from PyQt6.QtCore import QRegularExpression, Qt
+from PyQt6.QtGui import QIntValidator, QRegularExpressionValidator
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QListWidget, QMessageBox, QPushButton, QVBoxLayout
 
 from .ui.Ui_TeleplotDialog import Ui_TeleplotDialog
 
@@ -64,17 +64,22 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
             self.parent = parent
             layout = QVBoxLayout(self)
             self.list_widget = QListWidget()
-            self.list_widget.setSelectionMode(QListWidget.MultiSelection)  # Allow multiple selections
+            self.list_widget.setSelectionMode(QListWidget.SelectionMode.MultiSelection)  # Allow multiple selections
             self.list_widget.addItems(self.get_active_keys())
             refresh_button = QPushButton()
             refresh_button.setText("Refresh Keys")
             layout.addWidget(refresh_button)
             layout.addWidget(self.list_widget)
-            button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset)
+            button_box = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Ok |
+                QDialogButtonBox.StandardButton.Cancel |
+                QDialogButtonBox.StandardButton.Reset
+            )
+
             refresh_button.clicked.connect(self.refresh_keys)
             button_box.accepted.connect(self.populate_keys)
             button_box.rejected.connect(self.reject)
-            button_box.button(QDialogButtonBox.Reset).clicked.connect(self.clearSelection)
+            button_box.button(QDialogButtonBox.StandardButton.Reset).clicked.connect(self.clearSelection)
             layout.addWidget(button_box)
 
         def populate_keys(self):
@@ -97,7 +102,7 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
             self.list_widget.clearSelection()
     def select_active_telemetry(self):
         self._telem_selection_window = self.KeySelectionDialog(parent=self)
-        self._telem_selection_window.exec_()
+        self._telem_selection_window.exec()
         pass
     def save_teleplot(self):
         if self.validate_text():
@@ -118,7 +123,8 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
     def validate_text(self):
         regex_string = r"[a-zA-Z_][a-zA-Z0-9_ ]*"
         current_text = self.tb_vars.toPlainText()
-        validator = QRegExpValidator(QRegExp(regex_string))
+        regex = QRegularExpression(regex_string)
+        validator = QRegularExpressionValidator(regex)
         pos = 0
         state, valid_text, pos = validator.validate(current_text, pos)
         if self.tb_port.text() == '':
@@ -134,7 +140,7 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
                 QMessageBox.warning(self, "Error", "Please enter telemetry variables to monitor or remove the port to stop sending")
                 return False
 
-        if state == QRegExpValidator.Acceptable or current_text == '':
+        if state == QRegularExpressionValidator.State.Acceptable or current_text == '':
             return True
         else:
             QMessageBox.warning(self, "Error", "Please only enter valid variable characters")

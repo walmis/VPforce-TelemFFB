@@ -17,10 +17,10 @@
 #
 import json
 
-from PyQt5 import QtCore
-from PyQt5.QtCore import pyqtSignal, Qt, QPointF
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog
+from PyQt6 import QtCore
+from PyQt6.QtCore import pyqtSignal, Qt, QPointF
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog
 import inspect
 
 import telemffb.globals as G
@@ -53,7 +53,7 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
                                  ' "gain_pos": 100,'
                                  ' "gain_neg": 100,'
                                  ' "units": "gs",'
-                                 ' "scale": 10'
+                                 ' "scale": 10',
                                  ' "mode": constant'
                                  '}'
                                  )
@@ -61,7 +61,7 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.setupUi(self)
         self.retranslateUi(self)
         self.setWindowTitle(f"Advanced G-Force Effect Configuration ({self.device_type.capitalize()})")
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
         self.pb_saveclose.setToolTip('Save setting and close dialog')
         self.pb_saveclose.clicked.connect(lambda: self.save_curve_settings(close=True))
 
@@ -271,44 +271,44 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         """
         Load settings from a JSON-formatted string and apply them to both curve widgets.
         """
-        try:
-            settings = json.loads(json_string)
-            if "curve_pos" in settings and "curve_neg" in settings:
-                if pos:
-                    self.curve_pos.from_dict(settings["curve_pos"])
-                    self.cb_pos_smoothcurve.setChecked(settings['curve_pos']['smooth_curve_enabled'])
-                    self.gain_pos = settings.get('gain_pos', 100)
-                    self.sl_pos_mastergain.setValue(settings['gain_pos'])
-                if neg:
-                    self.curve_neg.from_dict(settings["curve_neg"])
-                    self.cb_neg_smoothcurve.setChecked(settings['curve_neg']['smooth_curve_enabled'])
-                    self.gain_neg = settings.get('gain_neg', 100)
-                    self.sl_neg_mastergain.setValue(settings['gain_neg'])
+        # try:
+        settings = json.loads(json_string)
+        if "curve_pos" in settings and "curve_neg" in settings:
+            if pos:
+                self.curve_pos.from_dict(settings["curve_pos"])
+                self.cb_pos_smoothcurve.setChecked(settings['curve_pos']['smooth_curve_enabled'])
+                self.gain_pos = settings.get('gain_pos', 100)
+                self.sl_pos_mastergain.setValue(settings['gain_pos'])
+            if neg:
+                self.curve_neg.from_dict(settings["curve_neg"])
+                self.cb_neg_smoothcurve.setChecked(settings['curve_neg']['smooth_curve_enabled'])
+                self.gain_neg = settings.get('gain_neg', 100)
+                self.sl_neg_mastergain.setValue(settings['gain_neg'])
 
-                    self.cb_enable_negative.setChecked(settings['enable_neg'])
+                self.cb_enable_negative.setChecked(settings['enable_neg'])
 
-                self.x_scale = settings.get('scale', 10)
-                self.current_unit = settings.get('units', "g")
-                self.effect_mode = settings.get('mode', 'constant')
-                if self.effect_mode == 'constant':
-                    self.cb_constant.setChecked(True)
-                    self.cb_offset.setChecked(False)
-                elif self.effect_mode == 'offset':
-                    self.cb_offset.setChecked(True)
-                    self.cb_constant.setChecked(False)
+            self.x_scale = settings.get('scale', 10)
+            self.current_unit = settings.get('units', "g")
+            self.effect_mode = settings.get('mode', 'constant')
+            if self.effect_mode == 'constant':
+                self.cb_constant.setChecked(True)
+                self.cb_offset.setChecked(False)
+            elif self.effect_mode == 'offset':
+                self.cb_offset.setChecked(True)
+                self.cb_constant.setChecked(False)
 
-                # self.cb_airspeed_unit.setCurrentText(self.current_unit)
-                self.update_slider_labels()
-                self.current_settings_dict = settings
+            # self.cb_airspeed_unit.setCurrentText(self.current_unit)
+            self.update_slider_labels()
+            self.current_settings_dict = settings
 
-            else:
-                raise ValueError("Invalid JSON format: Missing 'curve_pos' or 'curve_neg' keys.")
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON: {e}")
-            raise ValueError("Invalid JSON string.")
-        except Exception as e:
-            print(f"Error loading curve settings: {e}")
-            raise
+        #     else:
+        #         raise ValueError("Invalid JSON format: Missing 'curve_pos' or 'curve_neg' keys.")
+        # except json.JSONDecodeError as e:
+        #     print(f"Error decoding JSON: {e}")
+        #     raise ValueError("Invalid JSON string.")
+        # except Exception as e:
+        #     print(f"Error loading curve settings: {e}")
+        #     raise
 
 
     def copy_x_to_y(self):

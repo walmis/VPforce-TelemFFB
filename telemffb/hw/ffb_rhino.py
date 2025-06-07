@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import List, Self
 
 import usb1
-from PyQt5.QtCore import QObject, QTimer, QTimerEvent, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, QTimerEvent, pyqtSignal
 
 from telemffb.utils import Destroyable, DirectionModulator, clamp, overrides, millis
 

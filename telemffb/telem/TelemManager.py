@@ -24,7 +24,7 @@ import subprocess
 import threading
 import time
 
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 
 import telemffb.globals as G
 import telemffb.utils as utils

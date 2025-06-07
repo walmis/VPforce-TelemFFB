@@ -20,7 +20,7 @@
 import os
 import time
 
-from PyQt5.QtCore import QMutex, QThread, pyqtSignal
+from PyQt6.QtCore import QMutex, QThread, pyqtSignal
 
 class LogTailer(QThread):
     log_updated = pyqtSignal(str)

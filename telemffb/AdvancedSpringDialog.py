@@ -17,10 +17,10 @@
 #
 import json
 
-from PyQt5 import QtCore
-from PyQt5.QtCore import pyqtSignal, Qt, QPointF
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog
+from PyQt6 import QtCore
+from PyQt6.QtCore import pyqtSignal, Qt, QPointF
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog
 import inspect
 
 import telemffb.globals as G
@@ -62,7 +62,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         self.setupUi(self)
         self.retranslateUi(self)
         self.setWindowTitle(f"Advanced Spring Configuration ({self.device_type.capitalize()})")
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
 
         self.pb_copy_up.setIcon(QIcon(":/image/up_arrow.png"))
         self.pb_copy_up.setText('')

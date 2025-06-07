@@ -25,10 +25,10 @@ import shutil
 import sys
 from datetime import datetime
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog,
                              QFileDialog, QHeaderView, QLabel, QLineEdit,
                              QMessageBox, QPushButton, QSlider, QTableWidget,
                              QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget)
@@ -203,7 +203,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
         # xmlutils.create_empty_userxml_file()  # Now handled by TelemFFB on startup
         self.table_widget.horizontalHeader().setStretchLastSection(True) 
-        self.table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         # self.tb_currentmodel.setText(self.model_name)
         # self.l_currentmodel.setText(self.model_name)
         self.l_currentmodel.setText(f"<b>{self.model_name}</b> as a <b>{self.model_type}</b> for <b>{self.sim}</b>")
@@ -306,8 +306,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         mprint("show_user_model_dialog")
         current_aircraft = self.drp_models.currentText()
         dialog = UserModelDialog(self.sim,current_aircraft, self.model_type, self)
-        result = dialog.exec_()
-        if result == QtWidgets.QDialog.Accepted:
+        result = dialog.exec()
+        if result == QtWidgets.QDialog.DialogCode.Accepted:
             # Handle accepted
             new_aircraft = dialog.tb_current_aircraft.currentText()
             new_combo_box_value = dialog.combo_box.currentText()
@@ -409,7 +409,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.table_widget.cellDoubleClicked.connect(self.catch_doubleclick)
 
         # row click for property manager
-        self.table_widget.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
+        self.table_widget.setSelectionBehavior(QtWidgets.QTableView.SelectionBehavior.SelectRows)
         # this is for handling clicking the actual value cell..
         self.table_widget.itemSelectionChanged.connect(self.handle_item_click)
 
@@ -465,10 +465,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 lambda state, trow=row, tdata_dict=data_dict: self.override_state_changed(trow, tdata_dict, state))
 
             item = QTableWidgetItem()
-            item.setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+            item.setFlags(QtCore.Qt.ItemFlag.ItemIsUserCheckable | QtCore.Qt.ItemFlag.ItemIsEnabled)
             #item.setStyleSheet("margin-left:50%; margin-right:50%;")
-            item.setData(QtCore.Qt.UserRole, row)  # Attach row to the item
-            item.setData(QtCore.Qt.CheckStateRole, QtCore.Qt.Unchecked)  # Set initial state
+            item.setData(QtCore.Qt.ItemDataRole.UserRole, row)  # Attach row to the item
+            item.setData(QtCore.Qt.ItemDataRole.CheckStateRole, QtCore.Qt.CheckState.Unchecked)  # Set initial state
 
             grouping_item = QTableWidgetItem(data_dict['grouping'])
             displayname_item = QTableWidgetItem(data_dict['displayname'])
@@ -488,17 +488,17 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             # store name for use later, not shown
             name_item = QTableWidgetItem(data_dict['name'])
-            name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            name_item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
             state_item = QTableWidgetItem(str(state))
 
             # Connect the itemChanged signal to your custom function
-            value_item.setData(Qt.UserRole, row)  # Attach row to the item
-            value_item.setData(Qt.UserRole + 1, data_dict['name'])  # Attach name to the item
-            value_item.setData(Qt.UserRole + 2, data_dict['value'])  # Attach original value to the item
-            value_item.setData(Qt.UserRole + 3, data_dict['unit'])  # Attach unit to the item
-            value_item.setData(Qt.UserRole + 4, data_dict['datatype'])  # Attach datatype to the item
-            value_item.setData(Qt.UserRole + 5, data_dict['validvalues'])  # Attach datatype to the item
-            value_item.setData(Qt.UserRole + 6, str(state))  # Attach datatype to the item
+            value_item.setData(Qt.ItemDataRole.UserRole, row)  # Attach row to the item
+            value_item.setData(Qt.ItemDataRole.UserRole + 1, data_dict['name'])  # Attach name to the item
+            value_item.setData(Qt.ItemDataRole.UserRole + 2, data_dict['value'])  # Attach original value to the item
+            value_item.setData(Qt.ItemDataRole.UserRole + 3, data_dict['unit'])  # Attach unit to the item
+            value_item.setData(Qt.ItemDataRole.UserRole + 4, data_dict['datatype'])  # Attach datatype to the item
+            value_item.setData(Qt.ItemDataRole.UserRole + 5, data_dict['validvalues'])  # Attach datatype to the item
+            value_item.setData(Qt.ItemDataRole.UserRole + 6, str(state))  # Attach datatype to the item
 
             lprint(f"Row {row} - Grouping: {data_dict['grouping']}, Display Name: {data_dict['displayname']}, Unit: {data_dict['unit']}, Ovr: {data_dict['replaced']}")
 
@@ -537,15 +537,15 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                     item.setForeground(QtGui.QColor('red'))
 
             # Make specific columns read-only
-            grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemIsEditable)
-            displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemIsEditable)
+            grouping_item.setFlags(grouping_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            displayname_item.setFlags(displayname_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             displayname_item.setToolTip(data_dict['info'])
-            info_item.setFlags(info_item.flags() & ~Qt.ItemIsEditable)
-            replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemIsEditable)
-            device_item.setFlags(device_item.flags() & ~Qt.ItemIsEditable)
+            info_item.setFlags(info_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            replaced_item.setFlags(replaced_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            device_item.setFlags(device_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
             if not self.allow_in_table_editing:
-                value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
+                value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
             #
             # disable in-table value editing here
@@ -587,7 +587,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 for col in range(self.table_widget.columnCount()):
                     unselitem = self.table_widget.item(row, col)
                     if unselitem is not None:
-                        unselitem.setFlags(unselitem.flags() & ~Qt.ItemIsSelectable)
+                        unselitem.setFlags(unselitem.flags() & ~Qt.ItemFlag.ItemIsSelectable)
 
             # if row not in self.connected_rows:
             #     value_item.dataChanged.connect(self.handle_item_change)
@@ -680,7 +680,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
                 if datatype == 'bool':
                     # For a checkbox
-                    value_state = str(value_item.data(Qt.CheckStateRole))
+                    value_state = str(value_item.data(Qt.ItemDataRole.CheckStateRole))
                     if value_state == '0':
                         value = 'False'
                     else:
@@ -864,7 +864,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             # Use the current working directory as the starting point
             starting_dir = os.getcwd()
 
-        options = QFileDialog.Options()
+        options = QFileDialog.Option(0)
 
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Choose File", starting_dir,
@@ -1395,5 +1395,5 @@ if __name__ == "__main__":
 
     sw.show()
 
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 

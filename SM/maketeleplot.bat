@@ -1,0 +1,1 @@
+pyuic6 teleplot.ui -o ../telemffb/ui/Ui_TeleplotDialog.py

@@ -23,7 +23,7 @@ import telemffb.xmlutils as xmlutils
 
 import json
 import os
-from PyQt5.QtWidgets import QMessageBox, QPushButton
+from PyQt6.QtWidgets import QMessageBox, QPushButton
 from configobj import ConfigObj
 import textwrap
 
@@ -278,20 +278,20 @@ def autoconvert_config(main_window, cfg, usr):
             )
             return
         # perform the conversion
-        if not convert_settings(cfg=cfg, usr=usr, window=main_window):
-            return False
-        try:
-            os.rename(usr, f"{usr}.legacy")
-        except OSError:
-            ans = QMessageBox.warning(
-                main_window,
-                "Warning",
-                f'The legacy backup file for "{usr}" already exists, would you like to replace it?',
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
-            if ans == QMessageBox.Yes:
-                os.replace(usr, f"{usr}.legacy")
+        # if not convert_settings(cfg=cfg, usr=usr, window=main_window):
+        #     return False
+        # try:
+        #     os.rename(usr, f"{usr}.legacy")
+        # except OSError:
+        #     ans = QMessageBox.warning(
+        #         main_window,
+        #         "Warning",
+        #         f'The legacy backup file for "{usr}" already exists, would you like to replace it?',
+        #         QMessageBox.Yes | QMessageBox.No,
+        #         QMessageBox.No,
+        #     )
+        #     if ans == QMessageBox.Yes:
+        #         os.replace(usr, f"{usr}.legacy")
 
         QMessageBox.information(
             main_window,

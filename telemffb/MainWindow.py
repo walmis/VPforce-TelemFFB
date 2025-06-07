@@ -31,14 +31,14 @@ import winreg
 from collections import OrderedDict
 from datetime import datetime
 
-from PyQt5 import QtCore, QtWidgets
-from PyQt5.QtCore import QCoreApplication, Qt, QTimer, QUrl
-from PyQt5.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
-                         QKeySequence, QPixmap, QFontMetrics)
-from PyQt5.QtWidgets import (QAction, QApplication, QButtonGroup, QCheckBox,
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl
+from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
+                         QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut)
+from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QComboBox, QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QMainWindow, QMessageBox,
-                             QPushButton, QScrollArea, QShortcut, QTabWidget,
+                             QPushButton, QScrollArea, QTabWidget,
                              QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu)
 
 import telemffb.globals as G
@@ -178,7 +178,7 @@ class MainWindow(QMainWindow):
         cfg_log_folder_action = QAction('Open Config/Log Directory', self)
         def do_open_cfg_dir():
             modifiers = QApplication.keyboardModifiers()
-            if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier) and getattr(sys, 'frozen', False):
+            if (modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier) and getattr(sys, 'frozen', False):
                 os.startfile(getattr(sys, "_MEIPASS"), 'open')
             else:
                 os.startfile(G.userconfig_rootpath, 'open')
@@ -311,8 +311,8 @@ class MainWindow(QMainWindow):
 
         # Create a line beneath the menu bar
         line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
 
         # Add the line to the menu frame layout
         menu_frame_layout.addWidget(menubar)
@@ -331,7 +331,7 @@ class MainWindow(QMainWindow):
         self.devicetype_label = ClickLogo(self.logo_stack)
         self.devicetype_label.clicked.connect(self.device_logo_click_event)
         pixmap = HiDpiPixmap(G.vpf_logo)
-        pixmap = pixmap._scaled(271, 115, aspectRatioMode=QtCore.Qt.KeepAspectRatio, transformMode=QtCore.Qt.SmoothTransformation)
+        pixmap = pixmap._scaled(271, 115, aspectRatioMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation)
 
         pixmap2 = HiDpiPixmap(utils.get_device_logo(G.device_type))
         pixmap2 = pixmap2._scaled(round(pixmap2.width()), round(pixmap2.height()))
@@ -350,14 +350,14 @@ class MainWindow(QMainWindow):
 
            
         # Add the image labels to the layout
-        logo_status_layout.addWidget(self.logo_stack, alignment=Qt.AlignVCenter | Qt.AlignLeft)
+        logo_status_layout.addWidget(self.logo_stack, alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
 
         rh_status_area = QWidget()
         rh_status_layout = QVBoxLayout()
 
         sim_status_area = QWidget()
         status_layout = QHBoxLayout()
-        status_layout.setAlignment(Qt.AlignLeft)
+        status_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.dcs_label_icon = SimStatusLabel("DCS")
         self.il2_label_icon = SimStatusLabel("IL2")
@@ -365,11 +365,11 @@ class MainWindow(QMainWindow):
         self.xplane_label_icon = SimStatusLabel("X-PLANE")
 
         status_layout.addWidget(self.dcs_label_icon)
-        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Preferred, QSizePolicy.Minimum))
+        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum))
         status_layout.addWidget(self.il2_label_icon)
-        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Preferred, QSizePolicy.Minimum))
+        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum))
         status_layout.addWidget(self.msfs_label_icon)
-        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Preferred, QSizePolicy.Minimum))
+        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum))
         status_layout.addWidget(self.xplane_label_icon)
 
         self.label_icons = {
@@ -397,34 +397,34 @@ class MainWindow(QMainWindow):
         G.sim_listeners.simStarted.connect(on_sims_changed)
         G.sim_listeners.simStopped.connect(on_sims_changed)
 
-        status_layout.setAlignment(Qt.AlignRight)
+        status_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         sim_status_area.setLayout(status_layout)
 
         rh_status_layout.addWidget(sim_status_area)
 
-        rh_status_layout.setAlignment(Qt.AlignRight)
+        rh_status_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         ############
         # current craft
         self.craft_container = QWidget()
         self.craft_layout = QVBoxLayout(self.craft_container)
-        self.craft_layout.setAlignment(Qt.AlignLeft)
+        self.craft_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         cur_ac_lbl = QLabel()
         cur_ac_lbl.setText("<b>Current Aircraft:</b>")
-        cur_ac_lbl.setAlignment(Qt.AlignLeft)
+        cur_ac_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         cur_ac_lbl.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; }")
 
         self.cur_craft = QLabel()
         self.cur_craft.setText('Unknown')
         self.cur_craft.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Courier New; }")
-        self.cur_craft.setAlignment(Qt.AlignLeft)
+        self.cur_craft.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.cur_pattern = QLabel()
         self.cur_pattern.setText('(No Match)')
         self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Courier New; }")
-        self.cur_pattern.setAlignment(Qt.AlignLeft)
+        self.cur_pattern.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.craft_layout.addWidget(cur_ac_lbl)
         self.craft_layout.addWidget(self.cur_craft)
@@ -460,7 +460,7 @@ class MainWindow(QMainWindow):
                             padding: 5px;
                         }"""
         self.new_craft_button.setStyleSheet(ncb_css)
-        self.new_craft_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        self.new_craft_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         new_craft_layout.addWidget(self.new_craft_button)
         new_craft_layout.addSpacing(7)
         self.new_craft_button.clicked.connect(self.show_user_model_dialog)
@@ -474,7 +474,7 @@ class MainWindow(QMainWindow):
         test_craft_layout = QHBoxLayout()
         test_sim_lbl = QLabel('Sim:')
         test_sim_lbl.setMaximumWidth(30)
-        test_sim_lbl.setAlignment(Qt.AlignRight)
+        test_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         sims = ['', 'DCS', 'IL2', 'MSFS', 'XPLANE']
         self.test_sim = QComboBox()
         self.test_sim.setMaximumWidth(60)
@@ -482,7 +482,7 @@ class MainWindow(QMainWindow):
         self.test_sim.currentTextChanged.connect(self.test_sim_changed)
         test_name_lbl = QLabel('Aircraft Name:')
         test_name_lbl.setMaximumWidth(90)
-        test_name_lbl.setAlignment(Qt.AlignRight)
+        test_name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.test_name = QComboBox()
         self.test_name.setMinimumWidth(100)
         self.test_name.setEditable(False)
@@ -522,7 +522,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(self.config_scope_row)
 
         self.tab_widget = QTabWidget(self)
-        self.tab_widget.setTabShape(QTabWidget.Triangular)  # Set triangular tab shape
+        # self.tab_widget.setTabShape(QTabWidget.TabShape.Triangular)  # Set triangular tab shape
         # self.tab_widget.addTab(QWidget(), "Log")
         # self.tab_widget.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
 
@@ -532,8 +532,8 @@ class MainWindow(QMainWindow):
 
         # Create a horizontal line widget
         self.line_widget = QFrame(self)
-        self.line_widget.setFrameShape(QFrame.HLine)
-        self.line_widget.setFrameShadow(QFrame.Sunken)
+        self.line_widget.setFrameShape(QFrame.Shape.HLine)
+        self.line_widget.setFrameShadow(QFrame.Shadow.Sunken)
 
         # Add the tab widget and line widget to the main layout
         layout.addWidget(self.tab_widget)
@@ -559,9 +559,9 @@ class MainWindow(QMainWindow):
 
         self.refresh_telem_status()
 
-        self.lbl_telem_data.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.lbl_telem_data.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.lbl_telem_data.setWordWrap(False)
-        self.lbl_telem_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.lbl_telem_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.lbl_telem_data.setStyleSheet("""
             padding: 2px;
             font-family: Courier New;
@@ -572,7 +572,7 @@ class MainWindow(QMainWindow):
 
         self.lbl_effects_data = QLabel()
         self.effects_area.setWidget(self.lbl_effects_data)
-        self.lbl_effects_data.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.lbl_effects_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.lbl_effects_data.setStyleSheet("""
             padding: 2px;
             font-family: Courier New;
@@ -674,12 +674,12 @@ class MainWindow(QMainWindow):
             f_vers = 'error fetching'
         self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
 
-        self.version_label.setAlignment(Qt.AlignLeft)
-        self.firmware_label.setAlignment(Qt.AlignRight)
+        self.version_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.firmware_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         version_row_layout.addWidget(self.version_label)
         version_row_layout.addWidget(self.firmware_label)
 
-        version_row_layout.setAlignment(Qt.AlignBottom)
+        version_row_layout.setAlignment(Qt.AlignmentFlag.AlignBottom)
         layout.addLayout(version_row_layout)
 
         # self.test_button = QPushButton("SEND TEST MESSAGE")
@@ -727,7 +727,7 @@ class MainWindow(QMainWindow):
 
         def do_show_main_window(trigger):
             if isinstance(trigger, QSystemTrayIcon.ActivationReason):
-                if trigger == QSystemTrayIcon.DoubleClick:
+                if trigger == QSystemTrayIcon.ActivationReason.DoubleClick:
                     self.showNormal()  # Restore the window to its normal state if minimized
                     self.show()
                     self.raise_()
@@ -752,7 +752,8 @@ class MainWindow(QMainWindow):
 
         # Setup Start With Windows menu option
         if G.is_exe:
-            start_with_windows_action = QAction("Start With Windows", self, checkable=True)
+            start_with_windows_action = QAction("Start With Windows", self)
+            start_with_windows_action.setCheckable(True)
             start_with_windows_action.setChecked(G.system_settings.get('startWithWindows', False))
 
             def do_toggle_set_start_with_windows(checked):
@@ -763,7 +764,8 @@ class MainWindow(QMainWindow):
             options_menu.addAction(start_with_windows_action)
 
         # Setup Start Minimized menu option
-        start_minimized_action = QAction("Start in Tray", self, checkable=True)
+        start_minimized_action = QAction("Start in Tray", self)
+        start_minimized_action.setCheckable(True)
         start_minimized_action.setChecked(G.system_settings.get('startToTray', False))
 
         def do_toggle_set_start_minimized(checked):
@@ -774,7 +776,8 @@ class MainWindow(QMainWindow):
         options_menu.addAction(start_minimized_action)
 
         # Setup Send to Tray menu option
-        send_to_tray_action = QAction("Closing App Sends to Tray", self, checkable=True)
+        send_to_tray_action = QAction("Closing App Sends to Tray", self)
+        send_to_tray_action.setCheckable(True)
         send_to_tray_action.setChecked(G.system_settings.get('closeToTray', False))
 
         def do_toggle_set_send_to_tray(checked):
@@ -907,7 +910,7 @@ class MainWindow(QMainWindow):
         teleplot_action = QAction("Teleplot Setup", self)
         def do_open_teleplot_setup_dialog():
             dialog = TeleplotSetupDialog(self)
-            dialog.exec_()
+            dialog.exec()
         teleplot_action.triggered.connect(do_open_teleplot_setup_dialog)
         debug_menu.addAction(teleplot_action)
 
@@ -962,9 +965,9 @@ class MainWindow(QMainWindow):
         G.ipc_instance.send_broadcast_message("SHOW SETTINGS")
 
     def reset_user_config(self):
-        ans = QMessageBox.warning(self, "Caution", "Are you sure you want to proceed?  All contents of your user configuration will be erased\n\nA backup of the configuration will be generated containing the current timestamp.", QMessageBox.Ok | QMessageBox.Cancel)
+        ans = QMessageBox.warning(self, "Caution", "Are you sure you want to proceed?  All contents of your user configuration will be erased\n\nA backup of the configuration will be generated containing the current timestamp.", QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
 
-        if ans == QMessageBox.Ok:
+        if ans == QMessageBox.StandardButton.Ok:
             try:
                 # Get the current timestamp
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M')
@@ -1009,10 +1012,6 @@ class MainWindow(QMainWindow):
             self.instance_status_row.trimwheel_status_icon.show()
         self.add_instance_log_menu()
         self.add_system_tray()
-
-
-    def clear_log_widget(self):
-        self.log_widget.clear()
 
 
     def show_device_logo(self):
@@ -1300,7 +1299,7 @@ class MainWindow(QMainWindow):
     def toggle_settings_window(self, dbg=False):
         try:
             modifiers = QApplication.keyboardModifiers()
-            if ((modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier)) or dbg:
+            if ((modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier)) or dbg:
                 if self.test_craft_area.isVisible():
                     self.test_craft_area.hide()
                 else:
@@ -1422,7 +1421,7 @@ class MainWindow(QMainWindow):
         elif index == 1:  # Settings Tab
             self.current_tab_index = 1
             modifiers = QApplication.keyboardModifiers()
-            if (modifiers & QtCore.Qt.ControlModifier) and (modifiers & QtCore.Qt.ShiftModifier):
+            if (modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier):
                 self.cb_joystick.setVisible(True)
                 self.cb_pedals.setVisible(True)
                 self.cb_collective.setVisible(True)

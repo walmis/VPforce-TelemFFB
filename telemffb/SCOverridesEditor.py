@@ -17,8 +17,8 @@
 #
 
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QAbstractItemView, QDialog, QTableWidgetItem
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QAbstractItemView, QDialog, QTableWidgetItem
 
 from . import globals as G
 from . import xmlutils
@@ -116,22 +116,22 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
 
             # If source is 'defaults', make the text color grey
             if override['source'] == 'defaults':
-                name_item.setForeground(Qt.gray)
-                var_item.setForeground(Qt.gray)
-                sc_unit_item.setForeground(Qt.gray)
-                scale_item.setForeground(Qt.gray)
+                name_item.setForeground(Qt.GlobalColor.gray)
+                var_item.setForeground(Qt.GlobalColor.gray)
+                sc_unit_item.setForeground(Qt.GlobalColor.gray)
+                scale_item.setForeground(Qt.GlobalColor.gray)
 
                 # Make entire row unselectable
                 for col in range(4):
                     item = QTableWidgetItem()
-                    item.setFlags(item.flags() & ~Qt.ItemIsSelectable)
+                    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
                     self.tableWidget.setItem(row_index, col, item)
 
             # Setting items non-editable
-            name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
-            var_item.setFlags(var_item.flags() & ~Qt.ItemIsEditable)
-            sc_unit_item.setFlags(sc_unit_item.flags() & ~Qt.ItemIsEditable)
-            scale_item.setFlags(scale_item.flags() & ~Qt.ItemIsEditable)
+            name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            var_item.setFlags(var_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            sc_unit_item.setFlags(sc_unit_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            scale_item.setFlags(scale_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
             # Setting items for the row
             self.tableWidget.setItem(row, 0, name_item)
@@ -144,7 +144,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             row_index += 1
 
         # Set selection behavior to select entire rows
-        self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
 
         self.pb_delete.clicked.connect(self.delete_button_clicked)
 

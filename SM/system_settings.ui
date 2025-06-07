@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>616</width>
-    <height>855</height>
+    <height>922</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -30,7 +30,6 @@
           <widget class="QLabel" name="labelSystem">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
              <underline>true</underline>
             </font>
@@ -49,7 +48,44 @@
              </property>
             </widget>
            </item>
-           <item row="5" column="0" colspan="2">
+           <item row="5" column="0">
+            <widget class="LabeledToggle" name="cb_logPrune">
+             <property name="text">
+              <string>Prune Logs (Global):</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>System Logging Level:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0" colspan="2">
+            <widget class="LabeledToggle" name="useDarkmode">
+             <property name="text">
+              <string>Dark Mode</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0" colspan="2">
+            <widget class="LabeledToggle" name="ignoreUpdate">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="text">
+              <string>Disable Update Prompt on Startup</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="logLevel"/>
+           </item>
+           <item row="6" column="0" colspan="2">
             <layout class="QHBoxLayout" name="horizontalLayout_5">
              <item>
               <spacer name="horizontalSpacer_12">
@@ -139,45 +175,35 @@
              </item>
             </layout>
            </item>
-           <item row="0" column="0">
-            <widget class="QLabel" name="label">
-             <property name="text">
-              <string>System Logging Level:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
-            <widget class="QComboBox" name="logLevel"/>
-           </item>
-           <item row="3" column="0" colspan="2">
-            <widget class="LabeledToggle" name="ignoreUpdate">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="text">
-              <string>Disable Update Prompt on Startup</string>
-             </property>
-            </widget>
-           </item>
            <item row="1" column="1">
             <widget class="QLineEdit" name="telemTimeout"/>
            </item>
-           <item row="4" column="0">
-            <widget class="LabeledToggle" name="cb_logPrune">
-             <property name="text">
-              <string>Prune Logs (Global):</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0" colspan="2">
-            <widget class="LabeledToggle" name="useDarkmode">
-             <property name="text">
-              <string>Dark Mode</string>
-             </property>
-            </widget>
+           <item row="3" column="0" colspan="2">
+            <layout class="QHBoxLayout" name="horizontalLayout_14">
+             <item>
+              <spacer name="uw_spacer">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeType">
+                <enum>QSizePolicy::Fixed</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>13</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="LabeledToggle" name="useWindowsTheme">
+               <property name="text">
+                <string>Follow Windows Theme</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </item>
           </layout>
          </item>
@@ -200,7 +226,6 @@
         <widget class="Line" name="line_3">
          <property name="font">
           <font>
-           <weight>50</weight>
            <bold>false</bold>
           </font>
          </property>
@@ -220,7 +245,6 @@
             <widget class="QLabel" name="labelLaunch">
              <property name="font">
               <font>
-               <weight>75</weight>
                <bold>true</bold>
                <underline>true</underline>
               </font>
@@ -234,7 +258,6 @@
             <widget class="QCheckBox" name="cb_al_enable">
              <property name="font">
               <font>
-               <weight>50</weight>
                <bold>false</bold>
                <underline>false</underline>
               </font>
@@ -624,7 +647,6 @@ Headless:</string>
           <widget class="QLabel" name="labelSystem_2">
            <property name="font">
             <font>
-             <weight>75</weight>
              <bold>true</bold>
              <underline>true</underline>
             </font>
@@ -677,7 +699,6 @@ Headless:</string>
       <widget class="Line" name="line">
        <property name="font">
         <font>
-         <weight>50</weight>
          <bold>false</bold>
         </font>
        </property>
@@ -696,7 +717,6 @@ Headless:</string>
       <widget class="QLabel" name="labelSim">
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
          <underline>true</underline>
         </font>
@@ -1009,7 +1029,6 @@ Headless:</string>
       <widget class="Line" name="line_2">
        <property name="font">
         <font>
-         <weight>50</weight>
          <bold>false</bold>
         </font>
        </property>
@@ -1028,7 +1047,6 @@ Headless:</string>
       <widget class="QLabel" name="labelOther">
        <property name="font">
         <font>
-         <weight>75</weight>
          <bold>true</bold>
          <underline>true</underline>
         </font>

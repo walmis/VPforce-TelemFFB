@@ -22,8 +22,8 @@ import logging
 import socket
 import time
 
-from PyQt5.QtCore import QCoreApplication, QThread, pyqtSignal, QObject
-from PyQt5.QtWidgets import QMessageBox
+from PyQt6.QtCore import QCoreApplication, QThread, pyqtSignal, QObject
+from PyQt6.QtWidgets import QMessageBox
 
 import telemffb.globals as G
 from telemffb.utils import ChildPopen, load_custom_userconfig, overrides

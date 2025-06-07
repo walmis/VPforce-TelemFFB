@@ -30,8 +30,8 @@
     <rect>
      <x>9</x>
      <y>9</y>
-     <width>573</width>
-     <height>357</height>
+     <width>596</width>
+     <height>361</height>
     </rect>
    </property>
    <layout class="QGridLayout" name="gridLayout">
@@ -139,7 +139,6 @@
       </property>
       <property name="font">
        <font>
-        <weight>75</weight>
         <bold>true</bold>
         <underline>true</underline>
        </font>

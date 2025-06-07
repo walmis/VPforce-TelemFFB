@@ -62,11 +62,11 @@ import xml.etree.ElementTree as ET
 import numpy as np
 from scipy.interpolate import interp1d, Akima1DInterpolator
 
-from PyQt5.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings
-from PyQt5.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
+from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings, Qt
+from PyQt6.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
 
-from PyQt5 import QtCore, QtGui, Qt
-from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from PyQt6 import QtCore, QtGui
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 import stransi
 
 import telemffb.globals as G
@@ -530,11 +530,11 @@ def create_support_bundle(userconfig_rootpath):
 
     # Prompt the user for the destination and filename for the zip file
     file_dialog = QFileDialog()
-    file_dialog.setFileMode(QFileDialog.AnyFile)
-    file_dialog.setAcceptMode(QFileDialog.AcceptSave)
+    file_dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+    file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
     file_dialog.setNameFilter("Zip Files (*.zip)")
 
-    if file_dialog.exec_():
+    if file_dialog.exec():
         # Get the selected file path
         zip_file_path = file_dialog.selectedFiles()[0]
 
@@ -1380,8 +1380,8 @@ def analyze_il2_config(path, port=34385, window=None):
         return
     else:
         telem_message = QMessageBox(parent=window)
-        telem_message.setIcon(QMessageBox.Question)
-        telem_message.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        telem_message.setIcon(QMessageBox.Icon.Question)
+        telem_message.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         telem_message.setWindowTitle("TelemFFB IL-2 Config")
 
         if not telem_match or not motion_match:
@@ -1405,7 +1405,7 @@ def analyze_il2_config(path, port=34385, window=None):
             pop = pop + "\n\n***** - Please ensure Il-2 is not running before selecting 'Yes' - *****"
         telem_message.setText(pop)
         ans = telem_message.exec()
-        if ans == QMessageBox.Yes:
+        if ans == QMessageBox.StandardButton.Yes:
             config_data['telemetrydevice'] = telem_proposed
             config_data['motiondevice'] = motion_proposed
             try:
@@ -1413,7 +1413,7 @@ def analyze_il2_config(path, port=34385, window=None):
             except Exception as e:
                 QMessageBox.warning(window, "Config Update Error",
                                     f"There was an error writing to the Il-2 Config file:\n{e}")
-        elif ans == QMessageBox.No:
+        elif ans == QMessageBox.StandardButton.No:
             print("Answer: NO")
 
         # return config_data, telem_match, motion_match
@@ -1443,7 +1443,7 @@ def install_xplane_plugin(path, window):
     src_path = get_resource_path('xplane-plugin/TelemFFB-XPP/64/win.xpl', prefer_root=True)
     dst_path = os.path.join(path, 'resources', 'plugins', 'TelemFFB-XPP', '64', 'win.xpl')
 
-    ans = QMessageBox.No
+    ans = QMessageBox.StandardButton.No
     if not os.path.exists(dst_path):
         ans = QMessageBox.question(window, "X-Plane Plugin Installer", "X-plane plugin is not installed, install now?\n\nNote: X-Plane must not be running for this operation to succeed")
     else:
@@ -1454,7 +1454,7 @@ def install_xplane_plugin(path, window):
         else:
             return True
 
-    if ans == QMessageBox.Yes:
+    if ans == QMessageBox.StandardButton.Yes:
         tryloop = True
         while tryloop:
             try:
@@ -1466,8 +1466,8 @@ def install_xplane_plugin(path, window):
                 return True
             except Exception as e:
                 print(f"ERROR:{e}")
-                retry = QMessageBox.warning(window, "X-Plane Plugin Error", "There was an error copying the file.  Please ensure X-Plane is not running.\n\nWould you like to re-try?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                if retry == QMessageBox.No:
+                retry = QMessageBox.warning(window, "X-Plane Plugin Error", "There was an error copying the file.  Please ensure X-Plane is not running.\n\nWould you like to re-try?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+                if retry == QMessageBox.StandardButton.No:
                     tryloop = False
                     return False
     else:
@@ -1514,13 +1514,13 @@ def install_export_lua(window):
             if crc_a != crc_b:
                 dia = QMessageBox.question(window, "Contents of TelemFFB.lua export script have changed",
                                            f"Update export script {out_path} ?")
-                if dia == QMessageBox.Yes:
+                if dia == QMessageBox.StandardButton.Yes:
                     write_script()
             else:
                 logging.info(f"DCS Export Installer: TelemFFB entry is present in export script located at {path}, no update required")
         else:
             dia = QMessageBox.question(window, "Confirm", f"Install export script into {path}?")
-            if dia == QMessageBox.Yes:
+            if dia == QMessageBox.StandardButton.Yes:
                 if not export_installed:
                     logging.info("DCS Export Installer: Updating export.lua")
                     line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
@@ -1624,7 +1624,7 @@ class OutLog(QtCore.QObject):
         self.edit = edit
         self.out = out
         self.color = QtGui.QColor(color) if color else None
-        self.textReceived.connect(self.on_received, Qt.Qt.QueuedConnection)
+        self.textReceived.connect(self.on_received, Qt.ConnectionType.QueuedConnection)
         self.log_paused = False
 
     def isatty(self):
@@ -1893,13 +1893,22 @@ class LoggingFilter(logging.Filter):
 
 def load_custom_userconfig(new_path=""):
     print(f"newpath=>{new_path}<")
+
     if new_path == "":
-        options = QFileDialog.Options()
+        options = QFileDialog.Option(0)
+        options |= QFileDialog.Option.DontUseNativeDialog  # Optional: makes dialog consistent across platforms
+
         file_path, _ = QFileDialog.getOpenFileName(
-            None, "Select File", "", "All Files (*)", options=options
+            None,
+            "Select File",
+            "",
+            "All Files (*)",
+            options=options
         )
+
         if file_path == "":
             return
+
         G.userconfig_rootpath = os.path.basename(file_path)
         G.userconfig_path = file_path
     else:
@@ -1911,10 +1920,11 @@ def load_custom_userconfig(new_path=""):
         _userconfig_path=G.userconfig_path,
         _defaults_path=G.defaults_path,
     )
-    # reinitialize table from new config
+
     G.settings_mgr.init_ui()
 
     logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
+
     if G.master_instance and G.launched_instances:
         G.ipc_instance.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
 
@@ -2110,7 +2120,7 @@ class HiDpiPixmap(QPixmap):
 
         self.setDevicePixelRatio(ratio)
 
-    def _scaled(self, width, height, aspectRatioMode=QtCore.Qt.KeepAspectRatio, transformMode=QtCore.Qt.SmoothTransformation):
+    def _scaled(self, width, height, aspectRatioMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation):
         ratio = self.devicePixelRatio()
         scaled_pixmap = super().scaled(int(width * ratio), int(height * ratio), aspectRatioMode, transformMode)
         scaled_pixmap.setDevicePixelRatio(ratio)

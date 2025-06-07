@@ -20,7 +20,7 @@
 import logging
 from typing import List
 
-from PyQt5 import QtCore
+from PyQt6 import QtCore
 
 import telemffb.globals as G
 import telemffb.utils as utils

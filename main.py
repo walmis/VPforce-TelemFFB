@@ -17,8 +17,10 @@
 #
 
 import sys
+# import faulthandler
+# faulthandler.enable()
+from PyQt6.QtGui import QIcon, QColor
 
-from PyQt5.QtGui import QIcon, QColor
 
 from telemffb.CmdLineArgs import CmdLineArgs
 
@@ -36,15 +38,16 @@ import subprocess
 import traceback
 from datetime import datetime
 
-from PyQt5 import QtCore, QtWidgets, QtGui
-from PyQt5.QtCore import QCoreApplication
-from PyQt5.QtWidgets import QApplication, QMessageBox, QPlainTextEdit
+from PyQt6 import QtCore, QtWidgets, QtGui
+from PyQt6.QtCore import QCoreApplication, Qt
+from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit
+
 
 import resources
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
-from telemffb.config_utils import autoconvert_config
+# from telemffb.config_utils import autoconvert_config
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino, HapticEffect
 from telemffb.IPCNetworkThread import IPCNetworkThread
 from telemffb.LogWindow import LogWindow
@@ -100,13 +103,10 @@ def main():
     #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute. AA_EnableHighDpiScaling, True) #enable highdpi scaling
     #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)  #use highdpi icons
 
-
-
     dev : FFBRhino = None
 
     app = QApplication(sys.argv)
-    app.setStyle('Fusion')  # Set Fusion style
-
+    app.setStyle('fusion')  # Set Fusion style
 
     G.args = CmdLineArgs.parse()
 
@@ -121,7 +121,7 @@ def main():
     if G.master_instance:
         # Attempt to acquire a mutex lock.  If the acquisition fails, another master instance of TelemFFB is already running.
         msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setIcon(QMessageBox.Icon.Warning)
         msg_box.setWindowTitle("TelemFFB is already running")
         msg_box.setText(
             "TelemFFB is already running and cannot be started.  If you don't see the 'VP' icon in the system tray, "
@@ -131,46 +131,59 @@ def main():
         try:
             mutex = NamedMutex("VPforce_TelemFFB_Master_Instance", acquired=True, timeout=1)
             if not mutex.acquired:
-                msg_box.exec_()
+                msg_box.exec()
                 sys.exit(1)
         except WindowsError:
-            msg_box.exec_()
+            msg_box.exec()
             sys.exit(1)
 
     G.child_instance = G.args.child
 
     G.system_settings = utils.SystemSettings()
     G.useDarkMode = G.system_settings.get('useDarkmode', False)
+    theme_mode = G.system_settings.get('useWindowsTheme', False)
+    windows_mode = app.styleHints().colorScheme()
+    if not G.useDarkMode:
+        app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+    else:
+        if theme_mode:
+            if windows_mode == Qt.ColorScheme.Light:
+                app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+                G.useDarkMode = False
+            else:
+                app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+                G.useDarkMode = True
 
     # Create and set custom palette with accent color
     palette = app.palette()
     accent_color = QtGui.QColor('#9430ad')
-    palette.setColor(palette.Highlight, accent_color)
-    palette.setColor(palette.HighlightedText, QtGui.QColor('white'))
-    palette.setColor(palette.Link, accent_color)
+    palette.setColor(QtGui.QPalette.ColorRole.Highlight, accent_color)
+    palette.setColor(QtGui.QPalette.ColorRole.HighlightedText, QtGui.QColor('white'))
+    palette.setColor(QtGui.QPalette.ColorRole.Link, accent_color)
     app.setPalette(palette)
 
     if G.useDarkMode:
-        # Base colors
-        palette.setColor(palette.Window, QColor(53, 53, 53))
-        palette.setColor(palette.WindowText, QtGui.QColor('white'))
-        palette.setColor(palette.Base, QColor(35, 35, 35))
-        palette.setColor(palette.AlternateBase, QColor(53, 53, 53))
-        palette.setColor(palette.ToolTipBase, QtGui.QColor('white'))
-        palette.setColor(palette.ToolTipText, QtGui.QColor('white'))
-        palette.setColor(palette.Text, QtGui.QColor('white'))
-        palette.setColor(palette.Button, QColor(53, 53, 53))
-        palette.setColor(palette.ButtonText, QtGui.QColor('white'))
-        palette.setColor(palette.BrightText, QtGui.QColor('red'))
+        app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+        # Base colors with updated ColorRole enums
+        palette.setColor(QtGui.QPalette.ColorRole.Window, QColor(53, 53, 53))
+        palette.setColor(QtGui.QPalette.ColorRole.WindowText, QtGui.QColor('white'))
+        palette.setColor(QtGui.QPalette.ColorRole.Base, QColor(35, 35, 35))
+        palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+        palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor('white'))
+        palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('white'))
+        palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor('white'))
+        palette.setColor(QtGui.QPalette.ColorRole.Button, QColor(53, 53, 53))
+        palette.setColor(QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor('white'))
+        palette.setColor(QtGui.QPalette.ColorRole.BrightText, QtGui.QColor('red'))
 
         # Link colors
-        palette.setColor(palette.Link, QColor(42, 130, 218))
-        palette.setColor(palette.Highlight, QColor(42, 130, 218))
-        palette.setColor(palette.HighlightedText, QtGui.QColor('black'))
+        palette.setColor(QtGui.QPalette.ColorRole.Link, QColor(42, 130, 218))
+        palette.setColor(QtGui.QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+        palette.setColor(QtGui.QPalette.ColorRole.HighlightedText, QtGui.QColor('black'))
 
-        # Disabled
-        palette.setColor(palette.Disabled, palette.Text, QColor(127, 127, 127))
-        palette.setColor(palette.Disabled, palette.ButtonText, QColor(127, 127, 127))
+        # Disabled colors
+        palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.Text, QColor(127, 127, 127))
+        palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.ButtonText, QColor(127, 127, 127))
 
         app.setPalette(palette)
 
@@ -377,7 +390,7 @@ def main():
             }
 
             QMenuBar {
-                background-color: #2b2b2b;
+                background-color: #353535;
                 color: #dddddd;
             }
                         
@@ -457,115 +470,92 @@ def main():
             """
         )
     else:
-        app.setStyleSheet(
-            """
-            /*QCheckBox::indicator:checked { image: url(:/image/purplecheckbox.png); }
-            QCheckBox::indicator:checked:disabled {image: url(:/image/disabledcheckbox.png); }
-            QRadioButton::indicator:checked { image: url(:/image/rchecked.png);}*/
+        app.setStyleSheet("""
+        QPushButton:!pressed, #styledButton:!pressed {
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                              stop: 0 #e4a9e7, stop: 0.2 #c174e6,
+                                              stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
+            border-radius: 5px;
+            padding: 3px;
+            margin: 0px;
+            color: white;
+            border: 1px solid #6e1d6f;
+        }
 
-            QPushButton:!pressed, #styledButton:!pressed {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                                  stop: 0 #e4a9e7, stop: 0.2 #c174e6,
-                                                  stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
-                border-radius: 5px;
-                padding: 3px;
-                margin: 0px;
-                color: white;
-                border: 1px solid #6e1d6f; /* Existing border */
+        QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                              stop: 0 #e1e1e1, stop: 0.2 #cccccc,
+                                              stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
+            color: #666666;
+            border-radius: 5px;
+            padding: 3px;
+            margin: 0px;
+            border: 1px solid #999999;
+        }
 
-            }
+        QPushButton:pressed, #styledButton:pressed {
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                              stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
+                                              stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7);
+            border-radius: 5px;
+            padding: 3px;
+            margin: 0px;
+            color: white;
+            border: 1px solid #4e164e;
+        }
 
-            QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                                  stop: 0 #e1e1e1, stop: 0.2 #cccccc,
-                                                  stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
-                color: #666666;  /* Set the text color for disabled buttons */
-                border-radius: 5px;
-                padding: 3px;
-                margin: 0px;
-                border: 1px solid #999999; /* Existing border */
+        QPushButton:hover:!pressed, #styledButton:hover:!pressed {
+            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                              stop: 0 #f0b0f0, stop: 0.2 #d897d8,
+                                              stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
+            border-radius: 5px;
+            padding: 3px;
+            margin: 0px;
+            border: 1px solid #8e1da8;
+        }
 
-            }
+        QLineEdit, QPlainTextEdit, QTextEdit {
+            selection-background-color: #ab37c8;
+        }
 
-            QPushButton:pressed, #styledButton:pressed {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                                  stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
-                                                  stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7); /* Inverted gradient */
-                border-radius: 5px;
-                padding: 3px;
-                margin: 0px;
-                color: white;
-                border: 1px solid #4e164e; /* Darker border to indicate pressed state */
+        QSlider::handle:horizontal {
+            background: #ab37c8;
+            border: 1px solid #565a5e;
+            width: 16px;
+            height: 20px;
+            border-radius: 5px;
+            margin-top: -5px;
+            margin-bottom: -5px;
+            margin-left: -1px;
+            margin-right: -1px;
+        }
 
-            }
+        QSlider::handle:horizontal:disabled {
+            background: #888888;
+        }
 
-            QPushButton:hover:!pressed, #styledButton:hover:!pressed {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                                  stop: 0 #f0b0f0, stop: 0.2 #d897d8,
-                                                  stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
-                border-radius: 5px;
-                padding: 3px;
-                margin: 0px;
-                border: 1px solid #8e1da8; /* Existing border */
-            }
+        QSlider::groove:horizontal {
+            border: 1px solid #565a5e;
+            height: 8px;
+            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                        stop: 0 #e6e6e6, stop: 1 #bfbfbf);
+            margin: 0;
+            border-radius: 3px;
+        }
 
-            /*
-            QComboBox::down-arrow {
-                image: url(:/image/down-down.png);
-            }
+        QMenuBar {
+            background-color: #f0f0f0;
+        }
 
-            QComboBox QAbstractItemView {
-                border: 2px solid darkgray;
-                selection-background-color: #ab37c8;
-            }
-            */
-            
-            QLineEdit, QPlainTextEdit, QTextEdit {
-                selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
-            }
+        QMenu::item {
+            background-color: transparent;
+        }
 
-            QSlider::handle:horizontal {
-                background: #ab37c8; /* Set the handle color */
-                border: 1px solid #565a5e;
-                width: 16px;  /* Adjusted handle width */
-                height: 20px;  /* Adjusted handle height */
-                border-radius: 5px;  /* Adjusted border radius */
-                margin-top: -5px;  /* Negative margin to overlap with groove */
-                margin-bottom: -5px;  /* Negative margin to overlap with groove */
-                margin-left: -1px;  /* Adjusted left margin */
-                margin-right: -1px;  /* Adjusted right margin */
-            }
-
-            QSlider::handle:horizontal:disabled {
-                background: #888888; /* Set the color of the handle when disabled */
-            }
-
-            QSlider::groove:horizontal {
-                border: 1px solid #565a5e;
-                height: 8px;  /* Adjusted groove height */
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #e6e6e6, stop: 1 #bfbfbf
-                );
-                margin: 0;
-                border-radius: 3px;  /* Adjusted border radius */
-            }
-
-            QMenuBar {
-                background-color: #f0f0f0;
-            }
-
-            QMenu::item {
-                background-color: transparent;
-            }
-
-            QMenu::item:selected {
-                color: #ffffff;
-                background-color: "#ab37c8";
-            }
-
-            """
-        )
+        QMenu::item:selected {
+            color: white;
+            background-color: #ab37c8;
+        }
+        """)
 
     G.log_window = LogWindow()
     init_logging(G.log_window.widget)
@@ -578,7 +568,7 @@ def main():
     except Exception:
         logging.exception("Error Reading user config file..")
         ans = QMessageBox.question(None, "User Config Error", "There was an error reading the userconfig.  The file is likely corrupted.\n\nDo you want to back-up the existing config and create a new default (empty) config?\n\nIf you chose No, TelemFFB will exit.")
-        if ans == QMessageBox.Yes:
+        if ans == QMessageBox.StandardButton.Yes:
             # Get the current timestamp
             timestamp = datetime.now().strftime('%Y%m%d_%H%M')
 
@@ -694,7 +684,7 @@ def main():
         else:
             G.main_window.show()
 
-    autoconvert_config(G.main_window, utils.get_resource_path('config.ini'), utils.get_legacy_override_file())
+    # autoconvert_config(G.main_window, utils.get_resource_path('config.ini'), utils.get_legacy_override_file())
     if not G.release_version and not G.dev_build:
         utils.FetchLatestVersion(G.main_window.update_version_result,
                                 lambda error_message: logging.error("Error in thread: %s", error_message))
@@ -735,7 +725,7 @@ def main():
 
     G.sim_listeners.start_all()
 
-    app.exec_()
+    app.exec()
 
     if G.ipc_instance:
         G.ipc_instance.notify_close_children()
