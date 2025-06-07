@@ -53,8 +53,8 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
                                  ' "gain_pos": 100,'
                                  ' "gain_neg": 100,'
                                  ' "units": "gs",'
-                                 ' "scale": 10',
-                                 ' "mode": constant'
+                                 ' "scale": 10,'
+                                 ' "mode": "constant"'
                                  '}'
                                  )
 

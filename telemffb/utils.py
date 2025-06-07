@@ -1977,15 +1977,30 @@ def get_device_logo(dev_type :str):
 
     match str.lower(dev_type):
         case 'joystick':
-            _device_logo = ':/image/logo_j.png'
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_j_dm.png'
+            else:
+                _device_logo = ':/image/logo_j.png'
         case 'pedals':
-            _device_logo = ':/image/logo_p.png'
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_p_dm.png'
+            else:
+                _device_logo = ':/image/logo_p.png'
         case 'collective':
-            _device_logo = ':/image/logo_c.png'
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_c_dm.png'
+            else:
+                _device_logo = ':/image/logo_c.png'
         case 'trimwheel':
-            _device_logo = ':/image/logo_t.png'
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_t_dm.png'
+            else:
+                _device_logo = ':/image/logo_t.png'
         case _:
-            _device_logo = ':/image/logo_j.png'
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_j_dm.png'
+            else:
+                _device_logo = ':/image/logo_j.png'
     return _device_logo
 
 

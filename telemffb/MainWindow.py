@@ -425,7 +425,35 @@ class MainWindow(QMainWindow):
         self.cur_pattern.setText('(No Match)')
         self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Courier New; }")
         self.cur_pattern.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        text_color = "#dddddd" if G.useDarkMode else "#000000"
+        secondary_color = "#bbbbbb" if G.useDarkMode else "#444444"
 
+        cur_ac_lbl.setStyleSheet(f"""
+            QLabel {{
+                padding-left: 10px;
+                padding-top: 2px;
+                color: {text_color};
+                font-weight: bold;
+            }}
+        """)
+
+        self.cur_craft.setStyleSheet(f"""
+            QLabel {{
+                padding-left: 15px;
+                padding-top: 2px;
+                font-family: 'Courier New';
+                color: {text_color};
+            }}
+        """)
+
+        self.cur_pattern.setStyleSheet(f"""
+            QLabel {{
+                padding-left: 15px;
+                padding-top: 2px;
+                font-family: 'Courier New';
+                color: {secondary_color};
+            }}
+        """)
         self.craft_layout.addWidget(cur_ac_lbl)
         self.craft_layout.addWidget(self.cur_craft)
         self.craft_layout.addWidget(self.cur_pattern)
@@ -439,8 +467,17 @@ class MainWindow(QMainWindow):
         self.notification_label = QLabel('')
         self.notification_label.setWordWrap(True)
         self.notification_label.hide()
-        self.notification_label.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; color: red;}")
-
+        # self.notification_label.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; color: red;}")
+        self.notification_label.setStyleSheet("""
+            QLabel {
+                padding-left: 10px;
+                padding-top: 2px;
+                color: #ff6b6b; /* Softer red for dark mode */
+                background-color: rgba(255, 50, 50, 30); /* Light red background tint */
+                border: 1px solid #c33;
+                border-radius: 4px;
+            }
+        """)
         rh_status_layout.addWidget(self.notification_label)
 
         ##################
@@ -1018,18 +1055,17 @@ class MainWindow(QMainWindow):
         self.devicetype_label.show()
 
     def enable_device_logo_click(self, state):
+        hover_color = "#444444" if G.useDarkMode else "#DCDCDC"
         self.devicetype_label.setClickable(state)
         self.devicetype_label.setStyleSheet(
-            "QLabel {"
-            # "   background-color: #4CAF50;"  # Set background color
-            # "   color: white;"               # Set text color
-            # "   padding: 1px;"               # Add padding
-            "   border-radius: 4px;"         # Add rounded corners
-            # "   border: 2px solid #808080;"  # Add border
-            "}"
-            "QLabel:hover {"
-            "   background-color: #DCDCDC;"  # Change background color on hover
-            "}"
+            f"""
+               QLabel {{
+                   border-radius: 4px;
+               }}
+               QLabel:hover {{
+                   background-color: {hover_color};
+               }}
+               """
         )
 
     def device_logo_click_event(self):

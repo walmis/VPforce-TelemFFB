@@ -168,17 +168,16 @@ def main():
     app.setPalette(palette)
 
     if G.useDarkMode:
-        app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
         # Base colors with updated ColorRole enums
         palette.setColor(QtGui.QPalette.ColorRole.Window, QColor(53, 53, 53))
-        palette.setColor(QtGui.QPalette.ColorRole.WindowText, QtGui.QColor('white'))
+        palette.setColor(QtGui.QPalette.ColorRole.WindowText, QtGui.QColor("#dddddd"))
         palette.setColor(QtGui.QPalette.ColorRole.Base, QColor(35, 35, 35))
         palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
-        palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor('white'))
-        palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('white'))
-        palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor('white'))
+        palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor('#dddddd'))
+        palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
+        palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor('#dddddd'))
         palette.setColor(QtGui.QPalette.ColorRole.Button, QColor(53, 53, 53))
-        palette.setColor(QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor('white'))
+        palette.setColor(QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor('#dddddd'))
         palette.setColor(QtGui.QPalette.ColorRole.BrightText, QtGui.QColor('red'))
 
         # Link colors
@@ -189,11 +188,12 @@ def main():
         # Disabled colors
         palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.Text, QColor(127, 127, 127))
         palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.ButtonText, QColor(127, 127, 127))
+        palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QColor(43, 43, 43))  # or #2b2b2b
+        palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
 
         app.setPalette(palette)
 
-    # _vpf_logo = os.path.join(script_dir, "image/vpforcelogo.png")
-    _vpf_logo = ":/image/vpforcelogo.png"
+
     if G.args.device is None:
         mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
         master_rb = G.system_settings.get('masterInstance', 1)
@@ -267,21 +267,26 @@ def main():
     #     G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
     #     G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
 
-    if G.dev_build and G.dev_userconfig:
+    if G.dev_build:
         G.vpf_logo = ":/image/DEVlogo.png"
-        # manage userconfig in local running directory to avoid interfering with production userconfig
-        real_userconfig_path = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-        real_userconfig = os.path.join(real_userconfig_path, 'userconfig.xml')
-        if getattr(sys, 'frozen', False):
-            # Running as a bundled executable with PyInstaller
-            G.userconfig_rootpath = os.path.dirname(sys.executable)
-        else:
-            # Running as a standard Python script
-            G.userconfig_rootpath = os.path.dirname(os.path.abspath(__file__))
-        G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
-        if not os.path.isfile(G.userconfig_path):
-            shutil.copy(real_userconfig, G.userconfig_path)
+        if G.dev_userconfig:
+            # manage userconfig in local running directory to avoid interfering with production userconfig
+            real_userconfig_path = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
+            real_userconfig = os.path.join(real_userconfig_path, 'userconfig.xml')
+            if getattr(sys, 'frozen', False):
+                # Running as a bundled executable with PyInstaller
+                G.userconfig_rootpath = os.path.dirname(sys.executable)
+            else:
+                # Running as a standard Python script
+                G.userconfig_rootpath = os.path.dirname(os.path.abspath(__file__))
+            G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
+            if not os.path.isfile(G.userconfig_path):
+                shutil.copy(real_userconfig, G.userconfig_path)
     else:
+        if G.useDarkMode:
+            G.vpf_logo = ":/image/vpforcelogo_dm.png"
+        else:
+            G.vpf_logo = ":/image/vpforcelogo.png"
         G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
         G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
 

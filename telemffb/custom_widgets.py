@@ -640,9 +640,9 @@ class SimStatusLabel(QWidget):
         elif icon_type == "exclamation":
 
             # Draw an exclamation mark for the exclamation icon
-            line_length = int(size.height() * 0.4)  # Adjusted to ensure the dot is distinct and separate
+            line_length = int(size.height() * 0.3)  # Adjusted to ensure the dot is distinct and separate
             line_width = int(size.width() * 0.15)
-            dot_radius = int(size.width() * 0.08)  # Adjusted for a smaller dot
+            dot_radius = int(size.width() * 0.05)  # Adjusted for a smaller dot
             line_x = int(size.width() / 2)
             line_y1 = int((size.height() - line_length - dot_radius * 2) / 2)
             line_y2 = line_y1 + line_length
@@ -1035,12 +1035,23 @@ class CurveWidget(QWidget):
 
         # message label
         self.msg_label = QLabel(self)
-        self.msg_label.setStyleSheet("background-color: white; border: 1px solid black;")
+        if G.useDarkMode:
+            self.msg_label.setStyleSheet(
+                "background-color: #2b2b2b; color: #ff5555; border: 1px solid #999;"
+            )
+        else:
+            self.msg_label.setStyleSheet(
+                "background-color: white; color: red; border: 1px solid black;"
+            )
         self.msg_label.move(60, 40)
         self.msg_label.hide()
 
         self.coordinate_label = QLabel(self)
-        self.coordinate_label.setStyleSheet("background-color: white; border: 1px solid black;")
+        bg = "#ffffff" if not G.useDarkMode else "#444444"
+        fg = "black" if not G.useDarkMode else "white"
+        border = "black" if not G.useDarkMode else "#888888"
+
+        self.coordinate_label.setStyleSheet(f"background-color: {bg}; color: {fg}; border: 1px solid {border};")
         self.coordinate_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.coordinate_label.setFixedSize(120, 20)  # Adjust size as needed
         self.coordinate_label.hide()  # Initially hidden
@@ -1051,6 +1062,21 @@ class CurveWidget(QWidget):
 
         self.x_label_text = "X:"
         self.y_label_text = "Y:"
+        dark_mode = G.useDarkMode
+
+        # Axis and label color
+        self.axis_color = QColor("white") if dark_mode else QColor("black")
+
+        # Grid
+        self.grid_color = QColor(100, 100, 100) if dark_mode else QColor(Qt.GlobalColor.lightGray)
+
+        # Curve line
+        self.curve_color = QColor("#ab37c8") if dark_mode else Qt.GlobalColor.blue
+
+        # Point fill
+        self.point_fill = QColor(255, 200, 200) if dark_mode else QColor(255, 0, 0)
+
+        self.crosshair_color = Qt.GlobalColor.lightGray if G.useDarkMode else QColor("#ab37c8")
 
     def setEnabled(self, enabled: bool):
         """Enable or disable the widget."""
@@ -1119,51 +1145,6 @@ class CurveWidget(QWidget):
         self.msg_label.hide()  # Hide any error messages
         self.update()
 
-    # def get_force_for_speed(self, speed):
-    #     """Returns the output force (y) for a given input speed (x) based on the current curve."""
-    #     if not self.points:
-    #         raise ValueError("No points defined in the curve.")
-    #
-    #     x_values = [p.x() for p in self.points]
-    #     y_values = [p.y() for p in self.points]
-    #
-    #     if speed <= x_values[0]:
-    #         # Speed is below the first point
-    #         return 0  # Return 0% force
-    #     elif speed >= x_values[-1]:
-    #         # Speed is above the last point
-    #         return 100  # Return 100% force
-    #
-    #     force = 0  # Default value
-    #
-    #     if self.smooth_curve_enabled:
-    #         # Use smooth Akima interpolation if enabled
-    #         try:
-    #             if len(x_values) < 3:
-    #                 # Not enough points for Akima, fallback to linear
-    #                 interpolation = interp1d(x_values, y_values, bounds_error=False,
-    #                                          fill_value=(y_values[0], y_values[-1]))
-    #                 force = float(interpolation(speed))
-    #             else:
-    #                 akima = Akima1DInterpolator(x_values, y_values)
-    #                 force = float(akima(speed))
-    #         except Exception as e:
-    #             raise ValueError(f"Error in smooth interpolation: {e}")
-    #     else:
-    #         # Linear interpolation for the current points
-    #         interpolation = interp1d(x_values, y_values, bounds_error=False,
-    #                                  fill_value=(y_values[0], y_values[-1]))
-    #         force = float(interpolation(speed))
-    #
-    #     # Clamp the force to the range [0, 100]
-    #     return max(0, min(100, force))
-
-    # def decrease_x_scale(self):
-    #     """Decrease the x-axis scale by 100 knots, but not below the highest point's x value."""
-    #     max_x_value = max(p.x() for p in self.points)  # Get the highest x value among the points
-    #     self.x_scale = max(max(100, max_x_value), self.x_scale - 100)  # Ensure scale doesn't go below max x value
-    #     self.update()
-
     def highlight_dragged_point(self, painter):
         """Highlights the point currently being dragged."""
         painter.setPen(QPen(Qt.GlobalColor.red, 2))  # Red outline
@@ -1215,6 +1196,7 @@ class CurveWidget(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.draw_grid(painter)
         self.draw_axis_labels(painter)
         if self.smooth_curve_enabled:
@@ -1228,7 +1210,7 @@ class CurveWidget(QWidget):
 
         # Draw the crosshairs if position is set
         if hasattr(self, 'crosshair_position') and self.crosshair_position is not None:
-            painter.setPen(QPen(QColor("#ab37c8"), 2, Qt.PenStyle.DashLine))  # Red dashed lines for crosshairs
+            painter.setPen(QPen(self.crosshair_color, 2, Qt.PenStyle.DashLine))  # Red dashed lines for crosshairs
             rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)
 
             # Draw vertical and horizontal crosshair lines
@@ -1244,7 +1226,7 @@ class CurveWidget(QWidget):
             label_x = rect.left() + (rect.width() // 2) - (len(label_text) * 3)  # Center horizontally
             label_y = rect.top() - 5  # Fixed position slightly above the graph area
 
-            painter.setPen(QPen(Qt.GlobalColor.black))  # Black text color
+            painter.setPen(QPen(QColor("white") if G.useDarkMode else QColor("black")))
             painter.setFont(QFont('Arial', 10, QFont.Weight.Bold))  # Bold font for visibility
             painter.drawText(label_x, label_y, label_text)
 
@@ -1255,7 +1237,7 @@ class CurveWidget(QWidget):
     def draw_grid(self, painter):
         """Draws the grid lines."""
         rect = self.rect().adjusted(self.margin_left, self.margin_top, -self.margin_right, -self.margin_bottom)  # Adjust to ensure margin
-        painter.setPen(QPen(Qt.GlobalColor.lightGray, 1, Qt.PenStyle.DotLine))
+        painter.setPen(QPen(self.grid_color, 1, Qt.PenStyle.DotLine))
 
         # Draw horizontal grid lines (Y-axis 0% to 100%)
         for i in range(0, 11):
@@ -1272,7 +1254,7 @@ class CurveWidget(QWidget):
         font = QFont()
         font.setBold(True)
         painter.setFont(font)
-        painter.setPen(QPen(Qt.GlobalColor.black))
+        painter.setPen(QPen(self.axis_color))
         if x_unit is None:
             x_unit = ''
 
@@ -1293,7 +1275,7 @@ class CurveWidget(QWidget):
 
     def draw_curve(self, painter):
         """Draws the curve and points (linear segments)."""
-        painter.setPen(QPen(Qt.GlobalColor.blue, 2))
+        painter.setPen(QPen(self.curve_color, 2))
 
         # Convert points into widget space
         widget_points = [self.map_to_widget_space(p) for p in self.points]
@@ -1319,7 +1301,7 @@ class CurveWidget(QWidget):
             self.draw_curve(painter)
             return
 
-        painter.setPen(QPen(Qt.GlobalColor.blue, 2))
+        painter.setPen(QPen(self.curve_color, 2))
 
         # Extract x and y values from points
         x_values = [p.x() for p in self.points]
@@ -1344,7 +1326,7 @@ class CurveWidget(QWidget):
 
         # Draw control points
         for point in [self.map_to_widget_space(p) for p in self.points]:
-            painter.setBrush(QColor(255, 0, 0))
+            painter.setBrush(self.point_fill)
             painter.drawEllipse(QRectF(
                 point.x() - self.point_radius,
                 point.y() - self.point_radius,
