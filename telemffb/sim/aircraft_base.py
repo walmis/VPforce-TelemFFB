@@ -802,6 +802,7 @@ class AircraftBase(object):
                 # We are on the ground, calculate using G vectors
                 y_gs = telem_data.get("ACCs", 0)[0]
                 last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
+                print(f"I AM HERE{y_gs}")
 
             else:
                 # we are in the air, calculate G vector from rate of change of velocity since DCS Y g vector is world orientation
@@ -864,7 +865,7 @@ class AircraftBase(object):
                 avg_y_gs = -max_gs
 
             avg_y_gs = utils.clamp(abs(avg_y_gs) * self.decel_scale_factor, 0, 1)
-            if self._sim_is_dcs():
+            if self._sim_is_dcs() and not wow:
                 sb = telem_data.get('speedbrakes_value')
                 avg_y_gs = avg_y_gs * sb
             logging.debug(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
