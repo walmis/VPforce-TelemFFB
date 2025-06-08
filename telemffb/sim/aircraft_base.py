@@ -802,8 +802,6 @@ class AircraftBase(object):
                 # We are on the ground, calculate using G vectors
                 y_gs = telem_data.get("ACCs", 0)[0]
                 last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
-                print(f"I AM HERE{y_gs}")
-
             else:
                 # we are in the air, calculate G vector from rate of change of velocity since DCS Y g vector is world orientation
 
