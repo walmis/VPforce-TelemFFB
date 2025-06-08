@@ -221,7 +221,7 @@ class NoWheelNumberSlider(NoWheelSlider):
         option = QStyleOptionSlider()
         self.initStyleOption(option)
         handle_rect = self.style().subControlRect(
-            QStyle.ControlElement.CC_Slider,
+            QStyle.ComplexControl.CC_Slider,
             option,
             QStyle.SubControl.SC_SliderHandle,
             self
