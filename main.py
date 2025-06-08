@@ -69,19 +69,6 @@ def send_test_message():
         else:
             G.ipc_instance.send_message("TEST MESSAGE")
 
-
-    # sys_out = {}
-    # for key, value in sys_dict.items():
-    #     reg_key = map_dict.get(key, None)
-    #     if reg_key is None:
-    #         logging.error(f"System Setting conversion error: '{key}' is not a valid setting!")
-    #         continue
-    #     sys_out[key] = value
-    # out_val = json.dumps(sys_out)
-    # utils.set_reg('Sys', out_val)
-    # pass
-
-
 def launch_children():
     if not G.system_settings.get('autolaunchMaster'):
         return
@@ -253,19 +240,6 @@ def main():
     dev_serial = None
 
     G.defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
-    # if G.dev_build and G.dev_userconfig:
-    #     # manage userconfig in local running directory to avoid interfering with production userconfig
-    #     if getattr(sys, 'frozen', False):
-    #         # Running as a bundled executable with PyInstaller
-    #         G.userconfig_rootpath = os.path.dirname(sys.executable)
-    #     else:
-    #         # Running as a standard Python script
-    #         G.userconfig_rootpath = os.path.dirname(os.path.abspath(__file__))
-    #     G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
-    #
-    # else:
-    #     G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-    #     G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
 
     if G.dev_build:
         G.vpf_logo = ":/image/DEVlogo.png"

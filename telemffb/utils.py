@@ -1641,7 +1641,7 @@ class OutLog(QtCore.QObject):
                 tc = self.edit.textColor()
                 self.edit.setTextColor(self.color)
 
-            self.edit.moveCursor(QtGui.QTextCursor.End)
+            self.edit.moveCursor(QtGui.QTextCursor.MoveOperation.End)
             for text, char_format in p:
                 self.edit.setCurrentCharFormat(char_format)
                 self.edit.insertPlainText(text)
