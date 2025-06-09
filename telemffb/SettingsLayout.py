@@ -842,7 +842,7 @@ class SettingsLayout(QGridLayout):
         # erase_button = QToolButton()
         icon = QIcon()
         pixmap = HiDpiPixmap(":/image/delete_button.png")
-        #pixmap = pixmap.scaled(15, 15, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        #pixmap = pixmap.scaled(15, 15, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         icon.addPixmap(pixmap)
 
         # Create the erase button
@@ -974,7 +974,7 @@ class SettingsLayout(QGridLayout):
     def browse_for_config(self):
         self.trigger_form_reload = False
         options = QFileDialog.Option(0)
-        # options |= QFileDialog.DontUseNativeDialog
+        # options |= QFileDialog.Option.DontUseNativeDialog
         calling_button = self.sender()
         starting_dir = os.getcwd()
         if calling_button:

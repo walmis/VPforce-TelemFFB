@@ -561,7 +561,7 @@ class MainWindow(QMainWindow):
         self.tab_widget = QTabWidget(self)
         # self.tab_widget.setTabShape(QTabWidget.TabShape.Triangular)  # Set triangular tab shape
         # self.tab_widget.addTab(QWidget(), "Log")
-        # self.tab_widget.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        # self.tab_widget.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
 
         # Set the main window area height to 0
         # self.tab_widget.setMinimumHeight(14)

@@ -657,7 +657,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
     def browse_vpconf(self, mode):
         options = QFileDialog.Option(0)
-        # options |= QFileDialog.DontUseNativeDialog
+        # options |= QFileDialog.Option.DontUseNativeDialog
         calling_button = self.sender()
         starting_dir = os.getcwd()
         if mode == 'startup':

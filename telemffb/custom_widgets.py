@@ -495,7 +495,7 @@ class SimStatusLabel(QWidget):
         self.error_message = None
 
         self.lbl = QLabel(name)
-        # font = QFont("xxxxxx", weight=QFont.Bold)
+        # font = QFont("xxxxxx", weight=QFont.Weight.Bold)
         #
         # # Set the font to the label
         # self.lbl.setFont(font)

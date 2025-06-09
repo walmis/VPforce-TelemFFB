@@ -82,7 +82,7 @@ class LogTailWindow(QMainWindow):
 
     def update_log_widget(self, log_line):
         cursor = self.log_widget.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertText(log_line)
         self.log_widget.setTextCursor(cursor)
         self.log_widget.ensureCursorVisible()

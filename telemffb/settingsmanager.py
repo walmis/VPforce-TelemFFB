@@ -550,7 +550,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             #
             # disable in-table value editing here
             # if self.allow_in_table_editing:
-            #     value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
+            #     value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
             # Set the row count based on the actual data
             self.table_widget.setRowCount(list_length)
@@ -855,7 +855,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def browse_vpconf_file(self):
         current_text = self.tb_value.text()
-        # options |= QFileDialog.DontUseNativeDialog
+        # options |= QFileDialog.Option.DontUseNativeDialog
 
         if current_text and os.path.isfile(current_text):
             # Use the existing file path as the starting point
@@ -882,13 +882,13 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         lprint (f"{item.column()} : {self.value_previous} ")
         if item.column() == 3:  #  column 3 contains the 'value' items
 
-            row = item.data(Qt.UserRole)
-            name = item.data(Qt.UserRole + 1)
-            original_value = item.data(Qt.UserRole + 2)
-            unit = item.data(Qt.UserRole + 3)
-            datatype = item.data(Qt.UserRole + 4)
-            valid = item.data(Qt.UserRole + 5)
-            state = item.data(Qt.UserRole + 6)
+            row = item.data(Qt.ItemDataRole.UserRole)
+            name = item.data(Qt.ItemDataRole.UserRole + 1)
+            original_value = item.data(Qt.ItemDataRole.UserRole + 2)
+            unit = item.data(Qt.ItemDataRole.UserRole + 3)
+            datatype = item.data(Qt.ItemDataRole.UserRole + 4)
+            valid = item.data(Qt.ItemDataRole.UserRole + 5)
+            state = item.data(Qt.ItemDataRole.UserRole + 6)
             new_value = item.text()
 
             if datatype == 'bool':
@@ -1113,12 +1113,12 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             item = QTableWidgetItem()
             #item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             boolvalue = self.strtobool(value)
-            item.setData(Qt.CheckStateRole, Qt.Checked if boolvalue else Qt.Unchecked)
+            item.setData(QtCore.Qt.ItemDataRole.CheckStateRole, Qt.CheckState.Checked if boolvalue else Qt.CheckState.Unchecked)
             if not checkstate:
-                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)   # no editing if not allowed in this mode
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)   # no editing if not allowed in this mode
             # disable in-table value editing here
             if not self.allow_in_table_editing:
-                item.setFlags(item.flags() & ~Qt.ItemIsEnabled)  #
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)  #
             return item
         elif datatype == 'int' or datatype == 'd_int' or datatype == 'text' or datatype == 'float' or datatype == 'negfloat' or datatype == 'cfgfloat' :
             the_unit = str(unit)
@@ -1127,19 +1127,19 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             line_edit = QLineEdit(str(value) + the_unit)
             item = QTableWidgetItem(line_edit.text())  # Set the widget
             if not checkstate:
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)   # no editing if not allowed in this mode
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)   # no editing if not allowed in this mode
             return item
         # making float numeric for now...
         # elif datatype == 'float':
-        #     slider = QSlider(Qt.Horizontal)
+        #     slider = QSlider(Qt.Orientation.Horizontal)
         #     slider.setValue(int(float(value) * 100))  # Assuming float values between 0 and 1
         #     item = QTableWidgetItem()
-        #     item.setData(Qt.DisplayRole, slider)
+        #     item.setData(Qt.ItemDataRole.DisplayRole, slider)
         #     return item
         else:
             item = QTableWidgetItem(value)
             if not checkstate:
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)   # no editing if not allowed in this mode
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)   # no editing if not allowed in this mode
             return item
 
     def set_override_state(self, override_text):
@@ -1235,7 +1235,7 @@ class UserModelDialog(QDialog):
     the_sim = ''
     def __init__(self, sim, current_aircraft, current_type, parent=None):
         super(UserModelDialog, self).__init__(parent)
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
         self.the_sim = sim
         self.combo_box = None
         self.models_combo_box = None
