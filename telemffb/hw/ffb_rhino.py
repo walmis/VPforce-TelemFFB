@@ -181,6 +181,7 @@ class FFBReport_SetDeadzone(BaseStructure):
             ("reportId", ctypes.c_uint8),
             ("deadzone", ctypes.c_uint16),
         ]
+    _defaults_ = {"reportId": HID_REPORT_ID_SET_DEADZONE, "deadzone": 0}
 
 
 class FFBReport_EffectOperation(BaseStructure):
@@ -761,6 +762,16 @@ class FFBRhino(QObject):
         data.gain_id = slider_id
         data.gain_value = value
         self._dev.send_feature_report(bytes(data))
+
+    def set_deadzone(self, deadzone: int):
+        """
+        Set the deadzone for the device.
+
+        :param deadzone: Deadzone value in the range 0-4096.
+        """
+        assert(0 <= deadzone <= 4096)
+        data = FFBReport_SetDeadzone(deadzone=deadzone)
+        self._dev.write(bytes(data))
 
     # runs on mainThread
     @overrides(QObject)
