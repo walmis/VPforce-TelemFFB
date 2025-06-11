@@ -176,6 +176,42 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB</Grouping>
+		<order>650</order>
+		<name>enable_deadzone</name>
+		<displayname>Enable Deadzone</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB</Grouping>
+		<order>650.1</order>
+		<name>deadzone_base_pct</name>
+		<prereq>enable_deadzone</prereq>
+		<info>Always on circular deadzone equivalent to setting deadzone in configurator </info>
+		<displayname>Deadzone %</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<sliderfactor>.1</sliderfactor>
+		<trimwheel>true</trimwheel>
+		<validvalues>0,1000</validvalues>
+		<value>0</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB</Grouping>
 		<order>700</order>
 		<name>enable_damper_ovd</name>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>

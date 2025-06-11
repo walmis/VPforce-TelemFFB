@@ -1339,6 +1339,7 @@ class Aircraft(AircraftBase):
                 self.update_steering_friction_effect(telem_data)
 
         self._gforce_effect(telem_data)
+        self.set_deadzone()
 
 
 

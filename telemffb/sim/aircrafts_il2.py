@@ -249,6 +249,7 @@ class Aircraft(AircraftBase):
             self._update_flaps(telem_data.get("Flaps"))
         if self.is_pedals():
             self._override_pedal_spring(telem_data)
+        self.set_deadzone()
 
         # if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
         #     self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))

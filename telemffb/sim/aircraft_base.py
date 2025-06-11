@@ -289,6 +289,10 @@ class AircraftBase(object):
     override_spring_cp0_x: int = 0
     override_spring_cp0_y: int = 0
 
+    enable_deadzone: bool = False
+    deadzone_base_pct: float = 0.0
+
+
     g_y_offset: int = 0
 
     last_device_x = None
@@ -311,6 +315,7 @@ class AircraftBase(object):
         self._ipc_telem = {}
         self.adv_g_settings_dict: dict = {}
         self.adv_spr_settings_dict: dict = {}
+        self.active_deadzone_pct: float = 0.0
 
         self.hydraulic_factor = 0.000
         #clear any existing effects
@@ -1928,6 +1933,22 @@ class AircraftBase(object):
         self.adjuster.setCondition(self.spring_adjuster_y)
         self.adjuster.setCondition(self.spring_adjuster_x)
         self.adjuster.start()
+
+    def set_deadzone(self):
+        if not self.enable_deadzone:
+            if self.active_deadzone_pct != 0.0:
+                HapticEffect.device.set_deadzone(0)
+                self.active_deadzone_pct = 0.0
+                logging.info('Disabling deadzone')
+            return
+        if self.active_deadzone_pct != self.deadzone_base_pct:
+            dz = utils.clamp(round((self.deadzone_base_pct / 100) * 4096), 0, 4096)
+            HapticEffect.device.set_deadzone(dz)
+            self.active_deadzone_pct = self.deadzone_base_pct
+            logging.info(f"Setting Deadzone to %{self.deadzone_base_pct}")
+
+
+
 
     def on_event(self):
         pass

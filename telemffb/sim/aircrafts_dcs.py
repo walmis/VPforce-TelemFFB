@@ -213,6 +213,7 @@ class Aircraft(AircraftBase):
                 self.modify_game_spring()
 
         self.override_copilot_spring(telem_data)
+        self.set_deadzone()
 
     @overrides(AircraftBase)
     def on_event(self, event, *args):
