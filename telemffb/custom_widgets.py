@@ -165,16 +165,6 @@ class NoWheelSlider(QSlider):
                 margin-left: -1px;  /* Adjusted left margin */
                 margin-right: -1px;  /* Adjusted right margin */
             }}
-            QSlider::groove:horizontal {{
-                border: 1px solid #565a5e;
-                height: 8px;
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #666666, stop: 1 #444444
-                );
-                margin: 0px;
-                border-radius: 3px;
-            }}
         """
         self.setStyleSheet(css)
 
@@ -1764,7 +1754,9 @@ class GForceCurveWidget(CurveWidget):
         self.base_unit = base_unit
         self.setWindowTitle("G-Force Effect Curve Editor")
         self.x_label_text = "G Force:"
+        self.x_label_legend = "G Force"
         self.y_label_text = "Effect Force:"
+        self.y_label_legend = "% Constant Force"
         self.update()
         self.negative_instance = False
 

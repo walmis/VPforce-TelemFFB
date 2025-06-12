@@ -264,7 +264,10 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
             self.tog_live_view.setChecked(False)
             self.hide()
         else:
+            self.init_settings = json_string  # Update baseline
             self.pb_apply.setEnabled(False)
+            self.pb_saveclose.setEnabled(False)
+            self.check_dirty_state()
 
     def load_curve_settings(self, json_string):
         """

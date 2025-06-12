@@ -256,6 +256,9 @@ def main():
             G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
             if not os.path.isfile(G.userconfig_path):
                 shutil.copy(real_userconfig, G.userconfig_path)
+        else:
+            G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
+            G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
     else:
         if G.useDarkMode:
             G.vpf_logo = ":/image/vpforcelogo_dm.png"

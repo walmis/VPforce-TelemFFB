@@ -178,6 +178,10 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.lab_pos_gain_label.setToolTip("Sets the maximum amount of constant force generated based on the curve settings below")
         self.lab_neg_gain_label.setText("Maximum Negative G Force")
         self.lab_neg_gain_label.setToolTip("Sets the maximum amount of constant force generated based on the curve settings below")
+        self.curve_neg.y_label_legend = "% Constant Force"
+        self.curve_pos.y_label_legend = "% Constant Force"
+        self.curve_neg.update()
+        self.curve_pos.update()
 
     def enable_offset(self, state):
         if state is False:
@@ -191,6 +195,10 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.lab_pos_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
         self.lab_neg_gain_label.setText("Maximum Negative G Offset")
         self.lab_neg_gain_label.setToolTip("Sets the maximum amount that the spring offset can shift based on the curve settings below")
+        self.curve_neg.y_label_legend = "% Spring Offset"
+        self.curve_pos.y_label_legend = "% Spring Offset"
+        self.curve_neg.update()
+        self.curve_pos.update()
 
     def load_default_settings(self):
         self.init_settings = self.default_settings
@@ -309,7 +317,10 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
             self.tog_live_view.setChecked(False)
             self.hide()
         else:
+            self.init_settings = json_string  # Update baseline
             self.pb_apply.setEnabled(False)
+            self.pb_saveclose.setEnabled(False)
+            self.check_dirty_state()
 
     def load_curve_settings(self, json_string, pos=True, neg=True):
         """
@@ -337,9 +348,17 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
             if self.effect_mode == 'constant':
                 self.cb_constant.setChecked(True)
                 self.cb_offset.setChecked(False)
+                self.curve_neg.y_label_legend = "% Constant Force"
+                self.curve_pos.y_label_legend = "% Constant Force"
+                self.curve_neg.update()
+                self.curve_pos.update()
             elif self.effect_mode == 'offset':
                 self.cb_offset.setChecked(True)
                 self.cb_constant.setChecked(False)
+                self.curve_neg.y_label_legend = "% Spring Offset"
+                self.curve_pos.y_label_legend = "% Spring Offset"
+                self.curve_neg.update()
+                self.curve_pos.update()
 
             # self.cb_airspeed_unit.setCurrentText(self.current_unit)
             self.update_slider_labels()
