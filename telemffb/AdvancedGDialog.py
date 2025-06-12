@@ -77,7 +77,7 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.pb_revert.setToolTip('Revert to settings state when dialog opened')
         self.pb_revert.clicked.connect(self.revert_curve_settings)
 
-        self.tog_live_view.setToolTip('Show current live spring gain and airspeed on graph')
+        self.tog_live_view.setToolTip('Show current G-loading to force mapping on graph')
         self.tog_live_view.stateChanged.connect(self.toggle_live_view)
 
         self.curve_neg.negative_instance = True
