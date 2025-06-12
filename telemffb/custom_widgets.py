@@ -1077,13 +1077,27 @@ class CurveWidget(QWidget):
         # message label
         self.msg_label = QLabel(self)
         if G.useDarkMode:
-            self.msg_label.setStyleSheet(
-                "background-color: #2b2b2b; color: #ff5555; border: 1px solid #999;"
-            )
+            self.msg_label.setStyleSheet("""
+                QLabel {
+                    background-color: #ffcccc;
+                    color: #990000;
+                    border: 1px solid #cc6666;
+                    border-radius: 6px;
+                    padding: 4px 8px;
+                    font-weight: bold;
+                }
+            """)
         else:
-            self.msg_label.setStyleSheet(
-                "background-color: white; color: red; border: 1px solid black;"
-            )
+            self.msg_label.setStyleSheet("""
+                    QLabel {
+                        background-color: #ffeeee;
+                        color: #cc0000;
+                        border: 1px solid #aa4444;
+                        border-radius: 6px;
+                        padding: 4px 8px;
+                        font-weight: bold;
+                    }
+                """)
         self.msg_label.move(60, 40)
         self.msg_label.hide()
 
@@ -1102,7 +1116,9 @@ class CurveWidget(QWidget):
         self._enabled = True  # Internal state to track enabled/disabled status
 
         self.x_label_text = "X:"
+        #self.x_label_legend = "X:"  # Add to sublcass for specific Text
         self.y_label_text = "Y:"
+        #self.y_label_legend = "Y:"  # Add to sublcass for specific Text
         dark_mode = G.useDarkMode
 
         # Axis and label color
@@ -1314,7 +1330,35 @@ class CurveWidget(QWidget):
                 x_val=round(x_val)
             outsign = sign if sign is not None and x_val != 0 else ''
             painter.drawText(x - 10, rect.bottom() + self.margin_bottom // 2, f"{outsign}{x_val}{x_unit}")
+            # 🔽 Draw additional axis description below tick labels
 
+            if hasattr(self, "x_label_legend") and self.x_label_legend:
+                painter.setFont(QFont('Arial', 9))
+                text = self.x_label_legend
+                text_width = painter.fontMetrics().horizontalAdvance(text)
+                center_x = rect.left() + (rect.width() // 2)
+                center_y = rect.bottom() + self.margin_bottom - 2  # Adjust as needed for spacing
+                painter.drawText(center_x - text_width // 2, center_y, text)
+            # 🔽 Draw Y-axis legend vertically to the left of tick labels
+            if hasattr(self, "y_label_legend") and self.y_label_legend:
+                painter.save()
+                painter.setFont(QFont('Arial', 9))
+
+                text = self.y_label_legend
+                text_width = painter.fontMetrics().height()  # height now represents width of rotated text
+                text_height = painter.fontMetrics().horizontalAdvance(text)
+
+                # Calculate center of y-axis
+                y_center = rect.top() + rect.height() // 2
+
+                # X-position further left to avoid cutting off text
+                x_pos = rect.left() - self.margin_left + text_width -5  # Adjust this to your margin_left
+
+                painter.translate(x_pos, y_center + text_height // 2)
+                painter.rotate(-90)
+                painter.drawText(0, 0, text)
+
+                painter.restore()
 
     def draw_curve(self, painter):
         """Draws the curve and points (linear segments)."""
@@ -1648,7 +1692,9 @@ class SpringCurveWidget(CurveWidget):
         self.base_unit = base_unit
         self.setWindowTitle("Spring Force Curve Editor")
         self.x_label_text = "Speed:"
+        self.x_label_legend = "Speed (IAS)"
         self.y_label_text = "Gain:"
+        self.y_label_legend = "% Spring Gain"
 
     def draw_crosshairs(self, speed_mps, gain):
         if not self.isEnabled():
