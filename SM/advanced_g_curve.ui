@@ -196,7 +196,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="pb_save">
+        <widget class="QPushButton" name="pb_apply">
          <property name="text">
           <string>Apply</string>
          </property>

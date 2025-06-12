@@ -65,8 +65,11 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.pb_saveclose.setToolTip('Save setting and close dialog')
         self.pb_saveclose.clicked.connect(lambda: self.save_curve_settings(close=True))
 
-        self.pb_save.setToolTip('Save setting and keep dialog open. Will revert upon close unless saved')
-        self.pb_save.clicked.connect(lambda: self.save_curve_settings(close=False))
+        self.pb_apply.setToolTip('Apply setting and keep dialog open. Will revert upon close unless saved')
+        self.pb_apply.clicked.connect(lambda: self.save_curve_settings(close=False))
+
+        self.pb_apply.setEnabled(False)
+        self.pb_saveclose.setEnabled(False)
 
         self.pb_cancel.setToolTip('Close dialog and revert to settings state when dialog was opened')
         self.pb_cancel.clicked.connect(self.cancel_curve_settings)
@@ -127,6 +130,42 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.cb_offset.clicked.connect(self.enable_offset)
         self.cb_constant.clicked.connect(self.enable_constant)
 
+        self.sl_pos_mastergain.valueChanged.connect(lambda: (self.update_slider_labels(), self.check_dirty_state()))
+        self.sl_neg_mastergain.valueChanged.connect(lambda: (self.update_slider_labels(), self.check_dirty_state()))
+        self.cb_enable_negative.stateChanged.connect(lambda _: self.check_dirty_state())
+        self.cb_pos_smoothcurve.stateChanged.connect(lambda _: self.check_dirty_state())
+        self.cb_neg_smoothcurve.stateChanged.connect(lambda _: self.check_dirty_state())
+        self.cb_constant.clicked.connect(self.check_dirty_state)
+        self.cb_offset.clicked.connect(self.check_dirty_state)
+        self.sb_pos_max.valueChanged.connect(lambda _: self.check_dirty_state())
+        self.sb_neg_max.valueChanged.connect(lambda _: self.check_dirty_state())
+        self.curve_pos.modified.connect(self.check_dirty_state)
+        self.curve_neg.modified.connect(self.check_dirty_state)
+
+    def set_dirty_state(self, dirty: bool):
+        self.pb_apply.setEnabled(dirty)
+        self.pb_saveclose.setEnabled(dirty)
+
+    def check_dirty_state(self):
+        try:
+            # Current settings in JSON
+            settings = {
+                "curve_pos": self.curve_pos.to_dict(),
+                "gain_pos": self.sl_pos_mastergain.value(),
+                "curve_neg": self.curve_neg.to_dict(),
+                "gain_neg": self.sl_neg_mastergain.value(),
+                "enable_neg": self.cb_enable_negative.isChecked(),
+                "units": self.current_unit,
+                "scale": self.x_scale,
+                "mode": self.effect_mode
+            }
+            current_json = json.dumps(settings, sort_keys=True)
+            baseline_json = json.dumps(json.loads(self.init_settings), sort_keys=True)
+            self.set_dirty_state(current_json != baseline_json)
+        except Exception as e:
+            print(f"Error checking dirty state: {e}")
+            self.set_dirty_state(True)
+
     def enable_constant(self, state):
         if state is False:
             self.cb_offset.setChecked(True)
@@ -175,6 +214,7 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         if settings is not None:
             self.load_curve_settings(settings)
             self.toggle_negative_settings()
+        self.check_dirty_state()
         self.show()
     def showEvent(self, event):
         super().showEvent(event)
@@ -242,6 +282,8 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
 
     def revert_curve_settings(self):
         self.load_curve_settings(self.init_settings)
+        self.save_curve_settings(close=False)
+        self.check_dirty_state()
 
     def save_curve_settings(self, close=True):
         """
@@ -266,6 +308,8 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         if close:
             self.tog_live_view.setChecked(False)
             self.hide()
+        else:
+            self.pb_apply.setEnabled(False)
 
     def load_curve_settings(self, json_string, pos=True, neg=True):
         """

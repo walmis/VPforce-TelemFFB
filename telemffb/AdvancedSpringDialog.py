@@ -107,8 +107,8 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         self.pb_saveclose.setToolTip('Save setting and close dialog')
         self.pb_saveclose.clicked.connect(lambda: self.save_curve_settings(close=True))
 
-        self.pb_save.setToolTip('Save setting and keep dialog open. Will revert upon close unless saved')
-        self.pb_save.clicked.connect(lambda: self.save_curve_settings(close=False))
+        self.pb_apply.setToolTip('Apply setting and keep dialog open. Will revert upon close unless saved')
+        self.pb_apply.clicked.connect(lambda: self.save_curve_settings(close=False))
 
         self.pb_cancel.setToolTip('Close dialog and revert to settings state when dialog was opened')
         self.pb_cancel.clicked.connect(self.cancel_curve_settings)
@@ -145,11 +145,49 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         self.pb_x_reset.clicked.connect(lambda: self.reset_curve('x'))
         self.pb_y_reset.clicked.connect(lambda: self.reset_curve('y'))
 
+        self.pb_apply.setEnabled(False)
+        self.pb_saveclose.setEnabled(False)
+
+        self.sl_x_mastergain.valueChanged.connect(lambda: (self.update_slider_labels(), self.check_dirty_state()))
+        self.sl_y_mastergain.valueChanged.connect(lambda: (self.update_slider_labels(), self.check_dirty_state()))
+
+        self.cb_x_smoothcurve.stateChanged.connect(lambda _: self.check_dirty_state())
+        self.cb_y_smoothcurve.stateChanged.connect(lambda _: self.check_dirty_state())
+
+        self.cb_airspeed_unit.currentTextChanged.connect(lambda _: self.check_dirty_state())
+        self.pb_copy_up.clicked.connect(self.check_dirty_state)
+        self.pb_copy_down.clicked.connect(self.check_dirty_state)
+
+        self.curve_x.modified.connect(self.check_dirty_state)
+        self.curve_y.modified.connect(self.check_dirty_state)
+
+    def set_dirty_state(self, dirty: bool):
+        self.pb_apply.setEnabled(dirty)
+        self.pb_saveclose.setEnabled(dirty)
+
+    def check_dirty_state(self):
+        try:
+            settings = {
+                "curve_x": self.curve_x.to_dict(),
+                "gain_x": self.sl_x_mastergain.value(),
+                "curve_y": self.curve_y.to_dict(),
+                "gain_y": self.sl_y_mastergain.value(),
+                "units": self.current_unit,
+                "scale": round(self.x_scale)
+            }
+            current_json = json.dumps(settings, sort_keys=True)
+            baseline_json = json.dumps(json.loads(self.init_settings), sort_keys=True)
+            self.set_dirty_state(current_json != baseline_json)
+        except Exception as e:
+            print(f"[SpringDialog] Dirty check error: {e}")
+            self.set_dirty_state(True)
+
     def showme(self, settings = None):
         if self.current_settings is not None:
             self.init_settings = self.current_settings
         if settings is not None:
             self.load_curve_settings(settings)
+        self.check_dirty_state()
         self.show()
 
     def showEvent(self, event):
@@ -204,6 +242,8 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
 
     def revert_curve_settings(self):
         self.load_curve_settings(self.init_settings)
+        self.save_curve_settings(close=False)
+        self.check_dirty_state()
 
     def save_curve_settings(self, close=True):
         """
@@ -223,6 +263,8 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         if close:
             self.tog_live_view.setChecked(False)
             self.hide()
+        else:
+            self.pb_apply.setEnabled(False)
 
     def load_curve_settings(self, json_string):
         """
@@ -286,6 +328,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
                 print(f"increment = {new_airspeed - self.x_scale}")
                 self.change_airspeed_scale(new_airspeed - self.x_scale)
                 self.x_scale = new_airspeed
+                self.check_dirty_state()
 
             except ValueError as e:
                 # Show an error message if input is invalid
@@ -293,16 +336,18 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
 
     def copy_x_to_y(self):
         self.curve_y.from_dict(self.curve_x.to_dict())
+        self.check_dirty_state()
 
     def copy_y_to_x(self):
         self.curve_x.from_dict(self.curve_y.to_dict())
-        pass
+        self.check_dirty_state()
 
     def change_airspeed_scale(self, increment):
         for axis in [self.curve_x, self.curve_y]:
             axis.update_airspeed_range(increment)
-
         self.x_scale += increment
+        self.check_dirty_state()
+
 
     def change_airspeed_unit(self, new_unit):
         """Change the unit of the x-axis and update points and labels."""
@@ -323,6 +368,8 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
             axis.current_unit = new_unit
         self.x_scale *= conversion_factor
         self.current_unit = new_unit
+        self.check_dirty_state()
+
 
     def update_slider_labels(self):
         """

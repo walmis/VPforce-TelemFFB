@@ -1047,6 +1047,7 @@ class InstanceStatusRow(QWidget):
 
 
 class CurveWidget(QWidget):
+    modified = pyqtSignal()
     def __init__(self, parent=None, unit=None, base_unit=None):
         super().__init__(parent)
         # Default: 0% at 0 knots and 100% at 500 knots
@@ -1146,6 +1147,7 @@ class CurveWidget(QWidget):
             self.smooth_curve_enabled = False
             # self.msg_label.hide()  # Hide any error messages
             self.update()
+            self.modified.emit()
             return
 
         if len(self.points) < 4:
@@ -1183,6 +1185,7 @@ class CurveWidget(QWidget):
         # Enable smooth curve mode
         self.smooth_curve_enabled = True
         self.msg_label.hide()  # Hide any error messages
+        self.modified.emit()
         self.update()
 
     def highlight_dragged_point(self, painter):
@@ -1539,6 +1542,7 @@ class CurveWidget(QWidget):
             self.dragging_point = None
             self.last_valid_position = None  # Reset last valid position
             self.coordinate_label.hide()  # Hide the coordinate label
+            self.modified.emit()
             self.update()
 
     def show_context_menu(self, pos):
@@ -1555,6 +1559,7 @@ class CurveWidget(QWidget):
                 QTimer.singleShot(3000, self.msg_label.hide)
             else:
                 self.points.remove(self.right_clicked_point)
+                self.modified.emit()
                 self.update()
 
     def add_new_point(self, new_point):
@@ -1598,6 +1603,7 @@ class CurveWidget(QWidget):
         self.points[0].setY(0)
         self.points.append(new_point)
         self.points.sort(key=lambda p: p.x())  # Ensure points are ordered by x (speed)
+        self.modified.emit()
         self.update()
 
     def to_dict(self):
@@ -1622,6 +1628,7 @@ class CurveWidget(QWidget):
         """Resets the points to the default values."""
         self.points = [QPointF(self.x_min, 0), QPointF(self.x_max, 100)]  # Default 0% at 0 knots and 100%
         # self.test_point = None  # Clear the test point when resetting
+        self.modified.emit()
         self.update()
 
 
