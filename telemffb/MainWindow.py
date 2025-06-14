@@ -418,12 +418,12 @@ class MainWindow(QMainWindow):
 
         self.cur_craft = QLabel()
         self.cur_craft.setText('Unknown')
-        self.cur_craft.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Courier New; }")
+        self.cur_craft.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
         self.cur_craft.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.cur_pattern = QLabel()
         self.cur_pattern.setText('(No Match)')
-        self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Courier New; }")
+        self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
         self.cur_pattern.setAlignment(Qt.AlignmentFlag.AlignLeft)
         text_color = "#dddddd" if G.useDarkMode else "#000000"
         secondary_color = "#bbbbbb" if G.useDarkMode else "#444444"
@@ -441,7 +441,7 @@ class MainWindow(QMainWindow):
             QLabel {{
                 padding-left: 15px;
                 padding-top: 2px;
-                font-family: 'Courier New';
+                font-family: 'Casciadia Mono';
                 color: {text_color};
             }}
         """)
@@ -450,7 +450,7 @@ class MainWindow(QMainWindow):
             QLabel {{
                 padding-left: 15px;
                 padding-top: 2px;
-                font-family: 'Courier New';
+                font-family: 'Cascadia Mono';
                 color: {secondary_color};
             }}
         """)
@@ -601,7 +601,7 @@ class MainWindow(QMainWindow):
         self.lbl_telem_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.lbl_telem_data.setStyleSheet("""
             padding: 2px;
-            font-family: Courier New;
+            font-family: Cascadia Mono;
         """)
 
         # Set the QLabel widget as the widget inside the scroll area
@@ -612,7 +612,7 @@ class MainWindow(QMainWindow):
         self.lbl_effects_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.lbl_effects_data.setStyleSheet("""
             padding: 2px;
-            font-family: Courier New;
+            font-family: Cascadia Mono;
         """)
 
         self.telem_lbl = QLabel('Telemetry:')
