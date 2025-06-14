@@ -1896,6 +1896,13 @@ class AircraftBase(object):
         spring.start(override=True)
 
     def modify_game_spring(self):
+        if not self.adv_spr_override_enabled:
+            self.spring_adjuster.stop()
+            return
+        if self.adv_spr_gains == 'none':
+            self.flag_error('Please open and configure the advanced spring gain settings')
+            return
+
         gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.get('IAS', 0))
 
         self.spring_adjuster.name = 'adv_spr'
