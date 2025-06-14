@@ -941,25 +941,26 @@ class SettingsLayout(QGridLayout):
         """Used to force disable bool settings that are mutually exclusive with others"""
         if state != 2:
             # we are only interested in bool settings that have been enabled (state = 2)
-            return
+            return None
         for pair in exclusive_list:  # Iterate through prebuilt exclusivity list to find one matching this call
             a = pair[0]  # This is the enforcing setting
             b = pair[1]  # This is the setting(s) which need to be disabled if 'a' is enabled (comma separated)
             if a == name:  # Find if there is pair that matches this function call
                 disable_list = b.split(',')
-                a_widget = self.mainwindow.findChild(Toggle, f"cb_{name}") # find enforcing Toggle widget
-                if a_widget.isChecked():
-                    for b_widget in disable_list:
-                        widget = self.mainwindow.findChild(Toggle, f"cb_{b_widget}")  # find subordinate widget
-                        # print(f"WIDGET-{b_widget}: {widget}")
-                        if widget is not None:
-                            widget.setChecked(False) # force setting to disable for subordinate widget
+                return disable_list
+        return None
+
 
     def checkbox_changed(self, name, state):
         self.trigger_form_reload = True
         logging.debug(f"Checkbox {name} changed. New state: {state}")
         value = 'false' if state == 0 else 'true'
-        self.enforce_exclusives(name, state, self.exclusive_list)  # Check for and enforce exclusive settings
+        enforce_list = self.enforce_exclusives(name, state, self.exclusive_list)  # Check for and enforce exclusive settings
+        if value == 'true' and enforce_list is not None:
+            for exclusive in enforce_list:
+                #enforce_list is a list of settings that must not be true if 'value' is true (per exclusive attribute in defauls.xml)
+                xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, "false", exclusive)
+
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, name)
         if G.settings_mgr.timed_out:
             self.reload_caller()
