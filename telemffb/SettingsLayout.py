@@ -1110,6 +1110,7 @@ class SettingsLayout(QGridLayout):
             the_button.setText("Click to Configure")
         if G.settings_mgr.timed_out:
             self.reload_caller()
+
     def advanced_g_button_clicked(self, value=None):
         if value is None:
             value = self.advanced_g_settings
@@ -1118,11 +1119,12 @@ class SettingsLayout(QGridLayout):
         else:
             if self.adv_g_dialog is None:
                 self.adv_g_dialog = AdvancedGDialog(parent=G.main_window, settings=value, device=G.current_device_config_scope)
-                self.adv_g_dialog.setWindowFlags(Qt.WindowType.Window)
+                self.adv_g_dialog.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
                 self.adv_g_dialog.accepted.connect(self.update_advanced_g_effect)
                 self.adv_g_dialog.show()
             else:
                 self.adv_g_dialog.showme(settings=value)
+
     def advanced_spring_button_clicked(self, value=None):
         if value is None:
             value = self.advanced_spring_settings
@@ -1131,7 +1133,7 @@ class SettingsLayout(QGridLayout):
         else:
             if self.adv_spr_dialog is None:
                 self.adv_spr_dialog = AdvancedSpringDialog(parent=G.main_window, settings=value, device=G.current_device_config_scope)
-                self.adv_spr_dialog.setWindowFlags(Qt.WindowType.Window)
+                self.adv_spr_dialog.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
                 self.adv_spr_dialog.accepted.connect(self.update_advanced_spring_gains)
                 self.adv_spr_dialog.show()
             else:
