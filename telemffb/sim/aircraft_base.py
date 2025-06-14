@@ -325,7 +325,10 @@ class AircraftBase(object):
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
-        self.adjuster = effects['adjuster'].spring_adjuster()
+        self.spring_adjuster = effects['spring_adjuster'].spring_adjuster()
+        self.offset_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.offset_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
+        self.offset_adjuster = effects['offset_adjuster'].spring_adjuster()
 
         self.friction_effect_overridden: bool = False
 
@@ -752,13 +755,13 @@ class AircraftBase(object):
                     # If being called by advanced spring effect, don't apply adjuster offset here, return offset value and let the advanced spring adjuster effect do it
                     return adjuster_cpOy
 
-                self.adjuster.name = 'gforce_spr'
-                self.spring_adjuster_y.cpOffset = adjuster_cpOy
-                self.spring_adjuster_y.negativeSaturation = self.spring_adjuster_y.positiveSaturation = 4096
-                self.spring_adjuster_x.negativeSaturation = self.spring_adjuster_x.positiveSaturation = 4096
-                self.adjuster.setCondition(self.spring_adjuster_y)
-                self.adjuster.setCondition(self.spring_adjuster_x)
-                self.adjuster.start()
+                self.offset_adjuster.name = 'gforce_spr'
+                self.offset_adjuster_y.cpOffset = adjuster_cpOy
+                self.offset_adjuster_y.negativeSaturation = self.offset_adjuster_y.positiveSaturation = 4096
+                self.offset_adjuster_x.negativeSaturation = self.offset_adjuster_x.positiveSaturation = 4096
+                self.offset_adjuster.setCondition(self.offset_adjuster_y)
+                self.offset_adjuster.setCondition(self.offset_adjuster_x)
+                self.offset_adjuster.start()
 
         else:
             effects.dispose("gforce")
@@ -1895,7 +1898,7 @@ class AircraftBase(object):
     def modify_game_spring(self):
         gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.get('IAS', 0))
 
-        self.adjuster.name = 'adv_spr'
+        self.spring_adjuster.name = 'adv_spr'
         self.spring_adjuster_y.positiveCoefficient = self.spring_adjuster_y.negativeCoefficient = round(4096 * gains.get('y', 0))
         self.spring_adjuster_x.positiveCoefficient = self.spring_adjuster_x.negativeCoefficient = round(4096 * gains.get('x', 0))
 
@@ -1930,9 +1933,9 @@ class AircraftBase(object):
         self.spring_adjuster_y.cpOffset = round(self.override_spring_cp0_y + self.g_y_offset)
         self.spring_adjuster_x.cpOffset = round(self.override_spring_cp0_x)
 
-        self.adjuster.setCondition(self.spring_adjuster_y)
-        self.adjuster.setCondition(self.spring_adjuster_x)
-        self.adjuster.start()
+        self.spring_adjuster.setCondition(self.spring_adjuster_y)
+        self.spring_adjuster.setCondition(self.spring_adjuster_x)
+        self.spring_adjuster.start()
 
     def set_deadzone(self):
         if not self.enable_deadzone:
