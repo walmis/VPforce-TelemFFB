@@ -20,7 +20,7 @@ import json
 from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSignal, Qt, QPointF
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog
+from PyQt6.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog, QFileDialog
 import inspect
 
 import telemffb.globals as G
@@ -42,6 +42,7 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.gain_pos: int = 100
         self.gain_neg: int = 100
         self.device_type = device
+        self.original_settings = None
         self.current_settings = None
         self.init_settings = None
         self.effect_mode: str = 'constant'
@@ -141,6 +142,82 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.sb_neg_max.valueChanged.connect(lambda _: self.check_dirty_state())
         self.curve_pos.modified.connect(self.check_dirty_state)
         self.curve_neg.modified.connect(self.check_dirty_state)
+
+        self.pb_export.clicked.connect(self.export_settings)
+        self.pb_import.clicked.connect(self.import_settings)
+
+    def export_settings(self):
+        settings = {
+            "settings_type": "advanced_gs",
+            "device_type": self.device_type,
+            "curve_pos": self.curve_pos.to_dict(),
+            "gain_pos": self.sl_pos_mastergain.value(),
+            "curve_neg": self.curve_neg.to_dict(),
+            "gain_neg": self.sl_neg_mastergain.value(),
+            "enable_neg": self.cb_enable_negative.isChecked(),
+            "units": self.current_unit,
+            "scale": self.x_scale,
+            "mode": self.effect_mode
+        }
+
+        json_string = json.dumps(settings, indent=4)
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Settings",
+            filter="Text Files (*.txt);;All Files (*)"
+        )
+        if filename:
+            try:
+                with open(filename, 'w') as f:
+                    f.write(json_string)
+                QMessageBox.information(self, "Export", "Settings exported successfully.")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to export settings:\n{e}")
+
+    def import_settings(self):
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Settings",
+            filter="Text Files (*.txt);;All Files (*)"
+        )
+        if filename:
+            try:
+                with open(filename, 'r') as f:
+                    json_string = f.read()
+                settings = json.loads(json_string)
+                if settings.get('settings_type', None) != 'advanced_gs':
+                    QMessageBox.critical(self, "Import Error", "The file is malformed or not an advanced G effect curve settings file.")
+                    return
+                # Validate schema
+                required_top_keys = {
+                    "curve_pos", "curve_neg", "gain_pos", "gain_neg",
+                    "enable_neg", "units", "scale", "mode"
+                }
+                required_curve_keys = {"x_min", "x_max", "points", "smooth_curve_enabled", "current_unit"}
+
+                missing_keys = required_top_keys - settings.keys()
+                if missing_keys:
+                    raise ValueError(f"Malformed settings - Missing keys: {', '.join(missing_keys)}")
+
+                for curve in ["curve_pos", "curve_neg"]:
+                    curve_keys = settings[curve].keys()
+                    missing_curve_keys = required_curve_keys - curve_keys
+                    if missing_curve_keys:
+                        raise ValueError(f"Malformed settings - Missing keys in '{curve}': {', '.join(missing_curve_keys)}")
+
+                # If validation passes:
+                self.original_settings = json.dumps(settings, sort_keys=True)
+                self.load_curve_settings(self.original_settings)
+                self.init_settings = self.original_settings
+                self.check_dirty_state()
+                QMessageBox.information(self, "Import", "Settings imported successfully.")
+
+            except json.JSONDecodeError:
+                QMessageBox.critical(self, "Import Error", "The file is not valid JSON.")
+            except ValueError as ve:
+                QMessageBox.critical(self, "Import Error", f"Invalid settings file:\n{ve}")
+            except Exception as e:
+                QMessageBox.critical(self, "Import Error", f"Unexpected error:\n{e}")
 
     def set_dirty_state(self, dirty: bool):
         self.pb_apply.setEnabled(dirty)
@@ -315,12 +392,10 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         self.accepted.emit(json_string)
         if close:
             self.tog_live_view.setChecked(False)
+            self.init_settings = json_string  # Update baseline
             self.hide()
         else:
-            self.init_settings = json_string  # Update baseline
             self.pb_apply.setEnabled(False)
-            self.pb_saveclose.setEnabled(False)
-            self.check_dirty_state()
 
     def load_curve_settings(self, json_string, pos=True, neg=True):
         """

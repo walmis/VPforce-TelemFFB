@@ -1043,6 +1043,7 @@
 		<Grouping>SpringCenter</Grouping>
 		<order>3800</order>
 		<name>pedal_mode_dummy</name>
+		<exclusive_with>adv_spr_override_enabled</exclusive_with>
 		<displayname>Pedal Mode Settings</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -1354,7 +1355,7 @@
 		<Grouping>Spring Override</Grouping>
 		<order>4550</order>
 		<name>adv_spr_override_enabled</name>
-		<exclusive_with>override_spring_enabled</exclusive_with>
+		<exclusive_with>override_spring_enabled,pedal_mode_dummy</exclusive_with>
 		<displayname>Advanced Spring Override</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -1385,6 +1386,7 @@
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1398,6 +1400,7 @@
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1431,6 +1434,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 		<value>0</value>
 		<datatype>button</datatype>
 	</defaults>
@@ -1442,6 +1446,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 		<value>0</value>
 		<datatype>button</datatype>
 	</defaults>
@@ -1454,6 +1459,7 @@
 		<displayname>Trim Slew Rate</displayname>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
+		<pedals>true</pedals>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,1000</validvalues>
 		<value>200</value>
