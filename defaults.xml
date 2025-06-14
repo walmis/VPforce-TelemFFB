@@ -590,6 +590,7 @@
 		<Grouping>SpringCenter</Grouping>
 		<order>1800</order>
 		<name>pedal_trimming_enabled</name>
+		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
 		<info>Enable pedal trimming feedback for fixed wing aircfraft</info>
 		<displayname>Pedal Trimming</displayname>
 		<DCS>true</DCS>
@@ -1386,7 +1387,6 @@
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
 		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
@@ -1394,7 +1394,7 @@
 		<Grouping>Spring Override</Grouping>
 		<order>4550.20</order>
 		<name>adv_spr_use_hardware_trim</name>
-		<exclusive_with>adv_spr_use_game_trim</exclusive_with>
+		<exclusive_with>adv_spr_use_game_trim,pedal_trimming_enabled</exclusive_with>
 		<prereq>adv_spr_override_enabled</prereq>
 		<displayname>Use Hardware Trim</displayname>
 		<DCS>true</DCS>
