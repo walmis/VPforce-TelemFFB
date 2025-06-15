@@ -778,7 +778,15 @@ class Aircraft(AircraftBase):
         rudder_coeff = _rud_dyn_pressure * self.rudder_gain * _slip_gain
 
         # apply expo curve
-        rudder_coeff = self.expocurve(rudder_coeff, self.rudder_expo)
+        if self.adv_spr_override_enabled:
+            # calculate spd based on current elevator_coeff assuming linear from 0 to VNE
+            adv_spr_stgs = json.loads(self.adv_spr_gains)
+            scale = adv_spr_stgs.get('scale')
+            spd_x = scale * rudder_coeff
+            x_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_x)
+            rudder_coeff = x_gains.get('x')
+        else:
+            rudder_coeff = self.expocurve(rudder_coeff, self.rudder_expo)
 
         telem_data["_rud_coeff"] = rudder_coeff
         rud = (slip_angle - rudder_angle) * _dyn_pressure * _slip_gain
