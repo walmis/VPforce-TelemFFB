@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog, QFile
 import inspect
 
 import telemffb.globals as G
+from telemffb import utils
 from telemffb.ui.Ui_AdvancedSpring import Ui_AdvancedSpringDialog
 from telemffb.utils import get_gain_from_speed
 from telemffb.custom_widgets import SpringCurveWidget
@@ -52,6 +53,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         self.sim = sim
         self.current_settings = None
         self.init_settings = None
+        self.applied_not_saved = False
         self.default_settings = ('{'
                                  '"curve_x": {"x_min": 0, "x_max": 500, "points": [{"x": 0.0, "y": 0.0}, {"x": 500.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"},'
                                  ' "curve_y": {"x_min": 0, "x_max": 500, "points": [{"x": 0.0, "y": 0.0}, {"x": 500.0, "y": 100.0}], "smooth_curve_enabled": false, "current_unit": "kt"},'
@@ -270,7 +272,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         self.pb_apply.setEnabled(dirty)
         self.pb_saveclose.setEnabled(dirty)
 
-    def check_dirty_state(self):
+    def check_dirty_state(self, apply=True):
         try:
             settings = {
                 "curve_x": self.curve_x.to_dict(),
@@ -282,7 +284,13 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
             }
             current_json = json.dumps(settings, sort_keys=True)
             baseline_json = json.dumps(json.loads(self.init_settings), sort_keys=True)
-            self.set_dirty_state(current_json != baseline_json)
+            result = (current_json != baseline_json)
+            utils.dbprint("red", f"DIRTYCHECK: {result}")
+            if apply:
+                self.set_dirty_state(result)
+            else :
+                return result
+
         except Exception as e:
             logging.error(f"[SpringDialog] Dirty check error: {e}")
             self.set_dirty_state(True)
@@ -298,6 +306,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         else:
             self.pb_get_vne.hide()
         self.sim = sim
+        self.applied_not_saved = False
         self.show()
 
     def showEvent(self, event):
@@ -347,8 +356,14 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
                 axis.draw_crosshairs(ias, gains.get(gain, 0)*100)
 
     def cancel_curve_settings(self):
-        self.revert_curve_settings()
-        self.save_curve_settings(close=True)
+        if self.applied_not_saved:
+            self.load_curve_settings(self.init_settings)
+            self.save_curve_settings(close=True)
+        else:
+            self.load_curve_settings(self.init_settings)
+            self.tog_live_view.setChecked(False)
+            self.hide()
+
 
     def revert_curve_settings(self):
         self.load_curve_settings(self.init_settings)
@@ -373,8 +388,10 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         if close:
             self.tog_live_view.setChecked(False)
             self.init_settings = json_string  # Update baseline
+            self.applied_not_saved = False
             self.hide()
         else:
+            self.applied_not_saved = True
             self.pb_apply.setEnabled(False)
 
     def load_curve_settings(self, json_string):
