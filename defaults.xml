@@ -598,11 +598,11 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
-		<order>1850</order>
-		<name>adv_spr_override_enabled</name>
-		<exclusive_with>dummy_basic_spring_settings,aircraft_is_fbw</exclusive_with>
-		<displayname>Advanced Spring Override</displayname>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>1860</order>
+		<name>dummy_dynamic_spring_settings</name>
+		<exclusive_with>aircraft_is_fbw</exclusive_with>
+		<displayname>Dynamic Spring Settings</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -611,10 +611,24 @@
 	</defaults>
 	<defaults>
 		<Grouping>Spring Override</Grouping>
-		<order>1850.1</order>
+		<order>1870</order>
+		<name>adv_spr_override_enabled</name>
+		<exclusive_with>dummy_basic_spring_settings,aircraft_is_fbw</exclusive_with>
+		<prereq>dummy_dynamic_spring_settings</prereq>
+		<displayname>Advanced Spring Mapping</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Spring Override</Grouping>
+		<order>1870.2</order>
 		<name>adv_spr_gains</name>
 		<prereq>adv_spr_override_enabled</prereq>
-		<displayname>Advanced Spring Override</displayname>
+		<displayname>Advanced Spring Mapping</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -624,14 +638,16 @@
 	</defaults>
 	<defaults>
 		<Grouping>Dynamic Forces</Grouping>
-		<order>1860</order>
+		<order>1880</order>
 		<name>dummy_basic_spring_settings</name>
-		<exclusive_with>adv_spr_override_enabled,aircraft_is_fbw</exclusive_with>
-		<displayname>Dynamic Spring Settings</displayname>
+		<exclusive_with>adv_spr_override_enabled</exclusive_with>
+		<prereq>dummy_dynamic_spring_settings</prereq>
+		<displayname>Basic Settings</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
+		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
@@ -640,7 +656,7 @@
 		<name>max_aileron_coeff</name>
 		<prereq>dummy_basic_spring_settings</prereq>
 		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
-		<displayname>Aileron Max Force</displayname>
+		<displayname>    Aileron Max Force</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -654,7 +670,7 @@
 		<name>aileron_expo</name>
 		<prereq>dummy_basic_spring_settings</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Aileron Expo</displayname>
+		<displayname>    Aileron Expo</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -668,7 +684,7 @@
 		<name>max_elevator_coeff</name>
 		<prereq>dummy_basic_spring_settings</prereq>
 		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
-		<displayname>Elevator Max Force</displayname>
+		<displayname>    Elevator Max Force</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -682,7 +698,7 @@
 		<name>elevator_expo</name>
 		<prereq>dummy_basic_spring_settings</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Elevator Expo</displayname>
+		<displayname>    Elevator Expo</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -696,7 +712,7 @@
 		<name>max_rudder_coeff</name>
 		<prereq>dummy_basic_spring_settings</prereq>
 		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
-		<displayname>Rudder Max Force</displayname>
+		<displayname>    Rudder Max Force</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -710,7 +726,7 @@
 		<name>rudder_expo</name>
 		<prereq>dummy_basic_spring_settings</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Rudder Expo</displayname>
+		<displayname>    Rudder Expo</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -719,10 +735,68 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
+		<Grouping>SpringCenter</Grouping>
 		<order>2500</order>
-		<name>vne_override</name>
+		<name>aircraft_is_spring_centered</name>
 		<prereq>dummy_basic_spring_settings</prereq>
+		<info>Enable spring centering for aircraft while maintaining dynamic forces&lt;br&gt;&lt;br&gt; Do not use together with FBW</info>
+		<any>true</any>
+		<displayname>    Spring Centering (not FBW)</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>2500.2</order>
+		<name>aileron_spring_gain</name>
+		<prereq>aircraft_is_spring_centered</prereq>
+		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<displayname>    Aileron Spring Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>2500.3</order>
+		<name>elevator_spring_gain</name>
+		<prereq>aircraft_is_spring_centered</prereq>
+		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<displayname>    Elevator Spring Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>SpringCenter</Grouping>
+		<order>2500.4</order>
+		<name>rudder_spring_gain</name>
+		<prereq>aircraft_is_spring_centered</prereq>
+		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<displayname>    Rudder Spring Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE><pedals>true</pedals>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>Dynamic Forces</Grouping>
+		<order>2600</order>
+		<name>vne_override</name>
+		<prereq>dummy_dynamic_spring_settings</prereq>
 		<info>Override Vne if plane data is incorrect.  Leave blank or delete setting to use sim Vne data &lt;br&gt;&lt;br&gt;Enter Vne Airspeed (IAS) where dynamic forces max out</info>
 		<any>true</any>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Override&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
@@ -735,68 +809,10 @@
 		<unit>kt</unit>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>2600</order>
-		<name>aircraft_is_spring_centered</name>
-		<prereq>dummy_basic_spring_settings</prereq>
-		<info>Enable spring centering for aircraft while maintaining dynamic forces&lt;br&gt;&lt;br&gt; Do not use together with FBW</info>
-		<any>true</any>
-		<displayname>Spring Centering (not FBW)</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>2600.2</order>
-		<name>aileron_spring_gain</name>
-		<prereq>aircraft_is_spring_centered</prereq>
-		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<displayname>Aileron Spring Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<value>0.3</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>2600.3</order>
-		<name>elevator_spring_gain</name>
-		<prereq>aircraft_is_spring_centered</prereq>
-		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<displayname>Elevator Spring Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<value>0.3</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>2600.4</order>
-		<name>rudder_spring_gain</name>
-		<prereq>aircraft_is_spring_centered</prereq>
-		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<displayname>Rudder Spring Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE><pedals>true</pedals>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<value>0.3</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
 		<Grouping>FlyByWire</Grouping>
 		<order>2700</order>
 		<name>aircraft_is_fbw</name>
-		<exclusive_with>adv_spr_override_enabled,dummy_basic_spring_settings</exclusive_with>
+		<exclusive_with>dummy_dynamic_spring_settings</exclusive_with>
 		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
 		<displayname>FlyByWire (FBW)</displayname>
 		<MSFS>true</MSFS>
@@ -4375,6 +4391,20 @@
 			<sim>XPLANE</sim>
 			<device>any</device>
 	</classdefaults>
+		<classdefaults>
+			<name>adv_spr_gains</name>
+			<type>PropellerAircraft</type>
+			<value>{"curve_x": {"x_min": 0.0, "x_max": 130, "points": [{"x": 0.0, "y": 0.0}, {"x": 14.6, "y": 25.5}, {"x": 45.0, "y": 55.0}, {"x": 76.4, "y": 72.0}, {"x": 104.7, "y": 82.0}, {"x": 130.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0.0, "x_max": 130.0, "points": [{"x": 0.0, "y": 0.0}, {"x": 14.6, "y": 25.5}, {"x": 45.0, "y": 55.0}, {"x": 76.4, "y": 72.0}, {"x": 104.7, "y": 82.0}, {"x": 130.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 130}</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+	</classdefaults>
+		<classdefaults>
+			<name>adv_spr_gains</name>
+			<type>PropellerAircraft</type>
+			<value>{"curve_x": {"x_min": 0.0, "x_max": 130, "points": [{"x": 0.0, "y": 0.0}, {"x": 14.6, "y": 25.5}, {"x": 45.0, "y": 55.0}, {"x": 76.4, "y": 72.0}, {"x": 104.7, "y": 82.0}, {"x": 130.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 130, "points": [{"x": 0.0, "y": 0.0}, {"x": 130.0, "y": 0.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 0, "units": "kt", "scale": 130}</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+	</classdefaults>
 	<classdefaults>
 		<name>afterburner_effect_enabled</name>
 		<type>JetAircraft</type>
@@ -5166,56 +5196,56 @@
 		<device>any</device>
 		</classdefaults>
 	<classdefaults>
-		<name>dummy_basic_spring_settings</name>
+		<name>dummy_dynamic_spring_settings</name>
 		<type>PropellerAircraft</type>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>dummy_basic_spring_settings</name>
+		<name>dummy_dynamic_spring_settings</name>
 		<type>JetAircraft</type>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>dummy_basic_spring_settings</name>
+		<name>dummy_dynamic_spring_settings</name>
 		<type>TurbopropAircraft</type>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>dummy_basic_spring_settings</name>
+		<name>dummy_dynamic_spring_settings</name>
 		<type>GliderAircraft</type>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>dummy_basic_spring_settings</name>
+		<name>dummy_dynamic_spring_settings</name>
 		<type>PropellerAircraft</type>
 		<value>true</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>dummy_basic_spring_settings</name>
+		<name>dummy_dynamic_spring_settings</name>
 		<type>JetAircraft</type>
 		<value>true</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>dummy_basic_spring_settings</name>
+		<name>dummy_dynamic_spring_settings</name>
 		<type>TurbopropAircraft</type>
 		<value>true</value>
 		<sim>XPLANE</sim>
 		<device>any</device>
 	</classdefaults>
 	<classdefaults>
-		<name>dummy_basic_spring_settings</name>
+		<name>dummy_dynamic_spring_settings</name>
 		<type>GliderAircraft</type>
 		<value>true</value>
 		<sim>XPLANE</sim>

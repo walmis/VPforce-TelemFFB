@@ -248,6 +248,8 @@ class Aircraft(AircraftBase):
 
         self.trimwheel_init = False
 
+        self.vne_override = 0
+
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
         # freq = 8
@@ -633,7 +635,6 @@ class Aircraft(AircraftBase):
         _airspeed = incidence_vec.z
         _airspeed = telem_data['IAS']
         telem_data["TAS"] = _airspeed   # why not use simvar AIRSPEED TRUE?
-        telem_data['TAS3'] = _airspeed  # what is this for?
         IAS = telem_data['IAS']
         telem_data['TAS_kt'] = _airspeed * ms2kt
         telem_data['IAS_kt'] = IAS * ms2kt
@@ -692,20 +693,22 @@ class Aircraft(AircraftBase):
 
         # determine standard Q with Vne to get proper gain
 
-        if self.vne_override == 0:
-            if telem_data['src'] == 'XPLANE':
-                vne = telem_data.get('Vne')
-                vs0 = telem_data.get('Vso')
-            else:
-                vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s   Vc is TAS!!
-                telem_data['Vc_kt'] = vc * ms2kt
-                Tvne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
-                # correction from TAS to IAS
-                # https://aviation.stackexchange.com/questions/25801/how-do-you-convert-true-airspeed-to-indicated-airspeed
-                qv= (0.5 * std_air_pressure * (Tvne ** 2))
-                kmNs = ((( qv / P0) + 1) ** (2/7))
-                vne = vsound * sqrt(5 * ( kmNs - 1))
+
+        if telem_data['src'] == 'XPLANE':
+            vne = telem_data.get('Vne')
+            vs0 = telem_data.get('Vso')
         else:
+            vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s   Vc is TAS!!
+            telem_data['Vc_kt'] = vc * ms2kt
+            Tvne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
+            # correction from TAS to IAS
+            # https://aviation.stackexchange.com/questions/25801/how-do-you-convert-true-airspeed-to-indicated-airspeed
+            qv= (0.5 * std_air_pressure * (Tvne ** 2))
+            kmNs = ((( qv / P0) + 1) ** (2/7))
+            vne = vsound * sqrt(5 * ( kmNs - 1))
+        telem_data['Vne_ms_calc'] = vne
+
+        if self.vne_override:
             vne = self.vne_override
 
         telem_data['Vne_kt'] = vne * ms2kt
@@ -959,6 +962,7 @@ class Aircraft(AircraftBase):
                     gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.get('IAS', 0))
                     # print(f"gains: {gains}")
                     self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(4096 * gains.get('x', 0))
+                    rc = gains.get('x', 0)
             else:
                 max_coeff_x = int(4096*self.max_rudder_coeff)
                 realtime_coeff_x = int(4096 * rudder_coeff)

@@ -178,6 +178,13 @@
         </widget>
        </item>
        <item>
+        <widget class="QPushButton" name="pb_get_vne">
+         <property name="text">
+          <string>VNE Import</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <spacer name="horizontalSpacer_3">
          <property name="orientation">
           <enum>Qt::Horizontal</enum>

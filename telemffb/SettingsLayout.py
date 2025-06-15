@@ -1130,15 +1130,15 @@ class SettingsLayout(QGridLayout):
         if value is None:
             value = self.advanced_spring_settings
         if G.master_instance and G.device_type != G.current_device_config_scope:
-            G.ipc_instance.send_broadcast_message(f'SHOW ADV SPR:{G.current_device_config_scope}')
+            G.ipc_instance.send_broadcast_message(f'SHOW ADV SPR;{G.current_device_config_scope};{value}')  # use semicolon for delimiter as value contains colons
         else:
             if self.adv_spr_dialog is None:
-                self.adv_spr_dialog = AdvancedSpringDialog(parent=G.main_window, settings=value, device=G.current_device_config_scope)
+                self.adv_spr_dialog = AdvancedSpringDialog(parent=G.main_window, settings=value, device=G.current_device_config_scope, sim=G.settings_mgr.current_sim)
                 self.adv_spr_dialog.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
                 self.adv_spr_dialog.accepted.connect(self.update_advanced_spring_gains)
                 self.adv_spr_dialog.show()
             else:
-                self.adv_spr_dialog.showme(settings=value)
+                self.adv_spr_dialog.showme(settings=value, sim=G.settings_mgr.current_sim)
 
     def configurator_button_clicked(self):
         """
@@ -1174,12 +1174,13 @@ class SettingsLayout(QGridLayout):
         # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
         self.reload_caller()
 
-    def update_advanced_spring_gains(self, spring_gain_curves: str):
+    def update_advanced_spring_gains(self, spring_gain_curves: str, scale: str, units: str):
         self.trigger_form_reload = True
         """
         Called when signal received that user saved the advanced spring gain settings
         """
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, spring_gain_curves, "adv_spr_gains")
+        # xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, str(scale), "vne_override", unit=units)
         self.show_erase_button("config_adv_spr_gains")
         # self.adv_spr_button.setText("Edit Spring Gains")
         # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))

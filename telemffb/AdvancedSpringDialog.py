@@ -16,11 +16,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
+import logging
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSignal, Qt, QPointF
 from PyQt6.QtGui import QIcon
-from PyQt6.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog, QFileDialog
+from PyQt6.QtWidgets import QDialog, QMessageBox, QComboBox, QInputDialog, QFileDialog, QMenu
 import inspect
 
 import telemffb.globals as G
@@ -35,10 +36,10 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         "kph": 3.6,
         "m/s": 1.0,
     }
-    accepted = pyqtSignal(str)
+    accepted = pyqtSignal(str, int, str)
 
 
-    def __init__(self, parent=None, settings=None, device="joystick"):
+    def __init__(self, parent=None, settings=None, device="joystick", sim=None):
         super(AdvancedSpringDialog, self).__init__(parent)
 
         # Units setup
@@ -48,6 +49,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         self.gain_x: int = 100
         self.gain_y: int = 100
         self.device_type = device
+        self.sim = sim
         self.current_settings = None
         self.init_settings = None
         self.default_settings = ('{'
@@ -163,6 +165,34 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
 
         self.pb_export.clicked.connect(self.export_settings)
         self.pb_import.clicked.connect(self.import_settings)
+        if self.sim not in ("MSFS", "XPLANE"):
+            self.pb_get_vne.hide()
+        # self.pb_get_vne.clicked.connect(self.import_airspeed)
+        self.pb_get_vne.setEnabled(False)
+
+        G.telem_manager.telemetryReceived.connect(lambda: self.toggle_vne_import_button(True))
+        G.telem_manager.telemetryTimeout.connect(lambda: self.toggle_vne_import_button(False))
+        self.pb_get_vne.setMenu(self.create_option_menu())
+
+
+    def create_option_menu(self):
+        menu = QMenu(self)
+
+        get_telem_action = menu.addAction("Get from Telemetry")
+        override_action = menu.addAction("Use Override Value")
+
+        get_telem_action.triggered.connect(lambda: self.import_airspeed(mode='telem'))
+        override_action.triggered.connect(lambda: self.import_airspeed(mode='override'))
+
+        return menu
+
+    def toggle_vne_import_button(self, enabled):
+        if enabled and not self.pb_get_vne.isEnabled():
+            self.pb_get_vne.setEnabled(True)
+            self.pb_get_vne.setToolTip("Import VNE value from active telemetry")
+        elif not enabled and self.pb_get_vne.isEnabled():
+            self.pb_get_vne.setEnabled(False)
+            self.pb_get_vne.setToolTip("Load into aircraft to enable VNE import")
 
     def export_settings(self):
         settings = {
@@ -254,15 +284,20 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
             baseline_json = json.dumps(json.loads(self.init_settings), sort_keys=True)
             self.set_dirty_state(current_json != baseline_json)
         except Exception as e:
-            print(f"[SpringDialog] Dirty check error: {e}")
+            logging.error(f"[SpringDialog] Dirty check error: {e}")
             self.set_dirty_state(True)
 
-    def showme(self, settings = None):
+    def showme(self, settings = None, sim=None):
         if self.current_settings is not None:
             self.init_settings = self.current_settings
         if settings is not None:
             self.load_curve_settings(settings)
         self.check_dirty_state()
+        if sim in ('MSFS', 'XPLANE'):
+            self.pb_get_vne.show()
+        else:
+            self.pb_get_vne.hide()
+        self.sim = sim
         self.show()
 
     def showEvent(self, event):
@@ -334,7 +369,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         }
         json_string = json.dumps(settings)
         self.current_settings = json_string
-        self.accepted.emit(json_string)
+        self.accepted.emit(json_string, self.x_scale, self.current_unit)
         if close:
             self.tog_live_view.setChecked(False)
             self.init_settings = json_string  # Update baseline
@@ -352,10 +387,10 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
             settings = json.loads(json_string)
 
         except json.JSONDecodeError as e:
-            print(f"Error decoding JSON: {e}")
+            logging.error(f"Error decoding JSON: {e}")
             raise ValueError("Invalid JSON string.")
         except Exception as e:
-            print(f"Error loading curve settings: {e}")
+            logging.error(f"Error loading curve settings: {e}")
             raise
         if hasattr(G.telem_manager.currentAircraft, 'adv_spr_settings_dict'):
             # Only update the aircraft on load if telem_manager is active.  Else will throw error when offline
@@ -397,12 +432,8 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
                 if new_airspeed <= 0:
                     raise ValueError("Airspeed must be a positive value.")
 
-                # # Apply the new airspeed value (example logic)
-                # for axis in [self.curve_x, self.curve_y]:
-                #     axis.x_scale = new_airspeed
-                #     axis.update()
-                print(f"increment = {new_airspeed - self.x_scale}")
-                self.change_airspeed_scale(new_airspeed - self.x_scale)
+
+                self.set_airspeed_scale(new_airspeed)
                 self.x_scale = new_airspeed
                 self.check_dirty_state()
 
@@ -422,6 +453,35 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         for axis in [self.curve_x, self.curve_y]:
             axis.update_airspeed_range(increment)
         self.x_scale += increment
+        self.check_dirty_state()
+
+    def set_airspeed_scale(self, new_scale: float):
+        for axis in [self.curve_x, self.curve_y]:
+            axis.set_airspeed_range(new_scale)
+        self.x_scale = new_scale
+        self.check_dirty_state()
+
+    def import_airspeed(self, mode="telem"):
+        if G.telem_manager.currentAircraft is None:
+            QMessageBox.critical(self, "Error", f"Please ensure you are loaded into the aircraft before importing the VNE value")
+            return
+        if mode == 'telem':
+            vne_airspeed = G.telem_manager.currentAircraft.telem_data.get('Vne_ms_calc', None)
+        elif mode == 'override':
+            vne_airspeed = G.telem_manager.currentAircraft.vne_override # get override vne from telemetry (in m/s)
+            if not vne_airspeed:
+                QMessageBox.critical(self, "Error", f"There does not appear to be a stored vne override for this aircraft")
+                return
+        else:
+            QMessageBox.critical(self, "Error", f"There was an error importing the VNE value")
+            return
+
+        if vne_airspeed is None:
+            QMessageBox.critical(self, "Error", f"Please ensure you are loaded into the aircraft before importing the VNE value")
+            return
+
+        telem_airspeed = vne_airspeed * self.UNIT_CONVERSIONS[self.current_unit]
+        self.set_airspeed_scale(telem_airspeed)
         self.check_dirty_state()
 
 

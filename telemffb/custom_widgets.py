@@ -1704,6 +1704,25 @@ class SpringCurveWidget(CurveWidget):
 
         super().draw_crosshairs(speed_converted, gain)
 
+    def set_airspeed_range(self, new_max):
+        """
+        Set the x-axis range by assigning a new x_max directly.
+        Keeps x_min fixed at 0, and scales all X points proportionally.
+        """
+        if new_max <= 0:
+            return  # Optionally raise an exception
+
+        current_range = self.x_max - self.x_min
+        if current_range == 0:
+            return
+
+        scale_factor = new_max / current_range
+        for point in self.points:
+            point.setX(point.x() * scale_factor)
+
+        self.x_max = new_max
+        self.update()
+
     def update_airspeed_range(self, increment):
         """
         Adjust the x-axis range by increasing or decreasing x_max.
