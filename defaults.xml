@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <TelemFFB>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>100</order>
 		<name>type</name>
 		<info>Aircraft Type</info>
@@ -15,7 +15,7 @@
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>100</order>
 		<name>type</name>
 		<info>Aircraft Type</info>
@@ -29,7 +29,7 @@
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>100</order>
 		<name>type</name>
 		<info>Aircraft Type</info>
@@ -44,7 +44,7 @@
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>100</order>
 		<name>type</name>
 		<info>Aircraft Type</info>
@@ -58,268 +58,416 @@
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>System</Grouping>
+		<grouping>Spring Mode</grouping>
 		<order>200</order>
-		<name>vpconf</name>
-		<info>Load a specific .vpconf file (created with VPForce Configurator)&lt;br&gt;&lt;br&gt;When using this function, it will remain active until set again by another sim, class, or model setting, or is defaulted back to "Global Default" profile  from System Settings</info>
-		<displayname>Configurator File</displayname>
-		<DCS>true</DCS>
+		<name>spring_mode</name>
+		<info>Spring Mode</info>
+		<displayname>Joystick Spring Mode</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<value>-</value>
-		<datatype>path</datatype>
+		<validvalues>JOYSTICK_MODE_LABELS</validvalues>
+		<value>BASIC</value>
+		<datatype>enumlist</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>System</Grouping>
+		<grouping>Dynamic Forces</grouping>
 		<order>300</order>
-		<name>configurator_override_enabled</name>
-		<info>Change VPConfigurator Sliders</info>
-		<displayname>Override Configurator Sliders</displayname>
-		<DCS>true</DCS>
+		<name>dummy_dynamic_spring_settings</name>
+		<exclusive_with>aircraft_is_fbw</exclusive_with>
+		<displayname>Dynamic Spring Settings</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Spring Override</grouping>
+		<order>310</order>
+		<name>adv_spr_override_enabled</name>
+		<exclusive_with>dummy_basic_spring_settings,aircraft_is_fbw</exclusive_with>
+		<prereq>dummy_dynamic_spring_settings</prereq>
+		<displayname>Advanced Spring Mapping</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>System</Grouping>
-		<order>300.1</order>
-		<name>configurator_gains</name>
-		<prereq>configurator_override_enabled</prereq>
-		<info>Directly modify the per-effect type  gain values on the VPforce device.&lt;br&gt;&lt;br&gt;Please read the manual to understand how it works and how it interacts with the "Configurator File" feature (these gains will override any pushed in a configurator profile)</info>
-		<displayname>Override Configurator Sliders</displayname>
-		<DCS>true</DCS>
+		<grouping>Spring Override</grouping>
+		<order>310.2</order>
+		<name>adv_spr_gains</name>
+		<prereq>adv_spr_override_enabled</prereq>
+		<displayname>Advanced Spring Mapping</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
-		<validvalues>none</validvalues>
 		<value>none</value>
-		<datatype>configurator</datatype>
+		<datatype>advspr</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>System</Grouping>
+		<grouping>Dynamic Forces</grouping>
 		<order>400</order>
-		<name>command_runner_enabled</name>
-		<info>Enable execution of any command when aircraft loads</info>
-		<displayname>Command Runner</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>System</Grouping>
-		<order>400.2</order>
-		<name>command_runner_command</name>
-		<prereq>command_runner_enabled</prereq>
-		<info>Enter a command to be executed when an aircraft loads.  There is no path or validation checking.  Command will be executed as is.&lt;br&gt;&lt;br&gt;Enter the command with the full path exactly as if running from a command prompt</info>
-		<displayname>Command Runner String</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<validvalues>Enter full path as if running from command prompt...</validvalues>
-		<value>Enter full path as if running from command prompt...</value>
-		<datatype>text</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FFB</Grouping>
-		<order>500</order>
-		<name>center_spring_on_pause</name>
-		<info>Force spring centering when in pause/slew mode</info>
-		<displayname>Center on Pause/Slew</displayname>
+		<name>dummy_basic_spring_settings</name>
+		<exclusive_with>adv_spr_override_enabled</exclusive_with>
+		<prereq>dummy_dynamic_spring_settings</prereq>
+		<displayname>Basic Settings</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FFB</Grouping>
-		<order>600</order>
-		<name>keep_forces_on_pause</name>
-		<info>Keep damper/inertia/friction force active during pause</info>
-		<displayname>Keep Forces on Pause/Slew</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
 		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB</Grouping>
-		<order>650</order>
-		<name>enable_deadzone</name>
-		<displayname>Enable Deadzone</displayname>
-		<DCS>true</DCS>
+		<grouping>Dynamic Forces</grouping>
+		<order>410</order>
+		<name>max_aileron_coeff</name>
+		<prereq>dummy_basic_spring_settings</prereq>
+		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
+		<displayname>    Aileron Max Force</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
-		<value>false</value>
-		<datatype>bool</datatype>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>n_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB</Grouping>
-		<order>650.1</order>
-		<name>deadzone_base_pct</name>
-		<prereq>enable_deadzone</prereq>
-		<info>Always on circular deadzone equivalent to setting deadzone in configurator </info>
-		<displayname>Deadzone %</displayname>
-		<DCS>true</DCS>
+		<grouping>Dynamic Forces</grouping>
+		<order>420</order>
+		<name>aileron_expo</name>
+		<prereq>dummy_basic_spring_settings</prereq>
+		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<displayname>    Aileron Expo</displayname>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
 		<sliderfactor>.1</sliderfactor>
-		<trimwheel>true</trimwheel>
-		<validvalues>0,1000</validvalues>
-		<value>0</value>
+		<validvalues>-3,5</validvalues>
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB</Grouping>
+		<grouping>Dynamic Forces</grouping>
+		<order>430</order>
+		<name>max_elevator_coeff</name>
+		<prereq>dummy_basic_spring_settings</prereq>
+		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
+		<displayname>    Elevator Max Force</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>n_float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Dynamic Forces</grouping>
+		<order>440</order>
+		<name>elevator_expo</name>
+		<prereq>dummy_basic_spring_settings</prereq>
+		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<displayname>    Elevator Expo</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>.1</sliderfactor>
+		<validvalues>-3,5</validvalues>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Dynamic Forces</grouping>
+		<order>450</order>
+		<name>max_rudder_coeff</name>
+		<prereq>dummy_basic_spring_settings</prereq>
+		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
+		<displayname>    Rudder Max Force</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<datatype>n_float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Dynamic Forces</grouping>
+		<order>460</order>
+		<name>rudder_expo</name>
+		<prereq>dummy_basic_spring_settings</prereq>
+		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<displayname>    Rudder Expo</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<sliderfactor>.1</sliderfactor>
+		<validvalues>-3,5</validvalues>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>500</order>
+		<name>aircraft_is_spring_centered</name>
+		<prereq>dummy_basic_spring_settings</prereq>
+		<info>Enable spring centering for aircraft while maintaining dynamic forces&lt;br&gt;&lt;br&gt; Do not use together with FBW</info>
+		<any>true</any>
+		<displayname>    Spring Centering (not FBW)</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>550.2</order>
+		<name>aileron_spring_gain</name>
+		<prereq>aircraft_is_spring_centered</prereq>
+		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<displayname>    Aileron Spring Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>550.3</order>
+		<name>elevator_spring_gain</name>
+		<prereq>aircraft_is_spring_centered</prereq>
+		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<displayname>    Elevator Spring Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>550.4</order>
+		<name>rudder_spring_gain</name>
+		<prereq>aircraft_is_spring_centered</prereq>
+		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<displayname>    Rudder Spring Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE><pedals>true</pedals>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FlyByWire</grouping>
+		<order>600</order>
+		<name>aircraft_is_fbw</name>
+		<exclusive_with>dummy_dynamic_spring_settings</exclusive_with>
+		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
+		<displayname>FlyByWire (FBW)</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FlyByWire</grouping>
+		<order>600.2</order>
+		<name>fbw_aileron_gain</name>
+		<prereq>aircraft_is_fbw</prereq>
+		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<displayname>FBW Aileron Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.6</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FlyByWire</grouping>
+		<order>600.3</order>
+		<name>fbw_elevator_gain</name>
+		<prereq>aircraft_is_fbw</prereq>
+		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<displayname>FBW Elevator Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.6</value>
+		<datatype>float</datatype>
+		</defaults>
+	<defaults>
+		<grouping>FlyByWire</grouping>
+		<order>600.4</order>
+		<name>fbw_rudder_gain</name>
+		<prereq>aircraft_is_fbw</prereq>
+		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
+		<displayname>FBW Rudder Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>0.5</value>
+		<datatype>float</datatype>
+		</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
 		<order>700</order>
-		<name>enable_damper_ovd</name>
-		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
-		<displayname>Damper Override</displayname>
+		<name>pedal_mode_dummy</name>
+		<exclusive_with>adv_spr_override_enabled</exclusive_with>
+		<displayname>Pedal Mode Settings</displayname>
 		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
 		<IL2>true</IL2>
-		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
+		<value>true</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>700.2</order>
+		<name>pedal_spring_mode</name>
+		<prereq>pedal_mode_dummy</prereq>
+		<info>Pedal spring mode.  See manual for use.</info>
+		<displayname>Pedal Spring Mode</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<pedals>true</pedals>
+		<validvalues>PEDAL_MODE_LABELS</validvalues>
+		<datatype>enumlist</datatype>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>700.3</order>
+		<name>pedal_spring_gain</name>
+		<prereq>pedal_mode_dummy</prereq>
+		<info>Percent of spring setting in VPForce Configurator</info>
+		<displayname>Pedal Spring Gain</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>.75</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>700.4</order>
+		<name>pedal_dampening_gain</name>
+		<prereq>pedal_mode_dummy</prereq>
+		<info>Percent of damper setting in VPForce Configurator</info>
+		<displayname>Pedal Dampening Gain</displayname>
+		<validvalues>0,100</validvalues>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>750</order>
+		<name>pedal_advanced_dummy</name>
+		<prereq>pedal_mode_dummy</prereq>
+		<info>Advanced Pedal Mode Settings - Dynamic Spring mode only.</info>
+		<displayname>Advanced Pedal Mode Settings (Dynamic Mode Only)</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<pedals>true</pedals>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB</Grouping>
-		<order>700.1</order>
-		<name>damper_force</name>
-		<prereq>enable_damper_ovd</prereq>
-		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
-		<displayname>Damper Effect</displayname>
+		<grouping>SpringCenter</grouping>
+		<order>750.2</order>
+		<name>aircraft_vs_speed</name>
+		<prereq>pedal_advanced_dummy</prereq>
+		<info>Stall Speed</info>
+		<any>true</any>
+		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Stall Speed V&lt;span style=" vertical-align:sub;"&gt;S&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
 		<IL2>true</IL2>
-		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<value>87</value>
+		<datatype>anyfloat</datatype>
+		<unit>kt</unit>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>750.3</order>
+		<name>aircraft_vs_gain</name>
+		<prereq>pedal_advanced_dummy</prereq>
+		<info>Spring gain when aircraft at Vs</info>
+		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;S&lt;/span&gt; Gain&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
-		<value>0</value>
+		<value>0.25</value>
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB</Grouping>
+		<grouping>SpringCenter</grouping>
+		<order>750.4</order>
+		<name>aircraft_vne_speed</name>
+		<prereq>pedal_advanced_dummy</prereq>
+		<info>Never Exceed Speed</info>
+		<any>true</any>
+		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Never Exceed Speed V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<pedals>true</pedals>
+		<validvalues>m/s,kt,mph,kph</validvalues>
+		<value>438</value>
+		<datatype>anyfloat</datatype>
+		<unit>kt</unit>
+	</defaults>
+	<defaults>
+		<grouping>SpringCenter</grouping>
+		<order>750.5</order>
+		<name>aircraft_vne_gain</name>
+		<prereq>pedal_advanced_dummy</prereq>
+		<info>Spring gain when aircraft is at Vne</info>
+		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Gain&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>1.0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Spring Override</grouping>
 		<order>800</order>
-		<name>enable_inertia_ovd</name>
-		<info>Apply inertia to axes.&lt;br&gt;Results in percent of configurator slider value</info>
-		<displayname>Inertia Override</displayname>
+		<name>override_spring_enabled</name>
+		<exclusive_with>adv_spr_override_enabled</exclusive_with>
+		<info>Override the spring effect set by DCS&lt;br&gt;&lt;br&gt;Warning: If you enable this for an official DCS module that has FFB Support, all DCS generated spring effects will cease to function, including dynamic forces and trim.&lt;br&gt;&lt;br&gt;Note: Not compatible with 'Trim Workaround' or 'Trim Release Damper' features</info>
+		<displayname>Override DCS Spring</displayname>
 		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB</Grouping>
-		<order>800.1</order>
-		<name>inertia_force</name>
-		<prereq>enable_inertia_ovd</prereq>
-		<info>Apply inertia to axes.&lt;br&gt;Results in percent of configurator slider value</info>
-		<displayname>Inertia Effect</displayname>
+		<grouping>Spring Override</grouping>
+		<order>800.2</order>
+		<name>override_spring_gain</name>
+		<prereq>override_spring_enabled</prereq>
+		<displayname>Override DCS Spring Gain</displayname>
 		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
 		<validvalues>0,100</validvalues>
-		<value>0</value>
+		<value>1.0</value>
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB</Grouping>
-		<order>900</order>
-		<name>enable_friction_ovd</name>
-		<info>Apply friction to axes.&lt;br&gt;Results in percent of configurator slider value</info>
-		<displayname>Friction Override</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FFB</Grouping>
-		<order>900.1</order>
-		<name>friction_force</name>
-		<prereq>enable_friction_ovd</prereq>
-		<info>Apply friction to axes.&lt;br&gt;Results in percent of configurator slider value</info>
-		<displayname>Friction Effect</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<trimwheel>true</trimwheel>
-		<validvalues>0,100</validvalues>
-		<value>0</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FFB</Grouping>
+		<grouping>FFB</grouping>
 		<order>1000</order>
 		<name>force_disable_collective_gain</name>
 		<info>Option to enable/disable TelemFFB from setting &lt;br&gt; the spring gain on the collective to 0 (Fixed wing only)</info>
@@ -331,7 +479,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1100</order>
 		<name>dcs_tr_damper_enabled</name>
 		<displayname>Trim Release Damper</displayname>
@@ -341,7 +489,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1100.2</order>
 		<name>dcs_tr_button</name>
 		<prereq>dcs_tr_damper_enabled</prereq>
@@ -352,7 +500,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1100.3</order>
 		<name>dcs_tr_damper_force</name>
 		<prereq>dcs_tr_damper_enabled</prereq>
@@ -364,7 +512,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1200</order>
 		<name>force_trim_enabled</name>
 		<displayname>Force Trim</displayname>
@@ -376,7 +524,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1200.2</order>
 		<name>cyclic_spring_gain</name>
 		<prereq>force_trim_enabled</prereq>
@@ -389,7 +537,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1200.3</order>
 		<name>elevator_force_trim</name>
 		<prereq>force_trim_enabled</prereq>
@@ -402,7 +550,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1200.4</order>
 		<name>aileron_force_trim</name>
 		<prereq>force_trim_enabled</prereq>
@@ -414,7 +562,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1200.5</order>
 		<name>collective_ft_use_master_buttons</name>
 		<prereq>force_trim_enabled</prereq>
@@ -428,7 +576,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1200.6</order>
 		<name>force_trim_button</name>
 		<prereq>force_trim_enabled</prereq>
@@ -441,7 +589,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1200.6</order>
 		<name>force_trim_button</name>
 		<prereq>force_trim_enabled</prereq>
@@ -453,7 +601,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1200.7</order>
 		<name>force_trim_reset_button</name>
 		<prereq>force_trim_enabled</prereq>
@@ -465,7 +613,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1200.8</order>
 		<name>trim_release_spring_gain</name>
 		<prereq>force_trim_enabled</prereq>
@@ -480,7 +628,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1300</order>
 		<name>collective_ft_ovd_enabled</name>
 		<info>Enable hardware force trim for collective axis</info>
@@ -491,20 +639,20 @@
 		<collective>true</collective>
 		<datatype>bool</datatype>
 	</defaults>
-	<defaults><Grouping>Basic</Grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><validvalues>0,100</validvalues><value>1.0</value><datatype>float</datatype>
+	<defaults><grouping>Basic</grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><validvalues>0,100</validvalues><value>1.0</value><datatype>float</datatype>
 		<order>1300.2</order>
 		<name>collective_ft_ovd_spring_gain</name>
 		<info>Spring Gain</info>
 		<displayname>Spring Gain</displayname>
 	</defaults>
-	<defaults><Grouping>Basic</Grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><validvalues>0,100</validvalues><value>0.15</value><datatype>float</datatype>
+	<defaults><grouping>Basic</grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><validvalues>0,100</validvalues><value>0.15</value><datatype>float</datatype>
 		<order>1300.3</order>
 		<name>collective_ft_ovd_tr_damper</name>
 		<info>Trim Release Damper Gain</info>
 		<displayname>Trim Release Damper Gain</displayname>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1300.4</order>
 		<name>collective_ft_use_master_buttons</name>
 		<prereq>collective_ft_ovd_enabled</prereq>
@@ -517,34 +665,90 @@
 		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
-	<defaults><Grouping>Basic</Grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><value>0</value><datatype>button</datatype>
+	<defaults><grouping>Basic</grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><value>0</value><datatype>button</datatype>
 		<order>1300.5</order>
 		<name>collective_ft_ovd_release</name>
 		<info>Trim Release Button</info>
 		<displayname>Trim Release Button</displayname>
 	</defaults>
-	<defaults><Grouping>Basic</Grouping><prereq>collective_ft_ovd_enabled</prereq><displayname>Trim Reset Button (full down)</displayname><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><value>0</value><datatype>button</datatype>
+	<defaults><grouping>Basic</grouping><prereq>collective_ft_ovd_enabled</prereq><displayname>Trim Reset Button (full down)</displayname><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><value>0</value><datatype>button</datatype>
 		<order>1300.6</order>
 		<name>collective_ft_ovd_reset</name>
 		<info>Trim Reset Button (full down)</info>
 	</defaults>
-	<defaults><Grouping>Basic</Grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><value>0</value><datatype>button</datatype>
+	<defaults><grouping>Basic</grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><value>0</value><datatype>button</datatype>
 		<order>1300.7</order>
 		<name>collective_ft_ovd_trim_down</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 	</defaults>
-	<defaults><Grouping>Basic</Grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><value>0</value><datatype>button</datatype>
+	<defaults><grouping>Basic</grouping><prereq>collective_ft_ovd_enabled</prereq><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><value>0</value><datatype>button</datatype>
 		<order>1300.8</order>
 		<name>collective_ft_ovd_trim_up</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 	</defaults>
-	<defaults><Grouping>Basic</Grouping><prereq>collective_ft_ovd_enabled</prereq><info>Affects rate at which trim will move when button held</info><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><sliderfactor>1</sliderfactor><validvalues>0,1000</validvalues><value>200</value><datatype>d_int</datatype>
+	<defaults><grouping>Basic</grouping><prereq>collective_ft_ovd_enabled</prereq><info>Affects rate at which trim will move when button held</info><DCS>true</DCS><MSFS>true</MSFS><XPLANE>true</XPLANE><collective>true</collective><sliderfactor>1</sliderfactor><validvalues>0,1000</validvalues><value>200</value><datatype>d_int</datatype>
 		<order>1300.9</order>
 		<name>collective_ft_ovd_trim_rate</name>
 		<displayname>Trim Slew Rate</displayname>
 	</defaults>
 	<defaults>
-		<Grouping>TrimWheel</Grouping>
+		<grouping>FFB Effect</grouping>
+		<order>1352</order>
+		<name>steering_friction</name>
+		<info>Enable pedal friction for steering gear wheel&lt;br&gt;** REQUIRES friction overrides to be enabled **</info>
+		<displayname>Steering Friction &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB Effect</grouping>
+		<order>1352.1</order>
+		<name>steering_friction_intensity</name>
+		<prereq>steering_friction</prereq>
+		<info>Max intensity of steering friction (% of configurator value)&lt;br&gt;** REQUIRES friction override to be enabled **</info>
+		<displayname>Steering Friction &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<trimwheel>1</trimwheel>
+		<validvalues>0,100</validvalues>
+		<value>0.8</value>
+		<datatype>n_float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB Effect</grouping>
+		<order>1352.2</order>
+		<name>steering_friction_expo</name>
+		<prereq>steering_friction</prereq>
+		<info>&lt;html&gt;&lt;body&gt;Controls decay rate of friction with speed.&lt;br&gt;0 = linear, gradual decay, -1.0 = very quick decay&lt;/body&gt;&lt;/html&gt;</info>
+		<displayname>Steering Friction Expo</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>-9,0</validvalues>
+		<value>-0.4</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB Effect</grouping>
+		<order>1352.3</order>
+		<name>steering_friction_spring</name>
+		<prereq>steering_friction</prereq>
+		<info>Strength of steering gear spring</info>
+		<displayname>Steering Gear Spring</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>0.5</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>TrimWheel</grouping>
 		<order>1400</order>
 		<name>trimwheel_use_master_buttons</name>
 		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from trim wheel (or  loopback app).</info>
@@ -555,7 +759,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>TrimWheel</Grouping>
+		<grouping>TrimWheel</grouping>
 		<order>1500</order>
 		<name>trimwheel_elev_dn_button</name>
 		<info>Button # to hold for nose down elevator trim</info>
@@ -566,7 +770,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>TrimWheel</Grouping>
+		<grouping>TrimWheel</grouping>
 		<order>1600</order>
 		<name>trimwheel_elev_up_button</name>
 		<info>Button # to hold for nose up elevator trim</info>
@@ -577,7 +781,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Basic</Grouping>
+		<grouping>Basic</grouping>
 		<order>1700</order>
 		<name>trim_workaround</name>
 		<info>Apply artificial trim movement - only for aircraft that do not support native FFB trim&lt;b&gt;&lt;b&gt;(AV8B, Mig-19)</info>
@@ -587,7 +791,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>1800</order>
 		<name>pedal_trimming_enabled</name>
 		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
@@ -598,202 +802,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>1860</order>
-		<name>dummy_dynamic_spring_settings</name>
-		<exclusive_with>aircraft_is_fbw</exclusive_with>
-		<displayname>Dynamic Spring Settings</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Spring Override</Grouping>
-		<order>1870</order>
-		<name>adv_spr_override_enabled</name>
-		<exclusive_with>dummy_basic_spring_settings,aircraft_is_fbw</exclusive_with>
-		<prereq>dummy_dynamic_spring_settings</prereq>
-		<displayname>Advanced Spring Mapping</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Spring Override</Grouping>
-		<order>1870.2</order>
-		<name>adv_spr_gains</name>
-		<prereq>adv_spr_override_enabled</prereq>
-		<displayname>Advanced Spring Mapping</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<value>none</value>
-		<datatype>advspr</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>1880</order>
-		<name>dummy_basic_spring_settings</name>
-		<exclusive_with>adv_spr_override_enabled</exclusive_with>
-		<prereq>dummy_dynamic_spring_settings</prereq>
-		<displayname>Basic Settings</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<value>true</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>1900</order>
-		<name>max_aileron_coeff</name>
-		<prereq>dummy_basic_spring_settings</prereq>
-		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
-		<displayname>    Aileron Max Force</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>n_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>2000</order>
-		<name>aileron_expo</name>
-		<prereq>dummy_basic_spring_settings</prereq>
-		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>    Aileron Expo</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>.1</sliderfactor>
-		<validvalues>-3,5</validvalues>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>2100</order>
-		<name>max_elevator_coeff</name>
-		<prereq>dummy_basic_spring_settings</prereq>
-		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
-		<displayname>    Elevator Max Force</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>n_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>2200</order>
-		<name>elevator_expo</name>
-		<prereq>dummy_basic_spring_settings</prereq>
-		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>    Elevator Expo</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>.1</sliderfactor>
-		<validvalues>-3,5</validvalues>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>2300</order>
-		<name>max_rudder_coeff</name>
-		<prereq>dummy_basic_spring_settings</prereq>
-		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
-		<displayname>    Rudder Max Force</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<datatype>n_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>2400</order>
-		<name>rudder_expo</name>
-		<prereq>dummy_basic_spring_settings</prereq>
-		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>    Rudder Expo</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<sliderfactor>.1</sliderfactor>
-		<validvalues>-3,5</validvalues>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>2500</order>
-		<name>aircraft_is_spring_centered</name>
-		<prereq>dummy_basic_spring_settings</prereq>
-		<info>Enable spring centering for aircraft while maintaining dynamic forces&lt;br&gt;&lt;br&gt; Do not use together with FBW</info>
-		<any>true</any>
-		<displayname>    Spring Centering (not FBW)</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>2500.2</order>
-		<name>aileron_spring_gain</name>
-		<prereq>aircraft_is_spring_centered</prereq>
-		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<displayname>    Aileron Spring Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<value>0.3</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>2500.3</order>
-		<name>elevator_spring_gain</name>
-		<prereq>aircraft_is_spring_centered</prereq>
-		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<displayname>    Elevator Spring Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<value>0.3</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>2500.4</order>
-		<name>rudder_spring_gain</name>
-		<prereq>aircraft_is_spring_centered</prereq>
-		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<displayname>    Rudder Spring Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE><pedals>true</pedals>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<value>0.3</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
+		<grouping>Dynamic Forces</grouping>
 		<order>2600</order>
 		<name>vne_override</name>
 		<prereq>dummy_dynamic_spring_settings</prereq>
@@ -809,62 +818,7 @@
 		<unit>kt</unit>
 	</defaults>
 	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>2700</order>
-		<name>aircraft_is_fbw</name>
-		<exclusive_with>dummy_dynamic_spring_settings</exclusive_with>
-		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
-		<displayname>FlyByWire (FBW)</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>2700.2</order>
-		<name>fbw_aileron_gain</name>
-		<prereq>aircraft_is_fbw</prereq>
-		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<displayname>FBW Aileron Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<validvalues>0,100</validvalues>
-		<value>0.6</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>2700.3</order>
-		<name>fbw_elevator_gain</name>
-		<prereq>aircraft_is_fbw</prereq>
-		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<displayname>FBW Elevator Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<validvalues>0,100</validvalues>
-		<value>0.6</value>
-		<datatype>float</datatype>
-		</defaults>
-	<defaults>
-		<Grouping>FlyByWire</Grouping>
-		<order>2700.4</order>
-		<name>fbw_rudder_gain</name>
-		<prereq>aircraft_is_fbw</prereq>
-		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
-		<displayname>FBW Rudder Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-		<value>0.5</value>
-		<datatype>float</datatype>
-		</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
+		<grouping>Dynamic Forces</grouping>
 		<order>2800</order>
 		<name>elevator_droop_moment</name>
 		<info>Strength of elevator droop at rest (pushes stick forward)</info>
@@ -876,7 +830,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Prop</Grouping>
+		<grouping>Prop</grouping>
 		<order>2900</order>
 		<name>elevator_prop_flow_ratio</name>
 		<info>Scaling of dynamic effects on elevator</info>
@@ -888,7 +842,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Prop</Grouping>
+		<grouping>Prop</grouping>
 		<order>3000</order>
 		<name>prop_diameter</name>
 		<info>Aircraft Prop Diameter</info>
@@ -903,7 +857,7 @@
 		<unit>m</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Prop</Grouping>
+		<grouping>Prop</grouping>
 		<order>3100</order>
 		<name>rudder_prop_flow_ratio</name>
 		<info>Scaling of dynamic effects on rudder</info>
@@ -915,7 +869,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Prop</Grouping>
+		<grouping>Prop</grouping>
 		<order>3200</order>
 		<name>rotor_blade_count</name>
 		<any>true</any>
@@ -930,7 +884,7 @@
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3300</order>
 		<name>collective_ap_spring_gain</name>
 		<info>Strength of spring force in Autopilot</info>
@@ -942,7 +896,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3400</order>
 		<name>collective_dampening_gain</name>
 		<displayname>Collective Dampening Gain</displayname>
@@ -950,7 +904,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3500</order>
 		<name>hpg_pedal_spring_gain</name>
 		<info>Percent of spring slider setting in VPForce Configurator</info>
@@ -962,7 +916,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3600</order>
 		<name>pedal_force_trim_enabled</name>
 		<info>Enable static spring and allow binding of force trim button for pedals</info>
@@ -974,7 +928,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3600.2</order>
 		<name>pedal_ft_use_master_buttons</name>
 		<prereq>pedal_force_trim_enabled</prereq>
@@ -988,7 +942,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3600.3</order>
 		<name>pedal_ft_release_button</name>
 		<prereq>pedal_force_trim_enabled</prereq>
@@ -1001,7 +955,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3600.4</order>
 		<name>pedal_ft_reset_button</name>
 		<prereq>pedal_force_trim_enabled</prereq>
@@ -1014,7 +968,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3600.5</order>
 		<name>pedal_spring_gain</name>
 		<prereq>pedal_force_trim_enabled</prereq>
@@ -1028,7 +982,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3700</order>
 		<name>pedal_ft_damper_enabled</name>
 		<prereq>pedal_force_trim_enabled</prereq>
@@ -1042,7 +996,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
+		<grouping>SpringCenter</grouping>
 		<order>3700.1</order>
 		<name>pedal_ft_damper_force</name>
 		<prereq>pedal_ft_damper_enabled</prereq>
@@ -1057,129 +1011,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>3800</order>
-		<name>pedal_mode_dummy</name>
-		<exclusive_with>adv_spr_override_enabled</exclusive_with>
-		<displayname>Pedal Mode Settings</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
-		<value>true</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>3800.2</order>
-		<name>pedal_spring_mode</name>
-		<prereq>pedal_mode_dummy</prereq>
-		<info>Pedal spring mode.  See manual for use.</info>
-		<displayname>Pedal Spring Mode</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
-		<validvalues>Sim Default,No Spring,Static Spring,Dynamic Spring</validvalues>
-		<datatype>list</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>3800.3</order>
-		<name>pedal_spring_gain</name>
-		<prereq>pedal_mode_dummy</prereq>
-		<info>Percent of spring setting in VPForce Configurator</info>
-		<displayname>Pedal Spring Gain</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-		<value>.75</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>3800.4</order>
-		<name>pedal_dampening_gain</name>
-		<prereq>pedal_mode_dummy</prereq>
-		<info>Percent of damper setting in VPForce Configurator</info>
-		<displayname>Pedal Dampening Gain</displayname>
-		<validvalues>0,100</validvalues>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>3900</order>
-		<name>pedal_advanced_dummy</name>
-		<prereq>pedal_mode_dummy</prereq>
-		<info>Advanced Pedal Mode Settings - Dynamic Spring mode only.</info>
-		<displayname>Advanced Pedal Mode Settings (Dynamic Mode Only)</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>3900.2</order>
-		<name>aircraft_vs_speed</name>
-		<prereq>pedal_advanced_dummy</prereq>
-		<info>Stall Speed</info>
-		<any>true</any>
-		<displayname>Stall Speed Vs</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
-		<validvalues>m/s,kt,mph,kph</validvalues>
-		<value>87</value>
-		<datatype>anyfloat</datatype>
-		<unit>kt</unit>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>3900.3</order>
-		<name>aircraft_vs_gain</name>
-		<prereq>pedal_advanced_dummy</prereq>
-		<info>Spring gain when aircraft at Vs</info>
-		<displayname>Vs Gain</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-		<value>0.25</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>3900.4</order>
-		<name>aircraft_vne_speed</name>
-		<prereq>pedal_advanced_dummy</prereq>
-		<info>Never Exceed Speed</info>
-		<any>true</any>
-		<displayname>Never Exceed Speed Vne</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
-		<validvalues>m/s,kt,mph,kph</validvalues>
-		<value>438</value>
-		<datatype>anyfloat</datatype>
-		<unit>kt</unit>
-	</defaults>
-	<defaults>
-		<Grouping>SpringCenter</Grouping>
-		<order>3900.5</order>
-		<name>aircraft_vne_gain</name>
-		<prereq>pedal_advanced_dummy</prereq>
-		<info>Spring gain when aircraft is at Vne</info>
-		<displayname>Vne Gain</displayname>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-		<value>1.0</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4000</order>
 		<name>cp_spr_override_enabled</name>
 		<info>Will temporarily override the spring gain on the joystick when the user is *not* sitting in the Pilot seat.</info>
@@ -1190,7 +1022,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4000.2</order>
 		<name>cp_spr_override_pilot_seat_id</name>
 		<prereq>cp_spr_override_enabled</prereq>
@@ -1203,7 +1035,7 @@
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4100</order>
 		<name>cp_spr_override_spring_gain</name>
 		<prereq>cp_spr_override_enabled</prereq>
@@ -1216,7 +1048,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4200</order>
 		<name>cp_spr_override_button_enabled</name>
 		<prereq>cp_spr_override_enabled</prereq>
@@ -1228,7 +1060,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4300</order>
 		<name>cp_spr_override_button</name>
 		<prereq>cp_spr_override_button_enabled</prereq>
@@ -1240,31 +1072,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
-		<order>4400</order>
-		<name>override_spring_enabled</name>
-		<exclusive_with>adv_spr_override_enabled</exclusive_with>
-		<info>Override the spring effect set by DCS&lt;br&gt;&lt;br&gt;Warning: If you enable this for an official DCS module that has FFB Support, all DCS generated spring effects will cease to function, including dynamic forces and trim.&lt;br&gt;&lt;br&gt;Note: Not compatible with 'Trim Workaround' or 'Trim Release Damper' features</info>
-		<displayname>Override DCS Spring</displayname>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Spring Override</Grouping>
-		<order>4400.2</order>
-		<name>override_spring_gain</name>
-		<prereq>override_spring_enabled</prereq>
-		<displayname>Override DCS Spring Gain</displayname>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<validvalues>0,100</validvalues>
-		<value>1.0</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4500</order>
 		<name>override_spring_ft_enabled</name>
 		<prereq>override_spring_enabled</prereq>
@@ -1276,7 +1084,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4500.2</order>
 		<name>override_spring_trim_release</name>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -1287,7 +1095,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4500.3</order>
 		<name>override_spring_tr_damper</name>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -1300,7 +1108,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4500.4</order>
 		<name>override_spring_trim_reset</name>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -1311,7 +1119,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4500.5</order>
 		<name>override_spring_trim_down</name>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -1322,7 +1130,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4500.6</order>
 		<name>override_spring_trim_up</name>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -1333,7 +1141,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4500.7</order>
 		<name>override_spring_trim_left</name>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -1344,7 +1152,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4500.8</order>
 		<name>override_spring_trim_right</name>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -1355,7 +1163,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4500.9</order>
 		<name>override_spring_trim_rate</name>
 		<prereq>override_spring_ft_enabled</prereq>
@@ -1369,7 +1177,7 @@
 		<datatype>d_int</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4550</order>
 		<name>adv_spr_override_enabled</name>
 		<exclusive_with>override_spring_enabled,pedal_mode_dummy</exclusive_with>
@@ -1381,7 +1189,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4550.1</order>
 		<name>adv_spr_gains</name>
 		<prereq>adv_spr_override_enabled</prereq>
@@ -1394,7 +1202,7 @@
 		<datatype>advspr</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4550.10</order>
 		<name>adv_spr_use_game_trim</name>
 		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
@@ -1407,7 +1215,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4550.20</order>
 		<name>adv_spr_use_hardware_trim</name>
 		<exclusive_with>adv_spr_use_game_trim,pedal_trimming_enabled</exclusive_with>
@@ -1421,7 +1229,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4550.21</order>
 		<name>override_spring_trim_down</name>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -1432,7 +1240,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4550.22</order>
 		<name>override_spring_trim_up</name>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -1443,7 +1251,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4550.23</order>
 		<name>override_spring_trim_left</name>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -1455,7 +1263,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4550.24</order>
 		<name>override_spring_trim_right</name>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -1467,7 +1275,7 @@
 		<datatype>button</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Spring Override</Grouping>
+		<grouping>Spring Override</grouping>
 		<order>4550.25</order>
 		<name>override_spring_trim_rate</name>
 		<prereq>adv_spr_use_hardware_trim</prereq>
@@ -1482,7 +1290,7 @@
 		<datatype>d_int</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600</order>
 		<name>telemffb_controls_axes</name>
 		<info>TelemFFB sends axis position to sim&lt;br&gt;&lt;br&gt;Required for Trim/AP Following&lt;br&gt;&lt;br&gt;** Do not assign in game or SPAD.next **</info>
@@ -1497,7 +1305,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600</order>
 		<name>telemffb_controls_axes</name>
 		<info>TelemFFB sends axis position to sim&lt;br&gt;&lt;br&gt;Required for Trim/AP Following</info>
@@ -1512,7 +1320,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600.2</order>
 		<name>local_disable_axis_control</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1528,7 +1336,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600.3</order>
 		<name>joystick_x_axis_scale</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1542,7 +1350,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600.4</order>
 		<name>joystick_y_axis_scale</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1557,7 +1365,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600.5</order>
 		<name>rudder_x_axis_scale</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1571,7 +1379,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600.61</order>
 		<name>hands_on_deadzone</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1583,7 +1391,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600.62</order>
 		<name>hands_off_deadzone</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1595,7 +1403,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600.71</order>
 		<name>feet_on_deadzone</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1607,7 +1415,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4600.72</order>
 		<name>feet_off_deadzone</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1619,19 +1427,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>TrimWheel</Grouping>
-		<order>4600.75</order>
-		<name>trimwheel_axis_invert</name>
-		<prereq>trimwheel_use_axis</prereq>
-		<info>Enable if trim wheel axis moves the wrong way</info>
-		<displayname>Elevator Trim Axis Invert</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<trimwheel>true</trimwheel>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>TrimWheel</Grouping>
+		<grouping>TrimWheel</grouping>
 		<order>4600.74</order>
 		<name>trimwheel_use_axis</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1643,7 +1439,19 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>TrimWheel</grouping>
+		<order>4600.75</order>
+		<name>trimwheel_axis_invert</name>
+		<prereq>trimwheel_use_axis</prereq>
+		<info>Enable if trim wheel axis moves the wrong way</info>
+		<displayname>Elevator Trim Axis Invert</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<trimwheel>true</trimwheel>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Axis Control</grouping>
 		<order>4700</order>
 		<name>enable_custom_x_axis</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1656,7 +1464,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4700.2</order>
 		<name>custom_x_axis</name>
 		<prereq>enable_custom_x_axis</prereq>
@@ -1669,7 +1477,7 @@
 		<datatype>anylist</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4700.2</order>
 		<name>custom_x_axis</name>
 		<prereq>enable_custom_x_axis</prereq>
@@ -1682,7 +1490,7 @@
 		<datatype>anylist</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4700.3</order>
 		<name>raw_x_axis_scale</name>
 		<prereq>enable_custom_x_axis</prereq>
@@ -1696,7 +1504,7 @@
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4800</order>
 		<name>enable_custom_y_axis</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1709,7 +1517,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4800</order>
 		<name>enable_custom_y_axis</name>
 		<prereq>trimwheel_use_axis</prereq>
@@ -1721,7 +1529,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4800.2</order>
 		<name>custom_y_axis</name>
 		<prereq>enable_custom_y_axis</prereq>
@@ -1734,7 +1542,7 @@
 		<datatype>anylist</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4800.2</order>
 		<name>custom_y_axis</name>
 		<prereq>enable_custom_y_axis</prereq>
@@ -1747,7 +1555,7 @@
 		<datatype>anylist</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4800.2</order>
 		<name>custom_y_axis</name>
 		<prereq>enable_custom_y_axis</prereq>
@@ -1760,7 +1568,7 @@
 		<datatype>anylist</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4800.3</order>
 		<name>raw_y_axis_scale</name>
 		<prereq>enable_custom_y_axis</prereq>
@@ -1775,7 +1583,7 @@
 		<datatype>list</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4900</order>
 		<name>trim_following</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1789,7 +1597,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4900.2</order>
 		<name>joystick_trim_follow_gain_physical_x</name>
 		<prereq>trim_following</prereq>
@@ -1803,7 +1611,7 @@
 		<datatype>negfloat</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4900.22</order>
 		<name>joystick_trim_follow_gain_virtual_x</name>
 		<prereq>trim_following</prereq>
@@ -1817,7 +1625,7 @@
 		<datatype>negfloat</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4900.4</order>
 		<name>joystick_trim_follow_gain_physical_y</name>
 		<prereq>trim_following</prereq>
@@ -1831,7 +1639,7 @@
 		<datatype>negfloat</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4900.42</order>
 		<name>joystick_trim_follow_gain_virtual_y</name>
 		<prereq>trim_following</prereq>
@@ -1845,7 +1653,7 @@
 		<datatype>negfloat</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4900.6</order>
 		<name>rudder_trim_follow_gain_physical_x</name>
 		<prereq>trim_following</prereq>
@@ -1859,7 +1667,7 @@
 		<datatype>negfloat</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>4900.62</order>
 		<name>rudder_trim_follow_gain_virtual_x</name>
 		<prereq>trim_following</prereq>
@@ -1872,7 +1680,7 @@
 		<datatype>negfloat</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>5000</order>
 		<name>ap_following</name>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1885,7 +1693,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>5000.2</order>
 		<name>joystick_ap_x_follow_deadzone</name>
 		<prereq>ap_following</prereq>
@@ -1898,7 +1706,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>5000.3</order>
 		<name>joystick_ap_follow_gain_physical_x</name>
 		<prereq>ap_following</prereq>
@@ -1911,7 +1719,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>5000.4</order>
 		<name>joystick_ap_follow_gain_virtual_x</name>
 		<prereq>ap_following</prereq>
@@ -1922,7 +1730,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>5000.5</order>
 		<name>invert_ap_x_axis</name>
 		<prereq>ap_following</prereq>
@@ -1932,7 +1740,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>5000.6</order>
 		<name>joystick_ap_y_follow_deadzone</name>
 		<prereq>ap_following</prereq>
@@ -1944,7 +1752,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>5000.7</order>
 		<name>joystick_ap_follow_gain_physical_y</name>
 		<prereq>ap_following</prereq>
@@ -1957,7 +1765,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>5000.8</order>
 		<name>joystick_ap_follow_gain_virtual_y</name>
 		<prereq>ap_following</prereq>
@@ -1968,7 +1776,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Axis Control</Grouping>
+		<grouping>Axis Control</grouping>
 		<order>5000.9</order>
 		<name>joystick_ap_y_follow_axis</name>
 		<prereq>ap_following</prereq>
@@ -2062,7 +1870,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB Effect</Grouping>
+		<grouping>FFB Effect</grouping>
 		<order>5100.2</order>
 		<name>hydraulic_loss_threshold</name>
 		<prereq>enable_hydraulic_loss_effect</prereq>
@@ -2078,7 +1886,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB Effect</Grouping>
+		<grouping>FFB Effect</grouping>
 		<order>5100.3</order>
 		<name>hydraulic_loss_damper</name>
 		<prereq>enable_hydraulic_loss_effect</prereq>
@@ -2094,7 +1902,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB Effect</Grouping>
+		<grouping>FFB Effect</grouping>
 		<order>5100.4</order>
 		<name>hydraulic_loss_inertia</name>
 		<prereq>enable_hydraulic_loss_effect</prereq>
@@ -2110,7 +1918,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB Effect</Grouping>
+		<grouping>FFB Effect</grouping>
 		<order>5100.5</order>
 		<name>hydraulic_loss_friction</name>
 		<prereq>enable_hydraulic_loss_effect</prereq>
@@ -2126,63 +1934,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB Effect</Grouping>
-		<order>352</order>
-		<name>steering_friction</name>
-		<info>Enable pedal friction for steering gear wheel&lt;br&gt;** REQUIRES friction overrides to be enabled **</info>
-		<displayname>Steering Friction &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FFB Effect</Grouping>
-		<order>352.1</order>
-		<name>steering_friction_intensity</name>
-		<prereq>steering_friction</prereq>
-		<info>Max intensity of steering friction (% of configurator value)&lt;br&gt;** REQUIRES friction override to be enabled **</info>
-		<displayname>Steering Friction &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<trimwheel>1</trimwheel>
-		<validvalues>0,100</validvalues>
-		<value>0.8</value>
-		<datatype>n_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FFB Effect</Grouping>
-		<order>352.2</order>
-		<name>steering_friction_expo</name>
-		<prereq>steering_friction</prereq>
-		<info>&lt;html&gt;&lt;body&gt;Controls decay rate of friction with speed.&lt;br&gt;0 = linear, gradual decay, -1.0 = very quick decay&lt;/body&gt;&lt;/html&gt;</info>
-		<displayname>Steering Friction Expo</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<sliderfactor>0.1</sliderfactor>
-		<validvalues>-9,0</validvalues>
-		<value>-0.4</value>
-		<datatype>d_float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FFB Effect</Grouping>
-		<order>352.3</order>
-		<name>steering_friction_spring</name>
-		<prereq>steering_friction</prereq>
-		<info>Strength of steering gear spring</info>
-		<displayname>Steering Gear Spring</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-		<value>0.5</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>FFB Effect</Grouping>
+		<grouping>FFB Effect</grouping>
 		<order>5150</order>
 		<name>steering_friction</name>
 		<info>Enable pedal friction for steering gear wheel&lt;br&gt;** REQUIRES friction overrides to be enabled **</info>
@@ -2194,7 +1946,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB Effect</Grouping>
+		<grouping>FFB Effect</grouping>
 		<order>5150.1</order>
 		<name>steering_friction_intensity</name>
 		<prereq>steering_friction</prereq>
@@ -2209,7 +1961,7 @@
 		<datatype>n_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB Effect</Grouping>
+		<grouping>FFB Effect</grouping>
 		<order>5150.2</order>
 		<name>steering_friction_expo</name>
 		<prereq>steering_friction</prereq>
@@ -2224,7 +1976,7 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>FFB Effect</Grouping>
+		<grouping>FFB Effect</grouping>
 		<order>5150.3</order>
 		<name>steering_friction_spring</name>
 		<prereq>steering_friction</prereq>
@@ -2238,7 +1990,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5200</order>
 		<name>gforce_effect_master</name>
 		<info>Master control for all G Effects</info>
@@ -2252,7 +2004,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5210</order>
 		<name>gforce_effect_enable</name>
 		<exclusive_with>new_gforce_effect_enable,gforce_effect_advanced_enabled</exclusive_with>
@@ -2266,7 +2018,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5210.22</order>
 		<name>gforce_effect_max_intensity</name>
 		<prereq>gforce_effect_enable</prereq>
@@ -2280,7 +2032,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5210.23</order>
 		<name>gforce_effect_curvature</name>
 		<prereq>gforce_effect_enable</prereq>
@@ -2295,7 +2047,7 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5210.24</order>
 		<name>gforce_min_gs</name>
 		<prereq>gforce_effect_enable</prereq>
@@ -2310,7 +2062,7 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5210.25</order>
 		<name>gforce_max_gs</name>
 		<prereq>gforce_effect_enable</prereq>
@@ -2325,7 +2077,7 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5220</order>
 		<name>new_gforce_effect_enable</name>
 		<exclusive_with>gforce_effect_advanced_enabled,gforce_effect_enable</exclusive_with>
@@ -2341,7 +2093,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5220.2</order>
 		<name>new_gforce_effect_max_intensity</name>
 		<prereq>new_gforce_effect_enable</prereq>
@@ -2357,7 +2109,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5220.3</order>
 		<name>new_gforce_min_gs</name>
 		<prereq>new_gforce_effect_enable</prereq>
@@ -2374,7 +2126,7 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5220.4</order>
 		<name>new_gforce_max_gs</name>
 		<prereq>new_gforce_effect_enable</prereq>
@@ -2391,7 +2143,7 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5220.5</order>
 		<name>new_gforce_effect_deflection_factor</name>
 		<prereq>new_gforce_effect_enable</prereq>
@@ -2407,7 +2159,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5230</order>
 		<name>new_gforce_enable_neg_gs</name>
 		<prereq>new_gforce_effect_enable</prereq>
@@ -2422,7 +2174,22 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
+		<order>5230</order>
+		<name>gforce_effect_advanced_enabled</name>
+		<exclusive_with>new_gforce_effect_enable,gforce_effect_enable</exclusive_with>
+		<prereq>gforce_effect_master</prereq>
+		<displayname>Advanced G Force Effect</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>G Force</grouping>
 		<order>5230.2</order>
 		<name>new_gforce_effect_max_intensity_neg</name>
 		<prereq>new_gforce_enable_neg_gs</prereq>
@@ -2438,7 +2205,21 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
+		<order>5230.2</order>
+		<name>gforce_effect_adv_curve</name>
+		<prereq>gforce_effect_advanced_enabled</prereq>
+		<displayname>Advanced</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<value>{"curve_pos": {"x_min": 1.0, "x_max": 10, "points": [{"x": 1.5, "y": 0.0}, {"x": 4.31, "y": 21.12}, {"x": 6.98, "y": 53.42}, {"x": 9.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "gs"}, "gain_pos": 75, "curve_neg": {"x_min": 0, "x_max": 7.0, "points": [{"x": 0.39, "y": 0.0}, {"x": 2.59, "y": 28.12}, {"x": 4.2, "y": 60.62}, {"x": 5.44, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "gs"}, "gain_neg": 75, "enable_neg": false, "units": "gs", "scale": 10}</value>
+		<datatype>advgs</datatype>
+	</defaults>
+	<defaults>
+		<grouping>G Force</grouping>
 		<order>5230.3</order>
 		<name>new_gforce_min_gs_neg</name>
 		<prereq>new_gforce_enable_neg_gs</prereq>
@@ -2455,7 +2236,7 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5230.4</order>
 		<name>new_gforce_max_gs_neg</name>
 		<prereq>new_gforce_enable_neg_gs</prereq>
@@ -2472,7 +2253,7 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>G Force</grouping>
 		<order>5230.5</order>
 		<name>new_gforce_effect_deflection_factor_neg</name>
 		<prereq>new_gforce_enable_neg_gs</prereq>
@@ -2488,36 +2269,7 @@
 		<datatype>negfloat</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
-		<order>5230</order>
-		<name>gforce_effect_advanced_enabled</name>
-		<exclusive_with>new_gforce_effect_enable,gforce_effect_enable</exclusive_with>
-		<prereq>gforce_effect_master</prereq>
-		<displayname>Advanced G Force Effect</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<value>false</value>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>G Force</Grouping>
-		<order>5230.2</order>
-		<name>gforce_effect_adv_curve</name>
-		<prereq>gforce_effect_advanced_enabled</prereq>
-		<displayname>Advanced</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<value>{"curve_pos": {"x_min": 1.0, "x_max": 10, "points": [{"x": 1.5, "y": 0.0}, {"x": 4.31, "y": 21.12}, {"x": 6.98, "y": 53.42}, {"x": 9.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "gs"}, "gain_pos": 75, "curve_neg": {"x_min": 0, "x_max": 7.0, "points": [{"x": 0.39, "y": 0.0}, {"x": 2.59, "y": 28.12}, {"x": 4.2, "y": 60.62}, {"x": 5.44, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "gs"}, "gain_neg": 75, "enable_neg": false, "units": "gs", "scale": 10}</value>
-		<datatype>advgs</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>5500</order>
 		<name>countermeasure_effect_enabled</name>
 		<displayname>Countermeasures</displayname>
@@ -2529,7 +2281,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>5500.1</order>
 		<name>cm_vibration_intensity</name>
 		<prereq>countermeasure_effect_enabled</prereq>
@@ -2544,7 +2296,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>5600</order>
 		<name>gunfire_effect_enabled</name>
 		<displayname>Gunfire</displayname>
@@ -2556,7 +2308,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>5600.1</order>
 		<name>gun_vibration_intensity</name>
 		<prereq>gunfire_effect_enabled</prereq>
@@ -2571,7 +2323,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>5700</order>
 		<name>weapon_release_effect_enabled</name>
 		<displayname>Weapons Release</displayname>
@@ -2583,7 +2335,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>5700.1</order>
 		<name>weapon_release_intensity</name>
 		<prereq>weapon_release_effect_enabled</prereq>
@@ -2598,7 +2350,7 @@
 		<datatype>float</datatype>
 		</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>5800</order>
 		<name>dummy_weapon_direction</name>
 		<displayname>Weapon Effects Direction</displayname>
@@ -2610,7 +2362,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>5800.1</order>
 		<name>weapon_effect_direction</name>
 		<prereq>dummy_weapon_direction</prereq>
@@ -2625,7 +2377,7 @@
 		<datatype>d_int</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic</Grouping>
+		<grouping>Dynamic</grouping>
 		<order>5900</order>
 		<name>elevator_droop_enabled</name>
 		<info>Simulate Elevator droop at low speeds &lt;20Kt</info>
@@ -2636,7 +2388,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic</Grouping>
+		<grouping>Dynamic</grouping>
 		<order>5900.1</order>
 		<name>elevator_droop_force</name>
 		<prereq>elevator_droop_enabled</prereq>
@@ -2652,7 +2404,7 @@
 		<unit></unit>
 	</defaults>
 	<defaults>
-		<Grouping>ETL</Grouping>
+		<grouping>ETL</grouping>
 		<order>6000</order>
 		<name>etl_effect_enable</name>
 		<info>Enable Effective Translational Lift Shimmy</info>
@@ -2666,7 +2418,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>ETL</Grouping>
+		<grouping>ETL</grouping>
 		<order>6000.1</order>
 		<name>etl_effect_intensity</name>
 		<prereq>etl_effect_enable</prereq>
@@ -2682,7 +2434,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>ETL</Grouping>
+		<grouping>ETL</grouping>
 		<order>6000.2</order>
 		<name>etl_start_speed</name>
 		<prereq>etl_effect_enable</prereq>
@@ -2699,7 +2451,7 @@
 		<unit>m/s</unit>
 	</defaults>
 	<defaults>
-		<Grouping>ETL</Grouping>
+		<grouping>ETL</grouping>
 		<order>6000.3</order>
 		<name>etl_stop_speed</name>
 		<prereq>etl_effect_enable</prereq>
@@ -2716,7 +2468,7 @@
 		<unit>m/s</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6100</order>
 		<name>engine_rotor_rumble_enabled</name>
 		<displayname>Heli Engine/Rotor Rumble</displayname>
@@ -2729,7 +2481,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6100.1</order>
 		<name>heli_engine_rumble_intensity</name>
 		<prereq>engine_rotor_rumble_enabled</prereq>
@@ -2747,7 +2499,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>VRS</Grouping>
+		<grouping>VRS</grouping>
 		<order>6200</order>
 		<name>vrs_effect_enable</name>
 		<info>Vortex Ring State Effect</info>
@@ -2761,7 +2513,7 @@
 		<unit>false</unit>
 	</defaults>
 	<defaults>
-		<Grouping>VRS</Grouping>
+		<grouping>VRS</grouping>
 		<order>6200.1</order>
 		<name>vrs_effect_intensity</name>
 		<prereq>vrs_effect_enable</prereq>
@@ -2778,7 +2530,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>VRS</Grouping>
+		<grouping>VRS</grouping>
 		<order>6200.3</order>
 		<name>vrs_threshold_speed</name>
 		<prereq>vrs_effect_enable</prereq>
@@ -2794,7 +2546,7 @@
 		<unit>kt</unit>
 	</defaults>
 	<defaults>
-		<Grouping>VRS</Grouping>
+		<grouping>VRS</grouping>
 		<order>6200.4</order>
 		<name>vrs_vs_onset</name>
 		<prereq>vrs_effect_enable</prereq>
@@ -2810,7 +2562,7 @@
 		<unit>fpm</unit>
 	</defaults>
 	<defaults>
-		<Grouping>VRS</Grouping>
+		<grouping>VRS</grouping>
 		<order>6200.5</order>
 		<name>vrs_vs_max</name>
 		<prereq>vrs_effect_enable</prereq>
@@ -2826,7 +2578,7 @@
 		<unit>fpm</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6300</order>
 		<name>afterburner_effect_enabled</name>
 		<info>Enable afterburner rumble effect</info>
@@ -2841,7 +2593,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6300.1</order>
 		<name>afterburner_effect_intensity</name>
 		<prereq>afterburner_effect_enabled</prereq>
@@ -2859,7 +2611,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6400</order>
 		<name>engine_prop_rumble_enabled</name>
 		<info>Enable Propeller Rumble</info>
@@ -2874,7 +2626,7 @@
 		<datatype>bool</datatype>
 		</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6400.2</order>
 		<name>engine_rumble_lowrpm</name>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -2893,7 +2645,7 @@
 		<datatype>d_int</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6400.3</order>
 		<name>engine_rumble_lowrpm_intensity</name>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -2912,7 +2664,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6400.4</order>
 		<name>engine_rumble_highrpm</name>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -2931,7 +2683,7 @@
 		<datatype>d_int</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6400.5</order>
 		<name>engine_rumble_highrpm_intensity</name>
 		<prereq>engine_prop_rumble_enabled</prereq>
@@ -2950,7 +2702,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6500</order>
 		<name>engine_jet_rumble_enabled</name>
 		<displayname>Jet Engine Rumble</displayname>
@@ -2964,7 +2716,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6500.1</order>
 		<name>jet_engine_rumble_intensity</name>
 		<prereq>engine_jet_rumble_enabled</prereq>
@@ -2981,7 +2733,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Engine</Grouping>
+		<grouping>Engine</grouping>
 		<order>6500.2</order>
 		<name>jet_engine_rumble_freq</name>
 		<prereq>engine_jet_rumble_enabled</prereq>
@@ -3000,7 +2752,7 @@
 		<unit>hz</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Buffeting</grouping>
 		<order>6600</order>
 		<name>il2_shake_master</name>
 		<info>These effects are duplicates of effects that are implemented by IL2 natively.  Recommend to disable the "shake" in IL2 FFB settings if you enable these.</info>
@@ -3013,7 +2765,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Buffeting</grouping>
 		<order>6600.2</order>
 		<name>il2_enable_buffet</name>
 		<prereq>il2_shake_master</prereq>
@@ -3027,7 +2779,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Buffeting</grouping>
 		<order>6600.21</order>
 		<name>il2_buffeting_factor</name>
 		<prereq>il2_enable_buffet</prereq>
@@ -3042,7 +2794,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Movement</grouping>
 		<order>6600.3</order>
 		<name>il2_enable_runway_rumble</name>
 		<prereq>il2_shake_master</prereq>
@@ -3055,7 +2807,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Movement</grouping>
 		<order>6600.31</order>
 		<name>il2_runway_rumble_intensity</name>
 		<prereq>il2_enable_runway_rumble</prereq>
@@ -3070,7 +2822,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>6600.4</order>
 		<name>il2_enable_weapons</name>
 		<prereq>il2_shake_master</prereq>
@@ -3083,7 +2835,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>6600.41</order>
 		<name>il2_weapon_release_intensity</name>
 		<prereq>il2_enable_weapons</prereq>
@@ -3098,7 +2850,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>6600.42</order>
 		<name>il2_bomb_release_intensity</name>
 		<prereq>il2_enable_weapons</prereq>
@@ -3113,7 +2865,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Weapons</grouping>
 		<order>6600.43</order>
 		<name>il2_rocket_release_intensity</name>
 		<prereq>il2_enable_weapons</prereq>
@@ -3128,94 +2880,84 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>G Force</grouping>
 		<order>6700</order>
-		<name>enable_stick_shaker</name>
-		<info>Enable stick shaker stall warning device</info>
-		<displayname>Stick Shaker</displayname>
+		<name>deceleration_effect_enable</name>
+		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
+		<displayname>Deceleration Effect</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<value></value>
+		<value>true</value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>6700</order>
-		<name>enable_stick_shaker</name>
-		<info>Enable stick shaker stall warning device</info>
-		<displayname>AoA Stick Shaker</displayname>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>6700</order>
-		<name>enable_stick_shaker</name>
-		<info>Enable stick shaker stall warning device</info>
-		<displayname>AoA Pedal Shaker</displayname>
-		<DCS>true</DCS>
-		<pedals>true</pedals>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>G Force</grouping>
 		<order>6700.1</order>
-		<name>stick_shaker_intensity</name>
-		<prereq>enable_stick_shaker</prereq>
-		<info>Enable stick shaker stall warning device</info>
-		<displayname>Stick Shaker Intensity</displayname>
+		<name>deceleration_max_force</name>
+		<prereq>deceleration_effect_enable</prereq>
+		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
+		<displayname>Deceleration Max Force</displayname>
+		<DCS>true</DCS>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
-		<value>0.12</value>
+		<value>0.35</value>
 		<datatype>float</datatype>
-	</defaults>
+		</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>G Force</grouping>
 		<order>6700.2</order>
-		<name>stick_shaker_intensity</name>
-		<prereq>enable_stick_shaker</prereq>
-		<info>Enable stick shaker stall warning device</info>
-		<displayname>Shaker Intensity</displayname>
+		<name>decel_scale_factor</name>
+		<prereq>deceleration_effect_enable</prereq>
+		<info>Artificially increase the G forces in the direction of deceleration</info>
+		<displayname>Deceleration Scale Factor</displayname>
 		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-		<value>0.4</value>
-		<datatype>float</datatype>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>10,30</validvalues>
+		<value>1.0</value>
+		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>G Force</grouping>
 		<order>6700.3</order>
-		<name>stick_shaker_aoa</name>
-		<prereq>enable_stick_shaker</prereq>
-		<info>AoA at which stick shaker activates</info>
-		<any>true</any>
-		<displayname>Shaker AoA Threshold</displayname>
+		<name>decel_invert_force</name>
+		<prereq>deceleration_effect_enable</prereq>
+		<info>Invert the frame of reference (direction of force) for the effect.  I.e. stick moving away from pilot vs. pilot moving towards stick.</info>
+		<displayname>Invert Force</displayname>
 		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-		<value>22.3</value>
-		<datatype>anyfloat</datatype>
+		<value>false</value>
+		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>G Force</grouping>
 		<order>6700.4</order>
-		<name>stick_shaker_frequency</name>
-		<prereq>enable_stick_shaker</prereq>
-		<info>Freqency in Hz of the effect</info>
-		<displayname>Shaker Freqency (Hz)</displayname>
+		<name>decel_airborne_disable</name>
+		<prereq>deceleration_effect_enable</prereq>
+		<info>Disable effect while airborne</info>
+		<displayname>Disable while Airborne</displayname>
 		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-		<value>40</value>
-		<datatype>d_int</datatype>
+		<value>true</value>
+		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
+		<grouping>Dynamic Forces</grouping>
 		<order>6800</order>
 		<name>aoa_effect_enabled</name>
 		<info>Enable or disable the dynamic Angle of Attack (AoA) based force effect</info>
@@ -3226,7 +2968,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
+		<grouping>Dynamic Forces</grouping>
 		<order>6800.1</order>
 		<name>aoa_effect_gain</name>
 		<prereq>aoa_effect_enabled</prereq>
@@ -3239,7 +2981,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
+		<grouping>Dynamic Forces</grouping>
 		<order>6800.1</order>
 		<name>max_aoa_cf_force</name>
 		<prereq>aoa_effect_enabled</prereq>
@@ -3253,7 +2995,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>AoA Reduction</Grouping>
+		<grouping>AoA Reduction</grouping>
 		<order>6900</order>
 		<name>aoa_reduction_effect_enabled</name>
 		<info>Enable or disable the AoA reduction force effect</info>
@@ -3265,7 +3007,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>AoA Reduction</Grouping>
+		<grouping>AoA Reduction</grouping>
 		<order>6900.1</order>
 		<name>aoa_reduction_max_force</name>
 		<prereq>aoa_reduction_effect_enabled</prereq>
@@ -3280,7 +3022,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>AoA Reduction</Grouping>
+		<grouping>AoA Reduction</grouping>
 		<order>6900.2</order>
 		<name>critical_aoa_max</name>
 		<prereq>aoa_reduction_effect_enabled</prereq>
@@ -3296,7 +3038,7 @@
 		<unit>deg</unit>
 	</defaults>
 	<defaults>
-		<Grouping>AoA Reduction</Grouping>
+		<grouping>AoA Reduction</grouping>
 		<order>6900.3</order>
 		<name>critical_aoa_start</name>
 		<prereq>aoa_reduction_effect_enabled</prereq>
@@ -3312,8 +3054,40 @@
 		<unit>deg</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7000</order>
+		<name>vibration_group</name>
+		<any>true</any>
+		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style='font-family:\"Arial Black\"; font-size:13pt;'&gt;Vibration&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>true</value>
+		<datatype>group</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Vibration</grouping>
+		<order>7050.4</order>
+		<name>stall_aoa</name>
+		<prereq>aoa_buffeting_enabled</prereq>
+		<info>Stall Angle of Attack</info>
+		<displayname>Stall AoA</displayname>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,30</validvalues>
+		<value>15</value>
+		<datatype>d_int</datatype>
+		<unit>deg</unit>
+	</defaults>
+	<defaults>
+		<grouping>Vibration</grouping>
+		<order>7050</order>
 		<name>aoa_buffeting_enabled</name>
 		<displayname>AoA/Stall Buffeting</displayname>
 		<DCS>true</DCS>
@@ -3325,8 +3099,8 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>7000.1</order>
+		<grouping>Vibration</grouping>
+		<order>7050.1</order>
 		<name>buffeting_intensity</name>
 		<prereq>aoa_buffeting_enabled</prereq>
 		<info>Peak AoA buffeting intensity</info>
@@ -3342,8 +3116,8 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>7000.2</order>
+		<grouping>Vibration</grouping>
+		<order>7050.2</order>
 		<name>aoa_buffet_freq</name>
 		<prereq>aoa_buffeting_enabled</prereq>
 		<info>Frequency of buffeting effect (Hz)</info>
@@ -3360,8 +3134,8 @@
 		<unit>hz</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>7000.3</order>
+		<grouping>Vibration</grouping>
+		<order>7050.3</order>
 		<name>buffet_aoa</name>
 		<prereq>aoa_buffeting_enabled</prereq>
 		<info>AoA when buffeting starts</info>
@@ -3376,23 +3150,7 @@
 		<unit>deg</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
-		<order>7000.4</order>
-		<name>stall_aoa</name>
-		<prereq>aoa_buffeting_enabled</prereq>
-		<info>Stall Angle of Attack</info>
-		<displayname>Stall AoA</displayname>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<collective>true</collective>
-		<validvalues>0,30</validvalues>
-		<value>15</value>
-		<datatype>d_int</datatype>
-		<unit>deg</unit>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7100</order>
 		<name>canopy_motion_effect_enabled</name>
 		<displayname>Canopy Motion</displayname>
@@ -3405,7 +3163,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7100.1</order>
 		<name>canopy_motion_intensity</name>
 		<prereq>canopy_motion_effect_enabled</prereq>
@@ -3422,7 +3180,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7200</order>
 		<name>damage_effect_enabled</name>
 		<displayname>Damage Effect</displayname>
@@ -3435,7 +3193,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Weapons</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7200.1</order>
 		<name>damage_effect_intensity</name>
 		<prereq>damage_effect_enabled</prereq>
@@ -3451,84 +3209,94 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7300</order>
-		<name>deceleration_effect_enable</name>
-		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
-		<displayname>Deceleration Effect</displayname>
-		<DCS>true</DCS>
+		<name>enable_stick_shaker</name>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>Stick Shaker</displayname>
 		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<value>true</value>
+		<value></value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
-		<order>7300.1</order>
-		<name>deceleration_max_force</name>
-		<prereq>deceleration_effect_enable</prereq>
-		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
-		<displayname>Deceleration Max Force</displayname>
+		<grouping>Vibration</grouping>
+		<order>7300</order>
+		<name>enable_stick_shaker</name>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>AoA Stick Shaker</displayname>
 		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Vibration</grouping>
+		<order>7300</order>
+		<name>enable_stick_shaker</name>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>AoA Pedal Shaker</displayname>
+		<DCS>true</DCS>
+		<pedals>true</pedals>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Vibration</grouping>
+		<order>7300.1</order>
+		<name>stick_shaker_intensity</name>
+		<prereq>enable_stick_shaker</prereq>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>Stick Shaker Intensity</displayname>
 		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
-		<value>0.35</value>
+		<value>0.12</value>
 		<datatype>float</datatype>
-		</defaults>
+	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7300.2</order>
-		<name>decel_scale_factor</name>
-		<prereq>deceleration_effect_enable</prereq>
-		<info>Artificially increase the G forces in the direction of deceleration</info>
-		<displayname>Deceleration Scale Factor</displayname>
+		<name>stick_shaker_intensity</name>
+		<prereq>enable_stick_shaker</prereq>
+		<info>Enable stick shaker stall warning device</info>
+		<displayname>Shaker Intensity</displayname>
 		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<sliderfactor>0.1</sliderfactor>
-		<validvalues>10,30</validvalues>
-		<value>1.0</value>
-		<datatype>d_float</datatype>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>0.4</value>
+		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7300.3</order>
-		<name>decel_invert_force</name>
-		<prereq>deceleration_effect_enable</prereq>
-		<info>Invert the frame of reference (direction of force) for the effect.  I.e. stick moving away from pilot vs. pilot moving towards stick.</info>
-		<displayname>Invert Force</displayname>
+		<name>stick_shaker_aoa</name>
+		<prereq>enable_stick_shaker</prereq>
+		<info>AoA at which stick shaker activates</info>
+		<any>true</any>
+		<displayname>Shaker AoA Threshold</displayname>
 		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<value>false</value>
-		<datatype>bool</datatype>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>22.3</value>
+		<datatype>anyfloat</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>G Force</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7300.4</order>
-		<name>decel_airborne_disable</name>
-		<prereq>deceleration_effect_enable</prereq>
-		<info>Disable effect while airborne</info>
-		<displayname>Disable while Airborne</displayname>
+		<name>stick_shaker_frequency</name>
+		<prereq>enable_stick_shaker</prereq>
+		<info>Freqency in Hz of the effect</info>
+		<displayname>Shaker Freqency (Hz)</displayname>
 		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
 		<joystick>true</joystick>
-		<value>true</value>
-		<datatype>bool</datatype>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>40</value>
+		<datatype>d_int</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7400</order>
 		<name>flaps_motion_effect_enabled</name>
 		<displayname>Flaps Motion</displayname>
@@ -3542,7 +3310,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7400.1</order>
 		<name>flaps_motion_intensity</name>
 		<prereq>flaps_motion_effect_enabled</prereq>
@@ -3561,7 +3329,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7500</order>
 		<name>fuelboom_motion_effect_enabled</name>
 		<info>Effect while fuel boom/door  is deploying/retracting</info>
@@ -3571,7 +3339,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7500.1</order>
 		<name>fuelboom_motion_intensity</name>
 		<prereq>fuelboom_motion_effect_enabled</prereq>
@@ -3585,7 +3353,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7600</order>
 		<name>gear_buffet_effect_enabled</name>
 		<displayname>Gear Buffet</displayname>
@@ -3599,7 +3367,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7600.1</order>
 		<name>gear_buffet_intensity</name>
 		<prereq>gear_buffet_effect_enabled</prereq>
@@ -3617,7 +3385,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7600.2</order>
 		<name>gear_buffet_freq</name>
 		<prereq>gear_buffet_effect_enabled</prereq>
@@ -3635,7 +3403,7 @@
 		<unit>hz</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7600.3</order>
 		<name>gear_buffet_speed_low</name>
 		<prereq>gear_buffet_effect_enabled</prereq>
@@ -3650,7 +3418,7 @@
 		<datatype>int</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7600.4</order>
 		<name>gear_buffet_speed_high</name>
 		<prereq>gear_buffet_effect_enabled</prereq>
@@ -3665,7 +3433,7 @@
 		<datatype>int</datatype>
 		</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7700</order>
 		<name>gear_motion_effect_enabled</name>
 		<displayname>Gear Motion</displayname>
@@ -3680,7 +3448,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7700.1</order>
 		<name>gear_motion_intensity</name>
 		<prereq>gear_motion_effect_enabled</prereq>
@@ -3699,7 +3467,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7800</order>
 		<name>overspeed_effect_enable</name>
 		<displayname>Overpeed Shake </displayname>
@@ -3712,7 +3480,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7800.1</order>
 		<name>overspeed_shake_intensity</name>
 		<prereq>overspeed_effect_enable</prereq>
@@ -3728,7 +3496,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7800.2</order>
 		<name>overspeed_shake_start</name>
 		<prereq>overspeed_effect_enable</prereq>
@@ -3745,7 +3513,7 @@
 		<unit>m/s</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7900</order>
 		<name>runway_rumble_enabled</name>
 		<info>Enable/disable runway rumble effect</info>
@@ -3759,7 +3527,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>7900.1</order>
 		<name>runway_rumble_intensity</name>
 		<prereq>runway_rumble_enabled</prereq>
@@ -3776,7 +3544,7 @@
 		<datatype>float</datatype>
 		</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8000</order>
 		<name>touchdown_effect_enabled</name>
 		<displayname>Touch-Down Effect</displayname>
@@ -3787,7 +3555,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8000.1</order>
 		<name>touchdown_effect_max_force</name>
 		<prereq>touchdown_effect_enabled</prereq>
@@ -3801,7 +3569,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8000.2</order>
 		<name>touchdown_effect_max_gs</name>
 		<prereq>touchdown_effect_enabled</prereq>
@@ -3816,7 +3584,7 @@
 		<datatype>d_float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8100</order>
 		<name>nosewheel_shimmy</name>
 		<displayname>Nosewheel Shimmy</displayname>
@@ -3827,7 +3595,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8100.1</order>
 		<name>nosewheel_shimmy_intensity</name>
 		<prereq>nosewheel_shimmy</prereq>
@@ -3841,7 +3609,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8100.2</order>
 		<name>nosewheel_shimmy_min_brakes</name>
 		<prereq>nosewheel_shimmy</prereq>
@@ -3855,7 +3623,7 @@
 		<datatype>float</datatype>
 		</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8100.3</order>
 		<name>nosewheel_shimmy_min_speed</name>
 		<prereq>nosewheel_shimmy</prereq>
@@ -3870,7 +3638,7 @@
 		<unit>m/s</unit>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8200</order>
 		<name>speedbrake_buffet_effect_enabled</name>
 		<displayname>Speedbrake Buffet</displayname>
@@ -3882,7 +3650,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8200.1</order>
 		<name>speedbrake_buffet_intensity</name>
 		<prereq>speedbrake_buffet_effect_enabled</prereq>
@@ -3899,7 +3667,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8300</order>
 		<name>speedbrake_motion_effect_enabled</name>
 		<displayname>Speedbrake Motion</displayname>
@@ -3911,7 +3679,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8300.1</order>
 		<name>speedbrake_motion_intensity</name>
 		<prereq>speedbrake_motion_effect_enabled</prereq>
@@ -3928,7 +3696,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8400</order>
 		<name>spoiler_buffet_effect_enabled</name>
 		<displayname>Spoiler Buffet</displayname>
@@ -3941,7 +3709,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8400.1</order>
 		<name>spoiler_buffet_intensity</name>
 		<prereq>spoiler_buffet_effect_enabled</prereq>
@@ -3959,7 +3727,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8500</order>
 		<name>spoiler_motion_effect_enabled</name>
 		<displayname>Spoiler Motion</displayname>
@@ -3971,7 +3739,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8500.1</order>
 		<name>spoiler_motion_intensity</name>
 		<prereq>spoiler_motion_effect_enabled</prereq>
@@ -3988,7 +3756,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8600</order>
 		<name>tailhook_motion_effect_enabled</name>
 		<info>Effect while tailhook is deploying/retracting</info>
@@ -3999,7 +3767,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8600.1</order>
 		<name>tailhook_motion_intensity</name>
 		<prereq>tailhook_motion_effect_enabled</prereq>
@@ -4014,32 +3782,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>8700</order>
-		<name>uncoordinated_turn_effect_enabled</name>
-		<info>Simulate lateral acceleration effect on stick in uncoordinated turns</info>
-		<displayname>Simulated Lateral Force</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<datatype>bool</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Dynamic Forces</Grouping>
-		<order>8700.1</order>
-		<name>lateral_force_gain</name>
-		<prereq>uncoordinated_turn_effect_enabled</prereq>
-		<displayname>Simulated Lateral Force Gain</displayname>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<sliderfactor>0.4</sliderfactor>
-		<validvalues>0,100</validvalues>
-		<value>0.2</value>
-		<datatype>float</datatype>
-	</defaults>
-	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8800</order>
 		<name>wingfold_motion_effect_enabled</name>
 		<info>Effect while wing-fold  is deploying/retracting</info>
@@ -4049,7 +3792,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Movement</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8800.1</order>
 		<name>wingfold_motion_intensity</name>
 		<prereq>wingfold_motion_effect_enabled</prereq>
@@ -4063,7 +3806,7 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8900</order>
 		<name>wind_effect_enabled</name>
 		<displayname>Wind Effect</displayname>
@@ -4073,7 +3816,7 @@
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8900.1</order>
 		<name>wind_effect_max_intensity</name>
 		<prereq>wind_effect_enabled</prereq>
@@ -4087,7 +3830,7 @@
 		<datatype>float</datatype>
 		</defaults>
 	<defaults>
-		<Grouping>Buffeting</Grouping>
+		<grouping>Vibration</grouping>
 		<order>8900.2</order>
 		<name>wind_effect_scaling</name>
 		<prereq>wind_effect_enabled</prereq>
@@ -4100,8 +3843,225 @@
 		<datatype>float</datatype>
 	</defaults>
 	<defaults>
-		<Grouping>Profile</Grouping>
-		<order>9000</order>
+		<grouping>Dynamic Forces</grouping>
+		<order>9300</order>
+		<name>uncoordinated_turn_effect_enabled</name>
+		<info>Simulate lateral acceleration effect on stick in uncoordinated turns</info>
+		<displayname>Simulated Lateral Force</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Dynamic Forces</grouping>
+		<order>9300.1</order>
+		<name>lateral_force_gain</name>
+		<prereq>uncoordinated_turn_effect_enabled</prereq>
+		<displayname>Simulated Lateral Force Gain</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<sliderfactor>0.4</sliderfactor>
+		<validvalues>0,100</validvalues>
+		<value>0.2</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9500</order>
+		<name>center_spring_on_pause</name>
+		<info>Force spring centering when in pause/slew mode</info>
+		<displayname>Center on Pause/Slew</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9600</order>
+		<name>keep_forces_on_pause</name>
+		<info>Keep damper/inertia/friction force active during pause</info>
+		<displayname>Keep Forces on Pause/Slew</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>true</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9650</order>
+		<name>enable_deadzone</name>
+		<displayname>Enable Deadzone</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9650.1</order>
+		<name>deadzone_base_pct</name>
+		<prereq>enable_deadzone</prereq>
+		<info>Always on circular deadzone equivalent to setting deadzone in configurator </info>
+		<displayname>Deadzone %</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<sliderfactor>.1</sliderfactor>
+		<validvalues>0,1000</validvalues>
+		<value>0</value>
+		<datatype>d_float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9700</order>
+		<name>enable_damper_ovd</name>
+		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<displayname>Damper Override</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9700.1</order>
+		<name>damper_force</name>
+		<prereq>enable_damper_ovd</prereq>
+		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<displayname>Damper Effect</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9800</order>
+		<name>enable_inertia_ovd</name>
+		<info>Apply inertia to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<displayname>Inertia Override</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9800.1</order>
+		<name>inertia_force</name>
+		<prereq>enable_inertia_ovd</prereq>
+		<info>Apply inertia to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<displayname>Inertia Effect</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9900</order>
+		<name>enable_friction_ovd</name>
+		<info>Apply friction to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<displayname>Friction Override</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>FFB</grouping>
+		<order>9900.1</order>
+		<name>friction_force</name>
+		<prereq>enable_friction_ovd</prereq>
+		<info>Apply friction to axes.&lt;br&gt;Results in percent of configurator slider value</info>
+		<displayname>Friction Effect</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<grouping>System</grouping>
+		<order>10000</order>
+		<name>system_group</name>
+		<any>true</any>
+		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style='font-family:\"Arial Black\"; font-size:13pt;'&gt;System&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>true</value>
+		<datatype>group</datatype>
+	</defaults>
+	<defaults>
+		<grouping>Profile</grouping>
+		<order>10100</order>
 		<name>telemffb_profile</name>
 		<any>true</any>
 		<displayname>TelemFFB Profile</displayname>
@@ -4114,6 +4074,92 @@
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
 		<value></value>
+		<datatype>text</datatype>
+	</defaults>
+	<defaults>
+		<grouping>System</grouping>
+		<order>10200</order>
+		<name>vpconf</name>
+		<info>Load a specific .vpconf file (created with VPForce Configurator)&lt;br&gt;&lt;br&gt;When using this function, it will remain active until set again by another sim, class, or model setting, or is defaulted back to "Global Default" profile  from System Settings</info>
+		<displayname>Configurator File</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>-</value>
+		<datatype>path</datatype>
+	</defaults>
+	<defaults>
+		<grouping>System</grouping>
+		<order>10300</order>
+		<name>configurator_override_enabled</name>
+		<info>Change VPConfigurator Sliders</info>
+		<displayname>Override Configurator Sliders</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>System</grouping>
+		<order>10300.1</order>
+		<name>configurator_gains</name>
+		<prereq>configurator_override_enabled</prereq>
+		<info>Directly modify the per-effect type  gain values on the VPforce device.&lt;br&gt;&lt;br&gt;Please read the manual to understand how it works and how it interacts with the "Configurator File" feature (these gains will override any pushed in a configurator profile)</info>
+		<displayname>Override Configurator Sliders</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<validvalues>none</validvalues>
+		<value>none</value>
+		<datatype>configurator</datatype>
+	</defaults>
+	<defaults>
+		<grouping>System</grouping>
+		<order>10400</order>
+		<name>command_runner_enabled</name>
+		<info>Enable execution of any command when aircraft loads</info>
+		<displayname>Command Runner</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<grouping>System</grouping>
+		<order>10400.2</order>
+		<name>command_runner_command</name>
+		<prereq>command_runner_enabled</prereq>
+		<info>Enter a command to be executed when an aircraft loads.  There is no path or validation checking.  Command will be executed as is.&lt;br&gt;&lt;br&gt;Enter the command with the full path exactly as if running from a command prompt</info>
+		<displayname>Command Runner String</displayname>
+		<DCS>true</DCS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>Enter full path as if running from command prompt...</validvalues>
+		<value>Enter full path as if running from command prompt...</value>
 		<datatype>text</datatype>
 	</defaults>
 	<sc_overrides>
@@ -7891,28 +7937,28 @@
 	<classdefaults>
 		<name>pedal_spring_mode</name>
 		<type>Helicopter</type>
-		<value>No Spring</value>
+		<value>NOSPRING</value>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>pedal_spring_mode</name>
 		<type>JetAircraft</type>
-		<value>Static Spring</value>
+		<value>STATIC</value>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>pedal_spring_mode</name>
 		<type>PropellerAircraft</type>
-		<value>Dynamic Spring</value>
+		<value>DYNAMIC</value>
 		<sim>IL2</sim>
 		<device>pedals</device>
 	</classdefaults>
 	<classdefaults>
 		<name>pedal_spring_mode</name>
 		<type>PropellerAircraft</type>
-		<value>Dynamic Spring</value>
+		<value>DYNAMIC</value>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</classdefaults>

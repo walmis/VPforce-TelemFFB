@@ -44,10 +44,13 @@ from . import xmlutils
 class SettingsLayout(QGridLayout):
     expanded_items = []
     prereq_list = []
+    group_list = []
+    collapsed_groups = set()
+
     ##########
     # debug settings
     show_slider_debug = False   # set to true for slider values shown
-    show_order_debug = False    # set to true for order numbers shown
+    show_order_debug = True    # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
 
     all_sliders = []
@@ -70,6 +73,9 @@ class SettingsLayout(QGridLayout):
         self.adv_spr_dialog = None
         self.advanced_g_settings = None
         self.adv_g_dialog = None
+        self.group_list = xmlutils.read_groups()
+        for g in self.group_list:
+            self.collapsed_groups.add(g['grouping'])
 
     def handleScrollKeyPressEvent(self, event):
         # Forward key events to each slider in the layout
@@ -92,6 +98,9 @@ class SettingsLayout(QGridLayout):
             if p_count > 1 or (p_count == 1 and item['hasbump'] != 'true'):
                 item['has_expander'] = 'true'
 
+            if item['datatype'] == 'group':
+                item['has_expander'] = 'true'
+
     def has_bump(self, datalist):
         for item in datalist:
             item['hasbump'] = ''
@@ -100,6 +109,7 @@ class SettingsLayout(QGridLayout):
                 for b in datalist:
                     if item['prereq'] == b['name']:
                         b['hasbump'] = 'true'
+
 
     def add_expanded(self, datalist):
         for item in datalist:
@@ -177,6 +187,25 @@ class SettingsLayout(QGridLayout):
                 p_list.append({'prereq': item['name'], 'value': 'False', 'count': count})
         return p_list
 
+
+    def is_group_displayname_expanded(self, grouping: str) -> bool:
+        return grouping not in self.collapsed_groups
+
+    def set_group_name_collapsed(self, name: str, collapsed: bool) -> None:
+        """
+        Set the collapse state of a group by its internal name.
+        Looks up the displayname from group_list to update collapsed_groups set.
+        """
+        grouping = next((g['grouping'] for g in self.group_list if g['name'] == name), None)
+        if grouping is None:
+            logging.warning(f"[set_group_name_collapsed] Name '{name}' not found in group_list.")
+            return
+
+        if collapsed:
+            self.collapsed_groups.add(grouping)
+        else:
+            self.collapsed_groups.discard(grouping)
+
     def build_rows(self, datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         # self.prereq_list = xmlutils.read_prereqs()
@@ -201,8 +230,9 @@ class SettingsLayout(QGridLayout):
             rowdisabled = False
             addrow = False
             is_expnd = is_expanded(item)
+            grp_expanded = self.is_group_displayname_expanded(item['grouping']) or item['datatype'] == 'group'
             # print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
-            if item['is_visible'].lower() == 'true':
+            if (item['is_visible'].lower() == 'true' and grp_expanded ):
                 i += 1
                 if bumped_up:
                     if self.bump_up:  # debug
@@ -288,6 +318,10 @@ class SettingsLayout(QGridLayout):
 
         erase_button = QPushButton() # Create erase button at beginning so behavior can be modified per widget type if necessary
 
+        # grouping collapsible header
+        #if item['datatype'] == 'group':     maybe nothing needed?
+
+
         # booleans get a checkbox
         if item['datatype'] == 'bool':
             # print(f"Exclusive: >{item['exclusive_with']}<")
@@ -340,6 +374,9 @@ class SettingsLayout(QGridLayout):
             unit_dropbox.setDisabled(rowdisabled)
 
         # everything has a name, except for things that have a checkbox *and* slider
+      #  if item['datatype'] == 'group':
+      #      label = InfoLabel(text=f"<html><head/><body><p><span style='font-family:\"Arial Black\"; font-size:14pt;'>{item['displayname']}</span></p></body></html>")
+      #  else:
         label = InfoLabel(text=f"{item['displayname']}")
         label.setObjectName(f'namelabel_{item["name"]}')
         label.setToolTip(item['info'])
@@ -477,7 +514,10 @@ class SettingsLayout(QGridLayout):
             expand_button.setArrowType(Qt.ArrowType.RightArrow)
         expand_button.setMaximumWidth(24)
         expand_button.setMinimumWidth(24)
-        expand_button.setObjectName(f"ex_{item['name']}")
+        if item['datatype'] == 'group':
+            expand_button.setObjectName(f"gex_{item['name']}")
+        else:
+            expand_button.setObjectName(f"ex_{item['name']}")
         expand_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         if G.useDarkMode:
             expand_button.setStyleSheet("""
@@ -539,8 +579,7 @@ class SettingsLayout(QGridLayout):
             sliderfactor.setMaximumWidth(0)
         sliderfactor.setObjectName(f"sf_{item['name']}")
 
-        if item['datatype'] == 'float' or \
-                item['datatype'] == 'negfloat':
+        if item['datatype'] == 'float' or item['datatype'] == 'negfloat':
 
             # print(f"label {value_label.objectName()} for slider {slider.objectName()}")
             factor = float(item['sliderfactor'])
@@ -721,15 +760,52 @@ class SettingsLayout(QGridLayout):
             spin_box.valueChanged.connect(self.spin_box_changed)
             self.addWidget(spin_box, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        if item['datatype'] == 'list' or item['datatype'] == 'anylist':
+        if item['datatype'] == 'list' or item['datatype'] == 'anylist' or item['datatype'] == 'enumlist':
             dropbox = QComboBox()
             dropbox.setMinimumWidth(150)
             dropbox.setEditable(True)
             dropbox.lineEdit().setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
-            dropbox.setObjectName(f"db_{item['name']}")
-            dropbox.addItems(validvalues)
             dropbox.blockSignals(True)
-            dropbox.setCurrentText(item['value'])
+            if item['datatype'] == 'enumlist':
+                dropbox.setObjectName(f"edb_{item['name']}")
+                label_dict_name = item['validvalues']
+                label_dict = G.ENUM_LABEL_REGISTRY.get(label_dict_name)
+                if label_dict is None:
+                    dropbox.addItem(f"Dict '{label_dict_name}' not found")
+                else:
+                    # Determine the enum class from one of the dictionary keys
+                    enum_class = type(next(iter(label_dict)))
+                    for enum_member, the_label in label_dict.items():
+                        dropbox.addItem(the_label, enum_member)
+                    if item['value'] != '':
+                        try:
+                            # Try converting the string to the enum member using the enum class
+                            enum_member = enum_class[item['value']]
+
+                            # Match by enum member (preferred)
+                            for index in range(dropbox.count()):
+                                if dropbox.itemData(index) == enum_member:
+                                    dropbox.setCurrentIndex(index)
+                                    break
+
+                        except KeyError:
+                            # If not a valid enum name, try matching by label text (legacy saved value)
+                            for index in range(dropbox.count()):
+                                if dropbox.itemText(index) == item['value']:
+                                    dropbox.setCurrentIndex(index)
+                                    enum_member = dropbox.itemData(index)
+                                    if enum_member:
+                                        item['value'] = enum_member.name  # Update value to enum name
+                                    break
+                            else:
+                                dropbox.addItem(f"Invalid enum value: {item['value']}")
+
+
+            else:
+                dropbox.setObjectName(f"db_{item['name']}")
+                dropbox.addItems(validvalues)
+                dropbox.setCurrentText(item['value'])
+
             if item['datatype'] == 'list':
                 dropbox.lineEdit().setReadOnly(True)
                 dropbox.editTextChanged.connect(self.dropbox_changed)
@@ -1024,8 +1100,17 @@ class SettingsLayout(QGridLayout):
 
     def dropbox_changed(self):
         self.trigger_form_reload = False
-        setting_name = self.sender().objectName().replace('db_', '')
-        value = self.sender().currentText()
+        sender = self.sender()
+        object_name = sender.objectName()
+        setting_name = object_name.replace('edb_', '').replace('db_', '')  # handle both db_ and edb_
+
+        # If it's an enum dropbox, get the enum member name
+        if object_name.startswith("edb_"):
+            enum_member = sender.itemData(sender.currentIndex())
+            value = enum_member.name if enum_member else sender.currentText()
+        else:
+            value = sender.currentText()
+
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
         self.show_erase_button()
@@ -1065,22 +1150,31 @@ class SettingsLayout(QGridLayout):
     def expander_clicked(self):
         self.trigger_form_reload = True
         logging.debug(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
-        settingname = self.sender().objectName().replace('ex_', '')
-        if self.sender().arrowType() == Qt.ArrowType.RightArrow:
-            # print ('expanded')
 
-            self.expanded_items.append(settingname)
+        settingname = self.sender().objectName().replace('gex_', '').replace('ex_', '')
+
+        if self.sender().arrowType() == Qt.ArrowType.RightArrow:
+            print (f'expanded {settingname}')
             self.sender().setArrowType(Qt.ArrowType.DownArrow)
+            if self.sender().objectName().startswith("gex_"):
+                self.set_group_name_collapsed(settingname,False)
+            else:
+                self.expanded_items.append(settingname)
+
 
             self.reload_caller()
         else:
-            # print ('collapsed')
-            new_exp_items = []
-            for ex in self.expanded_items:
-                if ex != settingname:
-                    new_exp_items.append(ex)
-            self.expanded_items = new_exp_items
+            print (f'collapsed {settingname}')
             self.sender().setArrowType(Qt.ArrowType.DownArrow)
+            if self.sender().objectName().startswith("gex_"):
+                self.set_group_name_collapsed(settingname,True)
+            else:
+                new_exp_items = []
+                for ex in self.expanded_items:
+                    if ex != settingname:
+                        new_exp_items.append(ex)
+                self.expanded_items = new_exp_items
+
 
             self.reload_caller()
 

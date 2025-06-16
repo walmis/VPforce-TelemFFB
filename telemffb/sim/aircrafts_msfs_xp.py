@@ -107,16 +107,6 @@ class Aircraft(AircraftBase):
     fbw_aileron_gain = 0.8
     fbw_rudder_gain = 0.8
 
-    nosewheel_shimmy = 0
-    nosewheel_shimmy_intensity = 0.15
-    nosewheel_shimmy_min_speed = 7
-    nosewheel_shimmy_min_brakes = 0.6
-
-    steering_friction = 0
-    steering_friction_intensity = 0.8
-    steering_friction_spring = 0.5
-    steering_friction_expo = -0.4
-
     force_trim_enabled = 0
     cyclic_spring_gain = 1.0
     force_trim_button = 0
@@ -144,6 +134,20 @@ class Aircraft(AircraftBase):
     rudder_expo: int = 0
 
     vne_override: int = 0
+
+    ######## PEDAL SPECIFIC
+
+    nosewheel_shimmy = 0
+    nosewheel_shimmy_intensity = 0.15
+    nosewheel_shimmy_min_speed = 7
+    nosewheel_shimmy_min_brakes = 0.6
+
+    steering_friction = 0
+    steering_friction_intensity = 0.8
+    steering_friction_spring = 0.5
+    steering_friction_expo = -0.4
+
+    ######## TRIMWHEEL SPECIFIC
 
     trimwheel_init = 0
     trimwheel_ap_spring_gain = 1
