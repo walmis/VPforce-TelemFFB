@@ -1981,6 +1981,74 @@
 	</defaults>
 	<defaults>
 		<Grouping>FFB Effect</Grouping>
+		<order>5050</order>
+		<name>turbulence_effect_enable</name>
+		<displayname>Turbulence Effect &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<value>false</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>5050.2</order>
+		<name>turbulence_hpf_alpha</name>
+		<prereq>turbulence_effect_enable</prereq>
+		<info>Controls how long wind gusts continue to influence the joystick</info>
+		<any></any>
+		<displayname>Gust Memory</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.9</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>5050.3</order>
+		<name>turbulence_smoothing_alpha</name>
+		<prereq>turbulence_effect_enable</prereq>
+		<info>Controls how quickly the output furce changes</info>
+		<displayname>Attack Speed</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>5050.4</order>
+		<name>turbulence_sensitivity</name>
+		<prereq>turbulence_effect_enable</prereq>
+		<info>Controls the wind gust speed required to trigger full force</info>
+		<displayname>Sensitivity</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.5</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
+		<order>5050.5</order>
+		<name>turbulence_intensity</name>
+		<prereq>turbulence_effect_enable</prereq>
+		<info>Caps the maximum constant force applied to the joystick</info>
+		<displayname>Intensity</displayname>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0.3</value>
+		<datatype>float</datatype>
+	</defaults>
+	<defaults>
+		<Grouping>FFB Effect</Grouping>
 		<order>5100</order>
 		<name>enable_hydraulic_loss_effect</name>
 		<info>Simulate high damper forces when hydraulic pressure is low/0&lt;br&gt;** REQUIRES damper/inertia/friction overrides to be enabled **</info>

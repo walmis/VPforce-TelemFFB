@@ -67,6 +67,10 @@ EFFECT_SINE = 4
 EFFECT_TRIANGLE = 5
 EFFECT_SAWTOOTHUP = 6
 EFFECT_SAWTOOTHDOWN = 7
+turbulence_modulator = utils.TurbulenceModulator()
+
+
+
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -147,6 +151,12 @@ class Aircraft(AircraftBase):
     trimwheel_spring_coeff_y = 0  # not used
     last_trimwheel_y = None
     trim_active = False
+
+    turbulence_effect_enable: bool = False
+    turbulence_hpf_alpha: float = 0.0
+    turbulence_smoothing_alpha: float = 0.0
+    turbulence_sensitivity: float = 0.0
+    turbulence_intensity: float = 0.0
 
     @classmethod
     def set_simconnect(cls, sc):
@@ -344,6 +354,15 @@ class Aircraft(AircraftBase):
             newvalue = (1 + k) * x + (-k) * (math.exp(expo_a * (x - 1)) - math.exp(-expo_a)) / (1 - math.exp(-expo_a))
         #print(f'expo input:{x} k:{k} output:{newvalue}')
         return newvalue
+    def _update_turbulence(self):
+        if self.turbulence_effect_enable:
+            force, dir = turbulence_modulator.update(self.telem_data, self.turbulence_hpf_alpha, self.turbulence_smoothing_alpha, self.turbulence_sensitivity, self.turbulence_intensity)
+            force = round(force, 4)
+            effects['turbulence'].constant(force, dir).start()
+
+            print(f"force:{force} dir:{dir}")
+        else:
+            effects['turbulence'].destroy()
 
     def _update_fbw_flight_controls(self, telem_data, ap=False):
         ap_send_flag_x = True
@@ -1326,6 +1345,9 @@ class Aircraft(AircraftBase):
         ### Generic Aircraft Class Telemetry Handler
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
+
+        if self.is_joystick():
+            self._update_turbulence()
 
         if self.is_trimwheel():
             self._update_trimwheel(telem_data)

@@ -424,6 +424,56 @@ class Vector:
         )
 
 
+class TurbulenceModulator:
+    def __init__(self):
+        self.prev_wind_x = None
+        self.prev_wind_z = None
+        self.hpf_x = 0.0
+        self.hpf_z = 0.0
+        self.prev_force = 0.0
+
+    def update(self, telem_data,
+               turbulence_hpf_alpha=0.95,
+               turbulence_smoothing_alpha=0.3,
+               turbulence_sensitivity=0.5,
+               turbulence_intensity=0.2):
+        try:
+            wind_x = telem_data['RelWind'][0]
+            wind_z = telem_data['RelWind'][2]
+        except (KeyError, IndexError, TypeError):
+            return 0.0, 0
+
+        if self.prev_wind_x is None or self.prev_wind_z is None:
+            self.prev_wind_x = wind_x
+            self.prev_wind_z = wind_z
+            return 0.0, 0
+
+        max_delta = (1.0 - turbulence_sensitivity) * 9.0 + 1.0
+
+        dx = wind_x - self.prev_wind_x
+        dz = wind_z - self.prev_wind_z
+
+        self.hpf_x = turbulence_hpf_alpha * (self.hpf_x + dx)
+        self.hpf_z = turbulence_hpf_alpha * (self.hpf_z + dz)
+
+        self.prev_wind_x = wind_x
+        self.prev_wind_z = wind_z
+
+        delta_mag = np.hypot(self.hpf_x, self.hpf_z)
+        normalized = min(delta_mag / max_delta, 1.0)
+        target_force = normalized * turbulence_intensity
+
+        smoothed_force = (
+            turbulence_smoothing_alpha * target_force
+            + (1 - turbulence_smoothing_alpha) * self.prev_force
+        )
+        self.prev_force = smoothed_force
+
+        gust_angle = np.degrees(np.arctan2(self.hpf_z, self.hpf_x))
+        force_angle = (gust_angle + 180 + 90 + 360) % 360
+
+        return smoothed_force, int(force_angle)
+
 def archive_logs(directory):
     today = datetime.today().strftime('%Y%m%d')
 
