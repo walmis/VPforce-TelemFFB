@@ -229,7 +229,10 @@ class AircraftBase(object):
     vrs_vs_onset: float = 0
     vrs_vs_max: float = 0
 
+    joystick_spring_mode = 'Basic Dynamic'  ## Basic Dynamic, Advanced Dynamic, Fly-By-Wire (FBW), Static (non-FBW)
+
     pedal_spring_mode = 'Static Spring'  ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+
     aircraft_vs_speed = 87
     aircraft_vs_gain = 0.25
     aircraft_vne_speed = 435
@@ -1690,6 +1693,7 @@ class AircraftBase(object):
     def check_master_button_press(self, button):
         # print(f"Checking {button} against {master_buttons}")
         return button in G.master_buttons
+
     def check_for_button_press(self, button):
         input_data = HapticEffect.device.get_input()
 
@@ -1702,7 +1706,6 @@ class AircraftBase(object):
         else:
             input_data = HapticEffect.device.get_input()
             return input_data.isButtonPressed(button)
-
 
     def _update_pedal_force_trim(self, telem_data):
         if not self.is_pedals(): return
