@@ -25,7 +25,7 @@ import re
 
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCursor, QIcon, QColor, QPixmap
+from PyQt6.QtGui import QCursor, QIcon, QFont, QColor, QPixmap
 from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
@@ -44,9 +44,6 @@ from . import xmlutils
 class SettingsLayout(QGridLayout):
     expanded_items = []
     prereq_list = []
-    group_list = []
-    collapsed_groups = set()
-
     ##########
     # debug settings
     show_slider_debug = False   # set to true for slider values shown
@@ -73,9 +70,6 @@ class SettingsLayout(QGridLayout):
         self.adv_spr_dialog = None
         self.advanced_g_settings = None
         self.adv_g_dialog = None
-        self.group_list = xmlutils.read_groups()
-        for g in self.group_list:
-            self.collapsed_groups.add(g['grouping'])
 
     def handleScrollKeyPressEvent(self, event):
         # Forward key events to each slider in the layout
@@ -98,9 +92,6 @@ class SettingsLayout(QGridLayout):
             if p_count > 1 or (p_count == 1 and item['hasbump'] != 'true'):
                 item['has_expander'] = 'true'
 
-            if item['datatype'] == 'group':
-                item['has_expander'] = 'true'
-
     def has_bump(self, datalist):
         for item in datalist:
             item['hasbump'] = ''
@@ -110,7 +101,6 @@ class SettingsLayout(QGridLayout):
                     if item['prereq'] == b['name']:
                         b['hasbump'] = 'true'
 
-
     def add_expanded(self, datalist):
         for item in datalist:
             item['parent_expanded'] = ''
@@ -119,6 +109,24 @@ class SettingsLayout(QGridLayout):
                     item['parent_expanded'] = 'true'
                 else:
                     item['parent_expanded'] = 'false'
+
+    def is_top_level_expanded(self, item, datalist):
+        """
+        Recursively check if the top-level parent of `item` is in self.expanded_items.
+        """
+        prereq = item.get('prereq', '')
+        if not prereq:
+            # Reached the top-level item
+            return item['name'] in self.expanded_items
+
+        # Find the parent item by its name
+        parent_item = next((x for x in datalist if x['name'] == prereq), None)
+        if parent_item is None:
+            # Broken link; treat as not expanded
+            return False
+
+        # Recurse upward
+        return self.is_top_level_expanded(parent_item, datalist)
 
     def is_visible(self, datalist):
 
@@ -130,25 +138,28 @@ class SettingsLayout(QGridLayout):
                 iv = 'true'
                 cond = 'no prereq needed'
             else:
-                for p in datalist:
-                    if item['prereq'] == p['name']:
-                        if p['value'].lower() == 'true':
-                            if p['has_expander'].lower() == 'true':
-                                if p['name'] in self.expanded_items and p['is_visible'] == 'true':
-                                    iv = 'true'
-                                    cond = 'item parent expanded'
+                if not self.is_top_level_expanded(item,datalist):
+                    iv = 'false'
+                else:
+                    for p in datalist:
+                        if item['prereq'] == p['name']:
+                            if p['value'].lower() == 'true':
+                                if p['has_expander'].lower() == 'true':
+                                    if p['name'] in self.expanded_items and p['is_visible'] == 'true':
+                                        iv = 'true'
+                                        cond = 'item parent expanded'
+                                    else:
+                                        if p['hasbump'].lower() == 'true':
+                                            if bumped_up:
+                                                iv = 'true'
+                                                cond = 'parent hasbump & bumped'
                                 else:
-                                    if p['hasbump'].lower() == 'true':
-                                        if bumped_up:
-                                            iv = 'true'
-                                            cond = 'parent hasbump & bumped'
-                            else:
-                                if p['is_visible'].lower() == 'true':
-                                    if p['hasbump'].lower() == 'true':
-                                        if bumped_up:
-                                            iv = 'true'
-                                            cond = 'parent hasbump & bumped no expander par vis'
-                        break
+                                    if p['is_visible'].lower() == 'true':
+                                        if p['hasbump'].lower() == 'true':
+                                            if bumped_up:
+                                                iv = 'true'
+                                                cond = 'parent hasbump & bumped no expander par vis'
+                            break
 
             item['is_visible'] = iv
             # for things not showing debugging:
@@ -187,25 +198,6 @@ class SettingsLayout(QGridLayout):
                 p_list.append({'prereq': item['name'], 'value': 'False', 'count': count})
         return p_list
 
-
-    def is_group_displayname_expanded(self, grouping: str) -> bool:
-        return grouping not in self.collapsed_groups
-
-    def set_group_name_collapsed(self, name: str, collapsed: bool) -> None:
-        """
-        Set the collapse state of a group by its internal name.
-        Looks up the displayname from group_list to update collapsed_groups set.
-        """
-        grouping = next((g['grouping'] for g in self.group_list if g['name'] == name), None)
-        if grouping is None:
-            logging.warning(f"[set_group_name_collapsed] Name '{name}' not found in group_list.")
-            return
-
-        if collapsed:
-            self.collapsed_groups.add(grouping)
-        else:
-            self.collapsed_groups.discard(grouping)
-
     def build_rows(self, datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         # self.prereq_list = xmlutils.read_prereqs()
@@ -230,9 +222,8 @@ class SettingsLayout(QGridLayout):
             rowdisabled = False
             addrow = False
             is_expnd = is_expanded(item)
-            grp_expanded = self.is_group_displayname_expanded(item['grouping']) or item['datatype'] == 'group'
             # print(f"{item['order']} - {item['value']} - b {bumped_up} - hb {item['hasbump']} - ex {is_expnd} - hs {item['has_expander']} - pex {item['parent_expanded']} - iv {item['is_visible']} - pcount {item['prereq_count']} - {item['displayname']} - pr {item['prereq']}")
-            if (item['is_visible'].lower() == 'true' and grp_expanded ):
+            if item['is_visible'].lower() == 'true':
                 i += 1
                 if bumped_up:
                     if self.bump_up:  # debug
@@ -313,14 +304,22 @@ class SettingsLayout(QGridLayout):
         if self.show_order_debug:
             order_lbl = QLabel()
             order_lbl.setText(item['order'])
-            order_lbl.setMaximumWidth(30)
+            order_lbl.setMaximumWidth(45)
             self.addWidget(order_lbl, i, ord_col)
 
         erase_button = QPushButton() # Create erase button at beginning so behavior can be modified per widget type if necessary
 
-        # grouping collapsible header
-        #if item['datatype'] == 'group':     maybe nothing needed?
+        # everything has a name, except for things that have a checkbox *and* slider
+        label = InfoLabel(text=f"{item['displayname']}")
+        label.setObjectName(f'namelabel_{item["name"]}')
+        label.setToolTip(item['info'])
+        label.setMinimumHeight(20)
+        label.setMinimumWidth(20)
 
+        # groups bumped left
+        if item['datatype'] == 'group':
+            lbl_col = 0
+            lbl_colspan = 5
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
@@ -349,7 +348,7 @@ class SettingsLayout(QGridLayout):
             else:
                 checkbox.setChecked(2)
             checkbox.blockSignals(False)
-            if item['prereq'] != '':
+            if item['prereq'] != '' and not 'group' in item['prereq']:
                 chk_col += 1
             self.addWidget(checkbox, i, chk_col)
             checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
@@ -373,15 +372,7 @@ class SettingsLayout(QGridLayout):
             unit_dropbox.blockSignals(False)
             unit_dropbox.setDisabled(rowdisabled)
 
-        # everything has a name, except for things that have a checkbox *and* slider
-      #  if item['datatype'] == 'group':
-      #      label = InfoLabel(text=f"<html><head/><body><p><span style='font-family:\"Arial Black\"; font-size:14pt;'>{item['displayname']}</span></p></body></html>")
-      #  else:
-        label = InfoLabel(text=f"{item['displayname']}")
-        label.setObjectName(f'namelabel_{item["name"]}')
-        label.setToolTip(item['info'])
-        label.setMinimumHeight(20)
-        label.setMinimumWidth(20)
+
         # label.setMaximumWidth(150)
         if item['order'][-2:] == '.1':
             olditem = self.itemAtPosition(i, lbl_col)
@@ -392,6 +383,7 @@ class SettingsLayout(QGridLayout):
             #         olditem = self.itemAtPosition(i, self.exp_col)
             #         if olditem is not None:
             #             self.remove_widget(olditem)
+
         if item['prereq'] != '' and item['hasbump'] != 'true' and item['order'][-2:] != '.1':
             # label.setStyleSheet("QLabel { padding-left: 20px; }")
             lbl_colspan = 1
@@ -514,10 +506,7 @@ class SettingsLayout(QGridLayout):
             expand_button.setArrowType(Qt.ArrowType.RightArrow)
         expand_button.setMaximumWidth(24)
         expand_button.setMinimumWidth(24)
-        if item['datatype'] == 'group':
-            expand_button.setObjectName(f"gex_{item['name']}")
-        else:
-            expand_button.setObjectName(f"ex_{item['name']}")
+        expand_button.setObjectName(f"ex_{item['name']}")
         expand_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         if G.useDarkMode:
             expand_button.setStyleSheet("""
@@ -883,8 +872,19 @@ class SettingsLayout(QGridLayout):
             erase_button.clicked.connect(self.erase_configurator_overrides)
             self.addWidget(self.configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # grouping collapsible header
+        if item['datatype'] == 'group':
+            # if item['exclusive_with'] !='':
+            #     pair=[item['name'],item['exclusive_with']]
+            #     if not pair in self.exclusive_list:
+            #         self.exclusive_list.append(pair)
+            if item['prereq'] !='':
+                chk_col += 1
+            font_family = "Impact"
+            font_size = 14
+            label.text_label.setFont(QFont(font_family, font_size))
 
-        if item['has_expander'] == 'true' and item['prereq'] != '':
+        if item['has_expander'].lower() == 'true' and item['prereq'] != '':
             exp_col += 1
         if not rowdisabled:
             # for p_item in self.prereq_list:
@@ -964,10 +964,12 @@ class SettingsLayout(QGridLayout):
             # These are top level config sections that have an expander button but do not have any ".1" sliders
             label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
             label.text_label.setOpenExternalLinks(False)
-            if G.useDarkMode:
-                label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{item["displayname"]}</a>')
-            else:
-                label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{item["displayname"]}</a>')
+            color = "#cc7ee0" if G.useDarkMode else "#ab37c8"
+            # if item['datatype'] == 'group':
+            #     font_family = "Impact"
+            #     font_size = 15
+            #     label.text_label.setFont(QFont(font_family,font_size))
+            label.text_label.setText(f'<a href="#" style="color: {color};">{item["displayname"]}</a>')
             label.text_label.setToolTip('Click to Expand')
             label.text_label.linkActivated.connect(expand_button.click)
 
@@ -1150,31 +1152,22 @@ class SettingsLayout(QGridLayout):
     def expander_clicked(self):
         self.trigger_form_reload = True
         logging.debug(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
-
-        settingname = self.sender().objectName().replace('gex_', '').replace('ex_', '')
-
+        settingname = self.sender().objectName().replace('ex_', '')
         if self.sender().arrowType() == Qt.ArrowType.RightArrow:
-            print (f'expanded {settingname}')
-            self.sender().setArrowType(Qt.ArrowType.DownArrow)
-            if self.sender().objectName().startswith("gex_"):
-                self.set_group_name_collapsed(settingname,False)
-            else:
-                self.expanded_items.append(settingname)
+            # print ('expanded')
 
+            self.expanded_items.append(settingname)
+            self.sender().setArrowType(Qt.ArrowType.DownArrow)
 
             self.reload_caller()
         else:
-            print (f'collapsed {settingname}')
+            # print ('collapsed')
+            new_exp_items = []
+            for ex in self.expanded_items:
+                if ex != settingname:
+                    new_exp_items.append(ex)
+            self.expanded_items = new_exp_items
             self.sender().setArrowType(Qt.ArrowType.DownArrow)
-            if self.sender().objectName().startswith("gex_"):
-                self.set_group_name_collapsed(settingname,True)
-            else:
-                new_exp_items = []
-                for ex in self.expanded_items:
-                    if ex != settingname:
-                        new_exp_items.append(ex)
-                self.expanded_items = new_exp_items
-
 
             self.reload_caller()
 

@@ -443,6 +443,10 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             #
             found_prereq = False
 
+            #dont show groups
+            if data_dict['datatype'] == 'group':
+                break
+
             if data_dict['prereq'] != '':
                 for pr in self.prereq_list:
                     if pr['prereq']==data_dict['prereq']:

@@ -640,7 +640,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
     else:
         final_result = def_craft_models_result
 
-    final_result = [item for item in final_result if item['value'] != '' or item['name'] == 'vpconf' or item['datatype'] == 'group']
+    final_result = [item for item in final_result if item['value'] != '' or item['name'] == 'vpconf']
 
 
     # read separate profile file
@@ -1110,41 +1110,6 @@ def sort_elements(tree):    #  unused for now.
     with open(userconfig_path, 'w') as xml_file:
         xml_file.write(xml_str)
 
-def read_groups():
-    tree = try_parse(defaults_path)
-    root = tree.getroot()
-
-    data_list = []
-    for defaults_elem in root.findall('.//defaults[datatype="group"]'):
-        name_elem = defaults_elem.find('name')
-        grouping_elem = defaults_elem.find('grouping')
-        value_elem = defaults_elem.find('value')
-
-        name = name_elem.text if name_elem is not None else ""
-        grouping = grouping_elem.text if grouping_elem is not None else ""
-        value = value_elem.text
-
-        # Skip if name is empty
-        if not name:
-            continue
-
-        # Check if displayname already added
-        found = False
-        for data_dict in data_list:
-            if data_dict['grouping'] == grouping:
-                data_dict['count'] += 1
-                found = True
-                break
-
-        if not found:
-            data_list.append({
-                'name': name,
-                'grouping': grouping,
-                'value': value,
-                'count': 1
-            })
-
-    return data_list
 
 
 def read_prereqs():
@@ -1190,7 +1155,7 @@ def eliminate_no_prereq(datalist):
     newlist = []
     for d_item in datalist:
         add_item = True
-        if d_item['prereq'] != '' : #and d_item != 'group'
+        if d_item['prereq'] != '':
             add_item = False
             for p_item in datalist:
                 if d_item['prereq'] == p_item['name'] and p_item['value'].lower() == 'true':
