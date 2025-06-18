@@ -883,6 +883,7 @@ class SettingsLayout(QGridLayout):
             font_family = "Impact"
             font_size = 14
             label.text_label.setFont(QFont(font_family, font_size))
+            expand_button.setVisible(False)
 
         if item['has_expander'].lower() == 'true' and item['prereq'] != '':
             exp_col += 1
