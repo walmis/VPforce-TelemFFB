@@ -880,7 +880,7 @@ class SettingsLayout(QGridLayout):
             #         self.exclusive_list.append(pair)
             if item['prereq'] !='':
                 chk_col += 1
-            font_family = "Impact"
+            font_family = "Black Ops One"
             font_size = 14
             label.text_label.setFont(QFont(font_family, font_size))
             expand_button.setVisible(False)
