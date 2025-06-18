@@ -34,7 +34,7 @@ from datetime import datetime
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
-                         QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut)
+                         QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut, QFontDatabase)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QComboBox, QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QMainWindow, QMessageBox,
@@ -79,6 +79,9 @@ class MainWindow(QMainWindow):
         self._update_available = None
 
         self.show_new_craft_button = False
+
+        QFontDatabase.addApplicationFont(':/image/BlackOpsOne-Regular.ttf')
+
         # Get the absolute path of the script's directory
         # script_dir = os.path.dirname(os.path.abspath(__file__))
         doc_url = 'https://vpforcecontrols.com/downloads/VPforce_Rhino_Manual.pdf'
