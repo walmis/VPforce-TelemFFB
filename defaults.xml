@@ -1798,7 +1798,7 @@
 		<name>airflow_group</name>
 		<info>Airflow effects max intensity controlled by Constant slider in Configurator</info>
 		<any>true</any>
-		<displayname>Airflow Efects</displayname>
+		<displayname>Airflow Effects</displayname>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
