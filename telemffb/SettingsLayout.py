@@ -267,7 +267,7 @@ class SettingsLayout(QGridLayout):
         self.addItem(spacerItem, i+1, 1, 1, 1)
         # Give entry column a high stretch factor, all others remain default 0.
         # When window is resized, the entry column will grow to take up all the new space
-        self.setColumnStretch(4, 10)
+        self.setColumnStretch(5, 10)
 
         # print (f"{i} rows with {self.count()} widgets")
 
@@ -963,8 +963,8 @@ class SettingsLayout(QGridLayout):
         sp_retain = erase_button.sizePolicy()
         sp_retain.setRetainSizeWhenHidden(True)
         erase_button.setSizePolicy(sp_retain)
-
         erase_button.setVisible(False)
+
         if item['replaced'] == 'Model (user)':
             if item['name'] != 'type':  # dont erase type on mainwindow settings
                 erase_button.setVisible(True)
