@@ -46,6 +46,7 @@ class SettingsLayout(QGridLayout):
     prereq_list = []
     ##########
     # debug settings
+    show_col_debug = True
     show_slider_debug = False   # set to true for slider values shown
     show_order_debug = True    # set to true for order numbers shown
     bump_up = True              # set to false for no row bumping up
@@ -95,11 +96,42 @@ class SettingsLayout(QGridLayout):
     def has_bump(self, datalist):
         for item in datalist:
             item['hasbump'] = ''
-            bumped_up = item['order'][-2:] == '.1'
+            bumped_up = item['order'][-1:] == '1' and '.' in item['order']
             if bumped_up:
                 for b in datalist:
                     if item['prereq'] == b['name']:
                         b['hasbump'] = 'true'
+
+    def get_parent_indent(self, datalist):
+        name_map = {item['name']: item for item in datalist}
+
+        for item in datalist:
+            indent = 0
+            parent_name = item.get('prereq')
+
+            # Check if order meets the ".endswith('1')" and contains '.' condition
+            order = item.get('order', '')
+            skip_increment = (
+                    isinstance(order, str) and
+                    '.' in order and
+                    order.strip().endswith('1')
+            )
+
+            while parent_name in name_map:
+                parent = name_map[parent_name]
+
+                # If parent is a group, force indent = 0 and stop
+                if parent.get('datatype') == 'group':
+                    indent = 0
+                    break
+
+                if not skip_increment:
+                    indent += 1
+                skip_increment = False  # Only skip increment for the first level
+
+                parent_name = parent.get('prereq')
+
+            item['indent'] = indent
 
     def add_expanded(self, datalist):
         for item in datalist:
@@ -131,7 +163,7 @@ class SettingsLayout(QGridLayout):
     def is_visible(self, datalist):
 
         for item in datalist:
-            bumped_up = item['order'][-2:] == '.1'
+            bumped_up = item['order'][-1:] == '1' and '.' in item['order']
             iv = 'false'
             cond = ''
             if item['prereq'] == '':
@@ -206,6 +238,7 @@ class SettingsLayout(QGridLayout):
         self.append_prereq_count(sorted_data)
         self.add_expanded(sorted_data)
         self.is_visible(sorted_data)
+        self.get_parent_indent(sorted_data)
         newlist = self.eliminate_invisible(sorted_data)
 
         def is_expanded(item):
@@ -218,7 +251,7 @@ class SettingsLayout(QGridLayout):
 
         i = 0
         for item in newlist:
-            bumped_up = item['order'][-2:] == '.1'
+            bumped_up = item['order'][-1:] == '1' and '.' in item['order']
             rowdisabled = False
             addrow = False
             is_expnd = is_expanded(item)
@@ -284,18 +317,18 @@ class SettingsLayout(QGridLayout):
                     self._clear_sub_layout(sub_layout)
                     sub_layout.deleteLater()
 
-    def generate_settings_row(self, item, i, rowdisabled=False):
+    def generate_settings_row(self, item, i,  rowdisabled=False ):
         self.setRowMinimumHeight(i, 25)
         entry_colspan = 2
-        lbl_colspan = 2
+        lbl_colspan = 3
 
         exp_col = 0
         chk_col = 1
         lbl_col = 2
-        entry_col = 4
-        unit_col = 5
-        val_col = 6
-        erase_col = 7
+        entry_col = 5
+        unit_col = entry_col + 1
+        val_col = unit_col + 1
+        erase_col = val_col + 1
         fct_col = 10
         ord_col = 11
 
@@ -316,10 +349,17 @@ class SettingsLayout(QGridLayout):
         label.setMinimumHeight(20)
         label.setMinimumWidth(20)
 
-        # groups bumped left
+        #determine indentation
+
         if item['datatype'] == 'group':
             lbl_col = 0
-            lbl_colspan = 5
+            item['indent'] = -1
+        else:
+            exp_col = item['indent']
+            chk_col = exp_col + 1
+            lbl_col = chk_col + 1
+        lbl_colspan = entry_col - lbl_col
+
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
@@ -348,8 +388,9 @@ class SettingsLayout(QGridLayout):
             else:
                 checkbox.setChecked(2)
             checkbox.blockSignals(False)
-            if item['prereq'] != '' and not 'group' in item['prereq']:
-                chk_col += 1
+
+            if self.show_col_debug:
+                checkbox.setToolTip(f"{chk_col}")
             self.addWidget(checkbox, i, chk_col)
             checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
 
@@ -373,21 +414,13 @@ class SettingsLayout(QGridLayout):
             unit_dropbox.setDisabled(rowdisabled)
 
 
-        # label.setMaximumWidth(150)
-        if item['order'][-2:] == '.1':
+        if item['order'][-1:] == '1' and '.' in item['order']:
             olditem = self.itemAtPosition(i, lbl_col)
             if olditem is not None:
                 self.remove_widget(olditem)
-            # for p_item in self.prereq_list:
-            #     if p_item['prereq'] == item['prereq'] and p_item['count'] == 1:
-            #         olditem = self.itemAtPosition(i, self.exp_col)
-            #         if olditem is not None:
-            #             self.remove_widget(olditem)
 
-        if item['prereq'] != '' and item['hasbump'] != 'true' and item['order'][-2:] != '.1':
-            # label.setStyleSheet("QLabel { padding-left: 20px; }")
-            lbl_colspan = 1
-            lbl_col += 1
+        cdb = f"{lbl_col} {lbl_colspan} ind:{item['indent']} " if self.show_col_debug else ''
+        label.setToolTip(f"{cdb}{item['info']}")
         self.addWidget(label, i, lbl_col, 1, lbl_colspan)
 
         slider = NoWheelSlider()
@@ -874,26 +907,21 @@ class SettingsLayout(QGridLayout):
 
         # grouping collapsible header
         if item['datatype'] == 'group':
-            # if item['exclusive_with'] !='':
-            #     pair=[item['name'],item['exclusive_with']]
-            #     if not pair in self.exclusive_list:
-            #         self.exclusive_list.append(pair)
-            if item['prereq'] !='':
-                chk_col += 1
+
             font_family = "Black Ops One"
             font_size = 14
             label.text_label.setFont(QFont(font_family, font_size))
             expand_button.setVisible(False)
 
-        if item['has_expander'].lower() == 'true' and item['prereq'] != '':
-            exp_col += 1
+
         if not rowdisabled:
             # for p_item in self.prereq_list:
             #     if p_item['prereq'] == item['name'] : # and p_item['count'] > 1:
             p_count = 0
             if item['prereq_count'] != '':
                 p_count = int(item['prereq_count'])
-
+            if self.show_col_debug:
+                expand_button.setToolTip(f"{exp_col}")
             if item['has_expander'].lower() == 'true':
                 if item['name'] in self.expanded_items:
                     row_count = p_count
@@ -974,7 +1002,7 @@ class SettingsLayout(QGridLayout):
             label.text_label.setToolTip('Click to Expand')
             label.text_label.linkActivated.connect(expand_button.click)
 
-        if item['order'][-2:] == '.1':
+        if item['order'][-1:] == '1' and '.' in item['order']:
             # For ".1" config objects, they take the place of the parent setting in the row when enabled so #we
             # need to find the expander button from the prerequisite object
             parent = item['prereq']

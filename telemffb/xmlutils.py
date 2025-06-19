@@ -97,7 +97,8 @@ def read_xml_file(the_sim, instance_device=''):
     data_list = []
     for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{the_device}="true"]'):
 
-        grouping = defaults_elem.find('grouping').text
+        grouping_elem = defaults_elem.find('grouping')
+        grouping = grouping_elem.text if grouping_elem is not None else ""
         order = defaults_elem.find('order').text
         name = defaults_elem.find('name').text
         displayname = defaults_elem.find('displayname').text
@@ -136,7 +137,8 @@ def read_xml_file(the_sim, instance_device=''):
             'prereq': prereq,
             'info': info,
             'sliderfactor': sliderfactor,
-            'device_text': device_text
+            'device_text': device_text,
+            'indent': 0
         }
 
         data_list.append(data_dict)
