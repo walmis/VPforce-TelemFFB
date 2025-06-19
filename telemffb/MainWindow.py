@@ -963,6 +963,15 @@ class MainWindow(QMainWindow):
         show_simvar_action.setCheckable(True)
         debug_menu.addAction(show_simvar_action)
 
+        show_order_action = QAction("Show settings order numbering", self)
+        def do_toggle_order_numbering():
+            SettingsLayout.show_order_debug = not  SettingsLayout.show_order_debug
+            show_order_action.setChecked(SettingsLayout.show_order_debug)
+
+        show_order_action.triggered.connect(do_toggle_order_numbering)
+        show_order_action.setCheckable(True)
+        debug_menu.addAction(show_order_action)
+
         configurator_settings_action = QAction('Configurator Gain Override', self)
         def do_open_configurator_dialog():
             dialog = ConfiguratorDialog(self)
