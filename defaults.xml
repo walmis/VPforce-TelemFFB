@@ -108,7 +108,8 @@
 		<order>300</order>
 		<name>dummy_dynamic_spring_settings</name>
 		<displayname>Dynamic Spring Settings</displayname>
-		<exclusive_with>aircraft_is_fbw</exclusive_with>
+		<exclusive_with></exclusive_with>
+		<prereq>		do not show</prereq>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -121,8 +122,8 @@
 		<order>310</order>
 		<name>adv_spr_override_enabled</name>
 		<displayname>Advanced Spring Mapping</displayname>
-		<exclusive_with>dummy_basic_spring_settings,aircraft_is_fbw</exclusive_with>
-		<prereq>dummy_dynamic_spring_settings</prereq>
+		<exclusive_with></exclusive_with>
+		<prereq>		do not show</prereq>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -136,7 +137,7 @@
 		<order>310.2</order>
 		<name>adv_spr_gains</name>
 		<displayname>Advanced Spring Mapping</displayname>
-		<prereq>adv_spr_override_enabled</prereq>
+		<prereq>spring_mode.ADVANCED</prereq>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -150,8 +151,8 @@
 		<order>400</order>
 		<name>dummy_basic_spring_settings</name>
 		<displayname>Basic Settings</displayname>
-		<exclusive_with>adv_spr_override_enabled</exclusive_with>
-		<prereq>dummy_dynamic_spring_settings</prereq>
+		<exclusive_with></exclusive_with>
+		<prereq>		do not show</prereq>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -165,7 +166,7 @@
 		<order>410</order>
 		<name>max_aileron_coeff</name>
 		<displayname>    Aileron Max Force</displayname>
-		<prereq>dummy_basic_spring_settings</prereq>
+		<prereq>spring_mode.BASIC.CENTER</prereq>
 		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -180,7 +181,7 @@
 		<order>420</order>
 		<name>aileron_expo</name>
 		<displayname>    Aileron Expo</displayname>
-		<prereq>dummy_basic_spring_settings</prereq>
+		<prereq>spring_mode.BASIC.CENTER</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -195,7 +196,7 @@
 		<order>430</order>
 		<name>max_elevator_coeff</name>
 		<displayname>    Elevator Max Force</displayname>
-		<prereq>dummy_basic_spring_settings</prereq>
+		<prereq>spring_mode.BASIC.CENTER</prereq>
 		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -210,7 +211,7 @@
 		<order>440</order>
 		<name>elevator_expo</name>
 		<displayname>    Elevator Expo</displayname>
-		<prereq>dummy_basic_spring_settings</prereq>
+		<prereq>spring_mode.BASIC.CENTER</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -225,7 +226,7 @@
 		<order>450</order>
 		<name>max_rudder_coeff</name>
 		<displayname>    Rudder Max Force</displayname>
-		<prereq>dummy_basic_spring_settings</prereq>
+		<prereq>spring_mode.BASIC.CENTER</prereq>
 		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -240,7 +241,7 @@
 		<order>460</order>
 		<name>rudder_expo</name>
 		<displayname>    Rudder Expo</displayname>
-		<prereq>dummy_basic_spring_settings</prereq>
+		<prereq>spring_mode.BASIC.CENTER</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -255,7 +256,7 @@
 		<order>470</order>
 		<name>vne_override</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Override&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>dummy_dynamic_spring_settings</prereq>
+		<prereq>spring_mode.BASIC.CENTER</prereq>
 		<info>Override Vne if plane data is incorrect.  Leave blank or delete setting to use sim Vne data &lt;br&gt;&lt;br&gt;Enter Vne Airspeed (IAS) where dynamic forces max out</info>
 		<any>true</any>
 		<MSFS>true</MSFS>
@@ -272,7 +273,7 @@
 		<order>500</order>
 		<name>aircraft_is_spring_centered</name>
 		<displayname>    Spring Centering (not FBW)</displayname>
-		<prereq>dummy_basic_spring_settings</prereq>
+		<prereq>		do not show</prereq>
 		<info>Enable spring centering for aircraft while maintaining dynamic forces&lt;br&gt;&lt;br&gt; Do not use together with FBW</info>
 		<any>true</any>
 		<MSFS>true</MSFS>
@@ -287,7 +288,7 @@
 		<order>550.2</order>
 		<name>aileron_spring_gain</name>
 		<displayname>    Aileron Spring Gain</displayname>
-		<prereq>aircraft_is_spring_centered</prereq>
+		<prereq>spring_mode.CENTER</prereq>
 		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -303,7 +304,7 @@
 		<order>550.3</order>
 		<name>elevator_spring_gain</name>
 		<displayname>    Elevator Spring Gain</displayname>
-		<prereq>aircraft_is_spring_centered</prereq>
+		<prereq>spring_mode.CENTER</prereq>
 		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -319,7 +320,7 @@
 		<order>550.4</order>
 		<name>rudder_spring_gain</name>
 		<displayname>    Rudder Spring Gain</displayname>
-		<prereq>aircraft_is_spring_centered</prereq>
+		<prereq>spring_mode.CENTER</prereq>
 		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE><pedals>true</pedals>
@@ -334,7 +335,8 @@
 		<order>600</order>
 		<name>aircraft_is_fbw</name>
 		<displayname>FlyByWire (FBW)</displayname>
-		<exclusive_with>dummy_dynamic_spring_settings</exclusive_with>
+		<exclusive_with></exclusive_with>
+		<prereq>		do not show</prereq>
 		<info>Identify aircraft as FBW if Simconnect data is inaccurate</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -348,7 +350,7 @@
 		<order>600.2</order>
 		<name>fbw_aileron_gain</name>
 		<displayname>FBW Aileron Gain</displayname>
-		<prereq>aircraft_is_fbw</prereq>
+		<prereq>spring_mode.FBW</prereq>
 		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -363,7 +365,7 @@
 		<order>600.3</order>
 		<name>fbw_elevator_gain</name>
 		<displayname>FBW Elevator Gain</displayname>
-		<prereq>aircraft_is_fbw</prereq>
+		<prereq>spring_mode.FBW</prereq>
 		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -378,7 +380,7 @@
 		<order>600.4</order>
 		<name>fbw_rudder_gain</name>
 		<displayname>FBW Rudder Gain</displayname>
-		<prereq>aircraft_is_fbw</prereq>
+		<prereq>spring_mode.FBW</prereq>
 		<info>Fixed spring gain for FBW aircraft&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
