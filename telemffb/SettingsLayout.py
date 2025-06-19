@@ -152,7 +152,7 @@ class SettingsLayout(QGridLayout):
             return item['name'] in self.expanded_items
 
         # Find the parent item by its name
-        parent_item = next((x for x in datalist if x['name'] == prereq), None)
+        parent_item = next((x for x in datalist if x['name'] in prereq), None)
         if parent_item is None:
             # Broken link; treat as not expanded
             return False
@@ -161,39 +161,37 @@ class SettingsLayout(QGridLayout):
         return self.is_top_level_expanded(parent_item, datalist)
 
     def is_visible(self, datalist):
-
         for item in datalist:
             bumped_up = item['order'][-1:] == '1' and '.' in item['order']
             iv = 'false'
             cond = ''
+
             if item['prereq'] == '':
                 iv = 'true'
                 cond = 'no prereq needed'
             else:
-                if not self.is_top_level_expanded(item,datalist):
+                if not self.is_top_level_expanded(item, datalist):
                     iv = 'false'
                 else:
                     for p in datalist:
-                        if item['prereq'] == p['name']:
-                            if p['value'].lower() == 'true':
-                                if p['has_expander'].lower() == 'true':
-                                    if p['name'] in self.expanded_items and p['is_visible'] == 'true':
+                        if p['name'] in item['prereq']:
+                            #  check if the parent's value is part of the prereq string
+                            if p['value'] in item['prereq'] or p['value'].lower() == 'true':
+                                if p.get('has_expander', 'false').lower() == 'true':
+                                    if p['name'] in self.expanded_items and p.get('is_visible', 'false') == 'true':
                                         iv = 'true'
                                         cond = 'item parent expanded'
-                                    else:
-                                        if p['hasbump'].lower() == 'true':
-                                            if bumped_up:
-                                                iv = 'true'
-                                                cond = 'parent hasbump & bumped'
-                                else:
-                                    if p['is_visible'].lower() == 'true':
-                                        if p['hasbump'].lower() == 'true':
-                                            if bumped_up:
-                                                iv = 'true'
-                                                cond = 'parent hasbump & bumped no expander par vis'
+                                    elif p.get('hasbump', 'false').lower() == 'true' and bumped_up:
+                                        iv = 'true'
+                                        cond = 'parent hasbump & bumped'
+                                elif p.get('is_visible', 'false').lower() == 'true':
+                                    if p.get('hasbump', 'false').lower() == 'true' and bumped_up:
+                                        iv = 'true'
+                                        cond = 'parent hasbump & bumped no expander par vis'
                             break
 
             item['is_visible'] = iv
+
             # for things not showing debugging:
             # if iv.lower() == 'true':
             #     print (f"{item['displayname']} visible because {cond}")
@@ -221,13 +219,16 @@ class SettingsLayout(QGridLayout):
         for item in datalist:
             found = False
             count = 0
+            itemname = item.get('name','')
             for p in datalist:
-                if item['name'] == p['prereq']:
-                    count += 1
-                    found = True
+                prereq = p.get('prereq', '')
+                if itemname in prereq:
+                    if ('.' in prereq or itemname == prereq):
+                        count += 1
+                        found = True
                 # If 'prereq' is not in the list, add a new entry
             if found:
-                p_list.append({'prereq': item['name'], 'value': 'False', 'count': count})
+                p_list.append({'prereq': item['name'], 'value': item['value'], 'count': count})
         return p_list
 
     def build_rows(self, datalist):

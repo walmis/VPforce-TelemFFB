@@ -91,14 +91,14 @@ useDarkMode : bool = False
 
 class JoystickSpringMode(Enum):
     BASIC = auto()
-    BASIC_W_SPRING = auto()
+    CENTER = auto()
     ADVANCED = auto()
     FBW = auto()
 
 
 JOYSTICK_MODE_LABELS = {
     JoystickSpringMode.BASIC: "Basic Dynamic",
-    JoystickSpringMode.BASIC_W_SPRING: "Basic Dynamic with Spring Centering",
+    JoystickSpringMode.CENTER: "Basic Dynamic with Spring Centering",
     JoystickSpringMode.ADVANCED: "Advanced Dynamic",
     JoystickSpringMode.FBW: "FlyByWire (FBW)"
 }
