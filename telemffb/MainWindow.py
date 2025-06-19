@@ -971,6 +971,16 @@ class MainWindow(QMainWindow):
         show_order_action.setCheckable(True)
         debug_menu.addAction(show_order_action)
 
+
+        show_settingname_action = QAction("Show settings internal name", self)
+        def do_toggle_settingsnames():
+            SettingsLayout.show_settings_names = not  SettingsLayout.show_settings_names
+            show_settingname_action.setChecked(SettingsLayout.show_settings_names)
+
+        show_settingname_action.triggered.connect(do_toggle_settingsnames)
+        show_settingname_action.setCheckable(True)
+        debug_menu.addAction(show_settingname_action)
+
         configurator_settings_action = QAction('Configurator Gain Override', self)
         def do_open_configurator_dialog():
             dialog = ConfiguratorDialog(self)

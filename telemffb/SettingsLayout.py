@@ -48,7 +48,8 @@ class SettingsLayout(QGridLayout):
     # debug settings
     show_col_debug = True
     show_slider_debug = False   # set to true for slider values shown
-    show_order_debug = True    # set to true for order numbers shown
+    show_order_debug = False    # set to true for order numbers shown
+    show_settings_names = False # show setting internal name instead of displayname
     bump_up = True              # set to false for no row bumping up
 
     all_sliders = []
@@ -344,7 +345,7 @@ class SettingsLayout(QGridLayout):
         erase_button = QPushButton() # Create erase button at beginning so behavior can be modified per widget type if necessary
 
         # everything has a name, except for things that have a checkbox *and* slider
-        label = InfoLabel(text=f"{item['displayname']}")
+        label = InfoLabel(text=f"{item['name']}") if self.show_settings_names else InfoLabel(text=f"{item['displayname']}")
         label.setObjectName(f'namelabel_{item["name"]}')
         label.setToolTip(item['info'])
         label.setMinimumHeight(20)
@@ -829,7 +830,7 @@ class SettingsLayout(QGridLayout):
                 dropbox.addItems(validvalues)
                 dropbox.setCurrentText(item['value'])
 
-            if item['datatype'] == 'list':
+            if item['datatype'] == 'list' or item['datatype'] == 'enumlist':
                 dropbox.lineEdit().setReadOnly(True)
                 dropbox.editTextChanged.connect(self.dropbox_changed)
             else:
@@ -999,7 +1000,8 @@ class SettingsLayout(QGridLayout):
             #     font_family = "Impact"
             #     font_size = 15
             #     label.text_label.setFont(QFont(font_family,font_size))
-            label.text_label.setText(f'<a href="#" style="color: {color};">{item["displayname"]}</a>')
+            labeltext = item["name"] if self.show_settings_names else item["displayname"]
+            label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
             label.text_label.setToolTip('Click to Expand')
             label.text_label.linkActivated.connect(expand_button.click)
 
@@ -1011,10 +1013,11 @@ class SettingsLayout(QGridLayout):
             if parent_expand_button is not None:
                 label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
                 label.text_label.setOpenExternalLinks(False)
+                labeltext = item["name"] if self.show_settings_names else item["displayname"]
                 if G.useDarkMode:
-                    label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{item["displayname"]}</a>')
+                    label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{labeltext}</a>')
                 else:
-                    label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{item["displayname"]}</a>')
+                    label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{labeltext}</a>')
                 label.text_label.linkActivated.connect(lambda href, parent_name=parent: self.expander_hyperlink_clicked(parent_name))
 
     def expander_hyperlink_clicked(self, parent):
