@@ -530,9 +530,18 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
             }
 
             class_data.append(model_dict)
+    removal_data = []
+    for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="!{the_class}"][device="{the_device}"]') + \
+                      root.findall(f'.//classdefaults[sim="any"][type="!{the_class}"][device="{the_device}"]') + \
+                      root.findall(f'.//classdefaults[sim="{the_sim}"][type="!{the_class}"][device="any"]') + \
+                      root.findall(f'.//classdefaults[sim="any"][type="!{the_class}"][device="any"]'):
+        removal_data.append(model_elem.find('name').text)
+    if not removal_data:
+        removal_data = None
+    return class_data, removal_data
 
-    return class_data
-
+def remove_dicts_by_names(data_list, removal_list):
+    return [d for d in data_list if d.get('name') not in removal_list]
 
 def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_device = ''):
     logging.info (f"Reading from XML:  Sim: {the_sim}, Aircraft name: {aircraft_name}, Class: {input_modeltype}")
@@ -588,7 +597,10 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
     # get additional class default data
     if model_class != "":
         # Use the extracted type in read_xml_file
-        craftresult = read_default_class_data(the_sim, model_class)
+        craftresult, removal_data = read_default_class_data(the_sim, model_class)
+
+        if removal_data is not None:
+            defaultdata = remove_dicts_by_names(defaultdata, removal_data)
 
         if craftresult is not None:
             # place for eliminating !Class data?
