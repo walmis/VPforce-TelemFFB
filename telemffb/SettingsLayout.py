@@ -46,7 +46,7 @@ class SettingsLayout(QGridLayout):
     prereq_list = []
     ##########
     # debug settings
-    show_col_debug = True
+    show_col_debug = False      # shows column, span, indent in label tooltip
     show_slider_debug = False   # set to true for slider values shown
     show_order_debug = False    # set to true for order numbers shown
     show_settings_names = False # show setting internal name instead of displayname
@@ -93,6 +93,8 @@ class SettingsLayout(QGridLayout):
 
             if p_count > 1 or (p_count == 1 and item['hasbump'] != 'true'):
                 item['has_expander'] = 'true'
+            if '.0' in item['order']:
+                item['has_expander'] = 'false'
 
     def has_bump(self, datalist):
         for item in datalist:
@@ -150,10 +152,14 @@ class SettingsLayout(QGridLayout):
         prereq = item.get('prereq', '')
         if not prereq:
             # Reached the top-level item
-            return item['name'] in self.expanded_items
+            if '.0' in item['order']:
+                return True
+            else:
+                return item['name'] in self.expanded_items
 
         # Find the parent item by its name
         parent_item = next((x for x in datalist if x['name'] in prereq), None)
+
         if parent_item is None:
             # Broken link; treat as not expanded
             return False
@@ -189,6 +195,8 @@ class SettingsLayout(QGridLayout):
                                     if p.get('hasbump', 'false').lower() == 'true' and bumped_up:
                                         iv = 'true'
                                         cond = 'parent hasbump & bumped no expander par vis'
+                                    if '.0' in p['order']:
+                                        iv = 'true'
                             break
 
             item['is_visible'] = iv
@@ -231,6 +239,19 @@ class SettingsLayout(QGridLayout):
             if found:
                 p_list.append({'prereq': item['name'], 'value': item['value'], 'count': count})
         return p_list
+
+    def set_spring_mode(self, mode):
+        for item in datalist:
+            if item['name'] == 'spring_mode':
+                item['value'] = mode
+    def convert_to_springmode(self, datalist):
+        for item in datalist:
+            if item['name'] == 'adv_spr_override_enabled':
+                self.set_spring_mode(self, 'ADVANCED')
+            if item['name'] == 'aircraft_is_spring_centered':
+                self.set_spring_mode(self, 'CENTER')
+            if item['name'] == 'aircraft_is_fbw':
+                self.set_spring_mode(self, 'FBW')
 
     def build_rows(self, datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
@@ -1148,6 +1169,12 @@ class SettingsLayout(QGridLayout):
 
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
+        if setting_name == 'spring_mode':
+            xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'adv_spr_override_enabled')
+            xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'aircraft_is_spring_centered')
+            xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'aircraft_is_fbw')
+            if G.settings_mgr.timed_out:
+                pass
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
