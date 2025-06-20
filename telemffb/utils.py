@@ -69,6 +69,8 @@ from PyQt6 import QtCore, QtGui
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 import stransi
 
+from enum import Enum, auto
+
 import telemffb.globals as G
 import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
@@ -2190,3 +2192,42 @@ class HiDpiPixmap(QPixmap):
         scaled_pixmap = super().scaled(int(width * ratio), int(height * ratio), aspectRatioMode, transformMode)
         scaled_pixmap.setDevicePixelRatio(ratio)
         return scaled_pixmap
+
+
+class JoystickSpringMode(Enum):
+    BASIC = auto()
+    CENTER = auto()
+    ADVANCED = auto()
+    FBW = auto()
+
+
+JOYSTICK_MODE_LABELS = {
+    JoystickSpringMode.BASIC: "Basic Dynamic",
+    JoystickSpringMode.CENTER: "Basic Dynamic with Spring Centering",
+    JoystickSpringMode.ADVANCED: "Advanced Dynamic",
+    JoystickSpringMode.FBW: "FlyByWire (FBW)"
+}
+
+class PedalSpringMode(Enum):
+    DEFAULT = auto()
+    NOSPRING = auto()
+    STATIC = auto()
+    DYNAMIC = auto()
+    CUSTOM = auto()
+    ADVANCED = auto()
+
+
+PEDAL_MODE_LABELS = {
+    PedalSpringMode.DEFAULT: "Sim Default",
+    PedalSpringMode.NOSPRING: "No Spring",
+    PedalSpringMode.STATIC: "Static Spring",
+    PedalSpringMode.DYNAMIC: "Dynamic Spring",
+    PedalSpringMode.CUSTOM: "Dynamic with Custom Speeds",
+    PedalSpringMode.ADVANCED: "Advanced Spring Override"
+}
+
+ENUM_LABEL_REGISTRY = {
+    "JOYSTICK_MODE_LABELS": JOYSTICK_MODE_LABELS,
+    "PEDAL_MODE_LABELS": PEDAL_MODE_LABELS
+    # Add other mappings here as needed
+}

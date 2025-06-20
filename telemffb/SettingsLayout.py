@@ -40,6 +40,8 @@ from telemffb.utils import validate_vpconf_profile, dbprint, HiDpiPixmap
 from . import globals as G
 from . import xmlutils
 
+from telemffb.utils import ENUM_LABEL_REGISTRY
+
 
 class SettingsLayout(QGridLayout):
     expanded_items = []
@@ -814,7 +816,7 @@ class SettingsLayout(QGridLayout):
             if item['datatype'] == 'enumlist':
                 dropbox.setObjectName(f"edb_{item['name']}")
                 label_dict_name = item['validvalues']
-                label_dict = G.ENUM_LABEL_REGISTRY.get(label_dict_name)
+                label_dict = ENUM_LABEL_REGISTRY.get(label_dict_name)
                 if label_dict is None:
                     dropbox.addItem(f"Dict '{label_dict_name}' not found")
                 else:
