@@ -164,7 +164,7 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         filename, _ = QFileDialog.getSaveFileName(
             self,
             "Export Settings",
-            filter="Text Files (*.txt);;All Files (*)"
+            filter="Settings Files (*.txt *.json);;All Files (*)"
         )
         if filename:
             try:
@@ -178,7 +178,7 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
         filename, _ = QFileDialog.getOpenFileName(
             self,
             "Import Settings",
-            filter="Text Files (*.txt);;All Files (*)"
+            filter="Settings Files (*.txt *.json);;All Files (*)"
         )
         if filename:
             try:

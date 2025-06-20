@@ -9844,6 +9844,20 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>adv_spr_gains</name>
+		<model>Bf-109K-4</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 470, "points": [{"x": 0.0, "y": 0.0}, {"x": 94.0, "y": 30.0}, {"x": 164.5, "y": 50.0}, {"x": 249.48, "y": 72.28}, {"x": 330.78, "y": 86.41}, {"x": 399.5, "y": 95.0}, {"x": 470.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 470, "points": [{"x": 0.0, "y": 5.0}, {"x": 94.0, "y": 35.0}, {"x": 164.5, "y": 55.0}, {"x": 259.5, "y": 78.26}, {"x": 329.0, "y": 90.0}, {"x": 404.29, "y": 95.65}, {"x": 470.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 470}</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>Bf-109K-4</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 470, "points": [{"x": 0.0, "y": 0.0}, {"x": 94.0, "y": 30.0}, {"x": 163.72, "y": 50.54}, {"x": 249.48, "y": 71.74}, {"x": 329.0, "y": 85.0}, {"x": 399.5, "y": 95.0}, {"x": 470.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 470, "points": [{"x": 0.0, "y": 0.0}, {"x": 470.0, "y": 0.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 0, "units": "kt", "scale": 470}</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Bf-109K-4</model>
 		<value>PropellerAircraft</value>
@@ -10290,6 +10304,20 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>adv_spr_gains</name>
+		<model>FW-190A8</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 435, "points": [{"x": 0.0, "y": 0.0}, {"x": 87.0, "y": 30.0}, {"x": 152.25, "y": 50.0}, {"x": 217.5, "y": 70.0}, {"x": 304.5, "y": 85.0}, {"x": 369.75, "y": 95.0}, {"x": 435.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 435, "points": [{"x": 0.0, "y": 5.0}, {"x": 87.0, "y": 35.0}, {"x": 152.25, "y": 55.0}, {"x": 217.5, "y": 75.0}, {"x": 304.5, "y": 90.0}, {"x": 375.21, "y": 97.83}, {"x": 435.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 435}</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>FW-190A8</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 435, "points": [{"x": 0.0, "y": 0.0}, {"x": 87.0, "y": 30.0}, {"x": 152.25, "y": 50.0}, {"x": 217.5, "y": 70.0}, {"x": 304.5, "y": 85.0}, {"x": 375.21, "y": 94.57}, {"x": 435.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 435, "points": [{"x": 0.0, "y": 0.0}, {"x": 435.0, "y": 0.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 0, "units": "kt", "scale": 435}</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>FW-190A8</model>
 		<value>PropellerAircraft</value>
@@ -10325,6 +10353,20 @@
 		<value>1.0</value>
 		<sim>DCS</sim>
 		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>FW-190D9</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 465, "points": [{"x": 0.0, "y": 0.0}, {"x": 93.0, "y": 30.0}, {"x": 162.75, "y": 50.0}, {"x": 232.5, "y": 70.0}, {"x": 325.5, "y": 85.0}, {"x": 395.25, "y": 95.0}, {"x": 465.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 465, "points": [{"x": 0.0, "y": 5.0}, {"x": 93.0, "y": 35.0}, {"x": 162.75, "y": 55.0}, {"x": 239.11, "y": 74.46}, {"x": 325.5, "y": 90.0}, {"x": 397.78, "y": 96.74}, {"x": 465.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 465}</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>FW-190D9</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 465, "points": [{"x": 0.0, "y": 0.0}, {"x": 93.0, "y": 30.0}, {"x": 162.75, "y": 50.0}, {"x": 232.5, "y": 70.0}, {"x": 325.5, "y": 85.0}, {"x": 402.19, "y": 94.57}, {"x": 465.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 465, "points": [{"x": 0.0, "y": 0.0}, {"x": 465.0, "y": 0.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 0, "units": "kt", "scale": 465}</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -10653,7 +10695,7 @@
 		</models>
 	<models>
 		<name>aircraft_vne_speed</name>
-		<model>Mosquito</model>
+		<model>MosquitoFBMkVI</model>
 		<value>415</value>
 		<unit>kt</unit>
 		<sim>DCS</sim>
@@ -10661,9 +10703,23 @@
 	</models>
 	<models>
 		<name>aircraft_vs_speed</name>
-		<model>Mosquito</model>
+		<model>MosquitoFBMkVI</model>
 		<value>90</value>
 		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>MosquitoFBMkVI</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 425, "points": [{"x": 0.0, "y": 0.0}, {"x": 85.0, "y": 30.0}, {"x": 148.75, "y": 50.0}, {"x": 212.5, "y": 70.0}, {"x": 297.5, "y": 85.0}, {"x": 361.25, "y": 95.0}, {"x": 425.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 425, "points": [{"x": 0.0, "y": 5.0}, {"x": 85.0, "y": 35.0}, {"x": 148.75, "y": 55.0}, {"x": 212.5, "y": 75.0}, {"x": 297.5, "y": 90.0}, {"x": 363.57, "y": 97.28}, {"x": 425.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 425}</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>MosquitoFBMkVI</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 425, "points": [{"x": 0.0, "y": 0.0}, {"x": 85.0, "y": 30.0}, {"x": 148.75, "y": 50.0}, {"x": 215.52, "y": 69.57}, {"x": 297.5, "y": 85.0}, {"x": 361.25, "y": 95.0}, {"x": 425.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 425, "points": [{"x": 0.0, "y": 0.0}, {"x": 425.0, "y": 0.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 0, "units": "kt", "scale": 425}</value>
 		<sim>DCS</sim>
 		<device>pedals</device>
 	</models>
@@ -10823,6 +10879,20 @@
 		<device>pedals</device>
 	</models>
 	<models>
+		<name>adv_spr_gains</name>
+		<model>P-47D.*</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 550, "points": [{"x": 0.0, "y": 0.0}, {"x": 110.0, "y": 30.0}, {"x": 192.5, "y": 50.0}, {"x": 275.0, "y": 70.0}, {"x": 385.0, "y": 85.0}, {"x": 467.5, "y": 95.0}, {"x": 550.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 550, "points": [{"x": 0.0, "y": 5.0}, {"x": 110.0, "y": 35.0}, {"x": 192.5, "y": 55.0}, {"x": 278.91, "y": 75.0}, {"x": 385.0, "y": 90.0}, {"x": 462.68, "y": 95.65}, {"x": 550.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 550}</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>P-47D.*</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 550, "points": [{"x": 0.0, "y": 0.0}, {"x": 110.0, "y": 30.0}, {"x": 192.5, "y": 50.0}, {"x": 275.0, "y": 70.0}, {"x": 385.0, "y": 85.0}, {"x": 467.5, "y": 95.0}, {"x": 550.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 550, "points": [{"x": 0.0, "y": 0.0}, {"x": 550.0, "y": 0.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 0, "units": "kt", "scale": 550}</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>P-47D.*</model>
 		<value>PropellerAircraft</value>
@@ -10859,6 +10929,20 @@
 		<sim>DCS</sim>
 		<device>joystick</device>
 		</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>P-51D</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 505, "points": [{"x": 0.0, "y": 0.0}, {"x": 101.0, "y": 30.0}, {"x": 176.75, "y": 50.0}, {"x": 252.5, "y": 70.0}, {"x": 353.5, "y": 85.0}, {"x": 429.25, "y": 95.0}, {"x": 505.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 505, "points": [{"x": 0.0, "y": 5.0}, {"x": 101.0, "y": 35.0}, {"x": 176.75, "y": 55.0}, {"x": 254.89, "y": 73.91}, {"x": 353.5, "y": 90.0}, {"x": 428.41, "y": 97.28}, {"x": 505.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 505}</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>P-51D</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 505, "points": [{"x": 0.0, "y": 0.0}, {"x": 101.0, "y": 30.0}, {"x": 176.75, "y": 50.0}, {"x": 252.5, "y": 70.0}, {"x": 353.5, "y": 85.0}, {"x": 429.25, "y": 95.0}, {"x": 505.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 505, "points": [{"x": 0.0, "y": 0.0}, {"x": 505.0, "y": 0.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 0, "units": "kt", "scale": 505}</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
 	<models>
 		<name>type</name>
 		<model>P-51D</model>
@@ -10976,6 +11060,20 @@
 		<sim>DCS</sim>
 		<device>joystick</device>
 		</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>SpitfireLFMkIX</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 0.0}, {"x": 90.0, "y": 30.0}, {"x": 157.5, "y": 50.0}, {"x": 225.0, "y": 70.0}, {"x": 315.0, "y": 85.0}, {"x": 382.5, "y": 95.0}, {"x": 450.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 5.0}, {"x": 90.0, "y": 35.0}, {"x": 157.5, "y": 55.0}, {"x": 230.33, "y": 72.83}, {"x": 315.0, "y": 90.0}, {"x": 381.75, "y": 97.28}, {"x": 450.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 450}</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>SpitfireLFMkIX</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 0.0}, {"x": 90.0, "y": 30.0}, {"x": 157.5, "y": 50.0}, {"x": 225.0, "y": 70.0}, {"x": 315.0, "y": 85.0}, {"x": 382.5, "y": 95.0}, {"x": 450.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 450, "points": [{"x": 0.0, "y": 0.0}, {"x": 450.0, "y": 0.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 0, "units": "kt", "scale": 450}</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
 	<models>
 		<name>type</name>
 		<model>SpitfireLFMkIX</model>
