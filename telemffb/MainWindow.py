@@ -523,15 +523,17 @@ class MainWindow(QMainWindow):
         self.test_name = QComboBox()
         self.test_name.setMinimumWidth(100)
         self.test_name.setEditable(False)
-        test_button = QToolButton()
-        test_button.setMaximumWidth(20)
-        test_button.setText('>')
-        test_button.clicked.connect(self.force_sim_aircraft)
+        self.test_name.currentTextChanged.connect(self.test_aircraft_changed)
+
+        self.test_button = QToolButton()
+        self.test_button.setMaximumWidth(20)
+        self.test_button.setText('>')
+        self.test_button.clicked.connect(self.force_sim_aircraft)
         test_craft_layout.addWidget(test_sim_lbl)
         test_craft_layout.addWidget(self.test_sim)
         test_craft_layout.addWidget(test_name_lbl)
         test_craft_layout.addWidget(self.test_name)
-        test_craft_layout.addWidget(test_button)
+        test_craft_layout.addWidget(self.test_button)
         self.test_craft_area.setLayout(test_craft_layout)
         self.test_craft_area.hide()
         layout.addWidget(self.test_craft_area)
@@ -719,10 +721,7 @@ class MainWindow(QMainWindow):
         version_row_layout.setAlignment(Qt.AlignmentFlag.AlignBottom)
         layout.addLayout(version_row_layout)
 
-        # self.test_button = QPushButton("SEND TEST MESSAGE")
-        # self.test_button.clicked.connect(lambda: send_test_message())
 
-        # layout.addWidget(self.test_button)
         G.telem_manager.telemetryReceived.connect(self.on_update_telemetry)
         G.telem_manager.telemetryTimeout.connect(self.on_telemetry_timeout)
         G.telem_manager.aircraftUpdated.connect(self.update_settings)
@@ -1179,6 +1178,15 @@ class MainWindow(QMainWindow):
         self.test_name.clear()
         self.test_name.addItems(models)
         self.test_name.blockSignals(False)
+        if G.master_instance:
+            G.ipc_instance.send_broadcast_message(f"DBG_SELECT_SIM:{self.test_sim.currentText()}")
+
+    def test_aircraft_changed(self):
+        if G.master_instance:
+            G.ipc_instance.send_broadcast_message(f'DBG_SELECT_AC:{self.test_name.currentText()}')
+            print(f"DBG_SELECT_AC:{self.test_name.currentText()}")
+
+
 
     @overrides(QWidget)
     def closeEvent(self, event):
@@ -1294,6 +1302,8 @@ class MainWindow(QMainWindow):
         self.settings_layout.expanded_items.clear()
         self.monitor_widget.hide()
         self.settings_layout.reload_caller()
+        if G.master_instance:
+            G.ipc_instance.send_broadcast_message(f"LOAD_DBG_AC")
 
 
     def open_system_settings_dialog(self):
@@ -1340,6 +1350,8 @@ class MainWindow(QMainWindow):
                     self.test_craft_area.hide()
                 else:
                     self.test_craft_area.show()
+                if G.master_instance:
+                    G.ipc_instance.send_broadcast_message("TOGGLE TESTCRAFT")
             else:
                 sm = G.settings_mgr
                 if sm.isVisible():
