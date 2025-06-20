@@ -10289,6 +10289,93 @@
 		</models>
 	<models>
 		<name>aircraft_vne_speed</name>
+		<model>F4U-1D</model>
+		<value>460</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>aircraft_vs_speed</name>
+		<model>F4U-1D</model>
+		<value>85</value>
+		<unit>kt</unit>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>buffeting_intensity</name>
+		<model>F4U-1D</model>
+		<value>0.3</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aoa_buffeting_enabled</name>
+		<model>F4U-1D</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aoa_buffet_freq</name>
+		<model>F4U-1D</model>
+		<value>15</value>
+		<unit>hz</unit>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>buffet_aoa</name>
+		<model>F4U-1D</model>
+		<value>10</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>stall_aoa</name>
+		<model>F4U-1D</model>
+		<value>13</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>tailhook_motion_effect_enabled</name>
+		<model>F4U-1D</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>wingfold_motion_effect_enabled</name>
+		<model>F4U-1D</model>
+		<value>false</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>F4U-1D</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 460, "points": [{"x": 0.0, "y": 0.0}, {"x": 92.0, "y": 30.0}, {"x": 168.96, "y": 54.35}, {"x": 244.17, "y": 72.28}, {"x": 322.0, "y": 85.0}, {"x": 391.0, "y": 95.0}, {"x": 460.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 460, "points": [{"x": 0.0, "y": 5.0}, {"x": 92.0, "y": 35.0}, {"x": 161.0, "y": 55.0}, {"x": 263.79, "y": 80.98}, {"x": 322.0, "y": 90.0}, {"x": 394.6, "y": 97.28}, {"x": 460.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_y": 100, "units": "kt", "scale": 460}</value>
+		<sim>DCS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>adv_spr_gains</name>
+		<model>F4U-1D</model>
+		<value>{"curve_x": {"x_min": 0, "x_max": 460, "points": [{"x": 0.0, "y": 0.0}, {"x": 92.0, "y": 30.0}, {"x": 161.0, "y": 50.0}, {"x": 245.26, "y": 72.83}, {"x": 323.74, "y": 86.96}, {"x": 391.0, "y": 95.0}, {"x": 460.0, "y": 100.0}], "smooth_curve_enabled": true, "current_unit": "kt"}, "gain_x": 100, "curve_y": {"x_min": 0, "x_max": 460, "points": [{"x": 0.0, "y": 0.0}, {"x": 460.0, "y": 0.0}], "smooth_curve_enabled": false, "current_unit": "kt"}, "gain_y": 0, "units": "kt", "scale": 460}</value>
+		<sim>DCS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>F4U-1D</model>
+		<value>PropellerAircraft</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aircraft_vne_speed</name>
 		<model>FW-190A8</model>
 		<value>370</value>
 		<unit>kt</unit>
