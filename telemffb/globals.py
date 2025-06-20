@@ -16,7 +16,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from enum import Enum, auto
 from typing import TYPE_CHECKING, Dict
 if TYPE_CHECKING:
     # from PyQt5.QtCore import QSettings
@@ -88,41 +87,3 @@ dev_build_str: str = "DEV_BUILD"
 
 useDarkMode : bool = False
 
-
-class JoystickSpringMode(Enum):
-    BASIC = auto()
-    CENTER = auto()
-    ADVANCED = auto()
-    FBW = auto()
-
-
-JOYSTICK_MODE_LABELS = {
-    JoystickSpringMode.BASIC: "Basic Dynamic",
-    JoystickSpringMode.CENTER: "Basic Dynamic with Spring Centering",
-    JoystickSpringMode.ADVANCED: "Advanced Dynamic",
-    JoystickSpringMode.FBW: "FlyByWire (FBW)"
-}
-
-class PedalSpringMode(Enum):
-    DEFAULT = auto()
-    NOSPRING = auto()
-    STATIC = auto()
-    DYNAMIC = auto()
-    CUSTOM = auto()
-    ADVANCED = auto()
-
-
-PEDAL_MODE_LABELS = {
-    PedalSpringMode.DEFAULT: "Sim Default",
-    PedalSpringMode.NOSPRING: "No Spring",
-    PedalSpringMode.STATIC: "Static Spring",
-    PedalSpringMode.DYNAMIC: "Dynamic Spring",
-    PedalSpringMode.CUSTOM: "Dynamic with Custom Speeds",
-    PedalSpringMode.ADVANCED: "Advanced Spring Override"
-}
-
-ENUM_LABEL_REGISTRY = {
-    "JOYSTICK_MODE_LABELS": JOYSTICK_MODE_LABELS,
-    "PEDAL_MODE_LABELS": PEDAL_MODE_LABELS
-    # Add other mappings here as needed
-}

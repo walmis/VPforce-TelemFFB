@@ -29,6 +29,7 @@ from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCo
 from telemffb.hw.ffb_rhino import EFFECT_SPRING,EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION, EFFECT_SPRING_ADJUSTER
 import telemffb.globals as G
 from telemffb.globals import master_instance, master_buttons
+from telemffb.utils import JoystickSpringMode, PedalSpringMode
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
@@ -229,10 +230,10 @@ class AircraftBase(object):
     vrs_vs_onset: float = 0
     vrs_vs_max: float = 0
 
-    spring_mode = G.JoystickSpringMode.BASIC
+    #spring_mode = G.JoystickSpringMode.BASIC
 
     ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
-    pedal_spring_mode = G.PedalSpringMode.STATIC
+    #pedal_spring_mode = G.PedalSpringMode.STATIC
 
     aircraft_vs_speed = 87
     aircraft_vs_gain = 0.25
@@ -296,7 +297,6 @@ class AircraftBase(object):
     enable_deadzone: bool = False
     deadzone_base_pct: float = 0.0
 
-
     g_y_offset: int = 0
 
     last_device_x = None
@@ -339,6 +339,9 @@ class AircraftBase(object):
         self.friction_effect_overridden: bool = False
 
         self.friction_effect_overridden: bool = False
+
+        self.spring_mode = JoystickSpringMode.BASIC
+        self.pedal_spring_mode = PedalSpringMode.STATIC
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
@@ -1373,7 +1376,7 @@ class AircraftBase(object):
 
     def _update_aoa_effect(self, telem_data, minspeed=50*kmh, maxspeed=140*kmh):
         if not self.is_joystick(): return
-        if self.spring_mode == G.JoystickSpringMode.FBW or telem_data.get("ACisFBW"): return
+        if self.spring_mode == JoystickSpringMode.FBW or telem_data.get("ACisFBW"): return
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
         local_stall_aoa = self.stall_aoa
@@ -1900,7 +1903,7 @@ class AircraftBase(object):
         spring.start(override=True)
 
     def modify_game_spring(self):
-        if not self.spring_mode == G.JoystickSpringMode.ADVANCED:
+        if not self.spring_mode == JoystickSpringMode.ADVANCED:
             self.spring_adjuster.stop()
             return
         if self.adv_spr_gains == 'none':
