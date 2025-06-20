@@ -645,7 +645,7 @@ class Aircraft(AircraftBase):
         else:
             effects["fbw_spring"].stop()
 
-        if self.joystick_spring_mode == G.JoystickSpringMode.CENTER:
+        if self.spring_mode == G.JoystickSpringMode.CENTER:
             elev_base_gain = self.elevator_spring_gain
             ailer_base_gain = self.aileron_spring_gain
             rudder_base_gain = self.rudder_spring_gain
