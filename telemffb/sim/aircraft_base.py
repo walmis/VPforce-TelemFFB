@@ -180,7 +180,7 @@ class AircraftBase(object):
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
     elevator_droop_enabled: bool = False
     elevator_droop_force: float = 0.0
-    aircraft_is_fbw: bool = False
+    aircraft_is_fbw: bool = False           #deprecated
 
     gear_motion_effect_enabled: bool = False
     gear_buffet_effect_enabled: bool = False
@@ -229,9 +229,10 @@ class AircraftBase(object):
     vrs_vs_onset: float = 0
     vrs_vs_max: float = 0
 
-    joystick_spring_mode = 'Basic Dynamic'  ## Basic Dynamic, Advanced Dynamic, Fly-By-Wire (FBW), Static (non-FBW)
+    spring_mode = G.JoystickSpringMode.BASIC
 
-    pedal_spring_mode = 'Static Spring'  ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    pedal_spring_mode = G.PedalSpringMode.STATIC
 
     aircraft_vs_speed = 87
     aircraft_vs_gain = 0.25
@@ -273,7 +274,7 @@ class AircraftBase(object):
     collective_ft_ovd_cp0_y = 4096
     collective_ft_use_master_buttons: bool = False
 
-    adv_spr_override_enabled: bool = False
+    adv_spr_override_enabled: bool = False   #deprecated
     adv_spr_gains: str = 'none'
     adv_spr_use_hardware_trim: bool = False
     adv_spr_use_game_trim: bool = True
@@ -1372,7 +1373,7 @@ class AircraftBase(object):
 
     def _update_aoa_effect(self, telem_data, minspeed=50*kmh, maxspeed=140*kmh):
         if not self.is_joystick(): return
-        if self.aircraft_is_fbw or telem_data.get("ACisFBW"): return
+        if self.spring_mode == G.JoystickSpringMode.FBW or telem_data.get("ACisFBW"): return
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
         local_stall_aoa = self.stall_aoa
@@ -1899,7 +1900,7 @@ class AircraftBase(object):
         spring.start(override=True)
 
     def modify_game_spring(self):
-        if not self.adv_spr_override_enabled:
+        if not self.spring_mode == G.JoystickSpringMode.ADVANCED:
             self.spring_adjuster.stop()
             return
         if self.adv_spr_gains == 'none':
