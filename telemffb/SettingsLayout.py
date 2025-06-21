@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageB
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle)
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton)
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.AdvancedGDialog import AdvancedGDialog
@@ -394,31 +394,24 @@ class SettingsLayout(QGridLayout):
             order_lbl.setMaximumWidth(45)
             self.addWidget(order_lbl, i, ord_col)
 
-        erase_button = QPushButton() # Create erase button at beginning so behavior can be modified per widget type if necessary
+        # right click erase button to move the setting up in hierarchy
+        show_move_menu = True if item['replaced'] == 'Model (user)' else False
+        erase_button = EraseButton(csim=G.settings_mgr.current_sim,
+                                   cclass=G.settings_mgr.current_class,
+                                   cmodel=G.settings_mgr.current_pattern,
+                                   csetting=item['name'],
+                                   cvalue=item['value'],
+                                   enable_context_menu=show_move_menu) # Create erase button at beginning so behavior can be modified per widget type if necessary
+        if show_move_menu:
+            erase_button.move_to_class_signal.connect(self.do_move_to_class)
+            erase_button.move_to_sim_signal.connect(self.do_move_to_sim)
 
         # everything has a name, except for things that have a checkbox *and* slider
         # some labels show Move right click menu
 
-        show_move_menu = True if item['datatype'] in {'bool', 'button'} and item['replaced'] == 'Model (user)' else False
+        label = InfoLabel(text=f"{item['name']}") if self.show_settings_names else (
+            InfoLabel(text=f"{item['displayname']}"))
 
-        label = InfoLabel(text=f"{item['name']}",
-                          enable_context_menu=show_move_menu,
-                          csim=G.settings_mgr.current_sim,
-                          cclass=G.settings_mgr.current_class,
-                          cvalue=item['value'],
-                          csetting=item['name'],
-                          cmodel=G.settings_mgr.current_pattern
-                          ) if self.show_settings_names else (
-            InfoLabel(text=f"{item['displayname']}",
-                      enable_context_menu=show_move_menu,
-                      csim=G.settings_mgr.current_sim,
-                      cclass=G.settings_mgr.current_class,
-                      cvalue=item['value'],
-                      csetting=item['name'],
-                      cmodel=G.settings_mgr.current_pattern))
-        if show_move_menu:
-            label.move_to_class_signal.connect(self.do_move_to_class)
-            label.move_to_sim_signal.connect(self.do_move_to_sim)
         label.setObjectName(f'namelabel_{item["name"]}')
         label.setToolTip(item['info'])
         label.setMinimumHeight(20)
