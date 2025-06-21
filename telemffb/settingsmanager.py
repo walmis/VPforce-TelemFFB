@@ -445,7 +445,8 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
             #dont show groups
             if data_dict['datatype'] == 'group':
-                break
+                self.table_widget.setRowHeight(row, 0)
+                continue
 
             if data_dict['prereq'] != '':
                 for pr in self.prereq_list:
