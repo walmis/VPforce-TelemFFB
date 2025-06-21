@@ -14,6 +14,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<trimwheel>true</trimwheel>
 		<value>true</value>
 	</defaults>
 	<defaults>
