@@ -327,15 +327,7 @@ class ClickLogo(QLabel):
 
 
 class InfoLabel(QWidget):
-    move_to_class_signal = pyqtSignal(str, str, str, str, str)  # csim, cclass, cvalue, csetting, cmodel
-    move_to_sim_signal = pyqtSignal(str, str, str, str)         # same but no class
-    def __init__(self, parent=None, text=None, tooltip=None,
-                 enable_context_menu=False,
-                 csim=None,
-                 cclass=None,
-                 cvalue=None,
-                 csetting=None,
-                 cmodel=None):
+    def __init__(self, parent=None, text=None, tooltip=None):
         super(InfoLabel, self).__init__(parent)
 
         # Text label
@@ -367,12 +359,41 @@ class InfoLabel(QWidget):
         if tooltip:
             self.setToolTip(tooltip)
 
-        # Enable custom context menu
+
+    def setText(self, text):
+        self.text_label.setText(text)
+        # Adjust the size of text_label based on the new text
+        # self.text_label.setFixedHeight(self.icon_label.height())
+
+    def setToolTip(self, tooltip):
+        if tooltip:
+            self.icon_label.setToolTip(tooltip)
+            self.icon_label.setVisible(True)
+        else:
+            self.icon_label.setToolTip('')
+            self.icon_label.setVisible(False)
+
+    def setTextStyleSheet(self, style_sheet):
+        self.text_label.setStyleSheet(style_sheet)
+
+    def show_icon(self):
+        # Manually scale the pixmap to a reasonable size
+        scaled_pixmap = self.pixmap.scaledToHeight(self.text_label.sizeHint().height())  # Adjust the height as needed
+        self.icon_label.setPixmap(scaled_pixmap)
+
+class EraseButton(QPushButton):
+    # Define the signals (you can connect these in the layout)
+    move_to_class_signal = pyqtSignal(str, str, str, str)  # csim, cclass, setting, value
+    move_to_sim_signal = pyqtSignal(str, str, str, str)  # csim, model, setting, value
+
+    def __init__(self, *args, csim=None, cclass=None, cmodel=None, csetting=None, cvalue=None,
+                 enable_context_menu=False, **kwargs):
+        super().__init__(*args, **kwargs)
         self.csim = csim
         self.cclass = cclass
-        self.cvalue =cvalue
-        self.csetting = csetting
         self.cmodel = cmodel
+        self.csetting = csetting
+        self.cvalue = cvalue
 
         self.enable_context_menu = enable_context_menu
         if self.enable_context_menu:
@@ -403,27 +424,6 @@ class InfoLabel(QWidget):
 
         # Show the menu at the global cursor position
         menu.exec(self.mapToGlobal(pos))
-
-    def setText(self, text):
-        self.text_label.setText(text)
-        # Adjust the size of text_label based on the new text
-        # self.text_label.setFixedHeight(self.icon_label.height())
-
-    def setToolTip(self, tooltip):
-        if tooltip:
-            self.icon_label.setToolTip(tooltip)
-            self.icon_label.setVisible(True)
-        else:
-            self.icon_label.setToolTip('')
-            self.icon_label.setVisible(False)
-
-    def setTextStyleSheet(self, style_sheet):
-        self.text_label.setStyleSheet(style_sheet)
-
-    def show_icon(self):
-        # Manually scale the pixmap to a reasonable size
-        scaled_pixmap = self.pixmap.scaledToHeight(self.text_label.sizeHint().height())  # Adjust the height as needed
-        self.icon_label.setPixmap(scaled_pixmap)
 
 
 class StatusLabel(QWidget):
