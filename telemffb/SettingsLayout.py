@@ -349,7 +349,7 @@ class SettingsLayout(QGridLayout):
                     self._clear_sub_layout(sub_layout)
                     sub_layout.deleteLater()
 
-    def do_move_to_class(self, csim, cclass, value, setting, model):
+    def do_move_to_class(self, csim, cclass, value, setting, model, unit):
 
         reply = QMessageBox.question(
             None,
@@ -361,10 +361,10 @@ class SettingsLayout(QGridLayout):
 
         if reply == QMessageBox.StandardButton.Yes:
             print(f"Moving {setting} setting ({value}) from {model} to all {csim} {cclass} class aircraft")
-            xmlutils.write_class_to_xml(csim, cclass, value, setting)
+            xmlutils.write_class_to_xml(csim, cclass, value, setting, unit)
             xmlutils.erase_models_from_xml(csim, model, setting)
 
-    def do_move_to_sim(self, csim, value, setting, model):
+    def do_move_to_sim(self, csim, value, setting, model, unit):
 
         reply = QMessageBox.question(
             None,
@@ -375,7 +375,7 @@ class SettingsLayout(QGridLayout):
         )
         if reply == QMessageBox.StandardButton.Yes:
             print(f"Moving {setting} setting ({value}) from {model} to {csim} Sim for all aircraft")
-            xmlutils.write_sim_to_xml(csim,value,setting)
+            xmlutils.write_sim_to_xml(csim,value,setting, unit)
             xmlutils.erase_models_from_xml(csim,model,setting)
 
     def generate_settings_row(self, item, i,  rowdisabled=False ):
@@ -408,6 +408,7 @@ class SettingsLayout(QGridLayout):
                                    cmodel=G.settings_mgr.current_pattern,
                                    csetting=item['name'],
                                    cvalue=item['value'],
+                                   cunit=item['unit'],
                                    enable_context_menu=show_move_menu) # Create erase button at beginning so behavior can be modified per widget type if necessary
         if show_move_menu:
             erase_button.move_to_class_signal.connect(self.do_move_to_class)

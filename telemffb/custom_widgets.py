@@ -383,10 +383,10 @@ class InfoLabel(QWidget):
 
 class EraseButton(QPushButton):
     # Define the signals (you can connect these in the layout)
-    move_to_class_signal = pyqtSignal(str, str, str, str)  # csim, cclass, setting, value
-    move_to_sim_signal = pyqtSignal(str, str, str, str)  # csim, model, setting, value
+    move_to_class_signal = pyqtSignal(str, str, str, str, str, str)  # csim, cclass, setting, value, unit
+    move_to_sim_signal = pyqtSignal(str, str, str, str, str)  # csim, model, setting, value, unit
 
-    def __init__(self, *args, csim=None, cclass=None, cmodel=None, csetting=None, cvalue=None,
+    def __init__(self, *args, csim=None, cclass=None, cmodel=None, csetting=None, cvalue=None, cunit=None,
                  enable_context_menu=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.csim = csim
@@ -394,6 +394,7 @@ class EraseButton(QPushButton):
         self.cmodel = cmodel
         self.csetting = csetting
         self.cvalue = cvalue
+        self.cunit = cunit
 
         self.enable_context_menu = enable_context_menu
         if self.enable_context_menu:
@@ -411,7 +412,8 @@ class EraseButton(QPushButton):
             self.cclass,
             self.cvalue,
             self.csetting,
-            self.cmodel))
+            self.cmodel,
+            self.cunit))
         menu.addAction(action1)
 
         action2 = QAction(f"Move setting to {csim} Sim for all aircraft", self)
@@ -419,7 +421,8 @@ class EraseButton(QPushButton):
             self.csim,
             self.cvalue,
             self.csetting,
-            self.cmodel))
+            self.cmodel,
+            self.cunit))
         menu.addAction(action2)
 
         # Show the menu at the global cursor position
