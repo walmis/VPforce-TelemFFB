@@ -1046,7 +1046,7 @@ class SettingsLayout(QGridLayout):
         if item['replaced'] == 'Model (user)':
             if item['name'] != 'type':  # dont erase type on mainwindow settings
                 erase_button.setVisible(True)
-                erase_button.setToolTip("Reset to Default")
+                erase_button.setToolTip("Reset to Default, Right-Click for more options")
         self.setRowStretch(i, 0)
         erase_button.setStyleSheet("""
             QPushButton {

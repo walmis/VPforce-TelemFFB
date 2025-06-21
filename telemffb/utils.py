@@ -2193,7 +2193,6 @@ class HiDpiPixmap(QPixmap):
         scaled_pixmap.setDevicePixelRatio(ratio)
         return scaled_pixmap
 
-
 class JoystickSpringMode(Enum):
     BASIC = auto()
     CENTER = auto()
