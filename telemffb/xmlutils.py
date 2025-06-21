@@ -516,7 +516,8 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
         if model_elem.find('name') is not None:
 
             name = model_elem.find('name').text
-            value = model_elem.find('value').text
+            value_elem = model_elem.find('value')
+            value = value_elem.text if value_elem is not None else ""
             unit_elem = model_elem.find('unit')
             unit = unit_elem.text if unit_elem is not None else ""
 
