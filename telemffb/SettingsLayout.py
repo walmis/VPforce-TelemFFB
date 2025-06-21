@@ -178,6 +178,13 @@ class SettingsLayout(QGridLayout):
             if item['prereq'] == '':
                 iv = 'true'
                 cond = 'no prereq needed'
+                pcount = 0
+                if item['datatype'] == 'group':
+                    for prereqs in datalist:
+                        if item['name'] in prereqs['prereq']:
+                            pcount += 1
+                    if pcount == 0:
+                        iv = 'false'
             else:
                 if not self.is_top_level_expanded(item, datalist):
                     iv = 'false'
