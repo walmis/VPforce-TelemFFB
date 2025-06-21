@@ -1014,18 +1014,16 @@ class SettingsLayout(QGridLayout):
             }
         """)
 
-        if item['has_expander'].lower() == 'true':
+        if item['has_expander'].lower() == 'true' or item['datatype'] == 'group':
             # These are top level config sections that have an expander button but do not have any ".1" sliders
             label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
             label.text_label.setOpenExternalLinks(False)
-            color = "#cc7ee0" if G.useDarkMode else "#ab37c8"
-            # if item['datatype'] == 'group':
-            #     font_family = "Impact"
-            #     font_size = 15
-            #     label.text_label.setFont(QFont(font_family,font_size))
+            color = "#cc7ee0" if G.useDarkMode else "#ab37c8"              # lighter purple looks better in dark
+            color = "#ab37c8" if item['datatype'] == 'group' else color    # unless its big group font
             labeltext = item["name"] if self.show_settings_names else item["displayname"]
             label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
-            label.text_label.setToolTip('Click to Expand')
+            clickaction = "Expand" if item['name'] not in self.expanded_items else "Collapse"
+            label.text_label.setToolTip(f'Click to {clickaction}')
             label.text_label.linkActivated.connect(expand_button.click)
 
         if item['order'][-1:] == '1' and '.' in item['order']:
@@ -1037,10 +1035,8 @@ class SettingsLayout(QGridLayout):
                 label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
                 label.text_label.setOpenExternalLinks(False)
                 labeltext = item["name"] if self.show_settings_names else item["displayname"]
-                if G.useDarkMode:
-                    label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{labeltext}</a>')
-                else:
-                    label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{labeltext}</a>')
+                color = "#cc7ee0" if G.useDarkMode else "#ab37c8"
+                label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
                 label.text_label.linkActivated.connect(lambda href, parent_name=parent: self.expander_hyperlink_clicked(parent_name))
 
     def expander_hyperlink_clicked(self, parent):
