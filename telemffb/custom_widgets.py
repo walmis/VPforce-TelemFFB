@@ -16,6 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from PyQt6.QtGui import QAction
 
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
@@ -25,6 +26,8 @@ from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimati
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
     QLinearGradient, QFont
 from PyQt6.QtWidgets import QStyle, QStyleOptionSlider
+
+from PyQt6.QtCore import Qt
 
 import numpy as np
 from scipy.interpolate import make_interp_spline, interp1d
@@ -324,7 +327,15 @@ class ClickLogo(QLabel):
 
 
 class InfoLabel(QWidget):
-    def __init__(self, parent=None, text=None, tooltip=None):
+    move_to_class_signal = pyqtSignal(str, str, str, str, str)  # csim, cclass, cvalue, csetting, cmodel
+    move_to_sim_signal = pyqtSignal(str, str, str, str)         # same but no class
+    def __init__(self, parent=None, text=None, tooltip=None,
+                 enable_context_menu=False,
+                 csim=None,
+                 cclass=None,
+                 cvalue=None,
+                 csetting=None,
+                 cmodel=None):
         super(InfoLabel, self).__init__(parent)
 
         # Text label
@@ -355,6 +366,43 @@ class InfoLabel(QWidget):
             self.setText(text)
         if tooltip:
             self.setToolTip(tooltip)
+
+        # Enable custom context menu
+        self.csim = csim
+        self.cclass = cclass
+        self.cvalue =cvalue
+        self.csetting = csetting
+        self.cmodel = cmodel
+
+        self.enable_context_menu = enable_context_menu
+        if self.enable_context_menu:
+            self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.customContextMenuRequested.connect(
+                lambda pos: self.show_context_menu(pos, csim, cclass)  #, cvalue, csetting, cmodel)
+            )
+
+    def show_context_menu(self,pos, csim, cclass):   # , cvalue, csetting, cmodel):
+        menu = QMenu(self)
+
+        action1 = QAction(f"Move setting to all {csim} {cclass} class aircraft", self)
+        action1.triggered.connect(lambda: self.move_to_class_signal.emit(
+            self.csim,
+            self.cclass,
+            self.cvalue,
+            self.csetting,
+            self.cmodel))
+        menu.addAction(action1)
+
+        action2 = QAction(f"Move setting to {csim} Sim for all aircraft", self)
+        action2.triggered.connect(lambda: self.move_to_sim_signal.emit(
+            self.csim,
+            self.cvalue,
+            self.csetting,
+            self.cmodel))
+        menu.addAction(action2)
+
+        # Show the menu at the global cursor position
+        menu.exec(self.mapToGlobal(pos))
 
     def setText(self, text):
         self.text_label.setText(text)

@@ -26,7 +26,7 @@ import re
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCursor, QIcon, QFont, QColor, QPixmap
-from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
+from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageBox,
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
@@ -342,6 +342,35 @@ class SettingsLayout(QGridLayout):
                     self._clear_sub_layout(sub_layout)
                     sub_layout.deleteLater()
 
+    def do_move_to_class(self, csim, cclass, value, setting, model):
+
+        reply = QMessageBox.question(
+            None,
+            "Confirmation",
+            f"Are you sure you want to move {setting} ({value}) from {model} to all {csim} {cclass} class aircraft?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No  # Default button
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            print(f"Moving {setting} setting ({value}) from {model} to all {csim} {cclass} class aircraft")
+            xmlutils.write_class_to_xml(csim, cclass, value, setting)
+            xmlutils.erase_models_from_xml(csim, model, setting)
+
+    def do_move_to_sim(self, csim, value, setting, model):
+
+        reply = QMessageBox.question(
+            None,
+            "Confirmation",
+            f"Are you sure you want to move {setting} ({value}) from {model} to ALL {csim} aircraft?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No  # Default button
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            print(f"Moving {setting} setting ({value}) from {model} to {csim} Sim for all aircraft")
+            xmlutils.write_sim_to_xml(csim,value,setting)
+            xmlutils.erase_models_from_xml(csim,model,setting)
+
     def generate_settings_row(self, item, i,  rowdisabled=False ):
         self.setRowMinimumHeight(i, 25)
         entry_colspan = 2
@@ -368,7 +397,28 @@ class SettingsLayout(QGridLayout):
         erase_button = QPushButton() # Create erase button at beginning so behavior can be modified per widget type if necessary
 
         # everything has a name, except for things that have a checkbox *and* slider
-        label = InfoLabel(text=f"{item['name']}") if self.show_settings_names else InfoLabel(text=f"{item['displayname']}")
+        # some labels show Move right click menu
+
+        show_move_menu = True if item['datatype'] in {'bool', 'button'} and item['replaced'] == 'Model (user)' else False
+
+        label = InfoLabel(text=f"{item['name']}",
+                          enable_context_menu=show_move_menu,
+                          csim=G.settings_mgr.current_sim,
+                          cclass=G.settings_mgr.current_class,
+                          cvalue=item['value'],
+                          csetting=item['name'],
+                          cmodel=G.settings_mgr.current_pattern
+                          ) if self.show_settings_names else (
+            InfoLabel(text=f"{item['displayname']}",
+                      enable_context_menu=show_move_menu,
+                      csim=G.settings_mgr.current_sim,
+                      cclass=G.settings_mgr.current_class,
+                      cvalue=item['value'],
+                      csetting=item['name'],
+                      cmodel=G.settings_mgr.current_pattern))
+        if show_move_menu:
+            label.move_to_class_signal.connect(self.do_move_to_class)
+            label.move_to_sim_signal.connect(self.do_move_to_sim)
         label.setObjectName(f'namelabel_{item["name"]}')
         label.setToolTip(item['info'])
         label.setMinimumHeight(20)
