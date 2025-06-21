@@ -508,12 +508,10 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
     else:
         the_device = instance_device
     # Iterate through models elements
-    #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]'):
-    #for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{device}"]'):
-    for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="{the_device}"]') + \
-                      root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="{the_device}"]') + \
-                      root.findall(f'.//classdefaults[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
-                      root.findall(f'.//classdefaults[sim="any"][type="{the_class}"][device="any"]'):
+    for model_elem in root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="{the_device}"]') + \
+                      root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="{the_device}"]') + \
+                      root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
+                      root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="any"]'):
 
         if model_elem.find('name') is not None:
 
@@ -531,10 +529,10 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
 
             class_data.append(model_dict)
     removal_data = []
-    for model_elem in root.findall(f'.//classdefaults[sim="{the_sim}"][type="!{the_class}"][device="{the_device}"]') + \
-                      root.findall(f'.//classdefaults[sim="any"][type="!{the_class}"][device="{the_device}"]') + \
-                      root.findall(f'.//classdefaults[sim="{the_sim}"][type="!{the_class}"][device="any"]') + \
-                      root.findall(f'.//classdefaults[sim="any"][type="!{the_class}"][device="any"]'):
+    for model_elem in root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="{the_device}"]') + \
+                      root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="{the_device}"]') + \
+                      root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="any"]') + \
+                      root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="any"]'):
         removal_data.append(model_elem.find('name').text)
     if not removal_data:
         removal_data = None
@@ -1133,7 +1131,9 @@ def read_prereqs():
     # Collect data in a list of dictionaries
     data_list = []
     for defaults_elem in root.findall(f'.//defaults'):
-
+        if defaults_elem.find('name') is None and defaults_elem.find('order') is None and defaults_elem.find('datatype') is None:
+            # Ignore empty rows that may exist for readability purposes
+            continue
         name = defaults_elem.find('name').text
         prereq_elem = defaults_elem.find('prereq')
         prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
