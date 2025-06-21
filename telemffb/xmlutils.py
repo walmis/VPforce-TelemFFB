@@ -1172,7 +1172,7 @@ def eliminate_no_prereq(datalist):
         if child_item['prereq'] != '':
             add_item = False
             for parent_item in datalist:
-                if parent_item['name'] in child_item['prereq'] and parent_item['value'].lower() == 'true':
+                if parent_item['name'] in child_item['prereq']:
                     if parent_item['name'] == child_item['prereq'] or '.' in child_item['prereq']:
                         add_item = True
                         break
