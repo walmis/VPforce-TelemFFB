@@ -853,12 +853,16 @@ class SettingsLayout(QGridLayout):
                 dropbox.addItems(validvalues)
                 dropbox.setCurrentText(item['value'])
 
-            if item['datatype'] == 'list' or item['datatype'] == 'enumlist':
-                dropbox.lineEdit().setReadOnly(True)
-                dropbox.editTextChanged.connect(self.dropbox_changed)
+            if item['name'] == 'type' and 'Default' in item['replaced']:
+                # block editing of type for default craft
+                dropbox.setDisabled(True)
             else:
-                dropbox.currentTextChanged.connect(self.dropbox_changed)
-            dropbox.blockSignals(False)
+                if item['datatype'] == 'list' or item['datatype'] == 'enumlist':
+                    dropbox.lineEdit().setReadOnly(True)
+                    dropbox.editTextChanged.connect(self.dropbox_changed)
+                else:
+                    dropbox.currentTextChanged.connect(self.dropbox_changed)
+                dropbox.blockSignals(False)
             self.addWidget(dropbox, i, entry_col, 1, entry_colspan)
             # dropbox.currentTextChanged.connect(self.dropbox_changed)
 
