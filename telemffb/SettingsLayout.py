@@ -938,7 +938,6 @@ class SettingsLayout(QGridLayout):
             label.text_label.setFont(QFont(font_family, font_size))
             expand_button.setVisible(False)
 
-
         if not rowdisabled:
             # for p_item in self.prereq_list:
             #     if p_item['prereq'] == item['name'] : # and p_item['count'] > 1:
@@ -1016,15 +1015,20 @@ class SettingsLayout(QGridLayout):
 
         if item['has_expander'].lower() == 'true' or item['datatype'] == 'group':
             # These are top level config sections that have an expander button but do not have any ".1" sliders
-            label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-            label.text_label.setOpenExternalLinks(False)
             color = "#cc7ee0" if G.useDarkMode else "#ab37c8"              # lighter purple looks better in dark
             color = "#ab37c8" if item['datatype'] == 'group' else color    # unless its big group font
             labeltext = item["name"] if self.show_settings_names else item["displayname"]
-            label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
-            clickaction = "Expand" if item['name'] not in self.expanded_items else "Collapse"
-            label.text_label.setToolTip(f'Click to {clickaction}')
-            label.text_label.linkActivated.connect(expand_button.click)
+            if '.0' not in item['order']:
+                label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
+                clickaction = "Expand" if item['name'] not in self.expanded_items else "Collapse"
+                label.text_label.setToolTip(f'Click to {clickaction}')
+                label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+                label.text_label.setOpenExternalLinks(False)
+                label.text_label.linkActivated.connect(expand_button.click)
+            else:
+                # remove hyperlink formatting of permanently expanded group items
+                label.text_label.setText(f'<a href="#" style="text-decoration: none; color: {color};">{labeltext}</a>')
+                label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
 
         if item['order'][-1:] == '1' and '.' in item['order']:
             # For ".1" config objects, they take the place of the parent setting in the row when enabled so #we
