@@ -48,7 +48,7 @@ class SettingsLayout(QGridLayout):
     prereq_list = []
     ##########
     # debug settings
-    show_col_debug = False      # shows column, span, indent in label tooltip
+    show_col_debug = True      # shows column, span, indent in label tooltip
     show_slider_debug = False   # set to true for slider values shown
     show_order_debug = False    # set to true for order numbers shown
     show_settings_names = False # show setting internal name instead of displayname
@@ -127,7 +127,6 @@ class SettingsLayout(QGridLayout):
 
                 # If parent is a group, force indent = 0 and stop
                 if parent.get('datatype') == 'group':
-                    indent = 0
                     break
 
                 if not skip_increment:
