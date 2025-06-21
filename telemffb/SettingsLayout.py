@@ -1157,7 +1157,7 @@ class SettingsLayout(QGridLayout):
             self.reload_caller()
 
     def dropbox_changed(self):
-        self.trigger_form_reload = False
+        self.trigger_form_reload = True
         sender = self.sender()
         object_name = sender.objectName()
         setting_name = object_name.replace('edb_', '').replace('db_', '')  # handle both db_ and edb_
