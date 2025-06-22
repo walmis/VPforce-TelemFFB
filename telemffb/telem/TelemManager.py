@@ -321,13 +321,12 @@ class TelemManager(QObject, threading.Thread):
         """Initialize a new aircraft when it changes."""
         aircraft_name = aircraft_info.name
         data_source = aircraft_info.data_source
-        module = aircraft_info.module
         
         logging.info(f"New aircraft loaded {aircraft_name}: resetting current aircraft config")
         self.currentAircraftConfig = {}
 
         params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-        Aircraft_Class = self._resolve_aircraft_class(aircraft_info, module, cls_name, params)
+        Aircraft_Class = self._resolve_aircraft_class(aircraft_info, cls_name, params)
         
         self._handle_vpconf_setup(params)
         self._handle_command_runner(params)
@@ -343,23 +342,15 @@ class TelemManager(QObject, threading.Thread):
         self._setup_simconnect_overrides(aircraft_name, data_source)
         self._update_settings_ui()
         self.aircraftUpdated.emit()
-
-    def _resolve_aircraft_class(self, aircraft_info: AircraftInfo, module, cls_name, params):
+    
+    def _resolve_aircraft_class(self, aircraft_info: AircraftInfo, cls_name, params):
         """Resolve the appropriate aircraft class to use."""
-        Aircraft_Class = getattr(module, cls_name, None)
-        
+        Aircraft_Class = getattr(aircraft_info.module, cls_name, None)
         if Aircraft_Class:
             logging.debug(f"CLASS={Aircraft_Class.__name__}")
         
         if not Aircraft_Class or Aircraft_Class.__name__ == "Aircraft":
-            Aircraft_Class = self.resolve_aircraft_class_from_sc(
-                aircraft_info.name, 
-                aircraft_info.data_source, 
-                module, 
-                aircraft_info.sc_aircraft_type, 
-                aircraft_info.sc_engine_type, 
-                params
-            )
+            Aircraft_Class = self.resolve_aircraft_class_from_sc(aircraft_info, params)
         
         return Aircraft_Class
 
@@ -498,11 +489,17 @@ class TelemManager(QObject, threading.Thread):
         try:
             self.telemetryReceived.emit(telem_data)
         except:
-            pass  # Qt object may be destroyed on exit
-
-    def resolve_aircraft_class_from_sc(self, aircraft_name, data_source, module, sc_aircraft_type, sc_engine_type, params):
+            pass  # Qt object may be destroyed on exit    
+    
+    def resolve_aircraft_class_from_sc(self, aircraft_info: AircraftInfo, params):
         """Resolve the aircraft class based on SimConnect data."""
         aircraftClass = None
+        aircraft_name = aircraft_info.name
+        data_source = aircraft_info.data_source
+        module = aircraft_info.module
+        sc_aircraft_type = aircraft_info.sc_aircraft_type
+        sc_engine_type = aircraft_info.sc_engine_type
+        
         if data_source == "MSFS":
             if sc_aircraft_type == "Helicopter":
                 logging.warning("Aircraft definition not found, using SimConnect Data (Helicopter Type)")
