@@ -1,6 +1,8 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import PyInstaller.config
+import libipc_ctypes
+import os
 
 #PyInstaller.config.CONF['distpath'] = "./dist/windows/VPforce-TelemFFB"
 distpath = PyInstaller.config.CONF['distpath'] + "/VPforce-TelemFFB"
@@ -10,7 +12,7 @@ print(distpath)
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[('xplane-plugin/TelemFFB-XPP/64/win.xpl', 'xplane-plugin/TelemFFB-XPP/64'), ('dll/hidapi.dll', '.'), ('simconnect/simconnect.dll', 'simconnect')],
+    binaries=[('xplane-plugin/TelemFFB-XPP/64/win.xpl', 'xplane-plugin/TelemFFB-XPP/64'), ('dll/hidapi.dll', '.'), ('simconnect/simconnect.dll', 'simconnect'), (os.path.join(os.path.dirname(libipc_ctypes.__file__), 'libipc.dll'), '.')],
     datas=[('export/*', 'export'), ('defaults.xml', '.'),  ('config.ini', '.'), ('simconnect/*.json', 'simconnect'), ('_RELEASE_NOTES.txt', '.')],
     hiddenimports=[],
     hookspath=[],
