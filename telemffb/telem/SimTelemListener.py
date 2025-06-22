@@ -18,7 +18,7 @@
 
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from PyQt6 import QtCore
 
@@ -28,6 +28,7 @@ from telemffb.sim.aircrafts_msfs_xp import Aircraft
 from telemffb.telem.IL2Manager import IL2Manager
 from telemffb.telem.NetworkThread import NetworkThread
 from telemffb.telem.SimConnectSock import SimConnectSock
+from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.utils import overrides
 
 
@@ -116,18 +117,21 @@ class SimIL2(SimTelemListener):
 class SimDCS(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("DCS")
-        self.telem : NetworkThread = None
+        self.telem_ipc : Optional[DcsIpcThread] = None
+        self.telem_udp : Optional[NetworkThread] = None # deprecated
 
     @overrides(SimTelemListener)
     def start(self):
         if not self.is_enabled:
             return
 
-        self.telem = NetworkThread(G.telem_manager, host="127.0.0.1", port=34380)
+        self.telem_udp = NetworkThread(G.telem_manager, host="127.0.0.1", port=34380)
+        self.telem_ipc = DcsIpcThread(G.telem_manager)
 
         self.do_validate()
         logging.info("Starting DCS Telemetry Listener")
-        self.telem.start()
+        self.telem_ipc.start()
+        self.telem_udp.start()
         self.started = True
 
     @overrides(SimTelemListener)
@@ -138,15 +142,18 @@ class SimDCS(SimTelemListener):
 
     @overrides(SimTelemListener)
     def stop(self):
-        if self.telem:
-            self.telem.quit()
-            self.telem = None
+        if self.telem_udp:
+            self.telem_udp.quit()
+            self.telem_udp = None
+        if self.telem_ipc:
+            self.telem_ipc.quit()
+            self.telem_ipc = None
             self.started = False
 
 class SimXPLANE(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("XPLANE")
-        self.telem : NetworkThread = None
+        self.telem : Optional[NetworkThread] = None
 
     @overrides(SimTelemListener)
     def start(self):
@@ -177,7 +184,7 @@ class SimXPLANE(SimTelemListener):
 class SimMSFS(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("MSFS")
-        self.telem : NetworkThread = None
+        self.telem : Optional[SimConnectSock] = None
 
     @overrides(SimTelemListener)
     def start(self):
