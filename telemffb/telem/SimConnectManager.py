@@ -492,7 +492,7 @@ class SimConnectManager(threading.Thread):
                     avatar = data.get("_IS AVATAR", False) # in 2024, see if user is controlling avatar
                     rtc = data.get("_IS IN RTC", False) # check if 2024 sim is running realtime cinematic (cut scene)
 
-                    in_menus = data.get('CameraState', 0) not in {2,3,4,5}  # Check the camera state value - workaround for FS2024 telemetry at wrong times https://forums.flightsimulator.com/t/at-the-finish-of-beta-loading-if-start-is-not-click-open-upon-reaching-yosemite-during-2nd-run-of-opening-graphics-telemetry-is-sent-to-motion-platform-causiing-violent-shaking-and-movement/702082/2?u=number4815901
+                    in_menus = data.get('CameraState', 0) not in (2,3,4,5)  # Check the camera state value - workaround for FS2024 telemetry at wrong times https://forums.flightsimulator.com/t/at-the-finish-of-beta-loading-if-start-is-not-click-open-upon-reaching-yosemite-during-2nd-run-of-opening-graphics-telemetry-is-sent-to-motion-platform-causiing-violent-shaking-and-movement/702082/2?u=number4815901
 
                     if self._sim_paused or data.get("Parked", 0) or data.get("Slew", 0) or avatar or rtc or in_menus:
                         data["STOP"] = 1
