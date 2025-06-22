@@ -1219,7 +1219,7 @@ class SettingsLayout(QGridLayout):
         # If it's an enum dropbox, get the enum member name
         if object_name.startswith("edb_"):
             enum_member = sender.itemData(sender.currentIndex())
-            value = enum_member.name if enum_member else sender.currentText()
+            value = enum_member if enum_member else sender.currentText()
         else:
             value = sender.currentText()
 
