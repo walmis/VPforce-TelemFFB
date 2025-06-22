@@ -869,6 +869,8 @@ def scale(val, src: tuple, dst: tuple, return_round=False, return_int=False):
     """
     Scale the given value from the scale of src to the scale of dst.
     """
+    if src[0] == src[1]: # avoid div/0
+        return dst[1]
     result = (val - src[0]) * (dst[1] - dst[0]) / (src[1] - src[0]) + dst[0]
     if return_round:
         return round(result)
