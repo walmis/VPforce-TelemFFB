@@ -30,18 +30,15 @@ from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageB
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton)
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, CenteredClickableComboBox)
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.AdvancedGDialog import AdvancedGDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile, dbprint, HiDpiPixmap
-
+import telemffb.utils as utils
 from . import globals as G
 from . import xmlutils
-
-from telemffb.utils import ENUM_LABEL_REGISTRY
-
 
 class SettingsLayout(QGridLayout):
     expanded_items = []
@@ -248,18 +245,18 @@ class SettingsLayout(QGridLayout):
                 p_list.append({'prereq': item['name'], 'value': item['value'], 'count': count})
         return p_list
 
-    def set_spring_mode(self, mode):
-        for item in datalist:
-            if item['name'] == 'spring_mode':
-                item['value'] = mode
-    def convert_to_springmode(self, datalist):
-        for item in datalist:
-            if item['name'] == 'adv_spr_override_enabled':
-                self.set_spring_mode(self, 'ADVANCED')
-            if item['name'] == 'aircraft_is_spring_centered':
-                self.set_spring_mode(self, 'CENTER')
-            if item['name'] == 'aircraft_is_fbw':
-                self.set_spring_mode(self, 'FBW')
+    # def set_spring_mode(self, mode):
+    #     for item in datalist:
+    #         if item['name'] == 'spring_mode':
+    #             item['value'] = mode
+    # def convert_to_springmode(self, datalist):
+    #     for item in datalist:
+    #         if item['name'] == 'adv_spr_override_enabled':
+    #             self.set_spring_mode(self, 'ADVANCED')
+    #         if item['name'] == 'aircraft_is_spring_centered':
+    #             self.set_spring_mode(self, 'CENTER')
+    #         if item['name'] == 'aircraft_is_fbw':
+    #             self.set_spring_mode(self, 'FBW')
 
     def build_rows(self, datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
@@ -857,42 +854,50 @@ class SettingsLayout(QGridLayout):
             spin_box.valueChanged.connect(self.spin_box_changed)
             self.addWidget(spin_box, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        if item['datatype'] == 'list' or item['datatype'] == 'anylist' or item['datatype'] == 'enumlist':
-            dropbox = QComboBox()
-            dropbox.setMinimumWidth(150)
-            dropbox.setEditable(True)
-            dropbox.lineEdit().setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
-            dropbox.blockSignals(True)
+        if item['datatype'] in ('list', 'anylist', 'enumlist'):
+            if item['datatype'] == 'anylist':
+                dropbox = QComboBox()
+                dropbox.setMinimumWidth(150)
+                dropbox.setEditable(True)
+                dropbox.lineEdit().setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
+                dropbox.blockSignals(True)
+            else:
+                dropbox = CenteredClickableComboBox()
+                dropbox.setMinimumWidth(150)
+                dropbox.blockSignals(True)
+
             if item['datatype'] == 'enumlist':
                 dropbox.setObjectName(f"edb_{item['name']}")
+
                 label_dict_name = item['validvalues']
-                label_dict = ENUM_LABEL_REGISTRY.get(label_dict_name)
-                if label_dict is None:
-                    dropbox.addItem(f"Dict '{label_dict_name}' not found")
+                label_dict = getattr(utils, label_dict_name, None)
+
+                if not isinstance(label_dict, dict):
+                    dropbox.addItem(f"Label dict '{label_dict_name}' not found or invalid")
                 else:
-                    # Determine the enum class from one of the dictionary keys
-                    enum_class = type(next(iter(label_dict)))
+                    try:
+                        enum_class = type(next(iter(label_dict)))
+                    except StopIteration:
+                        dropbox.addItem("Label dictionary is empty")
+                        enum_class = None
+
                     for enum_member, the_label in label_dict.items():
                         dropbox.addItem(the_label, enum_member)
-                    if item['value'] != '':
-                        try:
-                            # Try converting the string to the enum member using the enum class
-                            enum_member = enum_class[item['value']]
 
-                            # Match by enum member (preferred)
+                    if enum_class and item['value']:
+                        try:
+                            enum_member = enum_class[item['value']]
                             for index in range(dropbox.count()):
                                 if dropbox.itemData(index) == enum_member:
                                     dropbox.setCurrentIndex(index)
                                     break
-
-                        except KeyError:
-                            # If not a valid enum name, try matching by label text (legacy saved value)
+                        except (KeyError, ValueError):
                             for index in range(dropbox.count()):
                                 if dropbox.itemText(index) == item['value']:
                                     dropbox.setCurrentIndex(index)
                                     enum_member = dropbox.itemData(index)
                                     if enum_member:
-                                        item['value'] = enum_member.name  # Update value to enum name
+                                        item['value'] = enum_member.name
                                     break
                             else:
                                 dropbox.addItem(f"Invalid enum value: {item['value']}")
@@ -1219,7 +1224,7 @@ class SettingsLayout(QGridLayout):
         # If it's an enum dropbox, get the enum member name
         if object_name.startswith("edb_"):
             enum_member = sender.itemData(sender.currentIndex())
-            value = enum_member if enum_member else sender.currentText()
+            value = enum_member.name if enum_member else sender.currentText()
         else:
             value = sender.currentText()
 
