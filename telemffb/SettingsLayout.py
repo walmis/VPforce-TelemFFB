@@ -910,6 +910,7 @@ class SettingsLayout(QGridLayout):
 
             if item['name'] == 'type' and 'Default' in item['replaced']:
                 # block editing of type for default craft
+                dropbox.lineEdit().removeEventFilter(dropbox) # Disable expand of items when clicking on lineEdit area (req'd for custom widget type)
                 dropbox.setDisabled(True)
             else:
                 if item['datatype'] == 'list' or item['datatype'] == 'enumlist':

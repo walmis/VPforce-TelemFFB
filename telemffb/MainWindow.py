@@ -44,7 +44,7 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
-from telemffb.config_utils import autoconvert_config
+# from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.custom_widgets import (ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider,
                                      NoWheelNumberSlider, SimStatusLabel, vpf_purple)
@@ -244,13 +244,13 @@ class MainWindow(QMainWindow):
         reload_action.triggered.connect(self.force_reload_aircraft)
         utilities_menu.addAction(reload_action)
 
-        # Add settings converter
-        _legacy_override_file = utils.get_legacy_override_file()
-        if _legacy_override_file is not None:
-            convert_settings_action = QAction('Convert legacy user config to XML', self)
-            _legacy_config_file = utils.get_resource_path('config.ini')
-            convert_settings_action.triggered.connect(lambda: autoconvert_config(self, _legacy_config_file, _legacy_override_file))
-            utilities_menu.addAction(convert_settings_action)
+        # # Add settings converter
+        # _legacy_override_file = utils.get_legacy_override_file()
+        # if _legacy_override_file is not None:
+        #     convert_settings_action = QAction('Convert legacy user config to XML', self)
+        #     _legacy_config_file = utils.get_resource_path('config.ini')
+        #     convert_settings_action.triggered.connect(lambda: autoconvert_config(self, _legacy_config_file, _legacy_override_file))
+        #     utilities_menu.addAction(convert_settings_action)
 
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
             self.window_menu = self.menu.addMenu('Window')
@@ -515,16 +515,21 @@ class MainWindow(QMainWindow):
         test_sim_lbl = QLabel('Sim:')
         test_sim_lbl.setMaximumWidth(30)
         test_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        sims = ['', 'DCS', 'IL2', 'MSFS', 'XPLANE']
         self.test_sim = QComboBox()
         self.test_sim.setMaximumWidth(60)
+        sims = [''] + xmlutils.get_sims()
         self.test_sim.addItems(sims)
         self.test_sim.currentTextChanged.connect(self.test_sim_changed)
+        test_class_lbl = QLabel('Class:')
+        test_class_lbl.setMaximumWidth(30)
+        test_class_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.test_class = QComboBox()
+        self.test_class.currentTextChanged.connect(self.test_class_changed)
         test_name_lbl = QLabel('Aircraft Name:')
         test_name_lbl.setMaximumWidth(90)
         test_name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.test_name = QComboBox()
-        self.test_name.setMinimumWidth(100)
+        self.test_name.setMinimumWidth(80)
         self.test_name.setEditable(False)
         self.test_name.currentTextChanged.connect(self.test_aircraft_changed)
 
@@ -534,6 +539,8 @@ class MainWindow(QMainWindow):
         self.test_button.clicked.connect(self.force_sim_aircraft)
         test_craft_layout.addWidget(test_sim_lbl)
         test_craft_layout.addWidget(self.test_sim)
+        test_craft_layout.addWidget(test_class_lbl)
+        test_craft_layout.addWidget(self.test_class)
         test_craft_layout.addWidget(test_name_lbl)
         test_craft_layout.addWidget(self.test_name)
         test_craft_layout.addWidget(self.test_button)
@@ -1194,12 +1201,24 @@ class MainWindow(QMainWindow):
 
         self.update_settings()
 
-    def test_sim_changed(self):
-        models = xmlutils.read_models(self.test_sim.currentText())
-        self.test_name.blockSignals(True)
+    def test_class_changed(self, class_name):
+        models = xmlutils.read_models(self.test_sim.currentText(), class_name)
         self.test_name.clear()
-        self.test_name.addItems(models)
-        self.test_name.blockSignals(False)
+        for model_name in models:
+            self.test_name.addItem(model_name)
+        if G.master_instance:
+            G.ipc_instance.send_broadcast_message(f"DBG_SELECT_CLASS:{self.test_class.currentText()}")
+
+    def test_sim_changed(self, sim=None):
+        classes = xmlutils.get_classes_for_sim(sim)
+        self.test_class.clear()
+        self.test_class.addItem('')
+        for class_name in classes:
+            self.test_class.addItem(class_name)
+        self.test_name.clear()
+        models = xmlutils.read_models(sim)
+        for model_name in models:
+            self.test_name.addItem(model_name)
         if G.master_instance:
             G.ipc_instance.send_broadcast_message(f"DBG_SELECT_SIM:{self.test_sim.currentText()}")
 
@@ -1320,6 +1339,7 @@ class MainWindow(QMainWindow):
 
     def force_sim_aircraft(self):
         G.settings_mgr.current_sim = self.test_sim.currentText()
+        G.settings_mgr.current_class = self.test_class.currentText()
         G.settings_mgr.current_aircraft_name = self.test_name.currentText()
         self.settings_layout.expanded_items.clear()
         self.monitor_widget.hide()

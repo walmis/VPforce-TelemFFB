@@ -82,6 +82,29 @@ def update_vars(_device, _userconfig_path, _defaults_path):
     userconfig_path = _userconfig_path
     defaults_path = _defaults_path
 
+def get_classes_for_sim(sim):
+    tree = try_parse(defaults_path)
+    root = tree.getroot()
+    classes = []
+    # print(f"LOOKING FOR CLASSES FOR SIM {sim}")
+    for elem in root.findall(f'.//classes[sim="{sim}"]'):
+        class_name = elem.find('class_name')
+        if class_name is not None:
+            name = class_name.text
+            if name is not None:
+                classes.append(name)
+    return classes
+
+def get_sims():
+    tree = try_parse(defaults_path)
+    root = tree.getroot()
+    sims = []
+    for elem in root.findall(f'.//sims'):
+        sim_name = elem.find('sim')
+        if sim_name is not None:
+            name = sim_name.text
+            sims.append(name)
+    return sims
 
 def read_xml_file(the_sim, instance_device=''):
     mprint(f"read_xml_file  {the_sim}")

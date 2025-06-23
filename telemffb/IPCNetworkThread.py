@@ -234,6 +234,9 @@ class IPCNetworkThread(QThread):
                 elif msg.startswith("DBG_SELECT_SIM:"):
                     sim = msg.removeprefix("DBG_SELECT_SIM:")
                     G.main_window.test_sim.setCurrentText(sim)
+                elif msg.startswith("DBG_SELECT_CLASS:"):
+                    class_name = msg.removeprefix("DBG_SELECT_CLASS:")
+                    G.main_window.test_class.setCurrentText(class_name)
                 elif msg.startswith("DBG_SELECT_AC:"):
                     ac = msg.removeprefix("DBG_SELECT_AC:")
                     G.main_window.test_name.setCurrentText(ac)

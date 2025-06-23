@@ -110,12 +110,19 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_device.addItem('collective')
         self.drp_device.setCurrentText(self.device)
         self.drp_device.currentTextChanged.connect(self.update_device_scope)
+        # self.drp_sim.currentTextChanged.connect(self.update_classes)
         self.init_ui()
 
     @classmethod
     def update_state_vars(cls, **kwargs):
         for key, value in kwargs.items():
             setattr(cls, key, value)
+
+    def update_classes(self, sim):
+        classes = xmlutils.get_classes_for_sim(sim)
+        self.drp_class.clear()
+        for class_name in classes:
+            self.drp_class.addItem(class_name)
 
     def update_device_scope(self, dev):
         self.device = dev

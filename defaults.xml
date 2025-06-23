@@ -4900,7 +4900,7 @@
 		<pedals>true</pedals>
 		<value>false</value>
 	</defaults>
-	<sc_overrides>
+<sc_overrides>
 		<name>EngRPM</name>
 		<model>FlyInside B206.*</model>
 		<var>L:Aircraft.Engine.1.Turbine.N2.Smooth</var>
@@ -16674,4 +16674,84 @@
 		<sim>XPLANE</sim>
 		<device>any</device>
 	</models>
+	<classes>
+		<sim>DCS</sim>
+		<class_name>PropellerAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>DCS</sim>
+		<class_name>JetAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>DCS</sim>
+		<class_name>Helicopter</class_name>
+	</classes>
+	<classes>
+		<sim>IL2</sim>
+		<class_name>PropellerAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>IL2</sim>
+		<class_name>JetAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>PropellerAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>JetAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>TurbopropAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>GliderAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>Helicopter</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>HPGHelicopter</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>SASHelicopter</class_name>
+	</classes>
+	<classes>
+		<sim>XPLANE</sim>
+		<class_name>PropellerAircraft</class_name>
+		</classes>
+	<classes>
+		<sim>XPLANE</sim>
+		<class_name>JetAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>XPLANE</sim>
+		<class_name>TurbopropAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>XPLANE</sim>
+		<class_name>GliderAircraft</class_name>
+	</classes>
+	<classes>
+		<sim>XPLANE</sim>
+		<class_name>Helicopter</class_name>
+		</classes>
+	<sims>
+		<sim>DCS</sim>
+	</sims>
+	<sims>
+		<sim>IL2</sim>
+	</sims>
+	<sims>
+		<sim>MSFS</sim>
+	</sims>
+	<sims>
+		<sim>XPLANE</sim>
+	</sims>
 </TelemFFB>
