@@ -386,7 +386,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
-		<datatype>enumlist</datatype>
+		<datatype>bool</datatype>
 		<grouping>SpringCenter</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>700.2</order>
@@ -394,7 +394,6 @@
 		<displayname>Pedal Spring Mode</displayname>
 		<prereq>pedal_mode_dummy</prereq>
 		<info>Pedal spring mode.  See manual for use.</info>
-		<validvalues>PEDAL_MODE_LABELS</validvalues>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -1418,7 +1417,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.61</order>
+		<order>2100.62</order>
 		<name>hands_on_deadzone</name>
 		<displayname>Hands On Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1431,7 +1430,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.62</order>
+		<order>2100.63</order>
 		<name>hands_off_deadzone</name>
 		<displayname>Hands Off Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1444,7 +1443,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.71</order>
+		<order>2100.72</order>
 		<name>feet_on_deadzone</name>
 		<displayname>Feet On Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1457,7 +1456,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.72</order>
+		<order>2100.73</order>
 		<name>feet_off_deadzone</name>
 		<displayname>Feet Off Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -7175,15 +7174,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>trim_following</name>
-			<type>HPGHelicopter</type>
-			<value>false</value>
+			<type>!HPGHelicopter</type>
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>trim_following</name>
-			<type>HPGHelicopter</type>
-			<value>false</value>
+			<type>!HPGHelicopter</type>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
