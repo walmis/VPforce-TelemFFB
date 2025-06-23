@@ -314,7 +314,7 @@ class SettingsLayout(QGridLayout):
         #     dbprint("green", f"Function {frame_info.function} in {frame_info.filename} at line {frame_info.lineno}")
         self.clear_layout()
         if result is None:
-            cls, pat, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
+            cls, pat, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name, G.settings_mgr.current_class)
             G.settings_mgr.current_pattern = pat
         if result is not None:
             self.build_rows(result)
