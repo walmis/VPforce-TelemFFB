@@ -40,6 +40,7 @@ import time
 from typing import List, Dict
 from telemffb.hw.ffb_rhino import HapticEffect, FFBReport_SetCondition
 import telemffb.utils as utils
+from telemffb.utils import SpringMode
 import telemffb.globals as G
 import logging
 import random

@@ -2195,40 +2195,42 @@ class HiDpiPixmap(QPixmap):
         scaled_pixmap.setDevicePixelRatio(ratio)
         return scaled_pixmap
 
-class JoystickSpringMode(Enum):
+class SpringMode(Enum):
+    NONE = auto()
     BASIC = auto()
     CENTER = auto()
     ADVANCED = auto()
     FBW = auto()
-
-
-JOYSTICK_MODE_LABELS = {
-    JoystickSpringMode.BASIC: "Basic Dynamic",
-    JoystickSpringMode.CENTER: "Basic Dynamic with Spring Centering",
-    JoystickSpringMode.ADVANCED: "Advanced Dynamic",
-    JoystickSpringMode.FBW: "FlyByWire (FBW)"
-}
-
-class PedalSpringMode(Enum):
     DEFAULT = auto()
     NOSPRING = auto()
     STATIC = auto()
     DYNAMIC = auto()
     CUSTOM = auto()
-    ADVANCED = auto()
 
-
-PEDAL_MODE_LABELS = {
-    PedalSpringMode.DEFAULT: "Sim Default",
-    PedalSpringMode.NOSPRING: "No Spring",
-    PedalSpringMode.STATIC: "Static Spring",
-    PedalSpringMode.DYNAMIC: "Dynamic Spring",
-    PedalSpringMode.CUSTOM: "Dynamic with Custom Speeds",
-    PedalSpringMode.ADVANCED: "Advanced Spring Override"
+MSFS_XP_SPRING_MODE = {
+    SpringMode.BASIC: "Basic Dynamic",
+    SpringMode.CENTER: "Basic Dynamic with Spring Centering",
+    SpringMode.FBW: "FlyByWire (FBW)",
+    SpringMode.ADVANCED: "Advanced Dynamic"
 }
 
-ENUM_LABEL_REGISTRY = {
-    "JOYSTICK_MODE_LABELS": JOYSTICK_MODE_LABELS,
-    "PEDAL_MODE_LABELS": PEDAL_MODE_LABELS
-    # Add other mappings here as needed
+DCS_IL2_PEDAL_MODE = {
+    SpringMode.NONE: "None (Game Managed)",
+    SpringMode.NOSPRING: "No Spring (Free Floating)",
+    SpringMode.STATIC: "Static Spring",
+    SpringMode.DYNAMIC: "Dynamic Spring",
+    SpringMode.CUSTOM: "Dynamic with Custom Speeds",
+    SpringMode.ADVANCED: "Advanced Dynamic"
+}
+DCS_IL2_JOYSTICK_MODE = {
+    SpringMode.NONE: "None (Game Managed)",
+    SpringMode.CUSTOM: "Static Override w/ Hardware Trim",
+    SpringMode.ADVANCED: "Advanced Dynamic"
+}
+
+TEST_SPRING_MODE = {
+    SpringMode.BASIC: "TEST Dynamic",
+    SpringMode.CENTER: "TEST Dynamic with Spring Centering",
+    SpringMode.ADVANCED: "TEST Advanced Dynamic",
+    SpringMode.FBW: "TEST (FBW)"
 }

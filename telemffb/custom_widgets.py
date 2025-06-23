@@ -18,7 +18,7 @@
 
 from PyQt6.QtGui import QAction
 
-from PyQt6 import QtWidgets, QtCore
+from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
     QComboBox, QMessageBox, QMenu, QPushButton
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
@@ -39,6 +39,30 @@ from telemffb.utils import HiDpiPixmap
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
+class CenteredClickableComboBox(QComboBox):
+    # Custom combo box widget that both allows disabled line-edit as well as clicking on the main part of the widget to expand
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setEditable(True)
+        # Disable the focus stealing of the internal QLineEdit
+        self.lineEdit().setReadOnly(True)
+        self.lineEdit().setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
+        self.lineEdit().installEventFilter(self)
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent):
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self.showPopup()
+        super().mousePressEvent(event)
+
+    def wheelEvent(self, event):
+        # ignore mouse wheel
+        pass
+
+    def eventFilter(self, obj, event):
+        if obj == self.lineEdit() and event.type() == QtCore.QEvent.Type.MouseButtonPress:
+            self.showPopup()
+            return True
+        return super().eventFilter(obj, event)
 
 class NoKeyScrollArea(QScrollArea):
     def __init__(self):

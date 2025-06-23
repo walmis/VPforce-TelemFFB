@@ -95,7 +95,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
-		<validvalues>JOYSTICK_MODE_LABELS</validvalues>
+		<validvalues>MSFS_XP_SPRING_MODE</validvalues>
 		<value>BASIC</value>
 	</defaults>
 	<defaults>
@@ -111,7 +111,7 @@
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
-		<validvalues>JOYSTICK_MODE_LABELS</validvalues>
+		<validvalues>MSFS_XP_SPRING_MODE</validvalues>
 		<value>BASIC</value>
 	</defaults>
 	<defaults>
@@ -349,13 +349,28 @@
 		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>baslic</parentgroup>
-		<order>650</order>
-		<name>pedal_mode</name>
+		<order>650.0</order>
+		<name>spring_mode</name>
+		<displayname>Joystick Spring Mode</displayname>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<validvalues>DCS_IL2_JOYSTICK_MODE</validvalues>
+		<value>NONE</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>enumlist</datatype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>baslic</parentgroup>
+		<order>650.0</order>
+		<name>spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
-		<validvalues>PEDAL_MODE_LABELS</validvalues>
+		<validvalues>DCS_IL2_PEDAL_MODE</validvalues>
+		<value>DYNAMIC</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -367,9 +382,6 @@
 		<displayname>Pedal Mode Settings</displayname>
 		<exclusive_with>adv_spr_override_enabled</exclusive_with>
 		<prereq>basic_group</prereq>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
 		<value>true</value>
 	</defaults>
 	<defaults>
@@ -382,9 +394,6 @@
 		<displayname>Pedal Spring Mode</displayname>
 		<prereq>pedal_mode_dummy</prereq>
 		<info>Pedal spring mode.  See manual for use.</info>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
 		<validvalues>PEDAL_MODE_LABELS</validvalues>
 	</defaults>
 	<defaults>
@@ -395,25 +404,13 @@
 		<order>700.3</order>
 		<name>pedal_spring_gain</name>
 		<displayname>Pedal Spring Gain</displayname>
-		<prereq>pedal_mode_dummy</prereq>
+		<prereq>spring_mode.STATIC.DYNAMIC.CUSTOM</prereq>
 		<info>Percent of spring setting in VPForce Configurator</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
 		<value>.75</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>700.4</order>
-		<name>pedal_dampening_gain</name>
-		<displayname>Pedal Dampening Gain</displayname>
-		<prereq>pedal_mode_dummy</prereq>
-		<info>Percent of damper setting in VPForce Configurator</info>
-		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -425,9 +422,6 @@
 		<displayname>Advanced Pedal Mode Settings (Dynamic Mode Only)</displayname>
 		<prereq>pedal_mode_dummy</prereq>
 		<info>Advanced Pedal Mode Settings - Dynamic Spring mode only.</info>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<pedals>true</pedals>
 		<value>false</value>
 	</defaults>
 	<defaults>
@@ -438,7 +432,7 @@
 		<order>750.2</order>
 		<name>aircraft_vs_speed</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Stall Speed V&lt;span style=" vertical-align:sub;"&gt;S&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>pedal_advanced_dummy</prereq>
+		<prereq>spring_mode.CUSTOM</prereq>
 		<info>Stall Speed</info>
 		<any>true</any>
 		<DCS>true</DCS>
@@ -456,7 +450,7 @@
 		<order>750.3</order>
 		<name>aircraft_vs_gain</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;S&lt;/span&gt; Gain&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>pedal_advanced_dummy</prereq>
+		<prereq>spring_mode.CUSTOM</prereq>
 		<info>Spring gain when aircraft at Vs</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -472,7 +466,7 @@
 		<order>750.4</order>
 		<name>aircraft_vne_speed</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Never Exceed Speed V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>pedal_advanced_dummy</prereq>
+		<prereq>spring_mode.CUSTOM</prereq>
 		<info>Never Exceed Speed</info>
 		<any>true</any>
 		<DCS>true</DCS>
@@ -490,13 +484,155 @@
 		<order>750.5</order>
 		<name>aircraft_vne_gain</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Gain&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>pedal_advanced_dummy</prereq>
+		<prereq>spring_mode.CUSTOM</prereq>
 		<info>Spring gain when aircraft is at Vne</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
+	</defaults>
+	<defaults></defaults>
+	<defaults></defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>760</order>
+		<name>adv_spr_override_enabled</name>
+		<displayname>Advanced Spring Override</displayname>
+		<exclusive_with>override_spring_enabled,pedal_mode_dummy</exclusive_with>
+		<prereq>basic_group</prereq>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>advspr</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>770</order>
+		<name>adv_spr_gains</name>
+		<displayname>Advanced Spring Override</displayname>
+		<prereq>spring_mode.ADVANCED</prereq>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>none</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>770.2</order>
+		<name>adv_spr_use_game_trim</name>
+		<displayname>Use Game Trim</displayname>
+		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
+		<prereq>spring_mode.ADVANCED</prereq>
+		<value>true</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>770.3</order>
+		<name>adv_spr_use_hardware_trim</name>
+		<displayname>Use Hardware Trim</displayname>
+		<exclusive_with>adv_spr_use_game_trim,pedal_trimming_enabled</exclusive_with>
+		<prereq>spring_mode.ADVANCED</prereq>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>button</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>770.32</order>
+		<name>override_spring_trim_down</name>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<prereq>adv_spr_use_hardware_trim</prereq>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>button</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>770.33</order>
+		<name>override_spring_trim_up</name>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<prereq>adv_spr_use_hardware_trim</prereq>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>button</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>770.34</order>
+		<name>override_spring_trim_left</name>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<prereq>adv_spr_use_hardware_trim</prereq>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>button</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>770.35</order>
+		<name>override_spring_trim_right</name>
+		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
+		<prereq>adv_spr_use_hardware_trim</prereq>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>d_int</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>770.36</order>
+		<name>override_spring_trim_rate</name>
+		<displayname>Trim Slew Rate</displayname>
+		<prereq>adv_spr_use_hardware_trim</prereq>
+		<info>Rate at which the trim will move.&lt;br&gt;&lt;br&gt;Calculated as "steps per second" (1 step =1/8192 of total throw)</info>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<sliderfactor>1</sliderfactor>
+		<validvalues>0,1000</validvalues>
+		<value>200</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>780</order>
+		<name>pedal_trimming_enabled</name>
+		<displayname>Pedal Trimming</displayname>
+		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
+		<prereq>basic_group</prereq>
+		<info>Enable pedal trimming feedback for fixed wing aircfraft</info>
+		<DCS>true</DCS>
+		<pedals>true</pedals>
 	</defaults>
 	<defaults></defaults>
 	<defaults></defaults>
@@ -511,8 +647,6 @@
 		<exclusive_with>adv_spr_override_enabled</exclusive_with>
 		<prereq>basic_group</prereq>
 		<info>Override the spring effect set by DCS&lt;br&gt;&lt;br&gt;Warning: If you enable this for an official DCS module that has FFB Support, all DCS generated spring effects will cease to function, including dynamic forces and trim.&lt;br&gt;&lt;br&gt;Note: Not compatible with 'Trim Workaround' or 'Trim Release Damper' features</info>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
 	<defaults>
@@ -523,7 +657,7 @@
 		<order>800.2</order>
 		<name>override_spring_gain</name>
 		<displayname>Override DCS Spring Gain</displayname>
-		<prereq>override_spring_enabled</prereq>
+		<prereq>spring_mode.CUSTOM</prereq>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
@@ -537,7 +671,7 @@
 		<order>900</order>
 		<name>override_spring_ft_enabled</name>
 		<displayname>Hardware Force Trim</displayname>
-		<prereq>override_spring_enabled</prereq>
+		<prereq>spring_mode.CUSTOM</prereq>
 		<info>Bindings and other options for force trim release and hat based hardware trim</info>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
@@ -1036,153 +1170,6 @@
 		<info>Apply artificial trim movement - only for aircraft that do not support native FFB trim&lt;b&gt;&lt;b&gt;(AV8B, Mig-19)</info>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1800</order>
-		<name>pedal_trimming_enabled</name>
-		<displayname>Pedal Trimming</displayname>
-		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
-		<prereq>basic_group</prereq>
-		<info>Enable pedal trimming feedback for fixed wing aircfraft</info>
-		<DCS>true</DCS>
-		<pedals>true</pedals>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1900</order>
-		<name>adv_spr_override_enabled</name>
-		<displayname>Advanced Spring Override</displayname>
-		<exclusive_with>override_spring_enabled,pedal_mode_dummy</exclusive_with>
-		<prereq>basic_group</prereq>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<value>false</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>advspr</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1900.1</order>
-		<name>adv_spr_gains</name>
-		<displayname>Advanced Spring Override</displayname>
-		<prereq>adv_spr_override_enabled</prereq>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<value>none</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1900.2</order>
-		<name>adv_spr_use_game_trim</name>
-		<displayname>Use Game Trim</displayname>
-		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
-		<prereq>adv_spr_override_enabled</prereq>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<value>true</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1900.3</order>
-		<name>adv_spr_use_hardware_trim</name>
-		<displayname>Use Hardware Trim</displayname>
-		<exclusive_with>adv_spr_use_game_trim,pedal_trimming_enabled</exclusive_with>
-		<prereq>adv_spr_override_enabled</prereq>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<value>false</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1900.31</order>
-		<name>override_spring_trim_down</name>
-		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>adv_spr_use_hardware_trim</prereq>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<value>0</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1900.32</order>
-		<name>override_spring_trim_up</name>
-		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>adv_spr_use_hardware_trim</prereq>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<value>0</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1900.33</order>
-		<name>override_spring_trim_left</name>
-		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>adv_spr_use_hardware_trim</prereq>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<value>0</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1900.34</order>
-		<name>override_spring_trim_right</name>
-		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>adv_spr_use_hardware_trim</prereq>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<value>0</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>d_int</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1900.35</order>
-		<name>override_spring_trim_rate</name>
-		<displayname>Trim Slew Rate</displayname>
-		<prereq>adv_spr_use_hardware_trim</prereq>
-		<info>Rate at which the trim will move.&lt;br&gt;&lt;br&gt;Calculated as "steps per second" (1 step =1/8192 of total throw)</info>
-		<DCS>true</DCS>
-		<joystick>true</joystick>
-		<pedals>true</pedals>
-		<sliderfactor>1</sliderfactor>
-		<validvalues>0,1000</validvalues>
-		<value>200</value>
 	</defaults>
 	<defaults>
 		<datatype>bool</datatype>
