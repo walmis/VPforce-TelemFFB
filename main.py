@@ -105,7 +105,7 @@ def main():
 
     G.master_instance = not G.args.child
 
-    if G.master_instance:
+    if G.master_instance and not G.allow_multi_instance:
         # Attempt to acquire a mutex lock.  If the acquisition fails, another master instance of TelemFFB is already running.
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Icon.Warning)
