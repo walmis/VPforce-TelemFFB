@@ -16,7 +16,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from typing import TYPE_CHECKING, Dict, Optional, Any
 if TYPE_CHECKING:
     # from PyQt5.QtCore import QSettings
@@ -36,11 +35,12 @@ is_exe: bool = False
 args : 'CmdLineArgs'
 
 # Version and build configuration
-release_version : bool = False
+release_version : bool = False  # When true, build version will be 'release_version_str' and will not look for updates
 release_version_str: str = "Vx.x.x"
-dev_build : bool = False # when True, build versions will use 'dev_build_str' as the version string and will not look for updates
+dev_build : bool = False # when True, build versions will use 'dev_build_str', will use a dev branded logo and will not look for updates
 dev_userconfig: bool = True  # will use/create userconfig.xml in root when True (dev_build must also be true)
 dev_build_str: str = "DEV_BUILD"
+allow_multi_instance: bool = False  # if true, will skip mutex lock checks and allow multiple instances to run simultaneously
 vpf_logo: str = ":/image/vpforcelogo.png"
 
 # UI components
@@ -55,6 +55,8 @@ userconfig_path : str = ""
 defaults_path : str = ""
 current_vpconf_profile : Optional[str] = None
 current_device_config_scope: Optional[str] = None # add current device config scope to globals for tracking across telemffb modules
+current_offline_config_scope: Optional[str] = None  # Tracks scope of offline config mode for checking in settings_mgr
+offline_config_mode: bool = False  # Tracks offline config mode for checking in settings_mgr
 
 # Device information
 device_type : str = ""
@@ -83,7 +85,7 @@ child_buttons: Dict[str, Any] = {}
 # System components
 system_settings : 'SystemSettings'
 telem_manager : 'TelemManager'
-sim_listeners : 'SimListenerManager' 
+sim_listeners : 'SimListenerManager'
 
 # Triggers and flags
 force_reload_aircraft_trigger: bool = False
