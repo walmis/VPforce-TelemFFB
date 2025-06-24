@@ -993,13 +993,13 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
                 case 'Sim':
                     lprint(
                         f"Remove - {self.sim}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    xmlutils.erase_sim_from_xml(self.sim,data_dict['value'], data_dict['name'])
+                    xmlutils.erase_sim_from_xml(self.sim, data_dict['name'])
                     # self.drp_sim.setCurrentText('')
                     # self.drp_sim.setCurrentText(mysim)
                 case 'Class':
                     lprint(
                         f"Remove - {self.sim}.{self.drp_class.currentText()}, Name: {data_dict['name']}, value: {data_dict['value']}, State: {state}, Edit: {self.edit_mode}")
-                    xmlutils.erase_class_from_xml(self.sim,self.drp_class.currentText(), data_dict['value'], data_dict['name'])
+                    xmlutils.erase_class_from_xml(self.sim,self.drp_class.currentText(), data_dict['name'])
                     # self.drp_class.setCurrentText('')
                     # self.drp_class.setCurrentText(myclass)
                 case 'Model':
