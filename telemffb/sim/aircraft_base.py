@@ -33,13 +33,13 @@ from telemffb.utils import SpringMode, GEffectMode
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
-effects: Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
+effects: utils.Dispenser = utils.Dispenser(HapticEffect)
 
 # Highpass filter dispenser
-HPFs: Dict[str, utils.HighPassFilter] = utils.Dispenser(utils.HighPassFilter)
+HPFs: utils.Dispenser = utils.Dispenser(utils.HighPassFilter)
 
 # Lowpass filter dispenser
-LPFs: Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
+LPFs: utils.Dispenser = utils.Dispenser(utils.LowPassFilter)
 
 perftracker = utils.PerformanceTracker()
 
@@ -336,9 +336,6 @@ class AircraftBase(object):
 
         self.friction_effect_overridden: bool = False
 
-        self.friction_effect_overridden: bool = False
-
-        self.friction_effect_overridden: bool = False
 
         self.spring_mode = SpringMode.NONE.name
         self.gforce_effect_mode = GEffectMode.DISABLED.name
@@ -412,6 +409,14 @@ class AircraftBase(object):
         return data['value']
 
     def apply_settings(self, settings_dict):
+        """Apply settings from a configuration dictionary to the aircraft instance.
+
+        Args:
+            settings_dict (dict): Dictionary containing configuration key-value pairs.
+                                Keys should match aircraft attribute names.
+
+        Logs warnings for unknown parameters and info for each applied setting.
+        """
         for k, v in settings_dict.items():
             if k in ["type"]: continue
             if getattr(self, k, None) is None and k != 'vpconf' and 'dummy' not in k and 'command_runner' not in k:
@@ -421,6 +426,17 @@ class AircraftBase(object):
             setattr(self, k, v)
 
     def has_changed(self, item: str, delta_ms=0, data=None) -> bool:
+        """Check if a telemetry data item has changed since last call.
+
+        Args:
+            item (str): Name of the telemetry data item to check
+            delta_ms (int, optional): Time window in milliseconds to consider as "recently changed". Defaults to 0.
+            data (dict, optional): Telemetry data dictionary to use. Defaults to self._telem_data.
+
+        Returns:
+            bool: True if the item changed, False otherwise.
+                 If the item changed, returns a tuple (prev_val, new_val) instead.
+        """
         if data == None:
             data = self._telem_data
 
@@ -443,21 +459,46 @@ class AircraftBase(object):
         return False
 
     def flag_error(self, message):
+        """Flag an error message for display in the UI.
+
+        Args:
+            message (str): Error message to display
+        """
         dev = self.telem_data.get('FFBType', 'joystick').capitalize()
         self.telem_data['error'] = message
         if not master_instance:
             self._ipc_telem['error'] = f"{dev}: {message}"
 
     def is_joystick(self):
+        """Check if the current FFB device is a joystick.
+
+        Returns:
+            bool: True if device is a joystick, False otherwise
+        """
         return self._telem_data.get("FFBType", "joystick") == "joystick"
     
     def is_pedals(self):
+        """Check if the current FFB device is pedals.
+
+        Returns:
+            bool: True if device is pedals, False otherwise
+        """
         return self._telem_data.get("FFBType") == "pedals"
 
     def is_collective(self):
+        """Check if the current FFB device is a collective.
+
+        Returns:
+            bool: True if device is a collective, False otherwise
+        """
         return self._telem_data.get("FFBType") == "collective"
 
     def is_trimwheel(self):
+        """Check if the current FFB device is a trim wheel.
+
+        Returns:
+            bool: True if device is a trim wheel, False otherwise
+        """
         return self._telem_data.get("FFBType") == "trimwheel"
 
 
@@ -492,23 +533,47 @@ class AircraftBase(object):
         return False
     
     def _sim_is_msfs(self, *unused):
+        """Check if the current simulator is Microsoft Flight Simulator.
+
+        Returns:
+            int: 1 if MSFS, 0 otherwise
+        """
         if self._telem_data.get("src") == "MSFS":
             return 1
         else:
             return 0
 
     def _sim_is_xplane(self):
+        """Check if the current simulator is X-Plane.
+
+        Returns:
+            bool: True if X-Plane, False otherwise
+        """
         if self._telem_data.get('src') == "XPLANE":
             return True
         else:
             return False
 
     def _sim_is_dcs(self, *unused):
+        """Check if the current simulator is DCS World.
+
+        Returns:
+            int: 1 if DCS, 0 otherwise
+        """
         if self._telem_data.get("src") == "DCS":
             return 1
         else:
             return 0
+
     def _sim_is(self, sim, *unused):
+        """Check if the current simulator matches the specified name.
+
+        Args:
+            sim (str): Simulator name to check against
+
+        Returns:
+            int: 1 if matches, 0 otherwise
+        """
         if self._telem_data.get('src') == sim:
             return 1
         else:
@@ -582,6 +647,15 @@ class AircraftBase(object):
             effects.dispose("runway1")
 
     def new_gforce_effect(self, telem_data):
+        """Apply new G-force effects based on aircraft acceleration.
+
+        Generates force feedback effects that vary with G-forces experienced by the aircraft.
+        The effect strength is modulated by stick deflection and can handle both positive
+        and negative G-forces if configured.
+
+        Args:
+            telem_data (dict): Telemetry data containing acceleration information
+        """
         if not self.is_joystick() or not self.gforce_mode_is(GEffectMode.NEW) or self.gforce_mode_is(GEffectMode.DISABLED):
             effects.dispose("new_gforce")
             return
@@ -1970,13 +2044,14 @@ class AircraftBase(object):
 
 
 
-    def on_event(self):
+    def on_event(self, event, *args):
         pass
 
     def on_timeout(self):  # override me
         logging.info("Telemetry Timeout, stopping effects")
         # effects.foreach(lambda e: e.stop())
         for key, effect in effects.dict.items():
+            effect: HapticEffect
             if self.keep_forces_on_pause:
                 if effect.effect_type in [EFFECT_SPRING, EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION, EFFECT_SPRING_ADJUSTER]:
                     continue

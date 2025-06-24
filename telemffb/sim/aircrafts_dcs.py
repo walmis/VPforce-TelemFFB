@@ -46,7 +46,7 @@ from telemffb.utils import overrides
 from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
 from telemffb.utils import SpringMode
 from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects, perftracker
-
+from telemffb.telem.DcsIpcThread import DcsIpcThread
 #unit conversions (to m/s)
 knots = 0.514444
 kmh = 1.0/3.6
@@ -231,10 +231,7 @@ class Aircraft(AircraftBase):
 
     def send_commands(self, cmds):
         cmds = "\n".join(cmds)
-        if not getattr(self, "_socket", None):
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-        
-        self._socket.sendto(bytes(cmds, "utf-8"), ("127.0.0.1", 34381))
+        DcsIpcThread.send_commands(cmds)
 
     def _update_damage(self, telem_data):
         if not self.damage_effect_enabled: return
