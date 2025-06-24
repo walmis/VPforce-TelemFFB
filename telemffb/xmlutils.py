@@ -24,6 +24,7 @@ import xml.etree.ElementTree as ET
 import os
 import re
 import xml.dom.minidom
+import telemffb.globals as G
 
 
 print_debugs = False
@@ -811,6 +812,20 @@ def update_data_with_models(defaults_data, model_data, replacetext):
 
     return updated_result
 
+def write_to_xml(sim, class_name, model, value, setting, unit='', the_device=''):
+    if not G.offline_config_mode:
+        write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device)
+        return
+    else:
+        match G.current_offline_config_scope:
+            case 'SIM':
+                write_sim_to_xml(sim, value, setting, unit=unit, the_device=the_device)
+            case 'CLASS':
+                write_class_to_xml(sim, class_name, value, setting, unit=unit, the_device=the_device)
+            case 'AIRCRAFT':
+                write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device)
+            case _:
+                pass
 
 def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', the_device=''):
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
@@ -890,12 +905,13 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
                          f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}")
 
 
-def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
+def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit='', the_device = ''):
     mprint(f"write_class_to_xml  {the_sim}, {the_class}, {the_value}{unit}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = try_parse(userconfig_path)
     root = tree.getroot()
-    the_device = device
+    if the_device == '':
+        the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
     if setting_name in write_any_device_list:
         the_device = 'any'
@@ -932,12 +948,13 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit=''):
                      f"value={the_value}{unit}, type={the_class}, name={setting_name}")
 
 
-def write_sim_to_xml(the_sim, the_value, setting_name, unit=''):
+def write_sim_to_xml(the_sim, the_value, setting_name, unit='', the_device=''):
     mprint(f"write_sim_to_xml {the_sim}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = try_parse(userconfig_path)
     root = tree.getroot()
-    the_device = device
+    if the_device == '':
+        the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
     if setting_name in write_any_device_list:
         the_device = 'any'
