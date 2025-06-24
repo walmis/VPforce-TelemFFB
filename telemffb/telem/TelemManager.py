@@ -160,6 +160,7 @@ class TelemManager(QObject, threading.Thread):
         self.join()
 
     def submit_frame(self, data: bytes):
+        if G.offline_config_mode: return
         if isinstance(data, bytes):
             data = data.decode("utf-8")
 

@@ -516,6 +516,22 @@ class MainWindow(QMainWindow):
         self.offline_config_area = QWidget()
         main_layout = QVBoxLayout()  # vertical layout to hold both rows
 
+        self.banner_label = QLabel("Telemetry is paused while in offline editing mode")
+        self.banner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.banner_label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(255, 165, 0, 100);  /* Orange-ish translucent */
+                color: palette(windowText);
+                padding: 6px 10px;
+                font: Cascadia Mono;
+                font-weight: bold;
+                border: 1px solid palette(dark);
+                border-radius: 6px;
+            }
+        """)
+
+        main_layout.addWidget(self.banner_label)  # Add it above the combobox row
+
         # First row layout (existing widgets)
         top_row = QHBoxLayout()
         offline_sim_lbl = QLabel('Sim:')
@@ -562,6 +578,7 @@ class MainWindow(QMainWindow):
         bottom_row.addWidget(self.offline_button)
 
         # Combine both rows
+        main_layout.addWidget(self.banner_label)
         main_layout.addLayout(top_row)
         main_layout.addLayout(bottom_row)
 
@@ -1453,8 +1470,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
     def toggle_offline_mode(self, state):
-        print(f"I AM HERE:{G.device_type}:{state}")
-
         if not state:
             self.offline_config_area.hide()
             G.offline_config_mode = False
