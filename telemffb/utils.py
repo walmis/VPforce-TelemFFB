@@ -2207,6 +2207,7 @@ class SpringMode(Enum):
     DYNAMIC = auto()
     CUSTOM = auto()
 
+#used for both joystick and pedals
 MSFS_XP_SPRING_MODE = {
     SpringMode.BASIC: "Basic Dynamic",
     SpringMode.CENTER: "Basic Dynamic with Spring Centering",
@@ -2233,4 +2234,23 @@ TEST_SPRING_MODE = {
     SpringMode.CENTER: "TEST Dynamic with Spring Centering",
     SpringMode.ADVANCED: "TEST Advanced Dynamic",
     SpringMode.FBW: "TEST (FBW)"
+}
+
+class GEffectMode(Enum):
+    DISABLED = auto()
+    LEGACY = auto()
+    NEW = auto()
+    ADVANCED = auto()
+
+MSFS_XP_G_EFFECT_MODE = {
+    GEffectMode.DISABLED: "Disabled",
+    GEffectMode.LEGACY: "Exponential Curve",
+    GEffectMode.ADVANCED: "Custom Curve"
+}
+
+DCS_IL2_G_EFFECT_MODE = {
+    GEffectMode.DISABLED: "Disabled",
+    GEffectMode.LEGACY: "Exponential Curve",
+    GEffectMode.NEW: "Linear + Deflection Based",
+    GEffectMode.ADVANCED: "Custom Curve"
 }

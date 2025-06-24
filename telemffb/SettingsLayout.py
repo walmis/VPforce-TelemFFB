@@ -203,7 +203,8 @@ class SettingsLayout(QGridLayout):
                                     if '.0' in p['order']:
                                         iv = 'true'
                             break
-
+            if item['datatype'] == 'convert':
+                iv = 'false'
             item['is_visible'] = iv
 
             # for things not showing debugging:
@@ -245,22 +246,93 @@ class SettingsLayout(QGridLayout):
                 p_list.append({'prereq': item['name'], 'value': item['value'], 'count': count})
         return p_list
 
-    # def set_spring_mode(self, mode):
-    #     for item in datalist:
-    #         if item['name'] == 'spring_mode':
-    #             item['value'] = mode
-    # def convert_to_springmode(self, datalist):
-    #     for item in datalist:
-    #         if item['name'] == 'adv_spr_override_enabled':
-    #             self.set_spring_mode(self, 'ADVANCED')
-    #         if item['name'] == 'aircraft_is_spring_centered':
-    #             self.set_spring_mode(self, 'CENTER')
-    #         if item['name'] == 'aircraft_is_fbw':
-    #             self.set_spring_mode(self, 'FBW')
+    def set_mode(self, mode, setting, datalist):
+        for item in datalist:
+            if item['name'] == setting:
+                item['value'] = mode
+        xmlutils.write_to_xml(G.settings_mgr.current_sim,
+                              G.settings_mgr.current_class,
+                              G.settings_mgr.current_pattern,
+                              item['name'],
+                              item['value'])
+
+    def convert_to_springmode(self, datalist):
+        for item in datalist:
+            if item['name'] == 'adv_spr_override_enabled':
+                xmlutils.erase_from_xml(G.settings_mgr.current_sim,
+                                        G.settings_mgr.current_class,
+                                        G.settings_mgr.current_pattern,
+                                        item['name'])
+                self.set_mode('ADVANCED', 'spring_mode', datalist)
+            if item['name'] == 'aircraft_is_spring_centered':
+                xmlutils.erase_from_xml(G.settings_mgr.current_sim,
+                                        G.settings_mgr.current_class,
+                                        G.settings_mgr.current_pattern,
+                                        item['name'])
+                self.set_mode('CENTER', 'spring_mode', datalist)
+            if item['name'] == 'aircraft_is_fbw':
+                xmlutils.erase_from_xml(G.settings_mgr.current_sim,
+                                        G.settings_mgr.current_class,
+                                        G.settings_mgr.current_pattern,
+                                        item['name'])
+                self.set_mode('FBW', 'spring_mode', datalist)
+
+    def convert_to_pedalspringmode(self, datalist):
+        for item in datalist:
+            if item['name'] == 'pedal_spring_mode':
+                match item['value']:
+                    case "Dynamic Spring":
+                        self.set_mode('DYNAMIC', 'pedal_spring_mode', datalist)
+                    case "Static Spring":
+                        self.set_mode('STATIC', 'pedal_spring_mode', datalist)
+                    case "No Spring":
+                        self.set_mode('NOSPRING', 'pedal_spring_mode', datalist)
+                    case "Sim Default":
+                        self.set_mode('NONE', 'pedal_spring_mode', datalist)
+
+    def set_gforce_effect(self, mode, datalist):
+        for item in datalist:
+            if item['name'] == 'gforce_effect':
+                item['value'] = mode
+        xmlutils.write_to_xml(G.settings_mgr.current_sim,
+                              G.settings_mgr.current_class,
+                              G.settings_mgr.current_pattern,
+                              item['name'],
+                              item['value'])
+    def convert_to_gforcemode(self, datalist):
+        for item in datalist:
+            if item['name'] == 'gforce_effect_enable' and item['value'] == 'true':
+                xmlutils.erase_from_xml(G.settings_mgr.current_sim,
+                                        G.settings_mgr.current_class,
+                                        G.settings_mgr.current_pattern,
+                                        item['name'])
+                self.set_mode('LEGACY', 'gforce_effect_enable', datalist)
+            if item['name'] == 'new_gforce_effect_enable' and item['value'] == 'true':
+                xmlutils.erase_from_xml(G.settings_mgr.current_sim,
+                                        G.settings_mgr.current_class,
+                                        G.settings_mgr.current_pattern,
+                                        item['name'])
+                self.set_mode('LECACYNEW', 'gforce_effect_enable', datalist)
+            if item['name'] == 'gforce_effect_advanced_enabled' and item['value'] == 'true':
+                xmlutils.erase_from_xml(G.settings_mgr.current_sim,
+                                        G.settings_mgr.current_class,
+                                        G.settings_mgr.current_pattern,
+                                        item['name'])
+                self.set_mode('ADVANCED', 'gforce_effect_enable', datalist)
+            if item['name'] == 'gforce_effect_master' and item['value'] != 'true':
+                xmlutils.erase_from_xml(G.settings_mgr.current_sim,
+                                        G.settings_mgr.current_class,
+                                        G.settings_mgr.current_pattern,
+                                        item['name'])
+                self.set_mode('DISABLED', 'gforce_effect_enable', datalist)
+
 
     def build_rows(self, datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         # self.prereq_list = xmlutils.read_prereqs()
+        self.convert_to_springmode(sorted_data)
+        self.convert_to_pedalspringmode(sorted_data)
+        self.convert_to_gforcemode(sorted_data)
         self.prereq_list = self.read_active_prereqs(sorted_data)
         self.has_bump(sorted_data)
         self.append_prereq_count(sorted_data)
@@ -1242,6 +1314,12 @@ class SettingsLayout(QGridLayout):
             xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'adv_spr_override_enabled')
             xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'aircraft_is_spring_centered')
             xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'aircraft_is_fbw')
+            if G.settings_mgr.timed_out:
+                pass
+        if setting_name == 'gforce_effect':
+            xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'gforce_effect_enable')
+            xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'new_gforce_effect_enable')
+            xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'gforce_effect_advanced_enabled')
             if G.settings_mgr.timed_out:
                 pass
         self.show_erase_button()

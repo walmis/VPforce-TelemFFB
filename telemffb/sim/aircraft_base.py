@@ -29,7 +29,7 @@ from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCo
 from telemffb.hw.ffb_rhino import EFFECT_SPRING,EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION, EFFECT_SPRING_ADJUSTER
 import telemffb.globals as G
 from telemffb.globals import master_instance, master_buttons
-from telemffb.utils import SpringMode
+from telemffb.utils import SpringMode, GEffectMode
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
@@ -107,18 +107,18 @@ class AircraftBase(object):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
-    gforce_effect_master: bool = False
-    gforce_effect_enable: bool = False
+    # gforce_effect_master: bool = False
+    # gforce_effect_enable: bool = False
     gforce_effect_invert_force = 0  # case where "180" degrees does not equal "away from pilot"
     gforce_effect_curvature = 2.2
     gforce_effect_max_intensity = 1.0
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
-    gforce_effect_advanced_enabled = False
+    # gforce_effect_advanced_enabled = False
     gforce_effect_advanced_curve = {}
     gforce_current_factor: float = 0.0
 
-    new_gforce_effect_enable = False
+    # new_gforce_effect_enable = False
     new_gforce_effect_center_deadzone = 0
     new_gforce_min_gs = 1.1  # G's where the effect starts playing
     new_gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
@@ -170,7 +170,7 @@ class AircraftBase(object):
     engine_rumble_highrpm: int  = 2800
     engine_rumble_highrpm_intensity: float = 0.06
 
-    gforce_effect_enable : bool = False
+    # gforce_effect_enable : bool = False
 
     flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable
     flaps_buffet_intensity : float = 0.0      # peak buffeting intensity when flaps are deployed,  0 to disable
@@ -341,9 +341,13 @@ class AircraftBase(object):
         self.friction_effect_overridden: bool = False
 
         self.spring_mode = SpringMode.NONE.name
+        self.gforce_effect_mode = GEffectMode.DISABLED.name
 
     def spring_mode_is(self, mode):
         return mode.name == self.spring_mode
+
+    def gforce_mode_is(self, mode):
+        return mode.name == self.gforce_effect_mode
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
@@ -578,7 +582,7 @@ class AircraftBase(object):
             effects.dispose("runway1")
 
     def new_gforce_effect(self, telem_data):
-        if not self.is_joystick() or not self.new_gforce_effect_enable or not self.gforce_effect_master:
+        if not self.is_joystick() or not self.gforce_mode_is(GEffectMode.NEW) or self.gforce_mode_is(GEffectMode.DISABLED):
             effects.dispose("new_gforce")
             return
         if sum(telem_data.get("WeightOnWheels")):
@@ -659,11 +663,11 @@ class AircraftBase(object):
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def _gforce_effect(self, telem_data, adv_spr=False):
-        if not self.gforce_effect_master:
+        if not self.gforce_mode_is(GEffectMode.DISABLED):
             effects.dispose('gforce')
             effects.dispose('new_gforce')
             return
-        if self.new_gforce_effect_enable:
+        if self.self.gforce_mode_is(GEffectMode.NEW):
             # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
             effects.dispose("gforce")
             self.new_gforce_effect(telem_data)
@@ -698,7 +702,7 @@ class AircraftBase(object):
 
         logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
 
-        if self.gforce_effect_enable:
+        if self.gforce_mode_is(GEffectMode.LEGACY):
             gmin = self.gforce_min_gs
             gmax = self.gforce_max_gs
             direction = 180
@@ -725,7 +729,7 @@ class AircraftBase(object):
 
             logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
-        elif self.gforce_effect_advanced_enabled:
+        elif self.gforce_mode_is(GEffectMode.ADVANCED):
             if self.gforce_effect_adv_curve == 'none':
                 self.flag_error('Please Configure the Advanced G-Force Effect Settings')
                 effects.dispose('adv_gforce_constant')
