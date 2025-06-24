@@ -45,7 +45,7 @@ class SettingsLayout(QGridLayout):
     prereq_list = []
     ##########
     # debug settings
-    show_col_debug = True      # shows column, span, indent in label tooltip
+    show_col_debug = False      # shows column, span, indent in label tooltip
     show_slider_debug = False   # set to true for slider values shown
     show_order_debug = False    # set to true for order numbers shown
     show_settings_names = False # show setting internal name instead of displayname
