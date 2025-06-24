@@ -80,6 +80,8 @@ class MainWindow(QMainWindow):
 
         self.show_new_craft_button = False
 
+        self.aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
+
         QFontDatabase.addApplicationFont(':/image/BlackOpsOne-Regular.ttf')
 
         # Get the absolute path of the script's directory
@@ -949,9 +951,9 @@ class MainWindow(QMainWindow):
             if action.text() == "Debug":
                 return
         debug_menu = self.menu.addMenu("Debug")
-        aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
-        aircraft_picker_action.triggered.connect(lambda: self.toggle_settings_window(dbg=True))
-        debug_menu.addAction(aircraft_picker_action)
+        self.aircraft_picker_action.setCheckable(True)
+        self.aircraft_picker_action.triggered.connect(lambda: self.toggle_settings_window(dbg=True))
+        debug_menu.addAction(self.aircraft_picker_action)
 
         teleplot_action = QAction("Teleplot Setup", self)
         def do_open_teleplot_setup_dialog():
@@ -1232,6 +1234,8 @@ class MainWindow(QMainWindow):
             G.ipc_instance.send_broadcast_message(f"DBG_SELECT_SIM:{self.test_sim.currentText()}")
 
         G.current_offline_config_scope = 'SIM'  # set config scope to SIM
+        self.cur_craft.setText('OFFLINE EDITING MODE')
+        self.cur_pattern.setText(f"{G.current_offline_config_scope}: {sim}")
         self.force_sim_aircraft() # load settings based on sim
 
     def test_class_changed(self, class_name):
@@ -1244,6 +1248,8 @@ class MainWindow(QMainWindow):
             # send to child instances to mimic action
             G.ipc_instance.send_broadcast_message(f"DBG_SELECT_CLASS:{self.test_class.currentText()}")
         G.current_offline_config_scope = 'CLASS' # set config scope to CLASS
+        self.cur_craft.setText('OFFLINE EDITING MODE')
+        self.cur_pattern.setText(f"{G.current_offline_config_scope}: {class_name}")
         self.force_sim_aircraft() # load settings based on class and currently selected sim
 
     def test_aircraft_changed(self, ac_name=None):
@@ -1253,6 +1259,8 @@ class MainWindow(QMainWindow):
         self.test_class.blockSignals(False)  # unblock signals
 
         G.current_offline_config_scope = 'MODEL'
+        self.cur_craft.setText('OFFLINE EDITING MODE')
+        self.cur_pattern.setText(f"{G.current_offline_config_scope}: {ac_name}")
 
         if G.master_instance:
             G.ipc_instance.send_broadcast_message(f'DBG_SELECT_AC:{self.test_name.currentText()}')
@@ -1426,6 +1434,8 @@ class MainWindow(QMainWindow):
                 if self.test_craft_area.isVisible():
                     self.test_craft_area.hide()
                     G.offline_config_mode = False
+                    self.cur_craft.setText('Unknown')
+                    self.cur_pattern.setText('(No Match)')
                 else:
                     self.test_craft_area.show()
 
@@ -1433,6 +1443,7 @@ class MainWindow(QMainWindow):
                     G.settings_mgr.current_class =''
                     G.settings_mgr.current_aircraft = ''
                     G.offline_config_mode = True
+                self.aircraft_picker_action.setChecked(G.offline_config_mode)
                 if G.master_instance:
                     G.ipc_instance.send_broadcast_message("TOGGLE TESTCRAFT")
             else:
