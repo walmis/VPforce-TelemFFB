@@ -438,7 +438,14 @@ class EraseButton(QPushButton):
             self.csetting,
             self.cmodel,
             self.cunit))
-        menu.addAction(action1)
+        if not G.current_offline_config_scope:
+            menu.addAction(action1)
+        else:
+            match G.current_offline_config_scope:
+                case 'MODEL':
+                    menu.addAction(action1)
+                case _:
+                    pass
 
         action2 = QAction(f"Move setting to {csim} Sim for all aircraft", self)
         action2.triggered.connect(lambda: self.move_to_sim_signal.emit(
@@ -447,7 +454,16 @@ class EraseButton(QPushButton):
             self.csetting,
             self.cmodel,
             self.cunit))
-        menu.addAction(action2)
+        if not G.current_offline_config_scope:
+            menu.addAction(action2)
+        else:
+            match G.current_offline_config_scope:
+                case 'MODEL':
+                    menu.addAction(action2)
+                case 'CLASS':
+                    menu.addAction(action2)
+                case _:
+                    pass
 
         # Show the menu at the global cursor position
         menu.exec(self.mapToGlobal(pos))

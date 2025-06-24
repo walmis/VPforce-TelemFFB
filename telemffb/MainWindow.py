@@ -1252,7 +1252,7 @@ class MainWindow(QMainWindow):
         self.test_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
         self.test_class.blockSignals(False)  # unblock signals
 
-        G.current_offline_config_scope = 'AIRCRAFT'
+        G.current_offline_config_scope = 'MODEL'
 
         if G.master_instance:
             G.ipc_instance.send_broadcast_message(f'DBG_SELECT_AC:{self.test_name.currentText()}')

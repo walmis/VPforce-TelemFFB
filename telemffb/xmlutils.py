@@ -822,8 +822,23 @@ def write_to_xml(sim, class_name, model, value, setting, unit='', the_device='')
                 write_sim_to_xml(sim, value, setting, unit=unit, the_device=the_device)
             case 'CLASS':
                 write_class_to_xml(sim, class_name, value, setting, unit=unit, the_device=the_device)
-            case 'AIRCRAFT':
+            case 'MODEL':
                 write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device)
+            case _:
+                pass
+
+def erase_from_xml(sim, class_name, model, setting, the_device=''):
+    if not G.offline_config_mode:
+        erase_models_from_xml(sim, model, setting, the_device=the_device)
+        return
+    else:
+        match G.current_offline_config_scope:
+            case 'SIM':
+                erase_sim_from_xml(sim, setting,  the_device=the_device)
+            case 'CLASS':
+                erase_class_from_xml(sim, class_name, setting, the_device=the_device)
+            case 'MODEL':
+                erase_models_from_xml(sim, model, setting, the_device=the_device)
             case _:
                 pass
 
@@ -1023,12 +1038,13 @@ def write_converted_to_xml(differences):
         write_models_to_xml(m['sim'], m['model'], m['value'], m['name'])
 
 
-def erase_models_from_xml(the_sim, the_model, setting_name):
+def erase_models_from_xml(the_sim, the_model, setting_name, the_device=''):
     mprint(f"erase_models_from_xml  {the_sim} {the_model}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = try_parse(userconfig_path)
     root = tree.getroot()
-    the_device = device
+    if the_device == '':
+        the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
     if setting_name in write_any_device_list:
         the_device = 'any'
@@ -1076,19 +1092,19 @@ def erase_entire_model_from_xml(the_sim, the_model):
         logging.info(f"Removed all <models> elements with values: sim={the_sim} model={the_model}")
 
 
-def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
-    mprint(f"erase_class_from_xml  {the_sim} {the_class}, {the_value}, {setting_name}")
+def erase_class_from_xml( the_sim, the_class,  setting_name, the_device=''):
+    mprint(f"erase_class_from_xml  {the_sim} {the_class}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = try_parse(userconfig_path)
     root = tree.getroot()
-    the_device = device
+    if the_device == '':
+        the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
     if setting_name in write_any_device_list:
         the_device = 'any'
     elements_to_remove = []
     for class_elem in root.findall(f'.//classSettings[sim="{the_sim}"]'
                                    f'[device="{the_device}"]'
-                                   f'[value="{the_value}"]'
                                    f'[type="{the_class}"]'
                                    f'[name="{setting_name}"]'):
 
@@ -1103,22 +1119,22 @@ def erase_class_from_xml( the_sim, the_class, the_value, setting_name):
         # Write the modified XML back to the file
         write_userconfig_xml(tree)
         logging.info(f"Removed <classSettings> element with values: sim={the_sim}, device={the_device}, "
-                  f"value={the_value}, type={the_class}, name={setting_name}")
+                  f"type={the_class}, name={setting_name}")
 
 
-def erase_sim_from_xml(the_sim, the_value, setting_name):
-    mprint(f"erase_sim_from_xml  {the_sim} {the_value}, {setting_name}")
+def erase_sim_from_xml(the_sim, setting_name, the_device=''):
+    mprint(f"erase_sim_from_xml  {the_sim} {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
     tree = try_parse(userconfig_path)
     root = tree.getroot()
-    the_device = device
+    if the_device == '':
+        the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
     if setting_name in write_any_device_list:
         the_device = 'any'
     elements_to_remove = []
     for sim_elem in root.findall(f'.//simSettings[sim="{the_sim}"]'
                                    f'[device="{the_device}"]'
-                                   f'[value="{the_value}"]'
                                    f'[name="{setting_name}"]'):
 
         if sim_elem is not None:
@@ -1131,7 +1147,7 @@ def erase_sim_from_xml(the_sim, the_value, setting_name):
         root.remove(elem)
         # Write the modified XML back to the file
         write_userconfig_xml(tree)
-        logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}, name={setting_name}")
+        logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={the_device}, name={setting_name}")
 
 
 def sort_elements(tree):    #  unused for now.
