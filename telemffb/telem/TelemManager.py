@@ -108,6 +108,11 @@ class TelemManager(QObject, threading.Thread):
         self._simconnect : Optional[SimConnectManager] = None
         self.gain_overrides_active = False
         self.stop_state = False
+        self.pause_state = False
+
+    def set_paused(self, pause_state: bool = False):
+        self.pause_state = pause_state
+
 
     def set_simconnect(self, sc : SimConnectManager):
         self._simconnect = sc
@@ -173,6 +178,7 @@ class TelemManager(QObject, threading.Thread):
         self.join()
 
     def submit_frame(self, data_in: bytes):
+        if self.pause_state: return  # don't process frames while paused state True
         data : str
         if isinstance(data_in, bytes):
             data = data_in.decode("utf-8")

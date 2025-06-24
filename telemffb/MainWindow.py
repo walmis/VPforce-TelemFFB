@@ -1473,6 +1473,7 @@ class MainWindow(QMainWindow):
         if not state:
             self.offline_config_area.hide()
             G.offline_config_mode = False
+            G.telem_manager.set_paused(False)
             self.cur_craft.setText('Unknown')
             self.cur_pattern.setText('(No Match)')
         else:
@@ -1481,6 +1482,7 @@ class MainWindow(QMainWindow):
             G.settings_mgr.current_class = ''
             G.settings_mgr.current_aircraft = ''
             G.offline_config_mode = True
+            G.telem_manager.set_paused(True)
         self.offline_config_action.setChecked(state)
         if G.master_instance:
             G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
