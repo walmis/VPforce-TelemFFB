@@ -1835,17 +1835,16 @@ class AircraftBase(object):
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
 
-
-        if self.pedal_spring_mode == "Sim Default" or self.pedal_spring_mode == 0:
+        if self.spring_mode_is(SpringMode.NONE):
             if effects['pedal_spring'].started:
                 effects["pedal_spring"].stop()
             return
 
-        if self.pedal_spring_mode == 'No Spring' and not self.pedal_force_trim_enabled:
+        if self.spring_mode_is(SpringMode.NOSPRING):
             self.spring_x.positiveCoefficient = 0
             self.spring_x.negativeCoefficient = 0
 
-        elif self.pedal_spring_mode == 'Static Spring' or self.pedal_force_trim_enabled:
+        elif self.spring_mode_is(SpringMode.STATIC):
             if self.pedal_force_trim_enabled:
                 if not self._update_pedal_force_trim(telem_data):
                     spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
@@ -1853,23 +1852,15 @@ class AircraftBase(object):
             else:
                 spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
                 self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
-                if self.pedal_trimming_enabled:
+                if self.pedal_trimming_enabled and self._sim_is_dcs():
                     self._update_pedal_trim(telem_data)
 
-        elif self.pedal_spring_mode == 'Dynamic Spring' and not self.pedal_force_trim_enabled:
+        elif self.spring_mode_is(SpringMode.DYNAMIC) or self.spring_mode_is(SpringMode.CUSTOM):
             tas = telem_data.get("TAS", 0)
-            # ac_perf = self.get_aircraft_perf(telem_data)
-            # if self.aircraft_vs_speed:
-                #If user has added the speeds to their config, use that value
-            vs = self.aircraft_vs_speed
-            # else:
-                #Otherwise, use the value from the internal table
-                # vs = ac_perf['Vs']
 
-            # if self.aircraft_vne_speed:
+            vs = self.aircraft_vs_speed
+
             vne = self.aircraft_vne_speed
-            # else:
-            #     vne = ac_perf['Vne']
 
             if vs > vne:
                 self.flag_error(f"Dynamic pedal forces error: Vs speed ({vs}) is configured with a larger value than Vne ({vne}) - Invalid configuration")
@@ -1882,7 +1873,7 @@ class AircraftBase(object):
             # print(f"coeff={spr_coeff}")
             self.spring_x.positiveCoefficient = spr_coeff
             self.spring_x.negativeCoefficient = spr_coeff
-            if self.pedal_trimming_enabled:
+            if self.pedal_trimming_enabled and self._sim_is_dcs():
                 self._update_pedal_trim(telem_data)
             # return
         spring = effects["pedal_spring"].spring()
