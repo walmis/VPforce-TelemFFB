@@ -667,7 +667,7 @@ class AircraftBase(object):
             effects.dispose('gforce')
             effects.dispose('new_gforce')
             return
-        if self.self.gforce_mode_is(GEffectMode.NEW):
+        if self.gforce_mode_is(GEffectMode.NEW):
             # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
             effects.dispose("gforce")
             self.new_gforce_effect(telem_data)
