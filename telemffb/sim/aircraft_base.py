@@ -536,12 +536,9 @@ class AircraftBase(object):
         """Check if the current simulator is Microsoft Flight Simulator.
 
         Returns:
-            int: 1 if MSFS, 0 otherwise
+            bool: True if MSFS, False otherwise
         """
-        if self._telem_data.get("src") == "MSFS":
-            return 1
-        else:
-            return 0
+        return self._telem_data.get("src") == "MSFS"
 
     def _sim_is_xplane(self):
         """Check if the current simulator is X-Plane.
@@ -549,21 +546,23 @@ class AircraftBase(object):
         Returns:
             bool: True if X-Plane, False otherwise
         """
-        if self._telem_data.get('src') == "XPLANE":
-            return True
-        else:
-            return False
+        return self._telem_data.get('src') == "XPLANE"
 
     def _sim_is_dcs(self, *unused):
         """Check if the current simulator is DCS World.
 
         Returns:
-            int: 1 if DCS, 0 otherwise
+            bool: True if DCS, False otherwise
         """
-        if self._telem_data.get("src") == "DCS":
-            return 1
-        else:
-            return 0
+        return self._telem_data.get("src") == "DCS"
+
+    def _sim_is_il2(self, *unused):
+        """Check if the current simulator is IL2 Sturmovik..
+
+                Returns:
+                    bool: True if IL2, False otherwise
+                """
+        return self._telem_data.get("src") == "IL2"
 
     def _sim_is(self, sim, *unused):
         """Check if the current simulator matches the specified name.
@@ -572,12 +571,9 @@ class AircraftBase(object):
             sim (str): Simulator name to check against
 
         Returns:
-            int: 1 if matches, 0 otherwise
+            bool: True if matches, False otherwise
         """
-        if self._telem_data.get('src') == sim:
-            return 1
-        else:
-            return 0
+        return self._telem_data.get('src') == sim
 
     ########################################
     ######                            ######
