@@ -80,7 +80,7 @@ class MainWindow(QMainWindow):
 
         self.show_new_craft_button = False
 
-        self.aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
+        # self.aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
 
         QFontDatabase.addApplicationFont(':/image/BlackOpsOne-Regular.ttf')
 
@@ -174,9 +174,10 @@ class MainWindow(QMainWindow):
         system_settings_action.triggered.connect(self.open_system_settings_dialog)
         system_menu.addAction(system_settings_action)
 
-        settings_manager_action = QAction('Edit Sim/Class Defaults && Offline Models', self)
-        settings_manager_action.triggered.connect(self.toggle_settings_window)
-        system_menu.addAction(settings_manager_action)
+        self.offline_config_action = QAction('Edit Sim/Class Defaults && Offline Models', self)
+        self.offline_config_action.setCheckable(True)
+        self.offline_config_action.triggered.connect(self.toggle_offline_mode)
+        system_menu.addAction(self.offline_config_action)
 
 
 
@@ -512,43 +513,62 @@ class MainWindow(QMainWindow):
         #####################
         #  test loading buttons, set to true for debug
 
-        self.test_craft_area = QWidget()
-        test_craft_layout = QHBoxLayout()
-        test_sim_lbl = QLabel('Sim:')
-        test_sim_lbl.setMaximumWidth(30)
-        test_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.test_sim = QComboBox()
-        self.test_sim.setMaximumWidth(60)
-        sims = [''] + xmlutils.get_sims()
-        self.test_sim.addItems(sims)
-        self.test_sim.currentTextChanged.connect(self.test_sim_changed)
-        test_class_lbl = QLabel('Class:')
-        test_class_lbl.setMaximumWidth(30)
-        test_class_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.test_class = QComboBox()
-        self.test_class.currentTextChanged.connect(self.test_class_changed)
-        test_name_lbl = QLabel('Aircraft Name:')
-        test_name_lbl.setMaximumWidth(90)
-        test_name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.test_name = QComboBox()
-        self.test_name.setMinimumWidth(80)
-        self.test_name.setEditable(False)
-        self.test_name.currentTextChanged.connect(self.test_aircraft_changed)
+        self.offline_config_area = QWidget()
+        main_layout = QVBoxLayout()  # vertical layout to hold both rows
 
-        self.test_button = QToolButton()
-        self.test_button.setMaximumWidth(20)
-        self.test_button.setText('>')
-        # self.test_button.clicked.connect(self.force_sim_aircraft)
-        test_craft_layout.addWidget(test_sim_lbl)
-        test_craft_layout.addWidget(self.test_sim)
-        test_craft_layout.addWidget(test_class_lbl)
-        test_craft_layout.addWidget(self.test_class)
-        test_craft_layout.addWidget(test_name_lbl)
-        test_craft_layout.addWidget(self.test_name)
-        # test_craft_layout.addWidget(self.test_button)
-        self.test_craft_area.setLayout(test_craft_layout)
-        self.test_craft_area.hide()
-        layout.addWidget(self.test_craft_area)
+        # First row layout (existing widgets)
+        top_row = QHBoxLayout()
+        offline_sim_lbl = QLabel('Sim:')
+        offline_sim_lbl.setMaximumWidth(30)
+        offline_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.offline_sim = QComboBox()
+        self.offline_sim.setMaximumWidth(60)
+        sims = [''] + xmlutils.get_sims()
+        self.offline_sim.addItems(sims)
+        self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
+
+        offline_class_lbl = QLabel('Class:')
+        offline_class_lbl.setMaximumWidth(30)
+        offline_class_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.offline_class = QComboBox()
+        self.offline_class.currentTextChanged.connect(self.offline_class_changed)
+
+        offline_name_lbl = QLabel('Aircraft Name:')
+        offline_name_lbl.setMaximumWidth(90)
+        offline_name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.offline_name = QComboBox()
+        self.offline_name.setMinimumWidth(80)
+        self.offline_name.setEditable(False)
+        self.offline_name.currentTextChanged.connect(self.offline_aircraft_changed)
+
+        top_row.addWidget(offline_sim_lbl)
+        top_row.addWidget(self.offline_sim)
+        top_row.addWidget(offline_class_lbl)
+        top_row.addWidget(self.offline_class)
+        top_row.addWidget(offline_name_lbl)
+        top_row.addWidget(self.offline_name)
+
+        # Second row layout (button on the left)
+        bottom_row = QHBoxLayout()
+        bottom_row.addStretch()  # push button to the right
+
+        self.offline_button = QToolButton()
+        # self.offline_button.setMaximumWidth(20)
+        self.offline_button.setText('Exit Offline Mode')
+        self.offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
+        bottom_row.addWidget(self.offline_button)
+
+        # Combine both rows
+        main_layout.addLayout(top_row)
+        main_layout.addLayout(bottom_row)
+
+        self.offline_config_area.setLayout(main_layout)
+        self.offline_config_area.hide()
+        layout.addWidget(self.offline_config_area)
+
         self.configmode_group = QButtonGroup()
         self.cb_joystick = QCheckBox('Joystick')
         self.cb_pedals = QCheckBox('Pedals')
@@ -951,9 +971,9 @@ class MainWindow(QMainWindow):
             if action.text() == "Debug":
                 return
         debug_menu = self.menu.addMenu("Debug")
-        self.aircraft_picker_action.setCheckable(True)
-        self.aircraft_picker_action.triggered.connect(lambda: self.toggle_settings_window(dbg=True))
-        debug_menu.addAction(self.aircraft_picker_action)
+        # self.aircraft_picker_action.setCheckable(True)
+        # self.aircraft_picker_action.triggered.connect(lambda: self.toggle_settings_window(dbg=True))
+        # debug_menu.addAction(self.aircraft_picker_action)
 
         teleplot_action = QAction("Teleplot Setup", self)
         def do_open_teleplot_setup_dialog():
@@ -1202,78 +1222,84 @@ class MainWindow(QMainWindow):
         # log_tail_window.setWindowTitle(f"Log File Monitor ({G.current_device_config_scope})")
 
         self.update_settings()
-    def test_sim_changed(self, sim=None):
+    def offline_sim_changed(self, sim=None):
         if sim is None or sim == '':
             # if sim combobox is cleared, reset everything and clear the layout
-            self.test_name.blockSignals(True)
-            self.test_class.blockSignals(True)
-            self.test_name.clear()
-            self.test_class.clear()
-            self.test_name.blockSignals(False)
-            self.test_class.blockSignals(False)
+            self.offline_name.blockSignals(True)
+            self.offline_class.blockSignals(True)
+            self.offline_name.clear()
+            self.offline_class.clear()
+            self.offline_name.blockSignals(False)
+            self.offline_class.blockSignals(False)
             G.settings_mgr.current_sim = ''
             G.settings_mgr.current_class = ''
             G.settings_mgr.current_aircraft_name = ''
             self.settings_layout.clear_layout()
             return
-        self.test_class.clear()  #clear class field
-        self.test_class.addItem('')
+        self.offline_class.clear()  #clear class field
+        self.offline_class.addItem('')
         classes = xmlutils.get_classes_for_sim(sim)  # get classes based on chosen sim
 
         for class_name in classes:
-            self.test_class.addItem(class_name)  #populate class combobox based on results
+            self.offline_class.addItem(class_name)  #populate class combobox based on results
 
-        self.test_name.clear()  #clear aircraft selection combobox
+        self.offline_name.clear()  #clear aircraft selection combobox
 
         models = xmlutils.read_models(sim)  # get all available models based on sim
         for model_name in models:
             # populate the combobox with the model names
-            self.test_name.addItem(model_name)
+            self.offline_name.addItem(model_name)
         if G.master_instance:
             # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"DBG_SELECT_SIM:{self.test_sim.currentText()}")
+            G.ipc_instance.send_broadcast_message(f"DBG_SELECT_SIM:{self.offline_sim.currentText()}")
 
         G.current_offline_config_scope = 'SIM'  # set config scope to SIM
         self.cur_craft.setText('OFFLINE EDITING MODE')
         self.cur_pattern.setText(f"{G.current_offline_config_scope}: {sim}")
         self.force_sim_aircraft() # load settings based on sim
 
-    def test_class_changed(self, class_name):
-        models = xmlutils.read_models(self.test_sim.currentText(), class_name)  # get all available models based on sim and class
-        self.test_name.clear()  # clear the aircraft selection combobox
+    def offline_class_changed(self, class_name):
+        models = xmlutils.read_models(self.offline_sim.currentText(), class_name)  # get all available models based on sim and class
+        self.offline_name.clear()  # clear the aircraft selection combobox
         for model_name in models:
             # populate the combobox with the model names
-            self.test_name.addItem(model_name)
+            self.offline_name.addItem(model_name)
         if G.master_instance:
             # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"DBG_SELECT_CLASS:{self.test_class.currentText()}")
-        G.current_offline_config_scope = 'CLASS' # set config scope to CLASS
-        self.cur_craft.setText('OFFLINE EDITING MODE')
-        self.cur_pattern.setText(f"{G.current_offline_config_scope}: {class_name}")
+            G.ipc_instance.send_broadcast_message(f"DBG_SELECT_CLASS:{self.offline_class.currentText()}")
+        if class_name == '':
+            # reset back to sim mode if class field is cleared
+            self.offline_sim_changed(self.offline_sim.currentText())
+        else:
+            G.current_offline_config_scope = 'CLASS' # set config scope to CLASS
+            self.cur_craft.setText('OFFLINE EDITING MODE')
+            self.cur_pattern.setText(f"{G.current_offline_config_scope}: {class_name}")
         self.force_sim_aircraft() # load settings based on class and currently selected sim
 
-    def test_aircraft_changed(self, ac_name=None):
-        cfg, cls = G.telem_manager.get_aircraft_config(ac_name, self.test_sim.currentText()) # get class based on selected aircraft
-        self.test_class.blockSignals(True)  # block signals to prevent triggering of test_class_changed
-        self.test_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
-        self.test_class.blockSignals(False)  # unblock signals
+    def offline_aircraft_changed(self, ac_name=None):
+        cfg, cls = G.telem_manager.get_aircraft_config(ac_name, self.offline_sim.currentText()) # get class based on selected aircraft
+        self.offline_class.blockSignals(True)  # block signals to prevent triggering of offline_class_changed
+        self.offline_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
+        self.offline_class.blockSignals(False)  # unblock signals
 
-        G.current_offline_config_scope = 'MODEL'
-        self.cur_craft.setText('OFFLINE EDITING MODE')
-        self.cur_pattern.setText(f"{G.current_offline_config_scope}: {ac_name}")
+        if ac_name == '':
+            self.offline_class_changed(self.offline_class.currentText())
+        else:
+            G.current_offline_config_scope = 'MODEL'
+            self.cur_craft.setText('OFFLINE EDITING MODE')
+            self.cur_pattern.setText(f"{G.current_offline_config_scope}: {ac_name}")
 
         if G.master_instance:
-            G.ipc_instance.send_broadcast_message(f'DBG_SELECT_AC:{self.test_name.currentText()}')
-            print(f"DBG_SELECT_AC:{self.test_name.currentText()}")
+            G.ipc_instance.send_broadcast_message(f'DBG_SELECT_AC:{self.offline_name.currentText()}')
+            print(f"DBG_SELECT_AC:{self.offline_name.currentText()}")
 
         self.force_sim_aircraft()
-        print(f"CLASS: {G.settings_mgr.current_class}")
 
 
     def force_sim_aircraft(self):
-        G.settings_mgr.current_sim = self.test_sim.currentText()
-        G.settings_mgr.current_class = self.test_class.currentText()
-        G.settings_mgr.current_aircraft_name = self.test_name.currentText()
+        G.settings_mgr.current_sim = self.offline_sim.currentText()
+        G.settings_mgr.current_class = self.offline_class.currentText()
+        G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
         self.settings_layout.expanded_items.clear()
         self.monitor_widget.hide()
         self.settings_layout.reload_caller()
@@ -1426,26 +1452,29 @@ class MainWindow(QMainWindow):
                 HapticEffect.device.reset_effects()
             except Exception:
                 pass
+    def toggle_offline_mode(self, state):
+        print(f"I AM HERE:{G.device_type}:{state}")
+
+        if not state:
+            self.offline_config_area.hide()
+            G.offline_config_mode = False
+            self.cur_craft.setText('Unknown')
+            self.cur_pattern.setText('(No Match)')
+        else:
+            self.offline_config_area.show()
+            G.settings_mgr.current_sim = ''
+            G.settings_mgr.current_class = ''
+            G.settings_mgr.current_aircraft = ''
+            G.offline_config_mode = True
+        self.offline_config_action.setChecked(state)
+        if G.master_instance:
+            G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
 
     def toggle_settings_window(self, dbg=False):
         try:
             modifiers = QApplication.keyboardModifiers()
             if ((modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier)) or dbg:
-                if self.test_craft_area.isVisible():
-                    self.test_craft_area.hide()
-                    G.offline_config_mode = False
-                    self.cur_craft.setText('Unknown')
-                    self.cur_pattern.setText('(No Match)')
-                else:
-                    self.test_craft_area.show()
-
-                    G.settings_mgr.current_sim = ''
-                    G.settings_mgr.current_class =''
-                    G.settings_mgr.current_aircraft = ''
-                    G.offline_config_mode = True
-                self.aircraft_picker_action.setChecked(G.offline_config_mode)
-                if G.master_instance:
-                    G.ipc_instance.send_broadcast_message("TOGGLE TESTCRAFT")
+                pass
             else:
                 sm = G.settings_mgr
                 if sm.isVisible():

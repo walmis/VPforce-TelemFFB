@@ -229,19 +229,21 @@ class IPCNetworkThread(QThread):
                     btns = json.loads(payload[1])
                     G.child_buttons[dev] = btns
                     # print(G.child_buttons)
-                elif msg == 'TOGGLE TESTCRAFT':
-                    G.main_window.toggle_settings_window(dbg=True)
+                elif msg.startswith('TOGGLE OFFLINE:'):
+                    state_str = msg.removeprefix('TOGGLE OFFLINE:')
+                    state = state_str == 'True'
+                    G.main_window.toggle_offline_mode(state)
                 elif msg.startswith("DBG_SELECT_SIM:"):
                     sim = msg.removeprefix("DBG_SELECT_SIM:")
-                    G.main_window.test_sim.setCurrentText(sim)
+                    G.main_window.offline_sim.setCurrentText(sim)
                 elif msg.startswith("DBG_SELECT_CLASS:"):
                     class_name = msg.removeprefix("DBG_SELECT_CLASS:")
-                    G.main_window.test_class.setCurrentText(class_name)
+                    G.main_window.offline_class.setCurrentText(class_name)
                 elif msg.startswith("DBG_SELECT_AC:"):
                     ac = msg.removeprefix("DBG_SELECT_AC:")
-                    G.main_window.test_name.setCurrentText(ac)
+                    G.main_window.offline_name.setCurrentText(ac)
                 elif msg == 'LOAD_DBG_AC':
-                    G.main_window.test_button.click()
+                    G.main_window.offline_button.click()
 
                 else:
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")
