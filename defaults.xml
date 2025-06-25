@@ -327,14 +327,14 @@
 		<validvalues>0,100</validvalues>
 		<value>0.5</value>
 	</defaults>
-	<defaults></defaults>
-	<defaults></defaults>
+	<defaults><order>699</order></defaults>
+	<defaults><order>699</order></defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
 		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>baslic</parentgroup>
-		<order>650.0</order>
+		<order>700.0</order>
 		<name>spring_mode</name>
 		<displayname>Joystick Spring Mode</displayname>
 		<DCS>true</DCS>
@@ -348,7 +348,7 @@
 		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
 		<parentgroup>baslic</parentgroup>
-		<order>650.0</order>
+		<order>700.0</order>
 		<name>spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
 		<DCS>true</DCS>
@@ -356,29 +356,6 @@
 		<pedals>true</pedals>
 		<validvalues>DCS_IL2_PEDAL_MODE</validvalues>
 		<value>DYNAMIC</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>700</order>
-		<name>pedal_mode_dummy</name>
-		<displayname>Pedal Mode Settings</displayname>
-		<exclusive_with>adv_spr_override_enabled</exclusive_with>
-		<prereq>basic_group</prereq>
-		<value>true</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>700.2</order>
-		<name>pedal_spring_mode</name>
-		<displayname>Pedal Spring Mode</displayname>
-		<prereq>pedal_mode_dummy</prereq>
-		<info>Pedal spring mode.  See manual for use.</info>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -395,18 +372,6 @@
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
 		<value>.75</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>750</order>
-		<name>pedal_advanced_dummy</name>
-		<displayname>Advanced Pedal Mode Settings (Dynamic Mode Only)</displayname>
-		<prereq>pedal_mode_dummy</prereq>
-		<info>Advanced Pedal Mode Settings - Dynamic Spring mode only.</info>
-		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -476,20 +441,6 @@
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
 	</defaults>
-	<defaults></defaults>
-	<defaults></defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>760</order>
-		<name>adv_spr_override_enabled</name>
-		<displayname>Advanced Spring Override</displayname>
-		<exclusive_with>override_spring_enabled,pedal_mode_dummy</exclusive_with>
-		<prereq>basic_group</prereq>
-		<value>false</value>
-	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
 		<datatype>advspr</datatype>
@@ -510,22 +461,10 @@
 		<datatype>bool</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>770.2</order>
-		<name>adv_spr_use_game_trim</name>
-		<displayname>Use Game Trim</displayname>
-		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
-		<prereq>spring_mode.ADVANCED</prereq>
-		<value>true</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
 		<order>770.3</order>
 		<name>adv_spr_use_hardware_trim</name>
 		<displayname>Use Hardware Trim</displayname>
-		<exclusive_with>adv_spr_use_game_trim,pedal_trimming_enabled</exclusive_with>
+		<exclusive_with>pedal_trimming_enabled</exclusive_with>
 		<prereq>spring_mode.ADVANCED</prereq>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -617,21 +556,6 @@
 		<info>Enable pedal trimming feedback for fixed wing aircfraft</info>
 		<DCS>true</DCS>
 		<pedals>true</pedals>
-	</defaults>
-	<defaults></defaults>
-	<defaults></defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>Sim Options</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>800</order>
-		<name>override_spring_enabled</name>
-		<displayname>Override DCS Spring</displayname>
-		<exclusive_with>adv_spr_override_enabled</exclusive_with>
-		<prereq>basic_group</prereq>
-		<info>Override the spring effect set by DCS&lt;br&gt;&lt;br&gt;Warning: If you enable this for an official DCS module that has FFB Support, all DCS generated spring effects will cease to function, including dynamic forces and trim.&lt;br&gt;&lt;br&gt;Note: Not compatible with 'Trim Workaround' or 'Trim Release Damper' features</info>
-		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -769,6 +693,12 @@
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,1000</validvalues>
 		<value>200</value>
+	</defaults>
+	<defaults>
+		<order>999</order>
+	</defaults>
+	<defaults>
+		<order>999</order>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -2724,6 +2654,12 @@
 		<value>1.0</value>
 	</defaults>
 	<defaults>
+		<order>19999</order>
+	</defaults>
+	<defaults>
+		<order>19999</order>
+	</defaults>
+	<defaults>
 		<datatype>group</datatype>
 		<grouping>Acceleration</grouping>
 		<order>20000</order>
@@ -2740,7 +2676,6 @@
 		<collective>true</collective>
 		<value>true</value>
 	</defaults>
-	<defaults></defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
 		<datatype>convert</datatype>
@@ -3081,7 +3016,6 @@
 		<validvalues>-100,-50</validvalues>
 		<value>-1.0</value>
 	</defaults>
-	<defaults></defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
 		<datatype>bool</datatype>
@@ -3200,6 +3134,8 @@
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
 	</defaults>
+	<defaults><order>29999</order></defaults>
+	<defaults><order>29999</order></defaults>
 	<defaults>
 		<datatype>group</datatype>
 		<grouping>Ground</grouping>
@@ -3427,6 +3363,8 @@
 		<validvalues>0,100</validvalues>
 		<value>0.5</value>
 	</defaults>
+	<defaults><order>39999</order></defaults>
+	<defaults><order>39999</order></defaults>
 	<defaults>
 		<datatype>group</datatype>
 		<grouping>Mechanical</grouping>
@@ -4349,6 +4287,8 @@
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
 	</defaults>
+	<defaults><order>49999</order></defaults>
+	<defaults><order>49999</order></defaults>
 	<defaults>
 		<datatype>group</datatype>
 		<grouping>Weapons</grouping>
@@ -4491,6 +4431,8 @@
 		<validvalues>-1,359</validvalues>
 		<value>-1</value>
 	</defaults>
+	<defaults><order>59000</order></defaults>
+	<defaults><order>59000</order></defaults>
 	<defaults>
 		<datatype>group</datatype>
 		<grouping>FFB Overrides</grouping>
@@ -4671,6 +4613,8 @@
 		<validvalues>0,1000</validvalues>
 		<value>0</value>
 	</defaults>
+	<defaults><order>69999</order></defaults>
+	<defaults><order>69999</order></defaults>
 	<defaults>
 		<datatype>group</datatype>
 		<grouping>System</grouping>
@@ -4834,6 +4778,66 @@
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
 		<value>true</value>
+	</defaults>
+	<defaults>
+		<order>89999</order>
+	</defaults>
+	<defaults>
+		<order>89999</order>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>convert</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>91093</order>
+		<name>pedal_spring_mode</name>
+		<displayname>Pedal Spring Mode</displayname>
+		<info>Pedal spring mode.  See manual for use.</info>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>convert</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>91094</order>
+		<name>adv_spr_override_enabled</name>
+		<displayname>Advanced Spring Override</displayname>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>convert</datatype>
+		<grouping>Sim Options</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>91095</order>
+		<name>override_spring_enabled</name>
+		<displayname>Override DCS Spring</displayname>
+		<info>Override the spring effect set by DCS&lt;br&gt;&lt;br&gt;Warning: If you enable this for an official DCS module that has FFB Support, all DCS generated spring effects will cease to function, including dynamic forces and trim.&lt;br&gt;&lt;br&gt;Note: Not compatible with 'Trim Workaround' or 'Trim Release Damper' features</info>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>91990</order>
+		<name>pedal_mode_dummy</name>
+		<displayname>Pedal Mode Settings</displayname>
+		<prereq>	do not show</prereq>
+		<value>true</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>91991</order>
+		<name>pedal_advanced_dummy</name>
+		<displayname>Advanced Pedal Mode Settings (Dynamic Mode Only)</displayname>
+		<prereq>	do not show</prereq>
+		<info>Advanced Pedal Mode Settings - Dynamic Spring mode only.</info>
+		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>

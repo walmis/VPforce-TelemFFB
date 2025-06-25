@@ -278,7 +278,7 @@ class AircraftBase(object):
     adv_spr_override_enabled: bool = False   #deprecated
     adv_spr_gains: str = 'none'
     adv_spr_use_hardware_trim: bool = False
-    adv_spr_use_game_trim: bool = True
+    # adv_spr_use_game_trim: bool = True
     gforce_effect_adv_curve: str = 'none'
     trimwheel_elev_up_button: int = 0
     trimwheel_elev_dn_button: int = 0

@@ -1191,7 +1191,9 @@ def read_prereqs():
         if defaults_elem.find('name') is None and defaults_elem.find('order') is None and defaults_elem.find('datatype') is None:
             # Ignore empty rows that may exist for readability purposes
             continue
-        name = defaults_elem.find('name').text
+        # name is unused here?
+        # name_elem = defaults_elem.find('name').text
+        # name = (f"{name_elem.text}") if name_elem is not None else ""
         prereq_elem = defaults_elem.find('prereq')
         prereq = (f"{prereq_elem.text}") if prereq_elem is not None else ""
 
