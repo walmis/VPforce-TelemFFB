@@ -310,7 +310,7 @@ class SettingsLayout(QGridLayout):
     def convert_to_gforcemode(self, datalist):
         mode_map = {
             'gforce_effect_enable': 'LEGACY',
-            'new_gforce_effect_enable': 'LECACYNEW',
+            'new_gforce_effect_enable': 'NEW',
             'gforce_effect_advanced_enabled': 'ADVANCED',
         }
 
