@@ -4919,7 +4919,7 @@
 		<model>FlyInside B206.*</model>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
-		<scale>3.25</scale>
+		<scale>3.95</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>HydSys</name>
@@ -4938,7 +4938,7 @@
 		<model>FlyInside - B206.*</model>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
-		<scale>3.25</scale>
+		<scale>3.95</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>HydSys</name>
@@ -4957,7 +4957,7 @@
 		<model>FlyInside B47.*</model>
 		<var>L:Aircraft.Rotor.RPM.Percent</var>
 		<sc_unit>Percent Over 100</sc_unit>
-		<scale>3.00</scale>
+		<scale>3.6</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>APMaster</name>
