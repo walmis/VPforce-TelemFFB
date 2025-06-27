@@ -1,7 +1,7 @@
 pyqt6
 configobj
 pysimconnect @ https://github.com/walmis/pysimconnect/archive/refs/heads/master.zip
-libipc_ctypes @ https://github.com/walmis/libipc_ctypes/archive/refs/heads/master.zip
+pyzmq
 stransi
 libusb1
 pygetwindow
