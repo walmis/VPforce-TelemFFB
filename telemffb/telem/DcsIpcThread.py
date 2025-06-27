@@ -52,19 +52,19 @@ class DcsIpcThread(threading.Thread):
         :param command: Command string to send.
         """
         self = cls._instance
-
-        if not self.send_socket:
-            self.send_socket = self.zmq_context.socket(zmq.PUB)
-            self.send_socket.connect("tcp://localhost:34385")
-
         try:
+            if not self.send_socket:
+                self.send_socket = self.zmq_context.socket(zmq.PUB)
+                self.send_socket.connect("tcp://localhost:34385")
+
             self.send_socket.send_string(command, zmq.NOBLOCK)
         except zmq.Again:
             logging.warning("Failed to send command: socket would block")
         except zmq.ZMQError as e:
             logging.error(f"Error sending command to DCS ZMQ channel: {e}")
-        else:
-            logging.error("DCS ZMQ send socket is not initialized.")
+        except Exception as e:
+            logging.error(f"Unexpected error sending command to DCS ZMQ channel: {e}")
+
 
     def run(self) -> None:
         self._run = True
