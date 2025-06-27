@@ -18,17 +18,12 @@
 
 
 import logging
-import socket
 import threading
 from typing import Optional, Tuple, TYPE_CHECKING
-from libipc_ctypes import IPCChannel, ChannelType, ConnMode, IPCError, IPCStatus
-import time
 import zmq
-from zmq import Context, Socket
 
 if TYPE_CHECKING:
     from telemffb.telem.TelemManager import TelemManager
-
 
 class DcsIpcThread(threading.Thread):
     def __init__(self, telemetry: 'TelemManager') -> None:
