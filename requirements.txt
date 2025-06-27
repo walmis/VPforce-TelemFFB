@@ -6,5 +6,5 @@ stransi
 libusb1
 pygetwindow
 requests
-numpy
-scipy
+numpy==2.3.0
+scipy==1.15.3
