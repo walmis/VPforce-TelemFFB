@@ -32,13 +32,13 @@ from telemffb.globals import master_instance, master_buttons
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
-effects: Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
+effects: utils.Dispenser = utils.Dispenser(HapticEffect)
 
 # Highpass filter dispenser
-HPFs: Dict[str, utils.HighPassFilter] = utils.Dispenser(utils.HighPassFilter)
+HPFs: utils.Dispenser = utils.Dispenser(utils.HighPassFilter)
 
 # Lowpass filter dispenser
-LPFs: Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
+LPFs: utils.Dispenser = utils.Dispenser(utils.LowPassFilter)
 
 perftracker = utils.PerformanceTracker()
 
@@ -106,14 +106,16 @@ class AircraftBase(object):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
-    ####
-    #### Beta effects - set to 1 to enable
-    gforce_effect_enable = 0
-    gforce_effect_enable_areyoureallysure = 0
+    gforce_effect_master: bool = False
+    gforce_effect_enable: bool = False
+    gforce_effect_invert_force = 0  # case where "180" degrees does not equal "away from pilot"
     gforce_effect_curvature = 2.2
     gforce_effect_max_intensity = 1.0
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
+    gforce_effect_advanced_enabled = False
+    gforce_effect_advanced_curve = {}
+    gforce_current_factor: float = 0.0
 
     new_gforce_effect_enable = False
     new_gforce_effect_center_deadzone = 0
@@ -137,6 +139,7 @@ class AircraftBase(object):
     deceleration_max_force = 0.5
     decel_scale_factor = 1
     decel_invert_force = False
+    decel_airborne_disable: bool = True
     ###
 
     enable_hydraulic_loss_effect: bool = False
@@ -267,6 +270,30 @@ class AircraftBase(object):
     collective_ft_ovd_cp0_y = 4096
     collective_ft_use_master_buttons: bool = False
 
+    adv_spr_override_enabled: bool = False
+    adv_spr_gains: str = 'none'
+    adv_spr_use_hardware_trim: bool = False
+    adv_spr_use_game_trim: bool = True
+    gforce_effect_adv_curve: str = 'none'
+    trimwheel_elev_up_button: int = 0
+    trimwheel_elev_dn_button: int = 0
+    trimwheel_use_master_buttons: bool = False
+    trimwheel_axis_invert: bool = False
+    trimwheel_use_axis: bool = False
+
+    override_spring_trim_down: int = 0
+    override_spring_trim_left: int = 0
+    override_spring_trim_up: int = 0
+    override_spring_trim_right: int = 0
+    override_spring_trim_rate: int = 200
+    override_spring_cp0_x: int = 0
+    override_spring_cp0_y: int = 0
+
+    enable_deadzone: bool = False
+    deadzone_base_pct: float = 0.0
+
+
+    g_y_offset: int = 0
 
     last_device_x = None
     last_device_y = None
@@ -286,12 +313,25 @@ class AircraftBase(object):
         self._telem_data = {}
         self._last_telem_data = {}
         self._ipc_telem = {}
+        self.adv_g_settings_dict: dict = {}
+        self.adv_spr_settings_dict: dict = {}
+        self.active_deadzone_pct: float = 0.0
+
         self.hydraulic_factor = 0.000
         #clear any existing effects
         effects.clear()
 
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
+        self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
+        self.spring_adjuster = effects['spring_adjuster'].spring_adjuster()
+        self.offset_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.offset_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
+        self.offset_adjuster = effects['offset_adjuster'].spring_adjuster()
+
+        self.friction_effect_overridden: bool = False
+
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
@@ -356,6 +396,14 @@ class AircraftBase(object):
         return data['value']
 
     def apply_settings(self, settings_dict):
+        """Apply settings from a configuration dictionary to the aircraft instance.
+        
+        Args:
+            settings_dict (dict): Dictionary containing configuration key-value pairs.
+                                Keys should match aircraft attribute names.
+        
+        Logs warnings for unknown parameters and info for each applied setting.
+        """
         for k, v in settings_dict.items():
             if k in ["type"]: continue
             if getattr(self, k, None) is None and k != 'vpconf' and 'dummy' not in k and 'command_runner' not in k:
@@ -365,6 +413,17 @@ class AircraftBase(object):
             setattr(self, k, v)
 
     def has_changed(self, item: str, delta_ms=0, data=None) -> bool:
+        """Check if a telemetry data item has changed since last call.
+        
+        Args:
+            item (str): Name of the telemetry data item to check
+            delta_ms (int, optional): Time window in milliseconds to consider as "recently changed". Defaults to 0.
+            data (dict, optional): Telemetry data dictionary to use. Defaults to self._telem_data.
+        
+        Returns:
+            bool: True if the item changed, False otherwise. 
+                 If the item changed, returns a tuple (prev_val, new_val) instead.
+        """
         if data == None:
             data = self._telem_data
 
@@ -387,19 +446,47 @@ class AircraftBase(object):
         return False
 
     def flag_error(self, message):
+        """Flag an error message for display in the UI.
+        
+        Args:
+            message (str): Error message to display
+        """
         dev = self.telem_data.get('FFBType', 'joystick').capitalize()
         self.telem_data['error'] = message
         if not master_instance:
             self._ipc_telem['error'] = f"{dev}: {message}"
 
     def is_joystick(self):
+        """Check if the current FFB device is a joystick.
+        
+        Returns:
+            bool: True if device is a joystick, False otherwise
+        """
         return self._telem_data.get("FFBType", "joystick") == "joystick"
     
     def is_pedals(self):
+        """Check if the current FFB device is pedals.
+        
+        Returns:
+            bool: True if device is pedals, False otherwise
+        """
         return self._telem_data.get("FFBType") == "pedals"
 
     def is_collective(self):
+        """Check if the current FFB device is a collective.
+        
+        Returns:
+            bool: True if device is a collective, False otherwise
+        """
         return self._telem_data.get("FFBType") == "collective"
+
+    def is_trimwheel(self):
+        """Check if the current FFB device is a trim wheel.
+        
+        Returns:
+            bool: True if device is a trim wheel, False otherwise
+        """
+        return self._telem_data.get("FFBType") == "trimwheel"
 
 
     def anything_has_changed(self, item: str, value, delta_ms=0):
@@ -433,23 +520,47 @@ class AircraftBase(object):
         return False
     
     def _sim_is_msfs(self, *unused):
+        """Check if the current simulator is Microsoft Flight Simulator.
+        
+        Returns:
+            int: 1 if MSFS, 0 otherwise
+        """
         if self._telem_data.get("src") == "MSFS":
             return 1
         else:
             return 0
 
     def _sim_is_xplane(self):
+        """Check if the current simulator is X-Plane.
+        
+        Returns:
+            bool: True if X-Plane, False otherwise
+        """
         if self._telem_data.get('src') == "XPLANE":
             return True
         else:
             return False
 
     def _sim_is_dcs(self, *unused):
+        """Check if the current simulator is DCS World.
+        
+        Returns:
+            int: 1 if DCS, 0 otherwise
+        """
         if self._telem_data.get("src") == "DCS":
             return 1
         else:
             return 0
+            
     def _sim_is(self, sim, *unused):
+        """Check if the current simulator matches the specified name.
+        
+        Args:
+            sim (str): Simulator name to check against
+            
+        Returns:
+            int: 1 if matches, 0 otherwise
+        """
         if self._telem_data.get('src') == sim:
             return 1
         else:
@@ -460,6 +571,7 @@ class AircraftBase(object):
     ######  Generic Aircraft Effects  ######
     ######                            ######
     ########################################
+
     def _update_touchdown_effect(self, telem_data):
         """Generates a g-based force upon landing or as a result of large bumps"""
 
@@ -499,11 +611,11 @@ class AircraftBase(object):
             effects.dispose("runway1")
             return
 
-        WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # left, nose, right - wheels
+        WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # nose, left, right - wheels
         # get high pass filters for wheel shock displacement data and update with latest data
         hp_f_cutoff_hz = 3
-        v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[1])) * self.runway_rumble_intensity
-        v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[0] - WoW[2]) * self.runway_rumble_intensity
+        v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[0])) * self.runway_rumble_intensity
+        v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[1] - WoW[2]) * self.runway_rumble_intensity
 
         v1 = utils.clamp_minmax(v1, 0.5)
         v2 = utils.clamp_minmax(v2, 0.5)
@@ -522,7 +634,16 @@ class AircraftBase(object):
             effects.dispose("runway1")
 
     def new_gforce_effect(self, telem_data):
-        if not self.is_joystick() or not self.new_gforce_effect_enable:
+        """Apply new G-force effects based on aircraft acceleration.
+        
+        Generates force feedback effects that vary with G-forces experienced by the aircraft.
+        The effect strength is modulated by stick deflection and can handle both positive
+        and negative G-forces if configured.
+        
+        Args:
+            telem_data (dict): Telemetry data containing acceleration information
+        """
+        if not self.is_joystick() or not self.new_gforce_effect_enable or not self.gforce_effect_master:
             effects.dispose("new_gforce")
             return
         if sum(telem_data.get("WeightOnWheels")):
@@ -602,15 +723,20 @@ class AircraftBase(object):
         effects["new_gforce"].constant(g_factor, direction).start()
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
-    def _gforce_effect(self, telem_data):
+    def _gforce_effect(self, telem_data, adv_spr=False):
+        if not self.gforce_effect_master:
+            effects.dispose('gforce')
+            effects.dispose('new_gforce')
+            return
         if self.new_gforce_effect_enable:
+            # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
             effects.dispose("gforce")
             self.new_gforce_effect(telem_data)
             return
         else:
             effects.dispose("new_gforce")
 
-        if not self.is_joystick() or not self.gforce_effect_enable:
+        if not self.is_joystick():
             effects.dispose("gforce")
             return
 
@@ -621,15 +747,11 @@ class AircraftBase(object):
             effects.dispose("gforce")
             return
 
-        gmin = self.gforce_min_gs
-        gmax = self.gforce_max_gs
-        direction = 180
-
         if self._sim_is("DCS") or self._sim_is("IL2"):
             gs: float = telem_data.get("ACCs")[1]
             y_gs = telem_data.get("ACCs", 0)[0]
             last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
-        elif self._sim_is("MSFS"):
+        elif self._sim_is("MSFS") or self._sim_is("XPLANE"):
             gs: float = telem_data.get("G")
             y_gs = telem_data.get("AccBody")[2]
             last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
@@ -640,36 +762,85 @@ class AircraftBase(object):
             return
 
         logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
-        if gs < gmin:
-            effects["gforce"].stop()
-            # effects.dispose("gforce_damper")
+
+        if self.gforce_effect_enable:
+            gmin = self.gforce_min_gs
+            gmax = self.gforce_max_gs
+            direction = 180
+            if gs < gmin:
+                effects["gforce"].stop()
+                # effects.dispose("gforce_damper")
+                return
+            g_factor = round(utils.non_linear_scaling(gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
+
+            derivative_hz = 5  # derivative lpf filter -3db Hz
+            derivative_k = 0.1  # derivative gain value, or damping ratio
+
+            dGs = getattr(self, "_dGs", None)
+            if not dGs: dGs = self._dGs = utils.Derivative(derivative_hz)
+            dGs.lpf.cutoff_freq_hz = derivative_hz
+
+            g_deriv = - dGs.update(g_factor) * derivative_k
+
+            g_factor += g_deriv
+
+            g_factor = utils.clamp(g_factor, 0.0, 1.0)
+
+            effects["gforce"].constant(g_factor, direction).start()
+
+            logging.debug(f"G's = {gs} | gfactor = {g_factor}")
+
+        elif self.gforce_effect_advanced_enabled:
+            if self.gforce_effect_adv_curve == 'none':
+                self.flag_error('Please Configure the Advanced G-Force Effect Settings')
+                effects.dispose('adv_gforce_constant')
+                return
+            if self.adv_g_settings_dict == {}:
+                self.adv_g_settings_dict = utils.json.loads(self.gforce_effect_adv_curve)
+
+            gains = utils.get_gain_from_gs(self.gforce_effect_adv_curve, abs(gs))
+
+            mode = self.adv_g_settings_dict.get('mode', 'constant')
+
+            if gs >= 0:
+                g_factor = gains.get('pos')
+                direction = 180
+            else:
+                if self.adv_g_settings_dict.get('enable_neg'):
+                    g_factor = -gains.get('neg')
+                    direction = 0
+                else:
+                    effects.dispose('gforce')
+                    effects.dispose('gforce_spr')
+                    return
+
+            if not g_factor:
+                effects.dispose('gforce')
+                effects.dispose('gforce_spr')
+                return
+            if mode == 'constant':
+                g_factor = utils.clamp(g_factor, 0.0, 1.0)
+                effects["gforce"].constant(g_factor, direction).start()
+
+            elif mode == 'offset':
+                adjuster_cpOy = int(-g_factor*4096)
+
+                if adv_spr:
+                    # If being called by advanced spring effect, don't apply adjuster offset here, return offset value and let the advanced spring adjuster effect do it
+                    return adjuster_cpOy
+
+                self.offset_adjuster.name = 'gforce_spr'
+                self.offset_adjuster_y.cpOffset = adjuster_cpOy
+                self.offset_adjuster_y.negativeSaturation = self.offset_adjuster_y.positiveSaturation = 4096
+                self.offset_adjuster_x.negativeSaturation = self.offset_adjuster_x.positiveSaturation = 4096
+                self.offset_adjuster.setCondition(self.offset_adjuster_y)
+                self.offset_adjuster.setCondition(self.offset_adjuster_x)
+                self.offset_adjuster.start()
+
+        else:
+            effects.dispose("gforce")
             return
 
-        g_factor = round(utils.non_linear_scaling(gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
-
-        derivative_hz = 5 # derivative lpf filter -3db Hz
-        derivative_k = 0.1 # derivative gain value, or damping ratio
-
-        dGs = getattr(self, "_dGs", None)
-        if not dGs: dGs = self._dGs = utils.Derivative(derivative_hz)
-        dGs.lpf.cutoff_freq_hz = derivative_hz
-
-        g_deriv = - dGs.update(g_factor) * derivative_k
-
-        g_factor += g_deriv
-
-        g_factor = utils.clamp(g_factor, 0.0, 1.0)
-
-        # if self.gforce_effect_enable_deflection_factor:
-        #     input_data = HapticEffect.device.get_input()
-        #     x, y = input_data.axisXY()
-        #     deflection_factor = utils.scale_clamp(y, (0, self.gforce_effect_deflection_factor), (0, 1))
-        #     telem_data['g_deflection'] = deflection_factor
-        #     telem_data['g_y'] = y
-        #     g_factor = g_factor * deflection_factor
-
-        effects["gforce"].constant(g_factor, direction).start()
-        logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def _aoa_reduction_force_effect(self, telem_data):
         if not self.aoa_reduction_effect_enabled:
@@ -696,47 +867,89 @@ class AircraftBase(object):
         else:
             effects.dispose("crit_aoa")
         return
-    
+
     def _decel_effect(self, telem_data):
-        if not self.deceleration_effect_enable or not self.is_joystick(): 
+        if not self.deceleration_effect_enable or not self.is_joystick():
             effects.dispose("decel")
             return
 
+        wow = sum(telem_data.get("WeightOnWheels"), 0)
+        if not wow and self.decel_airborne_disable:
+            # When off ground, dispose effect and return
+            effects.dispose('decel')
+            return
+
         if self._sim_is("DCS") or self._sim_is("IL2"):
-            y_gs = telem_data.get("ACCs", 0)[0]
-            last_y_gs = self._last_telem_data.get("ACCs", [0,0,0])[0]
+            if self.decel_airborne_disable:
+                # We are on the ground, calculate using G vectors
+                y_gs = telem_data.get("ACCs", 0)[0]
+                last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
+            else:
+                # we are in the air, calculate G vector from rate of change of velocity since DCS Y g vector is world orientation
+
+                # if telem_data.get('speedbrakes_value', 0) <= 0.1:
+                #     # don't play decel effect while in the air unless the airbrake is deployed
+                #     effects.dispose("decel")
+                #     return
+
+                dt = perftracker.get_time_delta('decel')
+                speed = telem_data.get('TAS')
+
+                if not hasattr(self, 'last_speed'):
+                    self.last_speed = speed
+                if not hasattr(self, 'last_y_gs'):
+                    self.last_y_gs = 0
+                last_speed = self.last_speed
+                self.last_speed = speed
+
+                accel_g = 0
+                if last_speed is not None and dt > 0:
+                    delta_v = speed - last_speed
+                    acceleration = delta_v / dt  # m/s²
+                    accel_g = acceleration / 9.81  # convert to Gs
+
+                self.telem_data['decel_g'] = accel_g
+
+                y_gs = accel_g
+                last_y_gs = self.last_y_gs
+                self.last_y_gs = y_gs
+
         elif self._sim_is("MSFS"):
             y_gs = telem_data.get("AccBody")[2]
-            last_y_gs = self._last_telem_data.get("AccBody", [0,0,0])[2]
+            last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
+
         elif self._sim_is_xplane():
             y_gs = -telem_data.get("Gaxil")
             last_y_gs = self._last_telem_data.get("Gaxil", 0)
         delta_y = abs(y_gs) - abs(last_y_gs)
+
         if not self.anything_has_changed("decel", y_gs):
             return
 
         if abs(delta_y) > 3:  # If the per-frame rate of change is greater than 3 Gs, we have likely crashed and telemetry is violently spiking.. do not play effect:
             return
 
-        if not sum(telem_data.get("WeightOnWheels")):
-            effects.dispose("decel")
-            return
         if not telem_data.get("TAS", 0):
             effects.dispose("decel")
             return
         avg_y_gs = self.smoother.get_average("y_gs", y_gs, sample_size=8)
+
+        self.telem_data['decel_g_smooth'] = avg_y_gs
+
         max_gs = self.deceleration_max_force
 
         dir = 180 if not self.decel_invert_force else 0
 
-        wow = sum(telem_data.get("WeightOnWheels"), 0)
-        if (avg_y_gs < -0.03 < 500) and wow:  # Don't play effect for very small, or very large (crash) force values, or no weight on wheels
+        if (avg_y_gs < -0.03 < 500):  # Don't play effect for very small, or very large (crash) force values, or no weight on wheels
             if abs(avg_y_gs) > max_gs:
                 avg_y_gs = -max_gs
 
             avg_y_gs = utils.clamp(abs(avg_y_gs) * self.decel_scale_factor, 0, 1)
+            if self._sim_is_dcs() and not wow:
+                sb = telem_data.get('speedbrakes_value')
+                avg_y_gs = avg_y_gs * sb
             logging.debug(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
-            effects["decel"].constant(abs(avg_y_gs), direction= dir).start()
+            effects["decel"].constant(abs(avg_y_gs), direction=dir).start()
         else:
             effects.dispose("decel")
 
@@ -1199,14 +1412,14 @@ class AircraftBase(object):
             if effects['inertia'].started:
                 effects["inertia"].destroy()
 
-        if self.enable_friction_ovd:
-            if self.anything_has_changed('friction_value', self.friction_force) or not effects['friction'].started:
+        if not self.friction_effect_overridden:
+            if self.enable_friction_ovd:
                 force = utils.clamp(self.friction_force, 0.0, 1.0)
+                effects['friction'].name = 'friction'
                 effects["friction"].friction(int(4096*force), int(4096*force)).start()
-        else:
-            if effects['friction'].started:
-                effects["friction"].destroy()
-
+            else:
+                if effects['friction'].started:
+                    effects["friction"].destroy()
 
     ########################################
     ######                            ######
@@ -1756,13 +1969,79 @@ class AircraftBase(object):
         # ensure spring is started with override = true
         spring.start(override=True)
 
-    def on_event(self):
+    def modify_game_spring(self):
+        if not self.adv_spr_override_enabled:
+            self.spring_adjuster.stop()
+            return
+        if self.adv_spr_gains == 'none':
+            self.flag_error('Please open and configure the advanced spring gain settings')
+            return
+
+        gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.get('IAS', 0))
+
+        self.spring_adjuster.name = 'adv_spr'
+        self.spring_adjuster_y.positiveCoefficient = self.spring_adjuster_y.negativeCoefficient = round(4096 * gains.get('y', 0))
+        self.spring_adjuster_x.positiveCoefficient = self.spring_adjuster_x.negativeCoefficient = round(4096 * gains.get('x', 0))
+
+        if self.adv_spr_use_hardware_trim:
+            dt = perftracker.get_time_delta('override_spring_perf')
+            trim_step_size = self.override_spring_trim_rate * dt
+            # trim_step_size = 200 * dt
+            self.telem_data['_ovrd_spr_step'] = trim_step_size
+            self.telem_data['_ovrd_spr_dt'] = dt
+            # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
+            # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
+            input_data = HapticEffect.device.get_input()
+            x, y = input_data.axisXY()
+            current_buttons = input_data.getPressedButtons()
+
+            if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
+                self.override_spring_cp0_y -= trim_step_size
+            elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
+                self.override_spring_cp0_y += trim_step_size
+
+            if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
+                self.override_spring_cp0_x -= trim_step_size
+            elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
+                self.override_spring_cp0_x += trim_step_size
+
+            self.override_spring_cp0_x = round(utils.clamp(self.override_spring_cp0_x, -4096, 4096))
+            self.override_spring_cp0_y = round(utils.clamp(self.override_spring_cp0_y, -4096, 4096))
+
+        offset = self._gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
+        self.g_y_offset = offset if offset is not None else 0
+        self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]
+        self.spring_adjuster_y.cpOffset = round(self.override_spring_cp0_y + self.g_y_offset)
+        self.spring_adjuster_x.cpOffset = round(self.override_spring_cp0_x)
+
+        self.spring_adjuster.setCondition(self.spring_adjuster_y)
+        self.spring_adjuster.setCondition(self.spring_adjuster_x)
+        self.spring_adjuster.start()
+
+    def set_deadzone(self):
+        if not self.enable_deadzone:
+            if self.active_deadzone_pct != 0.0:
+                HapticEffect.device.set_deadzone(0)
+                self.active_deadzone_pct = 0.0
+                logging.info('Disabling deadzone')
+            return
+        if self.active_deadzone_pct != self.deadzone_base_pct:
+            dz = utils.clamp(round((self.deadzone_base_pct / 100) * 4096), 0, 4096)
+            HapticEffect.device.set_deadzone(dz)
+            self.active_deadzone_pct = self.deadzone_base_pct
+            logging.info(f"Setting Deadzone to %{self.deadzone_base_pct}")
+
+
+
+
+    def on_event(self, event, *args):
         pass
 
     def on_timeout(self):  # override me
         logging.info("Telemetry Timeout, stopping effects")
         # effects.foreach(lambda e: e.stop())
         for key, effect in effects.dict.items():
+            effect: HapticEffect
             if self.keep_forces_on_pause:
                 if effect.effect_type in [EFFECT_SPRING, EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION, EFFECT_SPRING_ADJUSTER]:
                     continue

@@ -23,7 +23,7 @@ import telemffb.xmlutils as xmlutils
 
 import json
 import os
-from PyQt5.QtWidgets import QMessageBox, QPushButton
+from PyQt6.QtWidgets import QMessageBox, QPushButton
 from configobj import ConfigObj
 import textwrap
 
@@ -151,7 +151,7 @@ def config_to_dict(section, name, value, isim="", device=G.device_type, new_ac=F
 
 def select_sim_for_conversion(window, aircraft_name):
     msg_box = QMessageBox(window)
-    msg_box.setIcon(QMessageBox.Question)
+    msg_box.setIcon(QMessageBox.Icon.Question)
     msg_box.setText(
         f"Please select the simulator to which '{aircraft_name}' from your user configuration belongs:"
     )
@@ -161,9 +161,9 @@ def select_sim_for_conversion(window, aircraft_name):
     dcs_button = QPushButton("DCS")
     il2_button = QPushButton("IL2")
 
-    msg_box.addButton(msfs_button, QMessageBox.YesRole)
-    msg_box.addButton(dcs_button, QMessageBox.NoRole)
-    msg_box.addButton(il2_button, QMessageBox.NoRole)
+    msg_box.addButton(msfs_button, QMessageBox.ButtonRole.YesRole)
+    msg_box.addButton(dcs_button, QMessageBox.ButtonRole.NoRole)
+    msg_box.addButton(il2_button, QMessageBox.ButtonRole.NoRole)
 
     result = msg_box.exec_()
 
@@ -264,11 +264,11 @@ def autoconvert_config(main_window, cfg, usr):
                 existing user config to '{os.path.basename(usr)}.legacy'
             """
             ),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
         )
 
-        if ans == QMessageBox.No:
+        if ans == QMessageBox.StandardButton.No:
             return
         if not os.path.isfile(usr):
             QMessageBox.warning(
@@ -278,20 +278,20 @@ def autoconvert_config(main_window, cfg, usr):
             )
             return
         # perform the conversion
-        if not convert_settings(cfg=cfg, usr=usr, window=main_window):
-            return False
-        try:
-            os.rename(usr, f"{usr}.legacy")
-        except OSError:
-            ans = QMessageBox.warning(
-                main_window,
-                "Warning",
-                f'The legacy backup file for "{usr}" already exists, would you like to replace it?',
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
-            )
-            if ans == QMessageBox.Yes:
-                os.replace(usr, f"{usr}.legacy")
+        # if not convert_settings(cfg=cfg, usr=usr, window=main_window):
+        #     return False
+        # try:
+        #     os.rename(usr, f"{usr}.legacy")
+        # except OSError:
+        #     ans = QMessageBox.warning(
+        #         main_window,
+        #         "Warning",
+        #         f'The legacy backup file for "{usr}" already exists, would you like to replace it?',
+        #         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        #         QMessageBox.StandardButton.No,
+        #     )
+        #     if ans == QMessageBox.StandardButton.Yes:
+        #         os.replace(usr, f"{usr}.legacy")
 
         QMessageBox.information(
             main_window,

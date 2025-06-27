@@ -23,15 +23,17 @@ import logging
 import os
 import re
 
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QCursor, QIcon, QColor, QPixmap
-from PyQt5.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
+from PyQt6 import QtWidgets, QtCore
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QCursor, QIcon, QColor, QPixmap
+from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, AnimatedToggle)
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle)
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
+from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
+from telemffb.AdvancedGDialog import AdvancedGDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile, dbprint, HiDpiPixmap
 
@@ -49,9 +51,11 @@ class SettingsLayout(QGridLayout):
     bump_up = True              # set to false for no row bumping up
 
     all_sliders = []
-
+    incrvalue = 1
     def __init__(self, parent=None, mainwindow=None):
         super(SettingsLayout, self).__init__(parent)
+        self.exclusive_list = []
+        self.parent_expander_dict = {}
         result = None
         if G.settings_mgr.current_sim != 'nothing':
             a, b, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
@@ -62,6 +66,10 @@ class SettingsLayout(QGridLayout):
         self.device = HapticEffect()
         self.setColumnMinimumWidth(7, 20)
         self.trigger_form_reload = True
+        self.advanced_spring_settings = None
+        self.adv_spr_dialog = None
+        self.advanced_g_settings = None
+        self.adv_g_dialog = None
 
     def handleScrollKeyPressEvent(self, event):
         # Forward key events to each slider in the layout
@@ -201,7 +209,7 @@ class SettingsLayout(QGridLayout):
                         i -= 1   # bump .1 setting onto the enable row
                 self.generate_settings_row(item, i, rowdisabled)
 
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.addItem(spacerItem, i+1, 1, 1, 1)
         # Give entry column a high stretch factor, all others remain default 0.
         # When window is resized, the entry column will grow to take up all the new space
@@ -282,7 +290,12 @@ class SettingsLayout(QGridLayout):
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
-
+            # print(f"Exclusive: >{item['exclusive_with']}<")
+            if item['exclusive_with'] != '':
+                pair = [item['name'],item['exclusive_with']]
+                if not pair in self.exclusive_list:
+                    self.exclusive_list.append(pair)
+            # print(item)
             checkbox = Toggle(
                 checked_color=vpf_purple,
                 bar_color=t_purple
@@ -297,10 +310,10 @@ class SettingsLayout(QGridLayout):
             checkbox.setObjectName(f"cb_{item['name']}")
             # checkbox.blockSignals(True)
             if item['value'].lower() == 'false':
-                checkbox.setCheckState(0)
+                checkbox.setChecked(0)
                 rowdisabled = True
             else:
-                checkbox.setCheckState(2)
+                checkbox.setChecked(2)
             checkbox.blockSignals(False)
             if item['prereq'] != '':
                 chk_col += 1
@@ -327,7 +340,8 @@ class SettingsLayout(QGridLayout):
             unit_dropbox.setDisabled(rowdisabled)
 
         # everything has a name, except for things that have a checkbox *and* slider
-        label = InfoLabel(f"{item['displayname']}")
+        label = InfoLabel(text=f"{item['displayname']}")
+        label.setObjectName(f'namelabel_{item["name"]}')
         label.setToolTip(item['info'])
         label.setMinimumHeight(20)
         label.setMinimumWidth(20)
@@ -348,101 +362,161 @@ class SettingsLayout(QGridLayout):
         self.addWidget(label, i, lbl_col, 1, lbl_colspan)
 
         slider = NoWheelSlider()
-        slider.setOrientation(QtCore.Qt.Horizontal)
+        slider.setOrientation(QtCore.Qt.Orientation.Horizontal)
         slider.setObjectName(f"sld_{item['name']}")
 
         n_slider = NoWheelNumberSlider()
-        n_slider.setOrientation(QtCore.Qt.Horizontal)
+        n_slider.setOrientation(QtCore.Qt.Orientation.Horizontal)
         n_slider.setObjectName(f"sld_{item['name']}")
 
         d_slider = NoWheelSlider()
-        d_slider.setOrientation(QtCore.Qt.Horizontal)
+        d_slider.setOrientation(QtCore.Qt.Orientation.Horizontal)
         d_slider.setObjectName(f"dsld_{item['name']}")
 
         df_slider = NoWheelSlider()
-        df_slider.setOrientation(QtCore.Qt.Horizontal)
+        df_slider.setOrientation(QtCore.Qt.Orientation.Horizontal)
         df_slider.setObjectName(f"dfsld_{item['name']}")
 
         m_butt = QPushButton("-")
         m_butt.setFixedSize(20, 20)
-        m_butt.setStyleSheet("""
-            QPushButton {
-                font-size: 16px;  /* Adjust the font size */
-                font-family: Cascadia Code;
-                font-weight: bold;
-                color: black;
-                padding: 0px;
-                border: none;  /* Remove any border */
-                margin: 0px;   /* Remove any margin */
-                background-color: transparent;  /* Transparent background */
-            }
-            QPushButton:hover {
-                background-color: #ddd;  /* Optional: Change background on hover */
-            }
-            QPushButton:pressed {
-                background-color: #bbb;  /* Optional: Change background on press */
-            }
-        """)
+        if G.useDarkMode:
+            m_butt.setStyleSheet("""
+                QPushButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: #ab37c8;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QPushButton:hover {
+                    background-color: #666;  /* Optional: Change background on hover */
+                }
+                QPushButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
+        else:
+            m_butt.setStyleSheet("""
+                QPushButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: black;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QPushButton:hover {
+                    background-color: #ddd;  /* Optional: Change background on hover */
+                }
+                QPushButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
 
         # Create the "+" button
         p_butt = QPushButton("+")
         p_butt.setFixedSize(20, 20)
-        p_butt.setStyleSheet("""
-            QPushButton {
-                font-size: 16px;  /* Adjust the font size */
-                font-family: Cascadia Code;
-                font-weight: bold;
-                color: black;
-                padding: 0px;
-                border: none;  /* Remove any border */
-                margin: 0px;   /* Remove any margin */
-                background-color: transparent;  /* Transparent background */
-            }
-            QPushButton:hover {
-                background-color: #ddd;  /* Optional: Change background on hover */
-            }
-            QPushButton:pressed {
-                background-color: #bbb;  /* Optional: Change background on press */
-            }
-        """)
+        if G.useDarkMode:
+            p_butt.setStyleSheet("""
+                QPushButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: #ab37c8;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QPushButton:hover {
+                    background-color: #666;  /* Optional: Change background on hover */
+                }
+                QPushButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
+        else:
+            p_butt.setStyleSheet("""
+                QPushButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: black;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QPushButton:hover {
+                    background-color: #ddd;  /* Optional: Change background on hover */
+                }
+                QPushButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
         # unit?
         line_edit.setText(item['value'])
         line_edit.blockSignals(False)
-        line_edit.setAlignment(Qt.AlignHCenter)
+        line_edit.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         line_edit.setObjectName(f"vle_{item['name']}")
         line_edit.setMinimumWidth(150)
         line_edit.editingFinished.connect(self.line_edit_changed)
 
         expand_button = QToolButton()
         if item['name'] in self.expanded_items:
-            expand_button.setArrowType(Qt.DownArrow)
+            expand_button.setArrowType(Qt.ArrowType.DownArrow)
         else:
-            expand_button.setArrowType(Qt.RightArrow)
+            expand_button.setArrowType(Qt.ArrowType.RightArrow)
         expand_button.setMaximumWidth(24)
         expand_button.setMinimumWidth(24)
         expand_button.setObjectName(f"ex_{item['name']}")
-        expand_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-        expand_button.setStyleSheet("""
-            QToolButton {
-                font-size: 16px;  /* Adjust the font size */
-                font-family: Cascadia Code;
-                font-weight: bold;
-                color: black;
-                padding: 0px;
-                border: none;  /* Remove any border */
-                margin: 0px;   /* Remove any margin */
-                background-color: transparent;  /* Transparent background */
-            }
-            QToolButton:hover {
-                background-color: #ddd;  /* Optional: Change background on hover */
-            }
-            QToolButton:pressed {
-                background-color: #bbb;  /* Optional: Change background on press */
-            }
-        """)
+        expand_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        if G.useDarkMode:
+            expand_button.setStyleSheet("""
+                QToolButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: #ab37c8;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QToolButton:hover {
+                    background-color: #666;  /* Optional: Change background on hover */
+                }
+                QToolButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
+        else:
+            expand_button.setStyleSheet("""
+                QToolButton {
+                    font-size: 16px;  /* Adjust the font size */
+                    font-family: Cascadia Code;
+                    font-weight: bold;
+                    color: black;
+                    padding: 0px;
+                    border: none;  /* Remove any border */
+                    margin: 0px;   /* Remove any margin */
+                    background-color: transparent;  /* Transparent background */
+                }
+                QToolButton:hover {
+                    background-color: #ddd;  /* Optional: Change background on hover */
+                }
+                QToolButton:pressed {
+                    background-color: #bbb;  /* Optional: Change background on press */
+                }
+            """)
         expand_button.clicked.connect(self.expander_clicked)
 
         usb_button_text = f"Button {item['value']}"
@@ -451,11 +525,11 @@ class SettingsLayout(QGridLayout):
         self.usbdevice_button = QPushButton(usb_button_text)
         self.usbdevice_button.setMinimumWidth(150)
         self.usbdevice_button.setObjectName(f"pb_{item['name']}")
-        self.usbdevice_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+        self.usbdevice_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         self.usbdevice_button.clicked.connect(self.usb_button_clicked)
 
         value_label = QLabel()
-        value_label.setAlignment(Qt.AlignVCenter)
+        value_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         value_label.setMaximumWidth(50)
         value_label.setObjectName(f"vl_{item['name']}")
         sliderfactor = QLabel(f"{item['sliderfactor']}")
@@ -496,7 +570,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(slider)
             sl_layout.addWidget(p_butt)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
-            self.addWidget(value_label, i, val_col, alignment=Qt.AlignVCenter)
+            self.addWidget(value_label, i, val_col, alignment=Qt.AlignmentFlag.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
 
             slider.blockSignals(False)
@@ -533,7 +607,7 @@ class SettingsLayout(QGridLayout):
             sl_layout.addWidget(n_slider)
             sl_layout.addWidget(p_butt)
             self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
-            self.addWidget(value_label, i, val_col, alignment=Qt.AlignVCenter)
+            self.addWidget(value_label, i, val_col, alignment=Qt.AlignmentFlag.AlignVCenter)
             self.addWidget(sliderfactor, i, fct_col)
 
             n_slider.blockSignals(False)
@@ -637,7 +711,7 @@ class SettingsLayout(QGridLayout):
             spin_box.setValue(int(item['value']))
             spin_box.blockSignals(False)
             spin_box.setMinimumWidth(80)
-            spin_box.setAlignment(Qt.AlignHCenter)
+            spin_box.setAlignment(Qt.AlignmentFlag.AlignHCenter)
             spin_box.setObjectName(f"sb_{item['name']}")
             if validvalues is None or validvalues == '':
                 pass
@@ -645,13 +719,13 @@ class SettingsLayout(QGridLayout):
                 spin_box.setMinimum(int(validvalues[0]))
                 spin_box.setMaximum(int(validvalues[1]))
             spin_box.valueChanged.connect(self.spin_box_changed)
-            self.addWidget(spin_box, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+            self.addWidget(spin_box, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
         if item['datatype'] == 'list' or item['datatype'] == 'anylist':
             dropbox = QComboBox()
             dropbox.setMinimumWidth(150)
             dropbox.setEditable(True)
-            dropbox.lineEdit().setAlignment(QtCore.Qt.AlignHCenter)
+            dropbox.lineEdit().setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
             dropbox.setObjectName(f"db_{item['name']}")
             dropbox.addItems(validvalues)
             dropbox.blockSignals(True)
@@ -666,31 +740,55 @@ class SettingsLayout(QGridLayout):
             # dropbox.currentTextChanged.connect(self.dropbox_changed)
 
         if item['datatype'] == 'path':
-            self.vpconf_brose_button = QPushButton()
-            self.vpconf_brose_button.blockSignals(True)
-            self.vpconf_brose_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
-            self.vpconf_brose_button.setMinimumWidth(150)
-            self.vpconf_brose_button.setObjectName('path_vpconf')
+            self.vpconf_browse_button = QPushButton()
+            self.vpconf_browse_button.blockSignals(True)
+            self.vpconf_browse_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            self.vpconf_browse_button.setMinimumWidth(150)
+            self.vpconf_browse_button.setObjectName('path_vpconf')
             if item['value'] == '-':
-                self.vpconf_brose_button.setText('Browse...')
+                self.vpconf_browse_button.setText('Browse...')
             else:
                 fname = os.path.basename(item['value'])
                 button_text = fname
-                self.vpconf_brose_button.setToolTip(item['value'])
+                self.vpconf_browse_button.setToolTip(item['value'])
                 # p_length = len(item['value'])
                 # if p_length > 45:
                 #     button_text = f"{button_text[:40]}...{button_text[-25:]}"
-                self.vpconf_brose_button.setText(button_text)
-            self.vpconf_brose_button.blockSignals(False)
-            self.vpconf_brose_button.setMaximumHeight(25)
-            self.vpconf_brose_button.clicked.connect(self.browse_for_config)
-            self.addWidget(self.vpconf_brose_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+                self.vpconf_browse_button.setText(button_text)
+            self.vpconf_browse_button.blockSignals(False)
+            self.vpconf_browse_button.setMaximumHeight(25)
+            self.vpconf_browse_button.clicked.connect(self.browse_for_config)
+            self.addWidget(self.vpconf_browse_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
         if item['datatype'] == 'int' or item['datatype'] == 'anyfloat':
             self.addWidget(line_edit, i, entry_col, 1, entry_colspan)
 
         if item['datatype'] == 'button':
-            self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+            self.addWidget(self.usbdevice_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        if item['datatype'] == 'advgs':
+            self.advanced_g_settings = item['value']
+            b_txt = 'Configure Settings' if item['value'] == "none" else "Edit Settings"
+            # print(f"ADVANCED SPRING {self.advanced_spring_settings}")
+            self.adv_g_button = QPushButton(b_txt)
+            self.adv_g_button.setMinimumWidth(150)
+            self.adv_g_button.setMinimumHeight(25)
+            self.adv_g_button.setObjectName(f"advspr_{item['name']}")
+            self.adv_g_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            self.adv_g_button.clicked.connect(lambda: self.advanced_g_button_clicked(self.advanced_g_settings))
+            self.addWidget(self.adv_g_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        if item['datatype'] == 'advspr':
+            self.advanced_spring_settings = item['value']
+            b_txt = 'Configure Settings' if item['value'] == "none" else "Edit Settings"
+            # print(f"ADVANCED SPRING {self.advanced_spring_settings}")
+            self.adv_spr_button = QPushButton(b_txt)
+            self.adv_spr_button.setMinimumWidth(150)
+            self.adv_spr_button.setMinimumHeight(25)
+            self.adv_spr_button.setObjectName(f"advspr_{item['name']}")
+            self.adv_spr_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            self.adv_spr_button.clicked.connect(lambda: self.advanced_spring_button_clicked(self.advanced_spring_settings))
+            self.addWidget(self.adv_spr_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
         if item['datatype'] == 'configurator':
             self.configurator_button = QPushButton("Configure Gain Overrides")
@@ -704,10 +802,10 @@ class SettingsLayout(QGridLayout):
             self.configurator_button.setMinimumWidth(150)
             self.configurator_button.setMaximumHeight(25)
             self.configurator_button.setObjectName(f"config_{item['name']}")
-            self.configurator_button.setCursor(QCursor(QtCore.Qt.PointingHandCursor))
+            self.configurator_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
             self.configurator_button.clicked.connect(self.configurator_button_clicked)
             erase_button.clicked.connect(self.erase_configurator_overrides)
-            self.addWidget(self.configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignLeft)
+            self.addWidget(self.configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
 
         if item['has_expander'] == 'true' and item['prereq'] != '':
@@ -744,7 +842,7 @@ class SettingsLayout(QGridLayout):
         # erase_button = QToolButton()
         icon = QIcon()
         pixmap = HiDpiPixmap(":/image/delete_button.png")
-        #pixmap = pixmap.scaled(15, 15, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        #pixmap = pixmap.scaled(15, 15, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         icon.addPixmap(pixmap)
 
         # Create the erase button
@@ -786,6 +884,38 @@ class SettingsLayout(QGridLayout):
             }
         """)
 
+        if item['has_expander'].lower() == 'true':
+            # These are top level config sections that have an expander button but do not have any ".1" sliders
+            label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+            label.text_label.setOpenExternalLinks(False)
+            if G.useDarkMode:
+                label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{item["displayname"]}</a>')
+            else:
+                label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{item["displayname"]}</a>')
+            label.text_label.setToolTip('Click to Expand')
+            label.text_label.linkActivated.connect(expand_button.click)
+
+        if item['order'][-2:] == '.1':
+            # For ".1" config objects, they take the place of the parent setting in the row when enabled so #we
+            # need to find the expander button from the prerequisite object
+            parent = item['prereq']
+            parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
+            if parent_expand_button is not None:
+                label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+                label.text_label.setOpenExternalLinks(False)
+                if G.useDarkMode:
+                    label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{item["displayname"]}</a>')
+                else:
+                    label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{item["displayname"]}</a>')
+                label.text_label.linkActivated.connect(lambda href, parent_name=parent: self.expander_hyperlink_clicked(parent_name))
+
+    def expander_hyperlink_clicked(self, parent):
+        # dbprint("red", f"EXPANDER: {parent}")
+        parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
+        if parent_expand_button is not None:
+            parent_expand_button.click()
+
+    # expander.click()
     def show_erase_button(self, setting_name=None):
         if setting_name is None:
             setting_name = self.sender().objectName()
@@ -795,8 +925,11 @@ class SettingsLayout(QGridLayout):
         setting = re.match(pattern, setting_name).group(1)
         # dbprint("red", f"SETTING: {setting}")
         eb = self.mainwindow.findChild(QPushButton, f"eb_{setting}")
-        eb.setVisible(True)
-        eb.setToolTip("Reset to Default")
+        if eb is not None:
+            eb.setVisible(True)
+            eb.setToolTip("Reset to Default")
+        else:
+            logging.info(f"Can't find erase button for '{setting}'.  Probably child device being configured via master")
 
     def remove_widget(self, olditem):
         widget = olditem.widget()
@@ -804,10 +937,30 @@ class SettingsLayout(QGridLayout):
             widget.deleteLater()
             self.removeWidget(widget)
 
+    def enforce_exclusives(self, name, state, exclusive_list):
+        """Used to force disable bool settings that are mutually exclusive with others"""
+        if state != 2:
+            # we are only interested in bool settings that have been enabled (state = 2)
+            return None
+        for pair in exclusive_list:  # Iterate through prebuilt exclusivity list to find one matching this call
+            a = pair[0]  # This is the enforcing setting
+            b = pair[1]  # This is the setting(s) which need to be disabled if 'a' is enabled (comma separated)
+            if a == name:  # Find if there is pair that matches this function call
+                disable_list = b.split(',')
+                return disable_list
+        return None
+
+
     def checkbox_changed(self, name, state):
         self.trigger_form_reload = True
         logging.debug(f"Checkbox {name} changed. New state: {state}")
         value = 'false' if state == 0 else 'true'
+        enforce_list = self.enforce_exclusives(name, state, self.exclusive_list)  # Check for and enforce exclusive settings
+        if value == 'true' and enforce_list is not None:
+            for exclusive in enforce_list:
+                #enforce_list is a list of settings that must not be true if 'value' is true (per exclusive attribute in defauls.xml)
+                xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, "false", exclusive)
+
         xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, name)
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -821,8 +974,8 @@ class SettingsLayout(QGridLayout):
 
     def browse_for_config(self):
         self.trigger_form_reload = False
-        options = QFileDialog.Options()
-        # options |= QFileDialog.DontUseNativeDialog
+        options = QFileDialog.Option(0)
+        # options |= QFileDialog.Option.DontUseNativeDialog
         calling_button = self.sender()
         starting_dir = os.getcwd()
         if calling_button:
@@ -845,7 +998,7 @@ class SettingsLayout(QGridLayout):
                 xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, file_path, 'vpconf')
 
                 self.show_erase_button('config_vpconf')
-                self.vpconf_brose_button.setText(os.path.basename(file_path))
+                self.vpconf_browse_button.setText(os.path.basename(file_path))
                 if G.settings_mgr.timed_out:
                     self.reload_caller()
 
@@ -913,11 +1066,11 @@ class SettingsLayout(QGridLayout):
         self.trigger_form_reload = True
         logging.debug(f"expander {self.sender().objectName()} clicked.  value: {self.sender().text()}")
         settingname = self.sender().objectName().replace('ex_', '')
-        if self.sender().arrowType() == Qt.RightArrow:
+        if self.sender().arrowType() == Qt.ArrowType.RightArrow:
             # print ('expanded')
 
             self.expanded_items.append(settingname)
-            self.sender().setArrowType(Qt.DownArrow)
+            self.sender().setArrowType(Qt.ArrowType.DownArrow)
 
             self.reload_caller()
         else:
@@ -927,7 +1080,7 @@ class SettingsLayout(QGridLayout):
                 if ex != settingname:
                     new_exp_items.append(ex)
             self.expanded_items = new_exp_items
-            self.sender().setArrowType(Qt.DownArrow)
+            self.sender().setArrowType(Qt.ArrowType.DownArrow)
 
             self.reload_caller()
 
@@ -959,6 +1112,34 @@ class SettingsLayout(QGridLayout):
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
+    def advanced_g_button_clicked(self, value=None):
+        if value is None:
+            value = self.advanced_g_settings
+        if G.master_instance and G.device_type != G.current_device_config_scope:
+            G.ipc_instance.send_broadcast_message(f'SHOW ADV SPR:{G.current_device_config_scope}')
+        else:
+            if self.adv_g_dialog is None:
+                self.adv_g_dialog = AdvancedGDialog(parent=G.main_window, settings=value, device=G.current_device_config_scope)
+                self.adv_g_dialog.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
+                self.adv_g_dialog.accepted.connect(self.update_advanced_g_effect)
+                self.adv_g_dialog.show()
+            else:
+                self.adv_g_dialog.showme(settings=value)
+
+    def advanced_spring_button_clicked(self, value=None):
+        if value is None:
+            value = self.advanced_spring_settings
+        if G.master_instance and G.device_type != G.current_device_config_scope:
+            G.ipc_instance.send_broadcast_message(f'SHOW ADV SPR;{G.current_device_config_scope};{value}')  # use semicolon for delimiter as value contains colons
+        else:
+            if self.adv_spr_dialog is None:
+                self.adv_spr_dialog = AdvancedSpringDialog(parent=G.main_window, settings=value, device=G.current_device_config_scope, sim=G.settings_mgr.current_sim)
+                self.adv_spr_dialog.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
+                self.adv_spr_dialog.accepted.connect(self.update_advanced_spring_gains)
+                self.adv_spr_dialog.show()
+            else:
+                self.adv_spr_dialog.showme(settings=value, sim=G.settings_mgr.current_sim)
+
     def configurator_button_clicked(self):
         """
         User clicked the configurator gain override settings button.
@@ -981,6 +1162,29 @@ class SettingsLayout(QGridLayout):
         else:
             G.gain_override_dialog.revert_gains()
             G.gain_override_dialog.reset_to_vpconf()
+
+    def update_advanced_g_effect(self, g_effect_curves: str):
+        self.trigger_form_reload = True
+        """
+        Called when signal received that user saved the advanced g-effect settings
+        """
+        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, g_effect_curves,"gforce_effect_adv_curve")
+        self.show_erase_button("config_gforce_effect_adv_curve")
+        # self.adv_spr_button.setText("Edit Spring Gains")
+        # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
+        self.reload_caller()
+
+    def update_advanced_spring_gains(self, spring_gain_curves: str, scale: str, units: str):
+        self.trigger_form_reload = True
+        """
+        Called when signal received that user saved the advanced spring gain settings
+        """
+        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, spring_gain_curves, "adv_spr_gains")
+        # xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, str(scale), "vne_override", unit=units)
+        self.show_erase_button("config_adv_spr_gains")
+        # self.adv_spr_button.setText("Edit Spring Gains")
+        # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
+        self.reload_caller()
 
     def update_configurator_overrides(self, gain_dict):
         self.trigger_form_reload = False

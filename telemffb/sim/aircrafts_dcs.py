@@ -46,7 +46,7 @@ from telemffb.utils import overrides
 from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
 
 from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects, perftracker
-
+from telemffb.telem.DcsIpcThread import DcsIpcThread
 #unit conversions (to m/s)
 knots = 0.514444
 kmh = 1.0/3.6
@@ -67,16 +67,6 @@ class Aircraft(AircraftBase):
     gear_motion_intensity : float = 0.12      # peak vibration intensity when gear is moving, 0 to disable
     # gear_buffet_effect_enabled: bool = True
     gear_buffet_intensity : float = 0.15      # peak buffeting intensity when gear down during flight,  0 to disable
-
-    ####
-    #### Beta effects - set to 1 to enable
-    gforce_effect_invert_force = 0  # case where "180" degrees does not equal "away from pilot"
-    gforce_effect_enable = 0
-    gforce_effect_enable_areyoureallysure = 0
-    gforce_effect_curvature = 2.2
-    gforce_effect_max_intensity = 1.0
-    gforce_min_gs = 1.5  # G's where the effect starts playing
-    gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
 
     ###
     ### AoA reduction force effect
@@ -213,7 +203,11 @@ class Aircraft(AircraftBase):
         self._update_touchdown_effect(telem_data)
         self._update_stick_shaker(telem_data)
         self.override_spring()
+
+        self.modify_game_spring()
+
         self.override_copilot_spring(telem_data)
+        self.set_deadzone()
 
     @overrides(AircraftBase)
     def on_event(self, event, *args):
@@ -237,10 +231,7 @@ class Aircraft(AircraftBase):
 
     def send_commands(self, cmds):
         cmds = "\n".join(cmds)
-        if not getattr(self, "_socket", None):
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-        
-        self._socket.sendto(bytes(cmds, "utf-8"), ("127.0.0.1", 34381))
+        DcsIpcThread.send_commands(cmds)
 
     def _update_damage(self, telem_data):
         if not self.damage_effect_enabled: return

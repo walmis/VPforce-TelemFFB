@@ -17,8 +17,8 @@
 #
 
 
-from PyQt5.QtGui import QFont, QIcon, QTextCursor
-from PyQt5.QtWidgets import QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QVBoxLayout, QWidget, QMainWindow, QPlainTextEdit
+from PyQt6.QtGui import QFont, QIcon, QTextCursor
+from PyQt6.QtWidgets import QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QVBoxLayout, QWidget, QMainWindow, QPlainTextEdit
 import os
 
 
@@ -45,7 +45,7 @@ class LogTailWindow(QMainWindow):
         self.log_widget = QPlainTextEdit(self.central_widget)
         self.log_widget.setReadOnly(True)
         self.log_widget.setFont(QFont("Courier New"))
-        self.log_widget.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.log_widget.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
 
         self.clear_button = QPushButton("Clear", self.central_widget)
         self.toggle_button = QPushButton("Pause", self.central_widget)
@@ -82,7 +82,7 @@ class LogTailWindow(QMainWindow):
 
     def update_log_widget(self, log_line):
         cursor = self.log_widget.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertText(log_line)
         self.log_widget.setTextCursor(cursor)
         self.log_widget.ensureCursorVisible()

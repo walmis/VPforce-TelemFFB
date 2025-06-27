@@ -1,5 +1,23 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 ############################################
+##  May 6, 2025
+############################################
+## General
+- Several bug fixes
+  - Fixed Certain simconnect override types could lead to corrupted user xml
+  - Fixed main setup window popping up every time if a joystick PID was not entered (e.g. if user had *only* pedals)
+## MSFS\XPLANE
+- New device type capability "Trim Wheel" has been added to TelemFFB
+  - Reads from and writes to trim axis.
+  - Syncs with aircraft trim position on load-in to aircraft
+  - Follows elevator trim during autopilot engagement
+  - Follows elevator trim if trim buttons are used as well
+## MSFS
+- Improved autopilot following logic
+  - New "Deadzone" per axis setting for autopilot following.  Input will not register until deadzone area is exceeded - improves behavior on autopilots that do not tolerate any input
+  - New settings to increase/decrease the amount of physical movement of the stick that the AP inputs will produce
+
+############################################
 ##  March 9, 2025
 ############################################
 ## MSFS 2024

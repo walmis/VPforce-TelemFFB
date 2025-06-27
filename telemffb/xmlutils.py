@@ -102,6 +102,8 @@ def read_xml_file(the_sim, instance_device=''):
         name = defaults_elem.find('name').text
         displayname = defaults_elem.find('displayname').text
         datatype = defaults_elem.find('datatype').text
+        exclusive_with = defaults_elem.find('exclusive_with')
+        exclusive_with = exclusive_with.text if exclusive_with is not None else ''
         unit_elem = defaults_elem.find('unit')
         unit = unit_elem.text if unit_elem is not None else ""
         value_elem = defaults_elem.find('value')
@@ -125,6 +127,7 @@ def read_xml_file(the_sim, instance_device=''):
             'order': order,
             'name': name,
             'displayname': displayname,
+            'exclusive_with': exclusive_with,
             'value': value,
             'unit': unit,
             'datatype': datatype,
@@ -482,7 +485,7 @@ def write_sc_override_to_xml(the_model, the_var, setting_name, sc_unit='', scale
                                    ("model", the_model),
                                    ("var", the_var),
                                    ("sc_unit", sc_unit),
-                                   ("scale", scale)]:
+                                   ("scale", str(scale))]:
                     ET.SubElement(overrides, tag).text = value
 
             # Write the modified XML back to the file

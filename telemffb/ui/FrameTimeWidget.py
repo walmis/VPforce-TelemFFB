@@ -1,7 +1,7 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QScrollArea
-from PyQt5.QtGui import QPainter, QPen, QLinearGradient, QColor, QFont
-from PyQt5.QtCore import Qt, QPointF, QTimer
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QScrollArea
+from PyQt6.QtGui import QPainter, QPen, QLinearGradient, QColor, QFont
+from PyQt6.QtCore import Qt, QPointF, QTimer
 import random
 
 class FrameTimeWidget(QWidget):
@@ -22,10 +22,10 @@ class FrameTimeWidget(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.HighQualityAntialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Set background color
-        painter.fillRect(self.rect(), Qt.white)
+        painter.fillRect(self.rect(), Qt.GlobalColor.white)
 
         # Draw vertical lines for each frame time
         if not self.frame_times:
@@ -37,9 +37,9 @@ class FrameTimeWidget(QWidget):
         print(strokew)
 
         gradient = QLinearGradient(0, 0, 0, self.height())
-        gradient.setColorAt(1, Qt.green)
+        gradient.setColorAt(1, Qt.GlobalColor.green)
         gradient.setColorAt(0.5, QColor(128,200,0)) # Frame time of 10 corresponds to green
-        gradient.setColorAt(0, Qt.red)
+        gradient.setColorAt(0, Qt.GlobalColor.red)
           # Frame time of 50 corresponds to yellow
 
         pen = QPen(gradient, strokew)
@@ -53,7 +53,7 @@ class FrameTimeWidget(QWidget):
 
             painter.drawLine(QPointF(x, self.height()), QPointF(x, y))
 
-        pen = QPen(Qt.black)
+        pen = QPen(Qt.GlobalColor.black)
         painter.setPen(pen)
 
         font = QFont("Courier New", 8)
@@ -109,4 +109,4 @@ if __name__ == '__main__':
 
     QTimer.singleShot(20, do_add)
 
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

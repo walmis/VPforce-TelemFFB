@@ -19,9 +19,9 @@
 
 import telemffb.globals as G
 
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QAction, QHBoxLayout, QMainWindow, QPlainTextEdit, QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
-from PyQt5.QtCore import QSettings
+from PyQt6.QtGui import QFont, QAction
+from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QPlainTextEdit, QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QWidget
+from PyQt6.QtCore import QSettings
 import logging
 
 logger = logging.getLogger()
@@ -66,7 +66,7 @@ class LogWindow(QMainWindow):
 
         # Create a QHBoxLayout for the buttons
         button_layout = QHBoxLayout()
-        button_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        button_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
 
         self.clear_button = QPushButton('Clear', self.central_widget)
         self.clear_button.clicked.connect(self.clear_log)

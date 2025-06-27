@@ -19,9 +19,9 @@
 
 import logging
 
-from PyQt5 import QtCore
-from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtWidgets import QDialog, QMessageBox
+from PyQt6 import QtCore
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtWidgets import QDialog, QMessageBox
 import inspect
 
 import telemffb.globals as G
@@ -53,7 +53,7 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.setupUi(self)
         self.retranslateUi(self)
         self.setWindowTitle(f"Configurator Gain Override ({G.device_type.capitalize()})")
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
         # self.cb_MasterGain.clicked
         self.sl_MasterGain.valueChanged.connect(self.update_labels)
         self.sl_MasterGain.delayedValueChanged.connect(self.set_gain_value)
@@ -85,12 +85,12 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.cb_Constant.stateChanged.connect(self.cb_toggle)
 
         self.cb_MasterGain.setChecked(self.cb_states['cb_MasterGain'])
-        self.cb_Periodic.setCheckState(self.cb_states['cb_Periodic'])
-        self.cb_Spring.setCheckState(self.cb_states['cb_Spring'])
-        self.cb_Damper.setCheckState(self.cb_states['cb_Damper'])
-        self.cb_Inertia.setCheckState(self.cb_states['cb_Inertia'])
-        self.cb_Friction.setCheckState(self.cb_states['cb_Friction'])
-        self.cb_Constant.setCheckState(self.cb_states['cb_Constant'])
+        self.cb_Periodic.setChecked(self.cb_states['cb_Periodic'])
+        self.cb_Spring.setChecked(self.cb_states['cb_Spring'])
+        self.cb_Damper.setChecked(self.cb_states['cb_Damper'])
+        self.cb_Inertia.setChecked(self.cb_states['cb_Inertia'])
+        self.cb_Friction.setChecked(self.cb_states['cb_Friction'])
+        self.cb_Constant.setChecked(self.cb_states['cb_Constant'])
 
         self.pb_Revert.clicked.connect(self.revert_gains)
         self.pb_Revert.setToolTip('Revert the settings to the values learned when TelemFFB was started -or- to the values in the last vpconf profile that was pushed by TelemFFB (if one has been pushed)')
@@ -130,8 +130,8 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
     def showEvent(self, event):
         self.raise_()
         self.activateWindow()
-        self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         super().showEvent(event)
 
     def show(self):
@@ -151,8 +151,8 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
         self.read_gains()
         self.at_show_state = self.construct_setting_table()
 
-        self.setWindowState(self.windowState() & ~Qt.WindowMinimized | Qt.WindowActive)
-        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+        self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self.raise_()
         self.activateWindow()
         super().show()

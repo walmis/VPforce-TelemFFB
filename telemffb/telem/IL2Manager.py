@@ -37,9 +37,12 @@ from typing import List, Iterable
 import struct
 from enum import IntEnum
 from dataclasses import dataclass
+from telemffb.telem.TelemParserBase import TelemParserBase
 import telemffb.utils as utils
 import telemffb.globals as G
 import pygetwindow as get_focus_window
+
+from telemffb.utils import hexdump
 
 
 knots = 0.514444
@@ -54,28 +57,6 @@ def dbg(level, *args, **kwargs):
     if dbg_en and level <= dbg_lvl:
         print(*args, **kwargs)
 
-
-def hexdump(src, length=16, sep='.'):
-    """Hex dump bytes to ASCII string, padded neatly
-    In [107]: x = b'\x01\x02\x03\x04AAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBB'
-    
-    In [108]: print('\n'.join(hexdump(x)))
-    00000000  01 02 03 04 41 41 41 41  41 41 41 41 41 41 41 41 |....AAAAAAAAAAAA|
-    00000010  41 41 41 41 41 41 41 41  41 41 41 41 41 41 42 42 |AAAAAAAAAAAAAABB|
-    00000020  42 42 42 42 42 42 42 42  42 42 42 42 42 42 42 42 |BBBBBBBBBBBBBBBB|
-    00000030  42 42 42 42 42 42 42 42                          |BBBBBBBB        |
-    """
-    FILTER = ''.join([(len(repr(chr(x))) == 3) and chr(x) or sep for x in range(256)])
-    lines = []
-    for c in range(0, len(src), length):
-        chars = src[c: c + length]
-        hex_ = ' '.join(['{:02x}'.format(x) for x in chars])
-        if len(hex_) > 24:
-            hex_ = '{} {}'.format(hex_[:24], hex_[24:])
-        printable = ''.join(['{}'.format((x <= 127 and FILTER[x]) or sep) for x in chars])
-        lines.append('{0:08x}  {1:{2}s} |{3:{4}s}|'.format(c, hex_, length * 3, printable, length))
-
-    return ("\n".join(lines))
 
 class BinaryDataReader:
     def __init__(self, data, endian='little'):
@@ -197,7 +178,7 @@ class StateDataStructure:
     air_brake_position: float = 0.0
 
 
-class IL2Manager():
+class IL2Manager(TelemParserBase):
     def __init__(self):
         self.ac_name: str = ""
         self.engine_info: list = []

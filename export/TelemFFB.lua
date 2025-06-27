@@ -1000,6 +1000,27 @@ local f_telemFFB = {
               actualRPM
             )
 
+          elseif string.find(obj.Name, "F4U-1D", 0, true) then
+            -------------------------------------------------------------------------------------------------------------------------------------------------------
+            -- Calculate Engine RPM from redline value and engine.RPM value
+            local engine_redline_reference = 2700
+            local engPercent = string.format("%.3f", math.max(engine.RPM.left, engine.RPM.right))
+            local actualRPM = math.floor(engine_redline_reference * (engPercent / 100))
+            local wing_fold = LoGetAircraftDrawArgumentValue(8)
+            local tail_hook = LoGetAircraftDrawArgumentValue(25)
+
+            -- I-16 sends to TelemFFB
+            damage_vars = {
+                81,146,147,155,213,214,215,217,218,219,220,223,224,225,227,228,229,230,234,236,237,244,250,252,
+            }
+            stringToSend =
+              string.format(
+              "ActualRPM=%s;WingFold=%2f;TailHook=%2f",
+              actualRPM,
+              wing_fold,
+              tail_hook
+            )
+
           elseif obj.Name == "A-10C" then
             -------------------------------------------------------------------------------------------------------------------------------------------------------
             local FlapsPos = MainPanel:get_argument_value(653)
@@ -1412,7 +1433,7 @@ local f_telemFFB = {
             local MechState = string.format("%.2f-%.2f", DragChuteState, 100 * LoGetMechInfo().gear.value)
             local MCP = LoGetMCPState()
 
-            local engineRPM = string.format("%.0f~%.0f", LoGetEngineInfo().RPM.left, LoGetEngineInfo().RPM.right)
+            --local engineRPM = string.format("%.0f~%.0f", LoGetEngineInfo().RPM.left, LoGetEngineInfo().RPM.right)
 
             local MCPState =
               tostring(MCP.LeftEngineFailure) .. "~" .. tostring(MCP.RightEngineFailure) .. "~" .. tostring(MCP.HydraulicsFailure) ..

@@ -23,8 +23,10 @@ import os
 import subprocess
 import threading
 import time
+from dataclasses import dataclass
 
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
+from typing import Optional, Tuple, TYPE_CHECKING
 
 import telemffb.globals as G
 import telemffb.utils as utils
@@ -34,6 +36,17 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
 from telemffb.telem.SimConnectManager import SimConnectManager
 from telemffb.utils import set_vpconf_profile
+
+if TYPE_CHECKING:
+    from telemffb.sim.aircraft_base import AircraftBase
+
+@dataclass
+class AircraftInfo:
+    name: Optional[str]
+    data_source: Optional[str]
+    module: object
+    sc_aircraft_type: Optional[str] = None
+    sc_engine_type: Optional[int] = None
 
 _config_mtime = 0
 _future_config_update_time = time.time()
@@ -70,9 +83,9 @@ class TelemManager(QObject, threading.Thread):
     aircraftUpdated = pyqtSignal()
     telemetryTimeout = pyqtSignal(bool)
 
-    currentAircraft: aircrafts_dcs.Aircraft = None
-    currentAircraftName: str = None
-    currentAircraftConfig: dict = {}
+    currentAircraft: Optional['AircraftBase'] = None
+    currentAircraftName: Optional[str] = None
+    currentAircraftConfig: dict
 
     timed_out: bool = True
     last_frame_time: float
@@ -92,7 +105,7 @@ class TelemManager(QObject, threading.Thread):
         self.max_frame_time = 0
         self.timeout_sec = 0.2
         self._ipc_telem_data = {}
-        self._simconnect : SimConnectManager= None
+        self._simconnect : Optional[SimConnectManager] = None
         self.gain_overrides_active = False
         self.stop_state = False
 
@@ -103,7 +116,7 @@ class TelemManager(QObject, threading.Thread):
     def simconnect(self) -> SimConnectManager:
         return self._simconnect
 
-    def get_aircraft_config(self, aircraft_name, data_source):
+    def get_aircraft_config(self, aircraft_name, data_source) -> Tuple[dict, str]:
         params = {}
         cls_name = "UNKNOWN"
         input_modeltype = ''
@@ -153,15 +166,18 @@ class TelemManager(QObject, threading.Thread):
 
             # logging.info(f"Got settings from settingsmanager:\n{formatted_result}")
         except Exception as e:
-            logging.warning(f"Error getting settings from Settings Manager:{e}")
+            logging.exception(f"Error getting settings from Settings Manager:{e}")
 
     def quit(self):
         self._run = False
         self.join()
 
-    def submit_frame(self, data: bytes):
-        if isinstance(data, bytes):
-            data = data.decode("utf-8")
+    def submit_frame(self, data_in: bytes):
+        data : str
+        if isinstance(data_in, bytes):
+            data = data_in.decode("utf-8")
+        else:
+            data = str(data_in)
 
         with self._cond:
             if data.startswith("Ev="):
@@ -175,7 +191,7 @@ class TelemManager(QObject, threading.Thread):
                 # log dropped frames, this is not necessarily a bad thing
                 # USB interrupt transfers (1ms) might take longer than one video frame
                 # we drop frames to keep latency to a minimum
-                logging.debug(f"Droppped frame (total {self._dropped_frames})")
+                logging.debug(f"Dropped frame (total {self._dropped_frames})")
 
     def process_events(self):
         while self._events:
@@ -197,282 +213,269 @@ class TelemManager(QObject, threading.Thread):
         logging.debug(f"get_changed_settings: {diff_dict.items()}")
         self.currentAircraftConfig.update(diff_dict)
         return diff_dict
-    
+
     def process_data(self, data):
+        """Main telemetry data processing pipeline."""
+        parsed_data = self._parse_telemetry_data(data)
+        aircraft_info = self._extract_aircraft_info(parsed_data)
+        
+        self._handle_aircraft_changes(aircraft_info, parsed_data)
+        self._handle_config_changes(aircraft_info)
+        self._process_current_aircraft_telemetry(parsed_data)
+        self._handle_ipc_and_plotting(parsed_data)
+        self._emit_telemetry(parsed_data)
 
+    def _parse_telemetry_data(self, data):
+        """Parse raw telemetry data and calculate frame timing metrics."""
         data = data.split(";")
-
-        telem_data = {}
-        telem_data["FFBType"] = G.device_type
-
-        self.frame_times.append(int((time.perf_counter() - self.last_frame_time)*1000))
-        if len(self.frame_times) > 500: 
-            self.frame_times.pop(0)
-
-        if self.frame_times[-1] > self.max_frame_time and len(self.frame_times) > 40:  # skip the first frames before counting frametime as max
-            threshold = 100
-            if self.frame_times[-1] > threshold:
-                logging.debug(
-                    f'*!*!*!* - Frametime threshold of {threshold}ms exceeded: time = {self.frame_times[-1]}ms')
-
-            self.max_frame_time = self.frame_times[-1]
-
-        telem_data["frameTimes"] = [self.frame_times[-1], max(self.frame_times)]
-        telem_data["maxFrameTime"] = f"{round(self.max_frame_time, 3)}"
-        telem_data["avgFrameTime"] = f"{round(sum(self.frame_times) / len(self.frame_times), 3):.3f}"
-
-        self.last_frame_time = time.perf_counter()
-
-        for i in data:
+        telem_data = {"FFBType": G.device_type}
+        
+        # Calculate frame timing
+        self._update_frame_timing(telem_data)
+        
+        # Parse telemetry parameters
+        for param in data:
             try:
-                if len(i):
-                    section, conf = i.split("=")
+                if len(param):
+                    section, conf = param.split("=")
                     values = conf.split("~")
                     telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
-
             except Exception:
-                logging.exception("Error Parsing Parameter: %s", repr(i))
+                logging.exception("Error Parsing Parameter: %s", repr(param))
+        
+        # Merge IPC telemetry data
+        self._merge_ipc_telemetry(telem_data)
+        
+        return telem_data
 
-        # Read telemetry sent via IPC channel from child instances and update local telemetry stream
+    def _update_frame_timing(self, telem_data):
+        """Update frame timing metrics and add to telemetry data."""
+        current_frame_time = int((time.perf_counter() - self.last_frame_time) * 1000)
+        self.frame_times.append(current_frame_time)
+        
+        if len(self.frame_times) > 500:
+            self.frame_times.pop(0)
+
+        # Check for frame time threshold violations
+        if current_frame_time > self.max_frame_time and len(self.frame_times) > 40:
+            threshold = 100
+            if current_frame_time > threshold:
+                logging.debug(f'*!*!*!* - Frametime threshold of {threshold}ms exceeded: time = {current_frame_time}ms')
+            self.max_frame_time = current_frame_time
+
+        telem_data["frameTimes"] = [current_frame_time, max(self.frame_times)]
+        telem_data["maxFrameTime"] = f"{round(self.max_frame_time, 3)}"
+        telem_data["avgFrameTime"] = f"{round(sum(self.frame_times) / len(self.frame_times), 3):.3f}"
+        
+        self.last_frame_time = time.perf_counter()
+
+    def _merge_ipc_telemetry(self, telem_data):
+        """Merge telemetry data from child instances via IPC."""
         if G.master_instance and G.launched_instances:
             self._ipc_telem_data = G.ipc_instance._ipc_telem
-            if self._ipc_telem_data != {}:
+            if self._ipc_telem_data:
                 telem_data.update(self._ipc_telem_data)
                 self._ipc_telem_data.clear()
 
+    def _extract_aircraft_info(self, telem_data) -> AircraftInfo:
+        """Extract aircraft information and determine the appropriate module."""
         aircraft_name = telem_data.get("N")
         data_source = telem_data.get("src", None)
+        
+        # Determine aircraft module based on data source
         if data_source == "MSFS":
             module = aircrafts_msfs_xp
             sc_aircraft_type = telem_data.get("SimconnectCategory", None)
             sc_engine_type = telem_data.get("EngineType", 4)
-            # 0 = Piston
-            # 1 = Jet
-            # 2 = None
-            # 3 = Helo(Bell) turbine
-            # 4 = Unsupported
-            # 5 = Turboprop
         elif data_source == "IL2":
             module = aircrafts_il2
+            sc_aircraft_type = None
+            sc_engine_type = None
         elif data_source == 'XPLANE':
             module = aircrafts_msfs_xp
+            sc_aircraft_type = None
+            sc_engine_type = None
         else:
             module = aircrafts_dcs
+            sc_aircraft_type = None
+            sc_engine_type = None
+            
+        return AircraftInfo(
+            name=aircraft_name,
+            data_source=data_source,
+            module=module,
+            sc_aircraft_type=sc_aircraft_type,
+            sc_engine_type=sc_engine_type
+        )
 
+    def _handle_aircraft_changes(self, aircraft_info: AircraftInfo, telem_data):
+        """Handle aircraft changes and initialization."""
+        aircraft_name = aircraft_info.name
+        
         if aircraft_name and aircraft_name != self.currentAircraftName:
-
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
-                logging.info(f"New aircraft loaded: resetting current aircraft config")
-                self.currentAircraftConfig = {}
-
-                params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-
-                # self.settings_manager.update_current_aircraft(send_source, aircraft_name, cls_name)
-                Class = getattr(module, cls_name, None)
-                logging.debug(f"CLASS={Class.__name__}")
-
-                if not Class or Class.__name__ == "Aircraft":
-                    if data_source == "MSFS":
-                        if sc_aircraft_type == "Helicopter":
-                            logging.warning("Aircraft definition not found, using SimConnect Data (Helicopter Type)")
-                            type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.Helicopter")
-                            params.update(type_cfg)
-                            Class = module.Helicopter
-                        elif sc_aircraft_type == "Jet":
-                            logging.warning("Aircraft definition not found, using SimConnect Data (Jet Type)")
-                            type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.JetAircraft")
-                            params.update(type_cfg)
-                            Class = module.JetAircraft
-                        elif sc_aircraft_type == "Airplane":
-                            if sc_engine_type == 0:     # Piston
-                                logging.warning("Aircraft definition not found, using SimConnect Data (Propeller Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.PropellerAircraft")
-                                params.update(type_cfg)
-                                Class = module.PropellerAircraft
-                            if sc_engine_type == 1:     # Jet
-                                logging.warning("Aircraft definition not found, using SimConnect Data (Jet Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.JetAircraft")
-                                params.update(type_cfg)
-                                Class = module.JetAircraft
-                            elif sc_engine_type == 2:   # None
-                                logging.warning("Aircraft definition not found, using SimConnect Data (Glider Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.GliderAircraft")
-                                params.update(type_cfg)
-                                Class = module.GliderAircraft
-                            elif sc_engine_type == 3:   # Heli
-                                logging.warning("Aircraft definition not found, using SimConnect Data (Helo Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.HelicopterAircraft")
-                                params.update(type_cfg)
-                                Class = module.Helicopter
-                            elif sc_engine_type == 5:   # Turboprop
-                                logging.warning("Aircraft definition not found, using SimConnect Data (Turboprop Type)")
-                                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.TurbopropAircraft")
-                                params.update(type_cfg)
-                                Class = module.TurbopropAircraft
-                        else:
-                            logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
-                            Class = module.Aircraft
-                    else:
-                        logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
-                        Class = module.Aircraft
-
-                if "vpconf" in params:
-                    if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
-                        # Load the vpconf configurator file specified for the model, only if it is not the current
-                        # one loaded
-                        set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
-                        G.vpconf_configurator_gains = HapticEffect.device.get_gains()
-                        G.force_reload_aircraft_trigger = False
-                else:
-                    # If the current model does not have a vpconf specified, check whether the global default is
-                    # configured and enabled.  If so, load that vpconf profile
-                    load_global = G.system_settings.get("enableVPConfGlobalDefault", False)
-                    global_path = G.system_settings.get("pathVPConfStartup", "")
-                    if load_global and global_path != G.current_vpconf_profile:
-                        logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
-                        set_vpconf_profile(global_path, HapticEffect.device.serial)
-                        G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
-                    # utils.dbprint("red", f"Gains: {G.vpconf_configurator_gains}")
-
-                if params.get('command_runner_enabled', False):
-                    if params.get('command_runner_command', '') != '':
-                        try:
-                            subprocess.Popen(params['command_runner_command'], shell=True)
-                        except Exception as e:
-                            logging.error(f"Error running Command Executor for model: {e}")
-
-                if params.get('configurator_override_enabled', False):
-                    state = params.get('configurator_gains', 'none')
-                    if state != "none":
-                        state = json.loads(params.get('configurator_gains', '{}'))
-                        G.gain_override_dialog.set_gains_from_state(state)
-                        G.current_configurator_gains = state
-                        self.gain_overrides_active = True
-                        # dbprint("green", f"current_gain: {state}")
-                        # dbprint("yellow", f"vpconf_gain: {G.vpconf_configurator_gains}")
-                    else:
-                        # if the override is enabled but gain has not been set, send the last vpconf gain data to ensure
-                        # previous aircraft override gains do not persist.  The last vpconf gain data will either be
-                        # the gain at TelemFFB startup, or the last gain set by a pushed vpconf profile
-                        G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
-                        self.gain_overrides_active = True
-                else:
-                    # if the override is NOT enabled. send the last vpconf gain data to ensure
-                    # previous aircraft override gains do not persist.  The last vpconf gain data will either be
-                    # the gain at TelemFFB startup, or the last gain set by a pushed vpconf profile
-                    if self.gain_overrides_active:
-                        G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
-                        self.gain_overrides_active = False
-
-
-                logging.info(f"Creating handler for {aircraft_name}: {Class.__module__}.{Class.__name__}")
-
-                # instantiate new aircraft handler
-                self.currentAircraft = Class(aircraft_name)
-
-                self.currentAircraft.apply_settings(params)
-                self.currentAircraftConfig = params
-                if data_source == "MSFS" and aircraft_name != '':
-                    d1 = xmlutils.read_sc_overrides(aircraft_name)
-                    for sv in d1:
-                        self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
-                    self._simconnect._resubscribe()
-
-                if G.settings_mgr.isVisible():
-                    G.settings_mgr.b_getcurrentmodel.click()
-
-                self.aircraftUpdated.emit()
-                # dbprint("red", "Aircraft Updated Emit : #1")
-
+                self._initialize_new_aircraft(aircraft_info, telem_data)
             self.currentAircraftName = aircraft_name
 
+    def _initialize_new_aircraft(self, aircraft_info: AircraftInfo, telem_data):
+        """Initialize a new aircraft when it changes."""
+        aircraft_name = aircraft_info.name
+        data_source = aircraft_info.data_source
+        
+        logging.info(f"New aircraft loaded {aircraft_name}: resetting current aircraft config")
+        self.currentAircraftConfig = {}
+
+        params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
+        Aircraft_Class = self._resolve_aircraft_class(aircraft_info, cls_name, params)
+        
+        self._handle_vpconf_setup(params)
+        self._handle_command_runner(params)
+        self._handle_configurator_overrides(params)
+        
+        logging.info(f"Creating handler for {aircraft_name}: {Aircraft_Class.__module__}.{Aircraft_Class.__name__}")
+        
+        # Create and configure new aircraft instance
+        self.currentAircraft : AircraftBase = Aircraft_Class(aircraft_name)
+        self.currentAircraft.apply_settings(params)
+        self.currentAircraftConfig = params
+        
+        self._setup_simconnect_overrides(aircraft_name, data_source)
+        self._update_settings_ui()
+        self.aircraftUpdated.emit()
+    
+    def _resolve_aircraft_class(self, aircraft_info: AircraftInfo, cls_name, params):
+        """Resolve the appropriate aircraft class to use."""
+        Aircraft_Class = getattr(aircraft_info.module, cls_name, None)
+        if Aircraft_Class:
+            logging.debug(f"CLASS={Aircraft_Class.__name__}")
+        
+        if not Aircraft_Class or Aircraft_Class.__name__ == "Aircraft":
+            Aircraft_Class = self.resolve_aircraft_class_from_sc(aircraft_info, params)
+        
+        return Aircraft_Class
+
+    def _handle_vpconf_setup(self, params):
+        """Handle VPConf profile setup for the aircraft."""
+        if "vpconf" in params:
+            if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
+                set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                G.vpconf_configurator_gains = HapticEffect.device.get_gains()
+                G.force_reload_aircraft_trigger = False
+        else:
+            self._handle_global_vpconf_default()
+
+    def _handle_global_vpconf_default(self):
+        """Handle global VPConf default profile setup."""
+        load_global = G.system_settings.get("enableVPConfGlobalDefault", False)
+        global_path = G.system_settings.get("pathVPConfStartup", "")
+        if load_global and global_path != G.current_vpconf_profile:
+            logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
+            set_vpconf_profile(global_path, HapticEffect.device.serial)
+            G.vpconf_configurator_gains = HapticEffect.device.get_gains()
+
+    def _handle_command_runner(self, params):
+        """Handle command runner execution for the aircraft."""
+        if params.get('command_runner_enabled', False):
+            command = params.get('command_runner_command', '')
+            if command and 'Enter full path' not in command:
+                try:
+                    subprocess.Popen(command, shell=True)
+                except Exception as e:
+                    logging.error(f"Error running Command Executor for model: {e}")
+
+    def _handle_configurator_overrides(self, params):
+        """Handle configurator gain overrides for the aircraft."""
+        if params.get('configurator_override_enabled', False):
+            state = params.get('configurator_gains', 'none')
+            if state != "none":
+                state = json.loads(state)
+                G.gain_override_dialog.set_gains_from_state(state)
+                G.current_configurator_gains = state
+                self.gain_overrides_active = True
+            else:
+                G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
+                self.gain_overrides_active = True
+        else:
+            if self.gain_overrides_active:
+                G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
+                self.gain_overrides_active = False
+
+    def _setup_simconnect_overrides(self, aircraft_name, data_source):
+        """Setup SimConnect variable overrides for MSFS aircraft."""
+        if data_source == "MSFS" and aircraft_name:
+            overrides = xmlutils.read_sc_overrides(aircraft_name)
+            for sv in overrides:
+                self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
+            self._simconnect._resubscribe()
+
+    def _update_settings_ui(self):
+        """Update settings UI if visible."""
+        if G.settings_mgr.isVisible():
+            G.settings_mgr.b_getcurrentmodel.click()
+
+    def _handle_config_changes(self, aircraft_info: AircraftInfo):
+        """Handle configuration changes for existing aircraft."""
+        if self.currentAircraft and config_has_changed():
+            logging.info("Configuration has changed, reloading")
+            aircraft_name = aircraft_info.name
+            data_source = aircraft_info.data_source
+            
+            params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
+            updated_params = self.get_changed_params(params)
+            self.currentAircraft.apply_settings(updated_params)
+
+            self._handle_vpconf_setup(params)
+            self._handle_command_runner(params)
+            self._handle_configurator_overrides_update(params)
+            
+            if "type" in updated_params:
+                self._recreate_aircraft_with_new_type(aircraft_info, params, cls_name)
+            
+            self._setup_simconnect_overrides(aircraft_name, data_source)
+            self.aircraftUpdated.emit()
+
+    def _handle_configurator_overrides_update(self, params):
+        """Handle configurator overrides during config updates."""
+        if params.get('configurator_override_enabled', False):
+            state = params.get('configurator_gains', 'none')
+            if state != "none":
+                state = json.loads(state)
+                G.gain_override_dialog.set_gains_from_state(state)
+                G.current_configurator_gains = state
+                self.gain_overrides_active = True
+            else:
+                G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
+                self.gain_overrides_active = True
+
+    def _recreate_aircraft_with_new_type(self, aircraft_info: AircraftInfo, params, cls_name):
+        """Recreate aircraft instance when type changes."""
+        Aircraft_Class = getattr(aircraft_info.module, cls_name, None)
+        self.currentAircraft = Aircraft_Class(aircraft_info.name)
+        self.currentAircraft.apply_settings(params)
+        self.currentAircraftConfig = params
+
+    def _process_current_aircraft_telemetry(self, telem_data):
+        """Process telemetry for the current aircraft."""
         if self.currentAircraft:
-            if config_has_changed():
-                logging.info("Configuration has changed, reloading")
-                params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
-                updated_params = self.get_changed_params(params)
-                self.currentAircraft.apply_settings(updated_params)
-
-                if "vpconf" in params:
-                    if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
-                        # Load the vpconf configurator file specified for the model, only if it is not the current
-                        # one loaded
-                        set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
-                        G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
-                        G.force_reload_aircraft_trigger = False
-
-                else:
-                    # If the current model does not have a vpconf specified, check whether the global default is
-                    # configured and enabled.  If so, load that vpconf profile
-                    load_global = G.system_settings.get("enableVPConfGlobalDefault", False)
-                    global_path = G.system_settings.get("pathVPConfStartup", "")
-                    if load_global and global_path != G.current_vpconf_profile:
-                        logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
-                        set_vpconf_profile(global_path, HapticEffect.device.serial)
-                        G.vpconf_configurator_gains = HapticEffect.device.get_gains()  # set here to keep track of gains set by last vpconf
-                    # utils.dbprint("blue", f"Gains: {G.vpconf_configurator_gains}")
-                if params.get('command_runner_enabled', False):
-                    if params.get('command_runner_command', '') != '' and 'Enter full path' not in params.get('command_runner_command', ''):
-                        try:
-                            subprocess.Popen(params['command_runner_command'], shell=True)
-                        except Exception as e:
-                            logging.error(f"Error running Command Executor for model: {e}")
-
-                if params.get('configurator_override_enabled', False):
-                    state = params.get('configurator_gains', 'none')
-                    if state != "none":
-                        state = json.loads(params.get('configurator_gains', '{}'))
-                        G.gain_override_dialog.set_gains_from_state(state)
-                        G.current_configurator_gains = state
-                        self.gain_overrides_active = True
-                        # dbprint("red", f"current_gain: {state}")
-                    else:
-                        # if the override is enabled but gain has not been set, send the last vpconf gain data to ensure
-                        # previous aircraft override gains do not persist.  The last vpconf gain data will either be
-                        # the gain at TelemFFB startup, or the last gain set by a pushed vpconf profile
-                        G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
-                        self.gain_overrides_active = True
-                else:
-                    pass
-                    # We don't want to send the gains here else it will reset to startup gains whenever setting change is made
-
-                    # if the override is NOT enabled. send the last vpconf gain data to ensure
-                    # previous aircraft override gains do not persist.  The last vpconf gain data will either be
-                    # the gain at TelemFFB startup, or the last gain set by a pushed vpconf profile
-                    # G.gain_override_dialog.set_gains_from_object(G.vpconf_configurator_gains)
-
-                if "type" in updated_params:
-                    # if user changed type or if new aircraft dialog changed type, update aircraft class
-                    Class = getattr(module, cls_name, None)
-                    self.currentAircraft = Class(aircraft_name)
-                    self.currentAircraft.apply_settings(params)
-                    self.currentAircraftConfig = params
-
-                if data_source == "MSFS" and aircraft_name != '':
-                    d1 = xmlutils.read_sc_overrides(aircraft_name)
-                    for sv in d1:
-                        self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
-                    self._simconnect._resubscribe()
-
-                self.aircraftUpdated.emit()
-                # dbprint("red", "Aircraft Updated Emit : #2")
-
             try:
                 _tm = time.perf_counter()
-                self.currentAircraft._last_telem_data = self.currentAircraft._telem_data.copy() # Keep copy of last data for frame-to-frame comparison
+                self.currentAircraft._last_telem_data = self.currentAircraft._telem_data.copy()
                 self.currentAircraft._telem_data = telem_data
                 self.currentAircraft.on_telemetry(telem_data)
                 telem_data["perf"] = f"{(time.perf_counter() - _tm) * 1000:.3f}ms"
-
             except Exception:
                 logging.exception(".on_telemetry Exception")
 
-        # Send locally generated telemetry to master here
+    def _handle_ipc_and_plotting(self, telem_data):
+        """Handle IPC telemetry sending and plotting."""
+        # Send locally generated telemetry to master
         if G.child_instance and self.currentAircraft:
             ipc_telem = self.currentAircraft._ipc_telem
             if ipc_telem:
                 G.ipc_instance.send_ipc_telem(ipc_telem)
                 self.currentAircraft._ipc_telem.clear()
+        
+        # Handle plotting
         if G.args.plot:
             for item in G.args.plot:
                 if item in telem_data:
@@ -481,9 +484,67 @@ class TelemManager(QObject, threading.Thread):
                     else:
                         utils.teleplot.sendTelemetry(item, telem_data[item])
 
-        try:  # sometime Qt object is destroyed first on exit and this may cause a runtime exception
+    def _emit_telemetry(self, telem_data):
+        """Emit telemetry signal safely."""
+        try:
             self.telemetryReceived.emit(telem_data)
-        except: pass
+        except:
+            pass  # Qt object may be destroyed on exit    
+    
+    def resolve_aircraft_class_from_sc(self, aircraft_info: AircraftInfo, params):
+        """Resolve the aircraft class based on SimConnect data."""
+        aircraftClass = None
+        aircraft_name = aircraft_info.name
+        data_source = aircraft_info.data_source
+        module = aircraft_info.module
+        sc_aircraft_type = aircraft_info.sc_aircraft_type
+        sc_engine_type = aircraft_info.sc_engine_type
+        
+        if data_source == "MSFS":
+            if sc_aircraft_type == "Helicopter":
+                logging.warning("Aircraft definition not found, using SimConnect Data (Helicopter Type)")
+                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.Helicopter")
+                params.update(type_cfg)
+                aircraftClass = module.Helicopter
+            elif sc_aircraft_type == "Jet":
+                logging.warning("Aircraft definition not found, using SimConnect Data (Jet Type)")
+                type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.JetAircraft")
+                params.update(type_cfg)
+                aircraftClass = module.JetAircraft
+            elif sc_aircraft_type == "Airplane":
+                if sc_engine_type == 0:     # Piston
+                    logging.warning("Aircraft definition not found, using SimConnect Data (Propeller Type)")
+                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.PropellerAircraft")
+                    params.update(type_cfg)
+                    aircraftClass = module.PropellerAircraft
+                elif sc_engine_type == 1:     # Jet
+                    logging.warning("Aircraft definition not found, using SimConnect Data (Jet Type)")
+                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.JetAircraft")
+                    params.update(type_cfg)
+                    aircraftClass = module.JetAircraft
+                elif sc_engine_type == 2:   # None
+                    logging.warning("Aircraft definition not found, using SimConnect Data (Glider Type)")
+                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.GliderAircraft")
+                    params.update(type_cfg)
+                    aircraftClass = module.GliderAircraft
+                elif sc_engine_type == 3:   # Heli
+                    logging.warning("Aircraft definition not found, using SimConnect Data (Helo Type)")
+                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.HelicopterAircraft")
+                    params.update(type_cfg)
+                    aircraftClass = module.Helicopter
+                elif sc_engine_type == 5:   # Turboprop
+                    logging.warning("Aircraft definition not found, using SimConnect Data (Turboprop Type)")
+                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.TurbopropAircraft")
+                    params.update(type_cfg)
+                    aircraftClass = module.TurbopropAircraft
+            else:
+                logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
+                aircraftClass = module.Aircraft
+        else:
+            logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
+            aircraftClass = module.Aircraft
+
+        return aircraftClass
 
     def getTelemValue(self, key):
         if self.currentAircraft:

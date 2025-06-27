@@ -3,10 +3,24 @@
     <qresource>
         <file>image/disabledcheckbox.png</file>
         <file>image/down-down.png</file>
+        <file>image/up-up.png</file>
+        <file>image/down-down_grey.png</file>
+        <file>image/up-up_grey.png</file>
+        <file>image/up_arrow.png</file>
+        <file>image/down_arrow.png</file>
+        <file>image/left_grey.png</file>
+        <file>image/left-left_grey.png</file>
+        <file>image/right_grey.png</file>
+        <file>image/right-right_grey.png</file>
         <file>image/information.png</file>
         <file>image/logo_c.png</file>
+        <file>image/logo_c_dm.png</file>
         <file>image/logo_j.png</file>
+        <file>image/logo_j_dm.png</file>
         <file>image/logo_p.png</file>
+        <file>image/logo_p_dm.png</file>
+        <file>image/logo_t.png</file>
+        <file>image/logo_t_dm.png</file>
         <file>image/purplecheckbox.png</file>
         <file>image/rchecked.png</file>
         <file>image/vpforceicon.ico</file>
@@ -15,6 +29,8 @@
         <file>image/vpforceicon_run.png</file>
         <file>image/vpforceicon_paused.png</file>
         <file>image/vpforcelogo.png</file>
+        <file>image/vpforcelogo_dm.png</file>
+        <file>image/DEVlogo.png</file>
         <file>image/delete_button.png</file>
         <file>image/expo.png</file>
         <file>image/gain-force.png</file>
@@ -23,4 +39,6 @@
         <!-- Add other image files as needed -->
     </qresource>
 </RCC>
-<!-- run 'pyrcc5.exe -o resources.py resources.qrc' to generate resources.py file for use inside TelemFFB -->
+<!-- To create resources.py file... -->
+<!-- run 'C:\path_to_your_python\Lib\site-packages\qt6_applications\Qt\bin\rcc.exe -g python -o resources.py resources.qrc' -->
+<!-- **THEN YOU MUST**  OPEN resources.py and change 'from PySide6 import QtCore' to 'from PyQt6 import QtCore'-->

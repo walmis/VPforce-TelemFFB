@@ -22,8 +22,8 @@ import logging
 import socket
 import time
 
-from PyQt5.QtCore import QCoreApplication, QThread, pyqtSignal, QObject
-from PyQt5.QtWidgets import QMessageBox
+from PyQt6.QtCore import QCoreApplication, QThread, pyqtSignal, QObject
+from PyQt6.QtWidgets import QMessageBox
 
 import telemffb.globals as G
 from telemffb.utils import ChildPopen, load_custom_userconfig, overrides
@@ -38,6 +38,7 @@ class IPCNetworkThread(QThread):
     showlog_signal = pyqtSignal()
     hide_signal = pyqtSignal()
     show_settings_signal = pyqtSignal()
+    show_adv_spr_signal = pyqtSignal(str)
     show_cfg_ovds_signal = pyqtSignal()
     erase_cfg_ovds_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
@@ -65,7 +66,8 @@ class IPCNetworkThread(QThread):
         self._child_active = {
             'joystick': None,
             'pedals': None,
-            'collective': None
+            'collective': None,
+            'trimwheel': None
         }
 
         # Initialize socket
@@ -166,6 +168,13 @@ class IPCNetworkThread(QThread):
                     if dev == G.device_type:
                         logging.info("Show log command received via IPC")
                         self.showlog_signal.emit()
+                elif msg.startswith('SHOW ADV SPR;'):
+                    parts = msg.split(';') #delimiter is semicolon since value contains colons (json dictionary)
+                    if len(parts) == 3:
+                        _, target_dev, value = parts
+                        if target_dev == G.device_type:
+                            logging.info('Show advanced spring override config command received via IPC')
+                            self.show_adv_spr_signal.emit(value)
                 elif msg.startswith('SHOW GAIN OVD:'):
                     dev = msg.removeprefix('SHOW GAIN OVD:')
                     if dev == G.device_type:
@@ -220,6 +229,16 @@ class IPCNetworkThread(QThread):
                     btns = json.loads(payload[1])
                     G.child_buttons[dev] = btns
                     # print(G.child_buttons)
+                elif msg == 'TOGGLE TESTCRAFT':
+                    G.main_window.toggle_settings_window(dbg=True)
+                elif msg.startswith("DBG_SELECT_SIM:"):
+                    sim = msg.removeprefix("DBG_SELECT_SIM:")
+                    G.main_window.test_sim.setCurrentText(sim)
+                elif msg.startswith("DBG_SELECT_AC:"):
+                    ac = msg.removeprefix("DBG_SELECT_AC:")
+                    G.main_window.test_name.setCurrentText(ac)
+                elif msg == 'LOAD_DBG_AC':
+                    G.main_window.test_button.click()
 
                 else:
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")

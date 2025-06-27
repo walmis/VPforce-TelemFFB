@@ -59,11 +59,14 @@ import json
 import ssl
 import xml.etree.ElementTree as ET
 
-from PyQt5.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings
-from PyQt5.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
+import numpy as np
+from scipy.interpolate import interp1d, Akima1DInterpolator
 
-from PyQt5 import QtCore, QtGui, Qt
-from PyQt5.QtWidgets import QFileDialog, QMessageBox
+from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings, Qt
+from PyQt6.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
+
+from PyQt6 import QtCore, QtGui
+from PyQt6.QtWidgets import QFileDialog, QMessageBox
 import stransi
 
 import telemffb.globals as G
@@ -164,6 +167,7 @@ class EffectTranslator:
         "ab_rumble_2_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
         "ab_rumble_2_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
         "aoa": ["AoA Effect", "aoa_effect_gain"],
+        "ap_spring": ["Autopilot Spring", ""],
         "buffeting": ["AoA\\Stall Buffeting", "buffeting_intensity"],
         "bombs": ["Bomb Release", "weapon_release_intensity"],
         "canopymovement": ["Canopy Motion", "canopy_motion_intensity"],
@@ -210,6 +214,7 @@ class EffectTranslator:
         "payload_rel": ["Payload Release", "weapon_release_intensity"],
         "pause_spring": ["Pause/Slew Spring Force", ""],
         "pedal_spring": ["Pedal Spring", "pedal_spring_gain"],
+        "pedal_ap_spring": ["Pedal AP Spring", "hpg_pedal_spring_gain"],
         "pedal_damper": ["Pedal Damper", "pedal_dampening_gain"],
         "prop_rpm0-1": ["Propeller Engine Rumble", "engine_rumble_.*"],
         "prop_rpm0-2": ["Propeller Engine Rumble", "engine_rumble_.*"],
@@ -228,6 +233,7 @@ class EffectTranslator:
         "spoilerbuffet2-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
         "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
         "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
+        "steering_friction": ["Steering Friction", "steering_friction_intensity"],
         "stick_shaker" : ["Stick Shaker","stick_shaker_intensity"],
         "stick_shaker1" : ["Stick Shaker","stick_shaker_intensity"],
         "stick_shaker2" : ["Stick Shaker","stick_shaker_intensity"],
@@ -418,6 +424,56 @@ class Vector:
         )
 
 
+class TurbulenceModulator:
+    def __init__(self):
+        self.prev_wind_x = None
+        self.prev_wind_z = None
+        self.hpf_x = 0.0
+        self.hpf_z = 0.0
+        self.prev_force = 0.0
+
+    def update(self, telem_data,
+               turbulence_hpf_alpha=0.95,
+               turbulence_smoothing_alpha=0.3,
+               turbulence_sensitivity=0.5,
+               turbulence_intensity=0.2):
+        try:
+            wind_x = telem_data['RelWind'][0]
+            wind_z = telem_data['RelWind'][2]
+        except (KeyError, IndexError, TypeError):
+            return 0.0, 0
+
+        if self.prev_wind_x is None or self.prev_wind_z is None:
+            self.prev_wind_x = wind_x
+            self.prev_wind_z = wind_z
+            return 0.0, 0
+
+        max_delta = (1.0 - turbulence_sensitivity) * 9.0 + 1.0
+
+        dx = wind_x - self.prev_wind_x
+        dz = wind_z - self.prev_wind_z
+
+        self.hpf_x = turbulence_hpf_alpha * (self.hpf_x + dx)
+        self.hpf_z = turbulence_hpf_alpha * (self.hpf_z + dz)
+
+        self.prev_wind_x = wind_x
+        self.prev_wind_z = wind_z
+
+        delta_mag = np.hypot(self.hpf_x, self.hpf_z)
+        normalized = min(delta_mag / max_delta, 1.0)
+        target_force = normalized * turbulence_intensity
+
+        smoothed_force = (
+            turbulence_smoothing_alpha * target_force
+            + (1 - turbulence_smoothing_alpha) * self.prev_force
+        )
+        self.prev_force = smoothed_force
+
+        gust_angle = np.degrees(np.arctan2(self.hpf_z, self.hpf_x))
+        force_angle = (gust_angle + 180 + 90 + 360) % 360
+
+        return smoothed_force, int(force_angle)
+
 def archive_logs(directory):
     today = datetime.today().strftime('%Y%m%d')
 
@@ -524,11 +580,11 @@ def create_support_bundle(userconfig_rootpath):
 
     # Prompt the user for the destination and filename for the zip file
     file_dialog = QFileDialog()
-    file_dialog.setFileMode(QFileDialog.AnyFile)
-    file_dialog.setAcceptMode(QFileDialog.AcceptSave)
+    file_dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+    file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
     file_dialog.setNameFilter("Zip Files (*.zip)")
 
-    if file_dialog.exec_():
+    if file_dialog.exec():
         # Get the selected file path
         zip_file_path = file_dialog.selectedFiles()[0]
 
@@ -829,7 +885,7 @@ def scale_clamp(val, src: tuple, dst: tuple, return_round=False, return_int=Fals
     return clamp(v, dst[0], dst[1])
 
 
-def non_linear_scaling(x, min_val, max_val, curvature=1):
+def non_linear_scaling(x, min_val, max_val, curvature=1.0):
     # Scale the input value to a value between 0 and 1 within the given range
     scaled_value = (x - min_val) / (max_val - min_val)
 
@@ -883,6 +939,89 @@ def sine_point_in_time(amplitude, period_ms, phase_offset_deg=0):
     return value
 
 
+def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
+    """Interpolates the Y value given curve data and input x value."""
+    points = curve_dict.get("points", [])
+    smooth_curve_enabled = curve_dict.get("smooth_curve_enabled", False)
+
+    # Extract x and y values from points
+    x_values = np.array([p["x"] for p in points]) / conversion_factor  # Convert on factor
+    y_values = np.array([p["y"] for p in points])
+
+    # Handle out-of-bounds x_values
+    if input_x <= x_values[0]:
+        return y_values[0]
+    if input_x >= x_values[-1]:
+        return y_values[-1]
+
+    # Perform interpolation
+    if smooth_curve_enabled:
+        if len(x_values) < 4:
+            # Fallback to linear interpolation for insufficient points
+            interpolation = interp1d(x_values, y_values, bounds_error=False,
+                                     fill_value=(y_values[0], y_values[-1]))
+        else:
+            interpolation = Akima1DInterpolator(x_values, y_values)
+    else:
+        interpolation = interp1d(x_values, y_values, bounds_error=False,
+                                 fill_value=(y_values[0], y_values[-1]))
+
+    return float(interpolation(input_x))
+
+
+def get_gain_from_gs(json_string, input_gs):
+    settings = json.loads(json_string)
+    curve_pos = settings.get("curve_pos", {})
+    curve_neg = settings.get("curve_neg", {})
+    gain_pos = settings.get('gain_pos') / 100
+    gain_neg = settings.get('gain_neg') / 100
+
+    interpolated_pos = round(float(interpolate_curve_y_point(curve_pos, input_gs) / 100) * gain_pos, 3)
+    interpolated_neg = round(float(interpolate_curve_y_point(curve_neg, input_gs) / 100) * gain_neg, 3)
+
+    return {"pos": interpolated_pos, "neg": interpolated_neg}
+
+
+def get_gain_from_speed(json_string, input_airspeed_ms):
+    """
+    Interpolates the % force input airspeed and the advanced spring curve settings passed.
+
+    Args:
+        json_string (str): JSON-encoded string containing x and y curve dictionaries, units, and scale.
+        input_airspeed_ms (float): The airspeed in m/s for which to calculate the interpolated values.
+
+    Returns:
+        dict: A dictionary containing the interpolated X and Y gain values as a factor (0...1).
+    """
+    # Unit conversion factors
+    UNIT_CONVERSIONS = {
+        "kt": 1.94384,
+        "mph": 2.23694,
+        "kph": 3.6,
+        "m/s": 1.0,
+    }
+
+    # Parse JSON string
+    settings = json.loads(json_string)
+
+    # Extract curves and units
+    curve_x = settings.get("curve_x", {})
+    curve_y = settings.get("curve_y", {})
+    gain_x = settings.get('gain_x')/100
+    gain_y = settings.get('gain_y')/100
+    units = settings.get("units", "m/s")  # Default to m/s if units not specified
+
+    # Conversion factor to m/s
+    conversion_factor = UNIT_CONVERSIONS[units]
+
+    # Interpolate X and Y values
+    # print(f"x:{gain_x}, y:{gain_y}")
+    interpolated_x = round(float(interpolate_curve_y_point(curve_x, input_airspeed_ms, conversion_factor) / 100) * gain_x, 3)
+    interpolated_y = round(float(interpolate_curve_y_point(curve_y, input_airspeed_ms, conversion_factor) / 100) * gain_y, 3)
+
+    return {"x": interpolated_x, "y": interpolated_y}
+
+
 def pressure_from_altitude(altitude_m):
     """Calculate pressure at specified altitude
 
@@ -904,6 +1043,28 @@ def average(l):
     if not l:
         return 0
     return sum(l) / float(len(l))
+
+
+def polar_to_cartesian_deg(angle_deg, magnitude):
+    angle_rad = math.radians(angle_deg)
+    x = magnitude * math.cos(angle_rad)
+    y = magnitude * math.sin(angle_rad)
+    return x, y
+
+
+def add_vectors_deg(angle1_deg, mag1, angle2_deg, mag2):
+    x1, y1 = polar_to_cartesian_deg(angle1_deg, mag1)
+    x2, y2 = polar_to_cartesian_deg(angle2_deg, mag2)
+
+    x_sum = x1 + x2
+    y_sum = y1 + y2
+
+    # Convert back to polar
+    magnitude = math.hypot(x_sum, y_sum)
+    angle_deg = math.degrees(math.atan2(y_sum, x_sum))
+
+    return angle_deg, magnitude
+
 
 
 class LowPassFilter:
@@ -1269,8 +1430,8 @@ def analyze_il2_config(path, port=34385, window=None):
         return
     else:
         telem_message = QMessageBox(parent=window)
-        telem_message.setIcon(QMessageBox.Question)
-        telem_message.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        telem_message.setIcon(QMessageBox.Icon.Question)
+        telem_message.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         telem_message.setWindowTitle("TelemFFB IL-2 Config")
 
         if not telem_match or not motion_match:
@@ -1294,7 +1455,7 @@ def analyze_il2_config(path, port=34385, window=None):
             pop = pop + "\n\n***** - Please ensure Il-2 is not running before selecting 'Yes' - *****"
         telem_message.setText(pop)
         ans = telem_message.exec()
-        if ans == QMessageBox.Yes:
+        if ans == QMessageBox.StandardButton.Yes:
             config_data['telemetrydevice'] = telem_proposed
             config_data['motiondevice'] = motion_proposed
             try:
@@ -1302,7 +1463,7 @@ def analyze_il2_config(path, port=34385, window=None):
             except Exception as e:
                 QMessageBox.warning(window, "Config Update Error",
                                     f"There was an error writing to the Il-2 Config file:\n{e}")
-        elif ans == QMessageBox.No:
+        elif ans == QMessageBox.StandardButton.No:
             print("Answer: NO")
 
         # return config_data, telem_match, motion_match
@@ -1332,7 +1493,7 @@ def install_xplane_plugin(path, window):
     src_path = get_resource_path('xplane-plugin/TelemFFB-XPP/64/win.xpl', prefer_root=True)
     dst_path = os.path.join(path, 'resources', 'plugins', 'TelemFFB-XPP', '64', 'win.xpl')
 
-    ans = QMessageBox.No
+    ans = QMessageBox.StandardButton.No
     if not os.path.exists(dst_path):
         ans = QMessageBox.question(window, "X-Plane Plugin Installer", "X-plane plugin is not installed, install now?\n\nNote: X-Plane must not be running for this operation to succeed")
     else:
@@ -1343,7 +1504,7 @@ def install_xplane_plugin(path, window):
         else:
             return True
 
-    if ans == QMessageBox.Yes:
+    if ans == QMessageBox.StandardButton.Yes:
         tryloop = True
         while tryloop:
             try:
@@ -1355,8 +1516,8 @@ def install_xplane_plugin(path, window):
                 return True
             except Exception as e:
                 print(f"ERROR:{e}")
-                retry = QMessageBox.warning(window, "X-Plane Plugin Error", "There was an error copying the file.  Please ensure X-Plane is not running.\n\nWould you like to re-try?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                if retry == QMessageBox.No:
+                retry = QMessageBox.warning(window, "X-Plane Plugin Error", "There was an error copying the file.  Please ensure X-Plane is not running.\n\nWould you like to re-try?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+                if retry == QMessageBox.StandardButton.No:
                     tryloop = False
                     return False
     else:
@@ -1403,13 +1564,13 @@ def install_export_lua(window):
             if crc_a != crc_b:
                 dia = QMessageBox.question(window, "Contents of TelemFFB.lua export script have changed",
                                            f"Update export script {out_path} ?")
-                if dia == QMessageBox.Yes:
+                if dia == QMessageBox.StandardButton.Yes:
                     write_script()
             else:
                 logging.info(f"DCS Export Installer: TelemFFB entry is present in export script located at {path}, no update required")
         else:
             dia = QMessageBox.question(window, "Confirm", f"Install export script into {path}?")
-            if dia == QMessageBox.Yes:
+            if dia == QMessageBox.StandardButton.Yes:
                 if not export_installed:
                     logging.info("DCS Export Installer: Updating export.lua")
                     line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
@@ -1513,7 +1674,7 @@ class OutLog(QtCore.QObject):
         self.edit = edit
         self.out = out
         self.color = QtGui.QColor(color) if color else None
-        self.textReceived.connect(self.on_received, Qt.Qt.QueuedConnection)
+        self.textReceived.connect(self.on_received, Qt.ConnectionType.QueuedConnection)
         self.log_paused = False
 
     def isatty(self):
@@ -1530,7 +1691,7 @@ class OutLog(QtCore.QObject):
                 tc = self.edit.textColor()
                 self.edit.setTextColor(self.color)
 
-            self.edit.moveCursor(QtGui.QTextCursor.End)
+            self.edit.moveCursor(QtGui.QTextCursor.MoveOperation.End)
             for text, char_format in p:
                 self.edit.setCurrentCharFormat(char_format)
                 self.edit.insertPlainText(text)
@@ -1782,13 +1943,22 @@ class LoggingFilter(logging.Filter):
 
 def load_custom_userconfig(new_path=""):
     print(f"newpath=>{new_path}<")
+
     if new_path == "":
-        options = QFileDialog.Options()
+        options = QFileDialog.Option(0)
+        options |= QFileDialog.Option.DontUseNativeDialog  # Optional: makes dialog consistent across platforms
+
         file_path, _ = QFileDialog.getOpenFileName(
-            None, "Select File", "", "All Files (*)", options=options
+            None,
+            "Select File",
+            "",
+            "All Files (*)",
+            options=options
         )
+
         if file_path == "":
             return
+
         G.userconfig_rootpath = os.path.basename(file_path)
         G.userconfig_path = file_path
     else:
@@ -1800,10 +1970,11 @@ def load_custom_userconfig(new_path=""):
         _userconfig_path=G.userconfig_path,
         _defaults_path=G.defaults_path,
     )
-    # reinitialize table from new config
+
     G.settings_mgr.init_ui()
 
     logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
+
     if G.master_instance and G.launched_instances:
         G.ipc_instance.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
 
@@ -1856,13 +2027,30 @@ def get_device_logo(dev_type :str):
 
     match str.lower(dev_type):
         case 'joystick':
-            _device_logo = ':/image/logo_j.png'
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_j_dm.png'
+            else:
+                _device_logo = ':/image/logo_j.png'
         case 'pedals':
-            _device_logo = ':/image/logo_p.png'
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_p_dm.png'
+            else:
+                _device_logo = ':/image/logo_p.png'
         case 'collective':
-            _device_logo = ':/image/logo_c.png'
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_c_dm.png'
+            else:
+                _device_logo = ':/image/logo_c.png'
+        case 'trimwheel':
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_t_dm.png'
+            else:
+                _device_logo = ':/image/logo_t.png'
         case _:
-            _device_logo = ':/image/logo_j.png'
+            if G.useDarkMode:
+                _device_logo = ':/image/logo_j_dm.png'
+            else:
+                _device_logo = ':/image/logo_j.png'
     return _device_logo
 
 
@@ -1997,8 +2185,31 @@ class HiDpiPixmap(QPixmap):
 
         self.setDevicePixelRatio(ratio)
 
-    def _scaled(self, width, height, aspectRatioMode=QtCore.Qt.KeepAspectRatio, transformMode=QtCore.Qt.SmoothTransformation):
+    def _scaled(self, width, height, aspectRatioMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation):
         ratio = self.devicePixelRatio()
         scaled_pixmap = super().scaled(int(width * ratio), int(height * ratio), aspectRatioMode, transformMode)
         scaled_pixmap.setDevicePixelRatio(ratio)
         return scaled_pixmap
+
+
+def hexdump(src, length=16, sep='.'):
+    """Hex dump bytes to ASCII string, padded neatly
+    In [107]: x = b'\x01\x02\x03\x04AAAAAAAAAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBBBBBBBBBB'
+
+    In [108]: print('\n'.join(hexdump(x)))
+    00000000  01 02 03 04 41 41 41 41  41 41 41 41 41 41 41 41 |....AAAAAAAAAAAA|
+    00000010  41 41 41 41 41 41 41 41  41 41 41 41 41 41 42 42 |AAAAAAAAAAAAAABB|
+    00000020  42 42 42 42 42 42 42 42  42 42 42 42 42 42 42 42 |BBBBBBBBBBBBBBBB|
+    00000030  42 42 42 42 42 42 42 42                          |BBBBBBBB        |
+    """
+    FILTER = ''.join([(len(repr(chr(x))) == 3) and chr(x) or sep for x in range(256)])
+    lines = []
+    for c in range(0, len(src), length):
+        chars = src[c: c + length]
+        hex_ = ' '.join(['{:02x}'.format(x) for x in chars])
+        if len(hex_) > 24:
+            hex_ = '{} {}'.format(hex_[:24], hex_[24:])
+        printable = ''.join(['{}'.format((x <= 127 and FILTER[x]) or sep) for x in chars])
+        lines.append('{0:08x}  {1:{2}s} |{3:{4}s}|'.format(c, hex_, length * 3, printable, length))
+
+    return ("\n".join(lines))

@@ -1,1 +1,1 @@
-pyuic5 settingswindow.ui -o ../telemffb/ui/Ui_SettingsWindow.py
+pyuic6 settingswindow.ui -o ../telemffb/ui/Ui_SettingsWindow.py

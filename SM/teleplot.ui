@@ -18,7 +18,7 @@
     <rect>
      <x>7</x>
      <y>10</y>
-     <width>258</width>
+     <width>263</width>
      <height>296</height>
     </rect>
    </property>
@@ -96,7 +96,7 @@ clear the boxes and select OK</string>
      <x>10</x>
      <y>350</y>
      <width>251</width>
-     <height>25</height>
+     <height>26</height>
     </rect>
    </property>
    <layout class="QHBoxLayout" name="horizontalLayout">

@@ -152,6 +152,11 @@ class SimConnectManager(threading.Thread):
         SimVar("ElevDeflPct", "ELEVATOR DEFLECTION PCT", "Percent Over 100"),
         SimVar("ElevTrim", "ELEVATOR TRIM POSITION", "degrees"),
         SimVar("ElevTrimPct", "ELEVATOR TRIM PCT", "Percent Over 100"),
+        SimVar("ElevTrimDnLmt", "ELEVATOR TRIM DOWN LIMIT", "degrees"),
+        SimVar("ElevTrimUpLmt", "ELEVATOR TRIM UP LIMIT", "degrees"),
+        SimVar("ElevTrimNeutral", "ELEVATOR TRIM NEUTRAL", "degrees"),
+        SimVar("ElevTrimMax", "ELEVATOR TRIM MAX", "degrees"),  #2024 only (up)
+        SimVar("ElevTrimMin", "ELEVATOR TRIM MIN", "degrees"),  #2024 only (down)
         SimVar("AileronDefl", "AILERON AVERAGE DEFLECTION", "degrees"),
         SimVarArray("AileronDeflPctLR", "AILERON <> DEFLECTION PCT", keywords=("LEFT", "RIGHT"), unit="Percent Over 100"),
         SimVar("AileronTrim", "AILERON TRIM", "degrees"),
@@ -186,6 +191,7 @@ class SimConnectManager(threading.Thread):
         SimVarArray("EngRPM", "GENERAL ENG PCT MAX RPM", "percent", min=1, max=4),
         SimVar("NumEngines", "NUMBER OF ENGINES", "Number", datatype=DATATYPE_INT32),
         SimVarArray("AmbWind", "AMBIENT WIND <>", "meter/second", keywords= ("X", "Y", "Z")),
+        SimVarArray("RelWind", "RELATIVE WIND VELOCITY BODY <>", "meter/second", keywords= ("X", "Y", "Z")),
         SimVarArray("VelWorld", "VELOCITY WORLD <>", "meter/second", keywords= ("X", "Y", "Z")),
         SimVarArray("WeightOnWheels", "CONTACT POINT COMPRESSION", "Number", min=0, max=2),
         SimVarArray("Flaps", "TRAILING EDGE FLAPS <> PERCENT", "Percent Over 100", keywords=("LEFT", "RIGHT")),
@@ -205,7 +211,8 @@ class SimConnectManager(threading.Thread):
         SimVar("_IS IN RTC", "IS IN RTC", "bool"),
         SimVar("_IS AVATAR", "IS AVATAR", "bool"),
         SimVar("_IS AIRCRAFT", "IS AIRCRAFT", "bool"),
-
+        SimVar("CenterSteerAnglePct", "CONTACT POINT STEER ANGLE PCT", "percent over 100"),
+        SimVar("WaterRudderExt", "WATER LEFT RUDDER EXTENDED", "percent over 100"),
     ]
 
     def __init__(self):
@@ -485,7 +492,7 @@ class SimConnectManager(threading.Thread):
                     avatar = data.get("_IS AVATAR", False) # in 2024, see if user is controlling avatar
                     rtc = data.get("_IS IN RTC", False) # check if 2024 sim is running realtime cinematic (cut scene)
 
-                    in_menus = data.get('CameraState', 0) not in {2,3,4,5}  # Check the camera state value - workaround for FS2024 telemetry at wrong times https://forums.flightsimulator.com/t/at-the-finish-of-beta-loading-if-start-is-not-click-open-upon-reaching-yosemite-during-2nd-run-of-opening-graphics-telemetry-is-sent-to-motion-platform-causiing-violent-shaking-and-movement/702082/2?u=number4815901
+                    in_menus = data.get('CameraState', 0) not in (2,3,4,5)  # Check the camera state value - workaround for FS2024 telemetry at wrong times https://forums.flightsimulator.com/t/at-the-finish-of-beta-loading-if-start-is-not-click-open-upon-reaching-yosemite-during-2nd-run-of-opening-graphics-telemetry-is-sent-to-motion-platform-causiing-violent-shaking-and-movement/702082/2?u=number4815901
 
                     if self._sim_paused or data.get("Parked", 0) or data.get("Slew", 0) or avatar or rtc or in_menus:
                         data["STOP"] = 1

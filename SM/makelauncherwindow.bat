@@ -1,1 +1,0 @@
-pyuic5 launcherwindow.ui -o ../launcherwindow.py
