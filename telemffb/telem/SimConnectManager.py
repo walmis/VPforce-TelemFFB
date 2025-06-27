@@ -16,6 +16,21 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+"""
+SimConnectManager Module
+
+This module provides a SimConnect interface for Microsoft Flight Simulator (MSFS) telemetry
+and force feedback systems. It manages communication with MSFS via SimConnect to retrieve
+aircraft telemetry data and send control inputs for force feedback devices.
+
+The module includes:
+- SimVar: Individual simulation variable representation
+- SimVarArray: Array of simulation variables for multi-dimensional data
+- SimConnectManager: Main class for managing SimConnect connection and data flow
+
+Author: Valmantas Palikša, Micah Frisby
+License: GPL-3.0
+"""
 
 from simconnect import *
 from ctypes import byref, cast, sizeof
@@ -55,7 +70,38 @@ surface_types = {
 }
 
 class SimVar:
+    """
+    Represents a single simulation variable from Microsoft Flight Simulator.
+    
+    A SimVar encapsulates a single telemetry data point from MSFS, including
+    its name, SimConnect variable reference, units, data type, and optional
+    scaling or transformation functions.
+    
+    Attributes:
+        name (str): The friendly name for this simulation variable
+        var (str): The SimConnect variable name (e.g., "AIRSPEED TRUE")
+        sc_unit (str): The SimConnect unit specification
+        unit (str): The preferred output unit (optional)
+        datatype: The SimConnect data type (DATATYPE_FLOAT64, etc.)
+        scale (float): Optional scaling factor applied to the raw value
+        mutator (callable): Optional function to transform the raw value
+        parent (SimVarArray): Parent array if this SimVar is part of an array
+        index (int): Index within parent array if applicable
+    """
+    
     def __init__(self, name, var, sc_unit, unit=None, datatype=DATATYPE_FLOAT64, scale=None, mutator=None):
+        """
+        Initialize a SimVar instance.
+        
+        Args:
+            name (str): Friendly name for the variable
+            var (str): SimConnect variable name
+            sc_unit (str): SimConnect unit specification
+            unit (str, optional): Preferred output unit
+            datatype: SimConnect data type constant
+            scale (float, optional): Scaling factor for the value
+            mutator (callable, optional): Function to transform the value
+        """
         self.name = name
         self.var = var
         self.scale = scale
@@ -69,6 +115,15 @@ class SimVar:
             self.datatype = DATATYPE_INT32
 
     def _calculate(self, input):
+        """
+        Apply scaling and mutation transformations to a raw input value.
+        
+        Args:
+            input: The raw value from SimConnect
+            
+        Returns:
+            The transformed value after applying mutator and scaling
+        """
         if self.mutator:
             input = self.mutator(input)
         if self.scale:
@@ -76,10 +131,22 @@ class SimVar:
         return input
 
     def __repr__(self) -> str:
+        """
+        Return a string representation of the SimVar.
+        
+        Returns:
+            str: String representation showing name and variable reference
+        """
         return f"SimVar({self.name} '{self.var}')"
 
     @property
     def c_type(self):
+        """
+        Get the corresponding ctypes type for this SimVar's datatype.
+        
+        Returns:
+            ctypes type: The appropriate ctypes type for SimConnect data handling
+        """
         types = {
             DATATYPE_FLOAT64: c_double,
             DATATYPE_FLOAT32: c_float,
@@ -90,7 +157,41 @@ class SimVar:
         return types[self.datatype]
 
 class SimVarArray:
+    """
+    Represents an array of related simulation variables from Microsoft Flight Simulator.
+    
+    A SimVarArray groups multiple related SimVars together, such as engine parameters
+    for multi-engine aircraft or X/Y/Z components of vectors. It can handle both
+    indexed variables (e.g., "ENGINE 1 RPM", "ENGINE 2 RPM") and keyword-based
+    variables (e.g., "VELOCITY BODY X", "VELOCITY BODY Y").
+    
+    Attributes:
+        name (str): The base name for this variable array
+        var (str): The SimConnect variable template with placeholders
+        unit (str): The unit specification for all variables in the array
+        type: The SimConnect data type for all variables
+        scale (float): Optional scaling factor applied to all values
+        vars (list): List of individual SimVar instances in this array
+        values (list): Current values for each variable in the array
+        min (int): Minimum index for indexed variables
+        max (int): Maximum index for indexed variables
+        keywords (tuple): Keywords for keyword-based variables
+    """
+    
     def __init__(self, name, var, unit, type=DATATYPE_FLOAT64, scale=None, min=0, max=1, keywords=None):
+        """
+        Initialize a SimVarArray instance.
+        
+        Args:
+            name (str): Base name for the variable array
+            var (str): SimConnect variable template (use <> for keyword substitution)
+            unit (str): Unit specification for all variables
+            type: SimConnect data type constant
+            scale (float, optional): Scaling factor for all values
+            min (int): Minimum index for indexed variables (default: 0)
+            max (int): Maximum index for indexed variables (default: 1)
+            keywords (tuple, optional): Keywords for keyword-based variables
+        """
         self.name = name
         self.var = var
         self.unit = unit
@@ -121,9 +222,15 @@ class SimVarArray:
                     self.vars.append(v)
                     self.values.append(0)
     def clone(self):
-        """Return new SimVarArray object with copied values from called instance.
-        This method is used to create a separate copy of existing SimVarArrays for editing during dynamic
-        subscriptions without modifying the original array"""
+        """
+        Return new SimVarArray object with copied values from called instance.
+        
+        This method creates a separate copy of existing SimVarArrays for editing 
+        during dynamic subscriptions without modifying the original array.
+        
+        Returns:
+            SimVarArray: A new instance with the same configuration as this one
+        """
         cloned_sv_array = SimVarArray(self.name, self.var, self.unit, type=self.type, scale=self.scale, min=self.min, max=self.max, keywords=self.keywords)
         return cloned_sv_array
 
@@ -134,6 +241,30 @@ EV_STARTED = 65498 # id for started event
 EV_STOPPED = 65497  # id for stopped event
 EV_SIMSTATE = 65496
 class SimConnectManager(threading.Thread):
+    """
+    Manages SimConnect communication with Microsoft Flight Simulator.
+    
+    This class provides a threaded interface to Microsoft Flight Simulator's SimConnect
+    system, handling telemetry data retrieval, event transmission, and connection management.
+    It supports both MSFS 2020 and MSFS 2024.
+    
+    The manager maintains a comprehensive set of predefined simulation variables covering
+    aircraft state, control surfaces, engines, environmental conditions, and system states.
+    It also supports dynamic addition of custom variables and arrays.
+    
+    Key Features:
+    - Automatic connection and reconnection handling
+    - Comprehensive telemetry data collection
+    - Event and datum transmission to MSFS
+    - Support for both static and dynamic variable subscriptions
+    - Pause/stop state detection and handling
+    - Version detection (MSFS 2020/2024)
+    
+    Attributes:
+        sim_vars (list): Predefined simulation variables
+        sc: SimConnect instance (when connected)
+        connected_version (str): Detected MSFS version
+    """
 
     sim_vars = [
         SimVar("T", "ABSOLUTE TIME","Seconds" ),
@@ -216,6 +347,12 @@ class SimConnectManager(threading.Thread):
     ]
 
     def __init__(self):
+        """
+        Initialize the SimConnectManager.
+        
+        Sets up the thread infrastructure and initializes all internal state variables
+        for managing SimConnect communication, variable subscriptions, and data tracking.
+        """
         threading.Thread.__init__(self, daemon=True)
         self.sc = None
         self._quit = False
@@ -242,6 +379,23 @@ class SimConnectManager(threading.Thread):
 
 
     def add_simvar(self, name, var, sc_unit, unit=None, datatype=DATATYPE_FLOAT64, scale=None, mutator=None):
+        """
+        Add or override a simulation variable for the next subscription cycle.
+        
+        This method allows dynamic addition of new simulation variables or overriding
+        of existing ones. Variables are queued and will be applied on the next call
+        to _subscribe().
+        
+        Args:
+            name (str): Variable name. Use "name:index" format to override specific
+                       array elements (e.g., "PropRPM:2" for second engine RPM)
+            var (str): SimConnect variable reference
+            sc_unit (str): SimConnect unit specification
+            unit (str, optional): Preferred output unit
+            datatype: SimConnect data type constant
+            scale (float, optional): Scaling factor for the value
+            mutator (callable, optional): Function to transform the value
+        """
         if ":" in name:
             # We are replacing an element in a SimVarArray, create separate list
             sv = SimVar(name.split(":")[0], var, sc_unit, unit=unit, datatype=datatype, scale=scale, mutator=mutator)
@@ -252,6 +406,17 @@ class SimConnectManager(threading.Thread):
             self.temp_sim_vars.append(SimVar(name, var, sc_unit, unit=unit, datatype=datatype, scale=scale, mutator=mutator))
         
     def substitute_simvars(self):
+        """
+        Build the final list of simulation variables by merging predefined and custom variables.
+        
+        This method combines the predefined sim_vars list with any temporarily added variables
+        from add_simvar(), handling both individual variable overrides and SimVarArray element
+        overrides. It creates cloned copies of SimVarArrays when individual elements need to
+        be modified to avoid affecting the original definitions.
+        
+        Returns:
+            list: The final list of SimVar and SimVarArray objects to subscribe to
+        """
         # build a combined list of the pre-defined simvars from __init__ and any new/updated simvars that have been set by a model
         master_list = list(self.sim_vars)
         override_list = list(self.temp_sim_vars)
@@ -315,6 +480,19 @@ class SimConnectManager(threading.Thread):
         return resulting_list
 
     def _subscribe(self):
+        """
+        Subscribe to simulation variables with SimConnect.
+        
+        This method handles the SimConnect subscription process by:
+        1. Building the final variable list via substitute_simvars()
+        2. Checking if resubscription is needed (variable list changed)
+        3. Clearing old subscriptions if necessary
+        4. Adding all variables to a new data definition
+        5. Requesting periodic data updates from MSFS
+        
+        The subscription only occurs if the variable list has changed since the
+        last subscription to avoid unnecessary SimConnect overhead.
+        """
 
         sim_vars = self.substitute_simvars()
 
@@ -366,16 +544,43 @@ class SimConnectManager(threading.Thread):
 
     # blocks and reads telemetry
     def _resubscribe(self):
+        """
+        Request a resubscription on the next telemetry read cycle.
+        
+        Sets a flag that will cause _read_telem() to call _subscribe()
+        on the next iteration, allowing dynamic variable list updates.
+        """
         self.resubscribe = True
 
     def set_simdatum_to_msfs(self, simvar, value, units=None):
+        """
+        Queue a simulation datum to be sent to MSFS.
+        
+        Args:
+            simvar (str): The SimConnect variable name
+            value: The value to set
+            units (str, optional): Unit specification for the value
+        """
         self._simdatums_to_send.append((simvar, value, units))
 
     def send_event_to_msfs(self, event, data: int = 0):
+        """
+        Queue an event to be sent to MSFS.
+        
+        Args:
+            event (str): The event name or L:var name
+            data (int): The event data/value (default: 0)
+        """
         if event == "DO_NOT_SEND": return
         self._events_to_send.append((event, data))
 
     def tx_simdatums_to_msfs(self):
+        """
+        Transmit all queued simulation datums to MSFS.
+        
+        Processes the queue of pending datum updates and sends them
+        to MSFS via SimConnect. Handles and logs any transmission errors.
+        """
         while self._simdatums_to_send:
             simvar, value, units = self._simdatums_to_send.pop(0)
             try:
@@ -386,6 +591,14 @@ class SimConnectManager(threading.Thread):
 
 
     def tx_events_to_msfs(self):
+        """
+        Transmit all queued events to MSFS.
+        
+        Processes the queue of pending events and sends them to MSFS.
+        Handles both standard SimConnect events and L:var (local variable)
+        updates. L:vars are sent as simulation datums, while standard events
+        use the SimConnect event system.
+        """
         while self._events_to_send:
             event, data = self._events_to_send.pop(0)
             logging.debug(f"event {event}   data {data}")
@@ -400,6 +613,26 @@ class SimConnectManager(threading.Thread):
                     # self.telem_data['error'] = 1
 
     def _read_telem(self) -> bool:
+        """
+        Main telemetry reading loop for processing SimConnect messages.
+        
+        This method continuously polls SimConnect for new messages and processes them:
+        - Telemetry data packets are parsed and emitted via emit_packet()
+        - System events (pause, start, stop) are handled and emitted via emit_event()
+        - Connection state changes are detected and handled
+        - Queued events and datums are transmitted to MSFS
+        - Resubscription requests are processed
+        
+        The method handles various SimConnect message types including:
+        - RECV_SIMOBJECT_DATA: Aircraft telemetry data
+        - RECV_EVENT: System state changes (pause/unpause, sim start/stop)
+        - RECV_OPEN: Connection established
+        - RECV_QUIT: Connection closed
+        - RECV_EXCEPTION: SimConnect errors
+        
+        Returns:
+            bool: Always returns None in current implementation
+        """
         pRecv = RECV_P()
         nSize = DWORD()
 
@@ -513,15 +746,53 @@ class SimConnectManager(threading.Thread):
                 logging.warning(f"Received unknown simconnect message: {recv}")
 
     def emit_packet(self, data):
+        """
+        Emit a telemetry data packet.
+        
+        This method is intended to be overridden by subclasses to handle
+        incoming telemetry data packets from MSFS.
+        
+        Args:
+            data (dict): Dictionary containing telemetry variables and their values
+        """
         pass
 
     def emit_event(self, event, *args):
+        """
+        Emit a system event notification.
+        
+        This method is intended to be overridden by subclasses to handle
+        system events such as sim start/stop, pause/unpause, etc.
+        
+        Args:
+            event (str): The event name
+            *args: Additional event arguments
+        """
         pass
 
     def quit(self):
+        """
+        Request the manager thread to quit.
+        
+        Sets the quit flag that will cause the main run() loop to exit
+        gracefully on the next iteration.
+        """
         self._quit = True
 
     def run(self):
+        """
+        Main thread execution method.
+        
+        This method implements the main connection and data processing loop:
+        1. Attempts to establish SimConnect connection
+        2. Subscribes to system events (pause, start, stop, sim state)
+        3. Subscribes to telemetry variables
+        4. Enters the telemetry reading loop
+        5. Handles connection errors with automatic retry (10-second delay)
+        
+        The method will continue running until quit() is called or the thread
+        is terminated. It automatically handles connection loss and reconnection.
+        """
         while not self._quit:
             try:
                 logging.info("Trying SimConnect")
@@ -539,6 +810,18 @@ class SimConnectManager(threading.Thread):
                 pass
 
     def get_var_name(self,k):
+        """
+        Get the SimConnect variable name for a given variable key.
+        
+        This method looks up the SimConnect variable reference (e.g., "AIRSPEED TRUE")
+        for a given variable name key (e.g., "TAS") from the current subscription.
+        
+        Args:
+            k (str): The variable name key to look up
+            
+        Returns:
+            str or None: The SimConnect variable name, or None if not found
+        """
         return self.sv_dict.get(k, None)
         # for sv in (self.sim_vars):
         #     if isinstance(sv, SimVarArray):
