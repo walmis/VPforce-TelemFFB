@@ -37,7 +37,7 @@ from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
                          QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QComboBox, QFrame, QGridLayout, QGroupBox,
-                             QHBoxLayout, QLabel, QMainWindow, QMessageBox,
+                             QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QTabWidget,
                              QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu)
 
@@ -617,11 +617,25 @@ class MainWindow(QMainWindow):
             font-family: Cascadia Mono;
         """)
 
+        # Create telemetry header with label and filter
+        telem_header_widget = QWidget()
+        telem_header_layout = QHBoxLayout(telem_header_widget)
+        telem_header_layout.setContentsMargins(0, 0, 0, 0)
+        
         self.telem_lbl = QLabel('Telemetry:')
+        self.telem_filter = QLineEdit()
+        self.telem_filter.setPlaceholderText("Filter")
+        self.telem_filter.setMaximumWidth(100)
+        
+        telem_header_layout.addWidget(self.telem_lbl)
+        telem_header_layout.addWidget(self.telem_filter)
+        telem_header_layout.addStretch()  # Push everything to the left
+        
         self.effect_lbl = QLabel('Active Effects:')
         if G.master_instance:
             self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
-        monitor_area_layout.addWidget(self.telem_lbl, 0, 0)
+        
+        monitor_area_layout.addWidget(telem_header_widget, 0, 0)
         monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
         monitor_area_layout.addWidget(self.telem_area, 1, 0)
         monitor_area_layout.addWidget(self.effects_area, 1, 1)
@@ -1557,8 +1571,9 @@ class MainWindow(QMainWindow):
 
         try:
 
-            items = ""
+            telem_items = ""
             for k, v in data.items():
+
                 # check for msfs and debug mode (alt-d pressed), change to simvar name
                 if self.show_simvars:
                     if data["src"] == "MSFS":
@@ -1566,12 +1581,16 @@ class MainWindow(QMainWindow):
                         # s = simvarnames.get_var_name(k)
                         if s is not None:
                             k = s
+                            
+                if self.telem_filter.text() and not self.telem_filter.text().lower() in k.lower():
+                    continue
+
                 if isinstance(v, float):
-                    items += f"{k}: {v:.3f}\n"
+                    telem_items += f"{k}: {v:.3f}\n"
                 else:
                     if isinstance(v, list):
                         v = "[" + ", ".join([f"{x:.3f}" if isinstance(x, float) else str(x) if x is not None else "None" for x in v]) + "]"
-                    items += f"{k}: {v}\n"
+                    telem_items += f"{k}: {v}\n"
 
             active_effects = ""
             active_settings = []
@@ -1699,7 +1718,7 @@ class MainWindow(QMainWindow):
             self.cur_pattern.setText(f'Matched: <span style="font-family: Consolas, monospace;font-size: 14px">"{shown_pattern}"</span> ')
 
             if window_mode == 0:
-                self.lbl_telem_data.setText(items)
+                self.lbl_telem_data.setText(telem_items)
             # elif window_mode == self.effect_monitor_radio:
                 self.lbl_effects_data.setText(active_effects)
 
