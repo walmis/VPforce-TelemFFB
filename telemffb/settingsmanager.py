@@ -37,6 +37,7 @@ import telemffb.utils as utils
 import telemffb.globals as G
 from telemffb.utils import overrides
 from . import xmlutils
+# from .UserModelDialog import UserModelDialog
 from .ui.Ui_SettingsWindow import Ui_SettingsWindow
 
 print_debugs = False
@@ -78,7 +79,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.setupUi(self)  # This sets up the UI from Ui_SettingsWindow
         self.device = device
         self.timed_out = True
-
+        self.current_pattern = ''
         self.sim = self.current_sim
         self.setWindowTitle(f"TelemFFB Settings Manager ({self.device})")
         self.setWindowIcon(QIcon(":/image/vpforceicon.png"))
@@ -309,32 +310,32 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         except Exception as e:
             logging.info(f"Error restoring backup: {e}")
 
-    def show_user_model_dialog(self):
-        mprint("show_user_model_dialog")
-        current_aircraft = self.drp_models.currentText()
-        dialog = UserModelDialog(self.sim,current_aircraft, self.model_type, self)
-        result = dialog.exec()
-        if result == QtWidgets.QDialog.DialogCode.Accepted:
-            # Handle accepted
-            new_aircraft = dialog.tb_current_aircraft.currentText()
-            new_combo_box_value = dialog.combo_box.currentText()
-            pat_to_clone = dialog.models_combo_box.currentText()
-            if new_combo_box_value != '':
-                logging.info (f"New: {new_aircraft} {new_combo_box_value}")
-                xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type', None)
-            else:
-                logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
-                xmlutils.clone_pattern(self.sim, pat_to_clone, new_aircraft)
-
-            self.model_name = new_aircraft
-            # self.tb_currentmodel.setText(new_aircraft)
-            # self.l_currentmodel.setText(new_aircraft)
-            self.l_currentmodel.setText(f"<b>{self.model_name}</b> as a <b>{self.model_type}</b> for <b>{self.sim}</b>")
-
-            self.get_current_model(self.sim, new_aircraft)
-        else:
-            # Handle canceled
-            pass
+    # def show_user_model_dialog(self):
+    #     mprint("show_user_model_dialog")
+    #     current_aircraft = self.drp_models.currentText()
+    #     dialog = UserModelDialog(self.sim,current_aircraft, self.model_type, self)
+    #     result = dialog.exec()
+    #     if result == QtWidgets.QDialog.DialogCode.Accepted:
+    #         # Handle accepted
+    #         new_aircraft = dialog.tb_current_aircraft.currentText()
+    #         new_combo_box_value = dialog.combo_box.currentText()
+    #         pat_to_clone = dialog.models_combo_box.currentText()
+    #         if new_combo_box_value != '':
+    #             logging.info (f"New: {new_aircraft} {new_combo_box_value}")
+    #             xmlutils.write_models_to_xml(self.sim, new_aircraft, new_combo_box_value, 'type', None)
+    #         else:
+    #             logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
+    #             xmlutils.clone_pattern(self.sim, pat_to_clone, new_aircraft)
+    #
+    #         self.model_name = new_aircraft
+    #         # self.tb_currentmodel.setText(new_aircraft)
+    #         # self.l_currentmodel.setText(new_aircraft)
+    #         self.l_currentmodel.setText(f"<b>{self.model_name}</b> as a <b>{self.model_type}</b> for <b>{self.sim}</b>")
+    #
+    #         self.get_current_model(self.sim, new_aircraft)
+    #     else:
+    #         # Handle canceled
+    #         pass
 
     def setup_sim_list(self):
         mprint("setup_class_list")
@@ -832,24 +833,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         xmlutils.erase_entire_model_from_xml(self.sim, model_to_delete)
         self.reload_table()
 
-    # needs work....using value box for now.
-    # def usb_button_clicked(self):
-    #     button_name = self.sender().objectName().replace('pb_', '')
-    #     the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
-    #     the_button.setText("Push a button! ")
-    #     # listen for button loop
-    #     # Start a thread to fetch button press with a timeout
-    #     self.thread = mainwindow.ButtonPressThread(self.device, self.sender())
-    #     self.thread.button_pressed.connect(self.update_usb_button)
-    #     self.thread.start()
-    #
-    # def update_usb_button(self, button_name, value):
-    #     the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
-    #     the_button.setText(str(value))
-    #     if str(value) != '0':
-    #         xmlutils.write_models_to_xml(settings_mgr.current_sim, settings_mgr.current_pattern, str(value), button_name)
-    #     self.reload_caller()
-
     def set_override_gains(self):
         if self.device != G.device_type:
             QMessageBox.warning(self, "Error", "To set the gain overrides in the sim/class/offline editor, you must do so from the actual child instance interface.\n\nIn TelemFFB go to Window->Show Child Instance Windows and then open the sim/class/offline editor from the desired device instance., ")
@@ -1241,163 +1224,6 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         if self.sim == 'XPLANE' and craft == 'SASHelicopter': return True
 
         return False
-
-
-class UserModelDialog(QDialog):
-    the_sim = ''
-    def __init__(self, sim, current_aircraft, current_type, parent=None):
-        super(UserModelDialog, self).__init__(parent)
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
-        self.the_sim = sim
-        self.combo_box = None
-        self.models_combo_box = None
-        self.tb_current_aircraft = None
-        self.setWindowTitle(f"Create Model Settings ({self.the_sim} is current/selected)")
-        self.init_ui(sim, current_aircraft,current_type)
-
-    def class_combo_changed(self):
-        self.models_combo_box.blockSignals(True)
-        self.setup_models()
-        self.models_combo_box.setCurrentText('')
-        self.models_combo_box.blockSignals(False)
-        if self.combo_box.currentText() != '':
-            self.ok_button.setEnabled(True)
-        else:
-            self.ok_button.setEnabled(False)
-
-    def pattern_changed(self):
-        self.combo_box.blockSignals(True)
-        self.combo_box.setCurrentText('')
-        self.combo_box.blockSignals(False)
-        if self.models_combo_box.currentText() != '':
-            self.ok_button.setEnabled(True)
-        else:
-            self.ok_button.setEnabled(False)
-
-    def generate_regex_patterns(self,input_str):
-        words = input_str.split()
-        patterns = []
-
-        for i in range(len(words), 0, -1):
-            pattern = ' '.join(words[:i])
-            pattern += ".*"
-            patterns.append(pattern)
-
-        return patterns
-
-    def setup_models(self):
-        models = xmlutils.read_models(self.the_sim, self.combo_box.currentText())
-        self.models_combo_box.clear()
-        self.models_combo_box.blockSignals(True)
-        self.models_combo_box.addItem('')
-        self.models_combo_box.addItems(models)
-        self.models_combo_box.setCurrentText('')
-
-        self.models_combo_box.blockSignals(False)
-
-    def init_ui(self,sim,current_aircraft,current_type):
-
-        layout = QVBoxLayout()
-        lb1_txt = """
-    <p>TelemFFB uses regex to match aircraft names</p>
-    <p><b style="font-family: Courier">Name.*</b> will match anything starting with '<b>Name</b>'</p>
-    <p><b style="font-family: Courier">^Name$</b> will match only the exact '<b>Name</b>'</p>
-    <p><b style="font-family: Courier">(The )?Name.*</b> matches starting with '<b>Name</b>' or '<b>The Name</b>'</p>
-    
-    <p><b>**Note** if this is a new livery for an existing aircraft, is recommended to clone from the default profile</b></p>
-    <p><b>for that aircraft if one exists.  This is mandatory for aircraftad with special implementations like 'HPGHelicopter'</b></p>
-     
-"""
-        label1 = QLabel(lb1_txt)
-        # label1 = QLabel("TelemFFB uses regex to match aircraft names")
-        # label2 = QLabel("Name.* will match anything starting with 'Name'")
-        # label3 = QLabel("^Name$ will match only the exact 'Name'")
-        # label4 = QLabel("(The )?Name.* matches starting with 'Name' or 'The Name'" )
-        lb2_text = f"<br>Creating new aircraft profile within sim: <b>{self.the_sim}</b><br>"
-        label2 = QLabel(lb2_text)
-
-        label3 = QLabel("Choose or Edit the match pattern below.")
-
-        label6 = QLabel("And choose the aircraft class:")
-
-        label7 = QLabel("Or, choose an existing pattern to clone:")
-
-        classes = []
-        match sim:
-            case 'DCS':
-                classes = ["PropellerAircraft", "JetAircraft", "Helicopter"]
-            case 'IL2':
-                classes = ["PropellerAircraft", "JetAircraft"]
-            case 'MSFS':
-                classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'HPGHelicopter', 'SASHelicopter']
-            case 'XPLANE':
-                classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter']
-
-        # FOR TESTING
-        # classes.append('AllSettings')
-
-        # label_aircraft = QtWidgets.QLabel("Current Aircraft:")
-
-        self.tb_current_aircraft = QComboBox()
-        self.tb_current_aircraft.blockSignals(True)
-        patterns = self.generate_regex_patterns(current_aircraft)
-        self.tb_current_aircraft.addItem(current_aircraft)
-        self.tb_current_aircraft.addItems(patterns)
-
-        self.tb_current_aircraft.setCurrentText(current_aircraft)
-        self.tb_current_aircraft.setEditable(True)
-        self.tb_current_aircraft.setStyleSheet("QComboBox::view-item { align-text: center; }")
-        self.tb_current_aircraft.blockSignals(False)
-
-        self.combo_box = QComboBox()
-        self.combo_box.blockSignals(True)
-        self.combo_box.addItem('')
-        self.combo_box.addItems(classes)
-        self.combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
-        self.combo_box.setCurrentText(current_type)
-        self.combo_box.currentIndexChanged.connect(self.class_combo_changed)
-        self.combo_box.blockSignals(False)
-
-
-        self.models_combo_box = QComboBox()
-        self.setup_models()
-        self.models_combo_box.blockSignals(True)
-
-        self.models_combo_box.setStyleSheet("QComboBox::view-item { align-text: center; }")
-        self.models_combo_box.currentIndexChanged.connect(self.pattern_changed)
-        self.models_combo_box.blockSignals(False)
-
-
-        self.ok_button = QPushButton("OK")
-        self.ok_button.setStyleSheet("text-align:center;")
-        if self.combo_box.currentText() == '':
-            self.ok_button.setEnabled(False)
-        cancel_button = QPushButton("Cancel")
-        cancel_button.setStyleSheet("text-align:center;")
-
-        layout.addWidget(label1)
-        layout.addWidget(label2)
-        layout.addWidget(label3)
-        # layout.addWidget(label4)
-        # layout.addWidget(label5)
-        layout.addWidget(self.tb_current_aircraft)
-
-        layout.addWidget(label6)
-        layout.addWidget(self.combo_box)
-
-        layout.addWidget(label7)
-        layout.addWidget(self.models_combo_box)
-
-        layout.addWidget(self.ok_button)
-        layout.addWidget(cancel_button)
-
-        self.setLayout(layout)
-
-        self.ok_button.clicked.connect(self.accept)
-        cancel_button.clicked.connect(self.reject)
-
-
-
 
 
 if __name__ == "__main__":

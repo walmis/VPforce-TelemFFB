@@ -52,6 +52,7 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
 from telemffb.settingsmanager import UserModelDialog
+# from telemffb.UserModelDialog import UserModelDialog
 from telemffb.sim.aircraft_base import effects
 from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
