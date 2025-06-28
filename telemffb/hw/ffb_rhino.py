@@ -680,6 +680,11 @@ class DeviceInfo:
     usage_page: int
     vendor_id: int
 
+    @property
+    def ident(self) -> str:
+        """Returns the device name set in the VPforce Configurator"""
+        return self.product_string.replace("Rhino FFB ", "").strip()
+
 class FFBRhino(QObject):
     buttonPressed = pyqtSignal(int)
     buttonReleased = pyqtSignal(int)

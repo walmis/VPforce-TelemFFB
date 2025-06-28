@@ -1,3 +1,25 @@
+"""
+TelemFFB Main Application Entry Point
+
+This module orchestrates the startup and initialization of the TelemFFB application,
+which provides force feedback telemetry for flight simulation devices.
+
+Application Flow:
+1. Command line argument parsing and initial setup
+2. Master/child instance determination and mutex checking
+3. Device configuration and USB PID/VID setup
+4. Theme and styling configuration
+5. Configuration file path setup
+6. Device connection and firmware validation
+7. Logging system initialization
+8. Core component initialization (TelemManager, SimListeners, MainWindow)
+9. IPC network setup for multi-instance communication
+10. Window display and final setup
+11. Background initialization tasks
+12. Application event loop
+13. Cleanup on exit
+"""
+
 #
 # This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
 # Copyright (c) 2023 Valmantas Palikša.
@@ -88,7 +110,14 @@ def _launch_children():
 
 
 def _check_master_instance_mutex():
-    """Check if another master instance is already running."""
+    """
+    Check if another master instance is already running.
+    
+    Uses a named mutex to ensure only one master instance can run at a time.
+    Displays warning dialog and exits if another master is detected.
+    
+    Flow: Mutex check -> Warning dialog if conflict -> Exit if needed
+    """
     msg_box = QMessageBox()
     msg_box.setIcon(QMessageBox.Icon.Warning)
     msg_box.setWindowTitle("TelemFFB is already running")
@@ -108,7 +137,14 @@ def _check_master_instance_mutex():
         sys.exit(1)
 
 def _setup_device_configuration():
-    """Configure device type and USB VID/PID based on args or system settings."""
+    """
+    Configure device type and USB VID/PID based on args or system settings.
+    
+    Flow:
+    1. If no device specified in args, use system settings mapping
+    2. Map device type to USB PID from configuration
+    3. Set global device variables for use throughout application
+    """
     if G.args.device is None:
         mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
         master_rb = G.system_settings.get('masterInstance', 1)
@@ -137,7 +173,16 @@ def _setup_device_configuration():
         G.device_usbvidpid = G.args.device
 
 def _setup_theme_and_styling(app):
-    """Configure application theme and styling based on system settings."""
+    """
+    Configure application theme and styling based on system settings.
+    
+    Flow:
+    1. Read theme preference (light/dark/system)
+    2. Set Qt color scheme accordingly
+    3. Create custom palette with accent colors
+    4. Apply dark mode palette if needed
+    5. Apply custom stylesheets
+    """
     theme_setting = G.system_settings.get('themeId', 2)
 
     match theme_setting:
@@ -204,7 +249,16 @@ def _apply_custom_stylesheet(app):
         app.setStyleSheet(styles.LIGHT_MODE_STYLESHEET)
 
 def _determine_master_instance_status():
-    """Determine if this instance should be the master based on device type."""
+    """
+    Determine if this instance should be the master based on device type.
+    
+    Flow:
+    1. Map device types to indices
+    2. Compare current device with configured master device
+    3. Set master instance flag accordingly
+    
+    The master instance coordinates child instances and provides system tray interface.
+    """
     index_dict = {
         'joystick': 1,
         'pedals': 2,
@@ -218,7 +272,15 @@ def _determine_master_instance_status():
         G.master_instance = False
 
 def _setup_config_paths():
-    """Setup configuration file paths based on build type and mode."""
+    """
+    Setup configuration file paths based on build type and mode.
+    
+    Flow:
+    1. Set defaults path from resources
+    2. Configure logo based on build type and theme
+    3. Setup userconfig paths for dev vs production
+    4. Handle dev userconfig copying if needed
+    """
     G.defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
     
     if G.dev_build:
@@ -254,7 +316,19 @@ def _setup_standard_config_paths():
     G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
 
 def _initialize_device_connection():
-    """Initialize connection to the Rhino device and check firmware."""
+    """
+    Initialize connection to the Rhino device and check firmware.
+    
+    Flow:
+    1. Parse USB VID/PID from configuration
+    2. Enumerate all available Rhino devices
+    3. Attempt to connect to specified device
+    4. Validate firmware version meets requirements
+    5. Extract device identity and serial number
+    
+    Returns:
+        tuple: (device_object, serial_number, firmware_version)
+    """
     min_firmware_version = 'v1.0.17'
     dev_serial = None
     dev_firmware_version = 'ERROR'
@@ -278,7 +352,7 @@ def _initialize_device_connection():
             logging.info(f"Rhino Firmware: {dev_firmware_version}")
             _check_firmware_version(dev_firmware_version, min_firmware_version)
         
-        G.device_ident = dev.info.product_string.replace("Rhino FFB ", "").strip()
+        G.device_ident = dev.info.ident
         
     except Exception as e:
         logging.exception("Exception")
@@ -299,10 +373,8 @@ def _enumerate_and_log_devices():
         logging.info(f"* Path:{devinfo.path}")
         logging.info(f"*")
         if G.master_instance:
-            pid = int(f"{devinfo.product_id:04X}")
-            G.instance_dev_dict[pid] = {}
-            G.instance_dev_dict[pid]["ident"] = devinfo.product_string.replace("Rhino FFB ", "").strip()
-            G.instance_dev_dict[pid]["serial"] = devinfo.serial_number
+            G.instance_dev_dict[devinfo.product_id] = devinfo
+
     logging.info("-------")
 
 def _check_firmware_version(dev_firmware_version, min_firmware_version):
@@ -329,7 +401,15 @@ def _setup_logging_level():
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
 def _initialize_settings_manager():
-    """Initialize the settings manager with error handling for corrupted config."""
+    """
+    Initialize the settings manager with error handling for corrupted config.
+    
+    Flow:
+    1. Update XML variables with current device/paths
+    2. Attempt to create settings manager
+    3. If corruption detected, offer backup/reset option
+    4. Create new default config if user agrees
+    """
     xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
     try:
         G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, 
@@ -368,7 +448,16 @@ def _handle_corrupted_config():
         return
 
 def _setup_ipc_and_connections():
-    """Setup IPC network thread and connect all signals."""
+    """
+    Setup IPC network thread and connect all signals.
+    
+    Flow:
+    1. Create IPC network thread for inter-instance communication
+    2. Connect all IPC signals to appropriate handlers
+    3. Start IPC thread for message processing
+    
+    Enables master-child coordination and remote control capabilities.
+    """
     G.ipc_instance = IPCNetworkThread(dstport=G.args.masterport)
     G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
     G.ipc_instance.exit_signal.connect(exit_application)
@@ -439,7 +528,17 @@ def _setup_async_initialization(dev, dev_serial):
     init_async()
 
 def _cleanup_on_exit(dev_serial):
-    """Handle cleanup operations when application exits."""
+    """
+    Handle cleanup operations when application exits.
+    
+    Flow:
+    1. Notify child instances to close
+    2. Stop IPC communication
+    3. Stop all simulation listeners
+    4. Quit telemetry manager
+    5. Apply exit VPConfigurator profile if configured
+    6. Reset device gains to startup values if configured
+    """
     if G.ipc_instance:
         G.ipc_instance.notify_close_children()
         G.ipc_instance.stop()
@@ -460,57 +559,94 @@ def _cleanup_on_exit(dev_serial):
             pass
 
 def main():
+    """
+    Main application entry point and initialization flow.
+    
+    This function orchestrates the complete startup sequence:
+    - Sets up Qt application and basic configuration
+    - Determines master/child instance status
+    - Initializes device connections and validates firmware
+    - Sets up logging, telemetry, and UI components
+    - Starts background services and displays the main window
+    - Handles the application event loop until exit
+    """
+    # ============================================================================
+    # PHASE 1: Qt Application and Basic Setup
+    # ============================================================================
     #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute. AA_EnableHighDpiScaling, True) #enable highdpi scaling
     #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)  #use highdpi icons
 
     dev : FFBRhino = None
 
+    # Initialize Qt application with Fusion style for consistent cross-platform appearance
     app = QApplication(sys.argv)
     app.setStyle('fusion')  # Set Fusion style
 
+    # ============================================================================
+    # PHASE 2: Command Line Arguments and Instance Management
+    # ============================================================================
+    # Parse command line arguments to determine device type, ports, and operation mode
     G.args = CmdLineArgs.parse()
     G.is_exe = getattr(sys, 'frozen', False)
     headless_mode = G.args.headless
     G.master_instance = not G.args.child
 
+    # Ensure only one master instance can run at a time using named mutex
     if G.master_instance:
         _check_master_instance_mutex()
 
+    # ============================================================================
+    # PHASE 3: System Configuration and Device Setup
+    # ============================================================================
+    # Set child instance flag and load system-wide settings
     G.child_instance = G.args.child
     G.system_settings = utils.SystemSettings()
 
+    # Configure application theme (light/dark/system) and apply custom styling
     _setup_theme_and_styling(app)
+    
+    # Determine device type and USB VID/PID based on args or system settings
     _setup_device_configuration()
 
-    G.args.sim = str.upper(G.args.sim)
-    G.args.type = str.lower(G.args.type)
-
+    # Determine if this instance should be the master based on device type
     _determine_master_instance_status()
 
+    # ============================================================================
+    # PHASE 4: Version Info and Path Setup
+    # ============================================================================
     sys.path.insert(0, '')
     # sys.path.append('/simconnect')
 
+    # Get application version and initialize device serial tracking
     version = utils.get_version()
     dev_serial = None
 
+    # Setup configuration file paths (dev vs production, userconfig locations)
     _setup_config_paths()
     utils.create_empty_userxml_file(G.userconfig_path)
 
+    # Determine if running from executable or source for logging
     if G.is_exe:
         appmode = 'Executable'
     else:
         appmode = 'Source'
 
+    # ============================================================================
+    # PHASE 5: Logging and Debug Setup
+    # ============================================================================
+    # Log startup banner with version and configuration info
     logging.info("**************************************")
     logging.info("**************************************")
     logging.info(f"*****    TelemFFB version {version}: starting up from {appmode}:  Args= {G.args.__dict__}")
     logging.info("**************************************")
     logging.info("**************************************")
 
+    # Setup teleplot integration for real-time plotting if specified
     if G.args.teleplot:
         logging.info(f"Using {G.args.teleplot} for plotting")
         utils.teleplot.configure(G.args.teleplot)
 
+    # Configure global exception handler for better error reporting
     def excepthook(exc_type, exc_value, exc_tb):
         if exc_type == KeyboardInterrupt:
             utils.exit_application()
@@ -521,44 +657,97 @@ def main():
         # or QtWidgets.QApplication.exit(0)
     sys.excepthook = excepthook
 
+    # ============================================================================
+    # PHASE 6: UI and Logging Window Setup
+    # ============================================================================
+    # Apply final styling and create log window for debug output
     _apply_custom_stylesheet(app)
     
+    # Initialize log window and redirect stdout/stderr for capture
     G.log_window = LogWindow()
     _init_logging(G.log_window.widget)
     G.log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
 
+    # ============================================================================
+    # PHASE 7: Settings and Configuration Management
+    # ============================================================================
+    # Initialize settings manager with error handling for corrupted configs
     _initialize_settings_manager()
 
     logging.info(f"TelemFFB (version {version}) Starting")
 
+    # ============================================================================
+    # PHASE 8: Device Connection and Firmware Validation
+    # ============================================================================
+    # Connect to Rhino FFB device and validate firmware version
     dev, dev_serial, dev_firmware_version = _initialize_device_connection()
 
+    # Set logging level based on system settings
     _setup_logging_level()
 
+    # ============================================================================
+    # PHASE 9: Core Component Initialization
+    # ============================================================================
+    # Initialize telemetry manager for handling sim data
     G.telem_manager = TelemManager()
     G.telem_manager.start()
+    
+    # Initialize simulation listener manager for multiple sim support
     G.sim_listeners = SimListenerManager()
+    
+    # Create main application window
     G.main_window = MainWindow()
 
+    # ============================================================================
+    # PHASE 10: Inter-Process Communication Setup
+    # ============================================================================
+    # Setup IPC for master-child instance communication and connect all signals
     _setup_ipc_and_connections()
+    
+    # Connect device button events to main window handlers
     _setup_device_button_connections()
 
+    # ============================================================================
+    # PHASE 11: Child Instance Management (Master Only)
+    # ============================================================================
+    # Launch child instances if this is the master and auto-launch is enabled
     _launch_children()
 
+    # ============================================================================
+    # PHASE 12: Window Display and UI Presentation
+    # ============================================================================
+    # Show main window based on configuration (minimized, tray, normal)
     _handle_window_display(headless_mode)
+    
+    # Check for version updates in background (non-release builds)
     _check_version_update()
 
+    # Setup master-specific features (system tray, etc.)
     if G.master_instance:
         G.main_window.setup_master_instance()
 
+    # Prompt for system settings if no devices are configured
     _check_system_settings_required()
 
+    # ============================================================================
+    # PHASE 13: Background Initialization
+    # ============================================================================
+    # Start background tasks that don't block UI appearance
     _setup_async_initialization(dev, dev_serial)
 
+    # ============================================================================
+    # PHASE 14: Service Startup and Event Loop
+    # ============================================================================
+    # Start all simulation listeners to begin telemetry processing
     G.sim_listeners.start_all()
 
+    # Enter Qt application event loop - application runs until user exits
     app.exec()
 
+    # ============================================================================
+    # PHASE 15: Cleanup and Shutdown
+    # ============================================================================
+    # Perform cleanup operations when application exits
     _cleanup_on_exit(dev_serial)
 
 def _init_logging(log_widget : QPlainTextEdit):
