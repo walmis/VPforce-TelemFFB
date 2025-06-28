@@ -21,6 +21,44 @@ from typing import Optional, List
 import argparse
 
 class CmdLineArgs:
+    """Command line arguments parser and container for TelemFFB application."""
+    
+    teleplot: Optional[str]
+    """Destination IP:port address for teleplot.fr telemetry plotting service"""
+    
+    plot: Optional[List[str]]
+    """List of telemetry item names to send to teleplot"""
+    
+    device: Optional[str]
+    """Rhino device USB VID:PID identifier"""
+    
+    reset: Optional[bool]
+    """Flag to reset all FFB effects"""
+    
+    configfile: str
+    """Path to config ini file"""
+    
+    overridefile: Optional[str]
+    """Path to user config override file"""
+    
+    sim: str
+    """Simulator type (DCS|MSFS|IL2)"""
+    
+    type: Optional[str]
+    """FFB Device Type (joystick|pedals|collective)"""
+    
+    headless: Optional[bool]
+    """Flag to run in headless mode"""
+    
+    child: Optional[bool]
+    """Flag indicating this is a child instance"""
+    
+    masterport: Optional[str]
+    """Master instance IPC port"""
+    
+    minimize: Optional[bool]
+    """Flag to minimize application on startup"""
+
     def __init__(
         self,
         teleplot: Optional[str] = None,

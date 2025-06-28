@@ -425,7 +425,34 @@ class Vector:
 
 
 class TurbulenceModulator:
+    """
+    Simulates atmospheric turbulence effects for force feedback by analyzing wind velocity changes.
+    
+    This class processes relative wind data to generate realistic turbulence forces that can be
+    applied to flight controls. It uses high-pass filtering to detect rapid wind changes and
+    converts them into force magnitude and direction suitable for haptic feedback systems.
+    
+    The turbulence simulation works by:
+    1. Monitoring changes in relative wind velocity (X and Z components)
+    2. High-pass filtering the wind changes to isolate turbulent fluctuations
+    3. Converting wind deltas to force magnitude using configurable sensitivity
+    4. Smoothing the output force to prevent jarring transitions
+    5. Calculating force direction based on wind gust angle
+    
+    Attributes:
+        prev_wind_x (float): Previous frame's wind X-component for delta calculation
+        prev_wind_z (float): Previous frame's wind Z-component for delta calculation  
+        hpf_x (float): High-pass filtered wind change in X direction
+        hpf_z (float): High-pass filtered wind change in Z direction
+        prev_force (float): Previous frame's force output for smoothing
+    """
+    
     def __init__(self):
+        """
+        Initialize the turbulence modulator with default state.
+        
+        All wind history and filter states are reset to initial values.
+        """
         self.prev_wind_x = None
         self.prev_wind_z = None
         self.hpf_x = 0.0
@@ -437,6 +464,30 @@ class TurbulenceModulator:
                turbulence_smoothing_alpha=0.3,
                turbulence_sensitivity=0.5,
                turbulence_intensity=0.2):
+        """
+        Process telemetry data to generate turbulence force and direction.
+        
+        Args:
+            telem_data (dict): Telemetry data containing 'RelWind' key with [x, y, z] wind vector
+            turbulence_hpf_alpha (float, optional): High-pass filter coefficient (0.0-1.0).
+                Higher values = more aggressive filtering. Defaults to 0.95.
+            turbulence_smoothing_alpha (float, optional): Output smoothing coefficient (0.0-1.0).
+                Higher values = more responsive but less smooth. Defaults to 0.3.
+            turbulence_sensitivity (float, optional): Sensitivity to wind changes (0.0-1.0).
+                Lower values = more sensitive to small changes. Defaults to 0.5.
+            turbulence_intensity (float, optional): Maximum force intensity multiplier (0.0-1.0).
+                Higher values = stronger turbulence effects. Defaults to 0.2.
+        
+        Returns:
+            tuple: (force_magnitude, force_angle)
+                - force_magnitude (float): Normalized force strength (0.0-turbulence_intensity)
+                - force_angle (int): Force direction in degrees (0-359), where 0° is positive X-axis
+        
+        Note:
+            Returns (0.0, 0) if telemetry data is invalid or during initialization.
+            The force angle represents the direction opposite to the wind gust direction,
+            simulating the aircraft's resistance to the turbulent air mass.
+        """
         try:
             wind_x = telem_data['RelWind'][0]
             wind_z = telem_data['RelWind'][2]
@@ -459,7 +510,7 @@ class TurbulenceModulator:
         self.prev_wind_x = wind_x
         self.prev_wind_z = wind_z
 
-        delta_mag = np.hypot(self.hpf_x, self.hpf_z)
+        delta_mag = math.sqrt(self.hpf_x ** 2 + self.hpf_z ** 2)
         normalized = min(delta_mag / max_delta, 1.0)
         target_force = normalized * turbulence_intensity
 
@@ -1875,55 +1926,169 @@ def get_resource_path(relative_path, prefer_root=False, force=False):
         return f_path
 
 
-def validate_vpconf_profile(file, pid=None, dev_type=None, silent=False, window=None):
+def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, window=None):
+    """Validate a VPforce Configurator profile file against current device.
+    
+    This function checks if a VPforce Configurator profile file is compatible
+    with the current device by validating:
+    1. File format and structure
+    2. PID matching between profile and device
+    3. Device identifier matching
+    
+    Args:
+        file_path (str): Path to the VPforce Configurator profile file
+        pid (int or str): Expected device PID (Product ID)
+        dev_type (str): Device type (e.g., 'Joystick', 'Pedals')
+        silent (bool): If True, log errors instead of showing message boxes
+        window: Parent window for message boxes (can be None)
+        
+    Returns:
+        bool: True if profile is valid for current device, False otherwise
+    """
+
+    def _load_vpconf_config(file_path):
+        """Load and parse VPforce Configurator configuration file.
+        
+        Args:
+            file_path (str): Path to the configuration file
+            
+        Returns:
+            dict: Parsed configuration data
+            
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            json.JSONDecodeError: If file is not valid JSON
+            ValueError: If required fields are missing
+        """
+        try:
+            with open(file_path, 'r') as f:
+                config_data = json.load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Configuration file not found: {file_path}")
+        except json.JSONDecodeError as e:
+            raise json.JSONDecodeError(f"Invalid JSON in configuration file: {file_path}", e.doc, e.pos)
+        except Exception as e:
+            raise ValueError(f"Unable to read configuration file: {file_path}. Error: {e}")
+        
+        return config_data
+
+
+    def _extract_config_info(config_data):
+        """Extract key information from VPforce configuration data.
+        
+        Args:
+            config_data (dict): Configuration data from JSON file
+            
+        Returns:
+            tuple: (pid, serial, device_name) extracted from config
+            
+        Raises:
+            ValueError: If required fields are missing or invalid
+        """
+        # Extract USB PID
+        cfg_pid = config_data.get('config', {}).get('usb_pid', 'unknown')
+        if cfg_pid == 'unknown':
+            raise ValueError("Missing or invalid 'usb_pid' in configuration file")
+        
+        # Convert PID to integer (assuming it's in hex format)
+        try:
+            cfg_pid = int(format(cfg_pid, 'x'))
+        except (ValueError, TypeError):
+            raise ValueError(f"Invalid USB PID format: {cfg_pid}")
+        
+        # Extract serial number
+        cfg_serial = config_data.get('serial_number', 'unknown')
+        if cfg_serial == 'unknown':
+            raise ValueError("Missing or invalid 'serial_number' in configuration file")
+        
+        # Extract device name
+        cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
+        if cfg_device_name == 'unknown':
+            raise ValueError("Missing or invalid 'device_name' in configuration file")
+        
+        return cfg_pid, cfg_serial, cfg_device_name
+
+
+    def _get_current_device_ident(pid):
+        """Get the device identifier for the current device.
+        
+        Args:
+            pid (int): Device PID
+            
+        Returns:
+            str: Device identifier
+        """
+        if G.master_instance:
+            return G.instance_dev_dict[pid].ident
+        else:
+            return G.device_ident
+
+
+    def _show_error_message(title, message, silent, window):
+        """Display error message either as popup or log entry.
+        
+        Args:
+            title (str): Title for the message box
+            message (str): Error message to display
+            silent (bool): If True, log error instead of showing popup
+            window: Parent window for message box (can be None)
+        """
+        if silent:
+            logging.error(message)
+        else:
+            QMessageBox.warning(window, title, message)
+
+    # Normalize PID to integer
     if isinstance(pid, str):
         pid = int(pid)
+    
+    # Step 1: Load and parse configuration file
     try:
-        with open(file, 'r') as f:
-            config_data = json.load(f)
-    except:
-        if not silent:
-            QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
-        else:
-            logging.error(f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+        config_data = _load_vpconf_config(file_path)
+    except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
+        error_msg = f"The VPforce Configurator file appears to be invalid:\n\nFile: {file_path}\nError: {str(e)}"
+        _show_error_message("Invalid Configuration File", error_msg, silent, window)
         return False
-    cfg_pid = config_data.get('config', {}).get('usb_pid', 'unknown')
-    if cfg_pid == 'unknown':
-        if not silent:
-            QMessageBox.warning(window, "Error", f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
-        else:
-            logging.error(f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+    
+    # Step 2: Extract configuration information
+    try:
+        cfg_pid, cfg_serial, cfg_device_name = _extract_config_info(config_data)
+    except ValueError as e:
+        error_msg = f"The VPforce Configurator file is missing required information:\n\nFile: {file_path}\nError: {str(e)}"
+        _show_error_message("Invalid Configuration File", error_msg, silent, window)
         return False
-    passed = True
-    cfg_pid = int(format(cfg_pid, 'x'))
-    cfg_serial = config_data.get('serial_number', 'unknown')
-    cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
-    if cfg_serial == 'unknown':
-        passed = False
-        msg = f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}"
-        if not silent:
-            QMessageBox.warning(window, "Error",msg)
-        else:
-            logging.error(f"The VPforce Configurator file you selected appears to be invalid\n\nFile={file}")
+    
+    # Step 3: Validate PID matching
     if cfg_pid != pid:
-        passed = False
-        msg = f"The VPforce Configurator file you selected does not match the device you are trying to assign it to\n\nFile={file}\n\nThis instance is currently configuring:\n{dev_type}\npid= {pid}\n\nThe chosen profile is for\npid= {cfg_pid}\nname= {cfg_device_name}\nserial= {cfg_serial}"
-        if not silent:
-            QMessageBox.warning(window, "Wrong Device", msg)
-        else:
-            logging.error(msg)
-    if G.master_instance:
-        dev_ident = G.instance_dev_dict[pid].get("ident")
-    else:
-        dev_ident = G.device_ident
-    if cfg_device_name != dev_ident:
-        passed = False
-        msg = f"The VPforce Configurator file {file} contains a device ident >{cfg_device_name}< that is different from the device currently connected >{dev_ident}<  This will cause USB to disconnect."
-        if not silent:
-            QMessageBox.warning(window, "Wrong Device", msg)
-        else:
-            logging.error(msg)
-    return passed
+        error_msg = (
+            f"The VPforce Configurator file does not match the target device:\n\n"
+            f"File: {file_path}\n\n"
+            f"Current device:\n"
+            f"  Type: {dev_type}\n"
+            f"  PID: {pid}\n\n"
+            f"Profile device:\n"
+            f"  PID: {cfg_pid}\n"
+            f"  Name: {cfg_device_name}\n"
+            f"  Serial: {cfg_serial}"
+        )
+        _show_error_message("Device Mismatch", error_msg, silent, window)
+        return False
+    
+    # Step 4: Validate device identifier matching
+    current_device_ident = _get_current_device_ident(pid)
+    if cfg_device_name != current_device_ident:
+        error_msg = (
+            f"Device identifier mismatch detected:\n\n"
+            f"File: {file_path}\n\n"
+            f"Profile device identifier: {cfg_device_name}\n"
+            f"Connected device identifier: {current_device_ident}\n\n"
+            f"This mismatch may cause USB disconnection issues."
+        )
+        _show_error_message("Device Identifier Mismatch", error_msg, silent, window)
+        return False
+    
+    # All validations passed
+    return True
 
 
 class LoggingFilter(logging.Filter):
