@@ -842,6 +842,10 @@ def erase_from_xml(sim, class_name, model, setting, the_device=''):
             case _:
                 pass
 
+def add_new_model(sim, class_name, match_string):
+    """A helper function to abstract the required parameters to create a new user model entry"""
+    write_models_to_xml(sim, match_string, class_name, setting_name='type')
+
 def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', the_device=''):
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist

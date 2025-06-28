@@ -51,8 +51,8 @@ from telemffb.custom_widgets import (ClickLogo, InstanceStatusRow, NoKeyScrollAr
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
-from telemffb.settingsmanager import UserModelDialog
 # from telemffb.UserModelDialog import UserModelDialog
+from telemffb.NewAircraftWizard import NewAircraftWizard
 from telemffb.sim.aircraft_base import effects
 from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
@@ -507,7 +507,7 @@ class MainWindow(QMainWindow):
         self.new_craft_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         new_craft_layout.addWidget(self.new_craft_button)
         new_craft_layout.addSpacing(7)
-        self.new_craft_button.clicked.connect(self.show_user_model_dialog)
+        # self.new_craft_button.clicked.connect(self.show_user_model_dialog)
         layout.addLayout(new_craft_layout)
         self.new_craft_button.hide()
 
@@ -572,10 +572,16 @@ class MainWindow(QMainWindow):
         bottom_row = QHBoxLayout()
         bottom_row.addStretch()  # push button to the right
 
+        self.manual_add_button = QToolButton()
+        # self.offline_button.setMaximumWidth(20)
+        self.manual_add_button.setText('Manually Add Aircraft')
+        self.manual_add_button.clicked.connect(self.show_new_aircraft_wizard)
+
         self.offline_button = QToolButton()
         # self.offline_button.setMaximumWidth(20)
         self.offline_button.setText('Exit Offline Mode')
         self.offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
+        bottom_row.addWidget(self.manual_add_button)
         bottom_row.addWidget(self.offline_button)
 
         # Combine both rows
@@ -1322,10 +1328,13 @@ class MainWindow(QMainWindow):
         self.monitor_widget.hide()
         self.settings_layout.reload_caller()
 
-
-
         if G.master_instance:
             G.ipc_instance.send_broadcast_message(f"LOAD_DBG_AC")
+
+    def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None):
+        wizard = NewAircraftWizard(parent=self, manual=manual, auto_sim=sim, auto_name=name, auto_cls=cls)
+        wizard.accepted.connect(self.new_ac_wizard_finished)
+        wizard.show()
 
     @overrides(QWidget)
     def closeEvent(self, event):
@@ -1504,29 +1513,29 @@ class MainWindow(QMainWindow):
         except Exception:
             traceback.print_exc()
 
-    def show_user_model_dialog(self):
-        current_aircraft = self.cur_craft.text()
-        dialog = UserModelDialog(G.settings_mgr.current_sim, current_aircraft, G.settings_mgr.current_class, self)
-        result = dialog.exec()
-        if result == QtWidgets.QDialog.DialogCode.Accepted:
-            # Handle accepted
-            new_aircraft = dialog.tb_current_aircraft.currentText()
-            if new_aircraft == current_aircraft:
-                qm = QMessageBox()
-                ret = qm.question(self, 'Create Match Pattern', "Are you sure you want to match on the\nfull aircraft name and not a search pattern?", qm.StandardButton.Yes | qm.StandardButton.No)
-                if ret == qm.StandardButton.No:
-                    return
-            new_combo_box_value = dialog.combo_box.currentText()
-            pat_to_clone = dialog.models_combo_box.currentText()
-            if pat_to_clone == '':
-                logging.info(f"New: {new_aircraft} {new_combo_box_value}")
-                xmlutils.write_models_to_xml(G.settings_mgr.current_sim, new_aircraft, new_combo_box_value, 'type', None)
-            else:
-                logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
-                xmlutils.clone_pattern(G.settings_mgr.current_sim, pat_to_clone, new_aircraft)
-        else:
-            # Handle canceled
-            pass
+    # def show_user_model_dialog(self):
+    #     current_aircraft = self.cur_craft.text()
+    #     dialog = UserModelDialog(G.settings_mgr.current_sim, current_aircraft, G.settings_mgr.current_class, self)
+    #     result = dialog.exec()
+    #     if result == QtWidgets.QDialog.DialogCode.Accepted:
+    #         # Handle accepted
+    #         new_aircraft = dialog.tb_current_aircraft.currentText()
+    #         if new_aircraft == current_aircraft:
+    #             qm = QMessageBox()
+    #             ret = qm.question(self, 'Create Match Pattern', "Are you sure you want to match on the\nfull aircraft name and not a search pattern?", qm.StandardButton.Yes | qm.StandardButton.No)
+    #             if ret == qm.StandardButton.No:
+    #                 return
+    #         new_combo_box_value = dialog.combo_box.currentText()
+    #         pat_to_clone = dialog.models_combo_box.currentText()
+    #         if pat_to_clone == '':
+    #             logging.info(f"New: {new_aircraft} {new_combo_box_value}")
+    #             xmlutils.write_models_to_xml(G.settings_mgr.current_sim, new_aircraft, new_combo_box_value, 'type', None)
+    #         else:
+    #             logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
+    #             xmlutils.clone_pattern(G.settings_mgr.current_sim, pat_to_clone, new_aircraft)
+    #     else:
+    #         # Handle canceled
+    #         pass
 
     def update_from_menu(self):
         if self.perform_update(auto=False):
@@ -1822,8 +1831,14 @@ class MainWindow(QMainWindow):
             if G.settings_mgr.current_pattern == '' and data.get('N', '') != '':
                 if not self.new_craft_notification_sent:
                     shown_pattern = 'Using defaults'
-                    self.new_craft_button.show()
+                    new_sim = data.get('src', None)
+                    new_aircraft = data.get('N', None)
+                    new_class = G.settings_mgr.current_class
+                    self.new_craft_button.clicked.connect(lambda: self.show_new_aircraft_wizard(manual=False, sim=new_sim, cls=new_class,name=new_aircraft))
                     if G.master_instance:
+                        self.new_craft_button.show()
+                        self.show_new_aircraft_wizard(manual=False, sim=data.get('src', None), cls=G.settings_mgr.current_class,name=data.get('N', ''))
+                        # utils.dbprint("red", f"SIM: {data.get('src', None)} CLASS: {G.settings_mgr.current_class}, NAME: {data.get('N', '')}")
                         self.pop_tray_notification(
                             "** New Aircraft Found **",
                             f"No profile was found for the aircraft\n{data.get('N')}\n\nClick to open TelemFFB.",
@@ -1846,6 +1861,12 @@ class MainWindow(QMainWindow):
 
         except Exception:
             logging.exception("Exception")
+
+    def new_ac_wizard_finished(self):
+        self.new_craft_button.setVisible(False)
+        self.settings_layout.reload_layout(None)
+        # G.sim_listeners.restart_all()
+
 
     def perform_update(self, auto=True):
         if G.release_version:

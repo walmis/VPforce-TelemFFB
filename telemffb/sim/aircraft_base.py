@@ -419,6 +419,7 @@ class AircraftBase(object):
         """
         for k, v in settings_dict.items():
             if k in ["type"]: continue
+            if k.endswith("_group"): continue
             if getattr(self, k, None) is None and k != 'vpconf' and 'dummy' not in k and 'command_runner' not in k:
                 logging.info(f"WARNING: Unknown parameter {k} in config")
                 continue
