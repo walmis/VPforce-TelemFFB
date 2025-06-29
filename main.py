@@ -593,7 +593,8 @@ def main():
 
     # Ensure only one master instance can run at a time using named mutex
     if G.master_instance:
-        _check_master_instance_mutex()
+        if not G.allow_multi_instance:
+            _check_master_instance_mutex()
 
     # ============================================================================
     # PHASE 3: System Configuration and Device Setup
