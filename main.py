@@ -412,7 +412,7 @@ def _initialize_settings_manager():
     """
     xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
     try:
-        G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type,
+        G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type,
                                       userconfig_path=G.userconfig_path,
                                       defaults_path=G.defaults_path,
                                       system_settings=G.system_settings)
@@ -438,7 +438,7 @@ def _handle_corrupted_config():
         utils.create_empty_userxml_file(G.userconfig_path)
 
         logging.info(f"User config Reset:  Backup file created: {backup_file}")
-        G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type,
+        G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type,
                                       userconfig_path=G.userconfig_path,
                                       defaults_path=G.defaults_path,
                                       system_settings=G.system_settings)
