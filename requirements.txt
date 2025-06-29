@@ -1,10 +1,10 @@
 pyqt6
 configobj
 pysimconnect @ https://github.com/walmis/pysimconnect/archive/refs/heads/master.zip
-libipc_ctypes @ https://github.com/walmis/libipc_ctypes/archive/refs/heads/master.zip
+pyzmq
 stransi
 libusb1
 pygetwindow
 requests
-numpy
-scipy
+numpy==2.3.0
+scipy==1.15.3

@@ -1,3 +1,25 @@
+"""
+TelemFFB Main Application Entry Point
+
+This module orchestrates the startup and initialization of the TelemFFB application,
+which provides force feedback telemetry for flight simulation devices.
+
+Application Flow:
+1. Command line argument parsing and initial setup
+2. Master/child instance determination and mutex checking
+3. Device configuration and USB PID/VID setup
+4. Theme and styling configuration
+5. Configuration file path setup
+6. Device connection and firmware validation
+7. Logging system initialization
+8. Core component initialization (TelemManager, SimListeners, MainWindow)
+9. IPC network setup for multi-instance communication
+10. Window display and final setup
+11. Background initialization tasks
+12. Application event loop
+13. Cleanup on exit
+"""
+
 #
 # This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
 # Copyright (c) 2023 Valmantas Palikša.
@@ -60,6 +82,7 @@ from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             set_vpconf_profile)
 from telemffb.namedmutex import NamedMutex
+import styles
 resources # used
 
 def send_test_message():
@@ -69,7 +92,7 @@ def send_test_message():
         else:
             G.ipc_instance.send_message("TEST MESSAGE")
 
-def launch_children():
+def _launch_children():
     if not G.system_settings.get('autolaunchMaster'):
         return
     if not G.master_instance:
@@ -86,48 +109,80 @@ def launch_children():
         logging.exception("Error during Auto-Launch sequence")
 
 
-def main():
-    #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute. AA_EnableHighDpiScaling, True) #enable highdpi scaling
-    #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)  #use highdpi icons
+def _check_master_instance_mutex():
+    """
+    Check if another master instance is already running.
 
-    dev : FFBRhino = None
+    Uses a named mutex to ensure only one master instance can run at a time.
+    Displays warning dialog and exits if another master is detected.
 
-    app = QApplication(sys.argv)
-    app.setStyle('fusion')  # Set Fusion style
+    Flow: Mutex check -> Warning dialog if conflict -> Exit if needed
+    """
+    msg_box = QMessageBox()
+    msg_box.setIcon(QMessageBox.Icon.Warning)
+    msg_box.setWindowTitle("TelemFFB is already running")
+    msg_box.setText(
+        "TelemFFB is already running and cannot be started.  If you don't see the 'VP' icon in the system tray, "
+        "check the task manager for possible hung instances."
+    )
+    msg_box.setWindowIcon(QIcon(':/image/vpforceicon.png'))
 
-    G.args = CmdLineArgs.parse()
-
-    G.is_exe = getattr(sys, 'frozen', False)
-
-    # script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    headless_mode = G.args.headless
-
-    G.master_instance = not G.args.child
-
-    if G.master_instance and not G.allow_multi_instance:
-        # Attempt to acquire a mutex lock.  If the acquisition fails, another master instance of TelemFFB is already running.
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Icon.Warning)
-        msg_box.setWindowTitle("TelemFFB is already running")
-        msg_box.setText(
-            "TelemFFB is already running and cannot be started.  If you don't see the 'VP' icon in the system tray, "
-            "check the task manager for possible hung instances."
-        )
-        msg_box.setWindowIcon(QIcon(':/image/vpforceicon.png'))
-        try:
-            mutex = NamedMutex("VPforce_TelemFFB_Master_Instance", acquired=True, timeout=1)
-            if not mutex.acquired:
-                msg_box.exec()
-                sys.exit(1)
-        except WindowsError:
+    try:
+        mutex = NamedMutex("VPforce_TelemFFB_Master_Instance", acquired=True, timeout=1)
+        if not mutex.acquired:
             msg_box.exec()
             sys.exit(1)
+    except WindowsError:
+        msg_box.exec()
+        sys.exit(1)
 
-    G.child_instance = G.args.child
+def _setup_device_configuration():
+    """
+    Configure device type and USB VID/PID based on args or system settings.
 
-    G.system_settings = utils.SystemSettings()
+    Flow:
+    1. If no device specified in args, use system settings mapping
+    2. Map device type to USB PID from configuration
+    3. Set global device variables for use throughout application
+    """
+    if G.args.device is None:
+        mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
+        master_rb = G.system_settings.get('masterInstance', 1)
 
+        try:
+            d = mapping[master_rb]
+            G.device_usbpid = G.system_settings.get(f'pid{d.capitalize()}', "2055")
+            G.device_type = d
+        except KeyError:
+            G.device_usbpid = 2055
+            G.device_type = 'joystick'
+
+        if not G.device_usbpid: # check empty string
+            G.device_usbpid = '2055'
+
+        G.device_usbvidpid = f"FFFF:{G.device_usbpid}"
+        G.args.type = G.device_type
+    else:
+        if G.args.type is None:
+            G.device_type = 'joystick'
+            G.args.type = G.device_type
+        else:
+            G.device_type = str.lower(G.args.type)
+
+        G.device_usbpid = G.args.device.split(":")[1]
+        G.device_usbvidpid = G.args.device
+
+def _setup_theme_and_styling(app):
+    """
+    Configure application theme and styling based on system settings.
+
+    Flow:
+    1. Read theme preference (light/dark/system)
+    2. Set Qt color scheme accordingly
+    3. Create custom palette with accent colors
+    4. Apply dark mode palette if needed
+    5. Apply custom stylesheets
+    """
     theme_setting = G.system_settings.get('themeId', 2)
 
     match theme_setting:
@@ -155,69 +210,55 @@ def main():
     app.setPalette(palette)
 
     if G.useDarkMode:
-        # Base colors with updated ColorRole enums
-        palette.setColor(QtGui.QPalette.ColorRole.Window, QColor(53, 53, 53))
-        palette.setColor(QtGui.QPalette.ColorRole.WindowText, QtGui.QColor("#dddddd"))
-        palette.setColor(QtGui.QPalette.ColorRole.Base, QColor(35, 35, 35))
-        palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
-        palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor('#dddddd'))
-        palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
-        palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor('#dddddd'))
-        palette.setColor(QtGui.QPalette.ColorRole.Button, QColor(53, 53, 53))
-        palette.setColor(QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor('#dddddd'))
-        palette.setColor(QtGui.QPalette.ColorRole.BrightText, QtGui.QColor('red'))
+        _apply_dark_mode_palette(app, palette)
 
-        # Link colors
-        palette.setColor(QtGui.QPalette.ColorRole.Link, QColor(42, 130, 218))
-        palette.setColor(QtGui.QPalette.ColorRole.Highlight, QColor(42, 130, 218))
-        palette.setColor(QtGui.QPalette.ColorRole.HighlightedText, QtGui.QColor('black'))
+    _apply_custom_stylesheet(app)
 
-        # Disabled colors
-        palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.Text, QColor(127, 127, 127))
-        palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.ButtonText, QColor(127, 127, 127))
-        palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QColor(43, 43, 43))  # or #2b2b2b
-        palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
+def _apply_dark_mode_palette(app, palette):
+    """Apply dark mode color palette."""
+    # Base colors with updated ColorRole enums
+    palette.setColor(QtGui.QPalette.ColorRole.Window, QColor(53, 53, 53))
+    palette.setColor(QtGui.QPalette.ColorRole.WindowText, QtGui.QColor("#dddddd"))
+    palette.setColor(QtGui.QPalette.ColorRole.Base, QColor(35, 35, 35))
+    palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+    palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor('#dddddd'))
+    palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
+    palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor('#dddddd'))
+    palette.setColor(QtGui.QPalette.ColorRole.Button, QColor(53, 53, 53))
+    palette.setColor(QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor('#dddddd'))
+    palette.setColor(QtGui.QPalette.ColorRole.BrightText, QtGui.QColor('red'))
 
-        app.setPalette(palette)
+    # Link colors
+    palette.setColor(QtGui.QPalette.ColorRole.Link, QColor(42, 130, 218))
+    palette.setColor(QtGui.QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+    palette.setColor(QtGui.QPalette.ColorRole.HighlightedText, QtGui.QColor('black'))
 
+    # Disabled colors
+    palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.Text, QColor(127, 127, 127))
+    palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.ButtonText, QColor(127, 127, 127))
+    palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QColor(43, 43, 43))  # or #2b2b2b
+    palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
 
-    if G.args.device is None:
-        mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
-        master_rb = G.system_settings.get('masterInstance', 1)
-        
-        try:
-            d = mapping[master_rb]
-            G.device_usbpid = G.system_settings.get(f'pid{d.capitalize()}', "2055")
-            G.device_type = d
-        except KeyError:
-            G.device_usbpid = 2055
-            G.device_type = 'joystick'
+    app.setPalette(palette)
 
-        if not G.device_usbpid: # check empty string
-            G.device_usbpid = '2055'
-
-        G.device_usbvidpid = f"FFFF:{G.device_usbpid}"
-        G.args.type = G.device_type
+def _apply_custom_stylesheet(app):
+    """Apply custom stylesheet based on theme mode."""
+    if G.useDarkMode:
+        app.setStyleSheet(styles.DARK_MODE_STYLESHEET)
     else:
-        if G.args.type is None:
-            G.device_type = 'joystick'
-            G.args.type = G.device_type
-        else:
-            G.device_type = str.lower(G.args.type)
+        app.setStyleSheet(styles.LIGHT_MODE_STYLESHEET)
 
-        G.device_usbpid = G.args.device.split(":")[1]
-        G.device_usbvidpid = G.args.device
+def _determine_master_instance_status():
+    """
+    Determine if this instance should be the master based on device type.
 
+    Flow:
+    1. Map device types to indices
+    2. Compare current device with configured master device
+    3. Set master instance flag accordingly
 
-
-    G.system_settings = utils.SystemSettings()
-
-    G.args.sim = str.upper(G.args.sim)
-    G.args.type = str.lower(G.args.type)
-
-    # need to determine if someone has auto-launch enabled but has started an instance with -D
-    # The 'masterInstance' reg key holds the radio button index of the configured master instance
-    # 1=joystick, 2=pedals, 3=collective, 4=trimwheel
+    The master instance coordinates child instances and provides system tray interface.
+    """
     index_dict = {
         'joystick': 1,
         'pedals': 2,
@@ -230,360 +271,99 @@ def main():
     else:
         G.master_instance = False
 
-    sys.path.insert(0, '')
-    # sys.path.append('/simconnect')
+def _setup_config_paths():
+    """
+    Setup configuration file paths based on build type and mode.
 
-    version = utils.get_version()
-
-    min_firmware_version = 'v1.0.17'
-
-    dev_serial = None
-
+    Flow:
+    1. Set defaults path from resources
+    2. Configure logo based on build type and theme
+    3. Setup userconfig paths for dev vs production
+    4. Handle dev userconfig copying if needed
+    """
     G.defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
 
     if G.dev_build:
         G.vpf_logo = ":/image/DEVlogo.png"
         if G.dev_userconfig:
-            # manage userconfig in local running directory to avoid interfering with production userconfig
-            real_userconfig_path = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-            real_userconfig = os.path.join(real_userconfig_path, 'userconfig.xml')
-            if getattr(sys, 'frozen', False):
-                # Running as a bundled executable with PyInstaller
-                G.userconfig_rootpath = os.path.dirname(sys.executable)
-            else:
-                # Running as a standard Python script
-                G.userconfig_rootpath = os.path.dirname(os.path.abspath(__file__))
-            G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
-            if not os.path.isfile(G.userconfig_path):
-                shutil.copy(real_userconfig, G.userconfig_path)
+            _setup_dev_userconfig_paths()
         else:
-            G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-            G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
+            _setup_standard_config_paths()
     else:
         if G.useDarkMode:
             G.vpf_logo = ":/image/vpforcelogo_dm.png"
         else:
             G.vpf_logo = ":/image/vpforcelogo.png"
-        G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-        G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
+        _setup_standard_config_paths()
 
-    utils.create_empty_userxml_file(G.userconfig_path)
+def _setup_dev_userconfig_paths():
+    """Setup development userconfig paths."""
+    real_userconfig_path = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
+    real_userconfig = os.path.join(real_userconfig_path, 'userconfig.xml')
 
-    if G.is_exe:
-        appmode = 'Executable'
+    if getattr(sys, 'frozen', False):
+        G.userconfig_rootpath = os.path.dirname(sys.executable)
     else:
-        appmode = 'Source'
+        G.userconfig_rootpath = os.path.dirname(os.path.abspath(__file__))
 
-    logging.info("**************************************")
-    logging.info("**************************************")
-    logging.info(f"*****    TelemFFB version {version}: starting up from {appmode}:  Args= {G.args.__dict__}")
-    logging.info("**************************************")
-    logging.info("**************************************")
+    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
+    if not os.path.isfile(G.userconfig_path):
+        shutil.copy(real_userconfig, G.userconfig_path)
 
-    if G.args.teleplot:
-        logging.info(f"Using {G.args.teleplot} for plotting")
-        utils.teleplot.configure(G.args.teleplot)
+def _setup_standard_config_paths():
+    """Setup standard configuration paths."""
+    G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
+    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
 
-    def excepthook(exc_type, exc_value, exc_tb):
-        if exc_type == KeyboardInterrupt:
-            utils.exit_application()
-
-        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        sys.stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
-        #QtWidgets.QApplication.quit()
-        # or QtWidgets.QApplication.exit(0)
-    sys.excepthook = excepthook
-
-    if G.useDarkMode:
-        app.setStyleSheet(
-            """
-            QPushButton:!pressed, #styledButton:!pressed {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                                  stop: 0 #e4a9e7, stop: 0.2 #c174e6,
-                                                  stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
-                border-radius: 5px;
-                padding: 3px;
-                margin: 0px;
-                color: white;
-                border: 1px solid #6e1d6f; /* Existing border */
+def _initialize_device_connection():
+    """
+    Initialize connection to the Rhino device and check firmware.
     
-            }
+    Flow:
+    1. Parse USB VID/PID from configuration
+    2. Enumerate all available Rhino devices
+    3. Attempt to connect to specified device
+    4. Validate firmware version meets requirements
+    5. Extract device identity and serial number
     
-            QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                                  stop: 0 #e1e1e1, stop: 0.2 #cccccc,
-                                                  stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
-                color: #666666;  /* Set the text color for disabled buttons */
-                border-radius: 5px;
-                padding: 3px;
-                margin: 0px;
-                border: 1px solid #999999; /* Existing border */
-    
-            }
-    
-            QPushButton:pressed, #styledButton:pressed {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                                  stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
-                                                  stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7); /* Inverted gradient */
-                border-radius: 5px;
-                padding: 3px;
-                margin: 0px;
-                color: white;
-                border: 1px solid #4e164e; /* Darker border to indicate pressed state */
-            }
-    
-            QPushButton:hover:!pressed, #styledButton:hover:!pressed {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                                  stop: 0 #f0b0f0, stop: 0.2 #d897d8,
-                                                  stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
-                border-radius: 5px;
-                padding: 3px;
-                margin: 0px;
-                border: 1px solid #8e1da8; /* Existing border */
-    
-            }
-            
-             QLineEdit, QPlainTextEdit, QTextEdit {
-                background-color: #3a3a3a;
-                color: #ffffff;
-                selection-background-color: #ab37c8;  /* Set the highlight color for selected text */
-            }
-            
-            QSlider::handle:horizontal {
-                background: #ab37c8; /* Set the handle color */
-                border: 1px solid #565a5e;
-                width: 16px;  /* Adjusted handle width */
-                height: 20px;  /* Adjusted handle height */
-                border-radius: 5px;  /* Adjusted border radius */
-                margin-top: -5px;  /* Negative margin to overlap with groove */
-                margin-bottom: -5px;  /* Negative margin to overlap with groove */
-                margin-left: -1px;  /* Adjusted left margin */
-                margin-right: -1px;  /* Adjusted right margin */
-            }
-    
-            QSlider::handle:horizontal:disabled {
-                background: #888888; /* Set the color of the handle when disabled */
-            }
-                        
-            QSlider::groove:horizontal {
-                border: 1px solid #333333;
-                height: 8px;  /* Adjusted groove height */
-                background: qlineargradient(
-                    x1: 0, y1: 0, x2: 0, y2: 1,
-                    stop: 0 #5a5a5a, stop: 1 #3e3e3e
-                );
-            margin: 0;
-            border-radius: 3px;  /* Adjusted border radius */
-            }
-
-            QMenuBar {
-                background-color: #353535;
-                color: #dddddd;
-            }
-                        
-            QMenuBar::item:selected {
-                background-color: #ab37c8;
-                color: white;
-            }
-            
-            QMenuBar::item:pressed {
-                background-color: #ab37c8;
-                color: white;
-            }
-            
-            /* QMenu (the dropdown menu) */
-            QMenu {
-                background-color: #2b2b2b;
-                color: #dddddd;
-                border: 1px solid #444444;
-            }
-            
-            QMenu::item {
-                padding: 6px 20px;
-                background-color: transparent;
-            }
-            
-            QMenu::item:selected {
-                background-color: #ab37c8;
-                color: white;
-            }
- /*                       
-            QWidget {
-                background-color: #2b2b2b;
-                color: #dddddd;
-                selection-background-color: #5e3c88; /* for consistency */
-            }
-*/
-            QFrame {
-                background-color: #2b2b2b;
-                color: #dddddd;
-            }
-            
-            QComboBox {
-                background-color: #3a3a3a;
-                color: white;
-                border: 1px solid #999;
-            }
-           
-            QComboBox QAbstractItemView {
-                background-color: #2b2b2b;
-            }
-
-            QCheckBox {
-                color: white; /* Text color */
-                spacing: 5px;
-            }
-            
-            QCheckBox::indicator {
-                border: 1px solid #888;
-                background-color: transparent;
-                border-radius: 3px;
-            }
-            
-            QCheckBox::indicator:checked {
-                background-color: #ab37c8; /* Checked box color */
-                border: 1px solid #c174e6;
-            }
-            
-            QCheckBox::indicator:unchecked:hover {
-                border: 1px solid #ab37c8;
-            }
-            
-            QCheckBox::indicator:disabled {
-                background-color: #444;
-                border: 1px solid #666;
-            }
-
-            """
-        )
-    else:
-        app.setStyleSheet("""
-        QPushButton:!pressed, #styledButton:!pressed {
-            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                              stop: 0 #e4a9e7, stop: 0.2 #c174e6,
-                                              stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
-            border-radius: 5px;
-            padding: 3px;
-            margin: 0px;
-            color: white;
-            border: 1px solid #6e1d6f;
-        }
-
-        QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
-            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                              stop: 0 #e1e1e1, stop: 0.2 #cccccc,
-                                              stop: 0.5 #bbbbbb, stop: 0.8 #aaaaaa, stop: 1.0 #999999);
-            color: #666666;
-            border-radius: 5px;
-            padding: 3px;
-            margin: 0px;
-            border: 1px solid #999999;
-        }
-
-        QPushButton:pressed, #styledButton:pressed {
-            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                              stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
-                                              stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7);
-            border-radius: 5px;
-            padding: 3px;
-            margin: 0px;
-            color: white;
-            border: 1px solid #4e164e;
-        }
-
-        QPushButton:hover:!pressed, #styledButton:hover:!pressed {
-            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                              stop: 0 #f0b0f0, stop: 0.2 #d897d8,
-                                              stop: 0.5 #c07ec0, stop: 0.8 #a965a9, stop: 1.0 #914b91);
-            border-radius: 5px;
-            padding: 3px;
-            margin: 0px;
-            border: 1px solid #8e1da8;
-        }
-
-        QLineEdit, QPlainTextEdit, QTextEdit {
-            selection-background-color: #ab37c8;
-        }
-
-        QSlider::handle:horizontal {
-            background: #ab37c8;
-            border: 1px solid #565a5e;
-            width: 16px;
-            height: 20px;
-            border-radius: 5px;
-            margin-top: -5px;
-            margin-bottom: -5px;
-            margin-left: -1px;
-            margin-right: -1px;
-        }
-
-        QSlider::handle:horizontal:disabled {
-            background: #888888;
-        }
-
-        QSlider::groove:horizontal {
-            border: 1px solid #565a5e;
-            height: 8px;
-            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                        stop: 0 #e6e6e6, stop: 1 #bfbfbf);
-            margin: 0;
-            border-radius: 3px;
-        }
-
-        QMenuBar {
-            background-color: #f0f0f0;
-        }
-
-        QMenu::item {
-            background-color: transparent;
-        }
-
-        QMenu::item:selected {
-            color: white;
-            background-color: #ab37c8;
-        }
-        """)
-
-    G.log_window = LogWindow()
-    init_logging(G.log_window.widget)
-    G.log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
-
-    xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
-    try:
-        G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path,
-                                        defaults_path=G.defaults_path, system_settings=G.system_settings)
-    except Exception:
-        logging.exception("Error Reading user config file..")
-        ans = QMessageBox.question(None, "User Config Error", "There was an error reading the userconfig.  The file is likely corrupted.\n\nDo you want to back-up the existing config and create a new default (empty) config?\n\nIf you chose No, TelemFFB will exit.")
-        if ans == QMessageBox.StandardButton.Yes:
-            # Get the current timestamp
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-
-            # Create the backup file name with the timestamp
-            backup_file = os.path.join(G.userconfig_rootpath, ('userconfig_' + os.environ['USERNAME'] + "_" + timestamp + '_corrupted.bak'))
-
-            # Copy the file to the backup file
-            shutil.copy(G.userconfig_path, backup_file)
-
-            logging.debug(f"Backup created: {backup_file}")
-
-            os.remove(G.userconfig_path)
-            utils.create_empty_userxml_file(G.userconfig_path)
-
-            logging.info(f"User config Reset:  Backup file created: {backup_file}")
-            G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
-            QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
-        else:
-            QCoreApplication.instance().quit()
-            return
-
-    logging.info(f"TelemFFB (version {version}) Starting")
+    Returns:
+        tuple: (device_object, serial_number, firmware_version)
+    """
+    min_firmware_version = 'v1.0.17'
+    dev_serial = None
+    dev_firmware_version = 'ERROR'
+    dev = None
 
     try:
         vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
     except Exception:
-        pass
+        return dev, dev_serial, dev_firmware_version
 
+    _enumerate_and_log_devices()
+
+    try:
+        dev = HapticEffect.open(vid_pid[0], vid_pid[1])
+        if G.args.reset:
+            dev.reset_effects()
+        dev_firmware_version = dev.get_firmware_version()
+        dev_serial = dev.serial
+
+        if dev_firmware_version:
+            logging.info(f"Rhino Firmware: {dev_firmware_version}")
+            _check_firmware_version(dev_firmware_version, min_firmware_version)
+
+        G.device_ident = dev.info.ident
+
+    except Exception as e:
+        logging.exception("Exception")
+        QMessageBox.warning(None, "Cannot connect to Rhino",
+                          f"Unable to open HID at {G.device_usbvidpid} for device: {G.device_type}\nError: {e}\n\n"
+                          "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
+
+    return dev, dev_serial, dev_firmware_version
+
+def _enumerate_and_log_devices():
+    """Enumerate and log available Rhino devices."""
     devs = FFBRhino.enumerate()
     logging.info("Available Rhino Devices:")
     logging.info("-------")
@@ -593,33 +373,21 @@ def main():
         logging.info(f"* Path:{devinfo.path}")
         logging.info(f"*")
         if G.master_instance:
-            pid = int(f"{devinfo.product_id:04X}")
-            G.instance_dev_dict[pid] = {}
-            G.instance_dev_dict[pid]["ident"] = devinfo.product_string.replace("Rhino FFB ", "").strip()
-            G.instance_dev_dict[pid]["serial"] = devinfo.serial_number
+            G.instance_dev_dict[devinfo.product_id] = devinfo
+
     logging.info("-------")
 
-    try:
-        dev = HapticEffect.open(vid_pid[0], vid_pid[1])  # try to open RHINO
-        if G.args.reset:
-            dev.reset_effects()
-        dev_firmware_version = dev.get_firmware_version()
-        dev_serial = dev.serial
-        if dev_firmware_version:
-            logging.info(f"Rhino Firmware: {dev_firmware_version}")
-            minver = re.sub(r'\D', '', min_firmware_version)
-            devver = re.sub(r'\D', '', dev_firmware_version)
-            if devver < minver:
-                QMessageBox.warning(None, "Outdated Firmware", f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\nThe current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
-        G.device_ident = dev.info.product_string.replace("Rhino FFB ", "").strip()
-        # logging.info(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! >{G.device_ident}<")
-    except Exception as e:
-        logging.exception("Exception")
-        QMessageBox.warning(None, "Cannot connect to Rhino", f"Unable to open HID at {G.device_usbvidpid} for device: {G.device_type}\nError: {e}\n\nPlease open the System Settings and verify the Master\ndevice PID is configured correctly")
-        dev_firmware_version = 'ERROR'
+def _check_firmware_version(dev_firmware_version, min_firmware_version):
+    """Check if device firmware version meets minimum requirements."""
+    minver = re.sub(r'\D', '', min_firmware_version)
+    devver = re.sub(r'\D', '', dev_firmware_version)
+    if devver < minver:
+        QMessageBox.warning(None, "Outdated Firmware",
+                          f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\n"
+                          f"The current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
 
-    # config = get_config()
-    # ll = config["system"].get("logging_level", "INFO")
+def _setup_logging_level():
+    """Configure logging level based on system settings."""
     ll = G.system_settings.get('logLevel', 'INFO')
     log_levels = {
         "DEBUG": logging.DEBUG,
@@ -632,12 +400,64 @@ def main():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
+def _initialize_settings_manager():
+    """
+    Initialize the settings manager with error handling for corrupted config.
 
-    G.telem_manager = TelemManager()
-    G.telem_manager.start()
-    G.sim_listeners = SimListenerManager()
-    G.main_window = MainWindow()
+    Flow:
+    1. Update XML variables with current device/paths
+    2. Attempt to create settings manager
+    3. If corruption detected, offer backup/reset option
+    4. Create new default config if user agrees
+    """
+    xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
+    try:
+        G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type,
+                                      userconfig_path=G.userconfig_path,
+                                      defaults_path=G.defaults_path,
+                                      system_settings=G.system_settings)
+    except Exception:
+        logging.exception("Error Reading user config file..")
+        _handle_corrupted_config()
 
+def _handle_corrupted_config():
+    """Handle corrupted configuration file with user interaction."""
+    ans = QMessageBox.question(None, "User Config Error",
+                             "There was an error reading the userconfig.  The file is likely corrupted.\n\n"
+                             "Do you want to back-up the existing config and create a new default (empty) config?\n\n"
+                             "If you chose No, TelemFFB will exit.")
+    if ans == QMessageBox.StandardButton.Yes:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M')
+        backup_file = os.path.join(G.userconfig_rootpath,
+                                 f'userconfig_{os.environ["USERNAME"]}_{timestamp}_corrupted.bak')
+
+        shutil.copy(G.userconfig_path, backup_file)
+        logging.debug(f"Backup created: {backup_file}")
+
+        os.remove(G.userconfig_path)
+        utils.create_empty_userxml_file(G.userconfig_path)
+
+        logging.info(f"User config Reset:  Backup file created: {backup_file}")
+        G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type,
+                                      userconfig_path=G.userconfig_path,
+                                      defaults_path=G.defaults_path,
+                                      system_settings=G.system_settings)
+        QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
+    else:
+        QCoreApplication.instance().quit()
+        return
+
+def _setup_ipc_and_connections():
+    """
+    Setup IPC network thread and connect all signals.
+
+    Flow:
+    1. Create IPC network thread for inter-instance communication
+    2. Connect all IPC signals to appropriate handlers
+    3. Start IPC thread for message processing
+
+    Enables master-child coordination and remote control capabilities.
+    """
     G.ipc_instance = IPCNetworkThread(dstport=G.args.masterport)
     G.ipc_instance.child_keepalive_signal.connect(G.main_window.update_child_status)
     G.ipc_instance.exit_signal.connect(exit_application)
@@ -652,16 +472,16 @@ def main():
     G.ipc_instance.reload_aircraft_signal.connect(G.main_window.force_reload_aircraft)
     G.ipc_instance.start()
 
+def _setup_device_button_connections():
+    """Setup device button event connections."""
     try:
         HapticEffect.device.buttonPressed.connect(G.main_window.get_active_buttons)
         HapticEffect.device.buttonReleased.connect(G.main_window.get_active_buttons)
     except:
         pass
 
-    launch_children()
-
-    # log_tail_window = LogTailWindow(window)
-
+def _handle_window_display(headless_mode):
+    """Handle initial window display based on configuration."""
     if not headless_mode:
         if G.args.minimize or G.system_settings.get('masterStartMin', False):
             G.main_window.showMinimized()
@@ -671,28 +491,26 @@ def main():
         else:
             G.main_window.show()
 
-    # autoconvert_config(G.main_window, utils.get_resource_path('config.ini'), utils.get_legacy_override_file())
+def _check_version_update():
+    """Check for version updates if not release or dev build."""
     if not G.release_version and not G.dev_build:
         utils.FetchLatestVersion(G.main_window.update_version_result,
                                 lambda error_message: logging.error("Error in thread: %s", error_message))
 
-
-    if G.master_instance:
-        G.main_window.setup_master_instance()
-
+def _check_system_settings_required():
+    """Check if system settings dialog should be opened."""
     if (not G.system_settings.get("pidJoystick", None) and
         not G.system_settings.get("pidPedals", None) and
         not G.system_settings.get("pidCollective", None) and
-        not G.system_settings.get("pidTrimWheel", None) ):
+        not G.system_settings.get("pidTrimWheel", None)):
         G.main_window.open_system_settings_dialog()
 
-    # G.telem_manager.telemetryTimeout.connect(lambda state: G.main_window.update_sim_indicators(G.telem_manager.getTelemValue("src"), state))
-
-    # do some init in the background not blocking the main window first appearance
+def _setup_async_initialization(dev, dev_serial):
+    """Setup background initialization that doesn't block main window appearance."""
     @utils.threaded()
     def init_async():
         try:
-            G.startup_configurator_gains = dev.get_gains()  # capture the gains at TelemFFB startup before any startup vpconf was pushed
+            G.startup_configurator_gains = dev.get_gains()
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
@@ -703,39 +521,236 @@ def main():
                 logging.exception("Unable to set VPConfigurator startup profile")
 
         try:
-            G.vpconf_configurator_gains = dev.get_gains() # capture the gains here to use as reversion baseline any time a vpconf is pushed
-            # utils.dbprint("green", f"Gains: {G.vpconf_configurator_gains}")
+            G.vpconf_configurator_gains = dev.get_gains()
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
     init_async()
 
-    G.sim_listeners.start_all()
+def _cleanup_on_exit(dev_serial):
+    """
+    Handle cleanup operations when application exits.
 
-    app.exec()
-
+    Flow:
+    1. Notify child instances to close
+    2. Stop IPC communication
+    3. Stop all simulation listeners
+    4. Quit telemetry manager
+    5. Apply exit VPConfigurator profile if configured
+    6. Reset device gains to startup values if configured
+    """
     if G.ipc_instance:
         G.ipc_instance.notify_close_children()
         G.ipc_instance.stop()
 
     G.sim_listeners.stop_all()
     G.telem_manager.quit()
+
     if G.system_settings.get('enableVPConfExit', False):
-        ## Push the exit configurator profile if one is configured
         try:
             set_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
+
     if G.system_settings.get('enableResetGainsExit', False):
         try:
-            ## Last we push the gains we read at startup as good measure in case they were changed and never reverted by
-            ## a model change
             G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
         except:
             pass
 
+def main():
+    """
+    Main application entry point and initialization flow.
 
-def init_logging(log_widget : QPlainTextEdit):
+    This function orchestrates the complete startup sequence:
+    - Sets up Qt application and basic configuration
+    - Determines master/child instance status
+    - Initializes device connections and validates firmware
+    - Sets up logging, telemetry, and UI components
+    - Starts background services and displays the main window
+    - Handles the application event loop until exit
+    """
+    # ============================================================================
+    # PHASE 1: Qt Application and Basic Setup
+    # ============================================================================
+    #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute. AA_EnableHighDpiScaling, True) #enable highdpi scaling
+    #QApplication.setAttribute(QtCore.Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)  #use highdpi icons
+
+    dev : FFBRhino = None
+
+    # Initialize Qt application with Fusion style for consistent cross-platform appearance
+    app = QApplication(sys.argv)
+    app.setStyle('fusion')  # Set Fusion style
+
+    # ============================================================================
+    # PHASE 2: Command Line Arguments and Instance Management
+    # ============================================================================
+    # Parse command line arguments to determine device type, ports, and operation mode
+    G.args = CmdLineArgs.parse()
+    G.is_exe = getattr(sys, 'frozen', False)
+    headless_mode = G.args.headless
+    G.master_instance = not G.args.child
+
+    # Ensure only one master instance can run at a time using named mutex
+    if G.master_instance:
+        _check_master_instance_mutex()
+
+    # ============================================================================
+    # PHASE 3: System Configuration and Device Setup
+    # ============================================================================
+    # Set child instance flag and load system-wide settings
+    G.child_instance = G.args.child
+    G.system_settings = utils.SystemSettings()
+
+    # Configure application theme (light/dark/system) and apply custom styling
+    _setup_theme_and_styling(app)
+
+    # Determine device type and USB VID/PID based on args or system settings
+    _setup_device_configuration()
+
+    # Determine if this instance should be the master based on device type
+    _determine_master_instance_status()
+
+    # ============================================================================
+    # PHASE 4: Version Info and Path Setup
+    # ============================================================================
+    sys.path.insert(0, '')
+    # sys.path.append('/simconnect')
+
+    # Get application version and initialize device serial tracking
+    version = utils.get_version()
+    dev_serial = None
+
+    # Setup configuration file paths (dev vs production, userconfig locations)
+    _setup_config_paths()
+    utils.create_empty_userxml_file(G.userconfig_path)
+
+    # Determine if running from executable or source for logging
+    if G.is_exe:
+        appmode = 'Executable'
+    else:
+        appmode = 'Source'
+
+    # ============================================================================
+    # PHASE 5: Logging and Debug Setup
+    # ============================================================================
+    # Log startup banner with version and configuration info
+    logging.info("**************************************")
+    logging.info("**************************************")
+    logging.info(f"*****    TelemFFB version {version}: starting up from {appmode}:  Args= {G.args.__dict__}")
+    logging.info("**************************************")
+    logging.info("**************************************")
+
+    # Setup teleplot integration for real-time plotting if specified
+    if G.args.teleplot:
+        logging.info(f"Using {G.args.teleplot} for plotting")
+        utils.teleplot.configure(G.args.teleplot)
+
+    # Configure global exception handler for better error reporting
+    def excepthook(exc_type, exc_value, exc_tb):
+        if exc_type == KeyboardInterrupt:
+            utils.exit_application()
+
+        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        sys.stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
+        #QtWidgets.QApplication.quit()
+        # or QtWidgets.QApplication.exit(0)
+    sys.excepthook = excepthook
+
+    # ============================================================================
+    # PHASE 6: UI and Logging Window Setup
+    # ============================================================================
+    # Apply final styling and create log window for debug output
+    _apply_custom_stylesheet(app)
+
+    # Initialize log window and redirect stdout/stderr for capture
+    G.log_window = LogWindow()
+    _init_logging(G.log_window.widget)
+    G.log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
+
+    # ============================================================================
+    # PHASE 7: Settings and Configuration Management
+    # ============================================================================
+    # Initialize settings manager with error handling for corrupted configs
+    _initialize_settings_manager()
+
+    logging.info(f"TelemFFB (version {version}) Starting")
+
+    # ============================================================================
+    # PHASE 8: Device Connection and Firmware Validation
+    # ============================================================================
+    # Connect to Rhino FFB device and validate firmware version
+    dev, dev_serial, dev_firmware_version = _initialize_device_connection()
+
+    # Set logging level based on system settings
+    _setup_logging_level()
+
+    # ============================================================================
+    # PHASE 9: Core Component Initialization
+    # ============================================================================
+    # Initialize telemetry manager for handling sim data
+    G.telem_manager = TelemManager()
+    G.telem_manager.start()
+
+    # Initialize simulation listener manager for multiple sim support
+    G.sim_listeners = SimListenerManager()
+
+    # Create main application window
+    G.main_window = MainWindow()
+
+    # ============================================================================
+    # PHASE 10: Inter-Process Communication Setup
+    # ============================================================================
+    # Setup IPC for master-child instance communication and connect all signals
+    _setup_ipc_and_connections()
+
+    # Connect device button events to main window handlers
+    _setup_device_button_connections()
+
+    # ============================================================================
+    # PHASE 11: Child Instance Management (Master Only)
+    # ============================================================================
+    # Launch child instances if this is the master and auto-launch is enabled
+    _launch_children()
+
+    # ============================================================================
+    # PHASE 12: Window Display and UI Presentation
+    # ============================================================================
+    # Show main window based on configuration (minimized, tray, normal)
+    _handle_window_display(headless_mode)
+
+    # Check for version updates in background (non-release builds)
+    _check_version_update()
+
+    # Setup master-specific features (system tray, etc.)
+    if G.master_instance:
+        G.main_window.setup_master_instance()
+
+    # Prompt for system settings if no devices are configured
+    _check_system_settings_required()
+
+    # ============================================================================
+    # PHASE 13: Background Initialization
+    # ============================================================================
+    # Start background tasks that don't block UI appearance
+    _setup_async_initialization(dev, dev_serial)
+
+    # ============================================================================
+    # PHASE 14: Service Startup and Event Loop
+    # ============================================================================
+    # Start all simulation listeners to begin telemetry processing
+    G.sim_listeners.start_all()
+
+    # Enter Qt application event loop - application runs until user exits
+    app.exec()
+
+    # ============================================================================
+    # PHASE 15: Cleanup and Shutdown
+    # ============================================================================
+    # Perform cleanup operations when application exits
+    _cleanup_on_exit(dev_serial)
+
+def _init_logging(log_widget : QPlainTextEdit):
     log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
     
     sys.stdout = utils.OutLog(log_widget, sys.stdout)

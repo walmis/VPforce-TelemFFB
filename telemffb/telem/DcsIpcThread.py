@@ -18,14 +18,12 @@
 
 
 import logging
-import socket
 import threading
 from typing import Optional, Tuple, TYPE_CHECKING
-from libipc_ctypes import IPCChannel, ChannelType, ConnMode, IPCError, IPCStatus
+import zmq
 
 if TYPE_CHECKING:
     from telemffb.telem.TelemManager import TelemManager
-
 
 class DcsIpcThread(threading.Thread):
     def __init__(self, telemetry: 'TelemManager') -> None:
@@ -33,38 +31,78 @@ class DcsIpcThread(threading.Thread):
         assert telemetry is not None, "Telemetry manager must be provided"
         self._run: bool = False
         self._telem: 'TelemManager' = telemetry
-        self.recv_channel: IPCChannel
-        self.send_channel: IPCChannel
+        self.zmq_context: Optional[zmq.Context] = zmq.Context()
+        self.recv_socket: Optional[zmq.Socket] = None
+        self.send_socket: Optional[zmq.Socket] = None
+        DcsIpcThread._instance = self
+
+    def __del__(self) -> None:
+        """
+        Clean up ZMQ sockets and context when the instance is deleted.
+        """
+        self._cleanup_sockets()
+        if self.zmq_context:
+            self.zmq_context.destroy()
+            self.zmq_context = None
 
     @classmethod
     def send_commands(cls, command: str) -> None:
         """
-        Send a command to the DCS IPC channel.
+        Send a command to the DCS ZMQ channel.
         :param command: Command string to send.
         """
-        logging.error("DCS IPC send channel is not initialized.")
+        self = cls._instance
+        try:
+            if not self.send_socket:
+                self.send_socket = self.zmq_context.socket(zmq.PUB)
+                self.send_socket.connect("tcp://localhost:34385")
+
+            self.send_socket.send_string(command, zmq.NOBLOCK)
+        except zmq.Again:
+            logging.warning("Failed to send command: socket would block")
+        except zmq.ZMQError as e:
+            logging.error(f"Error sending command to DCS ZMQ channel: {e}")
+        except Exception as e:
+            logging.error(f"Unexpected error sending command to DCS ZMQ channel: {e}")
 
 
     def run(self) -> None:
         self._run = True
-        self.recv_channel: IPCChannel = IPCChannel(ChannelType.CHANNEL, "eu.vpforce.telemffb.telem", ConnMode.RECEIVER)
-        self.send_channel: IPCChannel = IPCChannel(ChannelType.CHANNEL, "eu.vpforce.telemffb.cmds", ConnMode.SENDER)
+        try:
+            if not self.recv_socket:
+                self.recv_socket = self.zmq_context.socket(zmq.SUB)
+                self.recv_socket.connect("tcp://localhost:34384")
+                self.recv_socket.setsockopt(zmq.SUBSCRIBE, b"")  # Subscribe to all messages
+                self.recv_socket.setsockopt(zmq.RCVTIMEO, 100)  # 100ms timeout
 
-        logging.info("Listening on DCS IPC channel")
-        
-        while self._run:
-            try:
-                packet : bytes = self.recv_channel.receive(100)
-                packet = packet.strip(b"\0")
-                self._telem.submit_frame(packet)
-            except IPCError as e:
-                if e.status_code == IPCStatus.ERROR_RECEIVE_FAILED:
+            logging.info("Listening on DCS ZMQ channel")
+            
+            while self._run:
+                try:
+                    packet = self.recv_socket.recv()
+                    packet = packet.strip(b"\0")
+                    self._telem.submit_frame(packet)
+                except zmq.Again:
                     continue
-                # Handle any exceptions that occur during IPC communication
-                logging.exception(f"Error receiving data from DCS IPC channel: {e.status_code}")
-                continue
+                except zmq.ZMQError as e:
+                    logging.exception(f"Error receiving data from DCS ZMQ channel: {e}")
+                    continue
+        finally:
+            self._cleanup_sockets()
 
     def quit(self) -> None:
         if self._run:
             logging.info("DcsIpcThread stopping")
             self._run = False
+
+    def _cleanup_sockets(self) -> None:
+        """Clean up ZMQ sockets and context."""
+        if self.recv_socket:
+            self.recv_socket.close()
+        if self.send_socket:
+            self.send_socket.close()
+        
+        self.send_socket = None
+        self.recv_socket = None
+
+

@@ -17,6 +17,7 @@
 #
 
 from typing import TYPE_CHECKING, Dict, Optional, Any
+
 if TYPE_CHECKING:
     # from PyQt5.QtCore import QSettings
     from .LogWindow import LogWindow
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
     from subprocess import Popen
     from telemffb.CmdLineArgs import CmdLineArgs
     from telemffb.ConfiguratorDialog import ConfiguratorDialog
+    from telemffb.hw.ffb_rhino import DeviceInfo
 
 # Application state
 is_exe: bool = False
@@ -72,7 +74,7 @@ gain_override_dialog: 'ConfiguratorDialog'
 
 # Instance management
 launched_instances : Dict[str, 'ChildPopen'] = {}
-instance_dev_dict : Dict[str, Any] = {}
+instance_dev_dict : Dict[int, 'DeviceInfo'] = {}
 master_instance : bool = False
 child_instance : bool = False
 ipc_instance : 'IPCNetworkThread'
