@@ -2019,7 +2019,7 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
             str: Device identifier
         """
         if G.master_instance:
-            return G.instance_dev_dict[pid].ident
+            return G.instance_dev_dict[int(str(pid), 16)].ident
         else:
             return G.device_ident
 
