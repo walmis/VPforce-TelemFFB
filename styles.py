@@ -150,6 +150,12 @@ QCheckBox::indicator:disabled {
     background-color: #444;
     border: 1px solid #666;
 }
+
+QLabel {
+    color: #dddddd;
+    background: transparent;
+}
+
 """
 
 LIGHT_MODE_STYLESHEET = """
