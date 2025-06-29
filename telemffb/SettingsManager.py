@@ -40,7 +40,6 @@ class SettingsManager:
         self.offline_mode = True
         self._online_mode_backup = {
             key: getattr(self, key) for key in [
-                'sim',
                 'current_sim',
                 'current_class',
                 'current_aircraft_name',
