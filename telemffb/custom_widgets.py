@@ -438,10 +438,10 @@ class EraseButton(QPushButton):
             self.csetting,
             self.cmodel,
             self.cunit))
-        if not G.current_offline_config_scope:
+        if not G.settings_mgr.offline_scope:
             menu.addAction(action1)
         else:
-            match G.current_offline_config_scope:
+            match G.settings_mgr.offline_scope:
                 case 'MODEL':
                     menu.addAction(action1)
                 case _:
@@ -454,10 +454,10 @@ class EraseButton(QPushButton):
             self.csetting,
             self.cmodel,
             self.cunit))
-        if not G.current_offline_config_scope:
+        if not G.settings_mgr.offline_scope:
             menu.addAction(action2)
         else:
-            match G.current_offline_config_scope:
+            match G.settings_mgr.offline_scope:
                 case 'MODEL':
                     menu.addAction(action2)
                 case 'CLASS':

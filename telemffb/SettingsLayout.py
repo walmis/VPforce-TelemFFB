@@ -1120,12 +1120,12 @@ class SettingsLayout(QGridLayout):
         erase_button.setVisible(False)
 
         replacematch = "Model (user)"
-        if G.offline_config_mode:
-            replacematch = G.current_offline_config_scope.lower() + " (user)"
+        if G.settings_mgr.offline_mode:
+            replacematch = G.settings_mgr.offline_scope.lower() + " (user)"
 
         if item['replaced'].lower() == replacematch:
             if item['name'] != 'type':  # dont erase type on mainwindow settings
-                logging.debug(f"show erase {G.current_offline_config_scope}")
+                logging.debug(f"show erase {G.settings_mgr.offline_scope}")
                 erase_button.setVisible(True)
                 erase_button.setToolTip("Reset to Default, Right-Click for more options")
 
@@ -1237,7 +1237,7 @@ class SettingsLayout(QGridLayout):
 
     def erase_setting(self, name):
         self.trigger_form_reload = True
-        logging.debug(G.current_offline_config_scope)
+        logging.debug(G.settings_mgr.offline_scope)
         logging.debug(f"Erase {name} clicked")
         xmlutils.erase_from_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, name, )
         if G.settings_mgr.timed_out:

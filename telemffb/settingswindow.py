@@ -242,7 +242,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_models.currentIndexChanged.connect(lambda index: self.update_table_on_model_change())
         self.pb_clear.clicked.connect(lambda: self.clear_selections())
         # create model setting button
-        self.b_createusermodel.clicked.connect(self.show_user_model_dialog)
+        # self.b_createusermodel.clicked.connect(self.show_user_model_dialog)
 
         # read prereqs
         self.prereq_list = xmlutils.read_prereqs()

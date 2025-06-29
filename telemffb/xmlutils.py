@@ -812,12 +812,12 @@ def update_data_with_models(defaults_data, model_data, replacetext):
 
     return updated_result
 
-def write_to_xml(sim, class_name, model, value, setting, unit='', the_device=''):
-    if not G.offline_config_mode:
+def write_to_xml(sim, class_name, model, value, setting, unit='', the_device='', scope='MODEL'):
+    if not G.settings_mgr.offline_mode:
         write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device)
         return
     else:
-        match G.current_offline_config_scope:
+        match G.settings_mgr.offline_scope:
             case 'SIM':
                 write_sim_to_xml(sim, value, setting, unit=unit, the_device=the_device)
             case 'CLASS':
@@ -828,11 +828,11 @@ def write_to_xml(sim, class_name, model, value, setting, unit='', the_device='')
                 pass
 
 def erase_from_xml(sim, class_name, model, setting, the_device=''):
-    if not G.offline_config_mode:
+    if not G.settings_mgr.offline_mode:
         erase_models_from_xml(sim, model, setting, the_device=the_device)
         return
     else:
-        match G.current_offline_config_scope:
+        match G.settings_mgr.offline_scope:
             case 'SIM':
                 erase_sim_from_xml(sim, setting,  the_device=the_device)
             case 'CLASS':

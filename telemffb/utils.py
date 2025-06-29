@@ -1975,7 +1975,7 @@ def load_custom_userconfig(new_path=""):
         _defaults_path=G.defaults_path,
     )
 
-    G.settings_mgr.init_ui()
+    # G.settings_mgr.init_ui()
 
     logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
 

@@ -233,17 +233,15 @@ class IPCNetworkThread(QThread):
                     state_str = msg.removeprefix('TOGGLE OFFLINE:')
                     state = state_str == 'True'
                     G.main_window.toggle_offline_mode(state)
-                elif msg.startswith("DBG_SELECT_SIM:"):
-                    sim = msg.removeprefix("DBG_SELECT_SIM:")
+                elif msg.startswith("OFFLINE_SIM:"):
+                    sim = msg.removeprefix("OFFLINE_SIM:")
                     G.main_window.offline_sim.setCurrentText(sim)
-                elif msg.startswith("DBG_SELECT_CLASS:"):
-                    class_name = msg.removeprefix("DBG_SELECT_CLASS:")
+                elif msg.startswith("OFFLINE_CLASS:"):
+                    class_name = msg.removeprefix("OFFLINE_CLASS:")
                     G.main_window.offline_class.setCurrentText(class_name)
-                elif msg.startswith("DBG_SELECT_AC:"):
-                    ac = msg.removeprefix("DBG_SELECT_AC:")
+                elif msg.startswith("OFFLINE_AC:"):
+                    ac = msg.removeprefix("OFFLINE_AC:")
                     G.main_window.offline_name.setCurrentText(ac)
-                elif msg == 'LOAD_DBG_AC':
-                    G.main_window.offline_button.click()
 
                 else:
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")

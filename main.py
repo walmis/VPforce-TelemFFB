@@ -52,7 +52,7 @@ from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino, HapticEffect
 from telemffb.IPCNetworkThread import IPCNetworkThread
 from telemffb.LogWindow import LogWindow
 from telemffb.MainWindow import MainWindow
-from telemffb.settingsmanager import SettingsWindow
+from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.SimTelemListener import SimListenerManager
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 #from telemffb.LogTailWindow import LogTailWindow
@@ -550,7 +550,7 @@ def main():
 
     xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
     try:
-        G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path, 
+        G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path,
                                         defaults_path=G.defaults_path, system_settings=G.system_settings)
     except Exception:
         logging.exception("Error Reading user config file..")
@@ -571,7 +571,7 @@ def main():
             utils.create_empty_userxml_file(G.userconfig_path)
 
             logging.info(f"User config Reset:  Backup file created: {backup_file}")
-            G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
+            G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type, userconfig_path=G.userconfig_path, defaults_path=G.defaults_path, system_settings=G.system_settings)
             QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
         else:
             QCoreApplication.instance().quit()

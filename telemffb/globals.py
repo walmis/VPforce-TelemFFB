@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from .LogWindow import LogWindow
     from .IPCNetworkThread import IPCNetworkThread
     from .utils import SystemSettings, ChildPopen
-    from .settingsmanager import SettingsWindow
+    from .SettingsManager import SettingsManager
     from .telem.TelemManager import TelemManager
     from .telem.SimTelemListener import SimListenerManager
     from telemffb.MainWindow import MainWindow
@@ -45,7 +45,7 @@ vpf_logo: str = ":/image/vpforcelogo.png"
 
 # UI components
 main_window :  'MainWindow' 
-settings_mgr : 'SettingsWindow' 
+settings_mgr : 'SettingsManager'
 log_window :   'LogWindow' 
 useDarkMode : bool = False
 

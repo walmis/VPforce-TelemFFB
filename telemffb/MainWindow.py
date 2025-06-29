@@ -424,7 +424,7 @@ class MainWindow(QMainWindow):
         cur_ac_lbl.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; }")
 
         self.cur_craft = QLabel()
-        self.cur_craft.setText('Unknown')
+        self.cur_craft.setText('None Detected')
         self.cur_craft.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
         self.cur_craft.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
@@ -1275,11 +1275,12 @@ class MainWindow(QMainWindow):
             self.offline_name.addItem(model_name)
         if G.master_instance:
             # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"DBG_SELECT_SIM:{self.offline_sim.currentText()}")
+            G.ipc_instance.send_broadcast_message(f"OFFLINE_SIM:{self.offline_sim.currentText()}")
 
-        G.current_offline_config_scope = 'SIM'  # set config scope to SIM
+        #G.current_offline_config_scope = 'SIM'  # set config scope to SIM
+        G.settings_mgr.offline_scope = 'SIM'  # set config scope to SIM
         self.cur_craft.setText('OFFLINE EDITING MODE')
-        self.cur_pattern.setText(f"{G.current_offline_config_scope}: {sim}")
+        self.cur_pattern.setText(f"{G.settings_mgr.offline_scope}: {sim}")
         self.force_sim_aircraft() # load settings based on sim
 
     def offline_class_changed(self, class_name):
@@ -1290,14 +1291,15 @@ class MainWindow(QMainWindow):
             self.offline_name.addItem(model_name)
         if G.master_instance:
             # send to child instances to mimic action
-            G.ipc_instance.send_broadcast_message(f"DBG_SELECT_CLASS:{self.offline_class.currentText()}")
+            G.ipc_instance.send_broadcast_message(f"OFFLINE_CLASS:{self.offline_class.currentText()}")
         if class_name == '':
             # reset back to sim mode if class field is cleared
             self.offline_sim_changed(self.offline_sim.currentText())
         else:
-            G.current_offline_config_scope = 'CLASS' # set config scope to CLASS
+            #G.current_offline_config_scope = 'CLASS' # set config scope to CLASS
+            G.settings_mgr.offline_scope = 'CLASS' # set config scope to CLASS
             self.cur_craft.setText('OFFLINE EDITING MODE')
-            self.cur_pattern.setText(f"{G.current_offline_config_scope}: {class_name}")
+            self.cur_pattern.setText(f"{G.settings_mgr.offline_scope}: {class_name}")
         self.force_sim_aircraft() # load settings based on class and currently selected sim
 
     def offline_aircraft_changed(self, ac_name=None):
@@ -1309,13 +1311,14 @@ class MainWindow(QMainWindow):
         if ac_name == '':
             self.offline_class_changed(self.offline_class.currentText())
         else:
-            G.current_offline_config_scope = 'MODEL'
+            #G.current_offline_config_scope = 'MODEL'
+            G.settings_mgr.offline_scope = 'MODEL'
             self.cur_craft.setText('OFFLINE EDITING MODE')
-            self.cur_pattern.setText(f"{G.current_offline_config_scope}: {ac_name}")
+            self.cur_pattern.setText(f"{G.settings_mgr.offline_scope}: {ac_name}")
 
         if G.master_instance:
-            G.ipc_instance.send_broadcast_message(f'DBG_SELECT_AC:{self.offline_name.currentText()}')
-            print(f"DBG_SELECT_AC:{self.offline_name.currentText()}")
+            G.ipc_instance.send_broadcast_message(f'OFFLINE_AC:{self.offline_name.currentText()}')
+            print(f"OFFLINE_AC:{self.offline_name.currentText()}")
 
         self.force_sim_aircraft()
 
@@ -1328,8 +1331,6 @@ class MainWindow(QMainWindow):
         self.monitor_widget.hide()
         self.settings_layout.reload_caller()
 
-        if G.master_instance:
-            G.ipc_instance.send_broadcast_message(f"LOAD_DBG_AC")
 
     def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None):
         wizard = NewAircraftWizard(parent=self, manual=manual, auto_sim=sim, auto_name=name, auto_cls=cls)
@@ -1481,37 +1482,53 @@ class MainWindow(QMainWindow):
                 pass
     def toggle_offline_mode(self, state):
         if not state:
-            self.offline_config_area.hide()
-            G.offline_config_mode = False
-            G.telem_manager.set_paused(False)
-            self.cur_craft.setText('Unknown')
+            # Exiting Offline editing mode
+            G.settings_mgr.go_online()
+            G.main_window.settings_layout.clear_layout()
+            self.cur_craft.setText('None Detected')
             self.cur_pattern.setText('(No Match)')
         else:
-            self.offline_config_area.show()
-            G.settings_mgr.current_sim = ''
-            G.settings_mgr.current_class = ''
-            G.settings_mgr.current_aircraft = ''
-            G.offline_config_mode = True
-            G.telem_manager.set_paused(True)
+            # Entering offline editing mode
+            G.settings_mgr.go_offline()
+
+            self.offline_name.blockSignals(True)
+            self.offline_class.blockSignals(True)
+            self.offline_name.blockSignals(True)
+            self.offline_name.clear()
+            self.offline_class.clear()
+            self.offline_sim.clear()
+            self.offline_name.blockSignals(False)
+            self.offline_class.blockSignals(False)
+            self.offline_name.blockSignals(False)
+
+            sims = [''] + xmlutils.get_sims()
+            self.offline_sim.addItems(sims)
+
+            self.cur_craft.setText('OFFLINE EDITING MODE')
+            self.cur_pattern.setText(f"Make Selection")
+            self.tab_widget.setCurrentIndex(1)
+
         self.offline_config_action.setChecked(state)
         if G.master_instance:
+            self.offline_config_area.setVisible(state)
+            utils.dbprint('red', f"DBG_TOGGLE_OFFLINE_MODE:{state}")
             G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
 
-    def toggle_settings_window(self, dbg=False):
-        try:
-            modifiers = QApplication.keyboardModifiers()
-            if ((modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier)) or dbg:
-                pass
-            else:
-                sm = G.settings_mgr
-                if sm.isVisible():
-                    sm.hide()
-                else:
-                    sm.move(self.x() + 50, self.y() + 100)
-                    sm.show()
-
-        except Exception:
-            traceback.print_exc()
+    # def toggle_settings_window(self, dbg=False):
+    #     try:
+    #         modifiers = QApplication.keyboardModifiers()
+    #         if ((modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier)) or dbg:
+    #             pass
+    #         else:
+    #             sm = G.settings_mgr
+    #             if sm.isVisible():
+    #                 sm.hide()
+    #             else:
+    #                 sm.move(self.x() + 50, self.y() + 100)
+    #                 sm.show()
+    #
+    #     except Exception:
+    #         traceback.print_exc()
 
     # def show_user_model_dialog(self):
     #     current_aircraft = self.cur_craft.text()

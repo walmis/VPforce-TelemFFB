@@ -346,7 +346,7 @@ class TelemManager(QObject, threading.Thread):
         self.currentAircraftConfig = params
 
         self._setup_simconnect_overrides(aircraft_name, data_source)
-        self._update_settings_ui()
+        # self._update_settings_ui()
         self.aircraftUpdated.emit()
 
     def _resolve_aircraft_class(self, aircraft_info: AircraftInfo, cls_name, params):
@@ -414,10 +414,10 @@ class TelemManager(QObject, threading.Thread):
                 self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
             self._simconnect._resubscribe()
 
-    def _update_settings_ui(self):
-        """Update settings UI if visible."""
-        if G.settings_mgr.isVisible():
-            G.settings_mgr.b_getcurrentmodel.click()
+    # def _update_settings_ui(self):
+    #     """Update settings UI if visible."""
+    #     if G.settings_mgr.isVisible():
+    #         G.settings_mgr.b_getcurrentmodel.click()
 
     def _handle_config_changes(self, aircraft_info: AircraftInfo):
         """Handle configuration changes for existing aircraft."""
