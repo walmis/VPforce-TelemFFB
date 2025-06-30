@@ -72,6 +72,7 @@ import stransi
 import telemffb.globals as G
 import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
+from .namedmutex import NamedMutex
 
 def dbprint(color, msg, instance=None):
     if instance is not None:
@@ -2157,9 +2158,18 @@ def set_vpconf_profile(config_filepath, serial):
             return
 
         logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
-
-        subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
         G.current_vpconf_profile = config_filepath
+
+        def exec():
+            # Use NamedMutex to ensure only one instance of the configurator is executed at a time
+            # This might help prevent issues with libusb race conditions when configurator tries to enumerate devices
+            with NamedMutex("vpconf_mutex", acquired=True):
+                ret = subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
+                logging.info(f"VPForce Configurator exited with code {ret}")
+
+        thread = threading.Thread(target=exec)
+        thread.start()
+
     else:
         logging.error("Unable to find VPforce Configurator installation location")
 
