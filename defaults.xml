@@ -723,7 +723,7 @@
 		<order>1100</order>
 		<name>dcs_tr_damper_enabled</name>
 		<displayname>Trim Release Damper</displayname>
-		<prereq>basic_group</prereq>
+		<prereq>spring_mode.NONE</prereq>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 	</defaults>
@@ -2678,22 +2678,6 @@
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
-		<datatype>convert</datatype>
-		<grouping>Acceleration</grouping>
-		<parentgroup>inertial</parentgroup>
-		<order>20099</order>
-		<name>gforce_effect_master</name>
-		<displayname>G-Force Effect</displayname>
-		<info>Master control for all G Effects</info>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<value>true</value>
-	</defaults>
-	<defaults>
-		<effecttype>constant</effecttype>
 		<datatype>enumlist</datatype>
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
@@ -2721,20 +2705,6 @@
 		<joystick>true</joystick>
 		<validvalues>DCS_IL2_G_EFFECT_MODE</validvalues>
 		<value>LEGACY</value>
-	</defaults>
-	<defaults>
-		<effecttype>constant</effecttype>
-		<datatype>convert</datatype>
-		<grouping>Acceleration</grouping>
-		<parentgroup>inertial</parentgroup>
-		<order>20110</order>
-		<name>gforce_effect_enable</name>
-		<displayname>G Force Effect (Legacy)</displayname>
-		<info>See manual for details</info>
-		<DCS>true</DCS>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
@@ -2802,22 +2772,6 @@
 		<sliderfactor>0.1</sliderfactor>
 		<validvalues>40,100</validvalues>
 		<value>7.0</value>
-	</defaults>
-	<defaults>
-		<effecttype>constant</effecttype>
-		<datatype>convert</datatype>
-		<grouping>Acceleration</grouping>
-		<parentgroup>inertial</parentgroup>
-		<order>20120</order>
-		<name>new_gforce_effect_enable</name>
-		<displayname>G Force Effect (Legacy **New**)</displayname>
-		<info>Alternate G Force Effec - Enabling will override legacy G Force Effect&lt;br&gt;&lt;br&gt;See manual for details</info>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
@@ -2893,21 +2847,6 @@
 		<joystick>true</joystick>
 		<validvalues>50,100</validvalues>
 		<value>1.0</value>
-	</defaults>
-	<defaults>
-		<effecttype>constant</effecttype>
-		<datatype>convert</datatype>
-		<grouping>Acceleration</grouping>
-		<parentgroup>inertial</parentgroup>
-		<order>20130</order>
-		<name>gforce_effect_advanced_enabled</name>
-		<displayname>Advanced G Force Effect</displayname>
-		<DCS>true</DCS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<IL2>true</IL2>
-		<joystick>true</joystick>
-		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
@@ -4784,6 +4723,49 @@
 	</defaults>
 	<defaults>
 		<order>89999</order>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<datatype>convert</datatype>
+		<grouping>Acceleration</grouping>
+		<parentgroup>inertial</parentgroup>
+		<order>91089</order>
+		<name>gforce_effect_advanced_enabled</name>
+		<displayname>Advanced G Force Effect</displayname>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<datatype>convert</datatype>
+		<grouping>Acceleration</grouping>
+		<parentgroup>inertial</parentgroup>
+		<order>91090</order>
+		<name>gforce_effect_master</name>
+		<displayname>G-Force Effect</displayname>
+		<info>Master control for all G Effects</info>
+		<value>true</value>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<datatype>convert</datatype>
+		<grouping>Acceleration</grouping>
+		<parentgroup>inertial</parentgroup>
+		<order>91091</order>
+		<name>gforce_effect_enable</name>
+		<displayname>G Force Effect (Legacy)</displayname>
+		<info>See manual for details</info>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<datatype>convert</datatype>
+		<grouping>Acceleration</grouping>
+		<parentgroup>inertial</parentgroup>
+		<order>91092</order>
+		<name>new_gforce_effect_enable</name>
+		<displayname>G Force Effect (Legacy **New**)</displayname>
+		<info>Alternate G Force Effec - Enabling will override legacy G Force Effect&lt;br&gt;&lt;br&gt;See manual for details</info>
+		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -7119,6 +7101,24 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spring_mode</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>!SASHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
 			<type>GliderAircraft</type>
 			<value>CENTER</value>
 			<sim>MSFS</sim>
@@ -8566,6 +8566,12 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>spring_mode</name>
+			<type>!Helicopter</type>
+			<sim>XPLANE</sim>
+			<device>any</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>spring_mode</name>
 			<type>GliderAircraft</type>
 			<value>CENTER</value>
 			<sim>XPLANE</sim>
@@ -9924,24 +9930,6 @@
 		<value>0.15</value>
 		<sim>any</sim>
 		<device>any</device>
-		</classdefaults_any>
-		<classdefaults_any>
-			<name>spring_mode</name>
-			<type>!Helicopter</type>
-			<sim>any</sim>
-			<device>any</device>
-		</classdefaults_any>
-		<classdefaults_any>
-			<name>spring_mode</name>
-			<type>!HPGHelicopter</type>
-			<sim>any</sim>
-			<device>any</device>
-		</classdefaults_any>
-		<classdefaults_any>
-			<name>spring_mode</name>
-			<type>!SASHelicopter</type>
-			<sim>any</sim>
-			<device>any</device>
 		</classdefaults_any>
 	<classdefaults_any>
 		<name>stall_aoa</name>
