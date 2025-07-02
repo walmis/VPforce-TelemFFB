@@ -175,10 +175,7 @@ class MainWindow(QMainWindow):
         system_settings_action.triggered.connect(self.open_system_settings_dialog)
         system_menu.addAction(system_settings_action)
 
-        self.offline_config_action = QAction('Edit Sim/Class Defaults && Offline Models', self)
-        self.offline_config_action.setCheckable(True)
-        self.offline_config_action.triggered.connect(self.toggle_offline_mode)
-        system_menu.addAction(self.offline_config_action)
+
 
 
 
@@ -218,6 +215,16 @@ class MainWindow(QMainWindow):
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
 
+        # Create "Profiles" menu
+        self.profiles_menu = self.menu.addMenu('Profiles')
+        self.offline_config_action = QAction('Enter Offline Profile\Sim Default\Class Default Mode', self)
+        # self.offline_config_action.setCheckable(True)
+        self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
+        self.profiles_menu.addAction(self.offline_config_action)
+
+        self.manual_new_aircraft_action = QAction('Manually add New Aircraft Profile', self)
+        self.manual_new_aircraft_action.triggered.connect(lambda: self.show_new_aircraft_wizard(manual=True))
+        self.profiles_menu.addAction(self.manual_new_aircraft_action)
         # Create the "Utilities" menu
         utilities_menu = self.menu.addMenu('Utilities')
 
@@ -565,14 +572,14 @@ class MainWindow(QMainWindow):
 
         # self.manual_add_button = QPushButton()
         # self.offline_button.setMaximumWidth(20)
-        self.manual_add_button.setText('Manually Add Aircraft')
-        self.manual_add_button.clicked.connect(self.show_new_aircraft_wizard)
+        # self.manual_add_button.setText('Manually Add Aircraft')
+        # self.manual_add_button.clicked.connect(self.show_new_aircraft_wizard)
 
         self.offline_button = QPushButton()
         # self.offline_button.setMaximumWidth(20)
         self.offline_button.setText('Exit Offline Mode')
         self.offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
-        bottom_row.addWidget(self.manual_add_button)
+        # bottom_row.addWidget(self.manual_add_button)
         bottom_row.addWidget(self.offline_button)
 
         # Combine both rows
@@ -1332,8 +1339,8 @@ class MainWindow(QMainWindow):
         G.settings_mgr.current_sim = self.offline_sim.currentText()
         G.settings_mgr.current_class = self.offline_class.currentText()
         G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
-        self.settings_layout.expanded_items.clear()
-        self.monitor_widget.hide()
+        # self.settings_layout.expanded_items.clear()
+        # self.monitor_widget.hide()
         self.settings_layout.reload_caller()
 
 
@@ -1486,78 +1493,49 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
     def toggle_offline_mode(self, state):
+        if state == G.settings_mgr.offline_mode:
+            # if already in the same state, do nothing
+            return
         if not state:
             # Exiting Offline editing mode
             G.settings_mgr.go_online()
+            # clear the layout after going back online
             G.main_window.settings_layout.clear_layout()
+            # reset the craft area text to default
             self.cur_craft.setText('None Detected')
             self.cur_pattern.setText('(No Match)')
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
-
+            # clear the layout in case an aircraft was previously loaded live
+            G.main_window.settings_layout.clear_layout()
+            # Block signals so we don't trigger text change on .clear() calls
             self.offline_name.blockSignals(True)
             self.offline_class.blockSignals(True)
             self.offline_name.blockSignals(True)
+            # clear contents of combo boxes so they can be repopulated
             self.offline_name.clear()
             self.offline_class.clear()
             self.offline_sim.clear()
+            # unblock signals
             self.offline_name.blockSignals(False)
             self.offline_class.blockSignals(False)
             self.offline_name.blockSignals(False)
-
+            # build sim list
             sims = [''] + xmlutils.get_sims()
             self.offline_sim.addItems(sims)
 
+            # modify current craft area text for offline mode
             self.cur_craft.setText('OFFLINE EDITING MODE')
             self.cur_pattern.setText(f"Make Selection")
+            # force the settings tab to be active
             self.tab_widget.setCurrentIndex(1)
 
-        self.offline_config_action.setChecked(state)
         if G.master_instance:
+            # Show the offline mode widgets, but only for master instance
             self.offline_config_area.setVisible(state)
-            utils.dbprint('red', f"DBG_TOGGLE_OFFLINE_MODE:{state}")
+            # Send command to chile instance to replicate actions
             G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
-
-    # def toggle_settings_window(self, dbg=False):
-    #     try:
-    #         modifiers = QApplication.keyboardModifiers()
-    #         if ((modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier)) or dbg:
-    #             pass
-    #         else:
-    #             sm = G.settings_mgr
-    #             if sm.isVisible():
-    #                 sm.hide()
-    #             else:
-    #                 sm.move(self.x() + 50, self.y() + 100)
-    #                 sm.show()
-    #
-    #     except Exception:
-    #         traceback.print_exc()
-
-    # def show_user_model_dialog(self):
-    #     current_aircraft = self.cur_craft.text()
-    #     dialog = UserModelDialog(G.settings_mgr.current_sim, current_aircraft, G.settings_mgr.current_class, self)
-    #     result = dialog.exec()
-    #     if result == QtWidgets.QDialog.DialogCode.Accepted:
-    #         # Handle accepted
-    #         new_aircraft = dialog.tb_current_aircraft.currentText()
-    #         if new_aircraft == current_aircraft:
-    #             qm = QMessageBox()
-    #             ret = qm.question(self, 'Create Match Pattern', "Are you sure you want to match on the\nfull aircraft name and not a search pattern?", qm.StandardButton.Yes | qm.StandardButton.No)
-    #             if ret == qm.StandardButton.No:
-    #                 return
-    #         new_combo_box_value = dialog.combo_box.currentText()
-    #         pat_to_clone = dialog.models_combo_box.currentText()
-    #         if pat_to_clone == '':
-    #             logging.info(f"New: {new_aircraft} {new_combo_box_value}")
-    #             xmlutils.write_models_to_xml(G.settings_mgr.current_sim, new_aircraft, new_combo_box_value, 'type', None)
-    #         else:
-    #             logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
-    #             xmlutils.clone_pattern(G.settings_mgr.current_sim, pat_to_clone, new_aircraft)
-    #     else:
-    #         # Handle canceled
-    #         pass
 
     def update_from_menu(self):
         if self.perform_update(auto=False):
