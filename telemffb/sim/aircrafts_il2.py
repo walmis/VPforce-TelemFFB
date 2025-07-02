@@ -40,7 +40,6 @@ import time
 from typing import List, Dict
 from telemffb.hw.ffb_rhino import HapticEffect, FFBReport_SetCondition
 import telemffb.utils as utils
-from telemffb.utils import SpringMode
 import telemffb.globals as G
 import logging
 import random
@@ -135,6 +134,8 @@ class Aircraft(AircraftBase):
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
         for e in effects.values(): e.destroy()
         effects.clear()
+
+        self.sprin_mode = self.SpringModeEnum.NONE.name
 
         # self.spring = HapticEffect().spring()
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)

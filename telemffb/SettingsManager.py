@@ -2,6 +2,8 @@ import logging
 import os
 import shutil
 from datetime import datetime
+from enum import Enum, auto
+
 import telemffb.globals as G
 from . import xmlutils
 
@@ -81,4 +83,67 @@ class SettingsManager:
                                    self.current_class)
         return cls, pattern, results
 
+    class SpringModeEnum(Enum):
+        NONE = auto()
+        BASIC = auto()
+        CENTER = auto()
+        ADVANCED = auto()
+        FBW = auto()
+        DEFAULT = auto()
+        NOSPRING = auto()
+        STATIC = auto()
+        DYNAMIC = auto()
+        CUSTOM = auto()
 
+    # used for both joystick and pedals
+    MSFS_XP_SPRING_MODE = {
+        SpringModeEnum.BASIC: "Basic Dynamic",
+        SpringModeEnum.CENTER: "Basic Dynamic with Spring Centering",
+        SpringModeEnum.FBW: "FlyByWire (FBW)",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+
+    DCS_IL2_PEDAL_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.NOSPRING: "No Spring (Free Floating)",
+        SpringModeEnum.STATIC: "Static Spring",
+        SpringModeEnum.DYNAMIC: "Dynamic Spring",
+        SpringModeEnum.CUSTOM: "Dynamic with Custom Speeds",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+    DCS_IL2_JOYSTICK_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+
+    DCS_HELI_JOYSTICK_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim"
+    }
+
+    TEST_SPRING_MODE = {
+        SpringModeEnum.BASIC: "TEST Dynamic",
+        SpringModeEnum.CENTER: "TEST Dynamic with Spring Centering",
+        SpringModeEnum.ADVANCED: "TEST Advanced Dynamic",
+        SpringModeEnum.FBW: "TEST (FBW)"
+    }
+
+    class GEffectModeEnum(Enum):
+        DISABLED = auto()
+        LEGACY = auto()
+        NEW = auto()
+        ADVANCED = auto()
+
+    MSFS_XP_G_EFFECT_MODE = {
+        GEffectModeEnum.DISABLED: "Disabled",
+        GEffectModeEnum.LEGACY: "Exponential Curve",
+        GEffectModeEnum.ADVANCED: "Custom Curve"
+    }
+
+    DCS_IL2_G_EFFECT_MODE = {
+        GEffectModeEnum.DISABLED: "Disabled",
+        GEffectModeEnum.LEGACY: "Exponential Curve",
+        GEffectModeEnum.NEW: "Linear + Deflection Based",
+        GEffectModeEnum.ADVANCED: "Custom Curve"
+    }

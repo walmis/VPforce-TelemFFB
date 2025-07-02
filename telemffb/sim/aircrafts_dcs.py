@@ -44,7 +44,6 @@ import time
 from telemffb import utils
 from telemffb.utils import overrides
 from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
-from telemffb.utils import SpringMode
 from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects, perftracker
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 #unit conversions (to m/s)
@@ -446,7 +445,7 @@ class Aircraft(AircraftBase):
 
     def override_spring(self):
         if not self.is_joystick(): return
-        if not self.spring_mode_is(SpringMode.CUSTOM):
+        if not self.spring_mode_is(self.SpringModeEnum.CUSTOM):
             # If feature disabled, ensure spring is stopped and abort
             effects['dcs_spr_override'].stop()
             return
@@ -639,7 +638,7 @@ class Helicopter(Aircraft):
 
     def update_tr_damper(self):
         if not self.is_joystick(): return
-        if not self.spring_mode_is(SpringMode.NONE): return  # only supported when spring mode is NONE (game managed)
+        if not self.spring_mode_is(self.SpringModeEnum.NONE): return  # only supported when spring mode is NONE (game managed)
         if not self.dcs_tr_damper_enabled: return
         if not self.dcs_tr_button:
             self.flag_error('Please configure the trim-release button.  It must match that which is bound as trim release in the sim.')

@@ -29,7 +29,6 @@ from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCo
 from telemffb.hw.ffb_rhino import EFFECT_SPRING,EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION, EFFECT_SPRING_ADJUSTER
 import telemffb.globals as G
 from telemffb.globals import master_instance, master_buttons
-from telemffb.utils import SpringMode, GEffectMode
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
@@ -336,9 +335,11 @@ class AircraftBase(object):
 
         self.friction_effect_overridden: bool = False
 
+        self.SpringModeEnum = G.settings_mgr.SpringModeEnum
+        self.GEffectModeEnum = G.settings_mgr.GEffectModeEnum
 
-        self.spring_mode = SpringMode.NONE.name
-        self.gforce_effect_mode = GEffectMode.DISABLED.name
+        self.spring_mode = self.SpringModeEnum.NONE.name
+        self.gforce_effect_mode = self.GEffectModeEnum.DISABLED.name
 
     def spring_mode_is(self, mode):
         return mode.name == self.spring_mode
@@ -653,7 +654,7 @@ class AircraftBase(object):
         Args:
             telem_data (dict): Telemetry data containing acceleration information
         """
-        if not self.is_joystick() or not self.gforce_mode_is(GEffectMode.NEW) or self.gforce_mode_is(GEffectMode.DISABLED):
+        if not self.is_joystick() or not self.gforce_effect_mode_is(self.GEffectModeEnum.NEW) or self.gforce_effect_mode_is(self.GEffectModeEnum.DISABLED):
             effects.dispose("new_gforce")
             return
         if sum(telem_data.get("WeightOnWheels")):
@@ -734,11 +735,11 @@ class AircraftBase(object):
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def _gforce_effect(self, telem_data, adv_spr=False):
-        if not self.gforce_mode_is(GEffectMode.DISABLED):
+        if self.gforce_effect_mode_is(self.GEffectModeEnum.DISABLED):
             effects.dispose('gforce')
             effects.dispose('new_gforce')
             return
-        if self.gforce_mode_is(GEffectMode.NEW):
+        if self.gforce_effect_mode_is(self.GEffectModeEnum.NEW):
             # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
             effects.dispose("gforce")
             self.new_gforce_effect(telem_data)
@@ -773,7 +774,7 @@ class AircraftBase(object):
 
         logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
 
-        if self.gforce_mode_is(GEffectMode.LEGACY):
+        if self.gforce_effect_mode_is(self.GEffectModeEnum.LEGACY):
             gmin = self.gforce_min_gs
             gmax = self.gforce_max_gs
             direction = 180
@@ -800,7 +801,7 @@ class AircraftBase(object):
 
             logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
-        elif self.gforce_mode_is(GEffectMode.ADVANCED):
+        elif self.gforce_effect_mode_is(self.GEffectModeEnum.ADVANCED):
             if self.gforce_effect_adv_curve == 'none':
                 self.flag_error('Please Configure the Advanced G-Force Effect Settings')
                 effects.dispose('adv_gforce_constant')
@@ -1453,7 +1454,7 @@ class AircraftBase(object):
 
     def _update_aoa_effect(self, telem_data, minspeed=50*kmh, maxspeed=140*kmh):
         if not self.is_joystick(): return
-        if self.spring_mode_is(SpringMode.FBW) or telem_data.get("ACisFBW"): return
+        if self.spring_mode_is(self.SpringModeEnum.FBW) or telem_data.get("ACisFBW"): return
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
         local_stall_aoa = self.stall_aoa
@@ -1836,16 +1837,16 @@ class AircraftBase(object):
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
 
-        if self.spring_mode_is(SpringMode.NONE):
+        if self.spring_mode_is(self.SpringModeEnum.NONE):
             if effects['pedal_spring'].started:
                 effects["pedal_spring"].stop()
             return
 
-        if self.spring_mode_is(SpringMode.NOSPRING):
+        if self.spring_mode_is(self.SpringModeEnum.NOSPRING):
             self.spring_x.positiveCoefficient = 0
             self.spring_x.negativeCoefficient = 0
 
-        elif self.spring_mode_is(SpringMode.STATIC):
+        elif self.spring_mode_is(self.SpringModeEnum.STATIC):
             if self.pedal_force_trim_enabled:
                 if not self._update_pedal_force_trim(telem_data):
                     spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
@@ -1856,7 +1857,7 @@ class AircraftBase(object):
                 if self.pedal_trimming_enabled and self._sim_is_dcs():
                     self._update_pedal_trim(telem_data)
 
-        elif self.spring_mode_is(SpringMode.DYNAMIC) or self.spring_mode_is(SpringMode.CUSTOM):
+        elif self.spring_mode_is(self.SpringModeEnum.DYNAMIC) or self.spring_mode_is(self.SpringModeEnum.CUSTOM):
             tas = telem_data.get("TAS", 0)
 
             vs = self.aircraft_vs_speed
@@ -1968,7 +1969,7 @@ class AircraftBase(object):
         spring.start(override=True)
 
     def modify_game_spring(self):
-        if not self.spring_mode_is(SpringMode.ADVANCED):
+        if not self.spring_mode_is(self.SpringModeEnum.ADVANCED):
             self.spring_adjuster.stop()
             return
         if self.adv_spr_gains == 'none':

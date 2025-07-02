@@ -46,7 +46,6 @@ from time import sleep
 from typing import Dict, List
 import telemffb.globals as G
 import telemffb.utils as utils
-from telemffb.utils import SpringMode
 from telemffb.hw.ffb_rhino import (FFBReport_Input, FFBReport_SetCondition,
                                    HapticEffect)
 from telemffb.sim.aircraft_base import AircraftBase, HPFs, LPFs, effects
@@ -266,7 +265,7 @@ class Aircraft(AircraftBase):
 
         self.vne_override = 0
 
-        self.spring_mode = SpringMode.BASIC.name
+        self.spring_mode = self.SpringModeEnum.BASIC.name
 
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
@@ -631,7 +630,7 @@ class Aircraft(AircraftBase):
         if ffb_type == "collective":
             return
 
-        if self.spring_mode_is(SpringMode.FBW) or telem_data.get("ACisFBW", 0):
+        if self.spring_mode_is(self.SpringModeEnum.FBW) or telem_data.get("ACisFBW", 0):
             logging.debug ("FBW Setting enabled, running fbw_flight_controls")
             self._update_fbw_flight_controls(telem_data)
             return
@@ -648,7 +647,7 @@ class Aircraft(AircraftBase):
         else:
             effects["fbw_spring"].stop()
 
-        if self.spring_mode_is(SpringMode.CENTER):
+        if self.spring_mode_is(self.SpringModeEnum.CENTER):
             elev_base_gain = self.elevator_spring_gain
             ailer_base_gain = self.aileron_spring_gain
             rudder_base_gain = self.rudder_spring_gain
@@ -770,7 +769,7 @@ class Aircraft(AircraftBase):
         # elevator_coeff = a * (_elev_dyn_pressure ** 2) + b * _elev_dyn_pressure * self.elevator_gain + c * slip_gain
 
         # apply expo curve
-        if self.spring_mode_is(SpringMode.ADVANCED):
+        if self.spring_mode_is(self.SpringModeEnum.ADVANCED):
             # calculate spd based on current elevator_coeff assuming linear from 0 to VNE
             adv_spr_stgs = json.loads(self.adv_spr_gains)
             scale = adv_spr_stgs.get('scale')
@@ -804,7 +803,7 @@ class Aircraft(AircraftBase):
         rudder_coeff = _rud_dyn_pressure * self.rudder_gain * _slip_gain
 
         # apply expo curve
-        if self.spring_mode_is(SpringMode.ADVANCED):
+        if self.spring_mode_is(self.SpringModeEnum.ADVANCED):
             # calculate spd based on current elevator_coeff assuming linear from 0 to VNE
             adv_spr_stgs = json.loads(self.adv_spr_gains)
             scale = adv_spr_stgs.get('scale')
@@ -1001,7 +1000,7 @@ class Aircraft(AircraftBase):
                 virtual_rudder_x_offs = 0
 
 
-            if self.spring_mode_is(SpringMode.ADVANCED):
+            if self.spring_mode_is(self.SpringModeEnum.ADVANCED):
                 if self.adv_spr_gains == 'none':
                     self.flag_error('Please open and configure the advanced spring gain settings')
                 else:
