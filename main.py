@@ -150,10 +150,10 @@ def _setup_device_configuration():
 
         try:
             d = mapping[master_rb]
-            G.device_usbpid = G.system_settings.get(f'pid{d.capitalize()}', "2055")
+            G.device_usbpid = str(G.system_settings.get(f'pid{d.capitalize()}', "2055"))
             G.device_type = d
         except KeyError:
-            G.device_usbpid = 2055
+            G.device_usbpid = '2055'
             G.device_type = 'joystick'
 
         if not G.device_usbpid: # check empty string
@@ -170,6 +170,8 @@ def _setup_device_configuration():
 
         G.device_usbpid = G.args.device.split(":")[1]
         G.device_usbvidpid = G.args.device
+        
+    assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
 
 def _setup_theme_and_styling(app):
     """
