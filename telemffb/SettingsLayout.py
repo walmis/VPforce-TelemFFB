@@ -925,16 +925,20 @@ class SettingsLayout(QGridLayout):
             self.addWidget(spin_box, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
         if item['datatype'] in ('list', 'anylist', 'enumlist'):
+            dropbox = QComboBox()
+            dropbox.setStyleSheet("""
+                QComboBox {
+                    qproperty-alignment: 'AlignCenter';
+                }
+            """)
+
             if item['datatype'] == 'anylist':
-                dropbox = QComboBox()
-                dropbox.setMinimumWidth(150)
                 dropbox.setEditable(True)
                 dropbox.lineEdit().setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
-                dropbox.blockSignals(True)
-            else:
-                dropbox = CenteredClickableComboBox()
-                dropbox.setMinimumWidth(150)
-                dropbox.blockSignals(True)
+            # else:
+            #     dropbox = CenteredClickableComboBox()
+            dropbox.setMinimumWidth(150)
+            dropbox.blockSignals(True)
 
             if item['datatype'] == 'enumlist':
                 dropbox.setObjectName(f"edb_{item['name']}")
@@ -980,11 +984,11 @@ class SettingsLayout(QGridLayout):
 
             if item['name'] == 'type' and 'Default' in item['replaced']:
                 # block editing of type for default craft
-                dropbox.lineEdit().removeEventFilter(dropbox) # Disable expand of items when clicking on lineEdit area (req'd for custom widget type)
+                # dropbox.lineEdit().removeEventFilter(dropbox) # Disable expand of items when clicking on lineEdit area (req'd for custom widget type)
                 dropbox.setDisabled(True)
             else:
                 if item['datatype'] == 'list' or item['datatype'] == 'enumlist':
-                    dropbox.lineEdit().setReadOnly(True)
+                    # dropbox.lineEdit().setReadOnly(True)
                     dropbox.editTextChanged.connect(self.dropbox_changed)
                 else:
                     dropbox.currentTextChanged.connect(self.dropbox_changed)
@@ -1123,7 +1127,7 @@ class SettingsLayout(QGridLayout):
         if G.settings_mgr.offline_mode:
             replacematch = G.settings_mgr.offline_scope.lower() + " (user)"
 
-        if item['replaced'].lower() == replacematch:
+        if item['replaced'].lower() == replacematch.lower():
             if item['name'] != 'type':  # dont erase type on mainwindow settings
                 logging.debug(f"show erase {G.settings_mgr.offline_scope}")
                 erase_button.setVisible(True)
