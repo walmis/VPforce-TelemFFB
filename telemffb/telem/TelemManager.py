@@ -543,6 +543,11 @@ class TelemManager(QObject, threading.Thread):
                     type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.TurbopropAircraft")
                     params.update(type_cfg)
                     aircraftClass = module.TurbopropAircraft
+                elif sc_engine_type == 6:   # Electric - just use PropellerAircraft type for this
+                    logging.warning("Aircraft definition not found, using SimConnect Data (Propeller Type)")
+                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.PropellerAircraft")
+                    params.update(type_cfg)
+                    aircraftClass = module.PropellerAircraft
             else:
                 logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
                 aircraftClass = module.Aircraft
