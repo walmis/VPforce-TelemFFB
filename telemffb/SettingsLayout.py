@@ -252,7 +252,7 @@ class SettingsLayout(QGridLayout):
         for item in datalist:
             if item['name'] == setting:
                 item['value'] = mode
-        xmlutils.write_to_xml(G.settings_mgr.current_sim,
+                xmlutils.write_to_xml(G.settings_mgr.current_sim,
                               G.settings_mgr.current_class,
                               G.settings_mgr.current_pattern,
                               item['name'],
@@ -312,7 +312,6 @@ class SettingsLayout(QGridLayout):
         mode_map = {
             'gforce_effect_enable': 'LEGACY',
             'new_gforce_effect_enable': 'NEW',
-            'gforce_effect_advanced_enabled': 'ADVANCED',
         }
 
         for item in datalist:
