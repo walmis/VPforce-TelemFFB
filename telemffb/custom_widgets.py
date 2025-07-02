@@ -35,6 +35,7 @@ from scipy.interpolate import Akima1DInterpolator
 
 import telemffb.globals as G
 from telemffb.utils import HiDpiPixmap
+import styles
 
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
@@ -351,8 +352,11 @@ class ClickLogo(QLabel):
 
 
 class InfoLabel(QWidget):
+    clicked = pyqtSignal()
+
     def __init__(self, parent=None, text=None, tooltip=None):
         super(InfoLabel, self).__init__(parent)
+        self._clickable = False
 
         # Text label
         self.text_label = QLabel(self)
@@ -383,6 +387,16 @@ class InfoLabel(QWidget):
         if tooltip:
             self.setToolTip(tooltip)
 
+    def setClickable(self, clickable):
+        self._clickable = clickable
+        if clickable:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def mousePressEvent(self, event):
+        if self._clickable:
+            self.clicked.emit()
 
     def setText(self, text):
         self.text_label.setText(text)
@@ -419,6 +433,7 @@ class EraseButton(QPushButton):
         self.csetting = csetting
         self.cvalue = cvalue
         self.cunit = cunit
+        self.setProperty("buttonType", 'erase_button')
 
         self.enable_context_menu = enable_context_menu
         if self.enable_context_menu:
@@ -476,7 +491,7 @@ class StatusLabel(QWidget):
         super(StatusLabel, self).__init__(parent)
 
         self.label = QLabel(text)
-        self.label.setStyleSheet("QLabel { padding-right: 5px; }")
+        self.label.setObjectName("StatusLabel")
 
         self.dot_color = color  # Default color
         self.dot_size = size
@@ -485,17 +500,6 @@ class StatusLabel(QWidget):
         self.setToolTip('Click to manage this device')
         layout = QHBoxLayout(self)
         layout.addWidget(self.label)
-
-    def enterEvent(self, event):
-        # Set the label to be purple and underlined when the mouse enters
-        self.label.setStyleSheet("QLabel { padding-right: 5px; color: #ab37c8; text-decoration: underline; }")
-
-    def leaveEvent(self, event):
-        # Set the label back to its original style when the mouse leaves
-        if G.useDarkMode:
-            self.label.setStyleSheet("QLabel { padding-right: 5px; color: white; text-decoration: none; }")
-        else:
-            self.label.setStyleSheet("QLabel { padding-right: 5px; color: black; text-decoration: none; }")
 
     def mousePressEvent(self, event):
         if self._clickable:
@@ -1078,6 +1082,7 @@ class InstanceStatusRow(QWidget):
     changeConfigScope = QtCore.pyqtSignal(str)
     def __init__(self) -> None:
         super().__init__()
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         self.instance_status_row = QHBoxLayout()
         self.master_status_icon = StatusLabel(None, f'This Instance({ G.device_type.capitalize() }):', Qt.GlobalColor.green, 8)

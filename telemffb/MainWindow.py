@@ -519,17 +519,8 @@ class MainWindow(QMainWindow):
 
         self.banner_label = QLabel("Telemetry is paused while in offline editing mode")
         self.banner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.banner_label.setStyleSheet("""
-            QLabel {
-                background-color: rgba(255, 165, 0, 100);  /* Orange-ish translucent */
-                color: palette(windowText);
-                padding: 6px 10px;
-                font: Cascadia Mono;
-                font-weight: bold;
-                border: 1px solid palette(dark);
-                border-radius: 6px;
-            }
-        """)
+        self.banner_label.setObjectName('OfflineBannerLabel')
+
 
         main_layout.addWidget(self.banner_label)  # Add it above the combobox row
 
@@ -546,7 +537,7 @@ class MainWindow(QMainWindow):
         self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
 
         offline_class_lbl = QLabel('Class:')
-        offline_class_lbl.setMaximumWidth(30)
+        offline_class_lbl.setMaximumWidth(40)
         offline_class_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.offline_class = QComboBox()
@@ -572,12 +563,12 @@ class MainWindow(QMainWindow):
         bottom_row = QHBoxLayout()
         bottom_row.addStretch()  # push button to the right
 
-        self.manual_add_button = QToolButton()
+        # self.manual_add_button = QPushButton()
         # self.offline_button.setMaximumWidth(20)
         self.manual_add_button.setText('Manually Add Aircraft')
         self.manual_add_button.clicked.connect(self.show_new_aircraft_wizard)
 
-        self.offline_button = QToolButton()
+        self.offline_button = QPushButton()
         # self.offline_button.setMaximumWidth(20)
         self.offline_button.setText('Exit Offline Mode')
         self.offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))

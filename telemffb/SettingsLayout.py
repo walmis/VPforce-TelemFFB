@@ -37,6 +37,7 @@ from telemffb.AdvancedGDialog import AdvancedGDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile, dbprint, HiDpiPixmap
 import telemffb.utils as utils
+import styles
 from . import globals as G
 from . import xmlutils
 
@@ -582,87 +583,13 @@ class SettingsLayout(QGridLayout):
         df_slider.setObjectName(f"dfsld_{item['name']}")
 
         m_butt = QPushButton("-")
+        m_butt.setProperty('buttonType', 'p_m_button')
         m_butt.setFixedSize(20, 20)
-        if G.useDarkMode:
-            m_butt.setStyleSheet("""
-                QPushButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: #ab37c8;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QPushButton:hover {
-                    background-color: #666;  /* Optional: Change background on hover */
-                }
-                QPushButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
-        else:
-            m_butt.setStyleSheet("""
-                QPushButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: black;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QPushButton:hover {
-                    background-color: #ddd;  /* Optional: Change background on hover */
-                }
-                QPushButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
 
         # Create the "+" button
         p_butt = QPushButton("+")
+        p_butt.setProperty('buttonType', 'p_m_button')
         p_butt.setFixedSize(20, 20)
-        if G.useDarkMode:
-            p_butt.setStyleSheet("""
-                QPushButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: #ab37c8;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QPushButton:hover {
-                    background-color: #666;  /* Optional: Change background on hover */
-                }
-                QPushButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
-        else:
-            p_butt.setStyleSheet("""
-                QPushButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: black;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QPushButton:hover {
-                    background-color: #ddd;  /* Optional: Change background on hover */
-                }
-                QPushButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
@@ -675,6 +602,7 @@ class SettingsLayout(QGridLayout):
         line_edit.editingFinished.connect(self.line_edit_changed)
 
         expand_button = QToolButton()
+        expand_button.setProperty('buttonType', 'expand_button')
         if item['name'] in self.expanded_items:
             expand_button.setArrowType(Qt.ArrowType.DownArrow)
         else:
@@ -683,44 +611,6 @@ class SettingsLayout(QGridLayout):
         expand_button.setMinimumWidth(24)
         expand_button.setObjectName(f"ex_{item['name']}")
         expand_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        if G.useDarkMode:
-            expand_button.setStyleSheet("""
-                QToolButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: #ab37c8;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QToolButton:hover {
-                    background-color: #666;  /* Optional: Change background on hover */
-                }
-                QToolButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
-        else:
-            expand_button.setStyleSheet("""
-                QToolButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: black;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QToolButton:hover {
-                    background-color: #ddd;  /* Optional: Change background on hover */
-                }
-                QToolButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
         expand_button.clicked.connect(self.expander_clicked)
 
         usb_button_text = f"Button {item['value']}"
@@ -1066,6 +956,7 @@ class SettingsLayout(QGridLayout):
             font_family = "Black Ops One"
             font_size = 14
             label.text_label.setFont(QFont(font_family, font_size))
+
             expand_button.setVisible(False)
 
         if not rowdisabled:
@@ -1130,41 +1021,25 @@ class SettingsLayout(QGridLayout):
                 erase_button.setToolTip("Reset to Default, Right-Click for more options")
 
         self.setRowStretch(i, 0)
-        erase_button.setStyleSheet("""
-            QPushButton {
-                font-size: 16px;  /* Adjust the font size */
-                font-family: Arial Black;
-                font-weight: bold;
-                color: black;
-                padding: 0px;
-                border: none;  /* Remove any border */
-                margin: 0px;   /* Remove any margin */
-                background-color: transparent;  /* Transparent background */
-            }
-            QPushButton:hover {
-                background-color: #ddd;  /* Optional: Change background on hover */
-            }
-            QPushButton:pressed {
-                background-color: #bbb;  /* Optional: Change background on press */
-            }
-        """)
+
 
         if item['has_expander'].lower() == 'true' or item['datatype'] == 'group':
             # These are top level config sections that have an expander button but do not have any ".1" sliders
-            color = "#cc7ee0" if G.useDarkMode else "#ab37c8"              # lighter purple looks better in dark
-            color = "#ab37c8" if item['datatype'] == 'group' else color    # unless its big group font
+            # color = "#cc7ee0" if G.useDarkMode else "#ab37c8"              # lighter purple looks better in dark
+            # color = "#ab37c8" if item['datatype'] == 'group' else color    # unless its big group font
             labeltext = item["name"] if self.show_settings_names else item["displayname"]
             if '.0' not in item['order']:
-                label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
+                # label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
                 clickaction = "Expand" if item['name'] not in self.expanded_items else "Collapse"
                 label.text_label.setToolTip(f'Click to {clickaction}')
-                label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-                label.text_label.setOpenExternalLinks(False)
-                label.text_label.linkActivated.connect(expand_button.click)
+                label.setClickable(True)
+                label.clicked.connect(expand_button.click)
+                label.text_label.setStyleSheet(styles.GROUP_LABEL_STYLESHEET)
+                # label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+                # label.text_label.setOpenExternalLinks(False)
+                # label.text_label.linkActivated.connect(expand_button.click)
             else:
-                # remove hyperlink formatting of permanently expanded group items
-                label.text_label.setText(f'<a href="#" style="text-decoration: none; color: {color};">{labeltext}</a>')
-                label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+                label.text_label.setStyleSheet("color: #ab37c8;")
 
         if item['order'][-1:] == '1' and '.' in item['order']:
             # For ".1" config objects, they take the place of the parent setting in the row when enabled so #we
@@ -1172,15 +1047,17 @@ class SettingsLayout(QGridLayout):
             parent = item['prereq']
             parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
             if parent_expand_button is not None:
-                label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-                label.text_label.setOpenExternalLinks(False)
+                # label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+                # label.text_label.setOpenExternalLinks(False)
                 labeltext = item["name"] if self.show_settings_names else item["displayname"]
                 color = "#cc7ee0" if G.useDarkMode else "#ab37c8"
-                label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
-                label.text_label.linkActivated.connect(lambda href, parent_name=parent: self.expander_hyperlink_clicked(parent_name))
+                # label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
+                label.text_label.setStyleSheet(styles.EXPAND_LABEL_STYLESHEET)
+                label.setClickable(True)
+                label.clicked.connect(lambda parent_name=parent: self.expander_hyperlink_clicked(parent_name))
 
     def expander_hyperlink_clicked(self, parent):
-        # dbprint("red", f"EXPANDER: {parent}")
+        dbprint("red", f"EXPANDER: {parent}")
         parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
         if parent_expand_button is not None:
             parent_expand_button.click()

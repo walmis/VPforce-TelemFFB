@@ -41,8 +41,7 @@ Application Flow:
 import sys
 # import faulthandler
 # faulthandler.enable()
-from PyQt6.QtGui import QIcon, QColor
-
+from PyQt6.QtGui import QIcon, QColor, QFont
 
 from telemffb.CmdLineArgs import CmdLineArgs
 
@@ -223,7 +222,7 @@ def _apply_dark_mode_palette(app, palette):
     palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
     palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor('#dddddd'))
     palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
-    palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor('#dddddd'))
+    palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor("#cccccc"))
     palette.setColor(QtGui.QPalette.ColorRole.Button, QColor(53, 53, 53))
     palette.setColor(QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor('#dddddd'))
     palette.setColor(QtGui.QPalette.ColorRole.BrightText, QtGui.QColor('red'))
@@ -581,6 +580,7 @@ def main():
     # Initialize Qt application with Fusion style for consistent cross-platform appearance
     app = QApplication(sys.argv)
     app.setStyle('fusion')  # Set Fusion style
+    app.setFont(QFont('Segoe UI', 10))
 
     # ============================================================================
     # PHASE 2: Command Line Arguments and Instance Management
