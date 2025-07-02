@@ -13066,6 +13066,34 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>joystick_trim_follow_gain_physical_x</name>
+		<model>AS 33 Me.*</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>AS 33 Me.*</model>
+		<value>GliderAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aileron_spring_gain</name>
+		<model>AS 33 Me.*</model>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>elevator_spring_gain</name>
+		<model>AS 33 Me.*</model>
+		<value>0.05</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>etl_effect_intensity</name>
 		<model>Asobo Cabri G2.*</model>
 		<value>0.25</value>
