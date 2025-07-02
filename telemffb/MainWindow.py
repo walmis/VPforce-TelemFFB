@@ -217,7 +217,7 @@ class MainWindow(QMainWindow):
 
         # Create "Profiles" menu
         self.profiles_menu = self.menu.addMenu('Profiles')
-        self.offline_config_action = QAction('Enter Offline Profile\Sim Default\Class Default Mode', self)
+        self.offline_config_action = QAction('Offline Profile\Sim Default\Class Default Mode', self)
         # self.offline_config_action.setCheckable(True)
         self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
         self.profiles_menu.addAction(self.offline_config_action)
@@ -538,7 +538,7 @@ class MainWindow(QMainWindow):
         offline_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.offline_sim = QComboBox()
-        self.offline_sim.setMaximumWidth(60)
+        self.offline_sim.setMaximumWidth(70)
         sims = [''] + xmlutils.get_sims()
         self.offline_sim.addItems(sims)
         self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
@@ -1259,14 +1259,15 @@ class MainWindow(QMainWindow):
 
         self.update_settings()
     def offline_sim_changed(self, sim=None):
+        self.offline_name.blockSignals(True)
+        self.offline_class.blockSignals(True)
+        self.offline_name.clear()
+        self.offline_class.clear()
+        self.offline_name.blockSignals(False)
+        self.offline_class.blockSignals(False)
         if sim is None or sim == '':
             # if sim combobox is cleared, reset everything and clear the layout
-            self.offline_name.blockSignals(True)
-            self.offline_class.blockSignals(True)
-            self.offline_name.clear()
-            self.offline_class.clear()
-            self.offline_name.blockSignals(False)
-            self.offline_class.blockSignals(False)
+
             G.settings_mgr.current_sim = ''
             G.settings_mgr.current_class = ''
             G.settings_mgr.current_aircraft_name = ''
