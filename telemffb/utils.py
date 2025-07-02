@@ -1990,24 +1990,19 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
             ValueError: If required fields are missing or invalid
         """
         # Extract USB PID
-        cfg_pid = config_data.get('config', {}).get('usb_pid', 'unknown')
-        if cfg_pid == 'unknown':
+        cfg_pid = config_data.get('config', {}).get('usb_pid', None)
+        if cfg_pid is None:
             raise ValueError("Missing or invalid 'usb_pid' in configuration file")
         
-        # Convert PID to integer (assuming it's in hex format)
-        try:
-            cfg_pid = int(format(cfg_pid, 'x'))
-        except (ValueError, TypeError):
-            raise ValueError(f"Invalid USB PID format: {cfg_pid}")
         
         # Extract serial number
-        cfg_serial = config_data.get('serial_number', 'unknown')
-        if cfg_serial == 'unknown':
+        cfg_serial = config_data.get('serial_number', None)
+        if cfg_serial is None:
             raise ValueError("Missing or invalid 'serial_number' in configuration file")
         
         # Extract device name
-        cfg_device_name = config_data.get('config', {}).get('device_name', 'unknown')
-        if cfg_device_name == 'unknown':
+        cfg_device_name = config_data.get('config', {}).get('device_name', None)
+        if cfg_device_name is None:
             raise ValueError("Missing or invalid 'device_name' in configuration file")
         
         return cfg_pid, cfg_serial, cfg_device_name
@@ -2023,7 +2018,7 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
             str: Device identifier
         """
         if G.master_instance:
-            return G.instance_dev_dict[int(str(pid), 16)].ident
+            return G.instance_dev_dict[pid].ident
         else:
             return G.device_ident
 
@@ -2044,7 +2039,7 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
 
     # Normalize PID to integer
     if isinstance(pid, str):
-        pid = int(pid)
+        pid = int(pid, 16)
     
     # Step 1: Load and parse configuration file
     try:
@@ -2069,9 +2064,9 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
             f"File: {file_path}\n\n"
             f"Current device:\n"
             f"  Type: {dev_type}\n"
-            f"  PID: {pid}\n\n"
+            f"  PID: {pid:04X}\n\n"
             f"Profile device:\n"
-            f"  PID: {cfg_pid}\n"
+            f"  PID: {cfg_pid:04X}\n"
             f"  Name: {cfg_device_name}\n"
             f"  Serial: {cfg_serial}"
         )

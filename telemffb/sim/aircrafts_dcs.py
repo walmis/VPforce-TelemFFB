@@ -408,6 +408,18 @@ class Aircraft(AircraftBase):
             # self.spring.stop()
             return
 
+        if self.dcs_tr_damper_enabled:
+            self.flag_error(
+                'Co-Pilot/RIO Spring Override is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
+            self.cp_spr_override_active = False
+            effects['cp_ovd_spring'].stop()
+            return
+        if self.trim_workaround:
+            self.flag_error(
+                'Co-Pilot/RIO Spring Override is not compatible with the Trim Workaround feature.  Please disable one or the other.')
+            self.cp_spr_override_active = False
+            effects['cp_ovd_spring'].stop()
+            return
 
         if self.cp_spr_override_button_enabled:
 
@@ -416,21 +428,7 @@ class Aircraft(AircraftBase):
                 effects['cp_ovd_spring'].stop()
                 self.cp_spr_override_active = False
                 return
-            if self.override_spring_enabled:
-                self.flag_error("Co-Pilot/RIO Spring Override is not compatible with \"DCS Spring Override\"\n  Please disable one or the other")
-                effects['cp_ovd_spring'].stop()
-                self.cp_spr_override_active = False
-                return
-            if self.dcs_tr_damper_enabled:
-                self.flag_error('Co-Pilot/RIO Spring Override is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
-                self.cp_spr_override_active = False
-                effects['cp_ovd_spring'].stop()
-                return
-            if self.trim_workaround:
-                self.flag_error('Co-Pilot/RIO Spring Override is not compatible with the Trim Workaround feature.  Please disable one or the other.')
-                self.cp_spr_override_active = False
-                effects['cp_ovd_spring'].stop()
-                return
+
 
             input_data = HapticEffect.device.get_input()
             override_pressed = input_data.isButtonPressed(self.cp_spr_override_button)
@@ -448,21 +446,15 @@ class Aircraft(AircraftBase):
 
     def override_spring(self):
         if not self.is_joystick(): return
-        if not self.override_spring_enabled:
+        if not self.spring_mode_is(SpringMode.CUSTOM):
             # If feature disabled, ensure spring is stopped and abort
             effects['dcs_spr_override'].stop()
             return
-        # Since override_spring overtakes DCS spring already, both the TR damper and trim workaround features are not
-        # needed and would conflict with the override of the spring effect
-        if self.dcs_tr_damper_enabled:
-            self.flag_error('Override DCS Spring is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
-            return
+
         if self.trim_workaround:
             self.flag_error('Override DCS Spring is not compatible with the Trim Workaround feature.  Please disable one or the other.')
             return
-        if self.cp_spr_override_enabled:
-            self.flag_error('Override DCS Spring is not compatible with the Co-Pilot/RIO Spring Override feature.  Please disable one or the other.')
-            return
+
 
         spring = effects['dcs_spr_override'].spring()
 
@@ -647,8 +639,11 @@ class Helicopter(Aircraft):
 
     def update_tr_damper(self):
         if not self.is_joystick(): return
+        if not self.spring_mode_is(SpringMode.NONE): return  # only supported when spring mode is NONE (game managed)
         if not self.dcs_tr_damper_enabled: return
-        if not self.dcs_tr_button: return
+        if not self.dcs_tr_button:
+            self.flag_error('Please configure the trim-release button.  It must match that which is bound as trim release in the sim.')
+            return
 
         input_data = HapticEffect.device.get_input()
         force_trim_pressed = input_data.isButtonPressed(self.dcs_tr_button)

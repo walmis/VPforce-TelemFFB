@@ -41,8 +41,7 @@ Application Flow:
 import sys
 # import faulthandler
 # faulthandler.enable()
-from PyQt6.QtGui import QIcon, QColor
-
+from PyQt6.QtGui import QIcon, QColor, QFont
 
 from telemffb.CmdLineArgs import CmdLineArgs
 
@@ -151,10 +150,10 @@ def _setup_device_configuration():
 
         try:
             d = mapping[master_rb]
-            G.device_usbpid = G.system_settings.get(f'pid{d.capitalize()}', "2055")
+            G.device_usbpid = str(G.system_settings.get(f'pid{d.capitalize()}', "2055"))
             G.device_type = d
         except KeyError:
-            G.device_usbpid = 2055
+            G.device_usbpid = '2055'
             G.device_type = 'joystick'
 
         if not G.device_usbpid: # check empty string
@@ -171,6 +170,8 @@ def _setup_device_configuration():
 
         G.device_usbpid = G.args.device.split(":")[1]
         G.device_usbvidpid = G.args.device
+        
+    assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
 
 def _setup_theme_and_styling(app):
     """
@@ -223,7 +224,7 @@ def _apply_dark_mode_palette(app, palette):
     palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
     palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor('#dddddd'))
     palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
-    palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor('#dddddd'))
+    palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor("#cccccc"))
     palette.setColor(QtGui.QPalette.ColorRole.Button, QColor(53, 53, 53))
     palette.setColor(QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor('#dddddd'))
     palette.setColor(QtGui.QPalette.ColorRole.BrightText, QtGui.QColor('red'))
@@ -581,6 +582,7 @@ def main():
     # Initialize Qt application with Fusion style for consistent cross-platform appearance
     app = QApplication(sys.argv)
     app.setStyle('fusion')  # Set Fusion style
+    app.setFont(QFont('Segoe UI', 10))
 
     # ============================================================================
     # PHASE 2: Command Line Arguments and Instance Management

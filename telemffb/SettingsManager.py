@@ -19,10 +19,6 @@ class SettingsManager:
         self._online_mode_backup = None
         self.offline_scope = None
         self.offline_mode = False
-        self.offline_current_sim = None
-        self.offline_current_class = None
-        self.offline_current_pattern = None
-        self.offline_current_aircraft_name = None
 
     def update_state_vars(self, **kwargs):
         for key, value in kwargs.items():
@@ -30,6 +26,16 @@ class SettingsManager:
 
     def set_sim(self, sim):
         self.current_sim = sim
+
+    def get_state_vars(self):
+        return {
+            'current_sim': self.current_sim,
+            'current_class': self.current_class,
+            'current_aircraft_name': self.current_aircraft_name,
+            'current_pattern': self.current_pattern,
+            'device': self.device
+        }
+
     def go_offline(self):
         """
         Capture the current state of data before going into offline settings mode

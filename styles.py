@@ -47,6 +47,62 @@ QPushButton:hover:!pressed, #styledButton:hover:!pressed {
     border: 1px solid #8e1da8;
 }
 
+QPushButton[buttonType="erase_button"] {
+    font-size: 16px;  /* Adjust the font size */
+    font-family: Cascadia Code;
+    font-weight: bold;
+    color: black;
+    padding: 0px;
+    border: none;  /* Remove any border */
+    margin: 0px;   /* Remove any margin */
+    background-color: transparent;  /* Transparent background */
+}
+            
+QPushButton[buttonType="erase_button"]:hover {
+    background-color: palett(window);  /* Optional: Change background on hover */
+}
+
+QPushButton[buttonType="erase_button"]:pressed {
+    background-color: #666;  /* Optional: Change background on press */
+}
+
+QPushButton[buttonType="p_m_button"] {                                  
+    font-size: 16px;  /* Adjust the font size */                        
+    font-family: Cascadia Code;                                         
+    font-weight: bold;                                                  
+    color: #ab37c8;                                                       
+    padding: 0px;                                                       
+    border: none;  /* Remove any border */                              
+    margin: 0px;   /* Remove any margin */                              
+    background-color: transparent;  /* Transparent background */        
+}   
+                                                                    
+QPushButton[buttonType="p_m_button"]:hover {                            
+    background-color: palett(window);  /* Optional: Change background on hover */ 
+}    
+                                                                   
+QPushButton[buttonType="p_m_button"]:pressed {                          
+    background-color: #666;  /* Optional: Change background on press */ 
+}                                                                       
+
+QToolButton[buttonType="expand_button"] {                                                          
+    font-size: 16px;  /* Adjust the font size */                       
+    font-family: Cascadia Code;                                        
+    font-weight: bold;                                                 
+    color: #c473d9;                                                    
+    border: none;  /* Remove any border */                             
+    margin: 0px;   /* Remove any margin */                             
+    background-color: transparent;  /* Transparent background */       
+}              
+                                                        
+QToolButton[button_type="expand_button"]:hover {                                                    
+    background-color: #666;  /* Optional: Change background on hover */
+}   
+                                                                   
+QToolButton[button_type="expand_button"]:pressed {                                                  
+    background-color: #bbb;  /* Optional: Change background on press */
+}                                                                      
+
 QLineEdit, QPlainTextEdit, QTextEdit {
     background-color: #3a3a3a;
     color: #ffffff;
@@ -82,22 +138,22 @@ QSlider::groove:horizontal {
 
 QMenuBar {
     background-color: #353535;
-    color: #dddddd;
+    color: palette(text);
 }
 
 QMenuBar::item:selected {
     background-color: #ab37c8;
-    color: white;
+    color: palette(text);
 }
 
 QMenuBar::item:pressed {
     background-color: #ab37c8;
-    color: white;
+    color: palette(text);
 }
 
 QMenu {
     background-color: #2b2b2b;
-    color: #dddddd;
+    color: palette(text);
     border: 1px solid #444444;
 }
 
@@ -108,17 +164,12 @@ QMenu::item {
 
 QMenu::item:selected {
     background-color: #ab37c8;
-    color: white;
-}
-
-QFrame {
-    background-color: #2b2b2b;
-    color: #dddddd;
+    color: palette(text);
 }
 
 QComboBox {
     background-color: #3a3a3a;
-    color: white;
+    color: palette(text);
     border: 1px solid #999;
 }
 
@@ -127,7 +178,7 @@ QComboBox QAbstractItemView {
 }
 
 QCheckBox {
-    color: white;
+    color: palette(text);
     spacing: 5px;
 }
 
@@ -152,10 +203,33 @@ QCheckBox::indicator:disabled {
 }
 
 QLabel {
-    color: #dddddd;
+    color: palette(text);
     background: transparent;
 }
 
+QLabel#OfflineBannerLabel {
+    background-color: rgba(255, 165, 0, 100);  /* Orange-ish translucent */
+    color: palette(windowText);
+    padding: 6px 10px;
+    font: Cascadia Mono;
+    font-weight: bold;
+    border: 1px solid palette(dark);
+    border-radius: 6px;
+}
+
+QLabel#StatusLabel:hover {
+    padding-right: 5px; 
+    color: #ab37c8;
+    text-decoration: underline; 
+    background-color: transparent;
+}
+
+QLabel#StatusLabel:!hover {
+    padding-right: 5px; 
+    color: #c473d9;
+    text-decoration: underline; 
+    background-color: transparent;
+}
 """
 
 LIGHT_MODE_STYLESHEET = """
@@ -202,6 +276,60 @@ QPushButton:hover:!pressed, #styledButton:hover:!pressed {
     border: 1px solid #8e1da8;
 }
 
+QPushButton[buttonType="erase_button"] {
+    font-size: 16px;  /* Adjust the font size */
+    font-family: Arial Black;
+    font-weight: bold;
+    color: black;
+    padding: 0px;
+    border: none;  /* Remove any border */
+    margin: 0px;   /* Remove any margin */
+    background-color: transparent;  /* Transparent background */
+}
+            
+QPushButton[buttonType="erase_button"]:hover {
+    background-color: #ddd;  /* Optional: Change background on hover */
+}
+
+QPushButton[buttonType="erase_button"]:pressed {
+    background-color: #bbb;  /* Optional: Change background on press */
+}
+
+QPushButton[buttonType="p_m_button"] {                                  
+    font-size: 16px;  /* Adjust the font size */                        
+    font-family: Cascadia Code;                                         
+    font-weight: bold;                                                  
+    color: black;                                                       
+    padding: 0px;                                                       
+    border: none;  /* Remove any border */                              
+    margin: 0px;   /* Remove any margin */                              
+    background-color: transparent;  /* Transparent background */        
+}                                                                       
+QPushButton[buttonType="p_m_button"]:hover {                            
+    background-color: #ddd;  /* Optional: Change background on hover */ 
+}                                                                       
+QPushButton[buttonType="p_m_button"]:pressed {                          
+    background-color: #666;  /* Optional: Change background on press */ 
+}                                                                       
+
+QToolButton[buttonType="expand_button"] {                                                          
+    font-size: 16px;  /* Adjust the font size */                       
+    font-family: Cascadia Code;                                        
+    font-weight: bold;                                                 
+    color: black;                                                      
+    padding: 0px;                                                      
+    border: none;  /* Remove any border */                             
+    margin: 0px;   /* Remove any margin */                             
+    background-color: transparent;  /* Transparent background */       
+}                                                                      
+QToolButton[buttonType="expand_button"]:hover {                                                    
+    background-color: #ddd;  /* Optional: Change background on hover */
+}      
+                                                                
+QToolButton[buttonType="expand_button"]:pressed {                                                  
+    background-color: #bbb;  /* Optional: Change background on press */
+}                                                                      
+
 QLineEdit, QPlainTextEdit, QTextEdit {
     selection-background-color: #ab37c8;
 }
@@ -240,7 +368,55 @@ QMenu::item {
 }
 
 QMenu::item:selected {
-    color: white;
+    color: palett(text);
     background-color: #ab37c8;
+}
+
+QLabel#OfflineBannerLabel {
+    background-color: rgba(255, 165, 0, 100);  /* Orange-ish translucent */
+    color: palette(windowText);
+    padding: 6px 10px;
+    font: Cascadia Mono;
+    font-weight: bold;
+    border: 1px solid palette(dark);
+    border-radius: 6px;
+}
+
+QLabel#StatusLabel:hover {
+    padding-right: 5px; 
+    color: #ab37c8;
+    text-decoration: underline; 
+    background-color: transparent;
+}
+
+QLabel#StatusLabel:!hover {
+    padding-right: 5px; 
+    color: #c473d9;
+    text-decoration: underline; 
+    background-color: transparent;
+}
+"""
+
+GROUP_LABEL_STYLESHEET = """
+QLabel:hover {
+    color: #c473d9;
+    text-decoration: underline; 
+}
+
+QLabel:!hover {
+    color: #ab37c8;
+    text-decoration: underline; 
+}
+"""
+
+EXPAND_LABEL_STYLESHEET = """
+QLabel:hover {
+    color: #ab37c8;
+    text-decoration: underline; 
+}
+
+QLabel:!hover {
+    color: #c473d9;
+    text-decoration: underline; 
 }
 """
