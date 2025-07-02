@@ -367,7 +367,7 @@ class Aircraft(AircraftBase):
             force = round(force, 4)
             effects['turbulence'].constant(force, dir).start()
 
-            print(f"force:{force} dir:{dir}")
+            #print(f"force:{force} dir:{dir}")
         else:
             effects['turbulence'].destroy()
 
