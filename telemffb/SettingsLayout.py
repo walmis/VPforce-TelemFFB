@@ -876,7 +876,7 @@ class SettingsLayout(QGridLayout):
                 # dropbox.lineEdit().removeEventFilter(dropbox) # Disable expand of items when clicking on lineEdit area (req'd for custom widget type)
                 dropbox.setDisabled(True)
             else:
-                if item['datatype'] == 'list' or item['datatype'] == 'enumlist':
+                if item['datatype'] == 'list':
                     # dropbox.lineEdit().setReadOnly(True)
                     dropbox.editTextChanged.connect(self.dropbox_changed)
                 else:
