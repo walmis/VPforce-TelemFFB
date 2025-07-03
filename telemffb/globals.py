@@ -65,6 +65,7 @@ device_type : str = ""
 device_usbpid : str 
 device_usbvidpid : str  # "FFFF:2055"
 device_ident : str  #Joystick, Pedals, etc.. as set in configurator
+device_firmware_version : str  # Firmware version as reported by device
 
 # Gain management
 startup_configurator_gains: Optional[Any] = None  # Gain object direct from 'device.get_gains'.  Gains get read at TelemFFB startup fallback baseline values.

@@ -347,6 +347,7 @@ def _initialize_device_connection():
         if G.args.reset:
             dev.reset_effects()
         dev_firmware_version = dev.get_firmware_version()
+        G.device_firmware_version = dev_firmware_version
         dev_serial = dev.serial
 
         if dev_firmware_version:

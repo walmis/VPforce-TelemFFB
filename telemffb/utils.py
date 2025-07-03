@@ -75,6 +75,13 @@ import telemffb.globals as G
 import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
 
+def check_min_firmware_version(dev_firmware_version, min_firmware_version):
+    """Check if device firmware version meets minimum requirements."""
+    minver = re.sub(r'\D', '', min_firmware_version)
+    devver = re.sub(r'\D', '', dev_firmware_version)
+    return devver >= minver
+
+
 def dbprint(color, msg, instance=None):
     if instance is not None:
         if instance != G.device_type:

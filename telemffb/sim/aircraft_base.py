@@ -751,6 +751,16 @@ class AircraftBase(object):
             effects.dispose("gforce")
             return
 
+        if self.gforce_effect_mode_is(self.GEffectModeEnum.ADVANCED):
+            # Verify the device firmware meets the minimum version required to execute this portion of the effect
+            # Flag error and abort if not met
+            supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+            if not supported:
+                self.flag_error('The Advanced/Custom Curve G-Force effect requires firmware v1.0.18 or higher.\n'
+                                f'The device is currently running version {G.device_firmware_version}\n'
+                                f'Please update your device firmware!')
+                return
+
         if sum(telem_data.get("WeightOnWheels")):
             effects.dispose("gforce")
             return
@@ -1971,6 +1981,14 @@ class AircraftBase(object):
     def modify_game_spring(self):
         if not self.spring_mode_is(self.SpringModeEnum.ADVANCED):
             self.spring_adjuster.stop()
+            return
+        # Verify the device firmware meets the minimum version required to execute this effect
+        # Flag error and abort if not met
+        supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+        if not supported:
+            self.flag_error('The Advanced/Custom Spring Override requires firmware v1.0.18 or higher.\n'
+                            f'The device is currently running version {G.device_firmware_version}\n'
+                            f'Please update your device firmware!')
             return
         if self.adv_spr_gains == 'none':
             self.flag_error('Please open and configure the advanced spring gain settings')
