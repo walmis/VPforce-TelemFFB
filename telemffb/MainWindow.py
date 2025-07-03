@@ -217,7 +217,6 @@ class MainWindow(QMainWindow):
 
         # Create "Profiles" menu
         self.profiles_menu = self.menu.addMenu('Profiles')
-        self.offline_config_action = QAction('Offline Profile\Sim Default\Class Default Mode', self)
         self.offline_config_action = QAction(r'Offline Profile\Sim Default\Class Default Mode', self)
         # self.offline_config_action.setCheckable(True)
         self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
