@@ -2682,7 +2682,7 @@
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20100.0</order>
-		<name>gforce_effect</name>
+		<name>gforce_effect_mode</name>
 		<displayname>G-Force Effect</displayname>
 		<prereq>inertial_group</prereq>
 		<MSFS>true</MSFS>
@@ -2697,7 +2697,7 @@
 		<grouping>Acceleration</grouping>
 		<parentgroup>inertial</parentgroup>
 		<order>20100.0</order>
-		<name>gforce_effect</name>
+		<name>gforce_effect_mode</name>
 		<displayname>G-Force Effect</displayname>
 		<prereq>inertial_group</prereq>
 		<DCS>true</DCS>
@@ -2714,7 +2714,7 @@
 		<order>20110.22</order>
 		<name>gforce_effect_max_intensity</name>
 		<displayname>Max Intensity</displayname>
-		<prereq>gforce_effect.LEGACY</prereq>
+		<prereq>gforce_effect_mode.LEGACY</prereq>
 		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -2730,7 +2730,7 @@
 		<order>20110.23</order>
 		<name>gforce_effect_curvature</name>
 		<displayname>G Force Curvature</displayname>
-		<prereq>gforce_effect.LEGACY</prereq>
+		<prereq>gforce_effect_mode.LEGACY</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Affects the onset characteristics of the overall effect&lt;br&gt;&lt;img src=":/image/g-force-curve.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -2747,7 +2747,7 @@
 		<order>20110.24</order>
 		<name>gforce_min_gs</name>
 		<displayname>Minimum Gs</displayname>
-		<prereq>gforce_effect.LEGACY</prereq>
+		<prereq>gforce_effect_mode.LEGACY</prereq>
 		<info>G loading where effect will start</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -2764,7 +2764,7 @@
 		<order>20110.25</order>
 		<name>gforce_max_gs</name>
 		<displayname>Maximum Gs</displayname>
-		<prereq>gforce_effect.LEGACY</prereq>
+		<prereq>gforce_effect_mode.LEGACY</prereq>
 		<info>G loading where effect will max out</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -2782,7 +2782,7 @@
 		<name>new_gforce_effect_max_intensity</name>
 		<displayname>Maximum Intensity</displayname>
 		<exclusive_with></exclusive_with>
-		<prereq>gforce_effect.NEW</prereq>
+		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -2800,7 +2800,7 @@
 		<order>20120.3</order>
 		<name>new_gforce_min_gs</name>
 		<displayname>Start Gs</displayname>
-		<prereq>gforce_effect.NEW</prereq>
+		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>G loading where effect will start</info>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -2819,7 +2819,7 @@
 		<order>20120.4</order>
 		<name>new_gforce_max_gs</name>
 		<displayname>Maximum Gs</displayname>
-		<prereq>gforce_effect.NEW</prereq>
+		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>G loading where effect will max out</info>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -2838,7 +2838,7 @@
 		<order>20120.5</order>
 		<name>new_gforce_effect_deflection_factor</name>
 		<displayname>Y-Axis Max Point</displayname>
-		<prereq>gforce_effect.NEW</prereq>
+		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>Y Axis deflection that will result in %100 of calculated force based on current g loading and min/max settings</info>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -2856,7 +2856,7 @@
 		<order>20130.2</order>
 		<name>gforce_effect_adv_curve</name>
 		<displayname>Advanced</displayname>
-		<prereq>gforce_effect.ADVANCED</prereq>
+		<prereq>gforce_effect_mode.ADVANCED</prereq>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2872,7 +2872,7 @@
 		<order>20140</order>
 		<name>new_gforce_enable_neg_gs</name>
 		<displayname>Enable Negative Gs</displayname>
-		<prereq>gforce_effect.NEW</prereq>
+		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>Enable effect for negative Gs</info>
 		<DCS>true</DCS>
 		<MSFS>true</MSFS>
@@ -5634,6 +5634,13 @@
 			<name>spoiler_motion_effect_enabled</name>
 			<type>PropellerAircraft</type>
 			<value>false</value>
+			<sim>DCS</sim>
+			<device>any</device>
+		</classdefaults_DCS>
+		<classdefaults_DCS>
+			<name>spring_mode</name>
+			<type>Helicopter</type>
+			<value>DCS_HELI_JOYSTICK_MODE</value>
 			<sim>DCS</sim>
 			<device>any</device>
 		</classdefaults_DCS>

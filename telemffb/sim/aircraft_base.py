@@ -344,7 +344,7 @@ class AircraftBase(object):
     def spring_mode_is(self, mode):
         return mode.name == self.spring_mode
 
-    def gforce_mode_is(self, mode):
+    def gforce_effect_mode_is(self, mode):
         return mode.name == self.gforce_effect_mode
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
