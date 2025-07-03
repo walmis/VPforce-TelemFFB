@@ -11,6 +11,7 @@ from . import xmlutils
 class SettingsManager:
     def __init__(self, datasource='', device='joystick', userconfig_path='', defaults_path='', system_settings={}):
 
+        self.timed_out = True
         self.current_sim = "nothing"
         self.current_class = ""
         self.current_aircraft_name = ""
