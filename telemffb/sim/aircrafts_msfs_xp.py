@@ -2828,4 +2828,16 @@ class SASHelicopter(Helicopter):
         pass
 
 
+class FlyInsideHelicopter(Helicopter):
+    vibration_intensity = 0
+
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+
+        input_data = HapticEffect.device.get_input()
+        self.phys_x, self.phys_y = input_data.axisXY()
+        self.cpO_y = round(self.phys_y * 4096)
+
+
+
 

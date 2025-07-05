@@ -64,7 +64,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
-		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,HPGHelicopter,GliderAircraft,SASHelicopter</validvalues>
+		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,GliderAircraft,Helicopter,HPGHelicopter,SASHelicopter,FlyInsideHelicopter</validvalues>
 	</defaults>
 	<defaults>
 		<datatype>list</datatype>
@@ -4226,6 +4226,22 @@
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
 	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>float</datatype>
+		<grouping>Vibration</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>42000</order>
+		<name>vibration_intensity</name>
+		<displayname>Vibration Intensity</displayname>
+		<prereq>mechanical_group</prereq>
+		<info>Intensity of Helicopter Vibration (from external flight model)</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+	</defaults>
 	<defaults><order>49999</order></defaults>
 	<defaults><order>49999</order></defaults>
 	<defaults>
@@ -4927,6 +4943,27 @@
 		<model>FlyInside - B206.*</model>
 		<var>L:Aircraft.Hydraulics.Enabled</var>
 		<sc_unit>bool</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibX</name>
+		<model>FlyInside B47.*</model>
+		<var>L:Aircraft.Vibrations.X</var>
+		<sc_unit>number</sc_unit>
+		<scale>1000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibY</name>
+		<model>FlyInside B47.*</model>
+		<var>L:Aircraft.Vibrations.Y</var>
+		<sc_unit>number</sc_unit>
+		<scale>10000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibZ</name>
+		<model>FlyInside B47.*</model>
+		<var>L:Aircraft.Vibrations.Z</var>
+		<sc_unit>number</sc_unit>
+		<scale>1000</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>EngRPM</name>
@@ -7608,6 +7645,13 @@
 		<classdefaults_MSFS>
 			<name>vrs_effect_intensity</name>
 			<type>SASHelicopter</type>
+			<value>0.12</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>vibration_intensity</name>
+			<type>FlyInsideHelicopter</type>
 			<value>0.12</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -15381,7 +15425,7 @@
 	<models>
 		<name>type</name>
 		<model>FlyInside B47.*</model>
-		<value>Helicopter</value>
+		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -16752,6 +16796,10 @@
 	<classes>
 		<sim>MSFS</sim>
 		<class_name>SASHelicopter</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>FlyInsideHelicopter</class_name>
 	</classes>
 	<classes>
 		<sim>XPLANE</sim>

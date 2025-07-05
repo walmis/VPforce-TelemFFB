@@ -95,6 +95,7 @@ def config_to_dict(section, name, value, isim="", device=G.device_type, new_ac=F
         "Helicopter",
         "HPGHelicopter",
         "SASHelicopter",
+        "FlyInsideHelicopter",
     ]
     sim = ""
     cls = ""
