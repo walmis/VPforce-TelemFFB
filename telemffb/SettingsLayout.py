@@ -1022,9 +1022,7 @@ class SettingsLayout(QGridLayout):
 
 
         if item['has_expander'].lower() == 'true' or item['datatype'] == 'group':
-            # These are top level config sections that have an expander button but do not have any ".1" sliders
-            # color = "#cc7ee0" if G.useDarkMode else "#ab37c8"              # lighter purple looks better in dark
-            # color = "#ab37c8" if item['datatype'] == 'group' else color    # unless its big group font
+
             labeltext = item["name"] if self.show_settings_names else item["displayname"]
             if '.0' not in item['order']:
                 # label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
@@ -1032,10 +1030,11 @@ class SettingsLayout(QGridLayout):
                 label.text_label.setToolTip(f'Click to {clickaction}')
                 label.setClickable(True)
                 label.clicked.connect(expand_button.click)
-                label.text_label.setStyleSheet(styles.GROUP_LABEL_STYLESHEET)
-                # label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-                # label.text_label.setOpenExternalLinks(False)
-                # label.text_label.linkActivated.connect(expand_button.click)
+                if item['datatype'] == 'group':
+                    label.text_label.setStyleSheet(styles.GROUP_LABEL_STYLESHEET)
+                else:
+                    label.text_label.setStyleSheet(styles.EXPAND_LABEL_STYLESHEET)
+
             else:
                 label.text_label.setStyleSheet(styles.LOCKED_GROUP_LABEL_STYLESHEET)
 

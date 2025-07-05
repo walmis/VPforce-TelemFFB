@@ -48,7 +48,7 @@ class StyledButton(QPushButton):
     where button appearance is heavily styled (e.g., gradients, rounded borders, etc.).
 
     Key Features:
-    - Ensures a minimum button width (default: 60px) so that short labels like "OK" or "Go"
+    - Ensures a minimum button width (default: 75px) so that short labels like "OK" or "Go"
       do not result in overly narrow buttons, which can look awkward or inconsistent.
     - Maintains the height determined by the base QPushButton and active style/theme.
     - Applies a specific object name ("styledButton") to associate with custom CSS rules.
