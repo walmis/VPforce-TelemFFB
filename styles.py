@@ -5,14 +5,11 @@ Contains both dark mode and light mode stylesheets.
 
 DARK_MODE_STYLESHEET = """
 QPushButton:!pressed, #styledButton:!pressed {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                      stop: 0 #e4a9e7, stop: 0.2 #c174e6,
-                                      stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
-    border-radius: 5px;
-    padding: 3px;
-    margin: 0px;
-    color: white;
-    border: 1px solid #6e1d6f;
+    background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:0, y2:0.0397727, stop:0 rgba(160, 0, 200, 255), stop:1 rgba(174, 106, 206, 255));
+    border-radius: 6px;
+    padding: 2px;
+    color: #dddddd; /* Ensures consistency */
+    border: 1px solid #9d30b3;
 }
 
 QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
@@ -27,14 +24,14 @@ QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
 }
 
 QPushButton:pressed, #styledButton:pressed {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                      stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
-                                      stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7);
-    border-radius: 5px;
-    padding: 3px;
-    margin: 0px;
-    color: white;
-    border: 1px solid #4e164e;
+    background-color: qlineargradient(
+        x1:0, y1:1, x2:1, y2:0,
+        stop: 0 #6e1d6f,
+        stop: 1.0 #ab37c8
+    );
+    border-radius: 6px;
+    padding: 4px 8px;
+    border: 1px solid #ab37c8;
 }
 
 QPushButton:hover:!pressed, #styledButton:hover:!pressed {
@@ -44,6 +41,7 @@ QPushButton:hover:!pressed, #styledButton:hover:!pressed {
     border-radius: 5px;
     padding: 3px;
     margin: 0px;
+    color: white;
     border: 1px solid #8e1da8;
 }
 
@@ -83,7 +81,25 @@ QPushButton[buttonType="p_m_button"]:hover {
                                                                    
 QPushButton[buttonType="p_m_button"]:pressed {                          
     background-color: #666;  /* Optional: Change background on press */ 
-}                                                                       
+}     
+
+QPushButton#SimPauseButton {
+    background-color: palette(button);
+    color: palette(buttonText);
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font: bold 12px 'Segoe UI';
+}
+
+QPushButton#SimPauseButton:hover {
+    background-color: palette(highlight);
+    color: palette(highlightedText);
+}
+
+QPushButton#SimPauseButton:pressed {
+    background-color: palette(dark);
+}                                                    
 
 QToolButton[buttonType="expand_button"] {                                                          
     font-size: 16px;  /* Adjust the font size */                       
@@ -176,32 +192,9 @@ QComboBox {
 QComboBox QAbstractItemView {
     background-color: #2b2b2b;
 }
-
-QCheckBox {
-    color: palette(text);
-    spacing: 5px;
+QCheckBox:disabled {
+  color: rgb(155, 155, 155);  /* lighter grey for better visibility */
 }
-
-QCheckBox::indicator {
-    border: 1px solid #888;
-    background-color: transparent;
-    border-radius: 3px;
-}
-
-QCheckBox::indicator:checked {
-    background-color: #ab37c8;
-    border: 1px solid #c174e6;
-}
-
-QCheckBox::indicator:unchecked:hover {
-    border: 1px solid #ab37c8;
-}
-
-QCheckBox::indicator:disabled {
-    background-color: #444;
-    border: 1px solid #666;
-}
-
 QLabel {
     color: palette(text);
     background: transparent;
@@ -234,14 +227,11 @@ QLabel#StatusLabel:!hover {
 
 LIGHT_MODE_STYLESHEET = """
 QPushButton:!pressed, #styledButton:!pressed {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                      stop: 0 #e4a9e7, stop: 0.2 #c174e6,
-                                      stop: 0.5 #ab37c8, stop: 0.8 #8e1da8, stop: 1.0 #6e1d6f);
-    border-radius: 5px;
-    padding: 3px;
-    margin: 0px;
-    color: white;
-    border: 1px solid #6e1d6f;
+    background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:0, y2:0.0397727, stop:0 rgba(160, 0, 200, 255), stop:1 rgba(174, 106, 206, 255));
+    border-radius: 6px;
+    padding: 2px;
+    color: #dddddd; /* Ensures consistency */
+    border: 1px solid #9d30b3;
 }
 
 QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
@@ -256,14 +246,14 @@ QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
 }
 
 QPushButton:pressed, #styledButton:pressed {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                      stop: 0 #6e1d6f, stop: 0.2 #8e1da8,
-                                      stop: 0.5 #ab37c8, stop: 0.8 #c174e6, stop: 1.0 #e4a9e7);
-    border-radius: 5px;
-    padding: 3px;
-    margin: 0px;
-    color: white;
-    border: 1px solid #4e164e;
+    background-color: qlineargradient(
+        x1:0, y1:1, x2:1, y2:0,
+        stop: 0 #6e1d6f,
+        stop: 1.0 #ab37c8
+    );
+    border-radius: 6px;
+    padding: 4px 8px;
+    border: 1px solid #ab37c8;
 }
 
 QPushButton:hover:!pressed, #styledButton:hover:!pressed {

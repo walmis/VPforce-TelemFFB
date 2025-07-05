@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageB
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, CenteredClickableComboBox)
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton)
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.AdvancedGDialog import AdvancedGDialog

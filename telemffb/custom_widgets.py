@@ -20,7 +20,7 @@ from PyQt6.QtGui import QAction
 
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
-    QComboBox, QMessageBox, QMenu, QPushButton
+    QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
@@ -40,30 +40,48 @@ import styles
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
-class CenteredClickableComboBox(QComboBox):
-    # Custom combo box widget that both allows disabled line-edit as well as clicking on the main part of the widget to expand
+class StyledButton(QPushButton):
+    """
+    A QPushButton subclass that ensures consistent styling and sizing.
+
+    This class is designed to be used with custom QSS (Qt Style Sheets)
+    where button appearance is heavily styled (e.g., gradients, rounded borders, etc.).
+
+    Key Features:
+    - Ensures a minimum button width (default: 60px) so that short labels like "OK" or "Go"
+      do not result in overly narrow buttons, which can look awkward or inconsistent.
+    - Maintains the height determined by the base QPushButton and active style/theme.
+    - Applies a specific object name ("styledButton") to associate with custom CSS rules.
+
+    Usage:
+    - Promote QPushButton widgets to StyledButton in Qt Designer.
+    - Ensure stylesheet contains styles for `#styledButton` to take effect.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setEditable(True)
-        # Disable the focus stealing of the internal QLineEdit
-        self.lineEdit().setReadOnly(True)
-        self.lineEdit().setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
-        self.lineEdit().installEventFilter(self)
+        # Set the object name to apply custom QSS styles targeting "#styledButton"
+        self.setObjectName("styledButton")
 
-    def mousePressEvent(self, event: QtGui.QMouseEvent):
-        if event.button() == QtCore.Qt.MouseButton.LeftButton:
-            self.showPopup()
-        super().mousePressEvent(event)
+    def sizeHint(self):
+        """
+        Returns the recommended size for the button, ensuring a minimum width
+        while preserving default style-calculated height.
+        """
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
 
-    def wheelEvent(self, event):
-        # ignore mouse wheel
-        pass
+        # Calculate the styled button size from the current style
+        style_size = self.style().sizeFromContents(
+            QStyle.ContentsType.CT_PushButton,
+            opt,
+            super().sizeHint(),
+            self
+        )
 
-    def eventFilter(self, obj, event):
-        if obj == self.lineEdit() and event.type() == QtCore.QEvent.Type.MouseButtonPress:
-            self.showPopup()
-            return True
-        return super().eventFilter(obj, event)
+        # Enforce a minimum width of 60px to match standard button sizing
+        min_width = max(style_size.width(), 75)
+
+        return QSize(min_width, super().sizeHint().height())
 
 class NoKeyScrollArea(QScrollArea):
     def __init__(self):
