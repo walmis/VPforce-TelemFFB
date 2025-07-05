@@ -83,24 +83,6 @@ QPushButton[buttonType="p_m_button"]:pressed {
     background-color: #666;  /* Optional: Change background on press */ 
 }     
 
-QPushButton#SimPauseButton {
-    background-color: palette(button);
-    color: palette(buttonText);
-    border: 1px solid palette(mid);
-    border-radius: 6px;
-    padding: 4px 10px;
-    font: bold 12px 'Segoe UI';
-}
-
-QPushButton#SimPauseButton:hover {
-    background-color: palette(highlight);
-    color: palette(highlightedText);
-}
-
-QPushButton#SimPauseButton:pressed {
-    background-color: palette(dark);
-}                                                    
-
 QToolButton[buttonType="expand_button"] {                                                          
     font-size: 16px;  /* Adjust the font size */                       
     font-family: Cascadia Code;                                        
@@ -388,6 +370,12 @@ QLabel#StatusLabel:!hover {
 """
 
 GROUP_LABEL_STYLESHEET = """
+QLabel {
+    color: #ab37c8;
+    font-family: "Black Ops One";
+    font-size: 14pt;
+}
+
 QLabel:hover {
     color: #c473d9;
     text-decoration: underline; 
@@ -398,6 +386,16 @@ QLabel:!hover {
     text-decoration: underline; 
 }
 """
+
+LOCKED_GROUP_LABEL_STYLESHEET = """
+QLabel {
+    color: #ab37c8;
+    font-family: "Black Ops One";
+    font-size: 14pt;
+}
+
+"""
+
 
 EXPAND_LABEL_STYLESHEET = """
 QLabel:hover {

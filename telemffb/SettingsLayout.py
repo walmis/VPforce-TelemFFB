@@ -955,11 +955,6 @@ class SettingsLayout(QGridLayout):
 
         # grouping collapsible header
         if item['datatype'] == 'group':
-
-            font_family = "Black Ops One"
-            font_size = 14
-            label.text_label.setFont(QFont(font_family, font_size))
-
             expand_button.setVisible(False)
 
         if not rowdisabled:
@@ -1042,7 +1037,7 @@ class SettingsLayout(QGridLayout):
                 # label.text_label.setOpenExternalLinks(False)
                 # label.text_label.linkActivated.connect(expand_button.click)
             else:
-                label.text_label.setStyleSheet("color: #ab37c8;")
+                label.text_label.setStyleSheet(styles.LOCKED_GROUP_LABEL_STYLESHEET)
 
         if item['order'][-1:] == '1' and '.' in item['order']:
             # For ".1" config objects, they take the place of the parent setting in the row when enabled so #we
