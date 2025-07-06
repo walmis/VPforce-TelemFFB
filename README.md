@@ -6,12 +6,10 @@ This Python application takes telemetry input a simulator and generates augmente
 Please note that while some effects may not be fully realistic, the main goal is to make the stick more lively and increase immersion during gameplay. 
 
 ## Quick Start
-While there is a "stable release" version 1.0.0 posted here on github, the vast majority of users are on the "Work in Progress" code base, which 
-is more advanced and user friendly than the current 'stable" version.  
 
-To get the latest "WIP" version, simply navigate to https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=D 
+To get the latest version, simply navigate to https://github.com/walmis/VPforce-TelemFFB/releases 
 - Download the latest package, unzip and run the exe
-- Don't forget to read the manual (Section 4.2) here: https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit
+- Don't forget to read the manual (Section 4) here: https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit
 ## Features
 Note:  Not all features are listed here, not all features are supported in all simulators
 - Turbulence effects that mimic the shaking and vibrations of flying through rough air
@@ -41,19 +39,18 @@ Full support for all of the above listed effects
 ### FFB Enabled Pedals
 Pedal behavior with TelemFFB will vary based on the sim in question.  None of the supported sims have native pedal support, so everything below is implemented entirely in TelemFFB.  
 In addition to most of the haptic effects listed above, the following is also supported:
-- MSFS
+- MSFS / XPLANE
   - Auto switching between FBW (fixed spring), Dynamic spring force w/ dynamic slip based forces, and un-sprung for helicopters (configurable dampening)
   - Rudder trim following
   - Rudder autopilot following
   - Nose-wheel shimmy effect
-- DCS
+- DCS / IL2
   - Auto switching between pedal spring modes (mode override and spring force configuration options available per aircraft)
     - Dynamic spring force based on individual aircraft speed envelope (Warbird default)
     - Fixed spring (Jet default)
     - Un-sprung with configurable dampening (Helicopter default)
   - Rudder trim following for fixed wing aircraft
-- IL2 
-  - Nothing has been added for pedals in IL-2 as of yet
+
 
 ### FFB Enabled Collective
 While the collective is not typically a control one would associate with requiring FFB, there are certain advantages as compared to a collective that relies on friction to stay put or provide dampening.
@@ -96,14 +93,13 @@ Similar to DCS, IL-2 has native FFB joystick support.  TelemFFB implements many 
 Note that there are several effects implemented in TelemFFB that are duplications of effects already supported by IL-2 (Gunfire, Stall/Drag buffeting and ground-roll).  If you chose to enable these effects in TelemFFB, it is recommended to disable the 'shake' force in the IL-2 FFB settings.
 
 ## Requirements
-- Python 3.9+
+- Python 3.11+
 - Git (https://git-scm.com/) to download the source from Github
 - DCS World, MSFS, or IL-2
 - VPforce Rhino FFB Joystick/kit, DIY Pedals or DIY Collective
 
 ## Documentation
-- The latest stable version documentation can be found here:  https://vpforce.eu/downloads/VPforce_Rhino_Manual.pdf
-- The latest 'work in progress' documentation is available at this Google Drive link:  https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit  
+- The latest documentation can be found here:  https://vpforce.eu/downloads/VPforce_Rhino_Manual.pdf 
 <br>
 Note that the documentation may be in-flux between 'wip' releases and may show features that are not yet released.
 
@@ -112,9 +108,9 @@ Note that the documentation may be in-flux between 'wip' releases and may show f
 ### Downloading
 If you are not git-savy or simply don't want to deal with python, git, and cloning repositories and would rather just use an all-in-one executable distribution...
 
-- The stable (master) branch release version is available here:   https://github.com/walmis/VPforce-TelemFFB/releases
+- The stable release version is available here:   https://github.com/walmis/VPforce-TelemFFB/releases
 
-- The development ('wip', possibly unstable) branch auto-builds are available here after each commit to the repository: https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=D
+- The development ('wip', possibly unstable) auto-builds are available here after each commit to the repository: https://vpforcecontrols.com/downloads/TelemFFB/?C=M;O=D
 <br>
 ### Installing and running
 Simply extract the zip file into a folder on your PC and run the exe
