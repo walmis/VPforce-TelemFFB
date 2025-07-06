@@ -2843,17 +2843,17 @@ class FlyInsideHelicopter(Helicopter):
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
-
+        rrpm = telem_data.get("RotorRPM")
         if self.is_joystick():
-            self._update_vibration(telem_data.get("FI_VibX"),telem_data.get("FI_VibY"))
+            self._update_vibration(telem_data.get("FI_VibX"),telem_data.get("FI_VibY") ,rrpm)
 
         if self.is_pedals():
-            self._update_vibration(telem_data.get("FI_VibX"),telem_data.get("FI_VibZ"))
+            self._update_vibration(telem_data.get("FI_VibX"),telem_data.get("FI_VibZ") ,rrpm)
 
         if self.is_collective():
-            self._update_vibration(telem_data.get("FI_VibZ"),telem_data.get("FI_VibY"))
+            self._update_vibration(telem_data.get("FI_VibZ"),telem_data.get("FI_VibY") ,rrpm)
 
-    def _update_vibration(self, X, Y):
+    def _update_vibration(self, X, Y, rrpm):
         if self.FI_vibration_enable:
 
             # FI vibration data is initially scaled in sc_overrides.
@@ -2863,6 +2863,9 @@ class FlyInsideHelicopter(Helicopter):
             direction = math.degrees(math.atan2(Y, X))
             # safety scaling if needed. tested at 50% configurator constant setting
             force *= 1
+
+            # reduce at lower rotor rpm
+            force *= utils.scale_clamp(rrpm,(0,150),(0,1))
 
             # crop input values to 1.0 because there may be higher numbers from crashes etc
             force = min(force, 1.0)
