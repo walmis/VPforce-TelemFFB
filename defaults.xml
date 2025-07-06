@@ -5799,6 +5799,18 @@
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>aoa_buffeting_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>aoa_effect_enabled</name>
 			<type>GliderAircraft</type>
 			<value>false</value>
@@ -6068,6 +6080,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>engine_jet_rumble_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>engine_jet_rumble_enabled</name>
 			<type>Helicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
@@ -6112,6 +6130,12 @@
 			<name>engine_rotor_rumble_enabled</name>
 			<type>SASHelicopter</type>
 			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>etl_effect_enable</name>
+			<type>!FlyInsideHelicopter</type>
 			<sim>MSFS</sim>
 			<device>any</device>
 		</classdefaults_MSFS>
@@ -6365,6 +6389,18 @@
 			<value>0</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>gear_buffet_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>gear_motion_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>hands_off_deadzone</name>
@@ -6988,6 +7024,18 @@
 			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>runway_rumble_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>rotor_blade_count</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>rotor_blade_count</name>
 			<type>Helicopter</type>
 			<value>2</value>
@@ -7489,6 +7537,12 @@
 			<device>trimwheel</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>touchdown_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>type</name>
 			<type>GliderAircraft</type>
 			<value>GliderAircraft</value>
@@ -7653,6 +7707,12 @@
 			<name>vne_override</name>
 			<type>TurbopropAircraft</type>
 			<unit>kt</unit>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>vrs_effect_enable</name>
+			<type>!FlyInsideHelicopter</type>
 			<sim>MSFS</sim>
 			<device>any</device>
 		</classdefaults_MSFS>
