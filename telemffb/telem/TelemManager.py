@@ -422,6 +422,7 @@ class TelemManager(QObject, threading.Thread):
     def _handle_config_changes(self, aircraft_info: AircraftInfo):
         """Handle configuration changes for existing aircraft."""
         if self.currentAircraft and config_has_changed():
+            xmlutils.update_roots()  # ride the same logic and Update the xml tree in xmlutils when the config changes
             logging.info("Configuration has changed, reloading")
             aircraft_name = aircraft_info.name
             data_source = aircraft_info.data_source

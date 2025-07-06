@@ -33,7 +33,13 @@ print_method_calls = False
 device = ''
 userconfig_path = ''
 defaults_path = ''
+global auto_user_root  #
+global auto_defaults_root  #
 
+def update_roots():
+    global auto_user_root, auto_defaults_root
+    auto_user_root = try_parse(G.userconfig_path).getroot()
+    auto_defaults_root = try_parse(G.defaults_path).getroot()
 
 def dbprint(color, msg):
     reset = '\033[0m'
@@ -84,11 +90,11 @@ def update_vars(_device, _userconfig_path, _defaults_path):
     defaults_path = _defaults_path
 
 def get_classes_for_sim(sim):
-    tree = try_parse(defaults_path)
-    root = tree.getroot()
+    # tree = try_parse(defaults_path)
+    # root = tree.getroot()
     classes = []
     # print(f"LOOKING FOR CLASSES FOR SIM {sim}")
-    for elem in root.findall(f'.//classes[sim="{sim}"]'):
+    for elem in auto_defaults_root.findall(f'.//classes[sim="{sim}"]'):
         class_name = elem.find('class_name')
         if class_name is not None:
             name = class_name.text
@@ -97,10 +103,10 @@ def get_classes_for_sim(sim):
     return classes
 
 def get_sims():
-    tree = try_parse(defaults_path)
-    root = tree.getroot()
+    # tree = try_parse(defaults_path)
+    # root = tree.getroot()
     sims = []
-    for elem in root.findall(f'.//sims'):
+    for elem in auto_defaults_root.findall(f'.//sims'):
         sim_name = elem.find('sim')
         if sim_name is not None:
             name = sim_name.text
@@ -108,9 +114,9 @@ def get_sims():
     return sims
 
 def read_xml_file(the_sim, instance_device=''):
-    mprint(f"read_xml_file  {the_sim}")
-    tree = try_parse(defaults_path)
-    root = tree.getroot()
+    # mprint(f"read_xml_file  {the_sim}")
+    # tree = try_parse(defaults_path)
+    # root = tree.getroot()
 
     if instance_device == '':
         the_device = device
@@ -119,7 +125,7 @@ def read_xml_file(the_sim, instance_device=''):
 
     # Collect data in a list of dictionaries
     data_list = []
-    for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][{the_device}="true"]'):
+    for defaults_elem in auto_defaults_root.findall(f'.//defaults[{the_sim}="true"][{the_device}="true"]'):
 
         grouping_elem = defaults_elem.find('grouping')
         grouping = grouping_elem.text if grouping_elem is not None else ""
@@ -178,12 +184,12 @@ def read_xml_file(the_sim, instance_device=''):
 
 def read_anydevice_settings(the_sim):
 
-    tree = try_parse(defaults_path)
-    root = tree.getroot()
+    # tree = try_parse(defaults_path)
+    # root = tree.getroot()
 
     # Collect data in a list of dictionaries
     data_list = []
-    for defaults_elem in root.findall(f'.//defaults[{the_sim}="true"][any="true"]'):
+    for defaults_elem in auto_defaults_root.findall(f'.//defaults[{the_sim}="true"][any="true"]'):
 
         name_elem = defaults_elem.find('name')
         if name_elem is not None:
@@ -195,15 +201,15 @@ def read_anydevice_settings(the_sim):
 
 def read_models(the_sim, the_class=''):
     all_models = ['']
-    tree = try_parse(defaults_path)
-    root = tree.getroot()
+    # tree = try_parse(defaults_path)
+    # root = tree.getroot()
     if the_class == '':
-        def_models =  root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
-                      root.findall(f'.//models[sim="any"][device="{device}"]') + \
-                      root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
-                      root.findall(f'.//models[sim="any"][device="any"]')
+        def_models =  auto_defaults_root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
+                      auto_defaults_root.findall(f'.//models[sim="any"][device="{device}"]') + \
+                      auto_defaults_root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+                      auto_defaults_root.findall(f'.//models[sim="any"][device="any"]')
     else:
-        def_models = root.findall(f'.//models[sim="{the_sim}"][value="{the_class}"]')
+        def_models = auto_defaults_root.findall(f'.//models[sim="{the_sim}"][value="{the_class}"]')
 
     for model_elem in def_models:
         pattern = model_elem.find('model')
@@ -213,15 +219,15 @@ def read_models(the_sim, the_class=''):
                 all_models.append(pattern.text)
 
     # create_empty_userxml_file() - handled by TelemFFB on startup via utils.py
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    # tree = try_parse(userconfig_path)
+    # root = tree.getroot()
     if the_class == '':
-        usr_models =  root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
-                      root.findall(f'.//models[sim="any"][device="{device}"]') + \
-                      root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
-                      root.findall(f'.//models[sim="any"][device="any"]')
+        usr_models =  auto_user_root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
+                      auto_user_root.findall(f'.//models[sim="any"][device="{device}"]') + \
+                      auto_user_root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
+                      auto_user_root.findall(f'.//models[sim="any"][device="any"]')
     else:
-        usr_models = root.findall(f'.//models[sim="{the_sim}"][value="{the_class}"]')
+        usr_models = auto_user_root.findall(f'.//models[sim="{the_sim}"][value="{the_class}"]')
     for model_elem in usr_models:
         pattern = model_elem.find('model')
         # lprint (pattern.text)
@@ -523,8 +529,8 @@ def write_sc_override_to_xml(the_model, the_var, setting_name, sc_unit='', scale
 
 def read_default_class_data(the_sim, the_class, instance_device=''):
     mprint(f"read_default_class_data  sim {the_sim}, class {the_class}")
-    tree = try_parse(defaults_path)
-    root = tree.getroot()
+    # tree = try_parse(defaults_path)
+    # root = tree.getroot()
 
     class_data = []
     if instance_device == '':
@@ -532,10 +538,10 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
     else:
         the_device = instance_device
     # Iterate through models elements
-    for model_elem in root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="{the_device}"]') + \
-                      root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="{the_device}"]') + \
-                      root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
-                      root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="any"]'):
+    for model_elem in auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="{the_device}"]') + \
+                      auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="{the_device}"]') + \
+                      auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="{the_class}"][device="any"]') + \
+                      auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="{the_class}"][device="any"]'):
 
         if model_elem.find('name') is not None:
 
@@ -554,10 +560,10 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
 
             class_data.append(model_dict)
     removal_data = []
-    for model_elem in root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="{the_device}"]') + \
-                      root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="{the_device}"]') + \
-                      root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="any"]') + \
-                      root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="any"]'):
+    for model_elem in auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="{the_device}"]') + \
+                      auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="{the_device}"]') + \
+                      auto_defaults_root.findall(f'.//classdefaults_{the_sim}[sim="{the_sim}"][type="!{the_class}"][device="any"]') + \
+                      auto_defaults_root.findall(f'.//classdefaults_any[sim="any"][type="!{the_class}"][device="any"]'):
         removal_data.append(model_elem.find('name').text)
     if not removal_data:
         removal_data = None
@@ -701,8 +707,8 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
 
 def read_user_sim_data(the_sim, instance_device=''):
     mprint(f"read_user_sim_data {the_sim}")
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    # tree = try_parse(userconfig_path)
+    # root = tree.getroot()
 
     sim_data = []
     if instance_device == '':
@@ -711,10 +717,10 @@ def read_user_sim_data(the_sim, instance_device=''):
         the_device = instance_device
     # Iterate through models elements
     # for model_elem in root.findall(f'.//simSettings[sim="{the_sim}" or sim="any"][device="{device}" or device="any"]'):
-    for model_elem in root.findall(f'.//simSettings[sim="{the_sim}"][device="{the_device}"]') + \
-                       root.findall(f'.//simSettings[sim="any"][device="{the_device}"]') + \
-                       root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]')  + \
-                       root.findall(f'.//simSettings[sim="any"][device="any"]'):
+    for model_elem in auto_user_root.findall(f'.//simSettings[sim="{the_sim}"][device="{the_device}"]') + \
+                       auto_user_root.findall(f'.//simSettings[sim="any"][device="{the_device}"]') + \
+                       auto_user_root.findall(f'.//simSettings[sim="{the_sim}"][device="any"]')  + \
+                       auto_user_root.findall(f'.//simSettings[sim="any"][device="any"]'):
 
         if model_elem.find('name') is not None:
 
@@ -736,8 +742,8 @@ def read_user_sim_data(the_sim, instance_device=''):
 
 def read_user_class_data(the_sim, crafttype, instance_device=''):
     mprint(f"read_user_class_data  {the_sim}, {crafttype}")
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    # tree = try_parse(userconfig_path)
+    # root = tree.getroot()
 
     model_data = []
     if instance_device == '':
@@ -746,7 +752,7 @@ def read_user_class_data(the_sim, crafttype, instance_device=''):
         the_device = instance_device
     # Iterate through models elements
     #for model_elem in root.findall(f'.//models[sim="{the_sim}"][device="{device}"]'):
-    for model_elem in root.findall(f'.//classSettings[sim="{the_sim}"][device="{the_device}"]'):     # + \
+    for model_elem in auto_user_root.findall(f'.//classSettings[sim="{the_sim}"][device="{the_device}"]'):     # + \
                       # root.findall(f'.//classSettings[sim="any"][device="{device}"]') + \
                       # root.findall(f'.//classSettings[sim="{the_sim}"][device="any"]') + \
                       # root.findall(f'.//classSettings[sim="any"][device="any"]'):
@@ -1186,12 +1192,12 @@ def sort_elements(tree):    #  unused for now.
 
 
 def read_prereqs():
-    tree = try_parse(defaults_path)
-    root = tree.getroot()
+    # tree = try_parse(defaults_path)
+    # root = tree.getroot()
 
     # Collect data in a list of dictionaries
     data_list = []
-    for defaults_elem in root.findall(f'.//defaults'):
+    for defaults_elem in auto_user_root.findall(f'.//defaults'):
         if defaults_elem.find('name') is None and defaults_elem.find('order') is None and defaults_elem.find('datatype') is None:
             # Ignore empty rows that may exist for readability purposes
             continue
