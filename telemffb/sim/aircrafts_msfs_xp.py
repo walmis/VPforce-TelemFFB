@@ -360,6 +360,7 @@ class Aircraft(AircraftBase):
             newvalue = (1 + k) * x + (-k) * (math.exp(expo_a * (x - 1)) - math.exp(-expo_a)) / (1 - math.exp(-expo_a))
         #print(f'expo input:{x} k:{k} output:{newvalue}')
         return newvalue
+
     def _update_turbulence(self):
         if self.turbulence_effect_enable:
             force, dir = turbulence_modulator.update(self.telem_data, self.turbulence_hpf_alpha, self.turbulence_smoothing_alpha, self.turbulence_sensitivity, self.turbulence_intensity)
@@ -2829,7 +2830,9 @@ class SASHelicopter(Helicopter):
 
 
 class FlyInsideHelicopter(Helicopter):
-    vibration_intensity = 0
+    FI_vibration_enable = True
+    FI_vibration_intensity = 0
+    FI_vibration_expo = 0
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -2838,6 +2841,39 @@ class FlyInsideHelicopter(Helicopter):
         self.phys_x, self.phys_y = input_data.axisXY()
         self.cpO_y = round(self.phys_y * 4096)
 
+    def on_telemetry(self, telem_data):
+        super().on_telemetry(telem_data)
 
+        if self.is_joystick():
+            self._update_vibration(telem_data.get("FI_VibX"),telem_data.get("FI_VibY"))
 
+        if self.is_pedals():
+            self._update_vibration(telem_data.get("FI_VibX"),telem_data.get("FI_VibZ"))
+
+        if self.is_collective():
+            self._update_vibration(telem_data.get("FI_VibZ"),telem_data.get("FI_VibY"))
+
+    def _update_vibration(self, X, Y):
+        if self.FI_vibration_enable:
+
+            # FI vibration data is initially scaled in sc_overrides.
+            # tune there so that the max desired vibration (overspeed probably) is ~1.0
+
+            force = math.hypot(X, Y)
+            direction = math.degrees(math.atan2(Y, X))
+            # safety scaling if needed. tested at 50% configurator constant setting
+            force *= 1
+
+            # crop input values to 1.0 because there may be higher numbers from crashes etc
+            force = min(force, 1.0)
+            force = self.expocurve(force, self.FI_vibration_expo)
+            force *= self.FI_vibration_intensity
+
+            force = round(force, 4)
+
+            effects['FI_vibration'].constant(force, direction).start()
+
+            #print(f"FI_vibration_force:{force} dir:{dir}")
+        else:
+            effects['FI_vibration'].destroy()
 
