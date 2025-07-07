@@ -4240,7 +4240,6 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
@@ -15461,7 +15460,7 @@
 	<models>
 		<name>type</name>
 		<model>FlyInside B206.*</model>
-		<value>Helicopter</value>
+		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
