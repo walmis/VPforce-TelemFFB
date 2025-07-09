@@ -27,6 +27,7 @@ from typing import List, Dict
 
 from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition
 from telemffb.hw.ffb_rhino import EFFECT_SPRING,EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION, EFFECT_SPRING_ADJUSTER
+from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN
 import telemffb.globals as G
 from telemffb.globals import master_instance, master_buttons
 
@@ -375,7 +376,7 @@ class AircraftBase(object):
         delta_to_go = data['dst_val'] - data['value']  # calculate distance left to move the value
         time_to_go = data['end_time'] - current_time_ms  # calculate time left to move the value to destination
 
-        step_size = (iteration_ms / time_to_go) * delta_to_go  # calculate step size required to reach target at time
+        step_size = (iteration_ms / time_to_go) * delta_to_go  # calculate step size to reach target at time
 
         if data['value'] == data['dst_val']:  # if we have reached the dst value, delete the key and return the value
             del self.stepper_dict[key]
@@ -643,13 +644,13 @@ class AircraftBase(object):
         Args:
             telem_data (dict): Telemetry data containing acceleration information
         """
-        if not self.is_joystick() or not self.new_gforce_effect_enable or not self.gforce_effect_master:
+        if self._should_skip_joystick_effect() or not self.new_gforce_effect_enable or not self.gforce_effect_master:
             effects.dispose("new_gforce")
             return
-        if sum(telem_data.get("WeightOnWheels")):
+        if self._should_skip_airborne_effect(telem_data):
             effects.dispose("new_gforce")
             return
-        if not telem_data.get("TAS", 0):
+        if self._should_skip_no_airspeed_effect(telem_data):
             effects.dispose("new_gforce")
             return
 
@@ -658,17 +659,11 @@ class AircraftBase(object):
         gmax = self.new_gforce_max_gs
         gmax_neg = self.new_gforce_max_gs_neg
 
-        if self._sim_is("DCS") or self._sim_is("IL2"):
-            gs: float = telem_data.get("ACCs")[1]
-            y_gs = telem_data.get("ACCs", 0)[0]
-            last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
-        elif self._sim_is("MSFS") or self._sim_is('XPLANE'):
-            gs: float = telem_data.get("G")
-            y_gs = telem_data.get("AccBody")[2]
-            last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
+        gs, y_gs, last_y_gs = self._get_gs_data(telem_data)
+        if gs is None:
+            return
 
-        delta_y = y_gs - last_y_gs
-        if abs(delta_y) > 3:  # Check deceleration G's.. If the per-frame rate of change is greater than 3-Gs, we have likely  crashed and telemetry is violently spiking.. do not play effect:
+        if self._is_telemetry_spike(y_gs, last_y_gs):
             effects.dispose("new_gforce")
             return
 
@@ -725,8 +720,7 @@ class AircraftBase(object):
 
     def _gforce_effect(self, telem_data, adv_spr=False):
         if not self.gforce_effect_master:
-            effects.dispose('gforce')
-            effects.dispose('new_gforce')
+            self._dispose_effects('gforce', 'new_gforce')
             return
         if self.new_gforce_effect_enable:
             # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
@@ -736,28 +730,22 @@ class AircraftBase(object):
         else:
             effects.dispose("new_gforce")
 
-        if not self.is_joystick():
+        if self._should_skip_joystick_effect():
             effects.dispose("gforce")
             return
 
-        if sum(telem_data.get("WeightOnWheels")):
+        if self._should_skip_airborne_effect(telem_data):
             effects.dispose("gforce")
             return
-        if not telem_data.get("TAS", 0):
+        if self._should_skip_no_airspeed_effect(telem_data):
             effects.dispose("gforce")
             return
 
-        if self._sim_is("DCS") or self._sim_is("IL2"):
-            gs: float = telem_data.get("ACCs")[1]
-            y_gs = telem_data.get("ACCs", 0)[0]
-            last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
-        elif self._sim_is("MSFS") or self._sim_is("XPLANE"):
-            gs: float = telem_data.get("G")
-            y_gs = telem_data.get("AccBody")[2]
-            last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
+        gs, y_gs, last_y_gs = self._get_gs_data(telem_data)
+        if gs is None:
+            return
 
-        delta_y = y_gs - last_y_gs
-        if abs(delta_y) > 3:  # Check deceleration G's.. If the per-frame rate of change is greater than 3-Gs, we have likely  crashed and telemetry is violently spiking.. do not play effect:
+        if self._is_telemetry_spike(y_gs, last_y_gs):
             effects.dispose("gforce")
             return
 
@@ -769,7 +757,6 @@ class AircraftBase(object):
             direction = 180
             if gs < gmin:
                 effects["gforce"].stop()
-                # effects.dispose("gforce_damper")
                 return
             g_factor = round(utils.non_linear_scaling(gs, gmin, gmax, curvature=self.gforce_effect_curvature), 4)
 
@@ -810,13 +797,11 @@ class AircraftBase(object):
                     g_factor = -gains.get('neg')
                     direction = 0
                 else:
-                    effects.dispose('gforce')
-                    effects.dispose('gforce_spr')
+                    self._dispose_effects('gforce', 'gforce_spr')
                     return
 
             if not g_factor:
-                effects.dispose('gforce')
-                effects.dispose('gforce_spr')
+                self._dispose_effects('gforce', 'gforce_spr')
                 return
             if mode == 'constant':
                 g_factor = utils.clamp(g_factor, 0.0, 1.0)
@@ -845,12 +830,12 @@ class AircraftBase(object):
     def _aoa_reduction_force_effect(self, telem_data):
         if not self.aoa_reduction_effect_enabled:
             return
-        if not self.is_joystick():
+        if self._should_skip_joystick_effect():
             return
-        if sum(telem_data.get("WeightOnWheels")):
+        if self._should_skip_airborne_effect(telem_data):
             effects.dispose("crit_aoa")
             return
-        if not telem_data.get("TAS", 0):
+        if self._should_skip_no_airspeed_effect(telem_data):
             effects.dispose("crit_aoa")
             return
         start_aoa = self.critical_aoa_start
@@ -1047,50 +1032,24 @@ class AircraftBase(object):
         gun = telem.get("Gun")
         flares = telem.get("Flares")
         chaff = telem.get("Chaff")
-        if self.anything_has_changed("PayloadInfo", payload) and self.weapon_release_effect_enabled:
-            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
+        
+        # Use helper method for weapon effects
+        self._create_weapon_effect("payload_rel", "PayloadInfo", payload, 
+                                 self.weapon_release_effect_enabled, self.weapon_release_intensity)
+        
+        self._create_weapon_effect("gunfire", "Gun", gun,
+                                 self.gunfire_effect_enabled, self.gun_vibration_intensity)
+        
+        # Countermeasures effect (combined flares and chaff)
+        cm_changed = (self.anything_has_changed("Flares", flares) or 
+                     self.anything_has_changed("Chaff", chaff))
+        if cm_changed and self.countermeasure_effect_enabled:
+            direction = self._get_effect_direction(self.weapon_effect_direction)
             if self.weapon_effect_direction == -1:
-                # Init random number for effect direction
-                random.seed(time.perf_counter())
-                random_weapon_release_direction = random.randint(0, 359)
-                if self.is_pedals():
-                    random_weapon_release_direction = random.choice([90, 270])
-
-                logging.info(f"Payload Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["payload_rel"].periodic(10, self.weapon_release_intensity, random_weapon_release_direction, duration=80).start(force=True)
-            else:
-                effects["payload_rel"].periodic(10, self.weapon_release_intensity, self.weapon_effect_direction, duration=80).start(force=True) # force sending the start command to the device
-        elif not self.anything_has_changed("PayloadInfo", payload, delta_ms=160) or not self.weapon_release_effect_enabled:
-            effects["payload_rel"].stop ()
-
-        if self.anything_has_changed("Gun", gun) and self.gunfire_effect_enabled:
-            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
-            if self.weapon_effect_direction == -1:
-                # Init random number for effect direction
-                random.seed(time.perf_counter())
-                random_weapon_release_direction = random.randint(0, 359)
-                if self.is_pedals():
-                    random_weapon_release_direction = random.choice([90, 270])
-                logging.info(f"Gun Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["gunfire"].periodic(10, self.gun_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
-            else:
-                effects["gunfire"].periodic(10, self.gun_vibration_intensity, self.weapon_effect_direction, duration=80).start(force=True)
-        elif not self.anything_has_changed("Gun", gun, delta_ms=160) or not self.gunfire_effect_enabled:
-            effects["gunfire"].stop()
-
-        if (self.anything_has_changed("Flares", flares) or self.anything_has_changed("Chaff", chaff)) and self.countermeasure_effect_enabled:
-            # If effect direction is set to random (-1) in ini file, randomize direction - else, use configured direction (default=45)
-            if self.weapon_effect_direction == -1:
-                # Init random number for effect direction
-                random.seed(time.perf_counter())
-                random_weapon_release_direction = random.randint(0, 359)
-                if self.is_pedals():
-                    random_weapon_release_direction = random.choice([90, 270])
-                logging.info(f"CM Effect Direction is randomized: {random_weapon_release_direction} deg")
-                effects["cm"].periodic(50, self.cm_vibration_intensity, random_weapon_release_direction, duration=80).start(force=True)
-            else:
-                effects["cm"].periodic(50, self.cm_vibration_intensity, self.weapon_effect_direction, duration=80).start(force=True)
-        if not (self.anything_has_changed("Flares", flares, delta_ms=160) or self.anything_has_changed("Chaff", chaff, delta_ms=160)) or not self.countermeasure_effect_enabled:
+                logging.info(f"CM Effect Direction is randomized: {direction} deg")
+            effects["cm"].periodic(50, self.cm_vibration_intensity, direction, duration=80).start(force=True)
+        elif not (self.anything_has_changed("Flares", flares, delta_ms=160) or 
+                 self.anything_has_changed("Chaff", chaff, delta_ms=160)) or not self.countermeasure_effect_enabled:
             effects["cm"].stop()
 
     def _update_flaps(self, flapspos):
@@ -1154,6 +1113,7 @@ class AircraftBase(object):
         if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
             return
 
+        # Speed brake motion effect
         if self.anything_has_changed("speedbrakes_value", spdbrk, 50) and self.speedbrake_motion_intensity > 0 and self.speedbrake_motion_effect_enabled:
             logging.debug(f"Speedbrake Pos: {spdbrk}")
             direction = 90 if self.is_pedals() else 0
@@ -1161,15 +1121,23 @@ class AircraftBase(object):
         else:
             effects.dispose("speedbrakemovement")
 
-        if tas > spd_thresh and spdbrk > .1 and self.speedbrake_buffet_intensity > 0 and self.speedbrake_buffet_effect_enabled:
-            # calculate insensity based on deployment percentage
-            realtime_intensity = self.speedbrake_buffet_intensity * spdbrk
-            effects["speedbrakebuffet"].periodic(13, realtime_intensity, utils.RandomDirectionModulator).start()
-            # effects["speedbrakebuffet2"].periodic(13, realtime_intensity, 45, 4).start()
-            logging.debug(f"PLAYING SPEEDBRAKE RUMBLE intensity:{realtime_intensity}")
-        else:
-            effects.dispose("speedbrakebuffet")
-            effects.dispose("speedbrakebuffet2")
+        # Speed brake buffeting effect using helper
+        config = {
+            'enabled_attr': 'speedbrake_buffet_effect_enabled',
+            'intensity_attr': 'speedbrake_buffet_intensity',
+            'effect_names': ['speedbrakebuffet'],
+            'effect_name': 'speedbrake',
+            'threshold_speed': spd_thresh,
+            'threshold_value': 0.1,
+            'deployment_key': 'speedbrakes_value',
+            'directions': [utils.RandomDirectionModulator],
+            'require_airborne': False
+        }
+        # Create a temporary telem_data with speedbrake value
+        temp_telem = dict(self._telem_data)
+        temp_telem['speedbrakes_value'] = spdbrk
+        temp_telem['TAS'] = tas
+        self._create_buffeting_effect(temp_telem, config)
 
     def _update_spoiler(self, spoiler, tas, spd_thresh_low=25, spd_thresh_hi=60):
         if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
@@ -1222,7 +1190,7 @@ class AircraftBase(object):
         Tailhook motion effect:
             Checks for presense of Tailhook telemetery and type of device.  If effect disabled or intensty set to 0,
             ensure effect is stopped and abort.
-            Check for change in telemetry over past 'delta_ms' miliseconds.  Delta insures effect doesn't flap on
+            Check for change in telemetry over the past 'delta_ms' miliseconds.  Delta insures effect doesn't flap on
             some aircraft with slow telemetry updates.
             When telemetry stops, check if hook is fully deployed or stored and play a short bump. Then stop the effect
         """
@@ -1247,64 +1215,41 @@ class AircraftBase(object):
             effects.dispose("hookmovement")
 
     def _update_fuelboom_effect(self, telem_data):
-        """
-        Fuel Boom motion effect:
-            Checks for presense of FuelBoom telemetery and type of device.  If effect disabled or intensty set to 0,
-            ensure effect is stopped and abort.
-            Check for change in telemetry over past 'delta_ms' miliseconds.  Delta insures effect doesn't flap on
-            some aircraft with slow telemetry updates.
-            When telemetry stops, check if boom is fully deployed or stored and play a short bump. Then stop the effect
-        """
-        boom = telem_data.get('FuelBoom', None)
-        if boom is None: return
-        if not self.is_joystick(): return
-
-        if not self.fuelboom_motion_effect_enabled or not self.fuelboom_motion_intensity:
-            effects.dispose('boommovement')
-            return
-
-        if self.anything_has_changed("fuelboom_value", boom, delta_ms=200):
-            logging.debug(f"Boom Pos: {boom}")
-            direction = 90 if self.is_pedals() else 0
-            effects["boommovement"].periodic(150, self.fuelboom_motion_intensity, direction, EFFECT_SAWTOOTHDOWN).start()
-        else:
-            # play short bump when boom stowed or deployed, change direction based on state.  Only play if movement effect still playing
-            if (boom == 0 or boom ==1) and effects['boommovement'].started:
-                dir = (1-boom) * 180
-                effects['clunk'].periodic(10, utils.clamp((self.fuelboom_motion_intensity * 2), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
-            # stop the effect
-            effects.dispose("boommovement")
+        """Fuel Boom motion effect using generic motion effect handler."""
+        config = {
+            'telem_key': 'FuelBoom',
+            'change_key': 'fuelboom_value',
+            'effect_names': ['boommovement'],
+            'clunk_effects': ['clunk'],
+            'enabled_attr': 'fuelboom_motion_effect_enabled',
+            'intensity_attr': 'fuelboom_motion_intensity',
+            'frequency': 150,
+            'directions': [90 if self.is_pedals() else 0],
+            'effect_type': EFFECT_SAWTOOTHDOWN,
+            'delta_ms': 200,
+            'clunk_duration': 40
+        }
+        self._create_motion_effect(telem_data, config)
 
     def _update_wingfold_effect(self, telem_data):
-        """
-        Wing Fold motion effect:
-            Checks for presense of WingFold telemetery and type of device.  If effect disabled or intensty set to 0,
-            ensure effect is stopped and abort.
-            Check for change in telemetry over past 'delta_ms' miliseconds.  Delta insures effect doesn't flap on
-            some aircraft with slow telemetry updates.
-            When telemetry stops, check if wing is fully deployed or stored and play a short bump. Then stop the effect
-        """
-        wing = telem_data.get('WingFold', None)
-        if wing is None: return
-        if not self.is_joystick(): return
-        on_ground = telem_data.get('SimOnGround', 0)
-        if not self.wingfold_motion_effect_enabled or not self.wingfold_motion_intensity or not on_ground:
-            effects.dispose('wingfoldmovement_1')
-            effects.dispose('wingfoldmovement_2')
-            return
-
-        if self.anything_has_changed("wingfold_value", wing, delta_ms=200):
-            logging.debug(f"Wing Pos: {wing}")
-            effects["wingfoldmovement_1"].periodic(100, self.wingfold_motion_intensity, 45, EFFECT_SAWTOOTHDOWN).start()
-            effects["wingfoldmovement_2"].periodic(100, self.wingfold_motion_intensity, 225, EFFECT_SAWTOOTHDOWN, phase=90).start()
-        else:
-            # play short back and forth bump when wings are fully deployed or stowed  Only play if movement effect still playing
-            if (wing == 0 or wing ==1) and effects['wingfoldmovement_1'].started:
-                effects['wingfoldclunk1'].periodic(10, utils.clamp((self.wingfold_motion_intensity * 2), 0, 1), 90, effect_type=EFFECT_SQUARE,duration=100).start()
-                effects['wingfoldclunk2'].periodic(10, utils.clamp((self.wingfold_motion_intensity * 2), 0, 1), 270, effect_type=EFFECT_SQUARE,duration=250, phase=180).start()
-            # stop the effect
-            effects.dispose("wingfoldmovement_1")
-            effects.dispose("wingfoldmovement_2")
+        """Wing Fold motion effect using generic motion effect handler."""
+        config = {
+            'telem_key': 'WingFold',
+            'change_key': 'wingfold_value',
+            'effect_names': ['wingfoldmovement_1', 'wingfoldmovement_2'],
+            'clunk_effects': ['wingfoldclunk1', 'wingfoldclunk2'],
+            'enabled_attr': 'wingfold_motion_effect_enabled',
+            'intensity_attr': 'wingfold_motion_intensity',
+            'frequency': 100,
+            'directions': [45, 225],
+            'effect_type': EFFECT_SAWTOOTHDOWN,
+            'delta_ms': 200,
+            'phase_offset': 90,
+            'require_ground': True,
+            'clunk_directions': [90, 270],
+            'clunk_duration': 100
+        }
+        self._create_motion_effect(telem_data, config)
 
     def _update_wind_effect(self, telem_data):
         if not self.is_joystick(): return
@@ -2049,3 +1994,221 @@ class AircraftBase(object):
 
     def on_telemetry(self, telem_data): 
         pass
+
+    # Helper methods for code reuse
+    def _get_random_direction(self):
+        """Get a random direction for weapon effects based on device type."""
+        import random
+        random.seed(time.perf_counter())
+        if self.is_pedals():
+            return random.choice([90, 270])
+        return random.randint(0, 359)
+
+    def _get_effect_direction(self, configured_direction: int) -> int:
+        """Get effect direction, either configured or random based on settings."""
+        if configured_direction == -1:
+            return self._get_random_direction()
+        return configured_direction
+
+    def _dispose_effects(self, *effect_names):
+        """Dispose multiple effects at once."""
+        for effect_name in effect_names:
+            effects.dispose(effect_name)
+
+    def _should_skip_joystick_effect(self) -> bool:
+        """Common check for joystick-only effects."""
+        return not self.is_joystick()
+
+    def _should_skip_airborne_effect(self, telem_data: dict) -> bool:
+        """Common check for effects that should be disabled when on ground."""
+        return bool(sum(telem_data.get("WeightOnWheels", [0])))
+
+    def _should_skip_no_airspeed_effect(self, telem_data: dict) -> bool:
+        """Common check for effects that require airspeed."""
+        return not telem_data.get("TAS", 0)
+
+    def _get_gs_data(self, telem_data: dict) -> tuple:
+        """Get G-force data based on simulator type."""
+        if self._sim_is("DCS") or self._sim_is("IL2"):
+            accs = telem_data.get("ACCs")
+            if not accs:
+                return None, None, None
+            gs = accs[1]
+            y_gs = accs[0]
+            last_accs = self._last_telem_data.get("ACCs", [0, 0, 0])
+            last_y_gs = last_accs[0]
+        elif self._sim_is("MSFS") or self._sim_is('XPLANE'):
+            gs = telem_data.get("G")
+            acc_body = telem_data.get("AccBody")
+            if not acc_body:
+                return None, None, None
+            y_gs = acc_body[2]
+            last_acc_body = self._last_telem_data.get("AccBody", [0, 0, 0])
+            last_y_gs = last_acc_body[2]
+        else:
+            return None, None, None
+        return gs, y_gs, last_y_gs
+
+    def _is_telemetry_spike(self, y_gs: float, last_y_gs: float, threshold: float = 3.0) -> bool:
+        """Check if telemetry shows a spike indicating crash or invalid data."""
+        return abs(y_gs - last_y_gs) > threshold
+
+    def _create_weapon_effect(self, effect_name: str, telem_key: str, telem_value, 
+                             enabled_flag: bool, intensity: float, frequency: int = 10, 
+                             duration: int = 80, delta_ms: int = 160):
+        """Generic method for weapon-related effects (gun, payload, countermeasures)."""
+        if not enabled_flag:
+            effects[effect_name].stop()
+            return
+
+        if self.anything_has_changed(telem_key, telem_value):
+            direction = self._get_effect_direction(self.weapon_effect_direction)
+            if self.weapon_effect_direction == -1:
+                logging.info(f"{effect_name.title()} Effect Direction is randomized: {direction} deg")
+            effects[effect_name].periodic(frequency, intensity, direction, duration=duration).start(force=True)
+        elif not self.anything_has_changed(telem_key, telem_value, delta_ms=delta_ms):
+            effects[effect_name].stop()
+
+    def _create_motion_effect(self, telem_data: dict, config: dict):
+        """
+        Generic method for motion effects (tailhook, fuelboom, wingfold, etc.).
+        
+        Args:
+            telem_data: Telemetry data dictionary
+            config: Configuration dictionary with keys:
+                - telem_key: Key in telemetry data
+                - change_key: Key for tracking changes
+                - effect_names: List of effect names
+                - clunk_effects: List of clunk effect names (optional)
+                - enabled_attr: Attribute name for enabled flag
+                - intensity_attr: Attribute name for intensity
+                - frequency: Effect frequency
+                - directions: List of directions for effects
+                - effect_type: Effect type (optional)
+                - delta_ms: Delta time for change detection
+                - require_ground: Whether effect requires being on ground
+                - phase_offset: Phase offset for secondary effects (optional)
+        """
+        value = telem_data.get(config['telem_key'])
+        if value is None:
+            return
+
+        if self._should_skip_joystick_effect():
+            return
+
+        # Check ground requirement
+        if config.get('require_ground', False):
+            on_ground = telem_data.get('SimOnGround', 0)
+            if not on_ground:
+                self._dispose_effects(*config['effect_names'])
+                return
+
+        enabled = getattr(self, config['enabled_attr'])
+        intensity = getattr(self, config['intensity_attr'])
+
+        if not enabled or not intensity:
+            self._dispose_effects(*config['effect_names'])
+            return
+
+        delta_ms = config.get('delta_ms', 200)
+        if self.anything_has_changed(config['change_key'], value, delta_ms=delta_ms):
+            logging.debug(f"{config['telem_key']} Pos: {value}")
+            
+            # Create main effects
+            for i, effect_name in enumerate(config['effect_names']):
+                direction = config['directions'][i] if i < len(config['directions']) else config['directions'][0]
+                effect_type = config.get('effect_type', 0)
+                phase = config.get('phase_offset', 0) if i > 0 else 0
+                
+                effects[effect_name].periodic(
+                    config['frequency'], 
+                    intensity, 
+                    direction, 
+                    effect_type,
+                    phase=phase
+                ).start()
+        else:
+            # Handle clunk effects when motion stops
+            clunk_effects = config.get('clunk_effects', [])
+            if clunk_effects and (value == 0 or value == 1):
+                if any(effects[name].started for name in config['effect_names']):
+                    clunk_intensity = utils.clamp(intensity * 2, 0, 1)
+                    
+                    for i, clunk_name in enumerate(clunk_effects):
+                        direction = config.get('clunk_directions', [180, 0])[i % 2]
+                        if config['telem_key'] in ['TailHook', 'FuelBoom']:
+                            direction = (1 - value) * 180
+                        duration = config.get('clunk_duration', 40)
+                        
+                        effects[clunk_name].periodic(
+                            10, 
+                            clunk_intensity, 
+                            direction, 
+                            effect_type=EFFECT_SQUARE,
+                            duration=duration
+                        ).start()
+            
+            # Stop main effects
+            self._dispose_effects(*config['effect_names'])
+
+    def _create_buffeting_effect(self, telem_data: dict, config: dict):
+        """
+        Generic method for buffeting effects.
+        
+        Args:
+            telem_data: Telemetry data dictionary
+            config: Configuration dictionary with keys:
+                - enabled_attr: Attribute name for enabled flag
+                - intensity_attr: Attribute name for intensity
+                - frequency_attr: Attribute name for frequency (optional)
+                - effect_name: Name of the effect
+                - threshold_speed: Minimum speed for effect
+                - threshold_value: Minimum deployment value
+                - deployment_key: Key for deployment value in telemetry
+                - speed_range: Tuple of (low_speed, high_speed) for intensity calculation
+                - require_airborne: Whether effect requires being airborne
+                - directions: List of directions for multi-axis effects
+        """
+        enabled = getattr(self, config['enabled_attr'])
+        intensity = getattr(self, config['intensity_attr'])
+        
+        if not enabled or not intensity:
+            self._dispose_effects(*config['effect_names'])
+            return
+
+        tas = telem_data.get("TAS", 0)
+        if tas < config.get('threshold_speed', 0):
+            self._dispose_effects(*config['effect_names'])
+            return
+
+        deployment = telem_data.get(config['deployment_key'], 0)
+        if deployment <= config.get('threshold_value', 0.1):
+            self._dispose_effects(*config['effect_names'])
+            return
+
+        if config.get('require_airborne', True) and self._should_skip_airborne_effect(telem_data):
+            self._dispose_effects(*config['effect_names'])
+            return
+
+        # Calculate intensity based on speed and deployment
+        speed_low, speed_high = config.get('speed_range', (0, 100))
+        tas_intensity = utils.scale_clamp(tas, (speed_low, speed_high), (0.0, 1.0))
+        
+        if isinstance(deployment, list):
+            # Handle special cases like F-14 spoilers
+            if config.get('special_calc') and "F-14" in str(telem_data.get("N", "")):
+                inner = (deployment[1], deployment[2])
+                outer = (deployment[0], deployment[3])
+                deployment = (0.85 * sum(inner) + 0.15 * sum(outer)) / 2
+            else:
+                deployment = sum(deployment) / len(deployment)
+
+        realtime_intensity = intensity * deployment * tas_intensity
+        frequency = getattr(self, config.get('frequency_attr', 'frequency'), 13)
+
+        # Create effects
+        for i, effect_name in enumerate(config['effect_names']):
+            direction = config['directions'][i] if i < len(config['directions']) else config['directions'][0]
+            effects[effect_name].periodic(frequency, realtime_intensity, direction, 4).start()
+
+        logging.debug(f"PLAYING {config['effect_name'].upper()} RUMBLE | intensity: {realtime_intensity}")
