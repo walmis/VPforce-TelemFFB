@@ -7,3 +7,5 @@ pyuic6 sc_overrides.ui -o ../telemffb/ui/Ui_SCOverridesDialog.py
 pyuic6 configurator.ui -o ../telemffb/ui/Ui_ConfiguratorDialog.py
 pyuic6 advanced_spring.ui -o ../telemffb/ui/Ui_AdvancedSpring.py
 pyuic6 advanced_g_curve.ui -o ../telemffb/ui/Ui_AdvancedGCurve.py
+pyuic6 profile_manager.ui -o ../telemffb/ui/Ui_ProfileManagerDialog.py
+pyuic6 profile_import_dialog.ui -o ../telemffb/ui/Ui_ProfileImportDialog.py

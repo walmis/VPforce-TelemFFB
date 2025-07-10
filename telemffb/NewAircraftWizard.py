@@ -18,7 +18,9 @@
 
 import re
 
-from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyle
+from PyQt6.QtCore import QRegularExpression
+from PyQt6.QtGui import QRegularExpressionValidator, QFont
+from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyle, QComboBox
 
 from . import globals as G
 from . import utils
@@ -90,6 +92,8 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         super(NewAircraftWizard, self).__init__(parent)
         self.parent = parent
         self.manual_mode = manual
+        self.profile_list: list = None
+        self.current_match_string: str = ''
         self.auto_sim = auto_sim
         self.auto_cls = auto_cls
         self.auto_name = auto_name
@@ -113,13 +117,18 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         # self.rb_suggested.toggled.connect(self.suggested_selected)
         # self.rb_manual.toggled.connect(self.validate_ac_page_entries)
         self.cb_clone.currentTextChanged.connect(self.validate_ac_page_entries)
+        self.tb_profileName.textChanged.connect(self.validate_profile_text)
 
         self.lbl_autodiscovery.setVisible(False)
         self.lbl_actype_discovery.setVisible(False)
+        self.lbl_profileNameError.setVisible(False)
         # self.pb_cancel.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogCancelButton))
         # self.pb_next.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowForward))
         # self.pb_previous.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowBack))
         # self.pb_finish.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogApplyButton))
+        regex = QRegularExpression(r'^[^<>:"/\\|?*\x00-\x1F]*$')
+        profile_validator = QRegularExpressionValidator(regex)
+        self.tb_manual_full_name.setValidator(profile_validator)
         self.init_state()
 
     def init_state(self):
@@ -160,6 +169,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             - Sim selection (Page 0)
             - Class selection (Page 1)
             - Aircraft configuration (Page 2)
+            - Profile name (Page 3)
             """
         match page_index:
             case 0:
@@ -206,8 +216,10 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
                     self.cb_clone.setStyleSheet(f"background-color: {color};")
 
                 self.validate_ac_page_entries()
+            case 3:  # Profile Name Page
+                self.pb_next.setEnabled(False)
+                self.validate_profile_text(self.tb_profileName.text())
 
-        print(f"Page index changed to {page_index}")
 
     def next_button_clicked(self):
         self.stackedWidget.setCurrentIndex(self.stackedWidget.currentIndex() + 1)
@@ -224,14 +236,16 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             match_string = self.cb_suggested.currentText()
         else:
             raise ValueError("Invalid match string selection")
-        clone_name = self.cb_clone.currentText()
-        if clone_name != '':
-            # print(f"Cloning from {clone_name} to {match_string} for {self.selected_sim}")
-            xmlutils.clone_pattern(self.selected_sim, clone_name, match_string)
+
+        if self.cb_clone.currentData():
+            clone_name, clone_profile = self.cb_clone.currentData()
+            xmlutils.clone_whole_model(self.selected_sim, clone_name, match_string, clone_profile, self.tb_profileName.text())
+            xmlutils.update_active_profile_entry(sim, class_name, match_string, self.tb_profileName.text())
+            # xmlutils.clone_profile_entry(self.selected_sim, self.selected_class, clone_name, clone_profile, match_string, self.tb_profileName.text())
         else:
-            # print(f"Finish button clicked, sim={sim}, class={class_name}, match={match_string}, clone={clone_name}")
             xmlutils.add_new_model(sim, class_name, match_string)
-        # self.parent.refresh_telemetry()
+            xmlutils.add_new_profile(sim, class_name, match_string, profile_name=self.tb_profileName.text())
+            xmlutils.update_active_profile_entry(sim, class_name, match_string, self.tb_profileName.text())
         self.accept()
 
     def sim_changed(self, sim):
@@ -252,7 +266,6 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         else:
             self.selected_sim = None
             self.pb_next.setEnabled(False)
-        print(f"Sim changed to {sim}")
 
     def class_changed(self, cls):
         """
@@ -263,17 +276,29 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         if cls != '':
             self.selected_class = self.internal_class_names.get(cls)
             self.pb_next.setEnabled(True)
-            self.aircraft_list = xmlutils.read_models(self.selected_sim, self.selected_class)
+            self.aircraft_list = self.get_models(self.selected_sim, self.selected_class)
             self.cb_clone.clear()
-            # self.cb_clone.addItem('')  # Not needed since read_models returns one null entry
-            for aircraft in self.aircraft_list:
-                self.cb_clone.addItem(aircraft)
+            self.cb_clone.addItem('')  # Not needed since read_models returns one null entry
+            max_name_len = max(len(aircraft) for aircraft, _ in self.aircraft_list)
+            font = QFont("Consolas")  # Or "Monospace" or "Consolas"
+            self.cb_clone.setFont(font)
+            for aircraft, profile in self.aircraft_list:
+                display_text = f"{aircraft.ljust(max_name_len)}  :  {profile}"
+                self.cb_clone.addItem(display_text, (aircraft, profile))
+                w = self.cb_clone.width()
+                self.cb_clone.setMinimumWidth(w + 10) # fix stupid sizing issue
+
             self.check_mandatory_clone(cls)
         else:
             self.pb_next.setEnabled(False)
 
+    def validate_profile_text(self, str):
+        state = False if str == '' else True
+        state = False if str.lower() == 'default' else state
+        self.pb_finish.setEnabled(state)
+
+
     def full_name_text_changed(self, str):
-        print(str)
         state = False if str == '' else True
         self.rb_manual.setEnabled(state)
         self.rb_suggested.setEnabled(state)
@@ -326,9 +351,9 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         else:
             mandatory_satisfied = True
         if valid_match and mandatory_satisfied:
-            self.pb_finish.setEnabled(True)
+            self.pb_next.setEnabled(True)
         else:
-            self.pb_finish.setEnabled(False)
+            self.pb_next.setEnabled(False)
 
 
 
@@ -340,23 +365,32 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             Highlights the match string field in red/green depending on result.
             """
         full_name = self.tb_manual_full_name.text()
+        tt = ''
+
         if not match_str:
             is_match = False
+            tt = "Please enter a match string"
+        elif match_str in self.aircraft_list:
+            is_match = False
+            tt = f"This match string already exists for {self.selected_sim} | {self.selected_class}"
         elif match_str == full_name:
             is_match = True
         elif self.looks_like_regex(match_str):
             try:
                 is_match = bool(re.match(match_str, full_name))
             except re.error:
+                tt = "Invalid regex pattern"
                 is_match = False
         else:
             # It's neither full match nor regex-style, reject
+            tt = "Match string will not match with full name"
             is_match = False
 
         # Set background color
         color = "rgba(0, 128, 0, 0.2)" if is_match else "rgba(255, 0, 0, 0.2)"
+        self.tb_manual_match_string.setToolTip(tt) if not is_match else self.tb_manual_match_string.setToolTip('')
         self.tb_manual_match_string.setStyleSheet(f"background-color: {color};")
-
+        self.current_match_string = match_str
         return is_match
 
     def looks_like_regex(self, pattern):
@@ -378,14 +412,26 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             self.lbl_clone.setText('You may select an existing profile to clone from')
 
     def get_sims(self):
-        list = xmlutils.get_sims()
-        return list
+        sims = xmlutils.get_sims()
+        return sims
+
     def get_classes(self, sim):
-        list = xmlutils.get_classes_for_sim(sim)
+        classes = xmlutils.get_classes_for_sim(sim)
+        return classes
+
+    def get_models(self, sim, cls):
+        list = []
+        models = xmlutils.read_models(sim, cls)
+        for model in models:
+            profiles = self.get_profiles(sim, cls, model)
+            for profile in profiles:
+                list.append((model, profile))
         return list
-    def get_aircraft(self, sim, cls):
-        self.list = xmlutils.read_models(sim, cls)
-        return list
+
+    def get_profiles(self, sim, cls, model):
+        profiles = xmlutils.get_available_profiles(sim, cls, model)
+        return profiles
+
 
     def generate_regex_patterns(self, input_str):
         """
