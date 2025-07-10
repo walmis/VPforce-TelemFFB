@@ -252,7 +252,7 @@ class SettingsLayout(QGridLayout):
         for item in datalist:
             if item['name'] == setting:
                 item['value'] = mode
-                xmlutils.write_to_xml(G.settings_mgr.current_sim,
+                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim,
                               G.settings_mgr.current_class,
                               G.settings_mgr.current_pattern,
                               item['name'],
@@ -270,7 +270,7 @@ class SettingsLayout(QGridLayout):
         for item in datalist:
             for name, mode in mode_map.items():
                 if item['name'] == name and item['value'] == 'true':
-                    xmlutils.erase_from_xml(
+                    G.settings_mgr.erase_from_xml(
                         G.settings_mgr.current_sim,
                         G.settings_mgr.current_class,
                         G.settings_mgr.current_pattern,
@@ -290,7 +290,7 @@ class SettingsLayout(QGridLayout):
             if item['name'] == 'pedal_spring_mode':
                 spring_mode = mode_map.get(item['value'])
                 if spring_mode:
-                    xmlutils.erase_from_xml(
+                    G.settings_mgr.erase_from_xml(
                         G.settings_mgr.current_sim,
                         G.settings_mgr.current_class,
                         G.settings_mgr.current_pattern,
@@ -302,7 +302,7 @@ class SettingsLayout(QGridLayout):
         for item in datalist:
             if item['name'] == 'gforce_effect':
                 item['value'] = mode
-        xmlutils.write_to_xml(G.settings_mgr.current_sim,
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim,
                               G.settings_mgr.current_class,
                               G.settings_mgr.current_pattern,
                               item['name'],
@@ -317,7 +317,7 @@ class SettingsLayout(QGridLayout):
         for item in datalist:
             for name, mode in mode_map.items():
                 if item['name'] == name and item['value'] == 'true':
-                    xmlutils.erase_from_xml(
+                    G.settings_mgr.erase_from_xml(
                         G.settings_mgr.current_sim,
                         G.settings_mgr.current_class,
                         G.settings_mgr.current_pattern,
@@ -1103,9 +1103,9 @@ class SettingsLayout(QGridLayout):
         if value == 'true' and enforce_list is not None:
             for exclusive in enforce_list:
                 #enforce_list is a list of settings that must not be true if 'value' is true (per exclusive attribute in defauls.xml)
-                xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, "false", exclusive)
+                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, "false", exclusive)
 
-        xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, name)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, name)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1113,7 +1113,7 @@ class SettingsLayout(QGridLayout):
         self.trigger_form_reload = True
         logging.debug(G.settings_mgr.offline_scope)
         logging.debug(f"Erase {name} clicked")
-        xmlutils.erase_from_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, name, )
+        G.settings_mgr.erase_from_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, name, )
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -1140,7 +1140,7 @@ class SettingsLayout(QGridLayout):
 
             if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
                 #lprint(f"Selected File: {file_path}")
-                xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, file_path, 'vpconf')
+                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, file_path, 'vpconf')
 
                 self.show_erase_button('config_vpconf')
                 self.vpconf_browse_button.setText(os.path.basename(file_path))
@@ -1152,7 +1152,7 @@ class SettingsLayout(QGridLayout):
         setting_name = self.sender().objectName().replace('sb_', '')
         value = str(self.sender().value())
         logging.debug(f"Spin Box {setting_name} changed. New value: {value}")
-        xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1162,7 +1162,7 @@ class SettingsLayout(QGridLayout):
         setting_name = self.sender().objectName().replace('le_', '')
         value = self.sender().text()
         logging.debug(f"Textbox {setting_name} changed. New value: {value}")
-        xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1181,7 +1181,7 @@ class SettingsLayout(QGridLayout):
             value = sender.currentText()
 
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
-        xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
         # commented out because erase happens on setting load
         # if setting_name == 'spring_mode':
         #     xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'adv_spr_override_enabled')
@@ -1209,7 +1209,7 @@ class SettingsLayout(QGridLayout):
         if line_edit is not None:
             value = line_edit.text()
         logging.debug(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
-        xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1224,7 +1224,7 @@ class SettingsLayout(QGridLayout):
             unit = unit_dropbox.currentText()
         value = self.sender().text()
         logging.debug(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
-        xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1272,7 +1272,7 @@ class SettingsLayout(QGridLayout):
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText(str(value))
         if str(value) != '0':
-            xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, str(value), button_name)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, str(value), button_name)
             self.show_erase_button(setting_name=f'pb_{button_name}')
         else:
             the_button.setText("Click to Configure")
@@ -1335,7 +1335,7 @@ class SettingsLayout(QGridLayout):
         """
         Called when signal received that user saved the advanced g-effect settings
         """
-        xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, g_effect_curves,"gforce_effect_adv_curve")
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, g_effect_curves,"gforce_effect_adv_curve")
         self.show_erase_button("config_gforce_effect_adv_curve")
         # self.adv_spr_button.setText("Edit Spring Gains")
         # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
@@ -1346,8 +1346,8 @@ class SettingsLayout(QGridLayout):
         """
         Called when signal received that user saved the advanced spring gain settings
         """
-        xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, spring_gain_curves, "adv_spr_gains")
-        # xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, str(scale), "vne_override", unit=units)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, spring_gain_curves, "adv_spr_gains")
+        # G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, str(scale), "vne_override", unit=units)
         self.show_erase_button("config_adv_spr_gains")
         # self.adv_spr_button.setText("Edit Spring Gains")
         # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
@@ -1360,7 +1360,7 @@ class SettingsLayout(QGridLayout):
         convert dictionary to text string and write to config.
         """
         gain_dict_json = json.dumps(gain_dict)
-        xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, gain_dict_json, "configurator_gains")
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, gain_dict_json, "configurator_gains")
         self.show_erase_button("config_configurator_gains")
         self.configurator_button.setText("Edit Gain Overrides")
 
@@ -1382,7 +1382,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
         if write:
-            xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
             self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1403,7 +1403,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
         if write:
-            xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
             self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1430,7 +1430,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         if write:
-            xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
             self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1457,7 +1457,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         if write:
-            xmlutils.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
             self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()

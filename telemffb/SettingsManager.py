@@ -66,23 +66,40 @@ class SettingsManager:
             self._online_mode_backup = None
             self.offline_scope = None
 
-    def write_single_setting(self, setting_name, setting_value, unit='', device='', scope='MODEL'):
-        if self.offline_mode:
-            scope = self.offline_scope if self.offline_scope else "MODEL"
+    def write_to_xml(self, sim, class_name, model, value, setting, unit='', the_device='', scope='MODEL'):
+        if not self.offline_mode:
 
-        # scope = self.offline_scope if self.offline_mode else "MODEL"
-        xmlutils.write_to_xml(self.current_sim, self.current_class, self.current_pattern, setting_value, setting_name, scope=scope)
+            xmlutils.write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device, profile_name=self.active_profile)
 
-    def erase_single_setting(self, setting_name):
-        xmlutils.erase_from_xml(self.current_sim, self.current_class, self.current_pattern, setting_name)
+            return
+        else:
+            match self.offline_scope:
+                case 'SIM':
+                    xmlutils.write_sim_to_xml(sim, value, setting, unit=unit, the_device=the_device)
+                case 'CLASS':
+                    xmlutils.write_class_to_xml(sim, class_name, value, setting, unit=unit, the_device=the_device)
+                case 'MODEL':
+                    if G.master_instance and self.active_profile == 'Auto User':
+                        xmlutils.add_new_profile(sim, class_name, model, profile_name=self.active_profile)
+                    xmlutils.write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device,profile_name=self.active_profile)
+                case _:
+                    pass
 
-    def erase_model(self, sim, model, setting):
-        pass
+    def erase_from_xml(self, sim, class_name, model, setting, the_device=''):
+        if not self.offline_mode:
+            xmlutils.erase_models_from_xml(sim, model, setting, the_device=the_device, profile_name=self.active_profile)
+            return
+        else:
+            match self.offline_scope:
+                case 'SIM':
+                    xmlutils.erase_sim_from_xml(sim, setting, the_device=the_device)
+                case 'CLASS':
+                    xmlutils.erase_class_from_xml(sim, class_name, setting, the_device=the_device)
+                case 'MODEL':
+                    xmlutils.erase_models_from_xml(sim, model, setting, the_device=the_device, profile_name=self.active_profile)
+                case _:
+                    pass
 
-    def read_current_model(self):
-        cls, pattern, results = xmlutils.read_single_model(self.current_sim, self.current_aircraft_name,
-                                   self.current_class)
-        return cls, pattern, results
 
     class SpringModeEnum(Enum):
         NONE = auto()
