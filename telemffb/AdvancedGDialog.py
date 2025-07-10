@@ -240,7 +240,6 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
             baseline_json = json.dumps(json.loads(self.init_settings), sort_keys=True)
             self.set_dirty_state(current_json != baseline_json)
         except Exception as e:
-            print(f"Error checking dirty state: {e}")
             self.set_dirty_state(True)
 
     def enable_constant(self, state):

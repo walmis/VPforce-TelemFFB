@@ -285,7 +285,6 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
             current_json = json.dumps(settings, sort_keys=True)
             baseline_json = json.dumps(json.loads(self.init_settings), sort_keys=True)
             result = (current_json != baseline_json)
-            utils.dbprint("red", f"DIRTYCHECK: {result}")
             if apply:
                 self.set_dirty_state(result)
             else :

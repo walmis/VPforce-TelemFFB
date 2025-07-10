@@ -897,7 +897,6 @@ class MainWindow(QMainWindow):
         if G.launched_instances:
             show_menu = QMenu("Instances", self)
             show_child_window_action = {}
-            print(f"LAUNCHED:{G.launched_instances}")
             for d in ["joystick", "pedals", "collective", 'trimwheel']:
                 if d in G.launched_instances:
                     def do_show_child_window(child=d):
@@ -906,7 +905,6 @@ class MainWindow(QMainWindow):
                     show_child_window_action[d] = QAction(f'Show {d.capitalize()} Instance', self)
                     show_child_window_action[d].triggered.connect(lambda _, child=d: do_show_child_window(child))
                     show_menu.addAction(show_child_window_action[d])
-                    print(f"ADDED: {d}")
             tray_menu.addMenu(show_menu)
 
         quit_action = QAction("Quit TelemFFB", self)
@@ -1331,7 +1329,6 @@ class MainWindow(QMainWindow):
 
         if G.master_instance:
             G.ipc_instance.send_broadcast_message(f'OFFLINE_AC:{self.offline_name.currentText()}')
-            print(f"OFFLINE_AC:{self.offline_name.currentText()}")
 
         self.force_sim_aircraft()
 

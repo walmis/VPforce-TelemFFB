@@ -426,7 +426,7 @@ class SettingsLayout(QGridLayout):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            print(f"Moving {setting} setting ({value}) from {model} to all {csim} {cclass} class aircraft")
+            logging.info(f"Moving {setting} setting ({value}) from {model} to all {csim} {cclass} class aircraft")
             xmlutils.write_class_to_xml(csim, cclass, value, setting, unit)
             xmlutils.erase_models_from_xml(csim, model, setting)
 
@@ -440,7 +440,7 @@ class SettingsLayout(QGridLayout):
             QMessageBox.StandardButton.No  # Default button
         )
         if reply == QMessageBox.StandardButton.Yes:
-            print(f"Moving {setting} setting ({value}) from {model} to {csim} Sim for all aircraft")
+            logging.info(f"Moving {setting} setting ({value}) from {model} to {csim} Sim for all aircraft")
             xmlutils.write_sim_to_xml(csim,value,setting, unit)
             xmlutils.erase_models_from_xml(csim,model,setting)
 
