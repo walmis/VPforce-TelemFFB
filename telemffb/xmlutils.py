@@ -1430,7 +1430,7 @@ def add_new_model(sim, class_name, match_string):
 
 def add_new_profile(sim, class_name, match_string, profile_name):
     """A helper function to abstract the required parameters to create a new user model entry"""
-    exists = auto_user_root.find(f'models[sim="{sim}"][model="{match_string}"][value="{class_name}"][name="profile"]')
+    exists = auto_user_root.find(f'models[sim="{sim}"][model="{match_string}"][value="{class_name}"][name="profile"][profile="{profile_name}"]')
     if not exists:
         write_models_to_xml(sim, match_string, class_name, the_device='any', setting_name='profile', profile_name=profile_name)
 
