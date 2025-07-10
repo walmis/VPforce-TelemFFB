@@ -60,7 +60,7 @@ import ssl
 import xml.etree.ElementTree as ET
 
 import numpy as np
-from scipy.interpolate import interp1d, Akima1DInterpolator
+import akima
 
 from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings, Qt
 from PyQt6.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
@@ -123,6 +123,43 @@ def micros() -> int:
     :rtype: int
     """
     return time.perf_counter_ns() // 1000
+
+
+class Interp1D:
+    def __init__(self, x, y, bounds_error=False, fill_value=None):
+        self.x = np.asarray(x)
+        self.y = np.asarray(y)
+        self.bounds_error = bounds_error
+        self.fill_value = fill_value
+
+        if np.any(np.diff(self.x) <= 0):
+            raise ValueError("x values must be strictly increasing")
+
+    def __call__(self, x_new):
+        x_new = np.asarray(x_new)
+
+        # Interpolation for in-bounds
+        y_interp = np.interp(x_new, self.x, self.y)
+
+        # Out-of-bounds handling
+        if not self.bounds_error and self.fill_value is not None:
+            below = x_new < self.x[0]
+            above = x_new > self.x[-1]
+            y_interp = np.where(below, self.fill_value[0], y_interp)
+            y_interp = np.where(above, self.fill_value[1], y_interp)
+        elif self.bounds_error:
+            if np.any(x_new < self.x[0]) or np.any(x_new > self.x[-1]):
+                raise ValueError("A value in x_new is outside the interpolation range.")
+
+        return y_interp if x_new.ndim > 0 else y_interp.item()
+
+class Akima1DInterpolator:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    def __call__(self, x_new):
+        return akima.interpolate(self.x, self.y, x_new)
+
 
 class Smoother:
     def __init__(self):
@@ -1020,12 +1057,12 @@ def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
     if smooth_curve_enabled:
         if len(x_values) < 4:
             # Fallback to linear interpolation for insufficient points
-            interpolation = interp1d(x_values, y_values, bounds_error=False,
+            interpolation = Interp1D(x_values, y_values, bounds_error=False,
                                      fill_value=(y_values[0], y_values[-1]))
         else:
             interpolation = Akima1DInterpolator(x_values, y_values)
     else:
-        interpolation = interp1d(x_values, y_values, bounds_error=False,
+        interpolation = Interp1D(x_values, y_values, bounds_error=False,
                                  fill_value=(y_values[0], y_values[-1]))
 
     return float(interpolation(input_x))

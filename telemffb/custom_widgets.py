@@ -30,11 +30,9 @@ from PyQt6.QtWidgets import QStyle, QStyleOptionSlider
 from PyQt6.QtCore import Qt
 
 import numpy as np
-from scipy.interpolate import make_interp_spline, interp1d
-from scipy.interpolate import Akima1DInterpolator
 
 import telemffb.globals as G
-from telemffb.utils import HiDpiPixmap
+from telemffb.utils import HiDpiPixmap, Akima1DInterpolator
 import styles
 
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
