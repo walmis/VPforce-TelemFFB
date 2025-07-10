@@ -82,6 +82,76 @@ def write_userconfig_xml(tree : ET.ElementTree):
     ET.indent(tree, " ")
     tree.write(userconfig_path, "utf-8")
 
+def convert_userconfig():
+    """
+    Updates a userconfig.xml file to support new profile mappings.
+    - Ensures <profileMappings> element exists
+    - Ensures every <model> has a <profile> child, defaulting to 'Auto User' for existing configs
+    -
+    - If any edits were made, Writes the updated XML back using xmlutils.consolidate_sort_and_write_userconfig
+    """
+    tree = try_parse(G.userconfig_path)
+    if tree is None:
+        logging.exception(f"Failed to parse: {G.userconfig_path}")
+        return
+
+    root = tree.getroot()
+    did_work = False
+    mappings_was_empty = False
+    # Add <profileMappings> if missing
+    if not root.findall("profileMappings"):
+        header = ET.Element("profileMappings")
+        for tag in ["model", "sim", "cls", "active_profile"]:
+            ET.SubElement(header, tag).text = None
+        root.append(header)
+        did_work = True
+        mappings_was_empty = True
+
+    # Ensure each <model> has a <profile> element
+    cls_sourced_list = []
+    models = root.find("models")
+    if models is not None:
+        for model_entry in root.findall("models"):
+            s = model_entry.findtext('sim')
+            m = model_entry.findtext('model')
+            if model_entry.find("profile") is None:
+                ET.SubElement(model_entry, "profile").text = "Auto User"
+                did_work = True
+            if mappings_was_empty:
+                if (s, m) not in cls_sourced_list:
+                    cls = get_class_for_sim_model(s,m)
+                    if cls is not None:
+                        # add mapping for "Auto User" into the profileMappings table
+                        mapping = ET.Element("profileMappings")
+                        ET.SubElement(mapping, "model").text = m
+                        ET.SubElement(mapping, "sim").text = s
+                        ET.SubElement(mapping, "cls").text = cls
+                        ET.SubElement(mapping, "active_profile").text = "Auto User"
+                        root.append(mapping)
+                        # add a "profile" name entry in the user models table
+                        p_mapping =  ET.Element("models")
+                        ET.SubElement(p_mapping, "name").text = 'profile'
+                        ET.SubElement(p_mapping, "model").text = m
+                        ET.SubElement(p_mapping, "value").text = cls
+                        ET.SubElement(p_mapping, "sim").text = s
+                        ET.SubElement(p_mapping, "device").text = 'any'
+                        ET.SubElement(p_mapping, "profile").text = "Auto User"
+                        root.append(p_mapping)
+                        did_work = True
+
+                    else:
+                        print(f"For {s}:{m}, c is {cls}")
+
+                    cls_sourced_list.append((s,m))
+
+
+    # Save updated file with sorting/consolidation
+    if did_work:
+        consolidate_sort_and_write_userconfig(tree)
+        return True
+    else:
+        return False
+
 
 def update_vars(_device, _userconfig_path, _defaults_path):
     global device, userconfig_path, defaults_path

@@ -397,6 +397,37 @@ def _setup_logging_level():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
+def _convert_user_config():
+    """
+    Converts user config from legacy single user profile to multi-user profile capabilities.
+    """
+    if G.master_instance:
+        xmlutils.update_roots()
+        xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
+        # Backup before conversion
+        original_file = G.userconfig_path
+        original_path = G.userconfig_rootpath
+        original_filename = os.path.basename(G.userconfig_path)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        backup_path = os.path.join(G.userconfig_rootpath, 'cfg_backup', 'conversion')
+        os.makedirs(backup_path, exist_ok=True)
+
+        backup_file = f"{original_filename}.pre-conversion.{timestamp}"
+        backup_full_path = os.path.join(backup_path, backup_file)
+        shutil.copy2(original_file, backup_full_path)
+
+        # Run conversion
+        conversion_happened = xmlutils.convert_userconfig()
+
+        # If no changes occurred, discard the backup
+        if not conversion_happened and os.path.exists(backup_full_path):
+            os.remove(backup_full_path)
+            # print(f"Backup discarded: {backup_full_path}")
+        else:
+            logging.info(f"Pre conversion userconfig backup saved: {backup_path}")
+
 def _initialize_settings_manager():
     """
     Initialize the settings manager with error handling for corrupted config.
@@ -676,6 +707,7 @@ def main():
     # PHASE 7: Settings and Configuration Management
     # ============================================================================
     # Initialize settings manager with error handling for corrupted configs
+    _convert_user_config()
     _initialize_settings_manager()
 
     logging.info(f"TelemFFB (version {version}) Starting")
