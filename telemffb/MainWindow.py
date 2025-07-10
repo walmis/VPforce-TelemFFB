@@ -82,6 +82,8 @@ class MainWindow(QMainWindow):
 
         self.show_new_craft_button = False
 
+        self.profile_mgr_dialog = None
+
         # self.aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
 
         QFontDatabase.addApplicationFont(':/image/BlackOpsOne-Regular.ttf')
@@ -586,11 +588,15 @@ class MainWindow(QMainWindow):
         bottom_row = QHBoxLayout()
         bottom_row.addStretch()  # push button to the right
 
+        self.back_to_profile_mgr_button = QPushButton('Back to Profile Manager')
+        self.back_to_profile_mgr_button.setVisible(False)
+        self.back_to_profile_mgr_button.clicked.connect(self.back_to_profile_mgr)
         self.offline_button = QPushButton()
         # self.offline_button.setMaximumWidth(20)
         self.offline_button.setText('Exit Offline Mode')
         self.offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
         # bottom_row.addWidget(self.manual_add_button)
+        bottom_row.addWidget(self.back_to_profile_mgr_button)
         bottom_row.addWidget(self.offline_button)
 
         # Combine both rows
@@ -1284,6 +1290,139 @@ class MainWindow(QMainWindow):
             combo.setMinimumWidth(max_width + 50)
 
         self.update_settings()
+    def show_profile_manager(self):
+        self.profile_mgr_dialog = ProfileManagerDialog(self)
+        self.profile_mgr_dialog.raise_()
+        self.profile_mgr_dialog.activateWindow()
+        self.profile_mgr_dialog.show()
+
+    def exit_offline_mode(self):
+        self.toggle_offline_mode(False)
+        if self.profile_mgr_dialog:
+            self.profile_mgr_dialog.close()
+
+
+    def back_to_profile_mgr(self):
+        self.back_to_profile_mgr_button.setVisible(False)
+        try:
+            # in case it somehow got closed
+            self.profile_mgr_dialog.show()
+        except:
+            QMessageBox.warning(self, "Profile Manager", "IDK WHY THIS ERROR HAPPENED")
+            pass
+        self.toggle_offline_mode(False)
+
+
+    @pyqtSlot(bool)
+    def toggle_offline_mode(self, state):
+        if state == G.settings_mgr.offline_mode:
+            # if already in the same state, do nothing
+            return
+        if not state:
+            # Exiting Offline editing mode
+
+            G.settings_mgr.go_online()
+            # clear the layout after going back online
+            G.main_window.settings_layout.clear_layout()
+            # reset the craft area text to default
+            self.cur_craft_label.setText('None Detected')
+            self.cur_pattern_label.setText('(No Match)')
+            self.active_profile_label.setText(G.settings_mgr.active_profile)
+            # self.active_profile_label.setText("Active Profile: (None)")
+            # self.cb_activeProfileCombo.clear()
+            # re-show the profile selecting widget
+            if G.master_instance:
+                self.profile_selector_label.setVisible(True)
+                self.cb_activeProfileCombo.setVisible(True)
+            self.settings_layout.reload_caller()
+        else:
+            # Entering offline editing mode
+            G.settings_mgr.go_offline()
+            # clear the layout in case an aircraft was previously loaded live
+            G.main_window.settings_layout.clear_layout()
+            # hide the profile selecting widget
+            if G.master_instance:
+                self.profile_selector_label.setVisible(False)
+                self.cb_activeProfileCombo.setVisible(False)
+            # Block signals so we don't trigger text change on .clear() calls
+            self.offline_name.blockSignals(True)
+            self.offline_class.blockSignals(True)
+            self.offline_name.blockSignals(True)
+            # clear contents of combo boxes so they can be repopulated
+            self.offline_name.clear()
+            self.offline_class.clear()
+            self.offline_sim.clear()
+            # unblock signals
+            self.offline_name.blockSignals(False)
+            self.offline_class.blockSignals(False)
+            self.offline_name.blockSignals(False)
+            # build sim list
+            sims = [''] + xmlutils.get_sims()
+            self.offline_sim.addItems(sims)
+
+            # modify current craft area text for offline mode
+            self.cur_craft_label.setText('OFFLINE EDITING MODE')
+            self.cur_pattern_label.setText(f"Make Selection")
+            self.active_profile_label.setText("Active Profile: (None)")
+
+            # force the settings tab to be active
+            self.tab_widget.setCurrentIndex(1)
+
+        if G.master_instance:
+            # Show the offline mode widgets, but only for master instance
+            self.offline_config_area.setVisible(state)
+            # Send command to chile instance to replicate actions
+            G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
+
+    @pyqtSlot(str, str, str, str)
+    def load_single_offline_model(self, sim, cls, model, profile):
+
+        self.toggle_offline_mode(True)
+        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
+            cb.blockSignals(True)
+            cb.clear()
+            cb.addItem('')
+
+        sim_list = xmlutils.get_sims()
+        for s in sim_list:
+            self.offline_sim.addItem(s)
+        self.offline_sim.setCurrentText(sim)
+
+        cls_list = xmlutils.get_classes_for_sim(sim)
+        for c in cls_list:
+            self.offline_class.addItem(c)
+        self.offline_class.setCurrentText(cls)
+
+        model_list = xmlutils.read_models(sim, cls)
+        for m in model_list:
+            self.offline_name.addItem(m)
+        self.offline_name.setCurrentText(model)
+
+        profile_list = xmlutils.get_available_profiles(sim, cls, model)
+        for p in profile_list:
+            self.offline_profile.addItem(p)
+        self.offline_profile.setCurrentText(profile)
+
+        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
+            cb.blockSignals(False)
+
+        G.settings_mgr.offline_scope = 'MODEL'
+        self.cur_craft_label.setText('OFFLINE EDITING MODE')
+        self.cur_pattern_label.setText(f"{G.settings_mgr.offline_scope}: {model}")
+        self.active_profile_label.setText(f"Active Profile: {profile}")
+
+        self.force_sim_aircraft()
+        if G.master_instance:
+            self.back_to_profile_mgr_button.setVisible(True)
+            args = [sim, cls, model, profile]
+            G.ipc_instance.send_broadcast_message(f"SHOW_OFFLINE_MODEL:{json.dumps(args)} ")
+            self.resize_offline_combos()
+
+
+
+    def update_offline_labeling(self):
+        pass
+
     def offline_sim_changed(self, sim=None):
         """
             Triggered when the offline 'Sim' combo box changes.
@@ -1385,6 +1524,7 @@ class MainWindow(QMainWindow):
 
         self.resize_offline_combos()
         self.force_sim_aircraft()
+
     def offline_profile_changed(self, profile):
         self.active_profile_label.setText(f"Active Profile: {profile}")
         self.resize_offline_combos()
@@ -1556,72 +1696,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-    def show_profile_manager(self):
-        dialog = ProfileManagerDialog(self)
-        dialog.raise_()
-        dialog.activateWindow()
-        dialog.show()
 
-    @pyqtSlot(bool)
-    def toggle_offline_mode(self, state):
-        if state == G.settings_mgr.offline_mode:
-            # if already in the same state, do nothing
-            return
-        if not state:
-            # Exiting Offline editing mode
-
-            G.settings_mgr.go_online()
-            # clear the layout after going back online
-            G.main_window.settings_layout.clear_layout()
-            # reset the craft area text to default
-            self.cur_craft_label.setText('None Detected')
-            self.cur_pattern_label.setText('(No Match)')
-            self.active_profile_label.setText(G.settings_mgr.active_profile)
-            # self.active_profile_label.setText("Active Profile: (None)")
-            # self.cb_activeProfileCombo.clear()
-            # re-show the profile selecting widget
-            if G.master_instance:
-                self.profile_selector_label.setVisible(True)
-                self.cb_activeProfileCombo.setVisible(True)
-            self.settings_layout.reload_caller()
-        else:
-            # Entering offline editing mode
-            G.settings_mgr.go_offline()
-            # clear the layout in case an aircraft was previously loaded live
-            G.main_window.settings_layout.clear_layout()
-            # hide the profile selecting widget
-            if G.master_instance:
-                self.profile_selector_label.setVisible(False)
-                self.cb_activeProfileCombo.setVisible(False)
-            # Block signals so we don't trigger text change on .clear() calls
-            self.offline_name.blockSignals(True)
-            self.offline_class.blockSignals(True)
-            self.offline_name.blockSignals(True)
-            # clear contents of combo boxes so they can be repopulated
-            self.offline_name.clear()
-            self.offline_class.clear()
-            self.offline_sim.clear()
-            # unblock signals
-            self.offline_name.blockSignals(False)
-            self.offline_class.blockSignals(False)
-            self.offline_name.blockSignals(False)
-            # build sim list
-            sims = [''] + xmlutils.get_sims()
-            self.offline_sim.addItems(sims)
-
-            # modify current craft area text for offline mode
-            self.cur_craft_label.setText('OFFLINE EDITING MODE')
-            self.cur_pattern_label.setText(f"Make Selection")
-            self.active_profile_label.setText("Active Profile: (None)")
-
-            # force the settings tab to be active
-            self.tab_widget.setCurrentIndex(1)
-
-        if G.master_instance:
-            # Show the offline mode widgets, but only for master instance
-            self.offline_config_area.setVisible(state)
-            # Send command to chile instance to replicate actions
-            G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
 
     def update_from_menu(self):
         if self.perform_update(auto=False):

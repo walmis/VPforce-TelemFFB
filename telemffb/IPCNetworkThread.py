@@ -47,6 +47,7 @@ class IPCNetworkThread(QThread):
     set_offline_class_signal = pyqtSignal(str)
     set_offline_ac_signal = pyqtSignal(str)
     set_offline_profile_signal = pyqtSignal(str)
+    show_offline_model_signal = pyqtSignal(str, str, str, str)
 
     def __init__(self, host="127.0.0.1", dstport=0, keepalive_sec=1, missed_keepalive=3):
         super().__init__()
@@ -250,6 +251,10 @@ class IPCNetworkThread(QThread):
                 elif msg.startswith("OFFLINE_PROFILE:"):
                     profile = msg.removeprefix("OFFLINE_PROFILE:")
                     self.set_offline_profile_signal.emit(profile)
+                elif msg.startswith("SHOW_OFFLINE_MODEL:"):
+                    payload = msg.removeprefix("SHOW_OFFLINE_MODEL:")
+                    args = json.loads(payload)
+                    self.show_offline_model_signal.emit(*args)
                 else:
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")
 

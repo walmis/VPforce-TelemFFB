@@ -76,6 +76,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.pb_Import.clicked.connect(self.import_profiles)
         self.pb_Clone.clicked.connect(self.on_clone_clicked)
         self.pb_Activate.clicked.connect(self.on_activate_clicked)
+        self.pb_Edit.clicked.connect(self.on_edit_clicked)
 
         self.pb_newAircraft.clicked.connect(self.on_new_wizard_clicked)
 
@@ -1019,6 +1020,19 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         item = selected[0]
         if not self.get_metadata(item, "active"):
             self.make_active_profile(item)
+
+    def on_edit_clicked(self):
+        selected = self.treeWidget.selectedItems()
+        if len(selected) != 1:
+            return
+        item = selected[0]
+        sim = self.get_metadata(item, 'sim_name')
+        cls = self.get_metadata(item, 'cls_name')
+        model = self.get_metadata(item, 'aircraft_name')
+        profile = self.get_metadata(item, 'profile_name')
+        G.main_window.load_single_offline_model(sim, cls, model, profile)
+        self.hide()
+
 
     @pyqtSlot()
     def on_clone_clicked(self):
