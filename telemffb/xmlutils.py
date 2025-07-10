@@ -15,8 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-
+import inspect
 # import globalvars
 import logging
 import time
@@ -25,7 +24,7 @@ import os
 import re
 import xml.dom.minidom
 import telemffb.globals as G
-
+from telemffb import utils
 
 print_debugs = False
 print_method_calls = False
@@ -34,11 +33,15 @@ device = ''
 userconfig_path = ''
 defaults_path = ''
 global auto_user_root  #
+global auto_user_tree
 global auto_defaults_root  #
 
+
+
 def update_roots():
-    global auto_user_root, auto_defaults_root
-    auto_user_root = try_parse(G.userconfig_path).getroot()
+    global auto_user_root, auto_defaults_root, auto_user_tree
+    auto_user_tree = try_parse(G.userconfig_path)
+    auto_user_root = auto_user_tree.getroot()
     auto_defaults_root = try_parse(G.defaults_path).getroot()
 
 def dbprint(color, msg):
@@ -79,8 +82,181 @@ def try_parse(file_path, max_attempts=3, delay=0.1):
     return None
 
 def write_userconfig_xml(tree : ET.ElementTree):
+    consolidate_sort_and_write_userconfig(tree)
+
+def really_write_userconfig_xml(tree : ET.ElementTree):
     ET.indent(tree, " ")
     tree.write(userconfig_path, "utf-8")
+
+# def consolidate_sort_and_write_userconfig(tree):
+#     """
+#     Deduplicates and reorders entries in the userconfig XML for consistency and performance.
+#
+#     Functionality:
+#     - Ensures only one <profileMappings> entry exists per (sim, cls, model).
+#     - Ensures <models> entries are byte-unique.
+#     - Sorts <profileMappings> by (profile, model, cls, sim).
+#     - Sorts <models> by (sim, model, device, name) for stable logical grouping.
+#
+#     Args:
+#         tree (ElementTree): Parsed XML tree from userconfig_path.
+#
+#     Effects:
+#         - Modifies the input tree in-place.
+#         - Calls write_userconfig_xml(tree) to persist changes to disk.
+#     """
+#     root = tree.getroot()
+#
+#     # 1. Collect <profileMappings> entries uniquely by (sim, cls, model)
+#     profile_map = {}
+#     for elem in root.findall('profileMappings'):
+#         key = (elem.findtext('sim'), elem.findtext('cls'), elem.findtext('model'))
+#         profile_map[key] = ET.tostring(elem)  # last write wins
+#
+#     # 2. Deduplicate exact <models> entries (byte-level)
+#     seen_model_bytes = set()
+#     unique_models = []
+#     for elem in root.findall('models'):
+#         raw = ET.tostring(elem)
+#         if raw not in seen_model_bytes:
+#             seen_model_bytes.add(raw)
+#             unique_models.append(elem)
+#
+#     # 3. Remove all <profileMappings> and <models> before reinserting
+#     for child in list(root):
+#         if child.tag in ('profileMappings', 'models'):
+#             root.remove(child)
+#
+#     # 4. Sort <profileMappings> by (profile, model, cls, sim)
+#     def profile_sort_key(raw_bytes):
+#         e = ET.fromstring(raw_bytes)
+#         return (
+#             e.findtext('active_profile') or '',
+#             e.findtext('model') or '',
+#             e.findtext('cls') or '',
+#             e.findtext('sim') or ''
+#         )
+#     for raw in sorted(profile_map.values(), key=profile_sort_key):
+#         root.append(ET.fromstring(raw))
+#
+#     # 5. Sort <models> by (sim, model, device, name)
+#     def model_sort_key(elem):
+#         return (
+#             elem.findtext('sim') or '',
+#             elem.findtext('model') or '',
+#             elem.findtext('profile') or '',
+#             elem.findtext('device') or '',
+#             elem.findtext('name') or ''
+#         )
+#     for elem in sorted(unique_models, key=model_sort_key):
+#         root.append(elem)
+#
+#     # 6. Persist updated XML to disk
+#     write_userconfig_xml(tree)
+def consolidate_sort_and_write_userconfig(tree):
+    """
+    Deduplicates and reorders entries in the userconfig XML for consistency and performance.
+
+    Functionality:
+    - Ensures only one <profileMappings> entry exists per (sim, cls, model)
+    - Ensures <models> entries are byte-unique
+    - Sorts <profileMappings> by (profile, model, cls, sim)
+    - Sorts <models> by (sim, model, profile, device, name)
+    - Sorts <simSettings> by (sim, device, name)
+    - Sorts <classSettings> by (sim, type, device, name)
+    - Sorts <sc_overrides> by (model, name)
+
+    Args:
+        tree (ElementTree): Parsed XML tree from userconfig_path
+
+    Effects:
+        - Modifies the input tree in-place
+        - Writes the updated XML to disk
+    """
+    root = tree.getroot()
+
+    # Collect and deduplicate <profileMappings>
+    profile_map = {}
+    for elem in root.findall('profileMappings'):
+        key = (elem.findtext('sim'), elem.findtext('cls'), elem.findtext('model'))
+        profile_map[key] = ET.tostring(elem)  # last wins
+
+    # Collect and deduplicate <models>
+    seen_model_bytes = set()
+    models_list = []
+    for elem in root.findall('models'):
+        raw = ET.tostring(elem)
+        if raw not in seen_model_bytes:
+            seen_model_bytes.add(raw)
+            models_list.append(elem)
+
+    # Collect others
+    sim_list = root.findall('simSettings')
+    class_list = root.findall('classSettings')
+    sc_list = root.findall('sc_overrides')
+
+    # Clear old entries
+    for child in list(root):
+        if child.tag in ('profileMappings', 'models', 'simSettings', 'classSettings', 'sc_overrides'):
+            root.remove(child)
+
+
+    # Sort and reinsert <simSettings>
+    def sim_key(e):
+        return (
+            e.findtext('sim', ''),
+            e.findtext('device', ''),
+            e.findtext('name', '')
+        )
+    for e in sorted(sim_list, key=sim_key):
+        root.append(e)
+
+    # Sort and reinsert <classSettings>
+    def class_key(e):
+        return (
+            e.findtext('sim', ''),
+            e.findtext('type', ''),
+            e.findtext('device', ''),
+            e.findtext('name', '')
+        )
+    for e in sorted(class_list, key=class_key):
+        root.append(e)
+
+    # Sort and reinsert <sc_overrides>
+    def sc_key(e):
+        return (
+            e.findtext('model', ''),
+            e.findtext('name', '')
+        )
+    for e in sorted(sc_list, key=sc_key):
+        root.append(e)
+
+    # Sort and reinsert <profileMappings>
+    def profile_key(raw_bytes):
+        e = ET.fromstring(raw_bytes)
+        return (
+            e.findtext('sim') or '',
+            e.findtext('cls') or '',
+            e.findtext('model') or '',
+            e.findtext('active_profile') or ''
+        )
+    for raw in sorted(profile_map.values(), key=profile_key):
+        root.append(ET.fromstring(raw))
+
+    # Sort and reinsert <models>
+    def model_key(e):
+        return (
+            e.findtext('sim', ''),
+            e.findtext('model', ''),
+            e.findtext('profile', ''),
+            e.findtext('device', ''),
+            e.findtext('name', '')
+        )
+    for e in sorted(models_list, key=model_key):
+        root.append(e)
+
+    # Finalize save
+    really_write_userconfig_xml(tree)
 
 def convert_userconfig():
     """
@@ -159,6 +335,33 @@ def update_vars(_device, _userconfig_path, _defaults_path):
     userconfig_path = _userconfig_path
     defaults_path = _defaults_path
 
+def get_available_profiles(sim, cls, model):
+    """
+    Returns a list of available profiles for the given sim, class, and model.
+    Args:
+        sim: the sim name (DCS, MSFS, etc)
+        cls: the class name (PropellerAircraft, JetAircraft, etc)
+        model: the model match string (e.g. 'P-51D.*' or '^P47D$')
+    Returns:
+        A list of available profiles for the given sim, class, and model.
+    """
+    # tree = try_parse(userconfig_path)
+    # root = tree.getroot()
+    profile_list = []
+    for model_elem in auto_user_root.findall(f'.//models[sim="{sim}"][model="{model}"]'):
+        profile_name = model_elem.find('profile')
+        if profile_name is not None:
+            p_name = profile_name.text
+            if p_name is not None and p_name not in profile_list:
+                profile_list.append(p_name)
+    # Also look in defaults root for a match for any object with a 'type' <name> attribute and a <value> of "class name"..
+    # add a "default" profile to the list if found
+    model_elem = auto_defaults_root.find(f'.//models[sim="{sim}"][model="{model}"][name="type"][value="{cls}"]')
+    if model_elem is not None:
+        profile_list.append('default')
+
+    return profile_list
+
 def get_classes_for_sim(sim):
     # tree = try_parse(defaults_path)
     # root = tree.getroot()
@@ -182,6 +385,8 @@ def get_sims():
             name = sim_name.text
             sims.append(name)
     return sims
+
+
 
 def read_xml_file(the_sim, instance_device=''):
     # mprint(f"read_xml_file  {the_sim}")
@@ -269,6 +474,107 @@ def read_anydevice_settings(the_sim):
     return data_list
 
 
+
+# def read_user_models(sim, cls, default_only=False):
+#
+#     """
+#     A method to, by default, retrieve a list of models for which the user has created a custom profile.  For custom added
+#     aircraft, there will be a "type" entry in the user config.  For modifications to default profiles, there are only
+#     settings mapped to the aircraft name.
+#     Optionally, can return only a list of default models for the sim, class.
+#     Args:
+#         sim: name of sim (DCS, MSFS, IL2, XPLANE)
+#         cls: name oircraft class (PropellerAircraft, JetAircraft, etc)
+#         default_only: if True, only the default models will be returned, otherwise only the user models will be returned
+#
+#     Returns: A sorted list of models
+#
+#     """
+#
+#     ## First read the default models
+#     ## This data will be used as a referenc to get the class name for aircraft that are in the user table but do not have a "type"
+#     ## meaning they are modifications of a default profile
+#
+#     total_aircraft = []
+#     for model_elem in auto_defaults_root.findall(".//models"):
+#         if model_elem.findtext("sim") == sim and model_elem.findtext("name") == "type" and model_elem.findtext("value") == cls:
+#             # get all models of type 'cls' for the given sim.  Create a list of aircraft names matching the type and sim (i.e. ("P-51D", "P47D")
+#             model_name = model_elem.findtext("model")
+#             model_value = model_elem.findtext("value")
+#             total_aircraft.append((model_name, "Default"))
+#
+#     if default_only:
+#         return sorted(total_aircraft)
+#     # Now we know all the models and their type for the given sim.
+#     # Now we read the user config and see if they have any custom models.  Custom models will have a "type" entry whereas settings that modify a default profile will not
+#
+#     for model_elem in auto_user_root.findall(".//models"):
+#         if model_elem.findtext("sim") == sim and model_elem.findtext("name") == "type" and model_elem.findtext("value") == cls:
+#             # get all models of type 'cls' for the given sim.  Create a list of aircraft names matching the type and sim (i.e. ("CustomAircraft1.*", "Custom Airfraft Two.*")
+#             # this list may be empty if the user has never manually created a profile
+#             model_name = model_elem.findtext("model")
+#             model_value = model_elem.findtext("value")
+#             profile_name = model_elem.findtext("profile")
+#             total_aircraft.append((model_name, profile_name))
+#
+#     # Now 'total_aircraft' contains all of the models for the given sim of the given class, both default models as well as user defined models
+#     # Now we will look at all the settings in the users config.  If an entry exists for a model, that means the user has a "user profile" for that model.
+#     results = []
+#     for user_setting in auto_user_root.findall(f'.//models'):
+#         # we now have all entries that pertain to 'sim', look for each model name in the known list of aircraft of type cls.  If it is in the lst,
+#         # the user has a "profile" for that aircraft, whether it is based on a default profile or a user profile.
+#         model_name = user_setting.findtext("model")
+#         profile_name = user_setting.findtext("profile")
+#         if any(model_name == aircraft for aircraft, _ in total_aircraft) and (model_name, profile_name) not in results:
+#             # print(f"MODEL NAME: {model_name}")
+#             results.append((model_name, profile_name))
+#
+#     return sorted(results)
+
+def read_user_models(sim, cls, default_only=False, user_only=True, both=False):
+
+    """
+    A method to, by default, retrieve a list of models for which the user has created a custom profile.  For custom added
+    aircraft, there will be a "type" entry in the user config.  For modifications to default profiles, there are only
+    settings mapped to the aircraft name.
+    Optionally, can return only a list of default models for the sim, class.
+    Args:
+        sim: name of sim (DCS, MSFS, IL2, XPLANE)
+        cls: name oircraft class (PropellerAircraft, JetAircraft, etc)
+        default_only: if True, only the default models will be returned, otherwise only the user models will be returned
+
+    Returns: A sorted list of models
+
+    """
+
+    ## First read the default models
+    ## This data will be used as a referenc to get the class name for aircraft that are in the user table but do not have a "type"
+    ## meaning they are modifications of a default profile
+
+    total_aircraft = []
+    if default_only or both:
+        for model_elem in auto_defaults_root.findall(".//models"):
+            if model_elem.findtext("sim") == sim and model_elem.findtext("name") == "type" and model_elem.findtext("value") == cls:
+                # get all models of type 'cls' for the given sim.  Create a list of aircraft names matching the type and sim (i.e. ("P-51D", "P47D")
+                model_name = model_elem.findtext("model")
+                model_value = model_elem.findtext("value")
+                total_aircraft.append((model_name, "default"))
+        if default_only:
+            return sorted(total_aircraft)
+    if user_only or both:
+        for model_elem in auto_user_root.findall(".//models"):
+            if model_elem.findtext("sim") == sim and model_elem.findtext("value") == cls:
+                if model_elem.findtext("name") == "type" or model_elem.findtext("name") == "profile":
+                    # get all models of type 'cls' for the given sim.  Create a list of aircraft names matching the type and sim (i.e. ("CustomAircraft1.*", "Custom Airfraft Two.*")
+                    # this list may be empty if the user has never manually created a profile
+                    model_name = model_elem.findtext("model")
+                    model_value = model_elem.findtext("value")
+                    profile_name = model_elem.findtext("profile")
+                    if (model_name, profile_name) not in total_aircraft:
+                        total_aircraft.append((model_name, profile_name))
+
+    return total_aircraft
+
 def read_models(the_sim, the_class=''):
     all_models = ['']
     # tree = try_parse(defaults_path)
@@ -307,36 +613,25 @@ def read_models(the_sim, the_class=''):
 
     return sorted(all_models)
 
-
-def read_models_data(file_path, sim, full_model_name, alldevices=False, instance_device = ''):
+def new_read_usermodels_data(file_path, sim, full_model_name, alldevices=False, instance_device = '', active_profile=None):
     mprint(f"read_models_data  {file_path}, {sim}, {full_model_name}")
-    # runs on both defaults and userconfig xml files
+    if active_profile is None:
+        active_profile = G.settings_mgr.active_profile
     tree = try_parse(file_path)
     root = tree.getroot()
 
     model_data = []
     found_pattern = ''
 
-    if instance_device == '':
-        the_device = device
-    else:
-        the_device = instance_device
+    the_device = instance_device or device
 
-    if alldevices:
-        # Iterate through models elements
-        #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{device}"]'):
-        any_models = root.findall(f'.//models[sim="any"]')
+    match_pattern = get_pattern_by_sim_fullname(sim, full_model_name)
 
-        all_models = root.findall(f'.//models[sim="{sim}"]') 
+    # Collect models with 'device' set to 'any'
+    any_models = root.findall(f'.//models[sim="{sim}"][model="{match_pattern}"][device="any"]')
 
-    else:
-        # Collect models with 'device' set to 'any' or both 'sim' and 'device' set to 'any'
-        any_models = root.findall(f'.//models[sim="{sim}"][device="any"]') + \
-                     root.findall(f'.//models[sim="any"][device="any"]')
-
-        # Collect models with specific devices
-        all_models = root.findall(f'.//models[sim="{sim}"][device="{the_device}"]') + \
-                     root.findall(f'.//models[sim="any"][device="{the_device}"]')
+    # Collect models with specific devices
+    all_models = root.findall(f'.//models[sim="{sim}"][model="{match_pattern}"][device="{the_device}"]')
 
         # Create a dictionary to store models based on unique keys
     model_dict = {}
@@ -379,52 +674,80 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False, instance
 
     return model_data, found_pattern
 
-def read_models_from_tffbprofile(the_sim, profilename, pattern):
-    all_models = ['']
+def read_models_data(file_path, sim, full_model_name, alldevices=False, instance_device = '', user=False, profile=None):
+    mprint(f"read_models_data  {file_path}, {sim}, {full_model_name}")
+    # runs on both defaults and userconfig xml files
+    if profile is None:
+        profile = G.settings_mgr.active_profile
+    tree = try_parse(file_path)
+    root = tree.getroot()
+
     model_data = []
-    profileRootPath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-    profile_path = os.path.join(profileRootPath, profilename + '.tffbprofile')
-    try:
-        tree = try_parse(profile_path)
-        root = tree.getroot()
+    found_pattern = ''
 
-        usr_models =  root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
-                      root.findall(f'.//models[sim="any"][device="{device}"]') + \
-                      root.findall(f'.//models[sim="{the_sim}"][device="any"]') + \
-                      root.findall(f'.//models[sim="any"][device="any"]')
+    if instance_device == '':
+        the_device = device
+    else:
+        the_device = instance_device
 
+    profile_match = f"[profile='{profile}']" if user else ''
+
+    if alldevices:
+        # Iterate through models elements
+        #for model_elem in root.findall(f'.//models[sim="{self.sim}"][device="{device}"]'):
+        any_models = root.findall(f'.//models[sim="any"]{profile_match}')
+
+        all_models = root.findall(f'.//models[sim="{sim}"]{profile_match}')
+
+    else:
+        # Collect models with 'device' set to 'any' or both 'sim' and 'device' set to 'any'
+        any_models = root.findall(f'.//models[sim="{sim}"][device="any"]{profile_match}') + \
+                     root.findall(f'.//models[sim="any"][device="any"]{profile_match}')
+
+        # Collect models with specific devices
+        all_models = root.findall(f'.//models[sim="{sim}"][device="{the_device}"]{profile_match}') + \
+                     root.findall(f'.//models[sim="any"][device="{the_device}"]{profile_match}')
 
         # Create a dictionary to store models based on unique keys
-        model_dict = {}
+    model_dict = {}
 
-        # Process any_models
-        for model_elem in usr_models:
-            model_key = (model_elem.find('model').text, model_elem.find('name').text)
-            model_dict[model_key] = model_elem
+    # Process any_models
+    for model_elem in any_models:
+        model_key = (model_elem.find('model').text, model_elem.find('name').text)
+        model_dict[model_key] = model_elem
 
-        # Process the models
-        for model_elem in model_dict.values():
-            # Assuming 'model' is the element containing the wildcard pattern
+    # Process all_models, overwriting any existing models with the same key
+    for model_elem in all_models:
+        model_key = (model_elem.find('model').text, model_elem.find('name').text)
+        model_dict[model_key] = model_elem
 
-            name = model_elem.find('name').text
-            value = model_elem.find('value').text
-            unit_elem = model_elem.find('unit')
-            unit = unit_elem.text if unit_elem is not None else ""
-            saved_device = model_elem.find('device').text
-            model_dict = {
-                'model': pattern,
-                'name': name,
-                'value': value,
-                'unit': unit,
-                'device': saved_device
-            }
-            found_pattern = pattern
-            model_data.append(model_dict)
+    # Process the models
+    for model_elem in model_dict.values():
+        # Assuming 'model' is the element containing the wildcard pattern
 
-    except:
-        logging.warning("Couldn't load profile " + profilename)
+        unit_pattern = model_elem.find('model')
+        if unit_pattern is not None:
+            pattern = unit_pattern.text
+            if pattern is not None:
+                # Check if the full_model_name matches the pattern using re.match
+                if re.match(pattern, full_model_name) or pattern == full_model_name:
+                    name = model_elem.find('name').text
+                    value = model_elem.find('value').text
+                    unit_elem = model_elem.find('unit')
+                    unit = unit_elem.text if unit_elem is not None else ""
+                    saved_device = model_elem.find('device').text
+                    model_dict = {
+                        'name': name,
+                        'value': value,
+                        'unit': unit,
+                        'device': saved_device
+                    }
+                    found_pattern = pattern
+                    model_data.append(model_dict)
+                else:
+                    lprint (f"{pattern} does not match {full_model_name}")
 
-    return model_data
+    return model_data, found_pattern
 
 def read_sc_overrides(aircraft_name):
     def_model_overrides = read_models_sc_overrides(defaults_path, aircraft_name, 'defaults')
@@ -508,8 +831,8 @@ def update_sc_overrides_with_user(defaults_ovr, user_ovr):
 def erase_sc_override_from_xml(the_model, setting_name):
     mprint(f"erase_override_from_xml   {the_model}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    tree = auto_user_tree
+    root = auto_user_root
 
     elements_to_remove = []
     for ovr_elem in root.findall(f'sc_overrides[model="{the_model}"]'
@@ -531,8 +854,8 @@ def erase_sc_override_from_xml(the_model, setting_name):
 def write_sc_override_to_xml(the_model, the_var, setting_name, sc_unit='', scale=''):
     mprint(f"write_overrides_to_xml  {the_model}, {the_var}, {setting_name}, {scale}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    tree = auto_user_tree
+    root = auto_user_root
     ovr_elem = None
     if the_model == '':
         return
@@ -642,9 +965,39 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
 def remove_dicts_by_names(data_list, removal_list):
     return [d for d in data_list if d.get('name') not in removal_list]
 
-def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_device = ''):
-    logging.info (f"Reading from XML:  Sim: {the_sim}, Aircraft name: {aircraft_name}, Class: {input_modeltype}")
+def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_device = '', active_profile=None):
+    """
+        Loads and merges configuration data for a specific aircraft in a simulator, producing a fully-resolved,
+        sorted list of config parameters based on multiple levels of overrides.
 
+        This function:
+        - Loads default and user-specific model data from XML files
+        - Detects the model's class (if not provided)
+        - Applies layered overrides from:
+            1. Simulator-level defaults
+            2. Class-level defaults
+            3. User-level simulator overrides
+            4. User-level class overrides
+            5. Model-specific defaults
+            6. Model-specific user profile settings
+        - Merges and sorts the resulting config, respecting prerequisites and eliminating invalid entries
+
+        Args:
+            the_sim (str): Simulator name (e.g., "DCS", "MSFS").
+            aircraft_name (str): Full name or regex pattern identifying the aircraft.
+            input_modeltype (str, optional): Override for the model's class (e.g., "PropellerAircraft").
+            instance_device (str, optional): Specific input device name (e.g., "joystick").
+            active_profile (str, optional): User profile to use. Defaults to currently active profile.
+
+        Returns:
+            tuple:
+                - model_class (str): Final resolved aircraft class (from input or extracted from XML).
+                - model_pattern (str): Regex or name pattern matched from the XML.
+                - sorted_data (list of dict): Fully resolved and sorted configuration items.
+        """
+    logging.info (f"Reading from XML:  Sim: {the_sim}, Aircraft name: {aircraft_name}, Class: {input_modeltype}")
+    if active_profile is None:
+        active_profile = G.settings_mgr.active_profile
     time.sleep(0.1)
 
     print_counts = False
@@ -652,7 +1005,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
 
     # Read models data first
     model_data, def_model_pattern = read_models_data(defaults_path, the_sim, aircraft_name,False,instance_device)
-    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, aircraft_name,False,instance_device)
+    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, aircraft_name,False,instance_device, user=True, profile=active_profile)
 
     model_pattern = def_model_pattern
     if usr_model_pattern != '':
@@ -755,16 +1108,6 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
 
     final_result = [item for item in final_result if item['value'] != '' or item['name'] == 'vpconf']
 
-
-    # read separate profile file
-    profilename = ''
-    for item in final_result:
-        if item['name'] == 'telemffb_profile':
-            profilename = item['value']
-            profile_list = read_models_from_tffbprofile(the_sim,profilename,model_pattern )
-            final_result = update_data_with_models(final_result, profile_list, 'Model (profile)')
-
-
     prereq_list = read_prereqs()
     final_w_prereqs = check_prereq_value(prereq_list, final_result)
     final_wo_prereqs = eliminate_no_prereq(final_w_prereqs)
@@ -776,6 +1119,25 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
 
 
 def read_user_sim_data(the_sim, instance_device=''):
+    """
+       Extracts simulator-level user configuration overrides from the user config XML.
+
+       This method searches the `<simSettings>` section of the parsed user XML tree (`auto_user_root`) and returns
+       a list of dictionaries containing user-defined settings. It supports specific matching on simulator and
+       device values, as well as fallback matches using "any".
+
+       Args:
+           the_sim (str): The simulator name (e.g., "DCS", "MSFS").
+           instance_device (str, optional): Specific device to filter for (e.g., "joystick").
+                                            If empty, falls back to the global `device` value.
+
+       Returns:
+           list of dict: Each dictionary contains:
+               - 'name': The setting name
+               - 'value': The setting value
+               - 'unit': Optional unit string (may be empty)
+               - 'replaced': A fixed string indicating this data replaces 'Sim (user)' level
+       """
     mprint(f"read_user_sim_data {the_sim}")
     # tree = try_parse(userconfig_path)
     # root = tree.getroot()
@@ -811,6 +1173,25 @@ def read_user_sim_data(the_sim, instance_device=''):
     return sim_data
 
 def read_user_class_data(the_sim, crafttype, instance_device=''):
+    """
+        Retrieves user-defined configuration overrides for a specific aircraft class from the user config XML.
+
+        This function scans the `<classSettings>` section in the global `auto_user_root` tree for entries that
+        match the given simulator and device. It filters entries where the `<type>` tag (treated as a regex)
+        matches the provided aircraft class type (`crafttype`).
+
+        Args:
+            the_sim (str): Simulator name (e.g., "DCS", "MSFS").
+            crafttype (str): Aircraft class name to match (e.g., "JetAircraft").
+            instance_device (str, optional): Device name to filter by. Defaults to global `device` if empty.
+
+        Returns:
+            list of dict: A list of matching configuration dictionaries, each with:
+                - 'name': Configuration key
+                - 'value': Configuration value
+                - 'unit': Optional unit for the value (may be empty)
+                - 'replaced': A fixed string "Class (user)" indicating the override level
+        """
     mprint(f"read_user_class_data  {the_sim}, {crafttype}")
     # tree = try_parse(userconfig_path)
     # root = tree.getroot()
@@ -848,8 +1229,145 @@ def read_user_class_data(the_sim, crafttype, instance_device=''):
 
     return model_data
 
+def get_pattern_by_sim_fullname(sim, full_name):
+    """
+    Knowing only the sim name and the full name of the model as received in telemetry, this function returns the
+    pattern name stored in the config if it finds a item that will regex match the full name.
+    First looks in userconfig, then defaults.
+    Looks for all "type" elements and inspects the "model" element to see if it matches with the full name.
+    Args:
+        sim: name of sim (DCS, MSFS, etc)
+        full_name: eg. "Super Special Awesome Aircraft Livery Green"
+
+    Returns:
+        match pattern if found, else None
+    """
+    def re_match(pattern, full_model_name):
+        if re.match(pattern, full_model_name) or pattern == full_model_name:
+            return True
+        else:
+            return False
+
+    # users_root = try_parse(userconfig_path).getroot()
+    user_elements = auto_user_root.findall(f'models[sim="{sim}"][name="type"]')
+    for element in user_elements:
+        if element is not None:
+            match_string =  element.findtext("model")
+            if re_match(match_string, full_name):
+                # logging.info(f"!@!@!@!@!@!@!@!@!@!@!@!@!@Found a user config match, '{match_string}', for {full_name} in {sim}")
+                return match_string
+            else:
+                continue
+    # If we get here, there was no match in the user config, look in default config
+    # defaults_root = try_parse(defaults_path).getroot()
+    defaults_elements = auto_defaults_root.findall(f'models[sim="{sim}"][name="type"]')
+    for element in defaults_elements:
+        if element is not None:
+            match_string =  element.findtext("model")
+            if re_match(match_string, full_name):
+                # logging.info(f"!@!@!@!@!@!@!@!@!@!@!@!@!@Found a default config match, '{match_string}', for {full_name} in {sim}")
+                return match_string
+            else:
+                continue
+    # If we get here, there was no match in the default config or the user config, return None
+    logging.warning(f"!@!@!@!@!@!@!@!@!@!@!@!@!@No match found for {full_name} in {sim}")
+    return None
+
+
+def get_class_for_sim_model(sim, model):
+    """
+    Find and return the Aircraft Class for a given model/sim combo
+    - Looks in user table first and tries to find a "type" attribute match, returns the value if found
+    - If no match found in user table, it looks in defaults table to find a match for sim/aircraft and returns the type value
+    - If no match found, returns None
+    Args:
+        sim: the sim (DCS, MSFS, etc)
+        model: the model match string ('Super Special Aircraft.*)
+
+    Returns: Aircraft Class (i.e. "PropellerAircraft") if found, else None
+    """
+    # look for match in user config
+    # users_root = try_parse(userconfig_path).getroot()
+    entry = auto_user_root.find(f'models[sim="{sim}"][model="{model}"][name="type"]')
+    if entry is not None:
+        cls = entry.findtext('value')
+        return cls
+
+    # defaults_root = try_parse(defaults_path).getroot()
+    entry = auto_defaults_root.find(f'models[sim="{sim}"][model="{model}"][name="type"]')
+    if entry is not None:
+        cls = entry.findtext('value')
+        return cls
+
+    return None
+
+def get_active_profile_for_model(sim, cls, model, users_root=None):
+    """
+    Given the sim, class, and model, return the currently active profile for that aircraft.
+
+    Priority order:
+    1. Check <profileMappings> section for an explicit active profile entry.
+    2. Check <models> section for an implicit active profile.
+    3. Look in default config, return "default" if match found
+    4. return None if no available active profile is found
+
+    Args:
+        sim (str): Simulator name
+        cls (str): Aircraft class
+        model (str): Aircraft model
+        users_root (ElementTree.Element, optional): Pre-parsed userconfig root to avoid redundant parsing.
+
+    Returns:
+        str: Active profile name (e.g. "JoystickA", or "default") or None if no active profile found.
+    """
+    # if users_root is None:
+    #     users_root = try_parse(userconfig_path).getroot()
+
+    # 1. Check <profileMappings> section
+    for profile in auto_user_root.findall('.//profileMappings'):
+        m = profile.findtext('model')
+        s = profile.findtext('sim')
+        c = profile.findtext('cls')
+
+        if m == model and s == sim and c == cls:
+            return profile.findtext('active_profile')
+
+    # 2. Check <models> section for a profile tag
+    for model_entry in auto_user_root.findall('.//models'):
+        m = model_entry.findtext('model')
+        s = model_entry.findtext('sim')
+
+        if m == model and s == sim:
+            p = model_entry.findtext('profile')
+            if p:
+                return p
+    # 3. Nothing found in user profile, look for aircraft entry in defaults
+    defaults_root = try_parse(defaults_path).getroot()
+    for model_entry in defaults_root.findall('.//models'):
+        m = model_entry.findtext('model')
+        s = model_entry.findtext('sim')
+        if m == model and s == sim:
+            return "default"
+    # 4. Fallback default
+    logging.warning(f"No active or default profile found for model {model} in sim {sim}.")
+    return None
 
 def update_default_data_with_craft_result(defaultdata, craftresult):
+    """
+        Updates a base default configuration list with class-specific overrides.
+
+        For each entry in `craftresult`, this method searches for a matching `name` in `defaultdata` and
+        replaces the corresponding `value` and `unit` fields. It also adds a 'replaced' flag to indicate
+        that the entry came from a class default override.
+
+        Args:
+            defaultdata (list of dict): The base default configuration data.
+            craftresult (list of dict): The class-specific configuration overrides.
+
+        Returns:
+            list of dict: The updated configuration list, where applicable entries have been overridden
+                          by class-specific values and marked with 'replaced': "Class Default".
+        """
     updated_defaultdata = defaultdata.copy()  # Create a copy to avoid modifying the original data
 
     # Iterate through craftresult
@@ -869,6 +1387,23 @@ def update_default_data_with_craft_result(defaultdata, craftresult):
 
 
 def update_data_with_models(defaults_data, model_data, replacetext):
+    """
+        Merges settings from model-specific overrides into the default configuration list.
+
+        This function updates each entry in `defaults_data` if a matching entry by 'name' is found
+        in `model_data`. It copies the 'value' and 'unit' fields from `model_data` into the corresponding
+        entry in `defaults_data`, and marks it with the provided `replacetext` in the 'replaced' field
+        to indicate the source of the override.
+
+        Args:
+            defaults_data (list of dict): The base configuration settings.
+            model_data (list of dict): The model-specific overrides to apply.
+            replacetext (str): Text label to assign to the 'replaced' field when overrides are applied
+                               (e.g., 'Model (user)', 'Sim (user)', 'Class (user)').
+
+        Returns:
+            list of dict: The updated configuration list with applied overrides.
+        """
     updated_result = defaults_data.copy()
 
     # Create a dictionary mapping settings to their corresponding values and units
@@ -888,45 +1423,150 @@ def update_data_with_models(defaults_data, model_data, replacetext):
 
     return updated_result
 
-def write_to_xml(sim, class_name, model, value, setting, unit='', the_device='', scope='MODEL'):
-    if not G.settings_mgr.offline_mode:
-        write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device)
-        return
-    else:
-        match G.settings_mgr.offline_scope:
-            case 'SIM':
-                write_sim_to_xml(sim, value, setting, unit=unit, the_device=the_device)
-            case 'CLASS':
-                write_class_to_xml(sim, class_name, value, setting, unit=unit, the_device=the_device)
-            case 'MODEL':
-                write_models_to_xml(sim, model, value, setting, unit=unit, the_device=the_device)
-            case _:
-                pass
-
-def erase_from_xml(sim, class_name, model, setting, the_device=''):
-    if not G.settings_mgr.offline_mode:
-        erase_models_from_xml(sim, model, setting, the_device=the_device)
-        return
-    else:
-        match G.settings_mgr.offline_scope:
-            case 'SIM':
-                erase_sim_from_xml(sim, setting,  the_device=the_device)
-            case 'CLASS':
-                erase_class_from_xml(sim, class_name, setting, the_device=the_device)
-            case 'MODEL':
-                erase_models_from_xml(sim, model, setting, the_device=the_device)
-            case _:
-                pass
 
 def add_new_model(sim, class_name, match_string):
     """A helper function to abstract the required parameters to create a new user model entry"""
-    write_models_to_xml(sim, match_string, class_name, setting_name='type')
+    write_models_to_xml(sim, match_string, class_name, the_device='any', setting_name='type')
 
-def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', the_device=''):
+def add_new_profile(sim, class_name, match_string, profile_name):
+    """A helper function to abstract the required parameters to create a new user model entry"""
+    exists = auto_user_root.find(f'models[sim="{sim}"][model="{match_string}"][value="{class_name}"][name="profile"]')
+    if not exists:
+        write_models_to_xml(sim, match_string, class_name, the_device='any', setting_name='profile', profile_name=profile_name)
+
+def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', the_device='', profile_name=None):
+    """
+        Writes or updates a <models> entry in the user configuration XML.
+
+        This function handles the creation or update of aircraft-specific settings in the user config file.
+        It ensures proper device targeting, deduplication, and profile management (including redirecting
+        writes from "default" to "Auto User" and establishing the active profile if necessary).
+
+        Args:
+            the_sim (str): Simulator name (e.g., "DCS", "MSFS").
+            the_model (str): Aircraft model name (or match pattern).
+            the_value (str): The value to assign to the setting.
+            setting_name (str): The name of the setting to write.
+            unit (str, optional): The unit for the setting (e.g., "kg", "rpm"). Defaults to empty string.
+            the_device (str, optional): Device name. Defaults to global device fallback.
+            profile_name (str, optional): Profile to write the setting under. If set to "default", the
+                entry is redirected to "Auto User".
+
+        Behavior:
+            - Skips writing if model name is missing.
+            - Uses `read_anydevice_settings` to decide whether the setting should target "any" device.
+            - Redirects "default" profile writes to "Auto User", creating the entry if needed.
+            - Updates existing entries if one is found; otherwise, writes a new <models> block.
+            - Ensures no duplicates are created in the XML.
+            - Persists changes using `consolidate_sort_and_write_userconfig`.
+
+        Logging:
+            - Logs both new additions and updates.
+            - Prints a message if a duplicate entry is detected and skipped.
+        """
+    mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
+    dbprint("blue", f"[WRITE ENTRY] sim={the_sim}, model={the_model}, profile_name={profile_name}")
+
+    # Use preloaded global XML tree and root
+    tree = auto_user_tree
+    root = auto_user_root
+
+    if the_model == '':
+        return  # Do not allow writes without a model name
+
+    # Use global device fallback if none provided
+    if the_device == '':
+        the_device = device
+
+    # check if the setting is an "any device" setting.  If so, change the device to 'any', otherwise will be for active device
+    write_any_device_list = read_anydevice_settings(the_sim)
+    if setting_name in write_any_device_list:
+        the_device = 'any'
+
+    # Determine if profile was specified and be included in the write logic
+    is_profile_used = profile_name is not None and profile_name.lower() != 'none'
+
+    # If trying to write under "default", redirect to "Auto User"
+    if is_profile_used and profile_name.lower() == 'default':
+        # default is not a writable profile.. if a user modifies the config when default is loaded, write it to "Auto User' profile
+        # first check if there is a "profile" entry for "Auto User" for this sim/model
+        cls = get_class_for_sim_model(the_sim, the_model)
+
+        # Ensure "Auto User" profile exists before writing
+        auto_user_profile = root.find(
+            f'.//models[sim="{the_sim}"][model="{the_model}"][name="profile"][profile="Auto User"]')
+        if auto_user_profile is None:
+            # There is no auto-user profile yet, so we need to create one
+            add_new_profile(the_sim, cls, the_model, profile_name='Auto User')
+
+        # Set active profile and override profile name for the write
+        update_active_profile_entry(sim=the_sim, cls=cls, model=the_model, active_profile="Auto User")
+        profile_name = "Auto User"
+
+    # Build XPath query string to locate existing <models> entry
+    xpath = f'.//models[sim="{the_sim}"][device="{the_device}"][model="{the_model}"][name="{setting_name}"]'
+    if is_profile_used:
+        xpath += f'[profile="{profile_name}"]'
+
+    # Check if element already exists for this exact setting
+    model_elem = root.find(xpath)
+
+    if model_elem is not None:
+        # Update existing <value> and <unit> fields if found
+        for child_elem in model_elem:
+            if child_elem.tag == 'value':
+                child_elem.text = str(the_value)
+            if child_elem.tag == 'unit':
+                child_elem.text = str(unit)
+        write_userconfig_xml(tree)
+        logging.info(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
+                     f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}, profile={profile_name}")
+        return
+
+    # Deduplication: Avoid creating duplicate if exact entry already exists
+    def same_model(e):
+        tags = {
+            "name": setting_name,
+            "model": the_model,
+            "value": the_value,
+            "unit": unit,
+            "sim": the_sim,
+            "device": the_device,
+        }
+        if is_profile_used:
+            tags["profile"] = profile_name
+        return all(e.find(tag) is not None and e.find(tag).text == val for tag, val in tags.items())
+
+    if any(same_model(e) for e in root.findall("models")):
+        lprint("<models> element with the same values already exists. Skipping.")
+        return
+
+    # Create new <models> entry
+    models = ET.SubElement(root, "models")
+    tags_to_write = [("name", setting_name),
+                     ("model", the_model),
+                     ("value", the_value),
+                     ("sim", the_sim),
+                     ("device", the_device)]
+
+    if unit:
+        tags_to_write.append(("unit", unit))
+    if is_profile_used:
+        tags_to_write.append(("profile", profile_name))
+
+    for tag, val in tags_to_write:
+        ET.SubElement(models, tag).text = val
+
+    # Finalize XML save
+    consolidate_sort_and_write_userconfig(tree)
+    logging.info(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
+                 f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}, profile={profile_name}")
+
+def old_write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', the_device='', profile_name=None):
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    tree = auto_user_tree
+    root = auto_user_root
     model_elem = None
     if the_model == '':
         return
@@ -936,11 +1576,37 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
     if setting_name in write_any_device_list:
         the_device = 'any'
 
+    # profile_name = profile_name if profile_name else G.settings_mgr.active_profile
+    if profile_name is None:
+        profile_name = 'none'
+
+    if profile_name.lower() == 'default':
+        cls = get_class_for_sim_model(the_sim, the_model)
+        # default is not a writable profile.. if a user modifies the config when default is loaded, write it to "Auto User' profile
+        # first check if there is a "profile" entry for "Auto User" for this sim/model
+        auto_user_profile = root.find(
+            f'.//models[sim="{the_sim}"][model="{the_model}"][name="profile"][profile="Auto User"]')
+
+        if auto_user_profile is None:
+            # There is no auto-user profile yet, so we need to create one
+            # we don't know the "class" here, so we need to get it from the defaults table
+            # now add the profile entry
+            add_new_profile(the_sim, cls, the_model, profile_name='Auto User')
+
+        # set the active profile to "Auto User" so it will automatically load on the settings page
+        update_active_profile_entry(sim=the_sim, cls=cls, model=the_model, active_profile="Auto User")
+        # set the profile name to "Auto User" so the setting gets written to that profile
+        profile_name = "Auto User"
+
+
+
+
     # Check if an identical <models> element already exists
     model_elem = root.find(f'.//models[sim="{the_sim}"]'  
                                f'[device="{the_device}"]'
                                f'[model="{the_model}"]'
-                               f'[name="{setting_name}"]')
+                               f'[name="{setting_name}"]'
+                               f'[profile="{profile_name}"]')
 
 
     if model_elem is not None:
@@ -953,7 +1619,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
         if the_model != '':
             write_userconfig_xml(tree)
         logging.info(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
-                     f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}")
+                     f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}, profile={profile_name}")
 
     else:
         # Check if an identical <models> element already exists; if so, skip
@@ -966,7 +1632,8 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
                     ("value", the_value),
                     ("unit", unit),
                     ("sim", the_sim),
-                    ("device", the_device)
+                    ("device", the_device),
+                    ("profile", profile_name)
                 ]
             )
             for element in root.iter("models")
@@ -982,7 +1649,8 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
                                    ("model", the_model),
                                    ("value", the_value),
                                    ("sim", the_sim),
-                                   ("device", the_device)]:
+                                   ("device", the_device),
+                                   ("profile", profile_name)]:
                     ET.SubElement(models, tag).text = value
             else:
                 for tag, value in [("name", setting_name),
@@ -990,21 +1658,48 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
                                    ("value", the_value),
                                    ("unit", unit),
                                    ("sim", the_sim),
-                                   ("device", the_device)]:
+                                   ("device", the_device),
+                                   ("profile", profile_name)]:
                     ET.SubElement(models, tag).text = value
 
             # Write the modified XML back to the file
             tree = ET.ElementTree(root)
-            write_userconfig_xml(tree)
+            consolidate_sort_and_write_userconfig(tree)
             logging.info(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
-                         f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}")
+                         f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}, profile={profile_name}")
 
 
 def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit='', the_device = ''):
+    """
+        Writes or updates a <classSettings> entry in the user configuration XML.
+
+        This function manages simulator and class-level (i.e., aircraft type) settings,
+        ensuring values are appropriately scoped to the simulation environment and device.
+        If a matching element already exists, its value is updated. Otherwise, a new entry is created.
+
+        Args:
+            the_sim (str): Simulator name (e.g., "DCS", "MSFS").
+            the_class (str): Aircraft class or type (e.g., "JetAircraft", "Helicopter").
+            the_value (str): The setting's value to be saved.
+            setting_name (str): The name of the setting (e.g., "max_speed", "thrust_ratio").
+            unit (str, optional): The unit for the value (e.g., "kts", "kg"). Defaults to ''.
+            the_device (str, optional): Device name to scope the setting. Defaults to global `device`.
+
+        Behavior:
+            - If `the_device` is not provided, falls back to global `device`.
+            - If the setting is in the "write_any_device_list", forces `device="any"`.
+            - Searches for a matching <classSettings> block based on sim, device, type, and name.
+                - If found, updates the <value> sub-element.
+                - If not found, creates a new <classSettings> element.
+            - Saves changes using `write_userconfig_xml`.
+
+        Logging:
+            - Logs updates and additions with the full context of the written data.
+        """
     mprint(f"write_class_to_xml  {the_sim}, {the_class}, {the_value}{unit}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    tree = auto_user_tree
+    root = auto_user_root
     if the_device == '':
         the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -1044,10 +1739,35 @@ def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit='', the
 
 
 def write_sim_to_xml(the_sim, the_value, setting_name, unit='', the_device=''):
+    """
+       Writes or updates a <simSettings> entry in the user configuration XML file.
+
+       This function handles writing simulator-wide settings for a specific device. If a matching
+       setting already exists (based on sim, device, and name), it updates the <value> field.
+       If no match is found, a new <simSettings> block is appended to the XML.
+
+       Args:
+           the_sim (str): The name of the simulator (e.g., "MSFS", "DCS").
+           the_value (str): The value to be stored for the setting.
+           setting_name (str): The name of the setting being written or updated.
+           unit (str, optional): Unit of measurement (e.g., "kts", "lbs"). Defaults to ''.
+           the_device (str, optional): The device associated with this setting. Defaults to global `device`.
+
+       Behavior:
+           - If `the_device` is empty, falls back to the globally active device.
+           - If the setting is listed in `write_any_device_list`, sets device to 'any'.
+           - Checks for an existing matching <simSettings> entry.
+               - If found, updates the <value> child.
+               - If not found, creates a new <simSettings> element with provided attributes.
+           - Updates the XML on disk via `write_userconfig_xml`.
+
+       Logging:
+           - Logs both updates and new additions for full traceability.
+       """
     mprint(f"write_sim_to_xml {the_sim}, {the_value}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    tree = auto_user_tree
+    root = auto_user_root
     if the_device == '':
         the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -1084,55 +1804,130 @@ def write_sim_to_xml(the_sim, the_value, setting_name, unit='', the_device=''):
         logging.info(
             f"Added <simSettings> element with values: sim={the_sim}, device={the_device}, value={the_value}{unit}, name={setting_name}")
 
-def clone_pattern(the_sim, old_pattern, new_pattern):
-    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, old_pattern, True)
-    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, old_pattern, True)
+
+def clone_profile_entry(sim, cls, src_model, src_profile, dst_profile):
+    """
+    Clone a profile entry for a src_model and src_profile into a dst_profile.
+    This method clones *only* the profile entry and any profile specific settings.  To copy an entire model to another use 'clone_whole_model'
+    """
+
+    if src_profile == 'default':
+        # we are cloning a default profile, so we need to create a placeholder entry in the userconfig.xml
+        def_entry = auto_defaults_root.find(f'models[sim="{sim}"][value="{cls}"][model="{src_model}"][name="type"]')
+        if def_entry is not None:
+            cloned = ET.fromstring(ET.tostring(def_entry)) # Deep clone the element
+            cloned.find('name').text  = "profile"
+            ET.SubElement(cloned, 'profile').text = dst_profile
+            auto_user_root.append(cloned)
+            logging.info(f"Cloned profile entry for {sim} {cls} {src_model} from default to {dst_profile}")
+        else:
+            logging.error(f"No default entry found for {sim} {cls} {src_model} in defaults.xml while attempting to clone {src_profile} to {dst_profile}")
+    else:
+        # we are cloning a user profile or user created model, copy the entries
+    # Search for an exact match in existing user profiles
+        for entry in auto_user_root.findall("models"):
+            if (entry.findtext("sim"), entry.findtext("model"), entry.findtext("profile")) == (sim, src_model, src_profile):
+                cloned = ET.fromstring(ET.tostring(entry))  # Deep clone
+                cloned.find("profile").text = dst_profile
+                auto_user_root.append(cloned)
+
+    consolidate_sort_and_write_userconfig(auto_user_tree)
+
+
+def clone_whole_model(the_sim, old_pattern, new_pattern, old_profile, new_profile):
+    """
+        Clones all model configuration entries from an existing model profile and sim
+        to a new model profile under a different pattern.
+
+        This includes:
+        - Entries from both default and user configuration XMLs.
+        - Special handling of the `type` entry (which is written without profile).
+        - Creation of a new `profile` entry referencing the `new_profile` name.
+        - Cloning of special SC overrides (if any) for the model pattern.
+
+        Args:
+            the_sim (str): The simulator identifier (e.g., "MSFS", "DCS").
+            old_pattern (str): The regex or model name pattern to clone from.
+            new_pattern (str): The model pattern to clone to.
+            old_profile (str): The existing profile name to clone from.
+            new_profile (str): The new profile name to assign cloned settings to.
+
+        Notes:
+            - The method reads from both the defaults and userconfig XML paths using
+              `read_models_data`.
+            - For entries with `name == 'type'`, it creates an unprofiled entry, then rewrites
+              it as a `profile` entry for tracking purposes.
+            - `SC` override entries are also cloned using `write_sc_override_to_xml`.
+
+        This method is typically used during profile creation or duplication workflows.
+        """
+    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, old_pattern, alldevices=True)
+    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, old_pattern, alldevices=True, user=True, profile=old_profile)
     sc_overrides = read_sc_overrides(old_pattern)
     for item in user_model_data:
         model_data.append(item)
     for item in model_data:
+        if item['name'] == 'profile':
+            # we will be writing our own 'profile' value, so skip the existing models if it exists
+            continue
         if item['unit'] is None:
             item['unit'] = ''
-        write_models_to_xml(the_sim, new_pattern, item['value'],item['name'],item['unit'], item['device'])
+
+        if item['name'] == 'type':
+            # we want to include a type entry, but it doesn't get a profile name
+            write_models_to_xml(
+                the_sim=the_sim,
+                the_model=new_pattern,
+                the_value=item['value'],
+                setting_name=item['name'],
+                unit=item['unit'],
+                the_device=item['device']
+            )
+            # howerver, we want a name="profile" entry for the new model profile name, so we will change the value
+            # of "name" from "type" to "profile" and let the loop write it
+            item['name'] = 'profile'
+        write_models_to_xml(
+            the_sim=the_sim,
+            the_model=new_pattern,
+            the_value=item['value'],
+            setting_name=item['name'],
+            unit=item['unit'],
+            the_device=item['device'],
+            profile_name=new_profile
+        )
     for item in sc_overrides:
-        write_sc_override_to_xml(new_pattern,item['var'],item['name'],item['sc_unit'],item['scale'])
-
-def write_converted_to_xml(differences):
-    sim_set = []
-    class_set = []
-    model_set = []
-
-    for dif in differences:
-        if dif['new_ac']:
-            model_set.append(dif)
-        else:
-            if dif['class'] != '':
-                class_set.append(dif)
-            else:
-                sim_set.append(dif)
-    for s in sim_set:
-        write_sim_to_xml(s['sim'], s['value'], s['name'])
-    for c in class_set:
-        write_class_to_xml(c['sim'], c['class'], c['value'], c['name'])
-    for m in model_set:
-        write_models_to_xml(m['sim'], m['model'], m['value'], m['name'])
+        write_sc_override_to_xml(
+            the_model=new_pattern,
+            the_var=item['var'],
+            setting_name=item['name'],
+            sc_unit=item['sc_unit'],
+            scale=item['scale']
+        )
 
 
-def erase_models_from_xml(the_sim, the_model, setting_name, the_device=''):
+def erase_models_from_xml(the_sim, the_model, setting_name, the_device='', profile_name=None):
     mprint(f"erase_models_from_xml  {the_sim} {the_model}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    tree = auto_user_tree
+    root = auto_user_root
     if the_device == '':
         the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
     if setting_name in write_any_device_list:
         the_device = 'any'
+    profile_name = profile_name if profile_name else G.settings_mgr.active_profile
+
+    if profile_name.lower() == 'default':
+        # Profile name should never be 'default', but protect against issues and log a warning
+        logging.warning(f"Attempted to erase a model from the default profile: {the_sim} {the_model} {setting_name}")
+        return
+
     elements_to_remove = []
     for model_elem in root.findall(f'models[sim="{the_sim}"]'
                                    f'[device="{the_device}"]'                                   
                                    f'[model="{the_model}"]'
-                                   f'[name="{setting_name}"]'):
+                                   f'[name="{setting_name}"]'
+                                   f'[profile="{profile_name}"]'):
 
         if model_elem is not None:
             elements_to_remove.append(model_elem)
@@ -1147,11 +1942,89 @@ def erase_models_from_xml(the_sim, the_model, setting_name, the_device=''):
         logging.info(f"Removed <models> element with values: sim={the_sim}, device={the_device}, "
                   f"model={the_model}, name={setting_name}")
 
+
+
+def erase_aircraft_profiles(sim, cls_name, model):
+    tree = auto_user_tree
+    root = auto_user_root
+    for elem in root.findall(f'models[sim="{sim}"][model="{model}"]'):
+        root.remove(elem)
+    consolidate_sort_and_write_userconfig(tree)
+
+def update_active_profile_entry(sim: str, cls: str, model: str, active_profile: str):
+    # utils.debug_caller_args('green')
+    """
+    Update or create the <profileMappings> entry in the user configuration XML to reflect the active profile
+    for a specific aircraft model within a given simulator and class.
+
+    This method:
+    - Looks for an existing <profileMappings> element matching the provided model, sim, and cls.
+    - If found, it updates the <active_profile> tag with the new value.
+    - If not found, it creates a new <profileMappings> entry with all required child elements.
+    - Writes the modified XML tree back to disk using the shared XML utility method.
+
+    Parameters:
+        sim (str): The name of the simulator (e.g., "DCS", "MSFS").
+        cls (str): The classification of the aircraft (e.g., "JetAircraft", "PropellerAircraft").
+        model (str): The unique aircraft model identifier (e.g., "FA-18C_hornet").
+        active_profile (str): The profile name to mark as active for this aircraft.
+
+    Returns:
+        None
+    """
+    # Use the up-to-date pre-parsed tree/root objects
+    tree = auto_user_tree
+    root = auto_user_root
+
+    # First see if the incoming profile name is already set for the sim/cls/model
+    match = root.find(f'profileMappings[model="{model}"][sim="{sim}"][cls="{cls}"][active_profile="{active_profile}"]')
+    if match:
+        #print("!!!!  MATCHES - NOT WRITING")
+        return
+
+    # Try to find an existing <profileMappings> entry matching all criteria
+    entry = root.find(f'profileMappings[model="{model}"][sim="{sim}"][cls="{cls}"]')
+
+    if entry is None:
+        # Entry does not exist: create a new one with full structure
+        entry = ET.SubElement(root, "profileMappings")
+        ET.SubElement(entry, "model").text = model
+        ET.SubElement(entry, "sim").text = sim
+        ET.SubElement(entry, "cls").text = cls
+        ET.SubElement(entry, "active_profile").text = active_profile
+    else:
+        # Entry exists: update the active_profile sub-element
+        ap_elem = entry.find("active_profile")
+        if ap_elem is None:
+            ET.SubElement(entry, "active_profile").text = active_profile
+        else:
+            ap_elem.text = active_profile
+
+    # Save the modified XML back to the file
+    consolidate_sort_and_write_userconfig(tree)
+
+
+
+
+def erase_model_profile(sim, model, profile):
+    tree = auto_user_tree
+    root = auto_user_root
+    elements_to_remove = []
+    for model_elem in root.findall(f'models[sim="{sim}"][model="{model}"][profile="{profile}"]'):
+        if model_elem is not None:
+            elements_to_remove.append(model_elem)
+
+    if elements_to_remove:
+        for elem in elements_to_remove:
+            root.remove(elem)
+        consolidate_sort_and_write_userconfig(tree)
+        logging.info(f"Removed <models> element with values: sim={sim}, model={model}, profile={profile}")
+
 def erase_entire_model_from_xml(the_sim, the_model):
     mprint(f"erase_entire_models_from_xml  {the_sim} {the_model}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    tree = auto_user_tree
+    root = auto_user_root
     the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
 
@@ -1175,8 +2048,8 @@ def erase_entire_model_from_xml(the_sim, the_model):
 def erase_class_from_xml( the_sim, the_class,  setting_name, the_device=''):
     mprint(f"erase_class_from_xml  {the_sim} {the_class}, {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    tree = auto_user_tree
+    root = auto_user_root
     if the_device == '':
         the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -1205,8 +2078,8 @@ def erase_class_from_xml( the_sim, the_class,  setting_name, the_device=''):
 def erase_sim_from_xml(the_sim, setting_name, the_device=''):
     mprint(f"erase_sim_from_xml  {the_sim} {setting_name}")
     # Load the existing XML file or create a new one if it doesn't exist
-    tree = try_parse(userconfig_path)
-    root = tree.getroot()
+    tree = auto_user_tree
+    root = auto_user_root
     if the_device == '':
         the_device = device
     write_any_device_list = read_anydevice_settings(the_sim)
@@ -1233,7 +2106,7 @@ def erase_sim_from_xml(the_sim, setting_name, the_device=''):
 def sort_elements(tree):    #  unused for now.
     # Parse the XML file
 
-    root = tree.getroot()
+    root = auto_user_root
 
     # Extract all elements
     all_elements = root.findall('')
@@ -1263,7 +2136,7 @@ def sort_elements(tree):    #  unused for now.
 
 def read_prereqs():
     # tree = try_parse(defaults_path)
-    # root = tree.getroot()
+    # root = auto_user_root
 
     # Collect data in a list of dictionaries
     data_list = []

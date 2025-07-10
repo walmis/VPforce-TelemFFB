@@ -4,18 +4,26 @@ import shutil
 from datetime import datetime
 from enum import Enum, auto
 
+from PyQt6.QtCore import QObject, pyqtSignal
+
 import telemffb.globals as G
 from . import xmlutils
 
 
-class SettingsManager:
+class SettingsManager(QObject):
+    activeProfileChanged = pyqtSignal(str)
+    aircraftChanged = pyqtSignal(str)
+    default_write_attempted = pyqtSignal()
+
     def __init__(self, datasource='', device='joystick', userconfig_path='', defaults_path='', system_settings={}):
+        super().__init__()  # Required for QObject to function
 
         self.timed_out = True
         self.current_sim = "nothing"
         self.current_class = ""
         self.current_aircraft_name = ""
         self.current_pattern = ""
+        self.active_profile = None
         self.device = device
 
         # offline state variables
@@ -36,6 +44,7 @@ class SettingsManager:
             'current_class': self.current_class,
             'current_aircraft_name': self.current_aircraft_name,
             'current_pattern': self.current_pattern,
+            'active_profile': self.active_profile,
             'device': self.device
         }
 
@@ -53,6 +62,7 @@ class SettingsManager:
                 'current_class',
                 'current_aircraft_name',
                 'current_pattern',
+                'active_profile',
                 'device'
             ]
         }

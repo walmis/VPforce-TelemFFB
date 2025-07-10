@@ -32,14 +32,14 @@ from collections import OrderedDict
 from datetime import datetime
 
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl
+from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl, pyqtSlot
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
-                         QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut, QFontDatabase)
+                         QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut, QFontDatabase, QFont)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QComboBox, QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QTabWidget,
-                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu)
+                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu, QDialog)
 
 import telemffb.globals as G
 import telemffb.utils as utils
@@ -57,6 +57,7 @@ from telemffb.sim.aircraft_base import effects
 from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
+from telemffb.ProfileManagerDialog import ProfileManagerDialog, NewProfileDialog
 from telemffb.utils import exit_application, overrides, HiDpiPixmap
 
 class MainWindow(QMainWindow):
@@ -215,16 +216,19 @@ class MainWindow(QMainWindow):
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
 
-        # Create "Profiles" menu
-        self.profiles_menu = self.menu.addMenu('Profiles')
-        self.offline_config_action = QAction(r'Offline Profile\Sim Default\Class Default Mode', self)
-        # self.offline_config_action.setCheckable(True)
-        self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
-        self.profiles_menu.addAction(self.offline_config_action)
+        if G.master_instance:
+            # Create "Profiles" menu
+            self.profiles_menu = self.menu.addMenu('Profiles')
+            self.offline_config_action = QAction(r'Offline Profile\Sim Default\Class Default Mode', self)
+            self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
+            self.profiles_menu.addAction(self.offline_config_action)
 
-        self.manual_new_aircraft_action = QAction('Manually add New Aircraft Profile', self)
-        self.manual_new_aircraft_action.triggered.connect(lambda: self.show_new_aircraft_wizard(manual=True))
-        self.profiles_menu.addAction(self.manual_new_aircraft_action)
+            self.profile_manager_action = QAction('Profile Manager...', self)
+            self.profile_manager_action.triggered.connect(self.show_profile_manager)
+            self.profiles_menu.addAction(self.profile_manager_action)
+
+
+
         # Create the "Utilities" menu
         utilities_menu = self.menu.addMenu('Utilities')
 
@@ -430,47 +434,42 @@ class MainWindow(QMainWindow):
         cur_ac_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         cur_ac_lbl.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; }")
 
-        self.cur_craft = QLabel()
-        self.cur_craft.setText('None Detected')
-        self.cur_craft.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
-        self.cur_craft.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.cur_craft_label = QLabel()
+        self.cur_craft_label.setText('None Detected')
+        self.cur_craft_label.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
+        self.cur_craft_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        self.cur_pattern = QLabel()
-        self.cur_pattern.setText('(No Match)')
-        self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
-        self.cur_pattern.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        text_color = "#dddddd" if G.useDarkMode else "#000000"
-        secondary_color = "#bbbbbb" if G.useDarkMode else "#444444"
+        self.cur_pattern_label = QLabel()
+        self.cur_pattern_label.setText('Matched: (No Match)')
+        self.cur_pattern_label.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
+        self.cur_pattern_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        cur_ac_lbl.setStyleSheet(f"""
-            QLabel {{
-                padding-left: 10px;
-                padding-top: 2px;
-                color: {text_color};
-                font-weight: bold;
-            }}
-        """)
+        self.active_profile_label = QLabel()
+        self.active_profile_label.setText('Active Profile:')
+        self.active_profile_label.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
+        self.active_profile_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        # if G.master_instance:
+        profile_row_layout = QHBoxLayout()
+        profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        self.cur_craft.setStyleSheet(f"""
-            QLabel {{
-                padding-left: 15px;
-                padding-top: 2px;
-                font-family: 'Casciadia Mono';
-                color: {text_color};
-            }}
-        """)
+        self.profile_selector_label = QLabel("Select Profile:")
+        self.profile_selector_label.setStyleSheet("QLabel { padding-left: 15px; padding-top: 5px; }")
 
-        self.cur_pattern.setStyleSheet(f"""
-            QLabel {{
-                padding-left: 15px;
-                padding-top: 2px;
-                font-family: 'Cascadia Mono';
-                color: {secondary_color};
-            }}
-        """)
+        self.cb_activeProfileCombo = QComboBox()
+        self.cb_activeProfileCombo.setEnabled(False)
+        self.cb_activeProfileCombo.setStyleSheet("QComboBox { margin-left: 10px; }")
+        self.cb_activeProfileCombo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.cb_activeProfileCombo.currentTextChanged.connect(self.on_profile_change)
+
+        profile_row_layout.addWidget(self.profile_selector_label)
+        profile_row_layout.addWidget(self.cb_activeProfileCombo)
+
         self.craft_layout.addWidget(cur_ac_lbl)
-        self.craft_layout.addWidget(self.cur_craft)
-        self.craft_layout.addWidget(self.cur_pattern)
+        self.craft_layout.addWidget(self.cur_craft_label)
+        self.craft_layout.addWidget(self.cur_pattern_label)
+        self.craft_layout.addWidget(self.active_profile_label)
+        if G.master_instance:
+            self.craft_layout.addLayout(profile_row_layout)
         rh_status_layout.addWidget(self.craft_container)
         rh_status_area.setLayout(rh_status_layout)
 
@@ -522,6 +521,9 @@ class MainWindow(QMainWindow):
         #  test loading buttons, set to true for debug
 
         self.offline_config_area = QWidget()
+        self.offline_config_area.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
         main_layout = QVBoxLayout()  # vertical layout to hold both rows
 
         self.banner_label = QLabel("Telemetry is paused while in offline editing mode")
@@ -534,30 +536,41 @@ class MainWindow(QMainWindow):
         # First row layout (existing widgets)
         top_row = QHBoxLayout()
         offline_sim_lbl = QLabel('Sim:')
-        offline_sim_lbl.setMaximumWidth(30)
+        # offline_sim_lbl.setMaximumWidth(30)
         offline_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.offline_sim = QComboBox()
-        self.offline_sim.setMaximumWidth(70)
+        # self.offline_sim.setMaximumWidth(70)
         sims = [''] + xmlutils.get_sims()
         self.offline_sim.addItems(sims)
         self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
+        # self.offline_sim.setMinimumWidth(self.offline_sim.width() + 5)
 
         offline_class_lbl = QLabel('Class:')
-        offline_class_lbl.setMaximumWidth(40)
+        # offline_class_lbl.setMaximumWidth(40)
         offline_class_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.offline_class = QComboBox()
+        # self.offline_class.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.offline_class.currentTextChanged.connect(self.offline_class_changed)
 
         offline_name_lbl = QLabel('Aircraft Name:')
-        offline_name_lbl.setMaximumWidth(90)
+        # offline_name_lbl.setMaximumWidth(90)
         offline_name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.offline_name = QComboBox()
-        self.offline_name.setMinimumWidth(80)
+        # self.offline_name.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        # self.offline_name.setMinimumWidth(80)
         self.offline_name.setEditable(False)
         self.offline_name.currentTextChanged.connect(self.offline_aircraft_changed)
+
+        offline_profile_lbl = QLabel('Profile:')
+        offline_profile_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.offline_profile = QComboBox()
+
+        self.offline_profile.setEditable(False)
+        self.offline_profile.currentTextChanged.connect(self.offline_profile_changed)
 
         top_row.addWidget(offline_sim_lbl)
         top_row.addWidget(self.offline_sim)
@@ -565,15 +578,13 @@ class MainWindow(QMainWindow):
         top_row.addWidget(self.offline_class)
         top_row.addWidget(offline_name_lbl)
         top_row.addWidget(self.offline_name)
+        top_row.addWidget(offline_profile_lbl)
+        top_row.addWidget(self.offline_profile)
+        top_row.addStretch()
 
         # Second row layout (button on the left)
         bottom_row = QHBoxLayout()
         bottom_row.addStretch()  # push button to the right
-
-        # self.manual_add_button = QPushButton()
-        # self.offline_button.setMaximumWidth(20)
-        # self.manual_add_button.setText('Manually Add Aircraft')
-        # self.manual_add_button.clicked.connect(self.show_new_aircraft_wizard)
 
         self.offline_button = QPushButton()
         # self.offline_button.setMaximumWidth(20)
@@ -1093,8 +1104,11 @@ class MainWindow(QMainWindow):
                 # Get the current timestamp
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M')
 
+                backup_path = os.path.join(G.userconfig_rootpath, 'cfg_backup')
+                os.makedirs(backup_path, exist_ok=True)
+
                 # Create the backup file name with the timestamp
-                backup_file = os.path.join(G.userconfig_rootpath, ('userconfig_' + timestamp + '.bak'))
+                backup_file = os.path.join(backup_path, ('userconfig_' + timestamp + '.bak'))
 
                 # Copy the file to the backup file
                 shutil.copy(G.userconfig_path, backup_file)
@@ -1248,15 +1262,40 @@ class MainWindow(QMainWindow):
 
         if G.master_instance:
             self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
+        self.settings_layout.reload_caller()
 
-        # for file in os.listdir(log_folder):
-        #     if file.endswith(G.current_device_config_scope + '_' + current_log_ts):
-        #         self.log_tail_thread.change_log_file(os.path.join(log_folder, file))
-        #         pass
-        # log_tail_window.setWindowTitle(f"Log File Monitor ({G.current_device_config_scope})")
+    def resize_offline_combos(self):
+        """
+            Dynamically resizes the minimum width of all offline mode combo boxes
+            based on the widest item in each. Adds 50 pixels padding to ensure space.
+
+            This ensures no items are truncated in display and helps with layout alignment.
+            """
+        for combo in [self.offline_sim, self.offline_class, self.offline_name, self.offline_profile]:
+            metrics = QFontMetrics(combo.font())
+            max_width = 0
+
+            for i in range(combo.count()):
+                text = combo.itemText(i)
+                width = metrics.horizontalAdvance(text)
+                max_width = max(max_width, width)
+
+            # Add 2 pixels for spacing and set minimum width
+            combo.setMinimumWidth(max_width + 50)
 
         self.update_settings()
     def offline_sim_changed(self, sim=None):
+        """
+            Triggered when the offline 'Sim' combo box changes.
+
+            Updates all related combo boxes (class, aircraft, profile),
+            sets the configuration scope, and broadcasts the change
+            if in master mode.
+
+            Args:
+                sim (str, optional): The selected simulation name. If None or empty,
+                                     resets the offline editing UI.
+            """
         self.offline_name.blockSignals(True)
         self.offline_class.blockSignals(True)
         self.offline_name.clear()
@@ -1273,6 +1312,8 @@ class MainWindow(QMainWindow):
             return
         self.offline_class.clear()  #clear class field
         self.offline_class.addItem('')
+        self.offline_name.clear()
+        self.offline_profile.clear()
         classes = xmlutils.get_classes_for_sim(sim)  # get classes based on chosen sim
 
         for class_name in classes:
@@ -1290,13 +1331,15 @@ class MainWindow(QMainWindow):
 
         #G.current_offline_config_scope = 'SIM'  # set config scope to SIM
         G.settings_mgr.offline_scope = 'SIM'  # set config scope to SIM
-        self.cur_craft.setText('OFFLINE EDITING MODE')
-        self.cur_pattern.setText(f"{G.settings_mgr.offline_scope}: {sim}")
+        self.cur_craft_label.setText('OFFLINE EDITING MODE')
+        self.cur_pattern_label.setText(f"{G.settings_mgr.offline_scope}: {sim}")
+        self.resize_offline_combos()
         self.force_sim_aircraft() # load settings based on sim
 
     def offline_class_changed(self, class_name):
         models = xmlutils.read_models(self.offline_sim.currentText(), class_name)  # get all available models based on sim and class
         self.offline_name.clear()  # clear the aircraft selection combobox
+        self.offline_profile.clear()
         for model_name in models:
             # populate the combobox with the model names
             self.offline_name.addItem(model_name)
@@ -1309,12 +1352,22 @@ class MainWindow(QMainWindow):
         else:
             #G.current_offline_config_scope = 'CLASS' # set config scope to CLASS
             G.settings_mgr.offline_scope = 'CLASS' # set config scope to CLASS
-            self.cur_craft.setText('OFFLINE EDITING MODE')
-            self.cur_pattern.setText(f"{G.settings_mgr.offline_scope}: {class_name}")
+            self.cur_craft_label.setText('OFFLINE EDITING MODE')
+            self.cur_pattern_label.setText(f"{G.settings_mgr.offline_scope}: {class_name}")
+        self.resize_offline_combos()
         self.force_sim_aircraft() # load settings based on class and currently selected sim
 
     def offline_aircraft_changed(self, ac_name=None):
         cfg, cls = G.telem_manager.get_aircraft_config(ac_name, self.offline_sim.currentText()) # get class based on selected aircraft
+        profiles = xmlutils.get_available_profiles(self.offline_sim.currentText(), self.offline_class.currentText(), ac_name)
+        self.offline_profile.setEnabled(True)
+        self.offline_profile.clear()
+        self.offline_profile.addItem('Auto User')  # manually add 'Auto User' so it is at the top and always present even if there is not yet a Auto User Profile
+
+        for profile_name in profiles:
+            if profile_name != 'default' and profile_name != 'Auto User':
+                self.offline_profile.addItem(profile_name)
+
         self.offline_class.blockSignals(True)  # block signals to prevent triggering of offline_class_changed
         self.offline_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
         self.offline_class.blockSignals(False)  # unblock signals
@@ -1324,19 +1377,31 @@ class MainWindow(QMainWindow):
         else:
             #G.current_offline_config_scope = 'MODEL'
             G.settings_mgr.offline_scope = 'MODEL'
-            self.cur_craft.setText('OFFLINE EDITING MODE')
-            self.cur_pattern.setText(f"{G.settings_mgr.offline_scope}: {ac_name}")
+            self.cur_craft_label.setText('OFFLINE EDITING MODE')
+            self.cur_pattern_label.setText(f"{G.settings_mgr.offline_scope}: {ac_name}")
 
         if G.master_instance:
             G.ipc_instance.send_broadcast_message(f'OFFLINE_AC:{self.offline_name.currentText()}')
 
+        self.resize_offline_combos()
         self.force_sim_aircraft()
+    def offline_profile_changed(self, profile):
+        self.active_profile_label.setText(f"Active Profile: {profile}")
+        self.resize_offline_combos()
+        self.force_sim_aircraft()
+        if G.master_instance:
+            # send to child instances to mimic action
+            G.ipc_instance.send_broadcast_message(f"OFFLINE_PROFILE:{profile}")
+
+
+
 
 
     def force_sim_aircraft(self):
         G.settings_mgr.current_sim = self.offline_sim.currentText()
         G.settings_mgr.current_class = self.offline_class.currentText()
         G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
+        G.settings_mgr.active_profile = self.offline_profile.currentText()
         # self.settings_layout.expanded_items.clear()
         # self.monitor_widget.hide()
         self.settings_layout.reload_caller()
@@ -1490,6 +1555,13 @@ class MainWindow(QMainWindow):
                 HapticEffect.device.reset_effects()
             except Exception:
                 pass
+
+    def show_profile_manager(self):
+        dialog = ProfileManagerDialog(self)
+        dialog.raise_()
+        dialog.activateWindow()
+        dialog.show()
+
     @pyqtSlot(bool)
     def toggle_offline_mode(self, state):
         if state == G.settings_mgr.offline_mode:
@@ -1497,17 +1569,30 @@ class MainWindow(QMainWindow):
             return
         if not state:
             # Exiting Offline editing mode
+
             G.settings_mgr.go_online()
             # clear the layout after going back online
             G.main_window.settings_layout.clear_layout()
             # reset the craft area text to default
-            self.cur_craft.setText('None Detected')
-            self.cur_pattern.setText('(No Match)')
+            self.cur_craft_label.setText('None Detected')
+            self.cur_pattern_label.setText('(No Match)')
+            self.active_profile_label.setText(G.settings_mgr.active_profile)
+            # self.active_profile_label.setText("Active Profile: (None)")
+            # self.cb_activeProfileCombo.clear()
+            # re-show the profile selecting widget
+            if G.master_instance:
+                self.profile_selector_label.setVisible(True)
+                self.cb_activeProfileCombo.setVisible(True)
+            self.settings_layout.reload_caller()
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
+            # hide the profile selecting widget
+            if G.master_instance:
+                self.profile_selector_label.setVisible(False)
+                self.cb_activeProfileCombo.setVisible(False)
             # Block signals so we don't trigger text change on .clear() calls
             self.offline_name.blockSignals(True)
             self.offline_class.blockSignals(True)
@@ -1525,8 +1610,10 @@ class MainWindow(QMainWindow):
             self.offline_sim.addItems(sims)
 
             # modify current craft area text for offline mode
-            self.cur_craft.setText('OFFLINE EDITING MODE')
-            self.cur_pattern.setText(f"Make Selection")
+            self.cur_craft_label.setText('OFFLINE EDITING MODE')
+            self.cur_pattern_label.setText(f"Make Selection")
+            self.active_profile_label.setText("Active Profile: (None)")
+
             # force the settings tab to be active
             self.tab_widget.setCurrentIndex(1)
 
@@ -1669,7 +1756,59 @@ class MainWindow(QMainWindow):
 
         # Create and return the interpolated color
         return QColor(r, g, b, a)
-    
+
+    def on_profile_change(self, profile_name):
+        # utils.debug_caller_args("red")
+        """
+        Call to xmlutils to update the profile mapping for the aircraft when the user changes the profile
+        If the "add new" option is selected, pop a dialog asking for the new profile name.  If the user chooses
+        the "make active' option, make a further call to make the new profile the active one
+        Args:
+            profile_name: The profile name selected by the user
+
+        Returns: Nothing
+
+        """
+        sim = G.settings_mgr.current_sim
+        cls = G.settings_mgr.current_class
+        pattern = G.settings_mgr.current_pattern
+        cur_profile = G.settings_mgr.active_profile
+        if not G.master_instance: return
+        cur_txt = self.cb_activeProfileCombo.currentText()
+        if profile_name == 'Add New...':
+            self.cb_activeProfileCombo.blockSignals(True)
+            self.cb_activeProfileCombo.setCurrentText(cur_txt)
+            self.cb_activeProfileCombo.blockSignals(False)
+            if G.settings_mgr.active_profile.lower() == 'default':
+                type='new'
+
+            dlg = NewProfileDialog(self, type='neew')
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                # user canceled
+                return
+            new_profile, make_active, clone, profile_to_clone = dlg.get_data()
+            if not new_profile:
+                # user did not enter a string
+                return
+            # write new profile entry to user config file
+            if clone:
+                xmlutils.clone_whole_model(
+                    the_sim=G.settings_mgr.current_sim,
+                    old_pattern=G.settings_mgr.current_pattern,
+                    new_pattern=G.settings_mgr.current_pattern,
+                    old_profile=profile_to_clone,
+                    new_profile=new_profile
+                )
+            else:
+                xmlutils.add_new_profile(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, new_profile)
+            if make_active:
+                # change the profileMapping for this aircraft to the new profile
+                xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, new_profile)
+                G.settings_mgr.update_state_vars(active_profile=new_profile)
+                pass
+        else:
+            xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, profile_name)
+
     def on_telemetry_timeout(self):
         # self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
         self.lbl_effects_data.setText("")
@@ -1855,8 +1994,78 @@ class MainWindow(QMainWindow):
                 self.new_craft_button.hide()
                 self.new_craft_notification_sent = False
 
-            self.cur_craft.setText(data['N'])
-            self.cur_pattern.setText(f'Matched: <span style="font-family: Consolas, monospace;font-size: 14px">"{shown_pattern}"</span> ')
+            # Update the status labels and profile selection box
+            self.cur_craft_label.setText(data['N'])
+            ap = G.settings_mgr.active_profile
+            active_profile = xmlutils.get_active_profile_for_model(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
+
+            # print(f"Active Profile: {active_profile}, AP: {ap}")
+            available_profiles = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
+            # print(f"Profiles: {available_profiles}, ACTIVE: {active_profile}")
+
+            def update_profile_combo(new_items: list[str]):
+                """
+                Updates the profile combo box only if its contents differ (excluding 'Add New...').
+
+                Args:
+                    new_items (list[str]): List of profiles to populate.
+                """
+                ADD_NEW_LABEL = "Add New..."
+                PROFILE_MGR_LABEL = "Profile Manager..."
+
+                # Extract current items, excluding 'Add New...'
+                current_items = [
+                    self.cb_activeProfileCombo.itemText(i)
+                    for i in range(self.cb_activeProfileCombo.count())
+                    if self.cb_activeProfileCombo.itemText(i) != ADD_NEW_LABEL
+                ]
+                # enable the combobox if it is not enabled
+                if not self.cb_activeProfileCombo.isEnabled():
+                    self.cb_activeProfileCombo.setEnabled(True)
+                # populate combobox with new items if they are different
+                # block signals to avoid triggering the combobox's itemChanged signal
+
+                if set(current_items) != set(new_items):
+                    selected = self.cb_activeProfileCombo.currentText()
+                    self.cb_activeProfileCombo.blockSignals(True)
+                    self.cb_activeProfileCombo.clear()
+                    self.cb_activeProfileCombo.addItems(new_items)
+
+                    # Add styled 'Add New...' item
+                    self.cb_activeProfileCombo.addItem(ADD_NEW_LABEL)
+                    index = self.cb_activeProfileCombo.findText(ADD_NEW_LABEL)
+                    if index >= 0:
+                        font = QFont()
+                        font.setItalic(True)
+                        self.cb_activeProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
+
+                    self.cb_activeProfileCombo.blockSignals(False)
+
+                    if selected in new_items:
+                        self.cb_activeProfileCombo.setCurrentText(selected)
+                # """
+                #     Update the selection if the active profile has changed via other means (Auto User profile switch)
+                # """
+                # if self.cb_activeProfileCombo.currentText() != active_profile:
+                #     # self.cb_activeProfileCombo.blockSignals(True)
+                #     self.cb_activeProfileCombo.setCurrentText(active_profile)
+                #     self.cb_activeProfileCombo.blockSignals(False)
+
+
+            if G.master_instance:
+                update_profile_combo(available_profiles)
+
+                """
+                Update the selection if the active profile has changed via other means (Auto User profile switch)
+                """
+                if self.cb_activeProfileCombo.currentText() != active_profile:
+                    # self.cb_activeProfileCombo.blockSignals(True)
+                    self.cb_activeProfileCombo.setCurrentText(active_profile)
+                    self.cb_activeProfileCombo.blockSignals(False)
+
+            self.cur_pattern_label.setText(f'Matched: <span style="font-family: Consolas, monospace;font-size: 14px">"{shown_pattern}"</span>')
+            self.active_profile_label.setText(f'Active Profile: <span style="font-family: Consolas, monospace;font-size: 14px">"{active_profile}"</span>')
+                #HERE
 
             if window_mode == 0:
                 self.lbl_telem_data.setText(telem_items)

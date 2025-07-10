@@ -34,6 +34,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import hashlib
+import inspect
 from datetime import datetime, timedelta
 import math
 import os
@@ -99,6 +100,18 @@ def dbprint(color, msg, instance=None):
         case _:
             ccode = '\033[0m'
     print(f"{ccode}{msg}{reset}")
+
+def debug_caller_args(color):
+    frame = inspect.currentframe().f_back
+    caller_frame = frame.f_back
+
+    callee = frame.f_code.co_name
+    caller = caller_frame.f_code.co_name if caller_frame else "<top-level>"
+
+    args, _, _, values = inspect.getargvalues(frame)
+    arg_list = ", ".join(f"{arg}={repr(values[arg])}" for arg in args)
+
+    dbprint(color, f'"{callee}" called by "{caller}" Args: {arg_list}')
 
 def overrides(interface_class):
     """Decorator to ensure that a method in a subclass overrides a method in its superclass or interface."""

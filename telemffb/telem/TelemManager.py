@@ -138,8 +138,10 @@ class TelemManager(QObject, threading.Thread):
                 input_modeltype = input[1]
             else:
                 the_sim = send_source
+            ptrn = xmlutils.get_pattern_by_sim_fullname(the_sim, aircraft_name)
 
             cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, G.device_type)
+            active_profile = xmlutils.get_active_profile_for_model(the_sim, cls_name, pattern)
             #globals.settings_mgr.current_pattern = pattern
             if cls_name == '': 
                 cls_name = 'Aircraft'
@@ -165,7 +167,8 @@ class TelemManager(QObject, threading.Thread):
                 current_sim=the_sim,
                 current_aircraft_name=aircraft_name,
                 current_class=cls_name,
-                current_pattern=pattern)
+                current_pattern=pattern,
+                active_profile=active_profile)
 
             return params, cls_name
 
