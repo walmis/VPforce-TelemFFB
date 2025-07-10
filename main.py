@@ -433,11 +433,13 @@ def _initialize_settings_manager():
     Initialize the settings manager with error handling for corrupted config.
 
     Flow:
+    1. Initialize the xml root trees in XML Utils - is kept up to date when config changes
     1. Update XML variables with current device/paths
     2. Attempt to create settings manager
     3. If corruption detected, offer backup/reset option
     4. Create new default config if user agrees
     """
+    xmlutils.update_roots()
     xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
     try:
         G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type,
