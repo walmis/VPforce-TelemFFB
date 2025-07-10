@@ -1490,6 +1490,7 @@ class MainWindow(QMainWindow):
                 HapticEffect.device.reset_effects()
             except Exception:
                 pass
+    @pyqtSlot(bool)
     def toggle_offline_mode(self, state):
         if state == G.settings_mgr.offline_mode:
             # if already in the same state, do nothing

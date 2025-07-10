@@ -42,6 +42,11 @@ class IPCNetworkThread(QThread):
     show_cfg_ovds_signal = pyqtSignal()
     erase_cfg_ovds_signal = pyqtSignal()
     child_keepalive_signal = pyqtSignal(str, str)
+    toggle_offline_mode_signal = pyqtSignal(bool)
+    set_offline_sim_signal = pyqtSignal(str)
+    set_offline_class_signal = pyqtSignal(str)
+    set_offline_ac_signal = pyqtSignal(str)
+    set_offline_profile_signal = pyqtSignal(str)
 
     def __init__(self, host="127.0.0.1", dstport=0, keepalive_sec=1, missed_keepalive=3):
         super().__init__()
@@ -232,17 +237,19 @@ class IPCNetworkThread(QThread):
                 elif msg.startswith('TOGGLE OFFLINE:'):
                     state_str = msg.removeprefix('TOGGLE OFFLINE:')
                     state = state_str == 'True'
-                    G.main_window.toggle_offline_mode(state)
+                    self.toggle_offline_mode_signal.emit(state)
                 elif msg.startswith("OFFLINE_SIM:"):
                     sim = msg.removeprefix("OFFLINE_SIM:")
-                    G.main_window.offline_sim.setCurrentText(sim)
+                    self.set_offline_sim_signal.emit(sim)
                 elif msg.startswith("OFFLINE_CLASS:"):
                     class_name = msg.removeprefix("OFFLINE_CLASS:")
-                    G.main_window.offline_class.setCurrentText(class_name)
+                    self.set_offline_class_signal.emit(class_name)
                 elif msg.startswith("OFFLINE_AC:"):
                     ac = msg.removeprefix("OFFLINE_AC:")
-                    G.main_window.offline_name.setCurrentText(ac)
-
+                    self.set_offline_ac_signal.emit(ac)
+                elif msg.startswith("OFFLINE_PROFILE:"):
+                    profile = msg.removeprefix("OFFLINE_PROFILE:")
+                    self.set_offline_profile_signal.emit(profile)
                 else:
                     logging.info(f"GOT GENERIC MESSAGE: {msg}")
 

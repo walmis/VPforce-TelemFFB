@@ -467,6 +467,11 @@ def _setup_ipc_and_connections():
     G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
     G.ipc_instance.reload_aircraft_signal.connect(G.main_window.force_reload_aircraft)
+    G.ipc_instance.toggle_offline_mode_signal.connect(G.main_window.toggle_offline_mode)
+    G.ipc_instance.set_offline_sim_signal.connect(G.main_window.offline_sim.setCurrentText)
+    G.ipc_instance.set_offline_class_signal.connect(G.main_window.offline_class.setCurrentText)
+    G.ipc_instance.set_offline_ac_signal.connect(G.main_window.offline_name.setCurrentText)
+    G.ipc_instance.set_offline_profile_signal.connect(G.main_window.offline_profile.setCurrentText)
     G.ipc_instance.start()
 
 def _setup_device_button_connections():
