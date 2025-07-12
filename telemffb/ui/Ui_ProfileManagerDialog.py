@@ -173,9 +173,9 @@ class Ui_ProfileManagerDialog(object):
         self.rb_showAll.setText(_translate("ProfileManagerDialog", "Show All"))
         self.lb_expandButton.setText(_translate("ProfileManagerDialog", "Collapse All:"))
         self.pb_expandButton.setText(_translate("ProfileManagerDialog", "Collapse All"))
-        self.rb_showDefaults.setText(_translate("ProfileManagerDialog", "Show Defaults Only (Inc user added defaults)"))
-        self.rb_filterActive.setText(_translate("ProfileManagerDialog", "Show All Active User Profiles (Inc. active defaults)"))
-        self.rb_filterCurrentAircraft.setText(_translate("ProfileManagerDialog", "Show Currently Loaded Aircraft Profiles Only"))
+        self.rb_showDefaults.setText(_translate("ProfileManagerDialog", "Show System Defaults Only"))
+        self.rb_filterActive.setText(_translate("ProfileManagerDialog", "Show All Active Profiles (Inc. active defaults)"))
+        self.rb_filterCurrentAircraft.setText(_translate("ProfileManagerDialog", "Show Currently Loaded Aircraft Only"))
         self.pb_newAircraft.setText(_translate("ProfileManagerDialog", "New Aircraft Wizard"))
         self.pb_Exit.setText(_translate("ProfileManagerDialog", "Exit"))
 from telemffb.custom_widgets import StyledButton
