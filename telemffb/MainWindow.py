@@ -1443,10 +1443,9 @@ class MainWindow(QMainWindow):
         self.offline_class.blockSignals(False)
         if sim is None or sim == '':
             # if sim combobox is cleared, reset everything and clear the layout
-
-            G.settings_mgr.current_sim = ''
-            G.settings_mgr.current_class = ''
-            G.settings_mgr.current_aircraft_name = ''
+            self.offline_class.clear()  # clear class field
+            self.offline_name.clear()
+            self.offline_profile.clear()
             self.settings_layout.clear_layout()
             return
         self.offline_class.clear()  #clear class field
