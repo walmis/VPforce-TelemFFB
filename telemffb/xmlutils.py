@@ -833,8 +833,8 @@ def clone_whole_model(the_sim, old_pattern, new_pattern, old_profile, new_profil
 
         This method is typically used during profile creation or duplication workflows.
         """
-    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, old_pattern, alldevices=True)
-    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, old_pattern, alldevices=True, user=True, profile=old_profile)
+    model_data, def_model_pattern = read_models_data("defaults", the_sim, old_pattern, alldevices=True)
+    user_model_data, usr_model_pattern = read_models_data("user", the_sim, old_pattern, alldevices=True, user=True, profile=old_profile)
     sc_overrides = read_sc_overrides(old_pattern)
     for item in user_model_data:
         model_data.append(item)
@@ -1407,8 +1407,7 @@ def read_models(the_sim, the_class=''):
             List[str]: A sorted list of unique model names.
         """
     all_models = ['']
-    # tree = try_parse(defaults_path)
-    # root = tree.getroot()
+
     if the_class == '':
         def_models =  auto_defaults_root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
                       auto_defaults_root.findall(f'.//models[sim="any"][device="{device}"]') + \
@@ -1424,9 +1423,7 @@ def read_models(the_sim, the_class=''):
             if pattern.text not in all_models:
                 all_models.append(pattern.text)
 
-    # create_empty_userxml_file() - handled by TelemFFB on startup via utils.py
-    # tree = try_parse(userconfig_path)
-    # root = tree.getroot()
+
     if the_class == '':
         usr_models =  auto_user_root.findall(f'.//models[sim="{the_sim}"][device="{device}"]') + \
                       auto_user_root.findall(f'.//models[sim="any"][device="{device}"]') + \
@@ -1444,7 +1441,7 @@ def read_models(the_sim, the_class=''):
     return sorted(all_models)
 
 
-def read_models_data(file_path, sim, full_model_name, alldevices=False, instance_device = '', user=False, profile=None):
+def read_models_data(which_root, sim, full_model_name, alldevices=False, instance_device = '', user=False, profile=None):
     """
         Extracts model-specific configuration entries for a given aircraft model from the specified XML.
 
@@ -1463,12 +1460,21 @@ def read_models_data(file_path, sim, full_model_name, alldevices=False, instance
         Returns:
             Tuple[List[dict], str]: A list of model configuration dictionaries and the matching pattern.
         """
-    mprint(f"read_models_data  {file_path}, {sim}, {full_model_name}")
+    if which_root == 'user':
+        root = auto_user_root
+    elif which_root == 'defaults':
+        root = auto_defaults_root
+    else:
+        logging.exception(f"read_models_data called with invalid root object {which_root}")
+        raise ValueError(f"read_models_data called with invalid root object {which_root}")
+
+
+    mprint(f"read_models_data  {which_root}, {sim}, {full_model_name}")
     # runs on both defaults and userconfig xml files
     if profile is None:
         profile = G.settings_mgr.active_profile
-    tree = try_parse(file_path)
-    root = tree.getroot()
+    # tree = try_parse(file_path)
+    # root = tree.getroot()
 
     model_data = []
     found_pattern = ''
@@ -1548,13 +1554,13 @@ def read_sc_overrides(aircraft_name):
         Returns:
             List[dict]: Combined list of scale override dictionaries with user entries overriding defaults.
         """
-    def_model_overrides = read_models_sc_overrides(defaults_path, aircraft_name, 'defaults')
-    user_model_overrides = read_models_sc_overrides(userconfig_path, aircraft_name, 'user')
+    def_model_overrides = read_models_sc_overrides("defaults", aircraft_name, 'defaults')
+    user_model_overrides = read_models_sc_overrides("user", aircraft_name, 'user')
     result = update_sc_overrides_with_user(def_model_overrides,user_model_overrides)
     return result
 
 
-def read_models_sc_overrides(file_path, full_model_name, source):
+def read_models_sc_overrides(which_root, full_model_name, source):
     """
         Reads scale conversion override entries for a specific model from the given XML file.
 
@@ -1568,11 +1574,18 @@ def read_models_sc_overrides(file_path, full_model_name, source):
         Returns:
             List[dict]: List of override entries with name, var, sc_unit, scale, and source metadata.
         """
-    mprint(f"read_models_overrides  {file_path}, {full_model_name}")
+    if which_root == 'user':
+        root = auto_user_root
+    elif which_root == 'defaults' or 'default':
+        root = auto_defaults_root
+    else:
+        logging.exception(f"read_models_sc_overrides called with invalid root object {which_root}")
+        raise ValueError(f"read_models_sc_overrides with invalid root object {which_root}")
+    mprint(f"read_models_overrides  {which_root}, {full_model_name}")
     # runs on both defaults and userconfig xml files
     #pass 'all' to get all of them
-    tree = try_parse(file_path)
-    root = tree.getroot()
+    # tree = try_parse(file_path)
+    # root = tree.getroot()
 
     model_overrides = []
 
@@ -1624,8 +1637,7 @@ def read_default_class_data(the_sim, the_class, instance_device=''):
             Tuple[List[dict], Optional[List[str]]]: List of matching default settings, and list of names marked for removal.
         """
     mprint(f"read_default_class_data  sim {the_sim}, class {the_class}")
-    # tree = try_parse(defaults_path)
-    # root = tree.getroot()
+
 
     class_data = []
     if instance_device == '':
@@ -1704,8 +1716,8 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
     print_each_step = False  # for debugging
 
     # Read models data first
-    model_data, def_model_pattern = read_models_data(defaults_path, the_sim, aircraft_name,False,instance_device)
-    user_model_data, usr_model_pattern = read_models_data(userconfig_path, the_sim, aircraft_name,False,instance_device, user=True, profile=active_profile)
+    model_data, def_model_pattern = read_models_data("defaults", the_sim, aircraft_name,False,instance_device)
+    user_model_data, usr_model_pattern = read_models_data("user", the_sim, aircraft_name,False,instance_device, user=True, profile=active_profile)
 
     model_pattern = def_model_pattern
     if usr_model_pattern != '':
@@ -1839,8 +1851,7 @@ def read_user_sim_data(the_sim, instance_device=''):
                - 'replaced': A fixed string indicating this data replaces 'Sim (user)' level
        """
     mprint(f"read_user_sim_data {the_sim}")
-    # tree = try_parse(userconfig_path)
-    # root = tree.getroot()
+
 
     sim_data = []
     if instance_device == '':
@@ -1894,8 +1905,6 @@ def read_user_class_data(the_sim, crafttype, instance_device=''):
                 - 'replaced': A fixed string "Class (user)" indicating the override level
         """
     mprint(f"read_user_class_data  {the_sim}, {crafttype}")
-    # tree = try_parse(userconfig_path)
-    # root = tree.getroot()
 
     model_data = []
     if instance_device == '':
@@ -2044,7 +2053,6 @@ def get_pattern_by_sim_fullname(sim, full_name):
         else:
             return False
 
-    # users_root = try_parse(userconfig_path).getroot()
     user_elements = auto_user_root.findall(f'models[sim="{sim}"][name="type"]')
     for element in user_elements:
         if element is not None:
@@ -2055,7 +2063,6 @@ def get_pattern_by_sim_fullname(sim, full_name):
             else:
                 continue
     # If we get here, there was no match in the user config, look in default config
-    # defaults_root = try_parse(defaults_path).getroot()
     defaults_elements = auto_defaults_root.findall(f'models[sim="{sim}"][name="type"]')
     for element in defaults_elements:
         if element is not None:
@@ -2083,13 +2090,11 @@ def get_class_for_sim_model(sim, model):
     Returns: Aircraft Class (i.e. "PropellerAircraft") if found, else None
     """
     # look for match in user config
-    # users_root = try_parse(userconfig_path).getroot()
     entry = auto_user_root.find(f'models[sim="{sim}"][model="{model}"][name="type"]')
     if entry is not None:
         cls = entry.findtext('value')
         return cls
 
-    # defaults_root = try_parse(defaults_path).getroot()
     entry = auto_defaults_root.find(f'models[sim="{sim}"][model="{model}"][name="type"]')
     if entry is not None:
         cls = entry.findtext('value')
@@ -2117,8 +2122,6 @@ def get_active_profile_for_model(sim, cls, model, users_root=None):
     Returns:
         str: Active profile name (e.g. "JoystickA", or "default") or None if no active profile found.
     """
-    # if users_root is None:
-    #     users_root = try_parse(userconfig_path).getroot()
 
     # 1. Check <profileMappings> section
     for profile in auto_user_root.findall('.//profileMappings'):
@@ -2139,8 +2142,8 @@ def get_active_profile_for_model(sim, cls, model, users_root=None):
             if p:
                 return p
     # 3. Nothing found in user profile, look for aircraft entry in defaults
-    defaults_root = try_parse(defaults_path).getroot()
-    for model_entry in defaults_root.findall('.//models'):
+
+    for model_entry in auto_defaults_root.findall('.//models'):
         m = model_entry.findtext('model')
         s = model_entry.findtext('sim')
         if m == model and s == sim:
@@ -2160,8 +2163,6 @@ def get_available_profiles(sim, cls, model):
     Returns:
         A list of available profiles for the given sim, class, and model.
     """
-    # tree = try_parse(userconfig_path)
-    # root = tree.getroot()
     profile_list = []
     for model_elem in auto_user_root.findall(f'.//models[sim="{sim}"][model="{model}"]'):
         profile_name = model_elem.find('profile')
@@ -2393,13 +2394,18 @@ def old_write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''
         profile_name = "Auto User"
 
 
-def get_craft_attributes(file_path, sim, device):
-    mprint(f"get_craft_attributes {file_path}, {sim}, {device}")
+def get_craft_attributes(which_root, sim, device):
+    mprint(f"get_craft_attributes {which_root}, {sim}, {device}")
     craft_attributes = set()
     craft_attributes.add('Aircraft')
 
-    tree = try_parse(file_path)
-    root = tree.getroot()
+    if which_root == 'user':
+        root = auto_user_root
+    elif which_root == 'defaults' or 'default':
+        root = auto_defaults_root
+    else:
+        logging.exception(f"get_craft_attributes called with invalid root object {which_root}")
+        raise ValueError(f"get_craft_attributes with invalid root object {which_root}")
 
     for defaults_elem in root.findall(f'.//defaults[{sim}="true"][{device}="true"]'):
         # for defaults_elem in root.findall(f'.//defaults[{sim}="true" and {device}="true"]'):
