@@ -205,73 +205,121 @@ def consolidate_sort_and_write_userconfig(tree):
 
 def convert_userconfig():
     """
-    Updates a userconfig.xml file to support new profile mappings.
-    - Ensures <profileMappings> element exists
-    - Ensures every <model> has a <profile> child, defaulting to 'Auto User' for existing configs
-    -
-    - If any edits were made, Writes the updated XML back using xmlutils.consolidate_sort_and_write_userconfig
+    Upgrades a legacy userconfig file to the new format that includes profile tags and profileMappings.
+
+    This function performs the following:
+    - Identifies "User Default" entries based on 'type' settings.
+    - Identifies modified aircraft (with settings but no type) as "Auto User" entries.
+    - Appends appropriate <profile> tags to all models.
+    - Creates <models> entries for missing "Auto User" profiles.
+    - Adds <profileMappings> entries for all aircraft that were converted.
+    - Skips execution if conversion has already been applied.
+
+    Returns:
+        bool: True if conversion was applied, False otherwise.
     """
     tree = try_parse(G.userconfig_path)
     if tree is None:
         logging.exception(f"Failed to parse: {G.userconfig_path}")
-        return
+        return False
 
     root = tree.getroot()
-    did_work = False
-    mappings_was_empty = False
-    # Add <profileMappings> if missing
-    if not root.findall("profileMappings"):
-        header = ET.Element("profileMappings")
-        for tag in ["model", "sim", "cls", "active_profile"]:
-            ET.SubElement(header, tag).text = None
-        root.append(header)
-        did_work = True
-        mappings_was_empty = True
 
-    # Ensure each <model> has a <profile> element
-    cls_sourced_list = []
-    models = root.find("models")
-    if models is not None:
-        for model_entry in root.findall("models"):
-            s = model_entry.findtext('sim')
-            m = model_entry.findtext('model')
-            if model_entry.find("profile") is None:
-                ET.SubElement(model_entry, "profile").text = "Auto User"
-                did_work = True
-            if mappings_was_empty:
-                if (s, m) not in cls_sourced_list:
-                    cls = get_class_for_sim_model(s,m)
-                    if cls is not None:
-                        # add mapping for "Auto User" into the profileMappings table
-                        mapping = ET.Element("profileMappings")
-                        ET.SubElement(mapping, "model").text = m
-                        ET.SubElement(mapping, "sim").text = s
-                        ET.SubElement(mapping, "cls").text = cls
-                        ET.SubElement(mapping, "active_profile").text = "Auto User"
-                        root.append(mapping)
-                        # add a "profile" name entry in the user models table
-                        p_mapping =  ET.Element("models")
-                        ET.SubElement(p_mapping, "name").text = 'profile'
-                        ET.SubElement(p_mapping, "model").text = m
-                        ET.SubElement(p_mapping, "value").text = cls
-                        ET.SubElement(p_mapping, "sim").text = s
-                        ET.SubElement(p_mapping, "device").text = 'any'
-                        ET.SubElement(p_mapping, "profile").text = "Auto User"
-                        root.append(p_mapping)
-                        did_work = True
-
-                    else:
-                        print(f"For {s}:{m}, c is {cls}")
-
-                    cls_sourced_list.append((s,m))
-
-
-    # Save updated file with sorting/consolidation
-    if did_work:
-        consolidate_sort_and_write_userconfig(tree)
-        return True
-    else:
+    # If already converted (profileMappings exist), exit
+    if root.find("profileMappings") is not None:
         return False
+
+    # Check if there's anything to convert
+    if root.find("models") is None:
+        return False
+
+    """
+    # Find all user created models ('type' entries) - these models will become 'User Default'
+    """
+    user_default_list = []
+    user_default_models = root.findall('models[name="type"]')
+    for user_default in user_default_models:
+        model = user_default.findtext('model')
+        sim = user_default.findtext('sim')
+        if model and sim:
+            user_default_list.append((model, sim))
+
+    """
+    find all model/sim pairings that exist but don't have a 'type' parent entry.  These will become 'Auto User' profiles
+    """
+    user_settings_only_list = []
+    for entry in root.findall('models'):
+        model = entry.findtext('model')
+        sim = entry.findtext('sim')
+        if not model or not sim:
+            continue
+        if (model, sim) not in user_default_list and (model, sim) not in user_settings_only_list:
+            user_settings_only_list.append((model, sim))
+
+    """
+    We now have two lists:
+    user_default_models has (model, sim) tuples for aircraft that will become 'user defaults' (created by user)
+    user_settings_only_list has (model, sim) tuples for aircraft that will become 'auto user' profiles (settings modified from default aircraft)
+    """
+    for entry in root.findall('models'):
+        model = entry.findtext('model')
+        sim = entry.findtext('sim')
+        if not model or not sim:
+            continue
+
+        existing_profiles = entry.findall("profile")
+        if any(p.text in ("User Default", "Auto User") for p in existing_profiles):
+            continue  # Already patched
+
+        if (model, sim) in user_default_list:
+            ET.SubElement(entry, 'profile').text = "User Default"
+        elif (model, sim) in user_settings_only_list:
+            ET.SubElement(entry, 'profile').text = "Auto User"
+        else:
+            logging.warning(f"Unhandled model/sim: {model}/{sim}")
+
+    """
+    Each 'Auto User' profile gets a name='profile' entry that indicates a profile.
+    User Defaults have their name='type' entries.
+    """
+    existing_profile_defs = {(e.findtext("model"), e.findtext("sim"))
+                             for e in root.findall('models[name="profile"]')}
+
+    for model, sim in user_settings_only_list:
+        if (model, sim) in existing_profile_defs:
+            continue
+        cls = get_class_for_sim_model(sim, model)
+        profile_def = ET.SubElement(root, 'models')
+        ET.SubElement(profile_def, 'name').text = "profile"
+        ET.SubElement(profile_def, 'model').text = model
+        ET.SubElement(profile_def, 'value').text = cls
+        ET.SubElement(profile_def, 'sim').text = sim
+        ET.SubElement(profile_def, 'device').text = "any"
+        ET.SubElement(profile_def, 'profile').text = "Auto User"
+
+    """
+    Now we build the profileMappings table.
+    Each model will be set to its "profile" value (Auto User or User Default) depending on its type
+    """
+    seen_mappings = set()
+    for model, sim in user_default_list + user_settings_only_list:
+        if not model or not sim or (model, sim) in seen_mappings:
+            continue
+        seen_mappings.add((model, sim))
+
+        cls = get_class_for_sim_model(sim, model)
+        profile = "User Default" if (model, sim) in user_default_list else "Auto User"
+
+        mapping = ET.SubElement(root, "profileMappings")
+        ET.SubElement(mapping, "model").text = model
+        ET.SubElement(mapping, "sim").text = sim
+        ET.SubElement(mapping, "cls").text = cls
+        ET.SubElement(mapping, "active_profile").text = profile
+
+    consolidate_sort_and_write_userconfig(tree)
+    logging.info("Conversion complete: userconfig upgraded.")
+    return True
+
 
 #############################################################
 #####                                                   #####
