@@ -57,7 +57,7 @@ from telemffb.sim.aircraft_base import effects
 from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
-from telemffb.ProfileManagerDialog import ProfileManagerDialog, NewProfileDialog
+from telemffb.ProfileManager import ProfileManagerDialog, NewProfileDialog
 from telemffb.utils import exit_application, overrides, HiDpiPixmap
 
 class MainWindow(QMainWindow):
@@ -1500,11 +1500,12 @@ class MainWindow(QMainWindow):
         profiles = xmlutils.get_available_profiles(self.offline_sim.currentText(), self.offline_class.currentText(), ac_name)
         self.offline_profile.setEnabled(True)
         self.offline_profile.clear()
-        self.offline_profile.addItem('Auto User')  # manually add 'Auto User' so it is at the top and always present even if there is not yet a Auto User Profile
 
         for profile_name in profiles:
             if profile_name != 'default' and profile_name != 'Auto User':
                 self.offline_profile.addItem(profile_name)
+        if not self.offline_profile.count():
+            self.offline_profile.addItem('Auto User')  # manually add 'Auto User' so it is at the top and always present even if there is not yet a Auto User Profile
 
         self.offline_class.blockSignals(True)  # block signals to prevent triggering of offline_class_changed
         self.offline_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
@@ -1831,6 +1832,53 @@ class MainWindow(QMainWindow):
         # Create and return the interpolated color
         return QColor(r, g, b, a)
 
+    def update_craft_labels(self, model, match, profile):
+        self.cur_craft_label.setText(f'{model}')
+        self.cur_pattern_label.setText(f'Matched: "{match}"')
+        self.active_profile_label.setText(f'Active Profile: "{profile}"')
+
+    def update_profile_combo(self, new_items: list[str]):
+        """
+        Updates the profile combo box only if its contents differ (excluding 'Add New...').
+
+        Args:
+            new_items (list[str]): List of profiles to populate.
+        """
+        ADD_NEW_LABEL = "Add New..."
+        PROFILE_MGR_LABEL = "Profile Manager..."
+
+        # Extract current items, excluding 'Add New...'
+        current_items = [
+            self.cb_activeProfileCombo.itemText(i)
+            for i in range(self.cb_activeProfileCombo.count())
+            if self.cb_activeProfileCombo.itemText(i) != ADD_NEW_LABEL
+        ]
+        # enable the combobox if it is not enabled
+        if not self.cb_activeProfileCombo.isEnabled():
+            self.cb_activeProfileCombo.setEnabled(True)
+        # populate combobox with new items if they are different
+        # block signals to avoid triggering the combobox's itemChanged signal
+
+        if set(current_items) != set(new_items):
+            selected = self.cb_activeProfileCombo.currentText()
+            self.cb_activeProfileCombo.blockSignals(True)
+            self.cb_activeProfileCombo.clear()
+            self.cb_activeProfileCombo.addItems(new_items)
+
+            # Add styled 'Add New...' item
+            self.cb_activeProfileCombo.addItem(ADD_NEW_LABEL)
+            index = self.cb_activeProfileCombo.findText(ADD_NEW_LABEL)
+            if index >= 0:
+                font = QFont()
+                font.setItalic(True)
+                self.cb_activeProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
+
+            self.cb_activeProfileCombo.blockSignals(False)
+
+            if selected in new_items:
+                self.cb_activeProfileCombo.setCurrentText(selected)
+
+
     def on_profile_change(self, profile_name):
         # utils.debug_caller_args("red")
         """
@@ -1850,6 +1898,7 @@ class MainWindow(QMainWindow):
         if not G.master_instance: return
         cur_txt = self.cb_activeProfileCombo.currentText()
         if profile_name == 'Add New...':
+            ## Quickly block signals and set it back to the actual current model.. then kick off new profile dialog
             self.cb_activeProfileCombo.blockSignals(True)
             self.cb_activeProfileCombo.setCurrentText(cur_txt)
             self.cb_activeProfileCombo.blockSignals(False)
@@ -1866,22 +1915,30 @@ class MainWindow(QMainWindow):
                 return
             # write new profile entry to user config file
             if clone:
-                xmlutils.clone_whole_model(
-                    the_sim=G.settings_mgr.current_sim,
-                    old_pattern=G.settings_mgr.current_pattern,
-                    new_pattern=G.settings_mgr.current_pattern,
-                    old_profile=profile_to_clone,
-                    new_profile=new_profile
+                xmlutils.clone_profile_entry(
+                    sim=G.settings_mgr.current_sim,
+                    cls=G.settings_mgr.current_class,
+                    src_model=G.settings_mgr.current_pattern,
+                    src_profile=profile_to_clone,
+                    dst_profile=new_profile
                 )
             else:
                 xmlutils.add_new_profile(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, new_profile)
+
             if make_active:
                 # change the profileMapping for this aircraft to the new profile
                 xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, new_profile)
                 G.settings_mgr.update_state_vars(active_profile=new_profile)
-                pass
+
+            if G.telem_manager.timed_out:
+                self.update_profile_combo(xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern))
+                self.update_craft_labels(G.settings_mgr.current_aircraft_name, G.settings_mgr.current_pattern, G.settings_mgr.active_profile)
+                self.cb_activeProfileCombo.setCurrentText(G.settings_mgr.active_profile)
         else:
             xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, profile_name)
+            if G.telem_manager.timed_out:
+                self.update_craft_labels(G.settings_mgr.current_aircraft_name, G.settings_mgr.current_pattern, profile_name)
+                self.cb_activeProfileCombo.setCurrentText(profile_name)
 
     def on_telemetry_timeout(self):
         # self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
@@ -2077,65 +2134,14 @@ class MainWindow(QMainWindow):
             available_profiles = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
             # print(f"Profiles: {available_profiles}, ACTIVE: {active_profile}")
 
-            def update_profile_combo(new_items: list[str]):
-                """
-                Updates the profile combo box only if its contents differ (excluding 'Add New...').
-
-                Args:
-                    new_items (list[str]): List of profiles to populate.
-                """
-                ADD_NEW_LABEL = "Add New..."
-                PROFILE_MGR_LABEL = "Profile Manager..."
-
-                # Extract current items, excluding 'Add New...'
-                current_items = [
-                    self.cb_activeProfileCombo.itemText(i)
-                    for i in range(self.cb_activeProfileCombo.count())
-                    if self.cb_activeProfileCombo.itemText(i) != ADD_NEW_LABEL
-                ]
-                # enable the combobox if it is not enabled
-                if not self.cb_activeProfileCombo.isEnabled():
-                    self.cb_activeProfileCombo.setEnabled(True)
-                # populate combobox with new items if they are different
-                # block signals to avoid triggering the combobox's itemChanged signal
-
-                if set(current_items) != set(new_items):
-                    selected = self.cb_activeProfileCombo.currentText()
-                    self.cb_activeProfileCombo.blockSignals(True)
-                    self.cb_activeProfileCombo.clear()
-                    self.cb_activeProfileCombo.addItems(new_items)
-
-                    # Add styled 'Add New...' item
-                    self.cb_activeProfileCombo.addItem(ADD_NEW_LABEL)
-                    index = self.cb_activeProfileCombo.findText(ADD_NEW_LABEL)
-                    if index >= 0:
-                        font = QFont()
-                        font.setItalic(True)
-                        self.cb_activeProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
-
-                    self.cb_activeProfileCombo.blockSignals(False)
-
-                    if selected in new_items:
-                        self.cb_activeProfileCombo.setCurrentText(selected)
-                # """
-                #     Update the selection if the active profile has changed via other means (Auto User profile switch)
-                # """
-                # if self.cb_activeProfileCombo.currentText() != active_profile:
-                #     # self.cb_activeProfileCombo.blockSignals(True)
-                #     self.cb_activeProfileCombo.setCurrentText(active_profile)
-                #     self.cb_activeProfileCombo.blockSignals(False)
-
 
             if G.master_instance:
-                update_profile_combo(available_profiles)
-
+                self.update_profile_combo(available_profiles)
                 """
                 Update the selection if the active profile has changed via other means (Auto User profile switch)
                 """
                 if self.cb_activeProfileCombo.currentText() != active_profile:
-                    # self.cb_activeProfileCombo.blockSignals(True)
                     self.cb_activeProfileCombo.setCurrentText(active_profile)
-                    self.cb_activeProfileCombo.blockSignals(False)
 
             self.cur_pattern_label.setText(f'Matched: <span style="font-family: Consolas, monospace;font-size: 14px">"{shown_pattern}"</span>')
             self.active_profile_label.setText(f'Active Profile: <span style="font-family: Consolas, monospace;font-size: 14px">"{active_profile}"</span>')
