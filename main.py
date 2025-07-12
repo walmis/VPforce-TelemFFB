@@ -295,21 +295,21 @@ def _setup_config_paths():
 def _setup_dev_userconfig_paths():
     """Setup development userconfig paths."""
     real_userconfig_path = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-    real_userconfig = os.path.join(real_userconfig_path, 'userconfig.xml')
+    real_userconfig = os.path.join(real_userconfig_path, 'userconfig_v2.xml')
 
     if getattr(sys, 'frozen', False):
         G.userconfig_rootpath = os.path.dirname(sys.executable)
     else:
         G.userconfig_rootpath = os.path.dirname(os.path.abspath(__file__))
 
-    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
+    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
     if not os.path.isfile(G.userconfig_path):
         shutil.copy(real_userconfig, G.userconfig_path)
 
 def _setup_standard_config_paths():
     """Setup standard configuration paths."""
     G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
+    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
 
 def _initialize_device_connection():
     """
@@ -404,29 +404,8 @@ def _convert_user_config():
     if G.master_instance:
         xmlutils.update_roots()
         xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
-        # Backup before conversion
-        original_file = G.userconfig_path
-        original_path = G.userconfig_rootpath
-        original_filename = os.path.basename(G.userconfig_path)
+        utils.convert_legacy_userconfig(G.userconfig_path)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        backup_path = os.path.join(G.userconfig_rootpath, 'cfg_backup', 'conversion')
-        os.makedirs(backup_path, exist_ok=True)
-
-        backup_file = f"{original_filename}.pre-conversion.{timestamp}"
-        backup_full_path = os.path.join(backup_path, backup_file)
-        shutil.copy2(original_file, backup_full_path)
-
-        # Run conversion
-        conversion_happened = xmlutils.convert_userconfig()
-
-        # If no changes occurred, discard the backup
-        if not conversion_happened and os.path.exists(backup_full_path):
-            os.remove(backup_full_path)
-            # print(f"Backup discarded: {backup_full_path}")
-        else:
-            logging.info(f"Pre conversion userconfig backup saved: {backup_path}")
 
 def _initialize_settings_manager():
     """
@@ -661,6 +640,8 @@ def main():
 
     # Setup configuration file paths (dev vs production, userconfig locations)
     _setup_config_paths()
+
+    utils.copy_legacy_config_to_new(G.userconfig_path)
     utils.create_empty_userxml_file(G.userconfig_path)
 
     # Determine if running from executable or source for logging

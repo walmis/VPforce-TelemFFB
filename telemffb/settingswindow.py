@@ -277,7 +277,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
 
     def backup_userconfig(self):
         mprint("backup_userconfig")
-        # Ensure the userconfig.xml file exists
+        # Ensure the userconfig_v2.xml file exists
         # xmlutils.create_empty_userxml_file()  # Now handled by TelemFFB on startup
 
         backup_path = G.userconfig_path + ".backup"
@@ -285,7 +285,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         backup_path_time = f"{G.userconfig_path}_{timestamp}.backup"
         try:
-            # Copy the userconfig.xml file to the backup location
+            # Copy the userconfig_v2.xml file to the backup location
             shutil.copy2(G.userconfig_path, backup_path)
             #shutil.copy2(G.userconfig_path, backup_path_time)        #  do we want lots of backups?
             logging.info(f"Backup created: {backup_path}")
@@ -302,9 +302,9 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
             return
 
         try:
-            # Copy the backup file to userconfig.xml
+            # Copy the backup file to userconfig_v2.xml
             shutil.copy2(backup_path, G.userconfig_path)
-            logging.info(f"Backup '{backup_path}' restored to userconfig.xml")
+            logging.info(f"Backup '{backup_path}' restored to userconfig_v2.xml")
             #self.get_current_model()
 
         except Exception as e:

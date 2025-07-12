@@ -97,7 +97,7 @@ def really_write_userconfig_xml(tree : ET.ElementTree):
     tree.write(userconfig_path, "utf-8")
 
 
-def consolidate_sort_and_write_userconfig(tree):
+def consolidate_sort_and_write_userconfig(tree, ret=False):
     """
     Deduplicates and reorders entries in the userconfig XML for consistency and performance.
 
@@ -112,6 +112,7 @@ def consolidate_sort_and_write_userconfig(tree):
 
     Args:
         tree (ElementTree): Parsed XML tree from userconfig_path
+        ret: Bool: if True, returns the sorted tree rather than writing it
 
     Effects:
         - Modifies the input tree in-place
@@ -200,125 +201,10 @@ def consolidate_sort_and_write_userconfig(tree):
         root.append(e)
 
     # Finalize save
+    if ret:
+        return tree
     really_write_userconfig_xml(tree)
 
-
-def convert_userconfig():
-    """
-    Upgrades a legacy userconfig file to the new format that includes profile tags and profileMappings.
-
-    This function performs the following:
-    - Identifies "User Default" entries based on 'type' settings.
-    - Identifies modified aircraft (with settings but no type) as "Auto User" entries.
-    - Appends appropriate <profile> tags to all models.
-    - Creates <models> entries for missing "Auto User" profiles.
-    - Adds <profileMappings> entries for all aircraft that were converted.
-    - Skips execution if conversion has already been applied.
-
-    Returns:
-        bool: True if conversion was applied, False otherwise.
-    """
-    tree = try_parse(G.userconfig_path)
-    if tree is None:
-        logging.exception(f"Failed to parse: {G.userconfig_path}")
-        return False
-
-    root = tree.getroot()
-
-    # If already converted (profileMappings exist), exit
-    if root.find("profileMappings") is not None:
-        return False
-
-    # Check if there's anything to convert
-    if root.find("models") is None:
-        return False
-
-    """
-    # Find all user created models ('type' entries) - these models will become 'User Default'
-    """
-    user_default_list = []
-    user_default_models = root.findall('models[name="type"]')
-    for user_default in user_default_models:
-        model = user_default.findtext('model')
-        sim = user_default.findtext('sim')
-        if model and sim:
-            user_default_list.append((model, sim))
-
-    """
-    find all model/sim pairings that exist but don't have a 'type' parent entry.  These will become 'Auto User' profiles
-    """
-    user_settings_only_list = []
-    for entry in root.findall('models'):
-        model = entry.findtext('model')
-        sim = entry.findtext('sim')
-        if not model or not sim:
-            continue
-        if (model, sim) not in user_default_list and (model, sim) not in user_settings_only_list:
-            user_settings_only_list.append((model, sim))
-
-    """
-    We now have two lists:
-    user_default_models has (model, sim) tuples for aircraft that will become 'user defaults' (created by user)
-    user_settings_only_list has (model, sim) tuples for aircraft that will become 'auto user' profiles (settings modified from default aircraft)
-    """
-    for entry in root.findall('models'):
-        model = entry.findtext('model')
-        sim = entry.findtext('sim')
-        if not model or not sim:
-            continue
-
-        existing_profiles = entry.findall("profile")
-        if any(p.text in ("User Default", "Auto User") for p in existing_profiles):
-            continue  # Already patched
-
-        if (model, sim) in user_default_list:
-            ET.SubElement(entry, 'profile').text = "User Default"
-        elif (model, sim) in user_settings_only_list:
-            ET.SubElement(entry, 'profile').text = "Auto User"
-        else:
-            logging.warning(f"Unhandled model/sim: {model}/{sim}")
-
-    """
-    Each 'Auto User' profile gets a name='profile' entry that indicates a profile.
-    User Defaults have their name='type' entries.
-    """
-    existing_profile_defs = {(e.findtext("model"), e.findtext("sim"))
-                             for e in root.findall('models[name="profile"]')}
-
-    for model, sim in user_settings_only_list:
-        if (model, sim) in existing_profile_defs:
-            continue
-        cls = get_class_for_sim_model(sim, model)
-        profile_def = ET.SubElement(root, 'models')
-        ET.SubElement(profile_def, 'name').text = "profile"
-        ET.SubElement(profile_def, 'model').text = model
-        ET.SubElement(profile_def, 'value').text = cls
-        ET.SubElement(profile_def, 'sim').text = sim
-        ET.SubElement(profile_def, 'device').text = "any"
-        ET.SubElement(profile_def, 'profile').text = "Auto User"
-
-    """
-    Now we build the profileMappings table.
-    Each model will be set to its "profile" value (Auto User or User Default) depending on its type
-    """
-    seen_mappings = set()
-    for model, sim in user_default_list + user_settings_only_list:
-        if not model or not sim or (model, sim) in seen_mappings:
-            continue
-        seen_mappings.add((model, sim))
-
-        cls = get_class_for_sim_model(sim, model)
-        profile = "User Default" if (model, sim) in user_default_list else "Auto User"
-
-        mapping = ET.SubElement(root, "profileMappings")
-        ET.SubElement(mapping, "model").text = model
-        ET.SubElement(mapping, "sim").text = sim
-        ET.SubElement(mapping, "cls").text = cls
-        ET.SubElement(mapping, "active_profile").text = profile
-
-    consolidate_sort_and_write_userconfig(tree)
-    logging.info("Conversion complete: userconfig upgraded.")
-    return True
 
 
 #############################################################
@@ -621,72 +507,6 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
     logging.info(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
                  f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}, profile={profile_name}")
 
-    # Check if an identical <models> element already exists
-    model_elem = root.find(f'.//models[sim="{the_sim}"]'  
-                               f'[device="{the_device}"]'
-                               f'[model="{the_model}"]'
-                               f'[name="{setting_name}"]'
-                               f'[profile="{profile_name}"]')
-
-
-    if model_elem is not None:
-        # Update the value of the existing element
-        for child_elem in model_elem:
-            if child_elem.tag == 'value':
-                child_elem.text = str(the_value)
-            if child_elem.tag == 'unit':
-                child_elem.text = str(unit)
-        if the_model != '':
-            write_userconfig_xml(tree)
-        logging.info(f"Updated <models> element with values: sim={the_sim}, device={the_device}, "
-                     f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}, profile={profile_name}")
-
-    else:
-        # Check if an identical <models> element already exists; if so, skip
-        model_elem_exists = any(
-            all(
-                element.tag == tag and element.text == value
-                for tag, value in [
-                    ("name", setting_name),
-                    ("model", the_model),
-                    ("value", the_value),
-                    ("unit", unit),
-                    ("sim", the_sim),
-                    ("device", the_device),
-                    ("profile", profile_name)
-                ]
-            )
-            for element in root.iter("models")
-        )
-
-        if model_elem_exists:
-            lprint("<models> element with the same values already exists. Skipping.")
-        else:
-            # Create child elements with the specified content
-            models = ET.SubElement(root, "models")
-            if unit is None or unit == '':
-                for tag, value in [("name", setting_name),
-                                   ("model", the_model),
-                                   ("value", the_value),
-                                   ("sim", the_sim),
-                                   ("device", the_device),
-                                   ("profile", profile_name)]:
-                    ET.SubElement(models, tag).text = value
-            else:
-                for tag, value in [("name", setting_name),
-                                   ("model", the_model),
-                                   ("value", the_value),
-                                   ("unit", unit),
-                                   ("sim", the_sim),
-                                   ("device", the_device),
-                                   ("profile", profile_name)]:
-                    ET.SubElement(models, tag).text = value
-
-            # Write the modified XML back to the file
-            tree = ET.ElementTree(root)
-            consolidate_sort_and_write_userconfig(tree)
-            logging.info(f"Added <models> element with values: sim={the_sim}, device={the_device}, "
-                         f"value={the_value}, unit={unit}, model={the_model}, name={setting_name}, profile={profile_name}")
 
 
 def write_class_to_xml(the_sim, the_class, the_value, setting_name, unit='', the_device = ''):
