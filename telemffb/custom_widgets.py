@@ -16,7 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QWheelEvent
 
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
@@ -142,6 +142,11 @@ class DelayTimerSlider(QSlider):
 
     def _emitDelayedValueChanged(self):
         self.delayedValueChanged.emit(self.value())
+
+class NoWheelComboBox(QComboBox):
+    def wheelEvent(self, event: QWheelEvent):
+        # Ignore the wheel event entirely
+        event.ignore()
 
 class NoWheelSlider(QSlider):
     delayedValueChanged = pyqtSignal(int)

@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageB
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton)
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, NoWheelComboBox)
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.AdvancedGDialog import AdvancedGDialog
@@ -538,7 +538,7 @@ class SettingsLayout(QGridLayout):
 
         if item['unit'] is not None and item['unit'] != '':
             entry_colspan = 1
-            unit_dropbox = QComboBox()
+            unit_dropbox = NoWheelComboBox()
             unit_dropbox.blockSignals(True)
             if item['unit'] == 'hz':
                 unit_dropbox.addItem('hz')
@@ -814,12 +814,7 @@ class SettingsLayout(QGridLayout):
             self.addWidget(spin_box, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
         if item['datatype'] in ('list', 'anylist', 'enumlist'):
-            dropbox = QComboBox()
-            dropbox.setStyleSheet("""
-                QComboBox {
-                    qproperty-alignment: 'AlignCenter';
-                }
-            """)
+            dropbox = NoWheelComboBox()
 
             if item['datatype'] == 'anylist':
                 dropbox.setEditable(True)
@@ -1218,7 +1213,7 @@ class SettingsLayout(QGridLayout):
         self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('vle_', '')
         unit_dropbox_name = 'ud_' + self.sender().objectName().replace('vle_', '')
-        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
+        unit_dropbox = self.mainwindow.findChild(NoWheelComboBox, unit_dropbox_name)
         unit = ''
         if unit_dropbox is not None:
             unit = unit_dropbox.currentText()
@@ -1414,7 +1409,7 @@ class SettingsLayout(QGridLayout):
         value_label_name = 'vl_' + self.sender().objectName().replace('dsld_', '')
         sliderfactor_name = 'sf_' + self.sender().objectName().replace('dsld_', '')
         unit_dropbox_name = 'ud_' + self.sender().objectName().replace('dsld_', '')
-        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
+        unit_dropbox = self.mainwindow.findChild(NoWheelComboBox, unit_dropbox_name)
         unit = ''
         if unit_dropbox is not None:
             unit = unit_dropbox.currentText()
@@ -1441,7 +1436,7 @@ class SettingsLayout(QGridLayout):
         value_label_name = 'vl_' + self.sender().objectName().replace('dfsld_', '')
         sliderfactor_name = 'sf_' + self.sender().objectName().replace('dfsld_', '')
         unit_dropbox_name = 'ud_' + self.sender().objectName().replace('dfsld_', '')
-        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
+        unit_dropbox = self.mainwindow.findChild(NoWheelComboBox, unit_dropbox_name)
         unit = ''
         if unit_dropbox is not None:
             unit = unit_dropbox.currentText()
