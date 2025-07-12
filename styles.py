@@ -10,6 +10,7 @@ QPushButton:!pressed, #styledButton:!pressed {
     padding: 2px;
     color: #dddddd; /* Ensures consistency */
     border: 1px solid #9d30b3;
+    min-width: 70px;
 }
 
 QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
@@ -102,8 +103,11 @@ QToolButton[button_type="expand_button"]:pressed {
 }                                                                      
 
 QLineEdit, QPlainTextEdit, QTextEdit {
-    background-color: #3a3a3a;
+    background-color: #4e4e4e;
     color: #ffffff;
+    border: 1px solid #666666;
+    border-radius: 2px;
+    padding: 1px;
     selection-background-color: #ab37c8;
 }
 
@@ -214,6 +218,7 @@ QPushButton:!pressed, #styledButton:!pressed {
     padding: 2px;
     color: #dddddd; /* Ensures consistency */
     border: 1px solid #9d30b3;
+    min-width: 70px;
 }
 
 QPushButton:disabled:!pressed, #styledButton:disabled:!pressed {
