@@ -58,7 +58,7 @@ def config_has_changed(update=False) -> bool:
     # "hash" both mtimes together
     tm = int(os.path.getmtime(G.userconfig_path)) + int(os.path.getmtime(G.defaults_path))
     time_now = time.time()
-    update_delay = 0.4  # Delay added here to avoid file access errors with multiple instances
+    update_delay = 0.1  # Delay added here to avoid file access errors with multiple instances
 
     if not _config_mtime:
         # if the first time called, initialize times and return - to avoid double config load on first call
