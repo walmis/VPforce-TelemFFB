@@ -1578,7 +1578,9 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
         """
     logging.info (f"Reading from XML:  Sim: {the_sim}, Aircraft name: {aircraft_name}, Class: {input_modeltype}")
     if active_profile is None:
-        active_profile = G.settings_mgr.active_profile
+        ptrn = get_pattern_by_sim_fullname(the_sim, aircraft_name)
+        cls = get_class_for_sim_model(the_sim, ptrn)
+        active_profile = get_active_profile_for_model(the_sim, cls, ptrn)
     time.sleep(0.1)
 
     print_counts = False
