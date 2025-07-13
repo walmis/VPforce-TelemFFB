@@ -264,22 +264,26 @@ class NoWheelNumberSlider(NoWheelSlider):
 
         # --- Draw groove manually ---
         groove_rect = QRectF()
-        if self.orientation() == Qt.Orientation.Horizontal:
+
+        gradient = QLinearGradient(groove_rect.topLeft(), groove_rect.bottomLeft())
+        if G.useDarkMode:
+            gradient.setColorAt(0.0, QColor("#555555"))
+            gradient.setColorAt(1.0, QColor("#444444"))
+            painter.setPen(QPen(QColor("#4C4C4C")))
             groove_height = 6
+        else:
+            gradient.setColorAt(0.0, QColor("#e2e2e2"))
+            gradient.setColorAt(1.0, QColor("#cccccc"))
+            painter.setPen(QPen(QColor("#565a5e")))
+            groove_height = 9
+
+        if self.orientation() == Qt.Orientation.Horizontal:
             groove_y = (self.height() - groove_height) / 2
             groove_rect = QRectF(0, groove_y, self.width(), groove_height)
         else:
             groove_width = 8
             groove_x = (self.width() - groove_width) / 2
             groove_rect = QRectF(groove_x, 0, groove_width, self.height())
-
-        gradient = QLinearGradient(groove_rect.topLeft(), groove_rect.bottomLeft())
-        gradient.setColorAt(0.0, QColor("#555555"))
-        gradient.setColorAt(1.0, QColor("#444444"))
-
-        painter.setPen(QPen(QColor("#4C4C4C")))
-        painter.setBrush(gradient)
-        painter.drawRoundedRect(groove_rect, 2, 2)
 
         # Style option for the handle
         option = QStyleOptionSlider()
