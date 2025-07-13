@@ -16,7 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from PyQt6.QtGui import QAction, QWheelEvent
+from PyQt6.QtGui import QAction, QWheelEvent, QPalette
 
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
@@ -178,6 +178,81 @@ class NoWheelSlider(QSlider):
     def _emitDelayedValueChanged(self):
         self.delayedValueChanged.emit(self.value())
 
+    def paintEvent(self, event):
+        # super(NoWheelNumberSlider, self).paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # --- Draw groove manually ---
+        groove_rect = QRectF()
+        if self.orientation() == Qt.Orientation.Horizontal:
+            groove_height = 10
+            groove_y = (self.height() - groove_height) / 2
+            groove_rect = QRectF(0, groove_y, self.width(), groove_height)
+        else:
+            groove_width = 8
+            groove_x = (self.width() - groove_width) / 2
+            groove_rect = QRectF(groove_x, 0, groove_width, self.height())
+
+        palette = self.palette()
+        base_color = palette.color(QPalette.ColorRole.Mid)
+        highlight_color = palette.color(QPalette.ColorRole.Midlight)
+
+        gradient = QLinearGradient(groove_rect.topLeft(), groove_rect.bottomLeft())
+        gradient.setColorAt(0.0, base_color)
+        gradient.setColorAt(1.0, highlight_color)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(gradient)
+        painter.drawRoundedRect(groove_rect, 2, 2)
+
+        # Style option for the handle
+        option = QStyleOptionSlider()
+        self.initStyleOption(option)
+        handle_rect = self.style().subControlRect(
+            QStyle.ComplexControl.CC_Slider,
+            option,
+            QStyle.SubControl.SC_SliderHandle,
+            self
+        )
+
+        # Adjust handle size
+        handle_rect.setWidth(self.handle_width)
+        handle_rect.setHeight(self.handle_height)
+
+        # Calculate new handle position
+        if self.orientation() == Qt.Orientation.Horizontal:
+            handle_x = self.style().sliderPositionFromValue(
+                self.minimum(), self.maximum(), self.value(), self.width() - self.handle_width)
+            handle_rect.moveLeft(handle_x)
+        else:
+            handle_y = self.style().sliderPositionFromValue(
+                self.minimum(), self.maximum(), self.value(), self.height() - self.handle_height)
+            handle_rect.moveTop(handle_y)
+
+        # Draw custom gradient background
+        # Shift center to upper-left
+        cx = handle_rect.left() + handle_rect.width() * 0.3
+        cy = handle_rect.top() + handle_rect.height() * 0.3
+
+        # Increase radius for smoother falloff
+        radius = max(handle_rect.width(), handle_rect.height()) * 0.8
+        highlight = QColor("#eeeeee") if not G.useDarkMode else QColor("#aaaaaa")
+        gradient = QRadialGradient(cx, cy, radius)
+        gradient.setColorAt(0.0, QColor(highlight).lighter(130))
+        gradient.setColorAt(0.4, QColor(self.handle_color))
+        gradient.setColorAt(1.0, QColor(self.handle_color).darker(120))
+
+        gradient.setColorAt(0.0, QColor(highlight))
+        gradient.setColorAt(0.3, QColor(self.handle_color))
+        gradient.setColorAt(1.0, QColor(self.handle_color).darker())
+
+        painter.setBrush(QBrush(gradient))
+        painter.setPen(QPen(QColor("#565a5e")))
+        painter.drawRoundedRect(handle_rect, self.handle_height / 4, self.handle_height / 4)
+
+        painter.end()
+
     def wheelEvent(self, event):
         if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
             # Adjust the value by increments of 1
@@ -258,32 +333,32 @@ class NoWheelNumberSlider(NoWheelSlider):
         self.update()  # Ensure the slider is repainted to show the new text
 
     def paintEvent(self, event):
-        super(NoWheelNumberSlider, self).paintEvent(event)
+        # super(NoWheelNumberSlider, self).paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # --- Draw groove manually ---
         groove_rect = QRectF()
-
-        gradient = QLinearGradient(groove_rect.topLeft(), groove_rect.bottomLeft())
-        if G.useDarkMode:
-            gradient.setColorAt(0.0, QColor("#555555"))
-            gradient.setColorAt(1.0, QColor("#444444"))
-            painter.setPen(QPen(QColor("#4C4C4C")))
-            groove_height = 6
-        else:
-            gradient.setColorAt(0.0, QColor("#e2e2e2"))
-            gradient.setColorAt(1.0, QColor("#cccccc"))
-            painter.setPen(QPen(QColor("#565a5e")))
-            groove_height = 9
-
         if self.orientation() == Qt.Orientation.Horizontal:
+            groove_height = 10
             groove_y = (self.height() - groove_height) / 2
             groove_rect = QRectF(0, groove_y, self.width(), groove_height)
         else:
             groove_width = 8
             groove_x = (self.width() - groove_width) / 2
             groove_rect = QRectF(groove_x, 0, groove_width, self.height())
+
+        palette = self.palette()
+        base_color = palette.color(QPalette.ColorRole.Mid)
+        highlight_color = palette.color(QPalette.ColorRole.Midlight)
+
+        gradient = QLinearGradient(groove_rect.topLeft(), groove_rect.bottomLeft())
+        gradient.setColorAt(0.0, base_color)
+        gradient.setColorAt(1.0, highlight_color)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(gradient)
+        painter.drawRoundedRect(groove_rect, 2, 2)
 
         # Style option for the handle
         option = QStyleOptionSlider()
