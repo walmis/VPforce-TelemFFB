@@ -55,14 +55,21 @@ QPushButton[buttonType="erase_button"] {
     border: none;  /* Remove any border */
     margin: 0px;   /* Remove any margin */
     background-color: transparent;  /* Transparent background */
+    min-width: 25px;
+    border-radius:6px;
 }
             
 QPushButton[buttonType="erase_button"]:hover {
     background-color: palett(window);  /* Optional: Change background on hover */
+    min-width: 24px;
+    border-radius:6px;
 }
 
 QPushButton[buttonType="erase_button"]:pressed {
     background-color: #666;  /* Optional: Change background on press */
+    border: 1px solid #ab37c8;
+    min-width: 25px;
+    border-radius: 6px;
 }
 
 QPushButton[buttonType="p_m_button"] {                                  
@@ -73,15 +80,22 @@ QPushButton[buttonType="p_m_button"] {
     padding: 0px;                                                       
     border: none;  /* Remove any border */                              
     margin: 0px;   /* Remove any margin */                              
-    background-color: transparent;  /* Transparent background */        
+    background-color: transparent;  /* Transparent background */  
+    min-width: 20px;
+    border-radius:4px;      
 }   
                                                                     
 QPushButton[buttonType="p_m_button"]:hover {                            
     background-color: palett(window);  /* Optional: Change background on hover */ 
+    min-width: 20px;
+    border-radius: 4px;
 }    
                                                                    
 QPushButton[buttonType="p_m_button"]:pressed {                          
-    background-color: #666;  /* Optional: Change background on press */ 
+    background-color: #666;  /* Optional: Change background on press */
+    border: 1px solid #ab37c8;
+    min-width: 20px;
+    border-radius: 4px; 
 }     
 
 QToolButton[buttonType="expand_button"] {                                                          
