@@ -2837,46 +2837,56 @@ class FlyInsideHelicopter(Helicopter):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
-        input_data = HapticEffect.device.get_input()
-        self.phys_x, self.phys_y = input_data.axisXY()
-        self.cpO_y = round(self.phys_y * 4096)
+        # input_data = HapticEffect.device.get_input()
+        # self.phys_x, self.phys_y = input_data.axisXY()
+        # self.cpO_y = round(self.phys_y * 4096)
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
-        rrpm = telem_data.get("RotorRPM")
-        if self.is_joystick():
-            self._update_vibration(telem_data.get("FI_VibX"),telem_data.get("FI_VibY") ,rrpm)
+        self._update_vibration()
 
-        if self.is_pedals():
-            self._update_vibration(telem_data.get("FI_VibX"),telem_data.get("FI_VibZ") ,rrpm)
+    def _calc_etl_effect(self, *args, **kwargs):
+        ## effect not used for FI Heli
+        pass
 
-        if self.is_collective():
-            self._update_vibration(telem_data.get("FI_VibZ"),telem_data.get("FI_VibY") ,rrpm)
+    def _update_vrs_effect(self, *args, **kwargs):
+        ## effect not used for FI Heli
+        pass
 
-    def _update_vibration(self, X, Y, rrpm):
-        if self.FI_vibration_enable:
-
-            # FI vibration data is initially scaled in sc_overrides.
-            # tune there so that the max desired vibration (overspeed probably) is ~1.0
-
-            force = math.hypot(X, Y)
-            direction = math.degrees(math.atan2(Y, X))
-            # safety scaling if needed. tested at 50% configurator constant setting
-            force *= 1
-
-            # reduce at lower rotor rpm
-            force *= utils.scale_clamp(rrpm,(0,150),(0,1))
-
-            # crop input values to 1.0 because there may be higher numbers from crashes etc
-            force = min(force, 1.0)
-            force = self.expocurve(force, self.FI_vibration_expo)
-            force *= self.FI_vibration_intensity
-
-            force = round(force, 4)
-
-            effects['FI_vibration'].constant(force, direction).start()
-
-            #print(f"FI_vibration_force:{force} dir:{dir}")
-        else:
+    def _update_vibration(self):
+        if not self.FI_vibration_enable:
             effects['FI_vibration'].destroy()
+            return
+        rrpm = self.telem_data.get("RotorRPM", 0)
+        if self.is_joystick():
+            vx, vy = "FI_VibX", "FI_VibY"
+        elif self.is_pedals():
+            vx, vy = "FI_VibX", "FI_VibZ"
+        elif self.is_collective():
+            vx, vy = "FI_VibZ", "FI_VibY"
+        else:
+            return
+        x, y = self.telem_data.get(vx, 0), self.telem_data.get(vy, 0)
+
+        # FI vibration data is initially scaled in sc_overrides.
+        # tune there so that the max desired vibration (overspeed probably) is ~1.0
+
+        force = math.hypot(x, y)
+        direction = math.degrees(math.atan2(y, x))
+        # safety scaling if needed. tested at 50% configurator constant setting
+        force *= 1
+
+        # reduce at lower rotor rpm
+        force *= utils.scale_clamp(rrpm, (0, 150), (0, 1))
+
+        # crop input values to 1.0 because there may be higher numbers from crashes etc
+        force = min(force, 1.0)
+        force = self.expocurve(force, self.FI_vibration_expo)
+        force *= self.FI_vibration_intensity
+
+        force = round(force, 4)
+
+        effects['FI_vibration'].constant(force, direction).start()
+
+        # print(f"FI_vibration_force:{force} dir:{dir}")
 
