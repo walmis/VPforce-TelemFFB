@@ -61,7 +61,7 @@ QPushButton[buttonType="erase_button"] {
             
 QPushButton[buttonType="erase_button"]:hover {
     background-color: palett(window);  /* Optional: Change background on hover */
-    min-width: 24px;
+    min-width: 25px;
     border-radius:6px;
 }
 
@@ -278,14 +278,21 @@ QPushButton[buttonType="erase_button"] {
     border: none;  /* Remove any border */
     margin: 0px;   /* Remove any margin */
     background-color: transparent;  /* Transparent background */
+    min-width: 25px;
+    border-radius:6px;
 }
             
 QPushButton[buttonType="erase_button"]:hover {
     background-color: #ddd;  /* Optional: Change background on hover */
+    min-width: 25px;
+    border-radius:6px;
 }
 
 QPushButton[buttonType="erase_button"]:pressed {
     background-color: #bbb;  /* Optional: Change background on press */
+    border: 1px solid #ab37c8;
+    min-width: 25px;
+    border-radius: 6px;
 }
 
 QPushButton[buttonType="p_m_button"] {                                  
@@ -296,13 +303,21 @@ QPushButton[buttonType="p_m_button"] {
     padding: 0px;                                                       
     border: none;  /* Remove any border */                              
     margin: 0px;   /* Remove any margin */                              
-    background-color: transparent;  /* Transparent background */        
-}                                                                       
+    background-color: transparent;  /* Transparent background */
+    min-width: 20px;
+    border-radius:4px;         
+}     
+                                                                  
 QPushButton[buttonType="p_m_button"]:hover {                            
     background-color: #ddd;  /* Optional: Change background on hover */ 
-}                                                                       
+    min-width: 20px;
+    border-radius: 4px;
+}                      
+                                                 
 QPushButton[buttonType="p_m_button"]:pressed {                          
     background-color: #666;  /* Optional: Change background on press */ 
+    min-width: 20px;
+    border-radius: 4px;
 }                                                                       
 
 QToolButton[buttonType="expand_button"] {                                                          
@@ -346,8 +361,10 @@ QSlider::handle:horizontal:disabled {
 QSlider::groove:horizontal {
     border: 1px solid #565a5e;
     height: 8px;
-    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                stop: 0 #e6e6e6, stop: 1 #bfbfbf);
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 0, y2: 1,
+        stop: 0 #e6e6e6, stop: 1 #bfbfbf
+    );
     margin: 0;
     border-radius: 3px;
 }
