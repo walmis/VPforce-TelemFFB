@@ -103,12 +103,15 @@ QToolButton[button_type="expand_button"]:pressed {
 }                                                                      
 
 QLineEdit, QPlainTextEdit, QTextEdit {
-    background-color: #4e4e4e;
+    background-color: #414141;
     color: #ffffff;
     border: 1px solid #666666;
     border-radius: 2px;
     padding: 1px;
     selection-background-color: #ab37c8;
+}
+QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus {
+    border: 1px solid #ab37c8;  /* match your accent */
 }
 
 QSlider::handle:horizontal {
@@ -170,14 +173,13 @@ QMenu::item:selected {
 }
 
 QComboBox {
-    background-color: #3a3a3a;
-    color: palette(text);
     border: 1px solid #999;
 }
 
 QComboBox QAbstractItemView {
     background-color: #2b2b2b;
 }
+
 QCheckBox:disabled {
   color: rgb(155, 155, 155);  /* lighter grey for better visibility */
 }

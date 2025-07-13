@@ -1291,6 +1291,7 @@ class MainWindow(QMainWindow):
 
         self.update_settings()
     def show_profile_manager(self):
+        xmlutils.update_roots() # make sure roots get updated in case state is timedout and file has changed
         self.profile_mgr_dialog = ProfileManagerDialog(self)
         self.profile_mgr_dialog.raise_()
         self.profile_mgr_dialog.activateWindow()

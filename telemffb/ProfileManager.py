@@ -26,7 +26,7 @@ from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot, QRegularExp
 from PyQt6.QtGui import QAction, QIcon, QRegularExpressionValidator
 from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeWidgetItem, QHeaderView, QStyle, QMenu, QFileDialog, QTreeWidget, \
     QInputDialog, QTableWidgetItem, QComboBox, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QHBoxLayout, QPushButton, \
-    QRadioButton, QButtonGroup, QApplication
+    QRadioButton, QButtonGroup, QApplication, QListWidget, QListWidgetItem, QTableWidget, QAbstractItemView
 
 import telemffb.globals as G
 from telemffb.ui.Ui_ProfileManagerDialog import Ui_ProfileManagerDialog
@@ -106,6 +106,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         placeholder.setFlags(placeholder.flags() & ~Qt.ItemFlag.ItemIsSelectable)
         self.treeWidget.addTopLevelItem(placeholder)
 
+
         self.thread = QThread()
         self.worker = TreePopulationWorker()
         self.worker.moveToThread(self.thread)
@@ -116,6 +117,13 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
+
+        # Save scroll position
+        self._last_scroll_pos = self.treeWidget.verticalScrollBar().value()
+
+        # Save selected item text (column 0), or use custom data if more precise identification is needed
+        selected_item = self.treeWidget.currentItem()
+        self._last_selected_text = selected_item.text(0) if selected_item else None
 
         # Start thread
         self.thread.start()
@@ -173,11 +181,38 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.sort_aircraft_items()
         self.prune_empty_tree_items(self.treeWidget)
         self.treeWidget.expandAll()
+
+        # Restore scroll position
+        if hasattr(self, '_last_scroll_pos'):
+            self.treeWidget.verticalScrollBar().setValue(self._last_scroll_pos)
+
+        # Restore selection
+        def find_item_by_text(text: str, parent_item: QTreeWidgetItem = None) -> QTreeWidgetItem | None:
+            if parent_item is None:
+                parent_item = self.treeWidget.invisibleRootItem()
+
+            for i in range(parent_item.childCount()):
+                child = parent_item.child(i)
+                if child.text(0) == text:
+                    return child
+                result = find_item_by_text(text, child)
+                if result:
+                    return result
+            return None
+
+        if getattr(self, '_last_selected_text', None):
+            item_to_select = find_item_by_text(self._last_selected_text)
+            if item_to_select:
+                self.treeWidget.setCurrentItem(item_to_select)
+                self.treeWidget.scrollToItem(item_to_select, QAbstractItemView.ScrollHint.PositionAtCenter)
+
         self.pb_Delete.setEnabled(False)
         self.pb_Export.setEnabled(False)
         self.pb_Clone.setEnabled(False)
         self.pb_Edit.setEnabled(False)
         self.pb_Activate.setEnabled(False)
+
+        self.pb_Export.clicked.connect(self.export_selected_profile)
 
 
     def open_context_menu(self, position):
@@ -235,11 +270,18 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
 
         if selected_item:
+            # any item(s) are selected
             if len(self.treeWidget.selectedItems()) > 1:
+                # more than one item is selcted
                 self.pb_Clone.setEnabled(False)
                 self.pb_Edit.setEnabled(False)
                 self.pb_Activate.setEnabled(False)
+                if any(self.get_metadata(item, "type") == "user" for item in selected_item):
+                    self.pb_Export.setEnabled(True)
+                else:
+                    self.pb_Export.setEnabled(False)
             else:
+                # only one item is selected
                 self.pb_Clone.setEnabled(True)
                 self.pb_Edit.setEnabled(True)
                 if self.get_metadata(selected_item[0], 'active'):
@@ -256,6 +298,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                     self.pb_Export.setEnabled(False)
                     self.pb_Edit.setEnabled(False)
         else:
+            # all items unsulected
             self.pb_Delete.setEnabled(False)
             self.pb_Export.setEnabled(False)
             self.pb_Edit.setEnabled(False)
@@ -481,54 +524,6 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
     def unmark_item_as_active(self, item, column=3):
         item.setData(column, Qt.ItemDataRole.CheckStateRole, Qt.CheckState.Unchecked)
 
-    # def populate_aircraft_tree(self, tree_widget, show_defaults=False):
-    #
-    #     # PRELOAD XMLs just once
-    #     defaults_root = xmlutils.try_parse(xmlutils.defaults_path).getroot()
-    #     users_root = xmlutils.try_parse(xmlutils.userconfig_path).getroot()
-    #
-    #     tree_widget.clear()
-    #     enabled_sims = self.get_enabled_sims()
-    #     for sim in xmlutils.get_sims():
-    #         sim_item = QTreeWidgetItem([sim])
-    #         sim_item.setFlags(sim_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-    #         sim_item.setData(0, Qt.ItemDataRole.UserRole, {"type": "sim", "sim_name": sim, "enabled": sim in enabled_sims})
-    #         tree_widget.addTopLevelItem(sim_item)
-    #
-    #         for cls in xmlutils.get_classes_for_sim(sim):
-    #             cls_item = QTreeWidgetItem([cls])
-    #             sim_item.setData(0, Qt.ItemDataRole.UserRole,{"type": "cls", "sim_name": sim, "enabled": sim in enabled_sims})
-    #             cls_item.setFlags(cls_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
-    #             sim_item.addChild(cls_item)
-    #
-    #             for aircraft, profile_name in xmlutils.read_user_models(sim, cls, default_only=True):
-    #                 active_profile = xmlutils.get_active_profile_for_model(sim, cls, aircraft)
-    #                 active = True if active_profile == 'default' else False
-    #                 ac_item = QTreeWidgetItem([f'{aircraft}', f"Default"])
-    #                 ac_item.setData(0, Qt.ItemDataRole.UserRole, {"type": "default", "sim_name": sim, "cls_name": cls, "aircraft_name": aircraft, "active": active, "enabled": sim in enabled_sims, "profile_name": "default"})
-    #                 cls_item.addChild(ac_item)
-    #                 if active:
-    #                     self.mark_item_as_active(ac_item)
-    #                     # Show active default only if others exist for the same aircraft
-    #                     other_profiles_exist = any(
-    #                         a == aircraft for a, _ in xmlutils.read_user_models(sim, cls)
-    #                     )
-    #                     ac_item.setHidden(not other_profiles_exist)
-    #                 else:
-    #                     ac_item.setHidden(not show_defaults)
-    #                 self.update_active_column_text(ac_item, active)
-    #
-    #             for aircraft, profile_name in xmlutils.read_user_models(sim, cls):
-    #                 active_profile = xmlutils.get_active_profile_for_model(sim, cls, aircraft)
-    #                 active = True if active_profile == profile_name else False
-    #                 ac_item = QTreeWidgetItem([f'{aircraft}', "User", f'{profile_name}'])
-    #                 ac_item.setData(0, Qt.ItemDataRole.UserRole, {"type": "user", "sim_name": sim, "cls_name": cls, "aircraft_name": aircraft, "active": active, "enabled": sim in enabled_sims, "profile_name": profile_name})
-    #                 cls_item.addChild(ac_item)
-    #                 if active:
-    #                     self.mark_item_as_active(ac_item)
-    #                 self.update_active_column_text(ac_item, active)
-    #     self.sort_aircraft_items()
-    #     self.prune_empty_tree_items(tree_widget)
 
     def get_metadata(self, item, property):
         metadata = item.data(0, Qt.ItemDataRole.UserRole)
@@ -800,6 +795,149 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                 parent.removeChild(item)
                 self.prune_empty_tree_items(self.treeWidget)
 
+    def export_multiple_profile_xmls(
+            self,
+            profiles,
+            export_sim,
+            export_class,
+            devices,
+            output_dir,
+            get_metadata
+    ):
+        device_types = devices + ["any"]
+        seen_global = set()
+
+        for item in profiles:
+            sim = get_metadata(item, "sim_name")
+            cls = get_metadata(item, "cls_name")
+            model = item.text(0)
+            profile = get_metadata(item, "profile_name")
+
+            root = ET.Element("TelemFFB")
+            seen = set()
+
+            # Export sim-level defaults
+            if export_sim:
+                for device in device_types:
+                    for el in xmlutils.get_sim_defaults(sim, device):
+                        key = ET.tostring(el)
+                        if key not in seen:
+                            root.append(el)
+                            seen.add(key)
+
+            # Export class-level defaults
+            if export_class:
+                for device in device_types:
+                    for el in xmlutils.get_class_defaults(sim, cls, device):
+                        key = ET.tostring(el)
+                        if key not in seen:
+                            root.append(el)
+                            seen.add(key)
+
+            # Export model overrides
+            for el in xmlutils.get_sc_override(model):
+                key = ET.tostring(el)
+                if key not in seen:
+                    root.append(el)
+                    seen.add(key)
+
+            # Export model type
+            type_el = xmlutils.get_model_type(sim, model, cls)
+            if type_el is not None:
+                key = ET.tostring(type_el)
+                if key not in seen:
+                    root.append(type_el)
+                    seen.add(key)
+
+            # Export model settings
+            for device in device_types:
+                for el in xmlutils.get_model_profile(sim, model, profile, device):
+                    key = ET.tostring(el)
+                    if key not in seen:
+                        root.append(el)
+                        seen.add(key)
+
+            tree = ET.ElementTree(root)
+            tree = xmlutils.consolidate_sort_and_write_userconfig(tree, ret=True)
+
+            filename = f"{sim}_{cls}_{model}_{profile}.xml"
+            filename = self.sanitize_filename(filename)
+            file_path = os.path.join(output_dir, filename)
+
+            tree.write(file_path, encoding="utf-8", xml_declaration=True)
+
+    def export_combined_profile_xml(
+            self,
+            profiles,
+            export_sim,
+            export_class,
+            devices,
+            output_path,
+            get_metadata
+    ):
+        root = ET.Element("TelemFFB")
+        seen = set()
+        device_types = devices + ["any"]
+
+        sims = set()
+        classes = set()
+        models = set()
+
+        for item in profiles:
+            sim = get_metadata(item, "sim_name")
+            cls = get_metadata(item, "cls_name")
+            model = item.text(0)
+            profile = get_metadata(item, "profile_name")
+
+
+            sims.add(sim)
+            classes.add((sim, cls))
+            models.add((sim, model, cls, profile))
+
+        if export_sim:
+            for sim in sims:
+                for device in device_types:
+                    for el in xmlutils.get_sim_defaults(sim, device):
+                        key = ET.tostring(el)
+                        if key not in seen:
+                            root.append(el)
+                            seen.add(key)
+
+        if export_class:
+            for sim, cls in classes:
+                for device in device_types:
+                    for el in xmlutils.get_class_defaults(sim, cls, device):
+                        key = ET.tostring(el)
+                        if key not in seen:
+                            root.append(el)
+                            seen.add(key)
+
+        for sim, model, cls, profile in models:
+            for el in xmlutils.get_sc_override(model):
+                key = ET.tostring(el)
+                if key not in seen:
+                    root.append(el)
+                    seen.add(key)
+
+            type_el = xmlutils.get_model_type(sim, model, cls)
+            if type_el is not None:
+                key = ET.tostring(type_el)
+                if key not in seen:
+                    root.append(type_el)
+                    seen.add(key)
+
+            for device in device_types:
+                for el in xmlutils.get_model_profile(sim, model, profile, device):
+                    key = ET.tostring(el)
+                    if key not in seen:
+                        root.append(el)
+                        seen.add(key)
+
+        tree = ET.ElementTree(root)
+        tree = xmlutils.consolidate_sort_and_write_userconfig(tree, ret=True)
+        tree.write(output_path, encoding="utf-8", xml_declaration=True)
+
+
     def export_selected_profile(self):
         """
         Export selected user profiles to XML.
@@ -809,105 +947,77 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         Skips invalid/default entries. Cleans file names.
         """
+        xmlutils.update_roots() # make sure roots get updated in case state is timedout and file has changed
+
         selected_items = self.treeWidget.selectedItems()
         if not selected_items:
             QMessageBox.warning(self, "No Selection", "Please select one or more profiles to export.")
             return
 
-        default_items = [i for i in selected_items if self.get_metadata(i, "type") == "default"]
-        if default_items:
-            names = "\n".join(f"{i.text(0)} (Default)" for i in default_items)
-            QMessageBox.warning(
-                self, "Default Profiles are not exportable",
-                f"These profiles are default and cannot be exported:\n\n{names}\n\nPlease de-select and try again."
-            )
-            return
-
-        valid_items = [i for i in selected_items if i.childCount() == 0 and self.get_metadata(i, "type") == "user"]
-        if not valid_items:
-            QMessageBox.warning(self, "No Valid Profiles", "No exportable user profiles selected.")
-            return
-
-        if len(valid_items) == 1:
-            # SINGLE export
-            item = valid_items[0]
-            meta = item.data(0, Qt.ItemDataRole.UserRole) or {}
-            sim, cls, model, profile = meta.get("sim_name"), meta.get("cls_name"), meta.get("aircraft_name"), meta.get(
-                "profile_name")
-
-            fname = f"{sim}_{cls}_{model}_{profile}"
-            fname = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', fname)
-
-            filename, _ = QFileDialog.getSaveFileName(self, "Export Profile", f"{fname}.xml", "XML Files (*.xml)")
-            if filename and self.export_profile_to_xml(filename, sim, cls, model, profile):
-                QMessageBox.information(self, "Export Complete", f"Profile exported to:\n{filename}")
-            return
-
-        # MULTI export - ask how to export
-        choice, ok = QInputDialog.getItem(
-            self,
-            "Export Type",
-            "How would you like to export the selected profiles?",
-            ["Single Combined File", "Multiple Individual Files"],
-            current=0,
-            editable=False
-        )
-
-        if not ok:
-            return  # User cancelled
-
-        if choice == "Single Combined File":
-            # Unified file logic
-            save_path, _ = QFileDialog.getSaveFileName(self, "Save Combined Export", "combined_export.xml",
-                                                       "XML Files (*.xml)")
-            if not save_path:
-                return
-
-            export_root = ET.Element("TelemFFB")
-            for item in valid_items:
-                meta = item.data(0, Qt.ItemDataRole.UserRole) or {}
-                sim = meta.get("sim_name")
-                cls = meta.get("cls_name")
-                model = meta.get("aircraft_name")
-                profile = meta.get("profile_name")
-                if not all([sim, cls, model, profile]):
-                    continue
-
-                entries = [
-                    elem for elem in xmlutils.try_parse(xmlutils.userconfig_path).getroot().findall("models")
-                    if elem.findtext("sim") == sim and elem.findtext("model") == model and elem.findtext(
-                        "profile") == profile
-                ]
-                for e in entries:
-                    export_root.append(ET.fromstring(ET.tostring(e)))
-
-            ET.ElementTree(export_root).write(save_path, encoding="utf-8", xml_declaration=True)
-            QMessageBox.information(self, "Export Complete", f"{len(valid_items)} profiles exported to:\n{save_path}")
-
+        dialog = ExportOptionsDialog(selected_items, self.get_metadata, self)
+        if dialog.exec():
+            filtered_items, export_sim, export_class, export_mode, selected_devices = dialog.get_data()
         else:
-            # Multiple individual files
-            folder = QFileDialog.getExistingDirectory(self, "Select Export Folder")
-            if not folder:
+            return
+
+        if not filtered_items:
+            QMessageBox.warning(self, "No Exportable Profiles",
+                                "All selected profiles are default and cannot be exported.")
+            return
+
+        if export_mode == "combined":
+            save_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Combined Profile Export",
+                "profile_export.xml",
+                "XML Files (*.xml)"
+            )
+            if not save_path:
+                return  # Cancelled
+
+            try:
+                self.export_combined_profile_xml(
+                    profiles=filtered_items,
+                    export_sim=export_sim,
+                    export_class=export_class,
+                    devices=selected_devices,
+                    output_path=save_path,
+                    get_metadata=self.get_metadata
+                )
+            except Exception as e:
+                QMessageBox.critical(self, "Export Failed", f"An error occurred while exporting:\n{e}")
                 return
 
-            exported = 0
-            for item in valid_items:
-                meta = item.data(0, Qt.ItemDataRole.UserRole) or {}
-                sim = meta.get("sim_name")
-                cls = meta.get("cls_name")
-                model = meta.get("aircraft_name")
-                profile = meta.get("profile_name")
-                if not all([sim, cls, model, profile]):
-                    continue
+            QMessageBox.information(self, "Export Complete",
+                                    f"{len(filtered_items)} profiles exported to:\n{save_path}")
+        else:
+            # Multi-file export
+            output_dir = QFileDialog.getExistingDirectory(
+                self,
+                "Select Export Folder",
+                "",
+                QFileDialog.Option.ShowDirsOnly
+            )
+            if not output_dir:
+                return  # Cancelled
 
-                fname = f"{sim}_{cls}_{model}_{profile}"
-                fname = re.sub(r'[<>:"/\\|?*\x00-\x1F]', '', fname) + ".xml"
-                full_path = os.path.join(folder, fname)
+            try:
+                self.export_multiple_profile_xmls(
+                    profiles=filtered_items,
+                    export_sim=export_sim,
+                    export_class=export_class,
+                    devices=selected_devices,
+                    output_dir=output_dir,
+                    get_metadata=self.get_metadata
+                )
+            except Exception as e:
+                QMessageBox.critical(self, "Export Failed", f"An error occurred during export:\n{e}")
+                return
 
-                if self.export_profile_to_xml(full_path, sim, cls, model, profile):
-                    exported += 1
+            QMessageBox.information(self, "Export Complete",
+                                    f"{len(filtered_items)} profiles exported to:\n{output_dir}")
 
-            QMessageBox.information(self, "Export Complete", f"Exported {exported} profile(s) to:\n{folder}")
+
 
     def export_profile_to_xml(self, path: str, sim: str, cls: str, model: str, profile: str) -> bool:
         """
@@ -955,15 +1065,20 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         logging.info(f"Exported {len(entries)} entries to: {path}")
         return True
 
-    @pyqtSlot()
+
     def import_profiles(self):
+        xmlutils.update_roots() # make sure roots get updated in case state is timedout and file has changed
+
         # Load and parse the import file
         filename, _ = QFileDialog.getOpenFileName(self, "Import Aircraft Profiles", "", "XML Files (*.xml)")
         if not filename:
             return
 
         tree = ET.parse(filename)
-        imported_elements = tree.getroot().findall("models")
+        imported_sim_defaults = tree.getroot().findall('simSettings')
+        imported_class_defaults = tree.getroot().findall('classSettings')
+        imported_sc_overrides = tree.getroot().findall('sc_overrides')
+        imported_models = tree.getroot().findall("models")
 
         # Gather unique keys from current config
         current_tree = xmlutils.try_parse(xmlutils.userconfig_path)
@@ -975,17 +1090,19 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         # Show import dialog
         dlg = ProfileImportDialog(self)
-        dlg.load_entries(imported_elements, existing_keys)
+        dlg.load_entries(imported_sim_defaults, imported_class_defaults, imported_sc_overrides, imported_models, existing_keys)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
-        actions = dlg.get_import_actions()
+        actions, devices = dlg.get_import_actions()
 
+        devices.add('any')
         # Apply actions
         for entry in actions:
             sim, model, _ = entry["key"]
             new_profile = entry["new_profile"]
             action = entry["action"]
+
             for elem in entry["elements"]:
                 elem.find("profile").text = new_profile  # Rename if applicable
 
@@ -993,14 +1110,46 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                 continue
 
             if action == "overwrite":
-                # Remove matching entries
                 for e in list(current_root.findall("models")):
-                    if (e.findtext("sim"), e.findtext("model"), e.findtext("profile")) == (sim, model, new_profile):
-                        current_root.remove(e)
+                    e_sim = e.findtext("sim")
+                    e_model = e.findtext("model")
+                    e_profile = e.findtext("profile")
+                    e_device = e.findtext("device")
+
+                    if (e_sim, e_model, e_profile) != (sim, model, new_profile):
+                        continue
+
+                    if e_device not in devices:
+                        continue  # Keep existing user entries for devices not being imported
+
+                    current_root.remove(e)
 
             # Add new elements
             for elem in entry["elements"]:
+                device = elem.findtext("device")
+                if device not in devices:
+                    continue  # skip if device was not selected in import dialog
                 current_root.append(elem)
+
+        # Add sc_overrides entries for imported models (with deduping)
+        for entry in actions:
+            model = entry["key"][1]
+            action = entry["action"]
+
+            if action == "skip":
+                continue  # Skip models that weren't imported
+
+            for sc_elem in imported_sc_overrides:
+                if sc_elem.findtext("model") != model:
+                    continue
+
+                # De-dupe: remove any existing entry with same model + name
+                sc_name = sc_elem.findtext("name")
+                for existing in list(current_root.findall("sc_overrides")):
+                    if existing.findtext("model") == model and existing.findtext("name") == sc_name:
+                        current_root.remove(existing)
+
+                current_root.append(sc_elem)
 
         # Save updated XML
         xmlutils.consolidate_sort_and_write_userconfig(current_tree)
@@ -1070,12 +1219,15 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         if make_active:
             xmlutils.update_active_profile_entry(sim, cls, model, new_profile)
-            self.make_active_profile(item)  # UI toggle
+            # self.make_active_profile(item)  # UI toggle
 
         self.start_tree_population()
         QApplication.processEvents()
         QMessageBox.information(self, "Cloned", f"Profile '{old_profile}' cloned to '{new_profile}'")
 
+    def sanitize_filename(self, name: str) -> str:
+        """Remove illegal filename characters for Windows."""
+        return re.sub(r'[<>:"/\\|?*]', '', name)
 
 class NewProfileDialog(QDialog):
     def __init__(self, parent=None, type=None, sim=None, cls=None, model=None, profile=None):
@@ -1190,6 +1342,150 @@ class NewProfileDialog(QDialog):
         return profile_name, make_active, clone_existing, to_clone
 
 
+class ExportOptionsDialog(QDialog):
+    def __init__(self, selected_items, get_metadata, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Export Options")
+        self.setMinimumWidth(400)
+
+        self.original_items = selected_items
+        self.get_metadata = get_metadata
+        self.valid_items = [i for i in selected_items if get_metadata(i, "type") != "default"]
+        self.removed_defaults = [i for i in selected_items if get_metadata(i, "type") == "default"]
+
+        layout = QVBoxLayout(self)
+
+        # Warning section for excluded default items
+        if self.removed_defaults:
+            warning_label = QLabel(
+                "The following default profiles cannot be exported and will be excluded:"
+            )
+            warning_label.setStyleSheet("""
+                QLabel {
+                padding-left: 10px;
+                padding-top: 2px;
+                color: #dddddd; /* Softer red for dark mode */
+                background-color: rgba(255, 50, 50, 30); /* Light red background tint */
+                border: 1px solid #c33;
+                border-radius: 4px;
+            }
+            """)
+            layout.addWidget(warning_label)
+
+            table_widget = QTableWidget()
+            table_widget.setSortingEnabled(True)
+
+            table_widget.setColumnCount(4)
+            table_widget.setHorizontalHeaderLabels(["Aircraft", "Sim", "Class", "Profile"])
+            table_widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            table_widget.setRowCount(len(self.removed_defaults))
+            table_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+            table_widget.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+            table_widget.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            table_widget.verticalHeader().setVisible(False)
+            table_widget.horizontalHeader().setStretchLastSection(True)
+
+            for row, item in enumerate(self.removed_defaults):
+                table_widget.setItem(row, 0, QTableWidgetItem(item.text(0)))
+                table_widget.setItem(row, 1, QTableWidgetItem(get_metadata(item, "sim_name") or "—"))
+                table_widget.setItem(row, 2, QTableWidgetItem(get_metadata(item, "cls_name") or "—"))
+                table_widget.setItem(row, 3, QTableWidgetItem(get_metadata(item, "profile_name") or "—"))
+
+            table_widget.resizeColumnsToContents()
+            layout.addWidget(table_widget)
+
+        if self.valid_items:
+            included_label = QLabel("The following profiles will be exported:")
+            included_label.setStyleSheet("""
+                font-weight: bold;
+                margin-top: 8px;
+            """)
+            layout.addWidget(included_label)
+
+            included_table = QTableWidget()
+            included_table.setSortingEnabled(True)
+            included_table.setColumnCount(4)
+            included_table.setHorizontalHeaderLabels(["Aircraft", "Sim", "Class", "Profile"])
+            included_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            included_table.setRowCount(len(self.valid_items))
+            included_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+            included_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+            included_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            included_table.verticalHeader().setVisible(False)
+
+            for row, item in enumerate(self.valid_items):
+                included_table.setItem(row, 0, QTableWidgetItem(item.text(0)))
+                included_table.setItem(row, 1, QTableWidgetItem(get_metadata(item, "sim_name") or "—"))
+                included_table.setItem(row, 2, QTableWidgetItem(get_metadata(item, "cls_name") or "—"))
+                included_table.setItem(row, 3, QTableWidgetItem(get_metadata(item, "profile_name") or "—"))
+
+            included_table.resizeColumnsToContents()
+            layout.addWidget(included_table)
+
+
+        # Checkboxes
+        layout.addWidget(QLabel("Override Options:"))
+        self.checkbox_sim_defaults = QCheckBox("Include Applicable Default Sim Overrides")
+        self.checkbox_sim_defaults.setChecked(True)
+        self.checkbox_class_defaults = QCheckBox("Include Applicable Default Class Overrides")
+        self.checkbox_class_defaults.setChecked(True)
+        layout.addWidget(self.checkbox_sim_defaults)
+        layout.addWidget(self.checkbox_class_defaults)
+
+        # Radio Buttons for file export mode
+        layout.addWidget(QLabel("Export Mode:"))
+        self.radio_single_file = QRadioButton("Single Combined File")
+        self.radio_multiple_files = QRadioButton("Multiple Files (per aircraft)")
+
+        self.radio_group = QButtonGroup(self)
+        self.radio_group.addButton(self.radio_single_file)
+        self.radio_group.addButton(self.radio_multiple_files)
+        self.radio_single_file.setChecked(True)
+        if len(self.valid_items) == 1:
+            self.radio_multiple_files.setEnabled(False)
+
+        layout.addWidget(self.radio_single_file)
+        layout.addWidget(self.radio_multiple_files)
+
+        # Add device checkboxes if any launched instances are found
+        self.device_checkboxes = []
+        device_keys = list(set(G.launched_instances.keys()) | {G.device_type})
+        if G.launched_instances.keys():
+            layout.addWidget(QLabel("Include Settings For Devices (All active devices shown):"))
+            for key in sorted(device_keys):
+                checkbox = QCheckBox(key.capitalize())
+                checkbox.setChecked(True)
+                layout.addWidget(checkbox)
+                self.device_checkboxes.append((key, checkbox))
+        else:
+            self.device_checkboxes = []  # no checkboxes to show
+
+        # OK / Cancel Buttons
+        button_layout = QHBoxLayout()
+        self.ok_button = QPushButton("OK")
+        self.cancel_button = QPushButton("Cancel")
+        button_layout.addWidget(self.ok_button)
+        button_layout.addWidget(self.cancel_button)
+        layout.addLayout(button_layout)
+
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+
+    def get_data(self):
+        """
+        Returns:
+            tuple[list, bool, bool, str, list[str]]: (filtered_items, export_sim_defaults, export_class_defaults, export_mode, selected_device_keys)
+        """
+        export_sim = self.checkbox_sim_defaults.isChecked()
+        export_class = self.checkbox_class_defaults.isChecked()
+        export_mode = 'combined' if self.radio_single_file.isChecked() else 'multiple'
+
+        if self.device_checkboxes:
+            selected_devices = [key for key, cb in self.device_checkboxes if cb.isChecked()]
+        else:
+            selected_devices = [G.device_type]
+
+        return self.valid_items, export_sim, export_class, export_mode, selected_devices
 
 
 class TreePopulationWorker(QObject):

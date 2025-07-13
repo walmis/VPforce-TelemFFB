@@ -134,6 +134,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
     def init_state(self):
         self.pb_next.setEnabled(False)
         self.pb_previous.setEnabled(False)
+        self.pb_previous.setVisible(False)
         self.sim_list = self.get_sims()
         self.cb_sim.clear()
         self.cb_sim.addItem('')
@@ -169,13 +170,14 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             - Sim selection (Page 0)
             - Class selection (Page 1)
             - Aircraft configuration (Page 2)
-            - Profile name (Page 3)
+
             """
         match page_index:
             case 0:
                 # Sim Page
                 self.pb_finish.setEnabled(False)
                 self.pb_previous.setEnabled(False)
+                self.pb_previous.setVisible(False)
                 if self.cb_sim.currentText() == '':
                     self.pb_next.setEnabled(False)
                 else:
@@ -184,6 +186,9 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
                 # Class Page
                 self.pb_finish.setEnabled(False)
                 self.pb_previous.setEnabled(True)
+                self.pb_previous.setVisible(True)
+                self.pb_next.setVisible(True)
+
                 sim_name = self.cb_sim.currentText()
                 lbl_txt = self.lbl_class_page.text()
                 updated = lbl_txt.replace("&lt;sim&gt;", sim_name)
@@ -202,6 +207,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
                     self.tb_manual_full_name.setCursorPosition(len(self.tb_manual_full_name.text()))
                 self.pb_previous.setEnabled(True)
                 self.pb_next.setEnabled(False)
+                self.pb_next.setVisible(False)
 
                 # check if selected class name requires cloning from a default profile
                 cls_name = self.internal_class_names.get(self.cb_class.currentText())
@@ -214,6 +220,8 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
                 if self.mandatory_clone:
                     color = "rgba(255, 85, 85, 0.3)" if self.cb_clone.currentText() == '' else ""
                     self.cb_clone.setStyleSheet(f"background-color: {color};")
+
+                self.pb_next.setEnabled(False)
 
                 self.validate_ac_page_entries()
             case 3:  # Profile Name Page
@@ -239,13 +247,12 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
 
         if self.cb_clone.currentData():
             clone_name, clone_profile = self.cb_clone.currentData()
-            xmlutils.clone_whole_model(self.selected_sim, clone_name, match_string, clone_profile, self.tb_profileName.text())
-            xmlutils.update_active_profile_entry(sim, class_name, match_string, self.tb_profileName.text())
+            xmlutils.clone_whole_model(self.selected_sim, clone_name, match_string, clone_profile, "User Default")
+            xmlutils.update_active_profile_entry(sim, class_name, match_string, "User Default")
             # xmlutils.clone_profile_entry(self.selected_sim, self.selected_class, clone_name, clone_profile, match_string, self.tb_profileName.text())
         else:
-            xmlutils.add_new_model(sim, class_name, match_string)
-            xmlutils.add_new_profile(sim, class_name, match_string, profile_name=self.tb_profileName.text())
-            xmlutils.update_active_profile_entry(sim, class_name, match_string, self.tb_profileName.text())
+            xmlutils.add_new_model(sim, class_name, match_string, profile_name="User Default")
+            xmlutils.update_active_profile_entry(sim, class_name, match_string, "User Default")
         self.accept()
 
     def sim_changed(self, sim):
@@ -351,9 +358,9 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         else:
             mandatory_satisfied = True
         if valid_match and mandatory_satisfied:
-            self.pb_next.setEnabled(True)
+            self.pb_finish.setEnabled(True)
         else:
-            self.pb_next.setEnabled(False)
+            self.pb_finish.setEnabled(False)
 
 
 

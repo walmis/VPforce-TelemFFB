@@ -410,14 +410,14 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
             - Prints a message if a duplicate entry is detected and skipped.
         """
     mprint(f"write_models_to_xml  {the_sim}, {the_model}, {the_value}, {setting_name}")
-    dbprint("blue", f"[WRITE ENTRY] sim={the_sim}, model={the_model}, profile_name={profile_name}")
 
     # Use preloaded global XML tree and root
     tree = auto_user_tree
     root = auto_user_root
 
-    if the_model == '':
-        return  # Do not allow writes without a model name
+    if not the_model:
+        logging.error("Invalid model name provided")
+        raise ValueError(f"Invalid model name >{the_model}<")
 
     # Use global device fallback if none provided
     if the_device == '':
@@ -445,7 +445,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
             add_new_profile(the_sim, cls, the_model, profile_name='Auto User')
 
         # Set active profile and override profile name for the write
-        update_active_profile_entry(sim=the_sim, cls=cls, model=the_model, active_profile="Auto User")
+        update_active_profile_entry(sim=the_sim, cls=cls, model=the_model, new_profile="Auto User")
         profile_name = "Auto User"
 
     # Build XPath query string to locate existing <models> entry
@@ -652,23 +652,36 @@ def clone_profile_entry(sim, cls, src_model, src_profile, dst_profile):
     """
 
     if src_profile == 'default':
-        # we are cloning a default profile, so we need to create a placeholder entry in the userconfig.xml
+        # we are cloning a default profile, so we only need to create a placeholder entry for the profile in the userconfig_v2.xml
         def_entry = auto_defaults_root.find(f'models[sim="{sim}"][value="{cls}"][model="{src_model}"][name="type"]')
         if def_entry is not None:
             cloned = ET.fromstring(ET.tostring(def_entry)) # Deep clone the element
-            cloned.find('name').text  = "profile"
-            ET.SubElement(cloned, 'profile').text = dst_profile
+            cloned.find('name').text  = "profile"  # Change the type parameter to 'profile'
+            ET.SubElement(cloned, 'profile').text = dst_profile  #  Add the profile attribute with the profile name
             auto_user_root.append(cloned)
             logging.info(f"Cloned profile entry for {sim} {cls} {src_model} from default to {dst_profile}")
         else:
             logging.error(f"No default entry found for {sim} {cls} {src_model} in defaults.xml while attempting to clone {src_profile} to {dst_profile}")
     else:
-        # we are cloning a user profile or user created model, copy the entries
+        # we are cloning a user profile or user created model, determine which
     # Search for an exact match in existing user profiles
         for entry in auto_user_root.findall("models"):
-            if (entry.findtext("sim"), entry.findtext("model"), entry.findtext("profile")) == (sim, src_model, src_profile):
+            if (entry.findtext("sim"), entry.findtext("model"), entry.findtext("profile")) == (sim, src_model,
+                                                                                               src_profile):
                 cloned = ET.fromstring(ET.tostring(entry))  # Deep clone
-                cloned.find("profile").text = dst_profile
+
+                # Change <name>type</name> to <name>profile</name> if applicable
+                name_elem = cloned.find("name")
+                if name_elem is not None and name_elem.text == "type":
+                    name_elem.text = "profile"
+
+                # Set the destination profile
+                profile_elem = cloned.find("profile")
+                if profile_elem is not None:
+                    profile_elem.text = dst_profile
+                else:
+                    ET.SubElement(cloned, "profile").text = dst_profile
+
                 auto_user_root.append(cloned)
 
     consolidate_sort_and_write_userconfig(auto_user_tree)
@@ -705,27 +718,16 @@ def clone_whole_model(the_sim, old_pattern, new_pattern, old_profile, new_profil
     user_model_data, usr_model_pattern = read_models_data("user", the_sim, old_pattern, alldevices=True, user=True, profile=old_profile)
     sc_overrides = read_sc_overrides(old_pattern)
     for item in user_model_data:
+        # add all user model data to the model data to capture all settings
         model_data.append(item)
     for item in model_data:
         if item['name'] == 'profile':
-            # we will be writing our own 'profile' value, so skip the existing models if it exists
+            # We're creating a new user model which has a 'type' rather than 'profile'
             continue
         if item['unit'] is None:
             item['unit'] = ''
 
-        if item['name'] == 'type':
-            # we want to include a type entry, but it doesn't get a profile name
-            write_models_to_xml(
-                the_sim=the_sim,
-                the_model=new_pattern,
-                the_value=item['value'],
-                setting_name=item['name'],
-                unit=item['unit'],
-                the_device=item['device']
-            )
-            # howerver, we want a name="profile" entry for the new model profile name, so we will change the value
-            # of "name" from "type" to "profile" and let the loop write it
-            item['name'] = 'profile'
+
         write_models_to_xml(
             the_sim=the_sim,
             the_model=new_pattern,
@@ -970,7 +972,7 @@ def erase_sim_from_xml(the_sim, setting_name, the_device=''):
         logging.info(f"Removed <simSettings> element with values: sim={the_sim}, device={the_device}, name={setting_name}")
 
 
-def update_active_profile_entry(sim: str, cls: str, model: str, active_profile: str):
+def update_active_profile_entry(sim: str, cls: str, model: str, new_profile: str):
     # utils.debug_caller_args('green')
     """
     Update or create the <profileMappings> entry in the user configuration XML to reflect the active profile
@@ -986,7 +988,7 @@ def update_active_profile_entry(sim: str, cls: str, model: str, active_profile: 
         sim (str): The name of the simulator (e.g., "DCS", "MSFS").
         cls (str): The classification of the aircraft (e.g., "JetAircraft", "PropellerAircraft").
         model (str): The unique aircraft model identifier (e.g., "FA-18C_hornet").
-        active_profile (str): The profile name to mark as active for this aircraft.
+        new_profile (str): The profile name to mark as active for this aircraft.
 
     Returns:
         None
@@ -996,28 +998,27 @@ def update_active_profile_entry(sim: str, cls: str, model: str, active_profile: 
     root = auto_user_root
 
     # First see if the incoming profile name is already set for the sim/cls/model
-    match = root.find(f'profileMappings[model="{model}"][sim="{sim}"][cls="{cls}"][active_profile="{active_profile}"]')
-    if match:
-        #print("!!!!  MATCHES - NOT WRITING")
-        return
-
-    # Try to find an existing <profileMappings> entry matching all criteria
-    entry = root.find(f'profileMappings[model="{model}"][sim="{sim}"][cls="{cls}"]')
-
-    if entry is None:
+    element = root.find(f'profileMappings[sim="{sim}"][cls="{cls}"][model="{model}"]')
+    if element is not None:
+        current_profile = element.findtext('active_profile')
+        if current_profile == new_profile:
+            # No modifications required
+            return
+        else:
+            # Update the active_profile value
+            profile_node = element.find('active_profile')
+            if profile_node is not None:
+                profile_node.text = new_profile
+            else:
+                # Fallback if the node somehow doesn't exist
+                ET.SubElement(element, 'active_profile').text = new_profile
+    else:
         # Entry does not exist: create a new one with full structure
         entry = ET.SubElement(root, "profileMappings")
         ET.SubElement(entry, "model").text = model
         ET.SubElement(entry, "sim").text = sim
         ET.SubElement(entry, "cls").text = cls
-        ET.SubElement(entry, "active_profile").text = active_profile
-    else:
-        # Entry exists: update the active_profile sub-element
-        ap_elem = entry.find("active_profile")
-        if ap_elem is None:
-            ET.SubElement(entry, "active_profile").text = active_profile
-        else:
-            ap_elem.text = active_profile
+        ET.SubElement(entry, "active_profile").text = new_profile
 
     # Save the modified XML back to the file
     consolidate_sort_and_write_userconfig(tree)
@@ -1856,7 +1857,27 @@ def read_prereqs():
 #############################################################
 
 
-def add_new_model(sim, class_name, match_string):
+def get_sim_defaults(sim: str, dev_type: str):
+    xpath = f'simSettings[sim="{sim}"][device="{dev_type}"]'
+    return auto_user_root.findall(xpath)
+
+def get_class_defaults(sim: str, cls: str, dev_type: str):
+    xpath = f'classSettings[sim="{sim}"][type="{cls}"][device="{dev_type}"]'
+    return auto_user_root.findall(xpath)
+
+def get_model_profile(sim: str, model: str, profile: str, dev_type: str):
+    xpath = f'models[sim="{sim}"][model="{model}"][profile="{profile}"][device="{dev_type}"]'
+    return auto_user_root.findall(xpath)
+
+def get_sc_override(model: str):
+    xpath = f'sc_overrides[model="{model}"]'
+    return auto_user_root.findall(xpath)
+
+def get_model_type(sim: str, model: str, cls: str):
+    xpath = f'models[sim="{sim}"][model="{model}"][value="{cls}"][name="type"]'
+    return auto_user_root.find(xpath)
+
+def add_new_model(sim, class_name, match_string, profile_name):
     """
     Creates a new model entry in the user XML configuration.
 
@@ -1868,7 +1889,7 @@ def add_new_model(sim, class_name, match_string):
         class_name (str): Class/type name associated with the model.
         match_string (str): Wildcard or exact model identifier used to match aircraft names.
     """
-    write_models_to_xml(sim, match_string, class_name, the_device='any', setting_name='type')
+    write_models_to_xml(sim, match_string, class_name, the_device='any', setting_name='type', profile_name=profile_name)
 
 
 def add_new_profile(sim, class_name, match_string, profile_name):
@@ -2257,7 +2278,7 @@ def old_write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''
             add_new_profile(the_sim, cls, the_model, profile_name='Auto User')
 
         # set the active profile to "Auto User" so it will automatically load on the settings page
-        update_active_profile_entry(sim=the_sim, cls=cls, model=the_model, active_profile="Auto User")
+        update_active_profile_entry(sim=the_sim, cls=cls, model=the_model, new_profile="Auto User")
         # set the profile name to "Auto User" so the setting gets written to that profile
         profile_name = "Auto User"
 
