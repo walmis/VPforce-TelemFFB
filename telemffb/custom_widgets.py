@@ -225,10 +225,19 @@ class NoWheelSlider(QSlider):
             handle_x = self.style().sliderPositionFromValue(
                 self.minimum(), self.maximum(), self.value(), self.width() - self.handle_width)
             handle_rect.moveLeft(handle_x)
+
+            # Vertical alignment fix: center handle on groove
+            groove_y = (self.height() - 10) / 2  # groove_height is 10
+            handle_rect.moveTop(int(groove_y + 10 / 2 - self.handle_height / 2))
+
         else:
             handle_y = self.style().sliderPositionFromValue(
                 self.minimum(), self.maximum(), self.value(), self.height() - self.handle_height)
             handle_rect.moveTop(handle_y)
+
+            # Horizontal alignment fix for vertical slider
+            groove_x = (self.width() - 8) / 2  # groove_width is 8
+            handle_rect.moveLeft(int(groove_x + 8 / 2 - self.handle_width / 2))
 
         # Draw custom gradient background
         # Shift center to upper-left
@@ -333,7 +342,6 @@ class NoWheelNumberSlider(NoWheelSlider):
         self.update()  # Ensure the slider is repainted to show the new text
 
     def paintEvent(self, event):
-        # super(NoWheelNumberSlider, self).paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -379,10 +387,21 @@ class NoWheelNumberSlider(NoWheelSlider):
             handle_x = self.style().sliderPositionFromValue(
                 self.minimum(), self.maximum(), self.value(), self.width() - self.handle_width)
             handle_rect.moveLeft(handle_x)
+
+            # Center handle vertically on groove
+            groove_height = 10
+            groove_y = (self.height() - groove_height) / 2
+            handle_rect.moveTop(int(groove_y + groove_height / 2 - self.handle_height / 2))
+
         else:
             handle_y = self.style().sliderPositionFromValue(
                 self.minimum(), self.maximum(), self.value(), self.height() - self.handle_height)
             handle_rect.moveTop(handle_y)
+
+            # Center handle horizontally on groove
+            groove_width = 8
+            groove_x = (self.width() - groove_width) / 2
+            handle_rect.moveLeft(int(groove_x + groove_width / 2 - self.handle_width / 2))
 
         # Draw custom gradient background
         center = handle_rect.center()
