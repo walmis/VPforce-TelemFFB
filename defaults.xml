@@ -64,7 +64,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
-		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,Helicopter,HPGHelicopter,GliderAircraft,SASHelicopter</validvalues>
+		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,GliderAircraft,Helicopter,HPGHelicopter,SASHelicopter,FlyInsideHelicopter</validvalues>
 	</defaults>
 	<defaults>
 		<datatype>list</datatype>
@@ -4226,6 +4226,54 @@
 		<validvalues>0,100</validvalues>
 		<value>0.2</value>
 	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Vibration</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>42000</order>
+		<name>FI_vibration_enable</name>
+		<displayname>Vibration from Telemetry</displayname>
+		<prereq>mechanical_group</prereq>
+		<info>Helicopter Vibration (from external flight model)</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<datatype>float</datatype>
+		<grouping>Vibration</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>42000.1</order>
+		<name>FI_vibration_intensity</name>
+		<displayname>Vibration Intensity</displayname>
+		<prereq>FI_vibration_enable</prereq>
+		<info>Intensity of Helicopter Vibration (from external flight model)&lt;br&gt;Max intensity controlled by Constant slider in Configurator</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<effecttype>constant</effecttype>
+		<datatype>d_float</datatype>
+		<grouping>Vibration</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>42000.2</order>
+		<name>FI_vibration_expo</name>
+		<displayname>Vibration Expo</displayname>
+		<prereq>FI_vibration_enable</prereq>
+		<info>&lt;html&gt;&lt;body&gt;Force exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<sliderfactor>.2</sliderfactor>
+		<validvalues>-3,5</validvalues>
+	</defaults>
 	<defaults><order>49999</order></defaults>
 	<defaults><order>49999</order></defaults>
 	<defaults>
@@ -4927,6 +4975,27 @@
 		<model>FlyInside - B206.*</model>
 		<var>L:Aircraft.Hydraulics.Enabled</var>
 		<sc_unit>bool</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibX</name>
+		<model>FlyInside B47.*</model>
+		<var>L:Aircraft.Vibrations.X</var>
+		<sc_unit>number</sc_unit>
+		<scale>1000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibY</name>
+		<model>FlyInside B47.*</model>
+		<var>L:Aircraft.Vibrations.Y</var>
+		<sc_unit>number</sc_unit>
+		<scale>10000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibZ</name>
+		<model>FlyInside B47.*</model>
+		<var>L:Aircraft.Vibrations.Z</var>
+		<sc_unit>number</sc_unit>
+		<scale>10000</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>EngRPM</name>
@@ -5729,6 +5798,18 @@
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>aoa_buffeting_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>aoa_effect_enabled</name>
 			<type>GliderAircraft</type>
 			<value>false</value>
@@ -5998,6 +6079,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>engine_jet_rumble_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>engine_jet_rumble_enabled</name>
 			<type>Helicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
@@ -6042,6 +6129,12 @@
 			<name>engine_rotor_rumble_enabled</name>
 			<type>SASHelicopter</type>
 			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>etl_effect_enable</name>
+			<type>!FlyInsideHelicopter</type>
 			<sim>MSFS</sim>
 			<device>any</device>
 		</classdefaults_MSFS>
@@ -6295,6 +6388,18 @@
 			<value>0</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>gear_buffet_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>gear_motion_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>hands_off_deadzone</name>
@@ -6918,6 +7023,18 @@
 			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>runway_rumble_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>rotor_blade_count</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>rotor_blade_count</name>
 			<type>Helicopter</type>
 			<value>2</value>
@@ -6963,6 +7080,7 @@
 			<name>rudder_expo</name>
 			<type>TurbopropAircraft</type>
 			<value>0</value>
+			<unit>s</unit>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
@@ -6984,6 +7102,7 @@
 			<name>rudder_spring_gain</name>
 			<type>GliderAircraft</type>
 			<value>0.25</value>
+			<unit>s</unit>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
@@ -7417,6 +7536,12 @@
 			<device>trimwheel</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>touchdown_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>type</name>
 			<type>GliderAircraft</type>
 			<value>GliderAircraft</value>
@@ -7586,6 +7711,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>vrs_effect_enable</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>vrs_effect_enable</name>
 			<type>HPGHelicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
@@ -7609,6 +7740,27 @@
 			<name>vrs_effect_intensity</name>
 			<type>SASHelicopter</type>
 			<value>0.12</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>FI_vibration_enable</name>
+			<type>FlyInsideHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>FI_vibration_intensity</name>
+			<type>FlyInsideHelicopter</type>
+			<value>0.5</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>FI_vibration_expo</name>
+			<type>FlyInsideHelicopter</type>
+			<value>0.1</value>
 			<sim>MSFS</sim>
 			<device>any</device>
 		</classdefaults_MSFS>
@@ -15308,7 +15460,7 @@
 	<models>
 		<name>type</name>
 		<model>FlyInside B206.*</model>
-		<value>Helicopter</value>
+		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
@@ -15381,7 +15533,7 @@
 	<models>
 		<name>type</name>
 		<model>FlyInside B47.*</model>
-		<value>Helicopter</value>
+		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -16752,6 +16904,10 @@
 	<classes>
 		<sim>MSFS</sim>
 		<class_name>SASHelicopter</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>FlyInsideHelicopter</class_name>
 	</classes>
 	<classes>
 		<sim>XPLANE</sim>

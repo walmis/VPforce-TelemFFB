@@ -247,6 +247,7 @@ class EffectTranslator:
         "etlX": ["ETL Shaking", "etl_effect_intensity"],
         "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
         "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
+        "FI_vibration": ["FI Vibration", "FI_vibration_intensity"],
         "friction": ["Friction Override", "friction_force"],
         "boommovement" : ["Fuel Boom/Door","fuelboom_motion_intensity"],
         "gearbuffet": ["Gear Drag Buffeting", "gear_buffet_intensity"],

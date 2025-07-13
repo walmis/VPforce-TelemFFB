@@ -65,12 +65,13 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         "JetAircraft": "Jet Powered Aircraft",
         "GliderAircraft": "Glider",
         "Helicopter": "Helicopter",
+        "FlyInsideHelicopter": "FlyInside Helicopter",
         "HPGHelicopter": "Hype Group Airbus Helicopter",
         "SASHelicopter": "SimFocus SAS Helicopter"
     }
     internal_class_names = {v: k for k, v in friendly_class_names.items()}  # Build reverse lookup table
 
-    mandatory_clone_types = ("HPGHelicopter", "SASHelicopter") # Aircraft types with special treatment that must be cloned from a default profile
+    mandatory_clone_types = ("HPGHelicopter", "SASHelicopter", "FlyInsideHelicopter") # Aircraft types with special treatment that must be cloned from a default profile
     mandatory_clone: bool=False
     aircraft_list: list=None
     class_list: list=None
