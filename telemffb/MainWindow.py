@@ -536,53 +536,63 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.banner_label)  # Add it above the combobox row
 
         # First row layout (existing widgets)
-        top_row = QHBoxLayout()
-        offline_sim_lbl = QLabel('Sim:')
-        # offline_sim_lbl.setMaximumWidth(30)
-        offline_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        top_row = QGridLayout()
 
-        self.offline_sim = QComboBox()
-        # self.offline_sim.setMaximumWidth(70)
-        sims = [''] + xmlutils.get_sims()
-        self.offline_sim.addItems(sims)
-        self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
-        # self.offline_sim.setMinimumWidth(self.offline_sim.width() + 5)
+        # --- Labels ---
+        offline_sim_lbl = QLabel('Sim:')
+        offline_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         offline_class_lbl = QLabel('Class:')
-        # offline_class_lbl.setMaximumWidth(40)
-        offline_class_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-
-        self.offline_class = QComboBox()
-        # self.offline_class.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.offline_class.currentTextChanged.connect(self.offline_class_changed)
+        offline_class_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         offline_name_lbl = QLabel('Aircraft Name:')
-        # offline_name_lbl.setMaximumWidth(90)
-        offline_name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
+        offline_name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        offline_profile_lbl = QLabel('Profile:')
+        offline_profile_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        top_row.addWidget(offline_sim_lbl, 0, 0)
+        top_row.addWidget(offline_class_lbl, 0, 1)
+        top_row.addWidget(offline_name_lbl, 0, 2)
+        top_row.addWidget(offline_profile_lbl, 0, 3)
+
+        # --- ComboBoxes ---
+        self.offline_sim = QComboBox()
+        self.offline_sim.addItems([''] + xmlutils.get_sims())
+        self.offline_sim.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.offline_sim.setMinimumContentsLength(10)
+        self.offline_sim.setEditable(False)
+        self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
+
+        self.offline_class = QComboBox()
+        self.offline_class.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.offline_class.setMinimumContentsLength(15)
+        self.offline_class.setEditable(False)
+        self.offline_class.currentTextChanged.connect(self.offline_class_changed)
 
         self.offline_name = QComboBox()
-        # self.offline_name.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        # self.offline_name.setMinimumWidth(80)
+        self.offline_name.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.offline_name.setMinimumContentsLength(20)
         self.offline_name.setEditable(False)
         self.offline_name.currentTextChanged.connect(self.offline_aircraft_changed)
 
-        offline_profile_lbl = QLabel('Profile:')
-        offline_profile_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-
         self.offline_profile = QComboBox()
-
+        self.offline_profile.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.offline_profile.setMinimumContentsLength(15)
         self.offline_profile.setEditable(False)
         self.offline_profile.currentTextChanged.connect(self.offline_profile_changed)
 
-        top_row.addWidget(offline_sim_lbl)
-        top_row.addWidget(self.offline_sim)
-        top_row.addWidget(offline_class_lbl)
-        top_row.addWidget(self.offline_class)
-        top_row.addWidget(offline_name_lbl)
-        top_row.addWidget(self.offline_name)
-        top_row.addWidget(offline_profile_lbl)
-        top_row.addWidget(self.offline_profile)
-        top_row.addStretch()
+        # --- Add widgets to layout ---
+        top_row.addWidget(self.offline_sim, 1, 0)
+        top_row.addWidget(self.offline_class, 1, 1)
+        top_row.addWidget(self.offline_name, 1, 2)
+        top_row.addWidget(self.offline_profile, 1, 3)
+
+        # --- Column stretch ratios (1:2:4:2) ---
+        top_row.setColumnStretch(0, 1)
+        top_row.setColumnStretch(1, 2)
+        top_row.setColumnStretch(2, 4)
+        top_row.setColumnStretch(3, 2)
 
         # Second row layout (button on the left)
         bottom_row = QHBoxLayout()
@@ -1452,6 +1462,7 @@ class MainWindow(QMainWindow):
         self.offline_class.clear()  #clear class field
         self.offline_class.addItem('')
         self.offline_name.clear()
+        #self.offline_name.setMaximumWidth(200)
         self.offline_profile.clear()
         classes = xmlutils.get_classes_for_sim(sim)  # get classes based on chosen sim
 
