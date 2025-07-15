@@ -45,6 +45,9 @@ from pprint import pprint
 from time import sleep
 from typing import Dict, List
 
+from telemffb.util.TurbulenceModulator import TurbulenceModulator
+from telemffb.util.Vector import Vector, Vector2D
+
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import (FFBReport_Input, FFBReport_SetCondition,
                                    HapticEffect)
@@ -67,7 +70,7 @@ EFFECT_SINE = 4
 EFFECT_TRIANGLE = 5
 EFFECT_SAWTOOTHUP = 6
 EFFECT_SAWTOOTHDOWN = 7
-turbulence_modulator = utils.TurbulenceModulator()
+turbulence_modulator = TurbulenceModulator()
 
 
 
@@ -647,7 +650,7 @@ class Aircraft(AircraftBase):
             rudder_base_gain = self.rudder_spring_gain
             logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{ailer_base_gain}:{elev_base_gain}, rudder base gain to {rudder_base_gain}")
         
-        incidence_vec = utils.Vector(telem_data["Incidence"])
+        incidence_vec = Vector(telem_data["Incidence"])
 
         force_trim_x_offset = self.force_trim_x_offset
         force_trim_y_offset = self.force_trim_y_offset
@@ -968,7 +971,7 @@ class Aircraft(AircraftBase):
 
             cf_roll = _side_accel
 
-            cf = utils.Vector2D(cf_pitch, cf_roll)
+            cf = Vector2D(cf_pitch, cf_roll)
             if cf.magnitude() > 1.0: 
                 cf = cf.normalize()
 
@@ -1329,10 +1332,10 @@ class Aircraft(AircraftBase):
         super().on_telemetry(telem_data)
 
         if telem_data['src'] == "XPLANE":
-            incidence_vec = utils.Vector(telem_data["VelAcf"])
+            incidence_vec = Vector(telem_data["VelAcf"])
         else:
-            incidence_vec = utils.Vector(telem_data["VelWorld"])
-            wind_vec = utils.Vector(telem_data["AmbWind"])
+            incidence_vec = Vector(telem_data["VelWorld"])
+            wind_vec = Vector(telem_data["AmbWind"])
             incidence_vec = incidence_vec - wind_vec
             # Rotate the vector from world frame into body frame
             incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))

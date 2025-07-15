@@ -1257,7 +1257,7 @@ class AircraftBase(object):
         """
         boom = telem_data.get('FuelBoom', None)
         if boom is None: return
-        if not self.is_joystick(): return
+        if not (self.is_joystick() or self.is_pedals()): return
 
         if not self.fuelboom_motion_effect_enabled or not self.fuelboom_motion_intensity:
             effects.dispose('boommovement')

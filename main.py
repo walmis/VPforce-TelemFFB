@@ -80,7 +80,7 @@ from telemffb.ConfiguratorDialog import ConfiguratorDialog
 #from telemffb.LogTailWindow import LogTailWindow
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
-                            set_vpconf_profile)
+                            upload_vpconf_profile)
 from telemffb.namedmutex import NamedMutex
 import styles
 resources # used
@@ -518,7 +518,7 @@ def _setup_async_initialization(dev, dev_serial):
 
         if G.system_settings.get('enableVPConfStartup', False):
             try:
-                set_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
+                upload_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
             except Exception:
                 logging.exception("Unable to set VPConfigurator startup profile")
 
@@ -550,7 +550,7 @@ def _cleanup_on_exit(dev_serial):
     
     if G.system_settings.get('enableVPConfExit', False):
         try:
-            set_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
+            upload_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
     
