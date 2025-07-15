@@ -1892,11 +1892,7 @@ def upload_vpconf_profile(config_filepath, serial):
             logging.error(f"VPForce Config Error: ({config_filepath}) - The file failed validation!  Check the PID is correct for the device")
             return
 
-<<<<<<< HEAD
         logging.info(f"upload_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
-=======
-        logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
->>>>>>> 2ef8991ed83580b0b95e6a707d33b2bc745d66b4
         G.current_vpconf_profile = config_filepath
 
         def exec():
