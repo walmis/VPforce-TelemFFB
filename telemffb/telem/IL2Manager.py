@@ -179,7 +179,7 @@ class StateDataStructure:
     air_brake_position: float = 0.0
 
 
-class IL2Manager(TelemParserBase):
+class IL2TelemParser(TelemParserBase):
     def __init__(self):
         self.ac_name: str = ""
         self.engine_info: list = []
@@ -567,7 +567,7 @@ def log_il2_trace():
     s.bind(("", 34385))
     s.settimeout(1)
 
-    il2 = IL2Manager()
+    il2 = IL2TelemParser()
 
     tbase = time.time()
 
@@ -595,7 +595,7 @@ def test_il2_trace():
     import gzip
     import base64
 
-    il2 = IL2Manager()
+    il2 = IL2TelemParser()
 
     f = gzip.open('il2_test_data.gz', 'r')
     while True:

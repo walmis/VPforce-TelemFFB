@@ -25,7 +25,7 @@ from PyQt6 import QtCore
 import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.sim.aircrafts_msfs_xp import Aircraft
-from telemffb.telem.IL2Manager import IL2Manager
+from telemffb.telem.IL2Manager import IL2TelemParser
 from telemffb.telem.NetworkThread import NetworkThread
 from telemffb.telem.SharedMemThread import SharedMemThread
 from telemffb.telem.SimConnectSock import SimConnectSock
@@ -93,7 +93,7 @@ class SimIL2(SimTelemListener):
         if not self.is_enabled:
             return
 
-        self.telem = NetworkThread(G.telem_manager, host="127.0.0.1", port=self.port_udp, telem_parser=IL2Manager())
+        self.telem = NetworkThread(G.telem_manager, host="127.0.0.1", port=self.port_udp, telem_parser=IL2TelemParser())
 
         if self.do_validate() is False:
             logging.warning(
