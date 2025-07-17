@@ -608,8 +608,7 @@ class AircraftBase(object):
         """
         if self.is_collective(): return
         if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
-            effects.dispose("runway0")
-            effects.dispose("runway1")
+            effects.dispose("runway0", "runway1")
             return
 
         WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # nose, left, right - wheels
@@ -631,8 +630,7 @@ class AircraftBase(object):
             effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
             effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
         else:
-            effects.dispose("runway0")
-            effects.dispose("runway1")
+            effects.dispose("runway0", "runway1")
 
     def new_gforce_effect(self, telem_data):
         """Apply new G-force effects based on aircraft acceleration.
@@ -720,7 +718,7 @@ class AircraftBase(object):
 
     def _gforce_effect(self, telem_data, adv_spr=False):
         if not self.gforce_effect_master:
-            self._dispose_effects('gforce', 'new_gforce')
+            effects.dispose('gforce', 'new_gforce')
             return
         if self.new_gforce_effect_enable:
             # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
@@ -797,11 +795,11 @@ class AircraftBase(object):
                     g_factor = -gains.get('neg')
                     direction = 0
                 else:
-                    self._dispose_effects('gforce', 'gforce_spr')
+                    effects.dispose('gforce', 'gforce_spr')
                     return
 
             if not g_factor:
-                self._dispose_effects('gforce', 'gforce_spr')
+                effects.dispose('gforce', 'gforce_spr')
                 return
             if mode == 'constant':
                 g_factor = utils.clamp(g_factor, 0.0, 1.0)
@@ -1093,8 +1091,7 @@ class AircraftBase(object):
                 dir = 0 if gearpos == 0 else 180  # change direction of effect depending on if gear are closed or extended
                 effects['gearclunk'].periodic(10, utils.clamp((self.gear_motion_intensity * 3), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
         else:
-            effects.dispose("gearmovement")
-            effects.dispose("gearmovement2")
+            effects.dispose("gearmovement", "gearmovement2")
 
         # Gear Buffeting Effect
         if (tas > self.gear_buffet_speed_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
@@ -1106,8 +1103,7 @@ class AircraftBase(object):
             effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, 4).start()
             logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
         else:
-            effects.dispose("gearbuffet")
-            effects.dispose("gearbuffet2")
+            effects.dispose("gearbuffet", "gearbuffet2")
 
     def _update_speed_brakes(self, spdbrk, tas, spd_thresh=70):
         if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
@@ -1148,8 +1144,7 @@ class AircraftBase(object):
 
         # spoiler = self._telem_data.get("Spoilers", 0)
         if spoiler == 0 or spoiler == None:
-            effects.dispose("spoilermovement")
-            effects.dispose("spoilermovement2")
+            effects.dispose("spoilermovement", "spoilermovement2")
             return
         # average all spoiler values together
         if isinstance(spoiler, list):
@@ -1168,8 +1163,8 @@ class AircraftBase(object):
                 effects["spoilermovement2"].periodic(118, self.spoiler_motion_intensity, 90, 4).start()
             else:
                 logging.debug("Destroying Spoiler Effects")
-                effects["spoilermovement"].stop(1000)
-                effects["spoilermovement2"].stop(1000)
+                for effect in ["spoilermovement", "spoilermovement2"]:
+                    effects[effect].stop(1000)
 
         if tas > spd_thresh_low and spoiler > .1 and self.spoiler_buffet_intensity > 0 and self.spoiler_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
@@ -1180,10 +1175,8 @@ class AircraftBase(object):
             effects["spoilerbuffet2-1"].periodic(14, realtime_intensity, 90, 4).start()
             effects["spoilerbuffet2-2"].periodic(18, realtime_intensity, 90, 4).start()
         else:
-            effects["spoilerbuffet1-1"].stop(1000)
-            effects["spoilerbuffet1-2"].stop(1000)
-            effects["spoilerbuffet2-1"].stop(1000)
-            effects["spoilerbuffet2-2"].stop(1000)
+            for effect in ["spoilerbuffet1-1", "spoilerbuffet1-2", "spoilerbuffet2-1", "spoilerbuffet2-2"]:
+                effects[effect].stop(1000)
 
     def _update_tailhook_effect(self, telem_data):
         """
@@ -1409,10 +1402,7 @@ class AircraftBase(object):
 
     def update_piston_engine_rumble(self, telem_data):
         if not self.engine_prop_rumble_enabled:
-            effects.dispose("prop_rpm0-1")
-            effects.dispose("prop_rpm0-2")
-            effects.dispose("prop_rpm1-1")
-            effects.dispose("prop_rpm1-2")
+            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
             return
 
         if self._sim_is('DCS'):
@@ -1429,10 +1419,7 @@ class AircraftBase(object):
             rpm = max(rpm)
 
         if rpm < 5:
-            effects.dispose("prop_rpm0-1")
-            effects.dispose("prop_rpm0-2")
-            effects.dispose("prop_rpm1-1")
-            effects.dispose("prop_rpm1-2")
+            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
             return
 
         frequency = float(rpm) / 60
@@ -1457,10 +1444,7 @@ class AircraftBase(object):
             effects["prop_rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()  # vib on Y axis
             effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()  # vib on Y
         else:
-            effects.dispose("prop_rpm0-1")
-            effects.dispose("prop_rpm0-2")
-            effects.dispose("prop_rpm1-1")
-            effects.dispose("prop_rpm1-2")
+            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
 
     def _calc_engine_intensity(self, rpm) -> float:
         """
@@ -1492,8 +1476,7 @@ class AircraftBase(object):
     ########################################
     def _update_ab_effect(self, telem_data):
         if not self.afterburner_effect_intensity or not self.afterburner_effect_enabled:
-            effects.dispose("ab_rumble_1_1")
-            effects.dispose("ab_rumble_2_1")
+            effects.dispose("ab_rumble_1_1", "ab_rumble_2_1")
             return
 
         frequency = 20
@@ -1527,10 +1510,7 @@ class AircraftBase(object):
 
     def _update_jet_engine_rumble(self, telem_data):
         if not self.engine_jet_rumble_enabled or not self.jet_engine_rumble_intensity > 0:
-            effects.dispose("je_rumble_1_1")
-            effects.dispose("je_rumble_1_2")
-            effects.dispose("je_rumble_2_1")
-            effects.dispose("je_rumble_2_2")
+            effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
             return
         
         frequency = self.jet_engine_rumble_freq
@@ -1550,10 +1530,7 @@ class AircraftBase(object):
        
         if jet_eng_rpm == 0:
             # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
-            effects.dispose("je_rumble_1_1")
-            effects.dispose("je_rumble_1_2")
-            effects.dispose("je_rumble_2_1")
-            effects.dispose("je_rumble_2_2")
+            effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
             return
         
         r1_modulation = utils.sine_point_in_time(3, 60000)
@@ -1594,10 +1571,7 @@ class AircraftBase(object):
                 rotor = max(rotor)
         if WoW > 0:
             # logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
-            effects.dispose("etlX")
-            effects.dispose("etlY")
-            effects.dispose("overspeedX")
-            effects.dispose("overspeedY")
+            effects.dispose("etlX", "etlY", "overspeedX", "overspeedY")
             return
         if blade_ct is None:
             blade_ct = 2
@@ -1615,8 +1589,7 @@ class AircraftBase(object):
             effects["etlX"].periodic(self.etl_shake_frequency + 4, shake, 90).start()
             logging.debug(f"Playing ETL shake (freq = {self.etl_shake_frequency}, intens= {shake})")
         else:
-            effects.dispose("etlX")
-            effects.dispose("etlY")
+            effects.dispose("etlX", "etlY")
 
         if tas >= self.overspeed_shake_start and self.overspeed_effect_enable:
             shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start, self.overspeed_shake_start + 15, curvature=.7)
@@ -1625,8 +1598,7 @@ class AircraftBase(object):
             effects["overspeedX"].periodic(self.overspeed_shake_frequency + 4, shake, 90).start()
             logging.debug(f"Overspeed shake (freq = {self.etl_shake_frequency}, intens= {shake}) ")
         else:
-            effects.dispose("overspeedX")
-            effects.dispose("overspeedY")
+            effects.dispose("overspeedX", "overspeedY")
 
     def _update_vrs_effect(self, telem_data):
         vs = telem_data.get("VerticalSpeed", 0)
@@ -1642,8 +1614,7 @@ class AircraftBase(object):
         # print(f"tas:{tas}, vs:{vs}, wow:{wow}")
         if not self.vrs_effect_enable or wow or spd > self.vrs_threshold_speed or vs > 0:
             # print("I'm out")
-            effects.dispose("vrs_buffet")
-            effects.dispose("vrs_buffet2")
+            effects.dispose("vrs_buffet", "vrs_buffet2")
             return
 
         if abs(vs) >= self.vrs_vs_onset:
@@ -1658,13 +1629,11 @@ class AircraftBase(object):
             effects["vrs_buffet"].periodic(10, intensity, utils.RandomDirectionModulator).start()
             effects['vrs_buffet2'].periodic(12, intensity, utils.RandomDirectionModulator).start()
         else:
-            effects.dispose("vrs_buffet")
-            effects.dispose("vrs_buffet2")
+            effects.dispose("vrs_buffet", "vrs_buffet2")
 
     def _update_heli_engine_rumble(self, telem_data, blade_ct=None):
         if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:
-            effects.dispose("rotor_rpm0-1")
-            effects.dispose("rotor_rpm1-1")
+            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
             return
         if self._sim_is_xplane():
             rrpm = telem_data.get("PropRPM", 0)
@@ -1682,15 +1651,13 @@ class AircraftBase(object):
 
         # rotor = telem_data.get("RotorRPM")
 
-
         if blade_ct is None:
             blade_ct = 2
             rrpm = 250
 
 
         if rrpm < 5:
-            effects.dispose("rotor_rpm0-1")
-            effects.dispose("rotor_rpm1-1")
+            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
             return
 
         logging.debug(f"Engine Rumble: Blade_Ct={blade_ct}, RPM={rrpm}")
@@ -1703,8 +1670,7 @@ class AircraftBase(object):
             effects["rotor_rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
             effects["rotor_rpm1-1"].periodic(frequency2, self.heli_engine_rumble_intensity * .5, 90).start()  # vib on Y axis
         else:
-            effects.dispose("rotor_rpm0-1")
-            effects.dispose("rotor_rpm1-1")
+            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
 
     def check_master_button_press(self, button):
         # print(f"Checking {button} against {master_buttons}")
@@ -1722,6 +1688,11 @@ class AircraftBase(object):
             input_data = HapticEffect.device.get_input()
             return input_data.isButtonPressed(button)
 
+    def _update_pedal_trim(self, telem_data):
+        """Update the pedal trim effect based on telemetry data and user input.
+        This method should be overridden in subclasses to implement specific pedal trim logic.
+        """
+        pass
 
     def _update_pedal_force_trim(self, telem_data):
         if not self.is_pedals(): return
@@ -2010,11 +1981,6 @@ class AircraftBase(object):
             return self._get_random_direction()
         return configured_direction
 
-    def _dispose_effects(self, *effect_names):
-        """Dispose multiple effects at once."""
-        for effect_name in effect_names:
-            effects.dispose(effect_name)
-
     def _should_skip_joystick_effect(self) -> bool:
         """Common check for joystick-only effects."""
         return not self.is_joystick()
@@ -2100,14 +2066,14 @@ class AircraftBase(object):
         if config.get('require_ground', False):
             on_ground = telem_data.get('SimOnGround', 0)
             if not on_ground:
-                self._dispose_effects(*config['effect_names'])
+                effects.dispose(*config['effect_names'])
                 return
 
         enabled = getattr(self, config['enabled_attr'])
         intensity = getattr(self, config['intensity_attr'])
 
         if not enabled or not intensity:
-            self._dispose_effects(*config['effect_names'])
+            effects.dispose(*config['effect_names'])
             return
 
         delta_ms = config.get('delta_ms', 200)
@@ -2149,7 +2115,7 @@ class AircraftBase(object):
                         ).start()
             
             # Stop main effects
-            self._dispose_effects(*config['effect_names'])
+            effects.dispose(*config['effect_names'])
 
     def _create_buffeting_effect(self, telem_data: dict, config: dict):
         """
@@ -2173,21 +2139,21 @@ class AircraftBase(object):
         intensity = getattr(self, config['intensity_attr'])
         
         if not enabled or not intensity:
-            self._dispose_effects(*config['effect_names'])
+            effects.dispose(*config['effect_names'])
             return
 
         tas = telem_data.get("TAS", 0)
         if tas < config.get('threshold_speed', 0):
-            self._dispose_effects(*config['effect_names'])
+            effects.dispose(*config['effect_names'])
             return
 
         deployment = telem_data.get(config['deployment_key'], 0)
         if deployment <= config.get('threshold_value', 0.1):
-            self._dispose_effects(*config['effect_names'])
+            effects.dispose(*config['effect_names'])
             return
 
         if config.get('require_airborne', True) and self._should_skip_airborne_effect(telem_data):
-            self._dispose_effects(*config['effect_names'])
+            effects.dispose(*config['effect_names'])
             return
 
         # Calculate intensity based on speed and deployment

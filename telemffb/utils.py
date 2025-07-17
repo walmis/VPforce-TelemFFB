@@ -1034,12 +1034,13 @@ class Dispenser:
     def values(self):
         return self.dict.values()
 
-    def dispose(self, name):
-        if name in self.dict:
-            v = self.dict[name]
-            if isinstance(v, Destroyable):
-                v.destroy()
-            del self.dict[name]
+    def dispose(self, *names):
+        for name in names:
+            if name in self.dict:
+                v = self.dict[name]
+                if isinstance(v, Destroyable):
+                    v.destroy()
+                del self.dict[name]
 
     def foreach(self, func):
         for i in self.values():

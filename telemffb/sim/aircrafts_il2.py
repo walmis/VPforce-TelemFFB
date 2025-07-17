@@ -170,8 +170,8 @@ class Aircraft(AircraftBase):
             super()._update_runway_rumble(telem_data)
         else:
             self.runway_rumble_intensity = 0
-            effects.dispose("runway0")
-            effects.dispose("runway1")
+            effects.dispose("runway0", "runway1")
+
     def _update_buffeting(self, telem_data: dict):
         direction = 90 if self.is_pedals() else 0
         freq = telem_data.get("BuffetFrequency", 0)
@@ -182,12 +182,11 @@ class Aircraft(AircraftBase):
             effects["il2_buffet2"].periodic(freq * 1.5, amp2, direction + 180, effect_type=EFFECT_SINE, phase=90).start()
 
         else:
-            effects.dispose("il2_buffet")
-            effects.dispose("il2_buffet2")
+            effects.dispose("il2_buffet", "il2_buffet2")
+
     def _update_damage(self, telem_data):
         if not self.damage_effect_enabled or not self.damage_effect_intensity:
-            effects.dispose("hit")
-            effects.dispose("damage")
+            effects.dispose("hit", "damage")
             return
 
         hit = telem_data.get("Hits")
