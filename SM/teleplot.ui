@@ -67,7 +67,7 @@
        <item row="1" column="0">
         <widget class="QLabel" name="label_2">
          <property name="text">
-          <string>Enter Port Number:</string>
+          <string>Enter assigned Port Number:</string>
          </property>
         </widget>
        </item>
@@ -115,7 +115,7 @@
        <item row="0" column="0">
         <widget class="QLabel" name="label">
          <property name="text">
-          <string>Open a browser to &lt;a href=&quot;https://teleplot.fr/&quot;&gt;teleplot.fr&lt;/a&gt;</string>
+          <string>Click to open a browser to: &lt;a href=&quot;https://teleplot.fr/&quot;&gt;teleplot.fr&lt;/a&gt;</string>
          </property>
         </widget>
        </item>
@@ -125,7 +125,7 @@
       <widget class="QLabel" name="label_5">
        <property name="text">
         <string>To stop sending teleplot data,
-clear the boxes and select OK</string>
+clear the boxes and select Save</string>
        </property>
       </widget>
      </item>

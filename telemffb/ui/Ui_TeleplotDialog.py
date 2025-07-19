@@ -85,11 +85,11 @@ class Ui_TeleplotDialog(object):
         _translate = QtCore.QCoreApplication.translate
         TeleplotDialog.setWindowTitle(_translate("TeleplotDialog", "Teleplot Setup"))
         self.label_3.setText(_translate("TeleplotDialog", "Space separated list of Telemetry variables"))
-        self.label_2.setText(_translate("TeleplotDialog", "Enter Port Number:"))
+        self.label_2.setText(_translate("TeleplotDialog", "Enter assigned Port Number:"))
         self.label_6.setText(_translate("TeleplotDialog", "or select from active:"))
         self.pb_Select.setText(_translate("TeleplotDialog", "Select..."))
         self.label_4.setText(_translate("TeleplotDialog", "List:"))
-        self.label.setText(_translate("TeleplotDialog", "Open a browser to <a href=\"https://teleplot.fr/\">teleplot.fr</a>"))
+        self.label.setText(_translate("TeleplotDialog", "Click to open a browser to: <a href=\"https://teleplot.fr/\">teleplot.fr</a>"))
         self.label_5.setText(_translate("TeleplotDialog", "To stop sending teleplot data,\n"
-"clear the boxes and select OK"))
+"clear the boxes and select Save"))
         self.pb_clear.setText(_translate("TeleplotDialog", "Clear"))
