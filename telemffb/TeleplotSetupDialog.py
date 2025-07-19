@@ -57,6 +57,13 @@ class TeleplotSetupDialog(QDialog, Ui_TeleplotDialog):
         self.tb_vars.setPlainText(str(self.telem_vars))
         self.telem_data = parent.lbl_telem_data.text()
 
+        # Teleplot Link
+        bookmarked_section =  "https://teleplot.fr"
+        linkcolor = 'style="color: #c473d9;"' if G.useDarkMode else 'style="color: #ab37c8;"'
+        self.label.setText(f'Open a browser to <a href="{bookmarked_section}" {linkcolor}>teleplot.fr</a>')
+        self.label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        self.label.setOpenExternalLinks(True)
+
     class KeySelectionDialog(QDialog):
         def __init__(self, parent=None):
             super().__init__(parent)
