@@ -919,7 +919,9 @@ class Toggle(QCheckBox):
                  handle_color=Qt.GlobalColor.white,
                  disabled_color=Qt.GlobalColor.gray):
         super().__init__(parent)
-
+        self.setStyleSheet("QCheckBox::indicator { width: 0px; height: 0px; }")
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
         # Save our properties on the object via self, so we can access them later
         # in the paintEvent.
         self._bar_color = bar_color
