@@ -186,14 +186,6 @@ QMenu::item:selected {
     color: palette(text);
 }
 
-QComboBox {
-    border: 1px solid #999;
-}
-
-QComboBox QAbstractItemView {
-    background-color: #2b2b2b;
-}
-
 QCheckBox:disabled {
   color: rgb(155, 155, 155);  /* lighter grey for better visibility */
 }
