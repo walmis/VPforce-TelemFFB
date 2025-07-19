@@ -245,19 +245,17 @@ class NoWheelSlider(QSlider):
         cy = handle_rect.top() + handle_rect.height() * 0.3
 
         # Increase radius for smoother falloff
-        radius = max(handle_rect.width(), handle_rect.height()) * 0.8
-        highlight = QColor("#eeeeee") if not G.useDarkMode else QColor("#aaaaaa")
+        radius = max(handle_rect.width(), handle_rect.height())
         gradient = QRadialGradient(cx, cy, radius)
-        gradient.setColorAt(0.0, QColor(highlight).lighter(130))
-        gradient.setColorAt(0.4, QColor(self.handle_color))
-        gradient.setColorAt(1.0, QColor(self.handle_color).darker(120))
 
-        gradient.setColorAt(0.0, QColor(highlight))
-        gradient.setColorAt(0.3, QColor(self.handle_color))
-        gradient.setColorAt(1.0, QColor(self.handle_color).darker())
+        lighter_val = 150 if G.useDarkMode else 150
+        darker_val = 200 if G.useDarkMode else 150
+        gradient.setColorAt(0.0, QColor(self.handle_color).lighter(lighter_val))
+        gradient.setColorAt(0.15, QColor(self.handle_color))
+        gradient.setColorAt(1.0, QColor(self.handle_color).darker(darker_val))
 
         painter.setBrush(QBrush(gradient))
-        painter.setPen(QPen(QColor("#565a5e")))
+        painter.setPen(QPen(QColor(self.handle_color).darker(120)))
         painter.drawRoundedRect(handle_rect, self.handle_height / 4, self.handle_height / 4)
 
         painter.end()
@@ -404,15 +402,24 @@ class NoWheelNumberSlider(NoWheelSlider):
             handle_rect.moveLeft(int(groove_x + groove_width / 2 - self.handle_width / 2))
 
         # Draw custom gradient background
+        # Shift center to upper-left
+        cx = handle_rect.left() + handle_rect.width() * 0.25
+        cy = handle_rect.top() + handle_rect.height() * 0.3
+
         center = handle_rect.center()
         gradient = QRadialGradient(center.x(), center.y(), handle_rect.width() / 2)
 
-        gradient.setColorAt(0.0, QColor("#ffffff"))
-        gradient.setColorAt(0.3, QColor(self.handle_color))
-        gradient.setColorAt(1.0, QColor(self.handle_color).darker())
+        radius = max(handle_rect.width(), handle_rect.height())
+        gradient = QRadialGradient(cx, cy, radius)
+
+        lighter_val = 150 if G.useDarkMode else 150
+        darker_val = 200 if G.useDarkMode else 150
+        gradient.setColorAt(0.0, QColor(self.handle_color).lighter(lighter_val))
+        gradient.setColorAt(0.1, QColor(self.handle_color))
+        gradient.setColorAt(1.0, QColor(self.handle_color).darker(darker_val))
 
         painter.setBrush(QBrush(gradient))
-        painter.setPen(QPen(QColor("#565a5e")))
+        painter.setPen(QPen(QColor(self.handle_color).darker(120)))
         painter.drawRoundedRect(handle_rect, self.handle_height / 4, self.handle_height / 4)
 
         # Draw the value text
@@ -421,7 +428,8 @@ class NoWheelNumberSlider(NoWheelSlider):
         font.setBold(True)
         painter.setFont(font)
 
-        painter.setPen(Qt.GlobalColor.white)
+
+        painter.setPen(Qt.GlobalColor.black)
         painter.drawText(handle_rect, Qt.AlignmentFlag.AlignCenter, self.value_text)
 
         painter.end()
