@@ -991,7 +991,7 @@ class Toggle(QCheckBox):
         p.drawRoundedRect(barRect, rounding, rounding)
 
         # Draw the border around the bar
-        p.setPen(QPen(QColor("#565a5e"), 1))
+        p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(barRect, rounding, rounding)
 
         if self.isChecked() and self.isEnabled():
