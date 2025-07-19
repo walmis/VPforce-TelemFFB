@@ -952,6 +952,10 @@ class SettingsLayout(QGridLayout):
         if item['datatype'] == 'group':
             expand_button.setVisible(False)
 
+        if item['has_expander'].lower() == 'true':
+            self.addWidget(expand_button, i, exp_col)
+            expand_button.setHidden(rowdisabled)
+
         if not rowdisabled:
             # for p_item in self.prereq_list:
             #     if p_item['prereq'] == item['name'] : # and p_item['count'] > 1:
@@ -966,10 +970,8 @@ class SettingsLayout(QGridLayout):
                     if item['hasbump'].lower() != 'true':
                         row_count += 1
                     expand_button.setMaximumHeight(200)
-                    # self.addWidget(expand_button, i, exp_col, row_count, 1)
-                    self.addWidget(expand_button, i, exp_col)
-                else:
-                    self.addWidget(expand_button, i, exp_col)
+
+
 
         label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
@@ -1177,19 +1179,7 @@ class SettingsLayout(QGridLayout):
 
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
         G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
-        # commented out because erase happens on setting load
-        # if setting_name == 'spring_mode':
-        #     xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'adv_spr_override_enabled')
-        #     xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'aircraft_is_spring_centered')
-        #     xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'aircraft_is_fbw')
-        #     if G.settings_mgr.timed_out:
-        #         pass
-        # if setting_name == 'gforce_effect':
-        #     xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'gforce_effect_enable')
-        #     xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'new_gforce_effect_enable')
-        #     xmlutils.erase_models_from_xml(G.settings_mgr.current_sim,G.settings_mgr.current_pattern, 'gforce_effect_advanced_enabled')
-        #     if G.settings_mgr.timed_out:
-        #         pass
+
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
