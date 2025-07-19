@@ -293,8 +293,8 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             for aircraft, profile in self.aircraft_list:
                 display_text = f"{aircraft.ljust(max_name_len)}  :  {profile}"
                 self.cb_clone.addItem(display_text, (aircraft, profile))
-                w = self.cb_clone.width()
-                self.cb_clone.setMinimumWidth(w + 10) # fix stupid sizing issue
+                # w = self.cb_clone.width()
+                # self.cb_clone.setMinimumWidth(w + 10) # fix stupid sizing issue
 
             self.check_mandatory_clone(cls)
         else:

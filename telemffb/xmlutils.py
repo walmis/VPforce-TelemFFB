@@ -1928,7 +1928,7 @@ def remove_dicts_by_names(data_list, removal_list):
 def get_pattern_by_sim_fullname(sim, full_name):
     """
     Knowing only the sim name and the full name of the model as received in telemetry, this function returns the
-    pattern name stored in the config if it finds a item that will regex match the full name.
+    pattern name stored in the config if it finds an item that will regex match the full name.
     First looks in userconfig, then defaults.
     Looks for all "type" elements and inspects the "model" element to see if it matches with the full name.
     Args:
@@ -1964,7 +1964,7 @@ def get_pattern_by_sim_fullname(sim, full_name):
             else:
                 continue
     # If we get here, there was no match in the default config or the user config, return None
-    logging.warning(f"!@!@!@!@!@!@!@!@!@!@!@!@!@No match found for {full_name} in {sim}")
+    # logging.info(f"!@!@!@!@!@!@!@!@!@!@!@!@!@No match found for {full_name} in {sim}")
     return None
 
 
@@ -2040,7 +2040,7 @@ def get_active_profile_for_model(sim, cls, model, users_root=None):
         if m == model and s == sim:
             return "default"
     # 4. Fallback default
-    logging.warning(f"No active or default profile found for model {model} in sim {sim}.")
+    logging.debug(f"No active or default profile found for model {model} in sim {sim}.")
     return None
 
 

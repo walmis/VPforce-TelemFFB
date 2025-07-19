@@ -1560,9 +1560,15 @@ class MainWindow(QMainWindow):
 
 
     def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None):
+        # utils.debug_caller_args("red")
         wizard = NewAircraftWizard(parent=self, manual=manual, auto_sim=sim, auto_name=name, auto_cls=cls)
         wizard.accepted.connect(self.new_ac_wizard_finished)
-        wizard.show()
+        if wizard.exec():
+            try:
+                # make sure no other calls are connected to avoid stacking lambda calls if user cancels and doesn't add new aircraft
+                self.new_craft_button.clicked.disconnect()
+            except TypeError:
+                pass  # No handler connected yet
 
     @overrides(QWidget)
     def closeEvent(self, event):
@@ -2057,6 +2063,8 @@ class MainWindow(QMainWindow):
 
                 n_sliders = self.findChildren(NoWheelNumberSlider)
                 for my_slider in n_sliders:
+                    """This section updates the labels which are on the "NoWheelNumberSlider elements that reflect
+                    the current value of the coeff % values"""
                     slidername = my_slider.objectName().replace('sld_', '')
                     my_slider.blockSignals(True)
 
@@ -2115,22 +2123,27 @@ class MainWindow(QMainWindow):
 
             shown_pattern = G.settings_mgr.current_pattern
             if G.settings_mgr.current_pattern == '' and data.get('N', '') != '':
-                if not self.new_craft_notification_sent:
-                    shown_pattern = 'Using defaults'
-                    new_sim = data.get('src', None)
-                    new_aircraft = data.get('N', None)
-                    new_class = G.settings_mgr.current_class
-                    self.new_craft_button.clicked.connect(lambda: self.show_new_aircraft_wizard(manual=False, sim=new_sim, cls=new_class,name=new_aircraft))
-                    if G.master_instance:
+                shown_pattern = 'Using defaults'
+                new_sim = data.get('src', None)
+                new_aircraft = data.get('N', None)
+                new_class = G.settings_mgr.current_class
+                if G.master_instance:
+                    if not self.new_craft_button.isVisible():
+                        self.new_craft_button.clicked.connect(lambda: self.show_new_aircraft_wizard(manual=False,sim=new_sim,cls=new_class,name=new_aircraft))
                         self.new_craft_button.show()
-                        self.show_new_aircraft_wizard(manual=False, sim=data.get('src', None), cls=G.settings_mgr.current_class,name=data.get('N', ''))
-                        # utils.dbprint("red", f"SIM: {data.get('src', None)} CLASS: {G.settings_mgr.current_class}, NAME: {data.get('N', '')}")
-                        self.pop_tray_notification(
-                            "** New Aircraft Found **",
-                            f"No profile was found for the aircraft\n{data.get('N')}\n\nClick to open TelemFFB.",
-                            10,
-                        )
-                        self.new_craft_notification_sent = True
+
+                    if not data.get('STOP', False):
+                        if not self.new_craft_notification_sent:
+
+                            # utils.dbprint("red", f"SIM: {data.get('src', None)} CLASS: {G.settings_mgr.current_class}, NAME: {data.get('N', '')}")
+                            self.pop_tray_notification(
+                                "** New Aircraft Found **",
+                                f"No profile was found for the aircraft\n{data.get('N')}\n\nClick to open TelemFFB.",
+                                10,
+                            )
+                            self.new_craft_notification_sent = True
+                            self.show_new_aircraft_wizard(manual=False, sim=data.get('src', None), cls=G.settings_mgr.current_class, name=data.get('N', ''))
+
 
 
             else:

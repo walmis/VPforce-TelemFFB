@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_NewAircraftWizard(object):
     def setupUi(self, NewAircraftWizard):
         NewAircraftWizard.setObjectName("NewAircraftWizard")
-        NewAircraftWizard.resize(650, 458)
+        NewAircraftWizard.resize(650, 552)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Minimum)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -265,8 +265,6 @@ class Ui_NewAircraftWizard(object):
         self.cb_clone.setSizePolicy(sizePolicy)
         self.cb_clone.setObjectName("cb_clone")
         self.horizontalLayout_3.addWidget(self.cb_clone)
-        spacerItem8 = QtWidgets.QSpacerItem(250, 20, QtWidgets.QSizePolicy.Policy.Maximum, QtWidgets.QSizePolicy.Policy.Minimum)
-        self.horizontalLayout_3.addItem(spacerItem8)
         self.gridLayout_4.addLayout(self.horizontalLayout_3, 2, 0, 1, 1)
         self.verticalLayout_2.addLayout(self.gridLayout_4)
         self.gridLayout_6.addLayout(self.verticalLayout_2, 3, 0, 1, 2)
@@ -304,8 +302,8 @@ class Ui_NewAircraftWizard(object):
         self.lbl_profileNameError = QtWidgets.QLabel(parent=self.pg_profile)
         self.lbl_profileNameError.setObjectName("lbl_profileNameError")
         self.gridLayout_7.addWidget(self.lbl_profileNameError, 4, 0, 1, 1)
-        spacerItem9 = QtWidgets.QSpacerItem(20, 328, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
-        self.gridLayout_7.addItem(spacerItem9, 5, 1, 1, 1)
+        spacerItem8 = QtWidgets.QSpacerItem(20, 328, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
+        self.gridLayout_7.addItem(spacerItem8, 5, 1, 1, 1)
         self.stackedWidget.addWidget(self.pg_profile)
         self.gridLayout.addWidget(self.stackedWidget, 1, 0, 1, 1)
 
