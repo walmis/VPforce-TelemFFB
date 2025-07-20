@@ -948,9 +948,7 @@ class SettingsLayout(QGridLayout):
             erase_button.clicked.connect(self.erase_configurator_overrides)
             self.addWidget(self.configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # grouping collapsible header
-        if item['datatype'] == 'group':
-            expand_button.setVisible(False)
+
 
         if item['has_expander'].lower() == 'true':
             self.addWidget(expand_button, i, exp_col)
@@ -970,7 +968,9 @@ class SettingsLayout(QGridLayout):
                     if item['hasbump'].lower() != 'true':
                         row_count += 1
                     expand_button.setMaximumHeight(200)
-
+        # grouping collapsible header
+        if item['datatype'] == 'group':
+            expand_button.setVisible(False)
 
 
         label.setDisabled(rowdisabled)
