@@ -1581,7 +1581,6 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
         ptrn = get_pattern_by_sim_fullname(the_sim, aircraft_name)
         cls = get_class_for_sim_model(the_sim, ptrn)
         active_profile = get_active_profile_for_model(the_sim, cls, ptrn)
-    time.sleep(0.1)
 
     print_counts = False
     print_each_step = False  # for debugging
