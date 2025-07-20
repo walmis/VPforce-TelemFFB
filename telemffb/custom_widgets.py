@@ -975,7 +975,7 @@ class Toggle(QCheckBox):
 
         if not self.isEnabled():
             barGradient.setColorAt(0.0, self._disabled_color.lighter(150))
-            barGradient.setColorAt(0.5, self._disabled_color)
+            barGradient.setColorAt(0.0, self._disabled_color)
             barGradient.setColorAt(1.0, self._disabled_color.darker(150))
         else:
             barGradient.setColorAt(0.0, self._bar_color.lighter(150))
@@ -994,22 +994,35 @@ class Toggle(QCheckBox):
         p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(barRect, rounding, rounding)
 
-        if self.isChecked() and self.isEnabled():
+        if not self.isEnabled():
+            handle_color = self._disabled_color.darker(110)
+        elif self.isChecked():
             handle_color = self._handle_checked_brush.color()
         else:
             handle_color = self._handle_brush.color()
 
         # Draw the handle with a gradient for 3D effect
-        handleGradient = QRadialGradient(QPointF(xPos - handleRadius / 3, barRect.center().y() - handleRadius / 3),
-                                         handleRadius)
-        if G.useDarkMode:
-            handleGradient.setColorAt(0.0, handle_color)
-        else:
+        handleGradient = QRadialGradient(
+            QPointF(xPos - handleRadius / 3, barRect.center().y() - handleRadius / 3),
+            handleRadius
+        )
+
+        if not self.isEnabled():
+            handleGradient.setColorAt(0.0, handle_color.lighter(120))
+            handleGradient.setColorAt(0.4, handle_color)
+            handleGradient.setColorAt(1.0, handle_color.darker(130))
+        elif self.isChecked():
             handleGradient.setColorAt(0.0, QColor(255, 255, 255, 180))
-        handleGradient.setColorAt(0.6, handle_color)
-        handleGradient.setColorAt(1.0, handle_color.darker())
+            handleGradient.setColorAt(0.3, handle_color)
+            handleGradient.setColorAt(1.0, handle_color.darker(120))
+        else:
+            # OFF + Enabled: More subtle highlight
+            handleGradient.setColorAt(0.0, handle_color.lighter(150))
+            handleGradient.setColorAt(0.3, handle_color)
+            handleGradient.setColorAt(1.0, handle_color.darker(300))
 
         p.setBrush(handleGradient)
+        p.setPen(QPen(handle_color.darker()))
         p.drawEllipse(
             QPointF(xPos, barRect.center().y()),
             handleRadius, handleRadius)
