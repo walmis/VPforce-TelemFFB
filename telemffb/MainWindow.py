@@ -747,22 +747,6 @@ class MainWindow(QMainWindow):
 
         self.tab_widget.addTab(QWidget(), "Hide")
         self.tab_widget.currentChanged.connect(self.switch_window_view)
-        tab_bar = self.tab_widget.tabBar()
-        fm = QFontMetrics(tab_bar.font())
-        ht = fm.height()
-        tb_height = ht + 8
-    #     style_sheet = f"""
-    #     QTabBar::tab {{
-    #         height: {tb_height}px;
-    #     }}
-    #     QTabBar::tab:selected {{
-    #         background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-    #                               stop: 0 #dca3f2, stop: 0.2 #c174e6,
-    #                               stop: 0.5 #a13fb1, stop: 0.8 #822c94, stop: 1.0 #6b2378);
-    #         color: white;
-    #     }}
-    # """
-    #     self.tab_widget.setStyleSheet(style_sheet)
 
         tb_height = self.tab_widget.tabBar().sizeHint().height()
         self.tab_widget.setMinimumHeight(tb_height)
@@ -1333,14 +1317,15 @@ class MainWindow(QMainWindow):
             # Exiting Offline editing mode
 
             G.settings_mgr.go_online()
+
             # clear the layout after going back online
             G.main_window.settings_layout.clear_layout()
+
             # reset the craft area text to default
             self.cur_craft_label.setText('None Detected')
             self.cur_pattern_label.setText('(No Match)')
             self.active_profile_label.setText(G.settings_mgr.active_profile)
-            # self.active_profile_label.setText("Active Profile: (None)")
-            # self.cb_activeProfileCombo.clear()
+
             # re-show the profile selecting widget
             if G.master_instance:
                 self.profile_selector_label.setVisible(True)
@@ -1349,24 +1334,30 @@ class MainWindow(QMainWindow):
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
+
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
+
             # hide the profile selecting widget
             if G.master_instance:
                 self.profile_selector_label.setVisible(False)
                 self.cb_activeProfileCombo.setVisible(False)
+
             # Block signals so we don't trigger text change on .clear() calls
             self.offline_name.blockSignals(True)
             self.offline_class.blockSignals(True)
             self.offline_name.blockSignals(True)
+
             # clear contents of combo boxes so they can be repopulated
             self.offline_name.clear()
             self.offline_class.clear()
             self.offline_sim.clear()
+
             # unblock signals
             self.offline_name.blockSignals(False)
             self.offline_class.blockSignals(False)
             self.offline_name.blockSignals(False)
+
             # build sim list
             sims = [''] + xmlutils.get_sims()
             self.offline_sim.addItems(sims)
@@ -1382,6 +1373,7 @@ class MainWindow(QMainWindow):
         if G.master_instance:
             # Show the offline mode widgets, but only for master instance
             self.offline_config_area.setVisible(state)
+
             # Send command to chile instance to replicate actions
             G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
 
@@ -1863,7 +1855,6 @@ class MainWindow(QMainWindow):
             new_items (list[str]): List of profiles to populate.
         """
         ADD_NEW_LABEL = "Add New..."
-        PROFILE_MGR_LABEL = "Profile Manager..."
 
         # Extract current items, excluding 'Add New...'
         current_items = [
