@@ -29,6 +29,7 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeWidgetItem, QHeaderView, 
     QRadioButton, QButtonGroup, QApplication, QListWidget, QListWidgetItem, QTableWidget, QAbstractItemView
 
 import telemffb.globals as G
+from telemffb import utils
 from telemffb.ui.Ui_ProfileManagerDialog import Ui_ProfileManagerDialog
 from telemffb.ProfileImportDialog import ProfileImportDialog
 from telemffb.NewAircraftWizard import NewAircraftWizard
@@ -737,6 +738,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                     QMessageBox.information(self, "Deleted", f"Deleted entire aircraft profile set for '{model}'.")
 
                 self.prune_empty_tree_items(self.treeWidget)
+                G.main_window.update_settings()
                 return
 
             # Ask which profile should become active
@@ -764,6 +766,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             xmlutils.erase_model_profile(sim, model, profile)
             cls_item.removeChild(active_item)
             self.prune_empty_tree_items(self.treeWidget)
+            G.main_window.update_settings()
             QMessageBox.information(self, "Deleted", f"Deleted profile '{profile}' for '{model}'.")
             return
 
@@ -785,6 +788,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             item.parent().removeChild(item)
 
         self.prune_empty_tree_items(self.treeWidget)
+        G.main_window.update_settings()
         QMessageBox.information(self, "Deleted", f"Deleted {len(items)} profile(s).")
 
     def remove_tree_item(self, selected_item):
