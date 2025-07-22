@@ -101,6 +101,33 @@ def dbprint(color, msg, instance=None):
             ccode = '\033[0m'
     print(f"{ccode}{msg}{reset}")
 
+def debug_timed(func):
+    """
+    import debug_timed from utils into any module
+    add '@debug_timed` decorator to any method
+    timing results will be logged along with the calling function and arguments that were passed
+
+
+    """
+
+    def wrapper(*args, **kwargs):
+        if not G.master_instance:
+            return func(*args, **kwargs)
+        # Get caller frame
+        caller_frame = inspect.stack()[1]
+        caller_name = caller_frame.function
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        arg_strs = [repr(a) for a in args]
+        kwarg_strs = [f"{k}={v!r}" for k, v in kwargs.items()]
+        all_args = ", ".join(arg_strs + kwarg_strs)
+        elapsed = (time.perf_counter() - start) * 1000
+
+        logging.info(f"[TIMER] {elapsed:.2f} ms taken by {func.__name__} - called by {caller_name} ({all_args})")
+        return result
+
+    return wrapper
+
 def debug_caller_args(color):
     frame = inspect.currentframe().f_back
     caller_frame = frame.f_back
