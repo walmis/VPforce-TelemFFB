@@ -377,6 +377,13 @@ class MainWindow(QMainWindow):
         self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
         self.status_container.sim_status_label.set_waiting()
 
+        def on_sims_changed(sim : SimTelemListener):
+            self.status_container.update_enabled_sims(sim.name, sim.started)
+            utils.dbprint("blue", f"sim {sim.name} changed state to {sim.started}")
+            self.refresh_telem_status()
+
+        G.sim_listeners.simStarted.connect(on_sims_changed)
+        G.sim_listeners.simStopped.connect(on_sims_changed)
 
         rh_status_layout.addWidget(self.status_container)
         rh_status_area.setLayout(rh_status_layout)
@@ -910,6 +917,7 @@ class MainWindow(QMainWindow):
             f"X-Plane : {xplane_status}\n\n"
             "Enable or Disable in System -> System Settings"
         )
+
     def force_reload_aircraft(self):
         G.force_reload_aircraft_trigger = True
         G.telem_manager.currentAircraftName = None

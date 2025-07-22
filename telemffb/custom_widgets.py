@@ -226,6 +226,32 @@ class AppStatusWidget(QGroupBox):
     def set_profile_name(self, profile_name):
         self.active_profile_label.setText(profile_name)
 
+    def update_enabled_sims(self, sim: str, state: bool):
+        # Maintain state map across calls
+        if not hasattr(self, "_sim_states"):
+            self._sim_states = {
+                "DCS": False,
+                "MSFS": False,
+                "XPLANE": False,
+                "IL2": False
+            }
+
+        # Update the state for the provided sim
+        if sim in self._sim_states:
+            self._sim_states[sim] = state
+
+        # Build tooltip content
+        enabled = [s for s, enabled in self._sim_states.items() if enabled]
+        disabled = [s for s, enabled in self._sim_states.items() if not enabled]
+
+        tooltip = "Enabled Sims:\n"
+        tooltip += "".join(f"  {s}\n" for s in sorted(enabled)) if enabled else "  (None)\n"
+        tooltip += "\nDisabled Sims:\n"
+        tooltip += "".join(f"  {s}\n" for s in sorted(disabled)) if disabled else "  (None)"
+
+        # Set the updated tooltip
+        self.findChild(InfoLabel).setToolTip(tooltip)
+
 class SimStatusWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
