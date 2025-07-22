@@ -1291,9 +1291,12 @@ class MainWindow(QMainWindow):
         self.offline_name.setCurrentText(model)
 
         profile_list = xmlutils.get_available_profiles(sim, cls, model)
+        self.offline_profile.clear()
         for p in profile_list:
-            self.offline_profile.addItem(p)
+            if p != 'default':
+                self.offline_profile.addItem(p)
         self.offline_profile.setCurrentText(profile)
+        self.offline_profile_changed(profile)
 
         for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
             cb.blockSignals(False)
@@ -1417,7 +1420,7 @@ class MainWindow(QMainWindow):
 
     def offline_profile_changed(self, profile):
         # self.update_craft_text_block(profile=profile)
-
+        G.settings_mgr.offline_scope = 'MODEL'
         self.resize_offline_combos()
         self.force_sim_aircraft()
         if G.master_instance:
