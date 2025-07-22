@@ -20,7 +20,7 @@ from PyQt6.QtGui import QAction, QWheelEvent, QPalette
 
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
-    QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton
+    QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
@@ -37,6 +37,215 @@ import styles
 
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
+
+
+class AppStatusWidget(QGroupBox):
+    def __init__(self, master_instance=True, parent=None):
+        super().__init__("Application Status", parent)
+        self.offline = False
+        self.offline_recall_ac = ''
+        self.offline_recall_ptn = ''
+        self.offline_recall_pro = ''
+        self.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid gray;
+                border-radius: 5px;
+                margin-top: 6px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 3px 0 3px;
+            }
+            QComboBox {
+                margin-left: 10px;
+                padding: 0px;
+            }
+        """)
+
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        outer_layout.setContentsMargins(10, 18, 10, 8)
+
+        grid = QGridLayout()
+        grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        grid.setVerticalSpacing(10)  # consistent spacing
+        grid.setHorizontalSpacing(10)
+
+        row = 0
+        label_align = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        value_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+
+        sim_status_header = InfoLabel()
+        sim_status_header.text_label.setText('Sim Status:')
+        sim_status_header.setToolTip('Enabled Sims:\n  DCS\n  MSFS\n  XPLANE\n\nDisabled Sims:\n  IL2')
+
+        self.sim_status_label = SimStatusWidget()
+        self.cur_craft_label = QLabel("None Detected")
+        self.cur_pattern_label = QLabel("(No Match)")
+        self.active_profile_label = QLabel("(None)")
+        self.notification_label = QLabel('')
+        self.notification_label.setWordWrap(True)
+        self.notification_label.setMinimumHeight(60)
+        size_policy = self.notification_label.sizePolicy()
+        size_policy.setRetainSizeWhenHidden(True)
+        self.notification_label.setSizePolicy(size_policy)
+        self.notification_label.hide()
+        self.notification_label.setStyleSheet("""
+                    QLabel {
+                        padding-left: 10px;
+                        padding-top: 2px;
+                        color: #ff6b6b; /* Softer red for dark mode */
+                        background-color: rgba(255, 50, 50, 30); /* Light red background tint */
+                        border: 1px solid #c33;
+                        border-radius: 4px;
+                    }
+                """)
+
+        grid.addWidget(sim_status_header, row, 0, alignment=label_align)
+        grid.addWidget(self.sim_status_label, row, 1, alignment=value_align)
+        row += 1
+
+        grid.addWidget(QLabel("Current Aircraft:"), row, 0, alignment=label_align)
+        grid.addWidget(self.cur_craft_label, row, 1, alignment=value_align)
+        row += 1
+
+        grid.addWidget(QLabel("Matched Model:"), row, 0, alignment=label_align)
+        grid.addWidget(self.cur_pattern_label, row, 1, alignment=value_align)
+        row += 1
+
+        # if master_instance:
+        self.cb_selectProfileCombo = QComboBox()
+        self.cb_selectProfileCombo.addItems(['Select...'])
+        self.cb_selectProfileCombo.setCurrentIndex(0)
+
+        profile_row_layout = QHBoxLayout()
+        profile_row_layout.setContentsMargins(0, 0, 0, 0)
+        profile_row_layout.setSpacing(6)
+        profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        profile_row_layout.addWidget(self.active_profile_label)
+        profile_row_layout.addWidget(self.cb_selectProfileCombo)
+
+        grid.addWidget(QLabel("Active Profile:"), row, 0, alignment=label_align)
+
+        grid.addLayout(profile_row_layout, row, 1)
+        row += 1
+        grid.addWidget(self.notification_label, row, 0,3,3)
+
+        if not master_instance:
+            self.cb_selectProfileCombo.setDisabled(True)
+            self.cb_selectProfileCombo.setVisible(False)
+
+        outer_layout.addLayout(grid)
+
+    def reset(self):
+        self.offline = False
+        self.sim_status_label.set_waiting()
+        self.cur_craft_label.setText(self.offline_recall_ac)
+        self.cur_pattern_label.setText(self.offline_recall_ptn)
+        self.active_profile_label.setText(self.offline_recall_pro)
+        self.offline_recall_ac = ''
+        self.offline_recall_ptn = ''
+        self.offline_recall_pro = ''
+
+    def set_running(self, source):
+        if self.offline: return
+        self.sim_status_label.set_status(source, 'Running')
+        self.cb_selectProfileCombo.setDisabled(False)
+
+    def set_paused(self, source):
+        if self.offline: return
+        self.sim_status_label.set_status(source, 'Paused')
+        self.cb_selectProfileCombo.setDisabled(False)
+
+    def set_error(self, source):
+        if self.offline: return
+        self.sim_status_label.set_status(source, 'Error')
+        self.cb_selectProfileCombo.setDisabled(False)
+
+    def set_offline(self, source):
+        self.offline = True
+        self.sim_status_label.set_status(source, 'Offline')
+        self.offline_recall_ac = self.cur_craft_label.text()
+        self.offline_recall_pro = self.cur_pattern_label.text()
+        self.offline_recall_pro = self.active_profile_label.text()
+        self.cur_craft_label.setText('Offline')
+        self.cur_pattern_label.setText('Offline')
+        self.active_profile_label.setText('Offline')
+        self.cb_selectProfileCombo.setDisabled(True)
+
+    def flag_error(self, message):
+        self.notification_label.setText(message)
+        self.notification_label.show()
+
+    def clear_error(self):
+        self.notification_label.setText('')
+        self.notification_label.hide()
+
+    def set_fullname(self, full_name):
+        self.cur_craft_label.setText(full_name)
+
+    def set_match_pattern(self, pattern):
+        self.cur_pattern_label.setText(pattern)
+
+    def set_profile_name(self, profile_name):
+        self.active_profile_label.setText(profile_name)
+
+class SimStatusWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.sim_label = QLabel("Waiting...")
+        self.status_label = QLabel("")
+        self.status_label.setVisible(False)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self.sim_label)
+        layout.addWidget(self.status_label)
+
+        self._base_styles()
+
+    def _base_styles(self):
+        self.sim_label.setStyleSheet("QLabel { font-weight: bold; }")
+        self.status_label.setStyleSheet("""
+            QLabel {
+                padding: 2px 8px;
+                border-radius: 4px;
+                color: white;
+                font-weight: bold;
+            }
+        """)
+
+    def set_waiting(self):
+        self.sim_label.setText("Waiting...")
+        self.status_label.setVisible(False)
+
+    def set_status(self, sim_name: str, status: str):
+        self.sim_label.setText(sim_name)
+        self.status_label.setVisible(True)
+
+        status_color = {
+            "Running": "rgba(0, 200, 0, 100)",   # Green
+            "Paused": "rgba(255, 200, 0, 100)",  # Yellow
+            "Error": "rgba(255, 0, 0, 100)",      # Red
+            "Offline": "rgba(128,128,128, 100)",  # Grey
+        }.get(status, "rgba(120, 120, 120, 150)")
+
+        self.status_label.setText(status)
+        self.status_label.setStyleSheet(f"""
+            QLabel {{
+                padding: 2px 8px;
+                border-radius: 10px;
+                color: #dddddd;
+                background-color: {status_color};
+                font-weight: bold;
+            }}
+        """)
 
 class StyledButton(QPushButton):
     """

@@ -46,8 +46,7 @@ import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
-from telemffb.custom_widgets import (ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider,
-                                     NoWheelNumberSlider, SimStatusLabel, vpf_purple)
+from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, SimStatusLabel, vpf_purple, AppStatusWidget
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
@@ -117,10 +116,6 @@ class MainWindow(QMainWindow):
                 'height': 530,
                 'width': 700,
             },
-            # "2": {  # log
-            #     'height': 530,
-            #     'width': 700,
-            # },
             "2": {  # hide
                 'height': 0,
                 'width': 0,
@@ -261,14 +256,6 @@ class MainWindow(QMainWindow):
         reload_action.triggered.connect(self.force_reload_aircraft)
         utilities_menu.addAction(reload_action)
 
-        # # Add settings converter
-        # _legacy_override_file = utils.get_legacy_override_file()
-        # if _legacy_override_file is not None:
-        #     convert_settings_action = QAction('Convert legacy user config to XML', self)
-        #     _legacy_config_file = utils.get_resource_path('config.ini')
-        #     convert_settings_action.triggered.connect(lambda: autoconvert_config(self, _legacy_config_file, _legacy_override_file))
-        #     utilities_menu.addAction(convert_settings_action)
-
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
             self.window_menu = self.menu.addMenu('Window')
 
@@ -362,138 +349,41 @@ class MainWindow(QMainWindow):
 
         # Resize QGroupBox to match the size of the larger label
         max_width = round(pixmap.width() / pixmap.devicePixelRatioF())
-        max_height = round(pixmap.height() / pixmap.devicePixelRatioF())
+        max_height = round(pixmap.height() / pixmap.devicePixelRatioF() + 5)
         self.logo_stack.setFixedSize(max_width, max_height)
         self.logo_stack.setStyleSheet("QGroupBox { border: none; }")
         # Align self.image_label2 with the upper left corner of self.image_label
         self.devicetype_label.move(self.vpflogo_label.pos())
+        self.vpflogo_label.move(0, 5)
 
-           
-        # Add the image labels to the layout
-        logo_status_layout.addWidget(self.logo_stack, alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+
+        # Wrapper widget to control the logo's top padding
+        logo_wrapper = QWidget()
+        logo_wrapper_layout = QVBoxLayout(logo_wrapper)
+        logo_wrapper_layout.setContentsMargins(0, 12, 0, 0)  # Add top-only padding
+        logo_wrapper_layout.addWidget(self.logo_stack)
+        logo_wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+        # Now add only the wrapper to the horizontal layout
+        logo_status_layout.addWidget(logo_wrapper, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
         rh_status_area = QWidget()
         rh_status_layout = QVBoxLayout()
 
-        sim_status_area = QWidget()
-        status_layout = QHBoxLayout()
-        status_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        self.dcs_label_icon = SimStatusLabel("DCS")
-        self.il2_label_icon = SimStatusLabel("IL2")
-        self.msfs_label_icon = SimStatusLabel("MSFS")
-        self.xplane_label_icon = SimStatusLabel("X-PLANE")
-
-        status_layout.addWidget(self.dcs_label_icon)
-        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum))
-        status_layout.addWidget(self.il2_label_icon)
-        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum))
-        status_layout.addWidget(self.msfs_label_icon)
-        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum))
-        status_layout.addWidget(self.xplane_label_icon)
-
-        self.label_icons = {
-            'DCS': self.dcs_label_icon,
-            'IL2': self.il2_label_icon,
-            'MSFS': self.msfs_label_icon,
-            'XPLANE': self.xplane_label_icon,
-        }
-
-        def on_sims_changed(sim : SimTelemListener):
-            self.label_icons[sim.name].enabled = sim.started
-            self.refresh_telem_status()
-
-        def on_event(event):
-            if event[0] == "Stop":
-                src = G.telem_manager.getTelemValue("src")
-                if src in self.label_icons:
-                    lb = self.label_icons[src]
-                    lb.active = False
-                    lb.paused = False
-                self.refresh_telem_status()
-
-        G.telem_manager.eventReceived.connect(on_event)
-
-        G.sim_listeners.simStarted.connect(on_sims_changed)
-        G.sim_listeners.simStopped.connect(on_sims_changed)
-
-        status_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
-
-        sim_status_area.setLayout(status_layout)
-
-        rh_status_layout.addWidget(sim_status_area)
-
-        rh_status_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         ############
         # current craft
-        self.craft_container = QWidget()
-        self.craft_layout = QVBoxLayout(self.craft_container)
-        self.craft_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.status_container = AppStatusWidget(master_instance=G.master_instance)
+        self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
+        self.status_container.sim_status_label.set_waiting()
 
-        cur_ac_lbl = QLabel()
-        cur_ac_lbl.setText("<b>Current Aircraft:</b>")
-        cur_ac_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        cur_ac_lbl.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; }")
 
-        self.cur_craft_label = QLabel()
-        self.cur_craft_label.setText('None Detected')
-        self.cur_craft_label.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
-        self.cur_craft_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        self.cur_pattern_label = QLabel()
-        self.cur_pattern_label.setText('Matched: (No Match)')
-        self.cur_pattern_label.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
-        self.cur_pattern_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        self.active_profile_label = QLabel()
-        self.active_profile_label.setText('Active Profile:')
-        self.active_profile_label.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
-        self.active_profile_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        # if G.master_instance:
-        profile_row_layout = QHBoxLayout()
-        profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        self.profile_selector_label = QLabel("Select Profile:")
-        self.profile_selector_label.setStyleSheet("QLabel { padding-left: 15px; padding-top: 5px; }")
-
-        self.cb_activeProfileCombo = QComboBox()
-        self.cb_activeProfileCombo.setEnabled(False)
-        self.cb_activeProfileCombo.setStyleSheet("QComboBox { margin-left: 10px; }")
-        self.cb_activeProfileCombo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self.cb_activeProfileCombo.currentTextChanged.connect(self.on_profile_change)
-
-        profile_row_layout.addWidget(self.profile_selector_label)
-        profile_row_layout.addWidget(self.cb_activeProfileCombo)
-
-        self.craft_layout.addWidget(cur_ac_lbl)
-        self.craft_layout.addWidget(self.cur_craft_label)
-        self.craft_layout.addWidget(self.cur_pattern_label)
-        self.craft_layout.addWidget(self.active_profile_label)
-        if G.master_instance:
-            self.craft_layout.addLayout(profile_row_layout)
-        rh_status_layout.addWidget(self.craft_container)
+        rh_status_layout.addWidget(self.status_container)
         rh_status_area.setLayout(rh_status_layout)
 
-        logo_status_layout.addWidget(rh_status_area)
+        logo_status_layout.addWidget(rh_status_area,alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
 
         layout.addLayout(logo_status_layout)
-
-        self.notification_label = QLabel('')
-        self.notification_label.setWordWrap(True)
-        self.notification_label.hide()
-        # self.notification_label.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; color: red;}")
-        self.notification_label.setStyleSheet("""
-            QLabel {
-                padding-left: 10px;
-                padding-top: 2px;
-                color: #ff6b6b; /* Softer red for dark mode */
-                background-color: rgba(255, 50, 50, 30); /* Light red background tint */
-                border: 1px solid #c33;
-                border-radius: 4px;
-            }
-        """)
-        rh_status_layout.addWidget(self.notification_label)
 
         ##################
         #  new craft button
@@ -515,7 +405,6 @@ class MainWindow(QMainWindow):
         self.new_craft_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         new_craft_layout.addWidget(self.new_craft_button)
         new_craft_layout.addSpacing(7)
-        # self.new_craft_button.clicked.connect(self.show_user_model_dialog)
         layout.addLayout(new_craft_layout)
         self.new_craft_button.hide()
 
@@ -536,6 +425,27 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.banner_label)  # Add it above the combobox row
 
         # First row layout (existing widgets)
+        # --- Create the Offline Editor GroupBox ---
+        self.offline_groupbox = QGroupBox("Offline Editor Setup")
+        self.offline_groupbox.setStyleSheet("""
+            QGroupBox {
+            
+                font-weight: bold;
+                border: 1px solid gray;
+                border-radius: 5px;
+                margin-top: 6px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 3px 0 3px;
+            }
+        """)
+
+        offline_layout = QVBoxLayout(self.offline_groupbox)
+        offline_layout.setContentsMargins(10, 18, 10, 10)
+        offline_layout.setSpacing(10)
+
         top_row = QGridLayout()
 
         # --- Labels ---
@@ -594,10 +504,13 @@ class MainWindow(QMainWindow):
         top_row.setColumnStretch(2, 4)
         top_row.setColumnStretch(3, 2)
 
+        offline_layout.addLayout(top_row)
         # Second row layout (button on the left)
         bottom_row = QHBoxLayout()
-        bottom_row.addStretch()  # push button to the right
+        # bottom_row.addStretch()  # push button to the right
 
+        offline_scope = QLabel("<b>Offline Scope:   </b>")
+        self.offline_scope_label = QLabel('None')
         self.back_to_profile_mgr_button = QPushButton('Back to Profile Manager')
         self.back_to_profile_mgr_button.setVisible(False)
         self.back_to_profile_mgr_button.clicked.connect(self.back_to_profile_mgr)
@@ -606,11 +519,15 @@ class MainWindow(QMainWindow):
         self.offline_button.setText('Exit Offline Mode')
         self.offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
         # bottom_row.addWidget(self.manual_add_button)
-        bottom_row.addWidget(self.back_to_profile_mgr_button)
-        bottom_row.addWidget(self.offline_button)
-
+        bottom_row.addWidget(offline_scope, alignment=Qt.AlignmentFlag.AlignLeft)
+        bottom_row.addWidget(self.offline_scope_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        bottom_row.addStretch()
+        bottom_row.addWidget(self.back_to_profile_mgr_button, alignment=Qt.AlignmentFlag.AlignRight)
+        bottom_row.addWidget(self.offline_button, alignment=Qt.AlignmentFlag.AlignRight)
+        offline_layout.addLayout(bottom_row)
         # Combine both rows
         main_layout.addWidget(self.banner_label)
+        main_layout.addWidget(self.offline_groupbox)
         main_layout.addLayout(top_row)
         main_layout.addLayout(bottom_row)
 
@@ -642,13 +559,6 @@ class MainWindow(QMainWindow):
         layout.addLayout(self.config_scope_row)
 
         self.tab_widget = QTabWidget(self)
-        # self.tab_widget.setTabShape(QTabWidget.TabShape.Triangular)  # Set triangular tab shape
-        # self.tab_widget.addTab(QWidget(), "Log")
-        # self.tab_widget.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-
-        # Set the main window area height to 0
-        # self.tab_widget.setMinimumHeight(14)
-
 
         # Create a horizontal line widget
         self.line_widget = QFrame(self)
@@ -1016,9 +926,6 @@ class MainWindow(QMainWindow):
             if action.text() == "Debug":
                 return
         debug_menu = self.menu.addMenu("Debug")
-        # self.aircraft_picker_action.setCheckable(True)
-        # self.aircraft_picker_action.triggered.connect(lambda: self.toggle_settings_window(dbg=True))
-        # debug_menu.addAction(self.aircraft_picker_action)
 
         teleplot_action = QAction("Teleplot Setup", self)
         def do_open_teleplot_setup_dialog():
@@ -1283,7 +1190,8 @@ class MainWindow(QMainWindow):
             # Add 2 pixels for spacing and set minimum width
             combo.setMinimumWidth(max_width + 50)
 
-        self.update_settings()
+        self.settings_layout.reload_caller()
+
     def show_profile_manager(self):
         xmlutils.update_roots() # make sure roots get updated in case state is timedout and file has changed
         self.profile_mgr_dialog = ProfileManagerDialog(self)
@@ -1322,26 +1230,14 @@ class MainWindow(QMainWindow):
             G.main_window.settings_layout.clear_layout()
 
             # reset the craft area text to default
-            self.cur_craft_label.setText('None Detected')
-            self.cur_pattern_label.setText('(No Match)')
-            self.active_profile_label.setText(G.settings_mgr.active_profile)
-
-            # re-show the profile selecting widget
-            if G.master_instance:
-                self.profile_selector_label.setVisible(True)
-                self.cb_activeProfileCombo.setVisible(True)
+            self.status_container.reset()
             self.settings_layout.reload_caller()
         else:
             # Entering offline editing mode
             G.settings_mgr.go_offline()
-
+            self.status_container.set_offline("None")
             # clear the layout in case an aircraft was previously loaded live
             G.main_window.settings_layout.clear_layout()
-
-            # hide the profile selecting widget
-            if G.master_instance:
-                self.profile_selector_label.setVisible(False)
-                self.cb_activeProfileCombo.setVisible(False)
 
             # Block signals so we don't trigger text change on .clear() calls
             self.offline_name.blockSignals(True)
@@ -1361,11 +1257,6 @@ class MainWindow(QMainWindow):
             # build sim list
             sims = [''] + xmlutils.get_sims()
             self.offline_sim.addItems(sims)
-
-            # modify current craft area text for offline mode
-            self.cur_craft_label.setText('OFFLINE EDITING MODE')
-            self.cur_pattern_label.setText(f"Make Selection")
-            self.active_profile_label.setText("Active Profile: (None)")
 
             # force the settings tab to be active
             self.tab_widget.setCurrentIndex(1)
@@ -1410,9 +1301,6 @@ class MainWindow(QMainWindow):
             cb.blockSignals(False)
 
         G.settings_mgr.offline_scope = 'MODEL'
-        self.cur_craft_label.setText('OFFLINE EDITING MODE')
-        self.cur_pattern_label.setText(f"{G.settings_mgr.offline_scope}: {model}")
-        self.active_profile_label.setText(f"Active Profile: {profile}")
 
         self.force_sim_aircraft()
         if G.master_instance:
@@ -1450,6 +1338,8 @@ class MainWindow(QMainWindow):
             self.offline_name.clear()
             self.offline_profile.clear()
             self.settings_layout.clear_layout()
+            self.offline_scope_label.setText(f"None")
+
             return
         self.offline_class.clear()  #clear class field
         self.offline_class.addItem('')
@@ -1471,10 +1361,9 @@ class MainWindow(QMainWindow):
             # send to child instances to mimic action
             G.ipc_instance.send_broadcast_message(f"OFFLINE_SIM:{self.offline_sim.currentText()}")
 
-        #G.current_offline_config_scope = 'SIM'  # set config scope to SIM
         G.settings_mgr.offline_scope = 'SIM'  # set config scope to SIM
-        self.cur_craft_label.setText('OFFLINE EDITING MODE')
-        self.cur_pattern_label.setText(f"{G.settings_mgr.offline_scope}: {sim}")
+        self.offline_scope_label.setText(f"Editing SIM Defaults ({sim})")
+
         self.resize_offline_combos()
         self.force_sim_aircraft() # load settings based on sim
 
@@ -1492,10 +1381,9 @@ class MainWindow(QMainWindow):
             # reset back to sim mode if class field is cleared
             self.offline_sim_changed(self.offline_sim.currentText())
         else:
-            #G.current_offline_config_scope = 'CLASS' # set config scope to CLASS
             G.settings_mgr.offline_scope = 'CLASS' # set config scope to CLASS
-            self.cur_craft_label.setText('OFFLINE EDITING MODE')
-            self.cur_pattern_label.setText(f"{G.settings_mgr.offline_scope}: {class_name}")
+            self.offline_scope_label.setText(f"Editing Class Defaults ({class_name})")
+
         self.resize_offline_combos()
         self.force_sim_aircraft() # load settings based on class and currently selected sim
 
@@ -1506,11 +1394,12 @@ class MainWindow(QMainWindow):
         self.offline_profile.clear()
 
         for profile_name in profiles:
-            if profile_name != 'default' and profile_name != 'Auto User':
+            if profile_name != 'default':
                 self.offline_profile.addItem(profile_name)
+
         if not self.offline_profile.count():
             self.offline_profile.addItem('Auto User')  # manually add 'Auto User' so it is at the top and always present even if there is not yet a Auto User Profile
-
+            xmlutils.update_active_profile_entry(sim=self.offline_sim.currentText(), cls=cls, model=ac_name, new_profile="Auto User")
         self.offline_class.blockSignals(True)  # block signals to prevent triggering of offline_class_changed
         self.offline_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
         self.offline_class.blockSignals(False)  # unblock signals
@@ -1518,24 +1407,26 @@ class MainWindow(QMainWindow):
         if ac_name == '':
             self.offline_class_changed(self.offline_class.currentText())
         else:
-            #G.current_offline_config_scope = 'MODEL'
             G.settings_mgr.offline_scope = 'MODEL'
-            self.cur_craft_label.setText('OFFLINE EDITING MODE')
-            self.cur_pattern_label.setText(f"{G.settings_mgr.offline_scope}: {ac_name}")
 
         if G.master_instance:
             G.ipc_instance.send_broadcast_message(f'OFFLINE_AC:{self.offline_name.currentText()}')
+
+        self.offline_scope_label.setText(f"Editing Aircraft ({ac_name} - {self.offline_profile.currentText()})")
 
         self.resize_offline_combos()
         self.force_sim_aircraft()
 
     def offline_profile_changed(self, profile):
-        self.active_profile_label.setText(f"Active Profile: {profile}")
+        # self.update_craft_text_block(profile=profile)
+
         self.resize_offline_combos()
         self.force_sim_aircraft()
         if G.master_instance:
             # send to child instances to mimic action
             G.ipc_instance.send_broadcast_message(f"OFFLINE_PROFILE:{profile}")
+        self.offline_scope_label.setText(f"Editing Aircraft ({self.offline_name.currentText()} - {profile})")
+
 
 
 
@@ -1546,8 +1437,6 @@ class MainWindow(QMainWindow):
         G.settings_mgr.current_class = self.offline_class.currentText()
         G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
         G.settings_mgr.active_profile = self.offline_profile.currentText()
-        # self.settings_layout.expanded_items.clear()
-        # self.monitor_widget.hide()
         self.settings_layout.reload_caller()
 
 
@@ -1681,14 +1570,10 @@ class MainWindow(QMainWindow):
         # dialog.exec_()
 
     def update_settings(self):
-        # caller_frame = inspect.currentframe().f_back
-        # caller_name = caller_frame.f_code.co_name
-        # utils.dbprint("yellow", f"UPDATE_SETTINGS was called by {caller_name}")
+        # utils.debug_caller_args('blue')
+        self.populate_profile_combo(None) # populate combo with any new profiles
+        self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
         self.settings_layout.reload_caller()
-
-    # def show_sub_menu(self):
-    #     edit_button = self.sender()
-    #     self.sub_menu.popup(edit_button.mapToGlobal(edit_button.rect().bottomLeft()))
 
     def open_url(self, url):
 
@@ -1736,7 +1621,13 @@ class MainWindow(QMainWindow):
         if source is None:
             return
 
-        ic = self.label_icons[source]
+        if error:
+            self.status_container.set_error(source)
+        elif paused:
+            self.status_container.set_paused(source)
+        else:
+            self.status_container.set_running(source)
+
 
         if G.master_instance:
             if error:
@@ -1744,16 +1635,11 @@ class MainWindow(QMainWindow):
 
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
-                # utils.dbprint('blue', f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
-                self.notification_label.setText(message)
-                # Replace the "current aircraft" label with the message
-                container_height = self.craft_container.height()
-                self.notification_label.setFixedHeight(container_height)
-                self.craft_container.hide()
-                self.notification_label.show()
+
+                self.status_container.flag_error(message)
+
                 self.pop_tray_notification("Error", message, renew_period= 2)
 
-                ic.error_message = message  # set message for instance icon tooltip
 
             elif paused:
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_paused.png'))
@@ -1763,13 +1649,8 @@ class MainWindow(QMainWindow):
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_run.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Running ")
                 # re-show the "current aircraft" label once error cleared
-                self.notification_label.setText('')
-                self.notification_label.hide()
-                self.craft_container.show()
 
-        ic.error = error
-        ic.paused = paused
-        ic.active = True
+
 
 
 
@@ -1812,14 +1693,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-        # elif index == 2:  # Log Tab
-        #     self.current_tab_index = 2
-        #     try:
-        #         h = self.tab_sizes[str(index)]['height']
-        #         w = self.tab_sizes[str(index)]['width']
-        #         self.resize(int(w), int(h))
-        #     except: pass
-
         elif index == 2:  # Hide Tab
             self.current_tab_index = 2
 
@@ -1842,79 +1715,70 @@ class MainWindow(QMainWindow):
         # Create and return the interpolated color
         return QColor(r, g, b, a)
 
-    def update_craft_labels(self, model, match, profile):
-        self.cur_craft_label.setText(f'{model}')
-        self.cur_pattern_label.setText(f'Matched: "{match}"')
-        self.active_profile_label.setText(f'Active Profile: "{profile}"')
-
-    def update_profile_combo(self, new_items: list[str]):
+    def populate_profile_combo(self, new_items: list[str]=None):
         """
         Updates the profile combo box only if its contents differ (excluding 'Add New...').
 
         Args:
             new_items (list[str]): List of profiles to populate.
         """
+        SELECT_LABEL = 'Select...'
         ADD_NEW_LABEL = "Add New..."
+        if not self.status_container.cb_selectProfileCombo.isEnabled():
+            self.status_container.cb_selectProfileCombo.setEnabled(True)
+        if new_items is None:
+            new_items = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
-        # Extract current items, excluding 'Add New...'
-        current_items = [
-            self.cb_activeProfileCombo.itemText(i)
-            for i in range(self.cb_activeProfileCombo.count())
-            if self.cb_activeProfileCombo.itemText(i) != ADD_NEW_LABEL
-        ]
-        # enable the combobox if it is not enabled
-        if not self.cb_activeProfileCombo.isEnabled():
-            self.cb_activeProfileCombo.setEnabled(True)
-        # populate combobox with new items if they are different
-        # block signals to avoid triggering the combobox's itemChanged signal
+        self.status_container.cb_selectProfileCombo.blockSignals(True)
+        self.status_container.cb_selectProfileCombo.clear()
 
-        if set(current_items) != set(new_items):
-            selected = self.cb_activeProfileCombo.currentText()
-            self.cb_activeProfileCombo.blockSignals(True)
-            self.cb_activeProfileCombo.clear()
-            self.cb_activeProfileCombo.addItems(new_items)
+        self.status_container.cb_selectProfileCombo.addItem(SELECT_LABEL)
+        for item in new_items:
+                self.status_container.cb_selectProfileCombo.addItem(item)
 
-            # Add styled 'Add New...' item
-            self.cb_activeProfileCombo.addItem(ADD_NEW_LABEL)
-            index = self.cb_activeProfileCombo.findText(ADD_NEW_LABEL)
-            if index >= 0:
-                font = QFont()
-                font.setItalic(True)
-                self.cb_activeProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
+        self.status_container.cb_selectProfileCombo.addItem(ADD_NEW_LABEL)
+        index = self.status_container.cb_selectProfileCombo.findText(ADD_NEW_LABEL)
+        if index >= 0:
+            font = QFont()
+            font.setItalic(True)
+            self.status_container.cb_selectProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
 
-            self.cb_activeProfileCombo.blockSignals(False)
+        self.status_container.cb_selectProfileCombo.setCurrentIndex(0)
+        self.status_container.cb_selectProfileCombo.blockSignals(False)
 
-            if selected in new_items:
-                self.cb_activeProfileCombo.setCurrentText(selected)
-
-
-    def on_profile_change(self, profile_name):
+    def on_profile_change(self, index):
         # utils.debug_caller_args("red")
         """
         Call to xmlutils to update the profile mapping for the aircraft when the user changes the profile
         If the "add new" option is selected, pop a dialog asking for the new profile name.  If the user chooses
         the "make active' option, make a further call to make the new profile the active one
         Args:
-            profile_name: The profile name selected by the user
+            index: The selected index in the combobox.
 
         Returns: Nothing
 
         """
+        if not G.master_instance:
+            return
+        if index == 0:
+            return
+
+        profile_name = self.status_container.cb_selectProfileCombo.itemText(index)
+
+        self.status_container.cb_selectProfileCombo.blockSignals(True)
+        self.status_container.cb_selectProfileCombo.setCurrentIndex(0)
+        self.status_container.cb_selectProfileCombo.blockSignals(False)
+
         sim = G.settings_mgr.current_sim
         cls = G.settings_mgr.current_class
         pattern = G.settings_mgr.current_pattern
-        cur_profile = G.settings_mgr.active_profile
-        if not G.master_instance: return
-        cur_txt = self.cb_activeProfileCombo.currentText()
-        if profile_name == 'Add New...':
-            ## Quickly block signals and set it back to the actual current model.. then kick off new profile dialog
-            self.cb_activeProfileCombo.blockSignals(True)
-            self.cb_activeProfileCombo.setCurrentText(cur_txt)
-            self.cb_activeProfileCombo.blockSignals(False)
-            if G.settings_mgr.active_profile.lower() == 'default':
-                type='new'
 
-            dlg = NewProfileDialog(self, type='neew')
+        cur_txt = xmlutils.get_active_profile_for_model(sim, cls, pattern)
+        if profile_name == 'Add New...':
+            ## Quickly block signals and set it back to "Select".. then kick off new profile dialog
+
+
+            dlg = NewProfileDialog(self)
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 # user canceled
                 return
@@ -1940,17 +1804,16 @@ class MainWindow(QMainWindow):
                 G.settings_mgr.update_state_vars(active_profile=new_profile)
 
             if G.telem_manager.timed_out:
-                self.update_profile_combo(xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern))
-                self.update_craft_labels(G.settings_mgr.current_aircraft_name, G.settings_mgr.current_pattern, G.settings_mgr.active_profile)
-                self.cb_activeProfileCombo.setCurrentText(G.settings_mgr.active_profile)
+                self.populate_profile_combo(xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern))
+                self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
         else:
             xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, profile_name)
             if G.telem_manager.timed_out:
-                self.update_craft_labels(G.settings_mgr.current_aircraft_name, G.settings_mgr.current_pattern, profile_name)
-                self.cb_activeProfileCombo.setCurrentText(profile_name)
+                self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=profile_name)
+        if G.telem_manager.timed_out:
+            self.settings_layout.reload_caller()
 
     def on_telemetry_timeout(self):
-        # self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
         self.lbl_effects_data.setText("")
         if not self.error_state:
             # Only set icon to pause if error condition is not present when pausing
@@ -2095,14 +1958,16 @@ class MainWindow(QMainWindow):
             error_cond = data.get('error', None)
 
             if error_cond is None:  # no 'error' key in telemetry
-                if self.telemetry_timed_out or self.error_state:  # only set status to run if previously timed out or error status was true
+                if self.telemetry_timed_out or self.error_state:  # only set status to run if previously debug_timed out or error status was true
                     if not self.error_clean_counter:  # avoid flapping due to ipc_telem not populating on every frame due to thread timing between instances
                         self.update_sim_indicators(data.get('src'), paused=False)
                         self.error_state = False
                         self.telemetry_timed_out = False
+                        self.status_container.clear_error()
                     else:
                         self.error_clean_counter -= 1  # decrement the counter so that it will reach 0 once error is *truly* cleared
             elif error_cond is not None:
+
                 self.error_clean_counter = 5
                 if not self.error_state:  # only set error status once when there is error cond but state is not yet true
                     self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
@@ -2126,7 +1991,6 @@ class MainWindow(QMainWindow):
                     if not data.get('STOP', False):
                         if not self.new_craft_notification_sent:
 
-                            # utils.dbprint("red", f"SIM: {data.get('src', None)} CLASS: {G.settings_mgr.current_class}, NAME: {data.get('N', '')}")
                             self.pop_tray_notification(
                                 "** New Aircraft Found **",
                                 f"No profile was found for the aircraft\n{data.get('N')}\n\nClick to open TelemFFB.",
@@ -2142,39 +2006,33 @@ class MainWindow(QMainWindow):
                 self.new_craft_notification_sent = False
 
             # Update the status labels and profile selection box
-            self.cur_craft_label.setText(data['N'])
+            self.status_container.set_fullname(data['N'])
             ap = G.settings_mgr.active_profile
             active_profile = xmlutils.get_active_profile_for_model(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
-            # print(f"Active Profile: {active_profile}, AP: {ap}")
-            available_profiles = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
-            # print(f"Profiles: {available_profiles}, ACTIVE: {active_profile}")
-
-
-            if G.master_instance:
-                self.update_profile_combo(available_profiles)
-                """
-                Update the selection if the active profile has changed via other means (Auto User profile switch)
-                """
-                if self.cb_activeProfileCombo.currentText() != active_profile:
-                    self.cb_activeProfileCombo.setCurrentText(active_profile)
-
-            self.cur_pattern_label.setText(f'Matched: <span style="font-family: Consolas, monospace;font-size: 14px">"{shown_pattern}"</span>')
-            self.active_profile_label.setText(f'Active Profile: <span style="font-family: Consolas, monospace;font-size: 14px">"{active_profile}"</span>')
-                #HERE
+            self.update_craft_text_block(pattern=shown_pattern, profile=active_profile)
 
             if window_mode == 0:
                 self.lbl_telem_data.setText(telem_items)
-            # elif window_mode == self.effect_monitor_radio:
                 self.lbl_effects_data.setText(active_effects)
 
         except Exception:
             logging.exception("Exception")
 
+    def update_craft_text_block(self, craft=None, pattern=None, profile=None):
+        if craft is None:
+            craft = G.settings_mgr.current_aircraft_name
+        if pattern is None:
+            pattern = G.settings_mgr.current_pattern
+        if profile is None:
+            profile = G.settings_mgr.active_profile
+        self.status_container.cur_craft_label.setText(craft)
+        self.status_container.cur_pattern_label.setText(pattern)
+        self.status_container.active_profile_label.setText(profile)
+
     def new_ac_wizard_finished(self):
         self.new_craft_button.setVisible(False)
         self.settings_layout.reload_layout(None)
-        # G.sim_listeners.restart_all()
 
 
     def perform_update(self, auto=True):
@@ -2200,7 +2058,6 @@ class MainWindow(QMainWindow):
         if not is_exe: return False
 
         if self._update_available:
-            # vers, url = utils.fetch_latest_version()
             update_ans = QMessageBox.StandardButton.Yes
             if auto:
                 update_ans = QMessageBox.information(self, "Update Available!!",
