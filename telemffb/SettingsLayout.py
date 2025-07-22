@@ -363,6 +363,10 @@ class SettingsLayout(QGridLayout):
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.addItem(spacerItem, i+1, 1, 1, 1)
+
+        # set expander column minimum size so it does not shrink and shift layout when no expanders are visible
+        self.setColumnMinimumWidth(0, 30)
+
         # Give entry column a high stretch factor, all others remain default 0.
         # When window is resized, the entry column will grow to take up all the new space
         self.setColumnStretch(5, 10)
