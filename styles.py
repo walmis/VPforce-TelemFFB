@@ -8,7 +8,7 @@ QPushButton:!pressed, #styledButton:!pressed {
     background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:0, y2:0.0397727, stop:0 rgba(160, 0, 200, 255), stop:1 rgba(174, 106, 206, 255));
     border-radius: 6px;
     padding: 2px;
-    color: #dddddd; /* Ensures consistency */
+    color: white; /* Ensures consistency */
     border: 1px solid #9d30b3;
     min-width: 70px;
 }
