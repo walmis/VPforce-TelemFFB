@@ -839,7 +839,7 @@ class StatusLabel(QWidget):
 
     def mousePressEvent(self, event):
         if self._clickable:
-            dev = self.label.text().lower()
+            dev = self.label.text().lower().replace(" ","")
             self.clicked.emit(dev)
 
     def hide(self):
