@@ -422,7 +422,7 @@ class MainWindow(QMainWindow):
         self.banner_label.setObjectName('OfflineBannerLabel')
 
 
-        main_layout.addWidget(self.banner_label)  # Add it above the combobox row
+        # main_layout.addWidget(self.banner_label)  # Add it above the combobox row
 
         # First row layout (existing widgets)
         # --- Create the Offline Editor GroupBox ---
@@ -525,8 +525,6 @@ class MainWindow(QMainWindow):
         bottom_row.addWidget(self.back_to_profile_mgr_button, alignment=Qt.AlignmentFlag.AlignRight)
         bottom_row.addWidget(self.offline_button, alignment=Qt.AlignmentFlag.AlignRight)
         offline_layout.addLayout(bottom_row)
-        # Combine both rows
-        main_layout.addWidget(self.banner_label)
         main_layout.addWidget(self.offline_groupbox)
         main_layout.addLayout(top_row)
         main_layout.addLayout(bottom_row)

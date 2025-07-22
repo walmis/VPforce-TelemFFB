@@ -20,7 +20,7 @@ from PyQt6.QtGui import QAction, QWheelEvent, QPalette
 
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
-    QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox
+    QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox, QStackedLayout
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
@@ -103,6 +103,30 @@ class AppStatusWidget(QGroupBox):
                     }
                 """)
 
+        self.offline_label = QLabel('Telemetry is paused while in offline editing mode')
+        self.offline_label.setWordWrap(True)
+        self.offline_label.setMinimumHeight(60)
+        size_policy = self.offline_label.sizePolicy()
+        size_policy.setRetainSizeWhenHidden(True)
+        self.offline_label.setSizePolicy(size_policy)
+        self.offline_label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(255, 165, 0, 100);  /* Orange-ish translucent */
+                color: palette(windowText);
+                padding: 6px 10px;
+                font-weight: bold;
+                border: 1px solid palette(dark);
+                border-radius: 6px;
+            }
+        """)
+
+        # --- Stack the labels ---
+        self.message_stack = QStackedLayout()
+        self.message_stack.addWidget(QLabel('')) # Index 0
+        self.message_stack.addWidget(self.notification_label)  # index 1
+        self.message_stack.addWidget(self.offline_label)  # index 2
+        self.message_stack.setCurrentIndex(-1)  # Start with nothing visible
+
         grid.addWidget(sim_status_header, row, 0, alignment=label_align)
         grid.addWidget(self.sim_status_label, row, 1, alignment=value_align)
         row += 1
@@ -132,7 +156,7 @@ class AppStatusWidget(QGroupBox):
 
         grid.addLayout(profile_row_layout, row, 1)
         row += 1
-        grid.addWidget(self.notification_label, row, 0,3,3)
+        grid.addLayout(self.message_stack, row, 0,3,3)
 
         if not master_instance:
             self.cb_selectProfileCombo.setDisabled(True)
@@ -149,16 +173,20 @@ class AppStatusWidget(QGroupBox):
         self.offline_recall_ac = ''
         self.offline_recall_ptn = ''
         self.offline_recall_pro = ''
+        self.message_stack.setCurrentIndex(0)
+
 
     def set_running(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Running')
         self.cb_selectProfileCombo.setDisabled(False)
+        self.message_stack.setCurrentIndex(0)
 
     def set_paused(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Paused')
         self.cb_selectProfileCombo.setDisabled(False)
+        self.message_stack.setCurrentIndex(0)
 
     def set_error(self, source):
         if self.offline: return
@@ -175,14 +203,19 @@ class AppStatusWidget(QGroupBox):
         self.cur_pattern_label.setText('Offline')
         self.active_profile_label.setText('Offline')
         self.cb_selectProfileCombo.setDisabled(True)
+        self.message_stack.setCurrentIndex(2)
 
     def flag_error(self, message):
         self.notification_label.setText(message)
         self.notification_label.show()
+        self.message_stack.setCurrentIndex(1)
+
 
     def clear_error(self):
         self.notification_label.setText('')
         self.notification_label.hide()
+        self.message_stack.setCurrentIndex(0)
+
 
     def set_fullname(self, full_name):
         self.cur_craft_label.setText(full_name)
