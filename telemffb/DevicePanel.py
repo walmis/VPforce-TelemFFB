@@ -113,11 +113,15 @@ class DeviceIconWidget(QWidget):
     def _fade_text(self, visible: bool):
         self.opacity_anim.stop()
         self.opacity_anim.setStartValue(self.opacity_effect.opacity())
-        self.opacity_anim.setEndValue(1.0 if visible else 0.0)
+
+        # Always show text if this widget is active
+        final_visible = visible or self.active
+        self.opacity_anim.setEndValue(1.0 if final_visible else 0.0)
         self.opacity_anim.start()
 
     def set_active(self, active: bool):
         self.active = active
+        self._fade_text(self.hover)  # Maintain hover logic too
         self.update()
 
     def enterEvent(self, event: QEnterEvent):
