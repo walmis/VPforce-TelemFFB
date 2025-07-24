@@ -500,8 +500,7 @@ def _setup_device_button_connections():
 def _setup_device_connect_status():
     """Setup device disconnect/reconnect status signals"""
     try:
-        HapticEffect.device.deviceConnected.connect(lambda: setattr(G, "device_connection_status", True))
-        HapticEffect.device.deviceDisconnected.connect(lambda: setattr(G, "device_connection_status", False))
+        HapticEffect.device.deviceConnected.connect(G.main_window.update_device_status)
     except:
         pass
 

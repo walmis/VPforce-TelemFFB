@@ -370,27 +370,33 @@ class MainWindow(QMainWindow):
         # Add logo_wrapper to top-left cell
         # logo_status_layout.addWidget(logo_wrapper, 0, 0,alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
-        if G.master_instance:
-            # --- Icon Row ---
-            device_groupbox = QGroupBox("Device")
-            device_groupbox.setStyleSheet("""
-                        QGroupBox {
-    
-                            font-weight: bold;
-                            border: 1px solid gray;
-                            border-radius: 5px;
-                            margin-top: 6px;
-                        }
-                        QGroupBox::title {
-                            subcontrol-origin: margin;
-                            left: 10px;
-                            padding: 0 3px 0 3px;
-                        }
-                    """)
-            device_groupbox_layout = QVBoxLayout()
-            self.device_panel = DeviceIconPanel()
-            device_groupbox_layout.addWidget(self.device_panel)
-            device_groupbox.setLayout(device_groupbox_layout)
+        # if G.master_instance:
+        # --- Icon Row ---
+        device_groupbox = QGroupBox("Active Devices")
+        device_groupbox.setStyleSheet("""
+                    QGroupBox {
+
+                        font-weight: bold;
+                        border: 1px solid gray;
+                        border-radius: 5px;
+                        margin-top: 6px;
+                    }
+                    QGroupBox::title {
+                        subcontrol-origin: margin;
+                        left: 10px;
+                        padding: 0 3px 0 3px;
+                    }
+                """)
+        device_groupbox_layout = QVBoxLayout()
+        self.device_panel = DeviceIconPanel()
+        device_groupbox_layout.addWidget(self.device_panel)
+        device_groupbox.setLayout(device_groupbox_layout)
+
+        if not G.master_instance:
+            self.device_panel.set_devices([G.device_type])
+            self.device_panel.set_device_status(G.device_type, "ok")
+            self.device_panel.set_active_device(G.device_type)
+
             # logo_status_layout.addLayout(device_groupbox_layout, 1, 0, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             # logo_status_layout.addWidget(device_groupbox, 1, 0, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         left_stack = QWidget()
@@ -398,8 +404,8 @@ class MainWindow(QMainWindow):
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(6)
         left_layout.addWidget(logo_wrapper)
-        if G.master_instance:
-            left_layout.addWidget(device_groupbox)
+        # if G.master_instance:
+        left_layout.addWidget(device_groupbox)
 
         logo_status_layout.addWidget(left_stack, 0, 0, 2, 1,  # rowspan = 2
                                      alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
@@ -1043,6 +1049,12 @@ class MainWindow(QMainWindow):
 
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
+
+    @pyqtSlot(bool)
+    def update_device_status(self, connected):
+        G.device_connection_status = connected
+        status = "ACTIVE" if connected else "DISCONNECTED"
+        self.device_panel.set_device_status(G.device_type, status)
 
     @pyqtSlot(str, str)
     def update_child_status(self, device, status):

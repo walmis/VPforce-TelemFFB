@@ -688,8 +688,7 @@ class DeviceInfo:
 class FFBRhino(QObject):
     buttonPressed = pyqtSignal(int)
     buttonReleased = pyqtSignal(int)
-    deviceConnected = pyqtSignal()
-    deviceDisconnected = pyqtSignal()
+    deviceConnected = pyqtSignal(bool)
 
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> None:
 
@@ -795,9 +794,9 @@ class FFBRhino(QObject):
                 try:
                     self.reconnect()
                     logging.info("HID connected!")
-                    self.deviceConnected.emit()
+                    self.deviceConnected.emit(True)
                 except Exception:
-                    self.deviceDisconnected.emit()
+                    self.deviceConnected.emit(False)
                     logging.warn("Reconnecting HID device in 1s")
                     QTimer.singleShot(1000, do_reconnect)
 
