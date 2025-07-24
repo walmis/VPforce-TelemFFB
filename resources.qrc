@@ -1,6 +1,7 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource>
+        <file>image/TelemFFB_logo.png</file>
         <file>image/icon_joystick.png</file>
         <file>image/icon_pedals.png</file>
         <file>image/icon_collective.png</file>

@@ -358,12 +358,22 @@ class MainWindow(QMainWindow):
         self.devicetype_label.move(self.vpflogo_label.pos())
         self.vpflogo_label.move(0, 5)
 
+        t_logo_box = QGroupBox()
+        t_logo = QLabel(t_logo_box)
+        t_logo_box.setStyleSheet("QGroupBox { border: none; }")
+        t_pixmap = HiDpiPixmap(":/image/TelemFFB_logo.png")
+        t_pixmap = t_pixmap._scaled(round(t_pixmap.width()/5), round(t_pixmap.height()/5))
+        t_logo.setPixmap(t_pixmap)
 
+        max_width = round(t_pixmap.width() / t_pixmap.devicePixelRatioF())
+        max_height = round(t_pixmap.height() / t_pixmap.devicePixelRatioF() + 5)
+
+        t_logo_box.setFixedSize(max_width, max_height)
         # Wrapper widget to control the logo's top padding
         logo_wrapper = QWidget()
         logo_wrapper_layout = QVBoxLayout(logo_wrapper)
         logo_wrapper_layout.setContentsMargins(0, 12, 0, 0)  # Add top-only padding
-        logo_wrapper_layout.addWidget(self.logo_stack)
+        logo_wrapper_layout.addWidget(t_logo_box)
         logo_wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
         # Now add only the wrapper to the horizontal layout
@@ -387,6 +397,7 @@ class MainWindow(QMainWindow):
                         padding: 0 3px 0 3px;
                     }
                 """)
+        device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         device_groupbox_layout = QVBoxLayout()
         self.device_panel = DeviceIconPanel()
         device_groupbox_layout.addWidget(self.device_panel)
