@@ -333,55 +333,17 @@ class MainWindow(QMainWindow):
 
         logo_status_layout = QGridLayout()
 
-        # Add a label for the image
-        # Construct the absolute path of the image file
-        self.logo_stack = QGroupBox()
-        self.vpflogo_label = QLabel(self.logo_stack)
-        self.devicetype_label = ClickLogo(self.logo_stack)
-        self.devicetype_label.clicked.connect(self.device_logo_click_event)
-        pixmap = HiDpiPixmap(G.vpf_logo)
-        pixmap = pixmap._scaled(136, 58, aspectRatioMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation)
-
-        pixmap2 = HiDpiPixmap(utils.get_device_logo(G.device_type))
-        pixmap2 = pixmap2._scaled(round(pixmap2.width()/2), round(pixmap2.height()/2))
-
-        self.vpflogo_label.setPixmap(pixmap)
-        self.devicetype_label.setPixmap(pixmap2)
-        self.devicetype_label.setScaledContents(True)
-
-        # Resize QGroupBox to match the size of the larger label
-        max_width = round(pixmap.width() / pixmap.devicePixelRatioF())
-        max_height = round(pixmap.height() / pixmap.devicePixelRatioF() + 5)
-        self.logo_stack.setFixedSize(max_width, max_height)
-        self.logo_stack.setStyleSheet("QGroupBox { border: none; }")
-        # Align self.image_label2 with the upper left corner of self.image_label
-        self.devicetype_label.move(self.vpflogo_label.pos())
-        self.vpflogo_label.move(0, 5)
-
-        t_logo_box = QGroupBox()
-        t_logo = QLabel(t_logo_box)
-        t_logo_box.setStyleSheet("QGroupBox { border: none; }")
+        ##
+        ##  Create Logo
+        ##
+        t_logo = QLabel()
         t_pixmap = HiDpiPixmap(":/image/TelemFFB_logo.png")
         t_pixmap = t_pixmap._scaled(round(t_pixmap.width()/5), round(t_pixmap.height()/5))
         t_logo.setPixmap(t_pixmap)
 
-        max_width = round(t_pixmap.width() / t_pixmap.devicePixelRatioF())
-        max_height = round(t_pixmap.height() / t_pixmap.devicePixelRatioF() + 5)
-
-        t_logo_box.setFixedSize(max_width, max_height)
-        # Wrapper widget to control the logo's top padding
-        logo_wrapper = QWidget()
-        logo_wrapper_layout = QVBoxLayout(logo_wrapper)
-        logo_wrapper_layout.setContentsMargins(0, 12, 0, 0)  # Add top-only padding
-        logo_wrapper_layout.addWidget(t_logo_box)
-        logo_wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-
-        # Now add only the wrapper to the horizontal layout
-        # Add logo_wrapper to top-left cell
-        # logo_status_layout.addWidget(logo_wrapper, 0, 0,alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-
-        # if G.master_instance:
-        # --- Icon Row ---
+        ##
+        ##  Create Device Panel
+        ##
         device_groupbox = QGroupBox("Active Devices")
         device_groupbox.setStyleSheet("""
                     QGroupBox {
@@ -408,21 +370,9 @@ class MainWindow(QMainWindow):
             self.device_panel.set_device_status(G.device_type, "ok")
             self.device_panel.set_active_device(G.device_type)
 
-            # logo_status_layout.addLayout(device_groupbox_layout, 1, 0, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-            # logo_status_layout.addWidget(device_groupbox, 1, 0, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        left_stack = QWidget()
-        left_layout = QVBoxLayout(left_stack)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(6)
-        left_layout.addWidget(logo_wrapper)
-        # if G.master_instance:
-        left_layout.addWidget(device_groupbox)
-
-        logo_status_layout.addWidget(left_stack, 0, 0, 2, 1,  # rowspan = 2
-                                     alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        # --- Right-Hand Status Area ---
-        rh_status_area = QWidget()
-        rh_status_layout = QVBoxLayout()
+        ##
+        ##  Create Status Panel
+        ##-
         self.status_container = AppStatusWidget(master_instance=G.master_instance)
         self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
         self.status_container.sim_status_label.set_waiting()
@@ -434,20 +384,23 @@ class MainWindow(QMainWindow):
 
         G.sim_listeners.simStarted.connect(on_sims_changed)
         G.sim_listeners.simStopped.connect(on_sims_changed)
+        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 0, 1, 1)
+        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 1, 1, 1)
 
-        rh_status_layout.addWidget(self.status_container)
-        rh_status_layout.addStretch(1)
-        rh_status_area.setLayout(rh_status_layout)
+        logo_status_layout.addWidget(t_logo, 1, 0, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 2, 0, 1, 1)
 
-        # Add status area to top-right (0, 1)
-        logo_status_layout.addWidget(rh_status_area, 0, 1,2,1,
-                                     alignment=Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
 
-        # Optional: Balance spacing
+        # --- Device GroupBox below logo
+        logo_status_layout.addWidget(device_groupbox, 3, 0,
+                                     alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+        # --- AppStatusWidget spans two rows in right column
+        logo_status_layout.addWidget(self.status_container, 1, 2, 3, 1, alignment=Qt.AlignmentFlag.AlignTop)
+        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 4, 0, 1, 1)
+
         logo_status_layout.setColumnStretch(0, 1)
         logo_status_layout.setColumnStretch(1, 1)
-        logo_status_layout.setRowStretch(0, 0)
-        logo_status_layout.setRowStretch(1, 0)
         layout.addLayout(logo_status_layout)
 
         ##################
@@ -1108,8 +1061,8 @@ class MainWindow(QMainWindow):
 
 
     def setup_master_instance(self):
-        self.show_device_logo()
-        self.enable_device_logo_click(True)
+        # self.show_device_logo()
+        # self.enable_device_logo_click(True)
 
         #self.devicetype_label.hide()
         current_title = self.windowTitle()
@@ -1243,8 +1196,8 @@ class MainWindow(QMainWindow):
         G.current_device_config_scope = types[arg]
         self.device_panel.set_active_device(types[arg])
 
-        pixmap = HiDpiPixmap(utils.get_device_logo(G.current_device_config_scope))
-        self.devicetype_label.setPixmap(pixmap)
+        # pixmap = HiDpiPixmap(utils.get_device_logo(G.current_device_config_scope))
+        # self.devicetype_label.setPixmap(pixmap)
         #self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
 
         if G.master_instance:

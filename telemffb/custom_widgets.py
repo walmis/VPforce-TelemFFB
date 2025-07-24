@@ -67,7 +67,7 @@ class AppStatusWidget(QGroupBox):
 
         outer_layout = QVBoxLayout(self)
         outer_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        outer_layout.setContentsMargins(10, 18, 10, 8)
+        outer_layout.setContentsMargins(10, 18, 10, 28)
 
         grid = QGridLayout()
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
