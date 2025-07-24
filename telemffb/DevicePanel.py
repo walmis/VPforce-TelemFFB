@@ -10,17 +10,16 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QMainWindow, QSizePolicy, QGraphicsOpacityEffect
 )
 import os
-import resources
-resources
+
 from telemffb import utils
 
 ICON_SIZE = QSize(72, 72)
 
 DEVICE_ICONS = {
-    "joystick": "../image/icon_joystick.png",
-    "pedals": "../image/icon_pedals.png",
-    "collective": "../image/icon_collective.png",
-    "trimwheel": "../image/icon_trimwheel.png",
+    "joystick": ":/image/icon_joystick.png",
+    "pedals": ":/image/icon_pedals.png",
+    "collective": ":/image/icon_collective.png",
+    "trimwheel": ":/image/icon_trimwheel.png",
 }
 
 STATUS_COLORS = {
@@ -296,7 +295,7 @@ class DeviceIconPanel(QWidget):
         for device in device_list:
             if device.lower() not in DEVICE_ICONS:
                 continue
-            icon_path = os.path.join(os.path.dirname(__file__), DEVICE_ICONS[device.lower()])
+            icon_path =  DEVICE_ICONS[device.lower()]
             widget = DeviceIconWidget(device.lower(), icon_path)
             widget.clicked.connect(self.handle_icon_click)
             self.layout.addWidget(widget)
