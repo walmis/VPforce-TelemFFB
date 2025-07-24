@@ -27,6 +27,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox
 
 import telemffb.globals as G
+from telemffb import utils
 from telemffb.utils import load_custom_userconfig
 
 
@@ -64,7 +65,7 @@ class IPCNetworkThread(QObject, threading.Thread):
         self._last_keepalive_timestamp = time.time()
         self._ipc_telem = {}
         self._ipc_telem_effects = {}
-        self._child_keepalive_timestamp = {}
+        self._child_keepalive_info = {}
         self._child_addrs = {}
         self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None}
 
@@ -120,18 +121,28 @@ class IPCNetworkThread(QObject, threading.Thread):
 
             time.sleep(0.01)  # avoid CPU spin
 
+    def _check_child_dev_status(self):
+        pass
+
     def _check_missed_keepalives(self):
         now = time.time()
 
         if self._master:
-            for dev, ts in self._child_keepalive_timestamp.items():
+            for dev, info in self._child_keepalive_info.items():
+                ts = info["timestamp"]
+                is_connected = info["connected"]
                 delta = now - ts
                 if delta > self._keepalive_sec * self._missed_keepalive:
                     if self._child_active.get(dev):
                         self.child_keepalive_signal.emit(dev, "TIMEOUT")
                         self._child_active[dev] = False
                 else:
-                    if not self._child_active.get(dev):
+                    # utils.dbprint("yellow",
+                    #               f"{G.device_type} - Child: {dev} is {is_connected} at {ts}. ")
+                    if not is_connected:
+                        self.child_keepalive_signal.emit(dev, "DISCONNECTED")
+                        self._child_active[dev] = False
+                    elif not self._child_active.get(dev):
                         self.child_keepalive_signal.emit(dev, "ACTIVE")
                         self._child_active[dev] = True
         else:
@@ -150,7 +161,7 @@ class IPCNetworkThread(QObject, threading.Thread):
         if self._master:
             self.send_broadcast_message("Keepalive")
         else:
-            self.send_message(f"Child Keepalive:{G.device_type}")
+            self.send_message(f"Child Keepalive:{G.device_type}:{G.device_connection_status}")
 
     def _handle_message(self, msg, fromaddr):
         if msg == 'Keepalive':
@@ -159,10 +170,14 @@ class IPCNetworkThread(QObject, threading.Thread):
                 logging.debug(f"GOT KEEPALIVE: {ts}")
                 self._last_keepalive_timestamp = ts
         elif msg.startswith('Child Keepalive:'):
-            ch_dev = msg.removeprefix('Child Keepalive:')
-            logging.debug(f"GOT KEEPALIVE FROM CHILD: '{ch_dev}'")
+            _, ch_dev, ch_status = msg.split(':')
+            # ch_dev = msg.removeprefix('Child Keepalive:')
+            logging.debug(f"GOT KEEPALIVE FROM CHILD: '{ch_dev}', Device Connection Status is: {ch_status}")
             ts = time.time()
-            self._child_keepalive_timestamp[ch_dev] = ts
+            self._child_keepalive_info[ch_dev] = {
+                "timestamp": ts,
+                "connected": ch_status == "True"
+            }
             self._child_addrs[ch_dev] = fromaddr
             pass
         elif msg == 'MASTER INSTANCE QUIT':

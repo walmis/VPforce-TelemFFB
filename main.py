@@ -350,8 +350,10 @@ def _initialize_device_connection():
             _check_firmware_version(dev_firmware_version, min_firmware_version)
 
         G.device_ident = dev.info.ident
+        G.device_connection_status = True
 
     except Exception as e:
+        G.device_connection_status = False
         logging.exception("Exception")
         QMessageBox.warning(None, "Cannot connect to Rhino",
                           f"Unable to open HID at {G.device_usbvidpid} for device: {G.device_type}\nError: {e}\n\n"
@@ -492,6 +494,14 @@ def _setup_device_button_connections():
     try:
         HapticEffect.device.buttonPressed.connect(G.main_window.get_active_buttons)
         HapticEffect.device.buttonReleased.connect(G.main_window.get_active_buttons)
+    except:
+        pass
+
+def _setup_device_connect_status():
+    """Setup device disconnect/reconnect status signals"""
+    try:
+        HapticEffect.device.deviceConnected.connect(lambda: setattr(G, "device_connection_status", True))
+        HapticEffect.device.deviceDisconnected.connect(lambda: setattr(G, "device_connection_status", False))
     except:
         pass
 
@@ -726,6 +736,9 @@ def main():
 
     # Connect device button events to main window handlers
     _setup_device_button_connections()
+
+    # Connect device status events to main window handler:
+    _setup_device_connect_status()
 
     # ============================================================================
     # PHASE 11: Child Instance Management (Master Only)

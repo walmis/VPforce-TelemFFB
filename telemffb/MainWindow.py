@@ -39,7 +39,8 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QComboBox, QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QTabWidget,
-                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu, QDialog)
+                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu,
+                             QDialog, QStatusBar)
 
 import telemffb.globals as G
 import telemffb.utils as utils
@@ -47,6 +48,7 @@ import telemffb.xmlutils as xmlutils
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, SimStatusLabel, vpf_purple, AppStatusWidget
+from telemffb.DevicePanel import DeviceIconPanel
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
@@ -121,7 +123,7 @@ class MainWindow(QMainWindow):
                 'width': 0,
             }
         }
-        self.setMinimumWidth(600)
+        # self.setMinimumWidth(600)
         self.tab_sizes = self.default_tab_sizes
 
         self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
@@ -329,7 +331,7 @@ class MainWindow(QMainWindow):
         # Set the layout of the menu frame as the main layout
         layout.addWidget(menu_frame)
 
-        logo_status_layout = QHBoxLayout()
+        logo_status_layout = QGridLayout()
 
         # Add a label for the image
         # Construct the absolute path of the image file
@@ -338,10 +340,10 @@ class MainWindow(QMainWindow):
         self.devicetype_label = ClickLogo(self.logo_stack)
         self.devicetype_label.clicked.connect(self.device_logo_click_event)
         pixmap = HiDpiPixmap(G.vpf_logo)
-        pixmap = pixmap._scaled(271, 115, aspectRatioMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation)
+        pixmap = pixmap._scaled(136, 58, aspectRatioMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation)
 
         pixmap2 = HiDpiPixmap(utils.get_device_logo(G.device_type))
-        pixmap2 = pixmap2._scaled(round(pixmap2.width()), round(pixmap2.height()))
+        pixmap2 = pixmap2._scaled(round(pixmap2.width()/2), round(pixmap2.height()/2))
 
         self.vpflogo_label.setPixmap(pixmap)
         self.devicetype_label.setPixmap(pixmap2)
@@ -365,31 +367,70 @@ class MainWindow(QMainWindow):
         logo_wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
         # Now add only the wrapper to the horizontal layout
-        logo_status_layout.addWidget(logo_wrapper, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        # Add logo_wrapper to top-left cell
+        # logo_status_layout.addWidget(logo_wrapper, 0, 0,alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
+        if G.master_instance:
+            # --- Icon Row ---
+            device_groupbox = QGroupBox("Device")
+            device_groupbox.setStyleSheet("""
+                        QGroupBox {
+    
+                            font-weight: bold;
+                            border: 1px solid gray;
+                            border-radius: 5px;
+                            margin-top: 6px;
+                        }
+                        QGroupBox::title {
+                            subcontrol-origin: margin;
+                            left: 10px;
+                            padding: 0 3px 0 3px;
+                        }
+                    """)
+            device_groupbox_layout = QVBoxLayout()
+            self.device_panel = DeviceIconPanel()
+            device_groupbox_layout.addWidget(self.device_panel)
+            device_groupbox.setLayout(device_groupbox_layout)
+            # logo_status_layout.addLayout(device_groupbox_layout, 1, 0, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            # logo_status_layout.addWidget(device_groupbox, 1, 0, alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        left_stack = QWidget()
+        left_layout = QVBoxLayout(left_stack)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(6)
+        left_layout.addWidget(logo_wrapper)
+        if G.master_instance:
+            left_layout.addWidget(device_groupbox)
+
+        logo_status_layout.addWidget(left_stack, 0, 0, 2, 1,  # rowspan = 2
+                                     alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        # --- Right-Hand Status Area ---
         rh_status_area = QWidget()
         rh_status_layout = QVBoxLayout()
-
-
-        ############
-        # current craft
         self.status_container = AppStatusWidget(master_instance=G.master_instance)
         self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
         self.status_container.sim_status_label.set_waiting()
 
-        def on_sims_changed(sim : SimTelemListener):
+        def on_sims_changed(sim: SimTelemListener):
             self.status_container.update_enabled_sims(sim.name, sim.started)
-            utils.dbprint("blue", f"sim {sim.name} changed state to {sim.started}")
+            # utils.dbprint("blue", f"sim {sim.name} changed state to {sim.started}")
             self.refresh_telem_status()
 
         G.sim_listeners.simStarted.connect(on_sims_changed)
         G.sim_listeners.simStopped.connect(on_sims_changed)
 
         rh_status_layout.addWidget(self.status_container)
+        rh_status_layout.addStretch(1)
         rh_status_area.setLayout(rh_status_layout)
 
-        logo_status_layout.addWidget(rh_status_area,alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight)
+        # Add status area to top-right (0, 1)
+        logo_status_layout.addWidget(rh_status_area, 0, 1,2,1,
+                                     alignment=Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
 
+        # Optional: Balance spacing
+        logo_status_layout.setColumnStretch(0, 1)
+        logo_status_layout.setColumnStretch(1, 1)
+        logo_status_layout.setRowStretch(0, 0)
+        logo_status_layout.setRowStretch(1, 0)
         layout.addLayout(logo_status_layout)
 
         ##################
@@ -571,7 +612,7 @@ class MainWindow(QMainWindow):
         self.line_widget.setFrameShadow(QFrame.Shadow.Sunken)
 
         # Add the tab widget and line widget to the main layout
-        layout.addWidget(self.tab_widget)
+        layout.addWidget(self.tab_widget, stretch=1)
         layout.setSpacing(0)
         layout.addWidget(self.line_widget)
 
@@ -688,7 +729,7 @@ class MainWindow(QMainWindow):
         self.instance_status_row.changeConfigScope.connect(self.change_config_scope)
         self.instance_status_row.hide()
         layout.addWidget(self.instance_status_row)          
-
+        self.status_bar = QStatusBar(self)
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
 
@@ -699,7 +740,7 @@ class MainWindow(QMainWindow):
 
         self.version_label.setText(f'Version Status: {status_text}')
         self.version_label.setOpenExternalLinks(True)
-
+        self.setStatusBar(self.status_bar)
         self.firmware_label = QLabel()
         try:
             f_vers = HapticEffect.device.get_firmware_version()
@@ -709,12 +750,13 @@ class MainWindow(QMainWindow):
 
         self.version_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.firmware_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        version_row_layout.addWidget(self.version_label)
-        version_row_layout.addWidget(self.firmware_label)
+        # version_row_layout.addWidget(self.version_label)
+        # version_row_layout.addWidget(self.firmware_label)
 
-        version_row_layout.setAlignment(Qt.AlignmentFlag.AlignBottom)
-        layout.addLayout(version_row_layout)
-
+        # version_row_layout.setAlignment(Qt.AlignmentFlag.AlignBottom)
+        # layout.addLayout(version_row_layout)
+        self.status_bar.addWidget(self.firmware_label)
+        self.status_bar.addPermanentWidget(self.version_label)
 
         G.telem_manager.telemetryReceived.connect(self.on_update_telemetry)
         G.telem_manager.telemetryTimeout.connect(self.on_telemetry_timeout)
@@ -1002,9 +1044,10 @@ class MainWindow(QMainWindow):
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
 
-
+    @pyqtSlot(str, str)
     def update_child_status(self, device, status):
         self.instance_status_row.set_status(device, status)
+        self.device_panel.set_device_status(device, status)
 
     def show_child_settings(self):
         G.ipc_instance.send_broadcast_message("SHOW SETTINGS")
@@ -1060,6 +1103,13 @@ class MainWindow(QMainWindow):
             self.instance_status_row.trimwheel_status_icon.show()
         self.add_instance_log_menu()
         self.add_system_tray()
+        d_list = [G.device_type]
+        for d in G.launched_instances:
+            d_list.append(d)
+        self.device_panel.set_devices(d_list)
+        self.device_panel.set_device_status(G.device_type, "ok")
+        self.device_panel.DeviceClicked.connect(self.change_config_scope)
+        self.device_panel.set_active_device(G.device_type)
 
 
     def show_device_logo(self):
@@ -1168,6 +1218,7 @@ class MainWindow(QMainWindow):
 
         xmlutils.update_vars(types[arg], G.userconfig_path, G.defaults_path)
         G.current_device_config_scope = types[arg]
+        self.device_panel.set_active_device(types[arg])
 
         pixmap = HiDpiPixmap(utils.get_device_logo(G.current_device_config_scope))
         self.devicetype_label.setPixmap(pixmap)
