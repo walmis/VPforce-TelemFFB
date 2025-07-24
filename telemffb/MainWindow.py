@@ -725,10 +725,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        self.instance_status_row = InstanceStatusRow()
-        self.instance_status_row.changeConfigScope.connect(self.change_config_scope)
-        self.instance_status_row.hide()
-        layout.addWidget(self.instance_status_row)          
+        # self.instance_status_row = InstanceStatusRow()
+        # self.instance_status_row.changeConfigScope.connect(self.change_config_scope)
+        # self.instance_status_row.hide()
+        # layout.addWidget(self.instance_status_row)
         self.status_bar = QStatusBar(self)
         version_row_layout = QHBoxLayout()
         self.version_label = QLabel()
@@ -1046,7 +1046,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str, str)
     def update_child_status(self, device, status):
-        self.instance_status_row.set_status(device, status)
+        # self.instance_status_row.set_status(device, status)
         self.device_panel.set_device_status(device, status)
 
     def show_child_settings(self):
@@ -1092,15 +1092,15 @@ class MainWindow(QMainWindow):
         current_title = self.windowTitle()
         new_title = f"** MASTER INSTANCE ** {current_title}"
         self.setWindowTitle(new_title)
-        self.instance_status_row.show()
-        if "joystick" in G.launched_instances:
-            self.instance_status_row.joystick_status_icon.show()
-        if "pedals" in G.launched_instances:
-            self.instance_status_row.pedals_status_icon.show()
-        if "collective" in G.launched_instances:
-            self.instance_status_row.collective_status_icon.show()
-        if 'trimwheel' in G.launched_instances:
-            self.instance_status_row.trimwheel_status_icon.show()
+        # self.instance_status_row.show()
+        # if "joystick" in G.launched_instances:
+        #     self.instance_status_row.joystick_status_icon.show()
+        # if "pedals" in G.launched_instances:
+        #     self.instance_status_row.pedals_status_icon.show()
+        # if "collective" in G.launched_instances:
+        #     self.instance_status_row.collective_status_icon.show()
+        # if 'trimwheel' in G.launched_instances:
+        #     self.instance_status_row.trimwheel_status_icon.show()
         self.add_instance_log_menu()
         self.add_system_tray()
         d_list = [G.device_type]
