@@ -2546,6 +2546,11 @@ def check_launch_instance(dev_type :str, master_port : int) -> subprocess.Popen:
         if G.system_settings.get(f'startHeadless{dev_type_cap}', False):
             args.append('--headless')
 
+        if G.args.darkmode:
+            args.append('--darkmode')
+        elif G.args.lightmode:
+            args.append('--lightmode')
+
         logging.info("Auto-Launch: starting instance: %s", args)
         proc = ChildPopen(args)
         proc.udp_port = 60000 + int(usbpid)
