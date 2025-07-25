@@ -83,6 +83,7 @@ from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
 from telemffb.namedmutex import NamedMutex
 import styles
 resources # used
+mutex = None
 
 def send_test_message():
     if G.ipc_instance.running:
@@ -125,7 +126,7 @@ def _check_master_instance_mutex():
         "check the task manager for possible hung instances."
     )
     msg_box.setWindowIcon(QIcon(':/image/vpforceicon.png'))
-
+    global mutex
     try:
         mutex = NamedMutex("VPforce_TelemFFB_Master_Instance", acquired=True, timeout=1)
         if not mutex.acquired:
