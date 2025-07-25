@@ -59,6 +59,12 @@ class CmdLineArgs:
     minimize: Optional[bool]
     """Flag to minimize application on startup"""
 
+    darkmode: Optional[bool]
+    """Flag to force dark mode theme"""
+
+    lightmode: Optional[bool]
+    """Flag to force light mode theme"""
+
     def __init__(
         self,
         teleplot: Optional[str] = None,
@@ -72,7 +78,9 @@ class CmdLineArgs:
         headless: Optional[bool] = False,
         child: Optional[bool] = False,
         masterport: Optional[str] = None,
-        minimize: Optional[bool] = False
+        minimize: Optional[bool] = False,
+        darkmode: Optional[bool] = False,
+        lightmode: Optional[bool] = False
     ) -> None:
         self.teleplot = teleplot
         self.plot = plot
@@ -86,6 +94,8 @@ class CmdLineArgs:
         self.child = child
         self.masterport = masterport
         self.minimize = minimize
+        self.darkmode = darkmode
+        self.lightmode = lightmode
 
     @classmethod
     def parse(cls):
@@ -111,6 +121,9 @@ class CmdLineArgs:
         parser.add_argument('--masterport', type=str, help='master instance IPC port', default=None)
 
         parser.add_argument('--minimize', action='store_true', help='Minimize on startup')
+
+        parser.add_argument('--darkmode', action='store_true', help='Force dark mode theme')
+        parser.add_argument("--lightmode", action='store_true', help='Force light mode theme')
 
         args = parser.parse_args()
 

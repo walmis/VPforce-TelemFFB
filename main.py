@@ -186,6 +186,12 @@ def _setup_theme_and_styling(app):
     """
     theme_setting = G.system_settings.get('themeId', 2)
 
+    if G.args.darkmode:
+        theme_setting = 1
+
+    if G.args.lightmode:
+        theme_setting = 0
+
     match theme_setting:
         case 0: # Light Mode
             app.styleHints().setColorScheme(Qt.ColorScheme.Light)
