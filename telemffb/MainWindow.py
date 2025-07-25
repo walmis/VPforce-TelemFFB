@@ -712,7 +712,7 @@ class MainWindow(QMainWindow):
 
         """ Create settings scroll area widget that will hold the settings page"""
 
-        self.settings_area = QScrollArea()
+        self.settings_area = NoKeyScrollArea()
         self.settings_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.settings_area.setWidgetResizable(True)
 
