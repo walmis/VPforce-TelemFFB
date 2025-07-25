@@ -290,9 +290,9 @@ class SimStatusWidget(QWidget):
         self.status_label.setVisible(True)
 
         status_color = {
-            "Running": "rgba(0, 200, 0, 100)",   # Green
-            "Paused": "rgba(255, 200, 0, 100)",  # Yellow
-            "Error": "rgba(255, 0, 0, 100)",      # Red
+            "Running": "rgba(0, 200, 0, 150)",   # Green
+            "Paused": "rgba(255, 200, 0, 150)",  # Yellow
+            "Error": "rgba(255, 0, 0, 120)",      # Red
             "Offline": "rgba(128,128,128, 100)",  # Grey
         }.get(status, "rgba(120, 120, 120, 150)")
 
@@ -301,7 +301,6 @@ class SimStatusWidget(QWidget):
             QLabel {{
                 padding: 2px 8px;
                 border-radius: 10px;
-                color: #dddddd;
                 background-color: {status_color};
                 font-weight: bold;
             }}
@@ -359,22 +358,6 @@ class NoKeyScrollArea(QScrollArea):
 
     def addSlider(self, slider):
         self.sliders.append(slider)
-    #
-    # def keyPressEvent(self, event):
-    #     # Forward keypress events to all sliders
-    #     for slider in self.sliders:
-    #         try:
-    #             slider.keyPressEvent(event)
-    #         except:
-    #             pass
-    #
-    # def keyReleaseEvent(self, event):
-    #     # Forward keypress events to all sliders
-    #     for slider in self.sliders:
-    #         try:
-    #             slider.keyReleaseEvent(event)
-    #         except:
-    #             pass
 
 
 class SliderWithLabel(QWidget):
