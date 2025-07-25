@@ -345,22 +345,10 @@ class MainWindow(QMainWindow):
         """ Create Device Panel """
 
         device_groupbox = QGroupBox("Active Devices")
-        device_groupbox.setStyleSheet("""
-                    QGroupBox {
 
-                        font-weight: bold;
-                        border: 1px solid gray;
-                        border-radius: 5px;
-                        margin-top: 6px;
-                    }
-                    QGroupBox::title {
-                        subcontrol-origin: margin;
-                        left: 10px;
-                        padding: 0 3px 0 3px;
-                    }
-                """)
         device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         device_groupbox_layout = QVBoxLayout()
+        device_groupbox_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.device_panel = DeviceIconPanel()
         device_groupbox_layout.addWidget(self.device_panel)
         device_groupbox.setLayout(device_groupbox_layout)
@@ -374,6 +362,11 @@ class MainWindow(QMainWindow):
         """ Create Status Panel """
 
         self.status_container = AppStatusWidget(master_instance=G.master_instance)
+        status_group = QGroupBox("Application Status")
+        status_layout = QVBoxLayout(status_group)
+        status_layout.setContentsMargins(10, 18, 10, 8)
+        status_layout.addWidget(self.status_container)
+
         self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
         self.status_container.sim_status_label.set_waiting()
 
@@ -410,7 +403,7 @@ class MainWindow(QMainWindow):
 
         """ Add Status widget to column 2, span 3 rows """
 
-        logo_status_layout.addWidget(self.status_container, 1, 2, 3, 1, alignment=Qt.AlignmentFlag.AlignTop)
+        logo_status_layout.addWidget(status_group, 1, 2, 3, 1, alignment=Qt.AlignmentFlag.AlignTop)
         logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 4, 0, 1, 1)
 
         logo_status_layout.setColumnStretch(0, 1)

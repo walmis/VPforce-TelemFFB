@@ -316,7 +316,6 @@ class DeviceIconPanel(QWidget):
     def handle_icon_click(self, device_name):
         self.set_active_device(device_name)
         self.DeviceClicked.emit(device_name)
-        print(f"{device_name} clicked!")
 
     def set_active_device(self, device_name):
         for name, widget in self.icons.items():
