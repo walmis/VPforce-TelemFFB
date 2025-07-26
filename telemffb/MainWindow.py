@@ -1515,6 +1515,8 @@ class MainWindow(QMainWindow):
 
     def offline_profile_changed(self, profile):
         # self.update_craft_text_block(profile=profile)
+        if not profile:
+            return
         G.settings_mgr.offline_scope = 'MODEL'
         self.resize_offline_combos()
         self.force_sim_aircraft()

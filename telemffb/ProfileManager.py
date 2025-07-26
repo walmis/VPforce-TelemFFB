@@ -46,8 +46,9 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         self.setupUi(self)
         self.retranslateUi(self)
-        current_ac = G.settings_mgr.current_pattern
-        self.setWindowTitle(f"Profile Manager - Active Aircraft: {current_ac}")
+        self.first_init = True
+        self.current_ac = G.settings_mgr.current_pattern
+        self.setWindowTitle(f"Profile Manager - Active Aircraft: {self.current_ac}")
         # self.populate_aircraft_tree(self.treeWidget)
         self.treeWidget.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
 
@@ -69,9 +70,10 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.treeWidget.itemSelectionChanged.connect(self.on_tree_item_selected)
         self.treeWidget.expandAll()
 
-        self.tb_aircraft_filter.textChanged.connect(self.apply_combined_filters)
-        self.tb_profile_filter.textChanged.connect(self.apply_combined_filters)
-        self.filterButtonGroup.buttonToggled.connect(lambda b, c: self.apply_combined_filters() if c else None)
+        self.tb_aircraft_filter.textChanged.connect(self.apply_all_filters)
+        self.tb_profile_filter.textChanged.connect(self.apply_all_filters)
+
+        self.filterButtonGroup.buttonToggled.connect(lambda b, c: self.apply_all_filters() if c else None)
 
         self.pb_clear_filters.clicked.connect(self.clear_text_filters)
         self.pb_Import.clicked.connect(self.import_profiles)
@@ -89,13 +91,16 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             padding-right: 12px;
         }
         """)
-        self.pb_Delete.clicked.connect(self.delete_profile)
+        self.pb_Delete.clicked.connect(self.on_delete_clicked)
         self.pb_Exit.clicked.connect(self.close)
         self.pb_expandButton.clicked.connect(self.toggle_tree_expansion)
+
         self.treeWidget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.treeWidget.customContextMenuRequested.connect(self.open_context_menu)
-        # self.cb_filterActive.toggled.connect(self.filter_active_profiles)
-        # self.cb_filterCurrentAircraft.toggled.connect(self.on_filter_current_ac_clicked)
+
+        self.cb_active.toggled.connect(self.apply_all_filters)
+        self.cb_inactive.toggled.connect(self.apply_all_filters)
+
         self.start_tree_population()
 
     def start_tree_population(self):
@@ -187,6 +192,18 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         if hasattr(self, '_last_scroll_pos'):
             self.treeWidget.verticalScrollBar().setValue(self._last_scroll_pos)
 
+        if self.first_init:
+            if self.current_ac:
+                """If this is the first time the tree population is done (on new window show), default
+                to the current aircraft view if one is active"""
+                self.rb_showCurrentAircraft.setChecked(True)
+            else:
+                self.rb_showAll.setChecked(True)
+
+            self.first_init = False
+        else:
+            self.reapply_active_radio_button()
+
         # Restore selection
         def find_item_by_text(text: str, parent_item: QTreeWidgetItem = None) -> QTreeWidgetItem | None:
             if parent_item is None:
@@ -215,6 +232,82 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         self.pb_Export.clicked.connect(self.export_selected_profile)
 
+    def reapply_active_radio_button(self):
+        """Programmatically re-triggers the currently selected radio button's toggled logic."""
+        button = self.filterButtonGroup.checkedButton()
+        if button is not None:
+            # Temporarily uncheck and recheck to fire the signal
+            button.setChecked(False)
+            button.setChecked(True)
+
+    def apply_all_filters(self):
+        """Unified filter pipeline: radio mode, active/inactive state, and search fields."""
+        radio_button = self.filterButtonGroup.checkedButton()
+        show_mode = (
+            "all" if radio_button == self.rb_showAll else
+            "defaults" if radio_button == self.rb_showDefaults else
+            "user" if radio_button == self.rb_showUser else
+            "current_ac"
+        )
+
+        show_active = self.cb_active.isChecked()
+        show_inactive = self.cb_inactive.isChecked()
+        aircraft_query = self.tb_aircraft_filter.text().lower()
+        profile_query = self.tb_profile_filter.text().lower()
+
+        def should_show(item):
+            # Skip non-leaf items
+            if item.childCount() > 0:
+                return True
+
+            meta = self.get_metadata(item, "type")
+            sim = self.get_metadata(item, "sim_name")
+            cls = self.get_metadata(item, "cls_name")
+            ac = self.get_metadata(item, "aircraft_name")
+            item_type = self.get_metadata(item, "type")
+            active = self.get_metadata(item, "active")
+
+            # 1. Radio mode logic
+            if show_mode == "defaults" and item_type != "default":
+                return False
+            elif show_mode == "user" and item_type != "user":
+                return False
+            elif show_mode == "current_ac":
+                if sim != G.settings_mgr.current_sim:
+                    return False
+                if cls != G.settings_mgr.current_class:
+                    return False
+                if ac != G.settings_mgr.current_pattern:
+                    return False
+
+            # 2. Active/Inactive checkbox logic
+            if not ((active and show_active) or (not active and show_inactive)):
+                return False
+
+            # 3. Text filters
+            ac_text = item.text(0).lower()
+            profile_text = item.text(2).lower()
+            if aircraft_query not in ac_text or profile_query not in profile_text:
+                return False
+
+            return True
+
+        def recurse(item):
+            visible_children = 0
+            for i in range(item.childCount()):
+                child = item.child(i)
+                if child.childCount() == 0:
+                    child.setHidden(not should_show(child))
+                    if not child.isHidden():
+                        visible_children += 1
+                else:
+                    recurse(child)
+                    if not child.isHidden():
+                        visible_children += 1
+            item.setHidden(visible_children == 0)
+
+        for i in range(self.treeWidget.topLevelItemCount()):
+            recurse(self.treeWidget.topLevelItem(i))
 
     def open_context_menu(self, position):
         item = self.treeWidget.itemAt(position)
@@ -240,7 +333,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             menu.addAction(export_action)
 
             delete_action = QAction("Delete selected profile(s)", self)
-            delete_action.triggered.connect(self.delete_profile)
+            delete_action.triggered.connect(self.on_delete_clicked)
             menu.addAction(delete_action)
 
         menu.exec(self.treeWidget.viewport().mapToGlobal(position))
@@ -323,109 +416,133 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         self.sort_aircraft_items(by_column=logicalIndex, order=self.sort_order)
 
-    def on_filter_mode_changed(self, button, checked):
-        if not checked:
-            return  # Ignore button uncheck events
+    # def on_filter_mode_changed(self, button, checked):
+    #     if not checked:
+    #         return  # Ignore button uncheck events
+    #
+    #     if button == self.rb_showAll:
+    #         self.clear_sim_class_model_filter()
+    #         return
+    #
+    #     if button == self.rb_showDefaults:
+    #         self.clear_sim_class_model_filter()
+    #         self.toggle_show_defaults(True)
+    #
+    #     elif button == self.rb_showUser:
+    #         self.clear_sim_class_model_filter()
+    #         self.filter_active_profiles(True)
+    #
+    #     elif button == self.rb_showCurrentAircraft:
+    #         self.toggle_show_defaults(False)  # Hide defaults before filtering
+    #         self.filter_by_sim_class_model(
+    #             G.settings_mgr.current_sim,
+    #             G.settings_mgr.current_class,
+    #             G.settings_mgr.current_pattern
+    #         )
 
-        if button == self.rb_showAll:
-            self.clear_sim_class_model_filter()
-            return
+    # def apply_combined_filters(self):
+    #     """Apply radio button, search text, and activation status filters."""
+    #     self.apply_radio_filter()
+    #     self.apply_text_filters()
+    #     self.apply_active_filter()
 
-        if button == self.rb_showDefaults:
-            self.clear_sim_class_model_filter()
-            self.toggle_show_defaults(True)
+    # def apply_active_filter(self):
+    #     """Filter items based on activation status using cb_Active and cb_Inactive."""
+    #     show_active = self.cb_active.isChecked()
+    #     show_inactive = self.cb_inactive.isChecked()
+    #
+    #     def should_show(item):
+    #         if item.isHidden():
+    #             return False  # Already filtered out
+    #         active = self.get_metadata(item, "active")
+    #         return (active and show_active) or (not active and show_inactive)
+    #
+    #     def recurse(item):
+    #         if item.childCount() == 0:  # Leaf
+    #             item.setHidden(not should_show(item))
+    #         else:
+    #             for i in range(item.childCount()):
+    #                 recurse(item.child(i))
+    #
+    #     for i in range(self.treeWidget.topLevelItemCount()):
+    #         recurse(self.treeWidget.topLevelItem(i))
+    #
+    #     self.prune_empty_tree_items(self.treeWidget)
 
-        elif button == self.rb_filterActive:
-            self.clear_sim_class_model_filter()
-            self.filter_active_profiles(True)
-
-        elif button == self.rb_filterCurrentAircraft:
-            self.toggle_show_defaults(False)  # Hide defaults before filtering
-            self.filter_by_sim_class_model(
-                G.settings_mgr.current_sim,
-                G.settings_mgr.current_class,
-                G.settings_mgr.current_pattern
-            )
-
-    def apply_combined_filters(self):
-        """Apply both the radio button and text filter constraints."""
-        self.apply_radio_filter()  # Applies showDefaults, active-only, etc.
-        self.apply_text_filters()  # Then narrows results to matching search
-
-    def filter_active_profiles(self, show_only_active_user):
-        """
-        Filters the tree view to display only active user-created profiles when toggled.
-
-        If the toggle is on:
-            - Only user profiles with an active status are shown.
-            - Default profiles are hidden regardless of the 'Show Defaults' checkbox unless the default profile is active
-              and there are other active user profiles for that aircraft .
-
-        If the toggle is off:
-            - Default profiles are shown or hidden based on 'Show Defaults' checkbox.
-            - All user profiles are shown.
-
-        Args:
-            show_only_active_user (bool): True if filtering for active user profiles only.
-        """
-        def process_leaf(item):
-            item_type = self.get_metadata(item, "type")
-            ac_name = self.get_metadata(item, "aircraft_name")
-            cls = item.parent()
-            siblings = [cls.child(k) for k in range(cls.childCount())
-                        if self.get_metadata(cls.child(k), "aircraft_name") == ac_name]
-            has_user = any(self.get_metadata(s, "type") == "user" for s in siblings)
-            is_active = item.checkState(3) == Qt.CheckState.Checked
-
-            if show_only_active_user:
-                if item_type == "user":
-                    item.setHidden(not is_active)
-                elif item_type == "default":
-                    item.setHidden(not (is_active and has_user))
-            else:
-                if item_type == "default":
-                    item.setHidden(not (is_active and has_user))
-                else:
-                    item.setHidden(False)
-
-        def recurse(node):
-            if node.childCount() == 0:
-                process_leaf(node)
-            else:
-                for i in range(node.childCount()):
-                    recurse(node.child(i))
-
-        for idx in range(self.treeWidget.topLevelItemCount()):
-            recurse(self.treeWidget.topLevelItem(idx))
-
-        self.prune_empty_tree_items(self.treeWidget)
-
-    def filter_by_sim_class_model(self, target_sim, target_class, target_model):
-        """
-        Filters the tree to show only items matching the specified sim, class, and model.
-        All unrelated branches will be hidden.
-
-        Args:
-            target_sim (str): Simulator name (e.g., 'MSFS').
-            target_class (str): Aircraft class (e.g., 'Fighter').
-            target_model (str): Aircraft model name (e.g., 'F-16').
-        """
-        for i in range(self.treeWidget.topLevelItemCount()):
-            sim_item = self.treeWidget.topLevelItem(i)
-            sim_match = sim_item.text(0) == target_sim
-            sim_item.setHidden(not sim_match)
-
-            for j in range(sim_item.childCount()):
-                cls_item = sim_item.child(j)
-                cls_match = cls_item.text(0) == target_class
-                cls_item.setHidden(not (sim_match and cls_match))
-
-                for k in range(cls_item.childCount()):
-                    ac_item = cls_item.child(k)
-                    ac_name = self.get_metadata(ac_item, "aircraft_name")
-                    ac_item.setHidden(not (sim_match and cls_match and ac_name == target_model))
-
-        self.prune_empty_tree_items(self.treeWidget)
+    # def filter_active_profiles(self, show_only_active_user):
+    #     """
+    #     Filters the tree view to display only active user-created profiles when toggled.
+    #
+    #     If the toggle is on:
+    #         - Only user profiles with an active status are shown.
+    #         - Default profiles are hidden regardless of the 'Show Defaults' checkbox unless the default profile is active
+    #           and there are other active user profiles for that aircraft .
+    #
+    #     If the toggle is off:
+    #         - Default profiles are shown or hidden based on 'Show Defaults' checkbox.
+    #         - All user profiles are shown.
+    #
+    #     Args:
+    #         show_only_active_user (bool): True if filtering for active user profiles only.
+    #     """
+    #     def process_leaf(item):
+    #         item_type = self.get_metadata(item, "type")
+    #         ac_name = self.get_metadata(item, "aircraft_name")
+    #         cls = item.parent()
+    #         siblings = [cls.child(k) for k in range(cls.childCount())
+    #                     if self.get_metadata(cls.child(k), "aircraft_name") == ac_name]
+    #         has_user = any(self.get_metadata(s, "type") == "user" for s in siblings)
+    #         is_active = item.checkState(3) == Qt.CheckState.Checked
+    #
+    #         if show_only_active_user:
+    #             if item_type == "user":
+    #                 item.setHidden(not is_active)
+    #             elif item_type == "default":
+    #                 item.setHidden(not (is_active and has_user))
+    #         else:
+    #             if item_type == "default":
+    #                 item.setHidden(not (is_active and has_user))
+    #             else:
+    #                 item.setHidden(False)
+    #
+    #     def recurse(node):
+    #         if node.childCount() == 0:
+    #             process_leaf(node)
+    #         else:
+    #             for i in range(node.childCount()):
+    #                 recurse(node.child(i))
+    #
+    #     for idx in range(self.treeWidget.topLevelItemCount()):
+    #         recurse(self.treeWidget.topLevelItem(idx))
+    #
+    #     self.prune_empty_tree_items(self.treeWidget)
+    #
+    # def filter_by_sim_class_model(self, target_sim, target_class, target_model):
+    #     """
+    #     Filters the tree to show only items matching the specified sim, class, and model.
+    #     All unrelated branches will be hidden.
+    #
+    #     Args:
+    #         target_sim (str): Simulator name (e.g., 'MSFS').
+    #         target_class (str): Aircraft class (e.g., 'Fighter').
+    #         target_model (str): Aircraft model name (e.g., 'F-16').
+    #     """
+    #     for i in range(self.treeWidget.topLevelItemCount()):
+    #         sim_item = self.treeWidget.topLevelItem(i)
+    #         sim_match = sim_item.text(0) == target_sim
+    #         sim_item.setHidden(not sim_match)
+    #
+    #         for j in range(sim_item.childCount()):
+    #             cls_item = sim_item.child(j)
+    #             cls_match = cls_item.text(0) == target_class
+    #             cls_item.setHidden(not (sim_match and cls_match))
+    #
+    #             for k in range(cls_item.childCount()):
+    #                 ac_item = cls_item.child(k)
+    #                 ac_name = self.get_metadata(ac_item, "aircraft_name")
+    #                 ac_item.setHidden(not (sim_match and cls_match and ac_name == target_model))
+    #
+    #     self.prune_empty_tree_items(self.treeWidget)
 
     def clear_text_filters(self):
         self.tb_aircraft_filter.setText('')
@@ -454,48 +571,48 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         self.prune_empty_tree_items(self.treeWidget)
 
-    def apply_radio_filter(self):
-        button = self.filterButtonGroup.checkedButton()
+    # def apply_radio_filter(self):
+    #     button = self.filterButtonGroup.checkedButton()
+    #
+    #     if button == self.rb_showAll:
+    #         self.clear_sim_class_model_filter()
+    #     elif button == self.rb_showDefaults:
+    #         self.clear_sim_class_model_filter()
+    #         self.toggle_show_defaults(True)
+    #     elif button == self.rb_showUser:
+    #         self.clear_sim_class_model_filter()
+    #         self.filter_active_profiles(True)
+    #     elif button == self.rb_showCurrentAircraft:
+    #         self.toggle_show_defaults(False)
+    #         self.filter_by_sim_class_model(
+    #             G.settings_mgr.current_sim,
+    #             G.settings_mgr.current_class,
+    #             G.settings_mgr.current_pattern
+    #         )
 
-        if button == self.rb_showAll:
-            self.clear_sim_class_model_filter()
-        elif button == self.rb_showDefaults:
-            self.clear_sim_class_model_filter()
-            self.toggle_show_defaults(True)
-        elif button == self.rb_filterActive:
-            self.clear_sim_class_model_filter()
-            self.filter_active_profiles(True)
-        elif button == self.rb_filterCurrentAircraft:
-            self.toggle_show_defaults(False)
-            self.filter_by_sim_class_model(
-                G.settings_mgr.current_sim,
-                G.settings_mgr.current_class,
-                G.settings_mgr.current_pattern
-            )
-
-    def clear_sim_class_model_filter(self):
-        for i in range(self.treeWidget.topLevelItemCount()):
-            sim_item = self.treeWidget.topLevelItem(i)
-            sim_item.setHidden(False)
-            for j in range(sim_item.childCount()):
-                cls_item = sim_item.child(j)
-                cls_item.setHidden(False)
-                for k in range(cls_item.childCount()):
-                    ac_item = cls_item.child(k)
-                    ac_item.setHidden(False)
-
-        # Re-apply whatever the currently selected radio button is
-        active_button = self.filterButtonGroup.checkedButton()
-        if active_button == self.rb_showDefaults:
-            self.toggle_show_defaults(True)
-        elif active_button == self.rb_filterActive:
-            self.filter_active_profiles(True)
-        elif active_button == self.rb_filterCurrentAircraft:
-            self.filter_by_sim_class_model(
-                G.settings_mgr.current_sim,
-                G.settings_mgr.current_class,
-                G.settings_mgr.current_pattern
-            )
+    # def clear_sim_class_model_filter(self):
+    #     for i in range(self.treeWidget.topLevelItemCount()):
+    #         sim_item = self.treeWidget.topLevelItem(i)
+    #         sim_item.setHidden(False)
+    #         for j in range(sim_item.childCount()):
+    #             cls_item = sim_item.child(j)
+    #             cls_item.setHidden(False)
+    #             for k in range(cls_item.childCount()):
+    #                 ac_item = cls_item.child(k)
+    #                 ac_item.setHidden(False)
+    #
+    #     # Re-apply whatever the currently selected radio button is
+    #     active_button = self.filterButtonGroup.checkedButton()
+    #     if active_button == self.rb_showDefaults:
+    #         self.toggle_show_defaults(True)
+    #     elif active_button == self.rb_showUser:
+    #         self.filter_active_profiles(True)
+    #     elif active_button == self.rb_showCurrentAircraft:
+    #         self.filter_by_sim_class_model(
+    #             G.settings_mgr.current_sim,
+    #             G.settings_mgr.current_class,
+    #             G.settings_mgr.current_pattern
+    #         )
 
     def sort_aircraft_items(self, by_column=0, order=Qt.SortOrder.AscendingOrder):
         reverse = order == Qt.SortOrder.DescendingOrder
@@ -545,32 +662,32 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
             sim_item.setHidden(not sim_visible)
 
-    def toggle_show_defaults(self, checked):
-        """
-        If checked, only show default profiles. All user profiles are hidden.
-        If unchecked, visibility is not altered.
-        """
-        for i in range(self.treeWidget.topLevelItemCount()):
-            sim_item = self.treeWidget.topLevelItem(i)
-            for j in range(sim_item.childCount()):
-                cls_item = sim_item.child(j)
-
-                for k in range(cls_item.childCount()):
-                    item = cls_item.child(k)
-                    item_type = self.get_metadata(item, "type")
-                    is_active = self.get_metadata(item, "active")
-
-                    if checked:
-                        # Show only default profiles
-                        if item_type == "default":
-                            item.setHidden(False)
-                        else:
-                            item.setHidden(True)
-                    else:
-                        # Reset visibility (handled elsewhere)
-                        item.setHidden(False)
-
-        self.prune_empty_tree_items(self.treeWidget)
+    # def toggle_show_defaults(self, checked):
+    #     """
+    #     If checked, only show default profiles. All user profiles are hidden.
+    #     If unchecked, visibility is not altered.
+    #     """
+    #     for i in range(self.treeWidget.topLevelItemCount()):
+    #         sim_item = self.treeWidget.topLevelItem(i)
+    #         for j in range(sim_item.childCount()):
+    #             cls_item = sim_item.child(j)
+    #
+    #             for k in range(cls_item.childCount()):
+    #                 item = cls_item.child(k)
+    #                 item_type = self.get_metadata(item, "type")
+    #                 is_active = self.get_metadata(item, "active")
+    #
+    #                 if checked:
+    #                     # Show only default profiles
+    #                     if item_type == "default":
+    #                         item.setHidden(False)
+    #                     else:
+    #                         item.setHidden(True)
+    #                 else:
+    #                     # Reset visibility (handled elsewhere)
+    #                     item.setHidden(False)
+    #
+    #     self.prune_empty_tree_items(self.treeWidget)
 
     def update_active_column_text(self, item, active: bool, column=3):
         """
@@ -658,138 +775,6 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         return aircraft_name, cls_name, sim_name
 
-    def delete_profile(self):
-        """
-        Handles deletion of selected user profiles with safety checks:
-        - Prevents deletion of default profiles.
-        - Disallows deletion of multiple profiles if any are active.
-        - If deleting a single active profile and other profiles exist for the same aircraft,
-          prompts user to select a new active profile.
-        - If no other user profiles exist, deletes all profile records for the aircraft.
-        """
-        items = [i for i in self.treeWidget.selectedItems() if i.childCount() == 0]
-        if not items:
-            return
-
-        # Block default profile deletions
-        default_items = [i for i in items if self.get_metadata(i, "type") == "default"]
-        if default_items:
-            names = "\n".join(f"{i.text(0)} (Default)" for i in default_items)
-            QMessageBox.warning(
-                self,
-                "Cannot Delete Default Profiles",
-                f"The following default profiles cannot be deleted:\n\n{names}\n\nPlease de-select and try again"
-            )
-            return
-
-        # Disallow multi-selection if any are active
-        if any(self.get_metadata(i, "active") for i in items):
-            if len(items) > 1:
-                QMessageBox.warning(
-                    self, "Cannot Multi-Delete Active Profiles",
-                    "Active profiles cannot be deleted as part of a multi-selection.\n\n"
-                    "Please select only *one* active profile for deletion."
-                )
-                return
-
-            # Handle single active profile deletion
-            active_item = items[0]
-            sim = active_item.parent().parent().text(0)
-            cls = self.get_metadata(active_item, "cls_name")
-            model = active_item.text(0)
-            profile = active_item.text(2)
-            cls_item = active_item.parent()
-
-            # Get sibling profiles for same aircraft
-            siblings = [
-                cls_item.child(i)
-                for i in range(cls_item.childCount())
-                if self.get_metadata(cls_item.child(i), "aircraft_name") == model
-            ]
-            user_siblings = [s for s in siblings if self.get_metadata(s, "type") == "user" and s is not active_item]
-
-            # If no other user profiles...
-            if not user_siblings:
-                # Ask for confirmation before continuing
-                confirm = QMessageBox.question(
-                    self, "Confirm Deletion",
-                    f"This is the last user profile for '{model}'.\n"
-                    "Are you sure you want to delete it?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No
-                )
-                if confirm != QMessageBox.StandardButton.Yes:
-                    return
-
-                # Check for default fallback
-                default_item = next((s for s in siblings if self.get_metadata(s, "type") == "default"), None)
-
-                if default_item:
-                    self.make_active_profile(default_item)
-                    xmlutils.erase_model_profile(sim, model, profile)
-                    cls_item.removeChild(active_item)
-                    QMessageBox.information(
-                        self, "Deleted",
-                        f"Deleted profile '{profile}' for '{model}'.\nDefault profile has been set as active."
-                    )
-                else:
-                    xmlutils.erase_aircraft_profiles(sim, cls, model)
-                    for sib in siblings:
-                        cls_item.removeChild(sib)
-                    QMessageBox.information(self, "Deleted", f"Deleted entire aircraft profile set for '{model}'.")
-
-                self.prune_empty_tree_items(self.treeWidget)
-                G.main_window.update_settings()
-                return
-
-            # Ask which profile should become active
-            options = [self.get_metadata(s, "profile_name") for s in user_siblings]
-            has_default = any(self.get_metadata(s, "type") == "default" for s in siblings)
-            if has_default:
-                options.insert(0, "Default")
-
-            new_active, ok = QInputDialog.getItem(
-                self, "Choose Replacement Active Profile",
-                f"'{profile}' is active. Choose replacement active profile for '{model}':",
-                options, 0, False
-            )
-            if not ok:
-                return
-
-            # Make selected replacement profile active
-            for sib in siblings:
-                if (new_active == "Default" and self.get_metadata(sib, "type") == "default") or \
-                        self.get_metadata(sib, "profile_name") == new_active:
-                    self.make_active_profile(sib)
-                    break
-
-            # Delete original
-            xmlutils.erase_model_profile(sim, model, profile)
-            cls_item.removeChild(active_item)
-            self.prune_empty_tree_items(self.treeWidget)
-            G.main_window.update_settings()
-            QMessageBox.information(self, "Deleted", f"Deleted profile '{profile}' for '{model}'.")
-            return
-
-        # Handle standard deletions
-        names = "\n".join(f"{i.text(0)} ({i.text(2)})" for i in items)
-        resp = QMessageBox.question(
-            self, "Confirm Deletion",
-            f"Delete the following profiles?\n\n{names}",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No
-        )
-        if resp != QMessageBox.StandardButton.Yes:
-            return
-
-        for item in items:
-            sim = item.parent().parent().text(0)
-            model = item.text(0)
-            profile = item.text(2)
-            xmlutils.erase_model_profile(sim, model, profile)
-            item.parent().removeChild(item)
-
-        self.prune_empty_tree_items(self.treeWidget)
-        G.main_window.update_settings()
-        QMessageBox.information(self, "Deleted", f"Deleted {len(items)} profile(s).")
 
     def remove_tree_item(self, selected_item):
         if selected_item:
@@ -1186,6 +1171,139 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         G.main_window.load_single_offline_model(sim, cls, model, profile)
         self.hide()
 
+
+    def on_delete_clicked(self):
+        """
+        Handles deletion of selected user profiles with safety checks:
+        - Prevents deletion of default profiles.
+        - Disallows deletion of multiple profiles if any are active.
+        - If deleting a single active profile and other profiles exist for the same aircraft,
+          prompts user to select a new active profile.
+        - If no other user profiles exist, deletes all profile records for the aircraft.
+        """
+        items = [i for i in self.treeWidget.selectedItems() if i.childCount() == 0]
+        if not items:
+            return
+
+        # Block default profile deletions
+        default_items = [i for i in items if self.get_metadata(i, "type") == "default"]
+        if default_items:
+            names = "\n".join(f"{i.text(0)} (Default)" for i in default_items)
+            QMessageBox.warning(
+                self,
+                "Cannot Delete Default Profiles",
+                f"The following default profiles cannot be deleted:\n\n{names}\n\nPlease de-select and try again"
+            )
+            return
+
+        # Disallow multi-selection if any are active
+        if any(self.get_metadata(i, "active") for i in items):
+            if len(items) > 1:
+                QMessageBox.warning(
+                    self, "Cannot Multi-Delete Active Profiles",
+                    "Active profiles cannot be deleted as part of a multi-selection.\n\n"
+                    "Please select only *one* active profile for deletion."
+                )
+                return
+
+            # Handle single active profile deletion
+            active_item = items[0]
+            sim = active_item.parent().parent().text(0)
+            cls = self.get_metadata(active_item, "cls_name")
+            model = active_item.text(0)
+            profile = active_item.text(2)
+            cls_item = active_item.parent()
+
+            # Get sibling profiles for same aircraft
+            siblings = [
+                cls_item.child(i)
+                for i in range(cls_item.childCount())
+                if self.get_metadata(cls_item.child(i), "aircraft_name") == model
+            ]
+            user_siblings = [s for s in siblings if self.get_metadata(s, "type") == "user" and s is not active_item]
+
+            # If no other user profiles...
+            if not user_siblings:
+                # Ask for confirmation before continuing
+                confirm = QMessageBox.question(
+                    self, "Confirm Deletion",
+                    f"This is the last user profile for '{model}'.\n"
+                    "Are you sure you want to delete it?",
+                    QMessageBox.StandardButton.No | QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No
+                )
+                if confirm != QMessageBox.StandardButton.Yes:
+                    return
+
+                # Check for default fallback
+                default_item = next((s for s in siblings if self.get_metadata(s, "type") == "default"), None)
+
+                if default_item:
+                    self.make_active_profile(default_item)
+                    xmlutils.erase_model_profile(sim, model, profile)
+                    cls_item.removeChild(active_item)
+                    QMessageBox.information(
+                        self, "Deleted",
+                        f"Deleted profile '{profile}' for '{model}'.\nDefault profile has been set as active."
+                    )
+                else:
+                    xmlutils.erase_aircraft_profiles(sim, cls, model)
+                    for sib in siblings:
+                        cls_item.removeChild(sib)
+                    QMessageBox.information(self, "Deleted", f"Deleted entire aircraft profile set for '{model}'.")
+
+                self.prune_empty_tree_items(self.treeWidget)
+                G.main_window.update_settings()
+                return
+
+            # Ask which profile should become active
+            options = [self.get_metadata(s, "profile_name") for s in user_siblings]
+            has_default = any(self.get_metadata(s, "type") == "default" for s in siblings)
+            if has_default:
+                options.insert(0, "Default")
+
+            new_active, ok = QInputDialog.getItem(
+                self, "Choose Replacement Active Profile",
+                f"'{profile}' is active. Choose replacement active profile for '{model}':",
+                options, 0, False
+            )
+            if not ok:
+                return
+
+            # Make selected replacement profile active
+            for sib in siblings:
+                if (new_active == "Default" and self.get_metadata(sib, "type") == "default") or \
+                        self.get_metadata(sib, "profile_name") == new_active:
+                    self.make_active_profile(sib)
+                    break
+
+            # Delete original
+            xmlutils.erase_model_profile(sim, model, profile)
+            cls_item.removeChild(active_item)
+            self.prune_empty_tree_items(self.treeWidget)
+            G.main_window.update_settings()
+            QMessageBox.information(self, "Deleted", f"Deleted profile '{profile}' for '{model}'.")
+            return
+
+        # Handle standard deletions
+        names = "\n".join(f"{i.text(0)} ({i.text(2)})" for i in items)
+        resp = QMessageBox.question(
+            self, "Confirm Deletion",
+            f"Delete the following profiles?\n\n{names}",
+            QMessageBox.StandardButton.No | QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No
+        )
+        if resp != QMessageBox.StandardButton.Yes:
+            return
+
+        for item in items:
+            sim = item.parent().parent().text(0)
+            model = item.text(0)
+            profile = item.text(2)
+            xmlutils.erase_model_profile(sim, model, profile)
+            item.parent().removeChild(item)
+
+        self.prune_empty_tree_items(self.treeWidget)
+        G.main_window.update_settings()
+        QMessageBox.information(self, "Deleted", f"Deleted {len(items)} profile(s).")
 
     @pyqtSlot()
     def on_clone_clicked(self):
