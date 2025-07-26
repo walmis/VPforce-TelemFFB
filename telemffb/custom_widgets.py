@@ -16,26 +16,313 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from PyQt6.QtGui import QAction, QWheelEvent, QPalette
 
-from PyQt6 import QtWidgets, QtCore
+from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
-    QComboBox, QMessageBox, QMenu, QPushButton
+    QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox, QStackedLayout, QSizePolicy
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
     QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
     QLinearGradient, QFont
 from PyQt6.QtWidgets import QStyle, QStyleOptionSlider
 
+from PyQt6.QtCore import Qt
+
 import numpy as np
-from scipy.interpolate import make_interp_spline, interp1d
-from scipy.interpolate import Akima1DInterpolator
 
 import telemffb.globals as G
-from telemffb.utils import HiDpiPixmap
+from telemffb.utils import HiDpiPixmap, Akima1DInterpolator
+import styles
 
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
+
+class AppStatusWidget(QWidget):
+    def __init__(self, master_instance=True, parent=None):
+        super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.offline = False
+        self.offline_recall_ac = ''
+        self.offline_recall_ptn = ''
+        self.offline_recall_pro = ''
+
+        grid = QGridLayout(self)
+        grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        grid.setContentsMargins(10, 10, 10, 10)
+        grid.setVerticalSpacing(10)
+        grid.setHorizontalSpacing(10)
+
+        row = 0
+        label_align = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        value_align = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+
+        sim_status_header = InfoLabel()
+        sim_status_header.text_label.setText('Sim Status:')
+        sim_status_header.setToolTip('Enabled Sims:\n  DCS\n  MSFS\n  XPLANE\n\nDisabled Sims:\n  IL2')
+
+        self.sim_status_label = SimStatusWidget()
+        self.cur_craft_label = QLabel("None Detected")
+        self.cur_pattern_label = QLabel("(No Match)")
+        self.active_profile_label = QLabel("(None)")
+
+        self.notification_label = QLabel('')
+        self.notification_label.setWordWrap(True)
+        self.notification_label.setMinimumHeight(60)
+        size_policy = self.notification_label.sizePolicy()
+        size_policy.setRetainSizeWhenHidden(True)
+        self.notification_label.setSizePolicy(size_policy)
+        self.notification_label.hide()
+        self.notification_label.setStyleSheet("""
+            QLabel {
+                padding-left: 10px;
+                padding-top: 2px;
+                color: #ff6b6b;
+                background-color: rgba(255, 50, 50, 30);
+                border: 1px solid #c33;
+                border-radius: 4px;
+            }
+        """)
+
+        self.offline_label = QLabel('Telemetry is paused while in offline editing mode')
+        self.offline_label.setWordWrap(True)
+        self.offline_label.setMinimumHeight(60)
+        self.offline_label.setSizePolicy(size_policy)
+        self.offline_label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(255, 165, 0, 100);
+                color: palette(windowText);
+                padding: 6px 10px;
+                font-weight: bold;
+                border: 1px solid palette(dark);
+                border-radius: 6px;
+            }
+        """)
+
+        # Stacked message layout
+        self.message_stack = QStackedLayout()
+        self.message_stack.addWidget(QLabel(''))  # Index 0
+        self.message_stack.addWidget(self.notification_label)  # Index 1
+        self.message_stack.addWidget(self.offline_label)  # Index 2
+        self.message_stack.setCurrentIndex(-1)
+
+        # Layout content
+        grid.addWidget(sim_status_header, row, 0, alignment=label_align)
+        grid.addWidget(self.sim_status_label, row, 1, alignment=value_align)
+        row += 1
+
+        grid.addWidget(QLabel("Current Aircraft:"), row, 0, alignment=label_align)
+        grid.addWidget(self.cur_craft_label, row, 1, alignment=value_align)
+        row += 1
+
+        grid.addWidget(QLabel("Matched Model:"), row, 0, alignment=label_align)
+        grid.addWidget(self.cur_pattern_label, row, 1, alignment=value_align)
+        row += 1
+
+        self.cb_selectProfileCombo = QComboBox()
+        self.cb_selectProfileCombo.addItems(['Select...'])
+
+        profile_row_layout = QHBoxLayout()
+        profile_row_layout.setContentsMargins(0, 0, 0, 0)
+        profile_row_layout.setSpacing(6)
+        profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        profile_row_layout.addWidget(self.active_profile_label)
+        profile_row_layout.addWidget(self.cb_selectProfileCombo)
+
+        grid.addWidget(QLabel("Active Profile:"), row, 0, alignment=label_align)
+        grid.addLayout(profile_row_layout, row, 1)
+        row += 1
+
+        grid.addLayout(self.message_stack, row, 0, 1, 2)
+
+        if not master_instance:
+            self.cb_selectProfileCombo.setDisabled(True)
+            self.cb_selectProfileCombo.setVisible(False)
+
+    def reset(self):
+        self.offline = False
+        self.sim_status_label.set_waiting()
+        self.cur_craft_label.setText(self.offline_recall_ac)
+        self.cur_pattern_label.setText(self.offline_recall_ptn)
+        self.active_profile_label.setText(self.offline_recall_pro)
+        self.offline_recall_ac = ''
+        self.offline_recall_ptn = ''
+        self.offline_recall_pro = ''
+        self.message_stack.setCurrentIndex(0)
+
+
+    def set_running(self, source):
+        if self.offline: return
+        self.sim_status_label.set_status(source, 'Running')
+        self.cb_selectProfileCombo.setDisabled(False)
+        self.message_stack.setCurrentIndex(0)
+
+    def set_paused(self, source):
+        if self.offline: return
+        self.sim_status_label.set_status(source, 'Paused')
+        self.cb_selectProfileCombo.setDisabled(False)
+        self.message_stack.setCurrentIndex(0)
+
+    def set_error(self, source):
+        if self.offline: return
+        self.sim_status_label.set_status(source, 'Error')
+        self.cb_selectProfileCombo.setDisabled(False)
+
+    def set_offline(self, source):
+        self.offline = True
+        self.sim_status_label.set_status(source, 'Offline')
+        self.offline_recall_ac = self.cur_craft_label.text()
+        self.offline_recall_pro = self.cur_pattern_label.text()
+        self.offline_recall_pro = self.active_profile_label.text()
+        self.cur_craft_label.setText('Offline')
+        self.cur_pattern_label.setText('Offline')
+        self.active_profile_label.setText('Offline')
+        self.cb_selectProfileCombo.setDisabled(True)
+        self.message_stack.setCurrentIndex(2)
+
+    def flag_error(self, message):
+        self.notification_label.setText(message)
+        self.notification_label.show()
+        self.message_stack.setCurrentIndex(1)
+
+
+    def clear_error(self):
+        self.notification_label.setText('')
+        self.notification_label.hide()
+        self.message_stack.setCurrentIndex(0)
+
+
+    def set_fullname(self, full_name):
+        self.cur_craft_label.setText(full_name)
+
+    def set_match_pattern(self, pattern):
+        self.cur_pattern_label.setText(pattern)
+
+    def set_profile_name(self, profile_name):
+        self.active_profile_label.setText(profile_name)
+
+    def update_enabled_sims(self, sim: str, state: bool):
+        # Maintain state map across calls
+        if not hasattr(self, "_sim_states"):
+            self._sim_states = {
+                "DCS": False,
+                "MSFS": False,
+                "XPLANE": False,
+                "IL2": False
+            }
+
+        # Update the state for the provided sim
+        if sim in self._sim_states:
+            self._sim_states[sim] = state
+
+        # Build tooltip content
+        enabled = [s for s, enabled in self._sim_states.items() if enabled]
+        disabled = [s for s, enabled in self._sim_states.items() if not enabled]
+
+        tooltip = "Enabled Sims:\n"
+        tooltip += "".join(f"  {s}\n" for s in sorted(enabled)) if enabled else "  (None)\n"
+        tooltip += "\nDisabled Sims:\n"
+        tooltip += "".join(f"  {s}\n" for s in sorted(disabled)) if disabled else "  (None)"
+
+        # Set the updated tooltip
+        self.findChild(InfoLabel).setToolTip(tooltip)
+
+class SimStatusWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.sim_label = QLabel("Waiting...")
+        self.status_label = QLabel("")
+        self.status_label.setVisible(False)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(self.sim_label)
+        layout.addWidget(self.status_label)
+
+        self._base_styles()
+
+    def _base_styles(self):
+        self.sim_label.setStyleSheet("QLabel { font-weight: bold; }")
+        self.status_label.setStyleSheet("""
+            QLabel {
+                padding: 2px 8px;
+                border-radius: 4px;
+                color: white;
+                font-weight: bold;
+            }
+        """)
+
+    def set_waiting(self):
+        self.sim_label.setText("Waiting...")
+        self.status_label.setVisible(False)
+
+    def set_status(self, sim_name: str, status: str):
+        self.sim_label.setText(sim_name)
+        self.status_label.setVisible(True)
+
+        status_color = {
+            "Running": "rgba(0, 200, 0, 150)",   # Green
+            "Paused": "rgba(255, 200, 0, 150)",  # Yellow
+            "Error": "rgba(255, 0, 0, 120)",      # Red
+            "Offline": "rgba(128,128,128, 100)",  # Grey
+        }.get(status, "rgba(120, 120, 120, 150)")
+
+        self.status_label.setText(status)
+        self.status_label.setStyleSheet(f"""
+            QLabel {{
+                padding: 2px 8px;
+                border-radius: 10px;
+                background-color: {status_color};
+                font-weight: bold;
+            }}
+        """)
+
+class StyledButton(QPushButton):
+    """
+    A QPushButton subclass that ensures consistent styling and sizing.
+
+    This class is designed to be used with custom QSS (Qt Style Sheets)
+    where button appearance is heavily styled (e.g., gradients, rounded borders, etc.).
+
+    Key Features:
+    - Ensures a minimum button width (default: 75px) so that short labels like "OK" or "Go"
+      do not result in overly narrow buttons, which can look awkward or inconsistent.
+    - Maintains the height determined by the base QPushButton and active style/theme.
+    - Applies a specific object name ("styledButton") to associate with custom CSS rules.
+
+    Usage:
+    - Promote QPushButton widgets to StyledButton in Qt Designer.
+    - Ensure stylesheet contains styles for `#styledButton` to take effect.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set the object name to apply custom QSS styles targeting "#styledButton"
+        self.setObjectName("styledButton")
+
+    def sizeHint(self):
+        """
+        Returns the recommended size for the button, ensuring a minimum width
+        while preserving default style-calculated height.
+        """
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+
+        # Calculate the styled button size from the current style
+        style_size = self.style().sizeFromContents(
+            QStyle.ContentsType.CT_PushButton,
+            opt,
+            super().sizeHint(),
+            self
+        )
+
+        # Enforce a minimum width of 60px to match standard button sizing
+        min_width = max(style_size.width(), 75)
+
+        return QSize(min_width, super().sizeHint().height())
 
 class NoKeyScrollArea(QScrollArea):
     def __init__(self):
@@ -46,22 +333,6 @@ class NoKeyScrollArea(QScrollArea):
 
     def addSlider(self, slider):
         self.sliders.append(slider)
-    #
-    # def keyPressEvent(self, event):
-    #     # Forward keypress events to all sliders
-    #     for slider in self.sliders:
-    #         try:
-    #             slider.keyPressEvent(event)
-    #         except:
-    #             pass
-    #
-    # def keyReleaseEvent(self, event):
-    #     # Forward keypress events to all sliders
-    #     for slider in self.sliders:
-    #         try:
-    #             slider.keyReleaseEvent(event)
-    #         except:
-    #             pass
 
 
 class SliderWithLabel(QWidget):
@@ -99,6 +370,11 @@ class DelayTimerSlider(QSlider):
     def _emitDelayedValueChanged(self):
         self.delayedValueChanged.emit(self.value())
 
+class NoWheelComboBox(QComboBox):
+    def wheelEvent(self, event: QWheelEvent):
+        # Ignore the wheel event entirely
+        event.ignore()
+
 class NoWheelSlider(QSlider):
     delayedValueChanged = pyqtSignal(int)
     def __init__(self, *args, **kwargs):
@@ -116,7 +392,7 @@ class NoWheelSlider(QSlider):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)
         self.is_mouse_over = False
-        self._delay = 1000  # Delay in milliseconds
+        self._delay = 300  # Delay in milliseconds
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._emitDelayedValueChanged)
@@ -128,6 +404,88 @@ class NoWheelSlider(QSlider):
 
     def _emitDelayedValueChanged(self):
         self.delayedValueChanged.emit(self.value())
+
+    def paintEvent(self, event):
+        # super(NoWheelNumberSlider, self).paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # --- Draw groove manually ---
+        groove_rect = QRectF()
+        if self.orientation() == Qt.Orientation.Horizontal:
+            groove_height = 10
+            groove_y = (self.height() - groove_height) / 2
+            groove_rect = QRectF(0, groove_y, self.width(), groove_height)
+        else:
+            groove_width = 8
+            groove_x = (self.width() - groove_width) / 2
+            groove_rect = QRectF(groove_x, 0, groove_width, self.height())
+
+        palette = self.palette()
+        base_color = palette.color(QPalette.ColorRole.Mid)
+        highlight_color = palette.color(QPalette.ColorRole.Midlight)
+
+        gradient = QLinearGradient(groove_rect.topLeft(), groove_rect.bottomLeft())
+        gradient.setColorAt(0.0, base_color)
+        gradient.setColorAt(1.0, highlight_color)
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(gradient)
+        painter.drawRoundedRect(groove_rect, 2, 2)
+
+        # Style option for the handle
+        option = QStyleOptionSlider()
+        self.initStyleOption(option)
+        handle_rect = self.style().subControlRect(
+            QStyle.ComplexControl.CC_Slider,
+            option,
+            QStyle.SubControl.SC_SliderHandle,
+            self
+        )
+
+        # Adjust handle size
+        handle_rect.setWidth(self.handle_width)
+        handle_rect.setHeight(self.handle_height)
+
+        # Calculate new handle position
+        if self.orientation() == Qt.Orientation.Horizontal:
+            handle_x = self.style().sliderPositionFromValue(
+                self.minimum(), self.maximum(), self.value(), self.width() - self.handle_width)
+            handle_rect.moveLeft(handle_x)
+
+            # Vertical alignment fix: center handle on groove
+            groove_y = (self.height() - 10) / 2  # groove_height is 10
+            handle_rect.moveTop(int(groove_y + 10 / 2 - self.handle_height / 2))
+
+        else:
+            handle_y = self.style().sliderPositionFromValue(
+                self.minimum(), self.maximum(), self.value(), self.height() - self.handle_height)
+            handle_rect.moveTop(handle_y)
+
+            # Horizontal alignment fix for vertical slider
+            groove_x = (self.width() - 8) / 2  # groove_width is 8
+            handle_rect.moveLeft(int(groove_x + 8 / 2 - self.handle_width / 2))
+
+        # Draw custom gradient background
+        # Shift center to upper-left
+        cx = handle_rect.left() + handle_rect.width() * 0.3
+        cy = handle_rect.top() + handle_rect.height() * 0.3
+
+        # Increase radius for smoother falloff
+        radius = max(handle_rect.width(), handle_rect.height())
+        gradient = QRadialGradient(cx, cy, radius)
+
+        lighter_val = 150 if G.useDarkMode else 150
+        darker_val = 200 if G.useDarkMode else 150
+        gradient.setColorAt(0.0, QColor(self.handle_color).lighter(lighter_val))
+        gradient.setColorAt(0.15, QColor(self.handle_color))
+        gradient.setColorAt(1.0, QColor(self.handle_color).darker(darker_val))
+
+        painter.setBrush(QBrush(gradient))
+        painter.setPen(QPen(QColor(self.handle_color).darker(120)))
+        painter.drawRoundedRect(handle_rect, self.handle_height / 4, self.handle_height / 4)
+
+        painter.end()
 
     def wheelEvent(self, event):
         if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
@@ -209,14 +567,13 @@ class NoWheelNumberSlider(NoWheelSlider):
         self.update()  # Ensure the slider is repainted to show the new text
 
     def paintEvent(self, event):
-        super(NoWheelNumberSlider, self).paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # --- Draw groove manually ---
         groove_rect = QRectF()
         if self.orientation() == Qt.Orientation.Horizontal:
-            groove_height = 8
+            groove_height = 10
             groove_y = (self.height() - groove_height) / 2
             groove_rect = QRectF(0, groove_y, self.width(), groove_height)
         else:
@@ -224,13 +581,17 @@ class NoWheelNumberSlider(NoWheelSlider):
             groove_x = (self.width() - groove_width) / 2
             groove_rect = QRectF(groove_x, 0, groove_width, self.height())
 
-        gradient = QLinearGradient(groove_rect.topLeft(), groove_rect.bottomLeft())
-        gradient.setColorAt(0.0, QColor("#666666"))
-        gradient.setColorAt(1.0, QColor("#444444"))
+        palette = self.palette()
+        base_color = palette.color(QPalette.ColorRole.Mid)
+        highlight_color = palette.color(QPalette.ColorRole.Midlight)
 
-        painter.setPen(QPen(QColor("#565a5e")))
+        gradient = QLinearGradient(groove_rect.topLeft(), groove_rect.bottomLeft())
+        gradient.setColorAt(0.0, base_color)
+        gradient.setColorAt(1.0, highlight_color)
+
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(gradient)
-        painter.drawRoundedRect(groove_rect, 3, 3)
+        painter.drawRoundedRect(groove_rect, 2, 2)
 
         # Style option for the handle
         option = QStyleOptionSlider()
@@ -251,21 +612,41 @@ class NoWheelNumberSlider(NoWheelSlider):
             handle_x = self.style().sliderPositionFromValue(
                 self.minimum(), self.maximum(), self.value(), self.width() - self.handle_width)
             handle_rect.moveLeft(handle_x)
+
+            # Center handle vertically on groove
+            groove_height = 10
+            groove_y = (self.height() - groove_height) / 2
+            handle_rect.moveTop(int(groove_y + groove_height / 2 - self.handle_height / 2))
+
         else:
             handle_y = self.style().sliderPositionFromValue(
                 self.minimum(), self.maximum(), self.value(), self.height() - self.handle_height)
             handle_rect.moveTop(handle_y)
 
+            # Center handle horizontally on groove
+            groove_width = 8
+            groove_x = (self.width() - groove_width) / 2
+            handle_rect.moveLeft(int(groove_x + groove_width / 2 - self.handle_width / 2))
+
         # Draw custom gradient background
+        # Shift center to upper-left
+        cx = handle_rect.left() + handle_rect.width() * 0.25
+        cy = handle_rect.top() + handle_rect.height() * 0.3
+
         center = handle_rect.center()
         gradient = QRadialGradient(center.x(), center.y(), handle_rect.width() / 2)
 
-        gradient.setColorAt(0.0, QColor("#ffffff"))
-        gradient.setColorAt(0.3, QColor(self.handle_color))
-        gradient.setColorAt(1.0, QColor(self.handle_color).darker())
+        radius = max(handle_rect.width(), handle_rect.height())
+        gradient = QRadialGradient(cx, cy, radius)
+
+        lighter_val = 150 if G.useDarkMode else 150
+        darker_val = 200 if G.useDarkMode else 150
+        gradient.setColorAt(0.0, QColor(self.handle_color).lighter(lighter_val))
+        gradient.setColorAt(0.1, QColor(self.handle_color))
+        gradient.setColorAt(1.0, QColor(self.handle_color).darker(darker_val))
 
         painter.setBrush(QBrush(gradient))
-        painter.setPen(QPen(QColor("#565a5e")))
+        painter.setPen(QPen(QColor(self.handle_color).darker(120)))
         painter.drawRoundedRect(handle_rect, self.handle_height / 4, self.handle_height / 4)
 
         # Draw the value text
@@ -274,7 +655,8 @@ class NoWheelNumberSlider(NoWheelSlider):
         font.setBold(True)
         painter.setFont(font)
 
-        painter.setPen(Qt.GlobalColor.white)
+
+        painter.setPen(Qt.GlobalColor.black)
         painter.drawText(handle_rect, Qt.AlignmentFlag.AlignCenter, self.value_text)
 
         painter.end()
@@ -324,8 +706,11 @@ class ClickLogo(QLabel):
 
 
 class InfoLabel(QWidget):
+    clicked = pyqtSignal()
+
     def __init__(self, parent=None, text=None, tooltip=None):
         super(InfoLabel, self).__init__(parent)
+        self._clickable = False
 
         # Text label
         self.text_label = QLabel(self)
@@ -356,6 +741,17 @@ class InfoLabel(QWidget):
         if tooltip:
             self.setToolTip(tooltip)
 
+    def setClickable(self, clickable):
+        self._clickable = clickable
+        if clickable:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def mousePressEvent(self, event):
+        if self._clickable:
+            self.clicked.emit()
+
     def setText(self, text):
         self.text_label.setText(text)
         # Adjust the size of text_label based on the new text
@@ -377,6 +773,70 @@ class InfoLabel(QWidget):
         scaled_pixmap = self.pixmap.scaledToHeight(self.text_label.sizeHint().height())  # Adjust the height as needed
         self.icon_label.setPixmap(scaled_pixmap)
 
+class EraseButton(QPushButton):
+    # Define the signals (you can connect these in the layout)
+    move_to_class_signal = pyqtSignal(str, str, str, str, str, str)  # csim, cclass, setting, value, unit
+    move_to_sim_signal = pyqtSignal(str, str, str, str, str)  # csim, model, setting, value, unit
+
+    def __init__(self, *args, csim=None, cclass=None, cmodel=None, csetting=None, cvalue=None, cunit=None,
+                 enable_context_menu=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.csim = csim
+        self.cclass = cclass
+        self.cmodel = cmodel
+        self.csetting = csetting
+        self.cvalue = cvalue
+        self.cunit = cunit
+        self.setProperty("buttonType", 'erase_button')
+
+        self.enable_context_menu = enable_context_menu
+        if self.enable_context_menu:
+            self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            self.customContextMenuRequested.connect(
+                lambda pos: self.show_context_menu(pos, csim, cclass)  #, cvalue, csetting, cmodel)
+            )
+
+    def show_context_menu(self,pos, csim, cclass):   # , cvalue, csetting, cmodel):
+        menu = QMenu(self)
+
+        action1 = QAction(f"Move setting to all {csim} {cclass} class aircraft", self)
+        action1.triggered.connect(lambda: self.move_to_class_signal.emit(
+            self.csim,
+            self.cclass,
+            self.cvalue,
+            self.csetting,
+            self.cmodel,
+            self.cunit))
+        if not G.settings_mgr.offline_scope:
+            menu.addAction(action1)
+        else:
+            match G.settings_mgr.offline_scope:
+                case 'MODEL':
+                    menu.addAction(action1)
+                case _:
+                    pass
+
+        action2 = QAction(f"Move setting to {csim} Sim for all aircraft", self)
+        action2.triggered.connect(lambda: self.move_to_sim_signal.emit(
+            self.csim,
+            self.cvalue,
+            self.csetting,
+            self.cmodel,
+            self.cunit))
+        if not G.settings_mgr.offline_scope:
+            menu.addAction(action2)
+        else:
+            match G.settings_mgr.offline_scope:
+                case 'MODEL':
+                    menu.addAction(action2)
+                case 'CLASS':
+                    menu.addAction(action2)
+                case _:
+                    pass
+
+        # Show the menu at the global cursor position
+        menu.exec(self.mapToGlobal(pos))
+
 
 class StatusLabel(QWidget):
     clicked = pyqtSignal(str)
@@ -385,7 +845,7 @@ class StatusLabel(QWidget):
         super(StatusLabel, self).__init__(parent)
 
         self.label = QLabel(text)
-        self.label.setStyleSheet("QLabel { padding-right: 5px; }")
+        self.label.setObjectName("StatusLabel")
 
         self.dot_color = color  # Default color
         self.dot_size = size
@@ -395,20 +855,9 @@ class StatusLabel(QWidget):
         layout = QHBoxLayout(self)
         layout.addWidget(self.label)
 
-    def enterEvent(self, event):
-        # Set the label to be purple and underlined when the mouse enters
-        self.label.setStyleSheet("QLabel { padding-right: 5px; color: #ab37c8; text-decoration: underline; }")
-
-    def leaveEvent(self, event):
-        # Set the label back to its original style when the mouse leaves
-        if G.useDarkMode:
-            self.label.setStyleSheet("QLabel { padding-right: 5px; color: white; text-decoration: none; }")
-        else:
-            self.label.setStyleSheet("QLabel { padding-right: 5px; color: black; text-decoration: none; }")
-
     def mousePressEvent(self, event):
         if self._clickable:
-            dev = self.label.text().lower()
+            dev = self.label.text().lower().replace(" ","")
             self.clicked.emit(dev)
 
     def hide(self):
@@ -697,7 +1146,9 @@ class Toggle(QCheckBox):
                  handle_color=Qt.GlobalColor.white,
                  disabled_color=Qt.GlobalColor.gray):
         super().__init__(parent)
-
+        self.setStyleSheet("QCheckBox::indicator { width: 0px; height: 0px; }")
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
         # Save our properties on the object via self, so we can access them later
         # in the paintEvent.
         self._bar_color = bar_color
@@ -751,7 +1202,7 @@ class Toggle(QCheckBox):
 
         if not self.isEnabled():
             barGradient.setColorAt(0.0, self._disabled_color.lighter(150))
-            barGradient.setColorAt(0.5, self._disabled_color)
+            barGradient.setColorAt(0.0, self._disabled_color)
             barGradient.setColorAt(1.0, self._disabled_color.darker(150))
         else:
             barGradient.setColorAt(0.0, self._bar_color.lighter(150))
@@ -767,25 +1218,38 @@ class Toggle(QCheckBox):
         p.drawRoundedRect(barRect, rounding, rounding)
 
         # Draw the border around the bar
-        p.setPen(QPen(QColor("#565a5e"), 1))
+        p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(barRect, rounding, rounding)
 
-        if self.isChecked() and self.isEnabled():
+        if not self.isEnabled():
+            handle_color = self._disabled_color.darker(110)
+        elif self.isChecked():
             handle_color = self._handle_checked_brush.color()
         else:
             handle_color = self._handle_brush.color()
 
         # Draw the handle with a gradient for 3D effect
-        handleGradient = QRadialGradient(QPointF(xPos - handleRadius / 3, barRect.center().y() - handleRadius / 3),
-                                         handleRadius)
-        if G.useDarkMode:
-            handleGradient.setColorAt(0.0, handle_color)
-        else:
+        handleGradient = QRadialGradient(
+            QPointF(xPos - handleRadius / 3, barRect.center().y() - handleRadius / 3),
+            handleRadius
+        )
+
+        if not self.isEnabled():
+            handleGradient.setColorAt(0.0, handle_color.lighter(120))
+            handleGradient.setColorAt(0.4, handle_color)
+            handleGradient.setColorAt(1.0, handle_color.darker(130))
+        elif self.isChecked():
             handleGradient.setColorAt(0.0, QColor(255, 255, 255, 180))
-        handleGradient.setColorAt(0.6, handle_color)
-        handleGradient.setColorAt(1.0, handle_color.darker())
+            handleGradient.setColorAt(0.3, handle_color)
+            handleGradient.setColorAt(1.0, handle_color.darker(120))
+        else:
+            # OFF + Enabled: More subtle highlight
+            handleGradient.setColorAt(0.0, handle_color.lighter(150))
+            handleGradient.setColorAt(0.3, handle_color)
+            handleGradient.setColorAt(1.0, handle_color.darker(300))
 
         p.setBrush(handleGradient)
+        p.setPen(QPen(handle_color.darker()))
         p.drawEllipse(
             QPointF(xPos, barRect.center().y()),
             handleRadius, handleRadius)
@@ -987,6 +1451,7 @@ class InstanceStatusRow(QWidget):
     changeConfigScope = QtCore.pyqtSignal(str)
     def __init__(self) -> None:
         super().__init__()
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         self.instance_status_row = QHBoxLayout()
         self.master_status_icon = StatusLabel(None, f'This Instance({ G.device_type.capitalize() }):', Qt.GlobalColor.green, 8)

@@ -106,18 +106,18 @@ class AircraftBase(object):
     critical_aoa_start = 22
     critical_aoa_max = 25
 
-    gforce_effect_master: bool = False
-    gforce_effect_enable: bool = False
+    # gforce_effect_master: bool = False
+    # gforce_effect_enable: bool = False
     gforce_effect_invert_force = 0  # case where "180" degrees does not equal "away from pilot"
     gforce_effect_curvature = 2.2
     gforce_effect_max_intensity = 1.0
     gforce_min_gs = 1.5  # G's where the effect starts playing
     gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
-    gforce_effect_advanced_enabled = False
+    # gforce_effect_advanced_enabled = False
     gforce_effect_advanced_curve = {}
     gforce_current_factor: float = 0.0
 
-    new_gforce_effect_enable = False
+    # new_gforce_effect_enable = False
     new_gforce_effect_center_deadzone = 0
     new_gforce_min_gs = 1.1  # G's where the effect starts playing
     new_gforce_max_gs = 5.0  # G limit where the effect maxes out at strength defined in gforce_effect_max_intensity
@@ -169,7 +169,7 @@ class AircraftBase(object):
     engine_rumble_highrpm: int  = 2800
     engine_rumble_highrpm_intensity: float = 0.06
 
-    gforce_effect_enable : bool = False
+    # gforce_effect_enable : bool = False
 
     flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable
     flaps_buffet_intensity : float = 0.0      # peak buffeting intensity when flaps are deployed,  0 to disable
@@ -180,7 +180,7 @@ class AircraftBase(object):
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
     elevator_droop_enabled: bool = False
     elevator_droop_force: float = 0.0
-    aircraft_is_fbw: bool = False
+    aircraft_is_fbw: bool = False           #deprecated
 
     gear_motion_effect_enabled: bool = False
     gear_buffet_effect_enabled: bool = False
@@ -229,7 +229,11 @@ class AircraftBase(object):
     vrs_vs_onset: float = 0
     vrs_vs_max: float = 0
 
-    pedal_spring_mode = 'Static Spring'  ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    #spring_mode = G.JoystickSpringMode.BASIC
+
+    ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
+    #pedal_spring_mode = G.PedalSpringMode.STATIC
+
     aircraft_vs_speed = 87
     aircraft_vs_gain = 0.25
     aircraft_vne_speed = 435
@@ -270,10 +274,10 @@ class AircraftBase(object):
     collective_ft_ovd_cp0_y = 4096
     collective_ft_use_master_buttons: bool = False
 
-    adv_spr_override_enabled: bool = False
+    adv_spr_override_enabled: bool = False   #deprecated
     adv_spr_gains: str = 'none'
     adv_spr_use_hardware_trim: bool = False
-    adv_spr_use_game_trim: bool = True
+    # adv_spr_use_game_trim: bool = True
     gforce_effect_adv_curve: str = 'none'
     trimwheel_elev_up_button: int = 0
     trimwheel_elev_dn_button: int = 0
@@ -291,7 +295,6 @@ class AircraftBase(object):
 
     enable_deadzone: bool = False
     deadzone_base_pct: float = 0.0
-
 
     g_y_offset: int = 0
 
@@ -332,6 +335,17 @@ class AircraftBase(object):
 
         self.friction_effect_overridden: bool = False
 
+        self.SpringModeEnum = G.settings_mgr.SpringModeEnum
+        self.GEffectModeEnum = G.settings_mgr.GEffectModeEnum
+
+        self.spring_mode = self.SpringModeEnum.NONE.name
+        self.gforce_effect_mode = self.GEffectModeEnum.DISABLED.name
+
+    def spring_mode_is(self, mode):
+        return mode.name == self.spring_mode
+
+    def gforce_effect_mode_is(self, mode):
+        return mode.name == self.gforce_effect_mode
 
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
@@ -397,15 +411,16 @@ class AircraftBase(object):
 
     def apply_settings(self, settings_dict):
         """Apply settings from a configuration dictionary to the aircraft instance.
-        
+
         Args:
             settings_dict (dict): Dictionary containing configuration key-value pairs.
                                 Keys should match aircraft attribute names.
-        
+
         Logs warnings for unknown parameters and info for each applied setting.
         """
         for k, v in settings_dict.items():
             if k in ["type"]: continue
+            if k.endswith("_group"): continue
             if getattr(self, k, None) is None and k != 'vpconf' and 'dummy' not in k and 'command_runner' not in k:
                 logging.info(f"WARNING: Unknown parameter {k} in config")
                 continue
@@ -414,14 +429,14 @@ class AircraftBase(object):
 
     def has_changed(self, item: str, delta_ms=0, data=None) -> bool:
         """Check if a telemetry data item has changed since last call.
-        
+
         Args:
             item (str): Name of the telemetry data item to check
             delta_ms (int, optional): Time window in milliseconds to consider as "recently changed". Defaults to 0.
             data (dict, optional): Telemetry data dictionary to use. Defaults to self._telem_data.
-        
+
         Returns:
-            bool: True if the item changed, False otherwise. 
+            bool: True if the item changed, False otherwise.
                  If the item changed, returns a tuple (prev_val, new_val) instead.
         """
         if data == None:
@@ -447,7 +462,7 @@ class AircraftBase(object):
 
     def flag_error(self, message):
         """Flag an error message for display in the UI.
-        
+
         Args:
             message (str): Error message to display
         """
@@ -458,7 +473,7 @@ class AircraftBase(object):
 
     def is_joystick(self):
         """Check if the current FFB device is a joystick.
-        
+
         Returns:
             bool: True if device is a joystick, False otherwise
         """
@@ -466,7 +481,7 @@ class AircraftBase(object):
     
     def is_pedals(self):
         """Check if the current FFB device is pedals.
-        
+
         Returns:
             bool: True if device is pedals, False otherwise
         """
@@ -474,7 +489,7 @@ class AircraftBase(object):
 
     def is_collective(self):
         """Check if the current FFB device is a collective.
-        
+
         Returns:
             bool: True if device is a collective, False otherwise
         """
@@ -482,7 +497,7 @@ class AircraftBase(object):
 
     def is_trimwheel(self):
         """Check if the current FFB device is a trim wheel.
-        
+
         Returns:
             bool: True if device is a trim wheel, False otherwise
         """
@@ -521,50 +536,46 @@ class AircraftBase(object):
     
     def _sim_is_msfs(self, *unused):
         """Check if the current simulator is Microsoft Flight Simulator.
-        
+
         Returns:
-            int: 1 if MSFS, 0 otherwise
+            bool: True if MSFS, False otherwise
         """
-        if self._telem_data.get("src") == "MSFS":
-            return 1
-        else:
-            return 0
+        return self._telem_data.get("src") == "MSFS"
 
     def _sim_is_xplane(self):
         """Check if the current simulator is X-Plane.
-        
+
         Returns:
             bool: True if X-Plane, False otherwise
         """
-        if self._telem_data.get('src') == "XPLANE":
-            return True
-        else:
-            return False
+        return self._telem_data.get('src') == "XPLANE"
 
     def _sim_is_dcs(self, *unused):
         """Check if the current simulator is DCS World.
-        
+
         Returns:
-            int: 1 if DCS, 0 otherwise
+            bool: True if DCS, False otherwise
         """
-        if self._telem_data.get("src") == "DCS":
-            return 1
-        else:
-            return 0
-            
+        return self._telem_data.get("src") == "DCS"
+
+    def _sim_is_il2(self, *unused):
+        """Check if the current simulator is IL2 Sturmovik..
+
+                Returns:
+                    bool: True if IL2, False otherwise
+                """
+        return self._telem_data.get("src") == "IL2"
+
     def _sim_is(self, sim, *unused):
         """Check if the current simulator matches the specified name.
-        
+
         Args:
             sim (str): Simulator name to check against
-            
+
         Returns:
-            int: 1 if matches, 0 otherwise
+            bool: True if matches, False otherwise
         """
-        if self._telem_data.get('src') == sim:
-            return 1
-        else:
-            return 0
+        return self._telem_data.get('src') == sim
 
     ########################################
     ######                            ######
@@ -635,15 +646,15 @@ class AircraftBase(object):
 
     def new_gforce_effect(self, telem_data):
         """Apply new G-force effects based on aircraft acceleration.
-        
+
         Generates force feedback effects that vary with G-forces experienced by the aircraft.
         The effect strength is modulated by stick deflection and can handle both positive
         and negative G-forces if configured.
-        
+
         Args:
             telem_data (dict): Telemetry data containing acceleration information
         """
-        if not self.is_joystick() or not self.new_gforce_effect_enable or not self.gforce_effect_master:
+        if not self.is_joystick() or not self.gforce_effect_mode_is(self.GEffectModeEnum.NEW) or self.gforce_effect_mode_is(self.GEffectModeEnum.DISABLED):
             effects.dispose("new_gforce")
             return
         if sum(telem_data.get("WeightOnWheels")):
@@ -724,11 +735,11 @@ class AircraftBase(object):
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def _gforce_effect(self, telem_data, adv_spr=False):
-        if not self.gforce_effect_master:
+        if self.gforce_effect_mode_is(self.GEffectModeEnum.DISABLED):
             effects.dispose('gforce')
             effects.dispose('new_gforce')
             return
-        if self.new_gforce_effect_enable:
+        if self.gforce_effect_mode_is(self.GEffectModeEnum.NEW):
             # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
             effects.dispose("gforce")
             self.new_gforce_effect(telem_data)
@@ -739,6 +750,16 @@ class AircraftBase(object):
         if not self.is_joystick():
             effects.dispose("gforce")
             return
+
+        if self.gforce_effect_mode_is(self.GEffectModeEnum.ADVANCED):
+            # Verify the device firmware meets the minimum version required to execute this portion of the effect
+            # Flag error and abort if not met
+            supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+            if not supported:
+                self.flag_error('The Advanced/Custom Curve G-Force effect requires firmware v1.0.18 or higher.\n'
+                                f'The device is currently running version {G.device_firmware_version}\n'
+                                f'Please update your device firmware!')
+                return
 
         if sum(telem_data.get("WeightOnWheels")):
             effects.dispose("gforce")
@@ -763,7 +784,7 @@ class AircraftBase(object):
 
         logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
 
-        if self.gforce_effect_enable:
+        if self.gforce_effect_mode_is(self.GEffectModeEnum.LEGACY):
             gmin = self.gforce_min_gs
             gmax = self.gforce_max_gs
             direction = 180
@@ -790,7 +811,7 @@ class AircraftBase(object):
 
             logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
-        elif self.gforce_effect_advanced_enabled:
+        elif self.gforce_effect_mode_is(self.GEffectModeEnum.ADVANCED):
             if self.gforce_effect_adv_curve == 'none':
                 self.flag_error('Please Configure the Advanced G-Force Effect Settings')
                 effects.dispose('adv_gforce_constant')
@@ -1443,7 +1464,7 @@ class AircraftBase(object):
 
     def _update_aoa_effect(self, telem_data, minspeed=50*kmh, maxspeed=140*kmh):
         if not self.is_joystick(): return
-        if self.aircraft_is_fbw or telem_data.get("ACisFBW"): return
+        if self.spring_mode_is(self.SpringModeEnum.FBW) or telem_data.get("ACisFBW"): return
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
         local_stall_aoa = self.stall_aoa
@@ -1764,6 +1785,7 @@ class AircraftBase(object):
     def check_master_button_press(self, button):
         # print(f"Checking {button} against {master_buttons}")
         return button in G.master_buttons
+
     def check_for_button_press(self, button):
         input_data = HapticEffect.device.get_input()
 
@@ -1776,7 +1798,6 @@ class AircraftBase(object):
         else:
             input_data = HapticEffect.device.get_input()
             return input_data.isButtonPressed(button)
-
 
     def _update_pedal_force_trim(self, telem_data):
         if not self.is_pedals(): return
@@ -1825,21 +1846,17 @@ class AircraftBase(object):
 
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
-        ## 0=DCS Default
-        ## 1=spring disabled
-        ## 2=static spring enabled using "pedal_spring_gain" spring setting
-        ## 3=dynamic spring enabled.  Based on "pedal_spring_gain"
 
-        if self.pedal_spring_mode == "Sim Default" or self.pedal_spring_mode == 0:
+        if self.spring_mode_is(self.SpringModeEnum.NONE):
             if effects['pedal_spring'].started:
                 effects["pedal_spring"].stop()
             return
 
-        if self.pedal_spring_mode == 'No Spring' and not self.pedal_force_trim_enabled:
+        if self.spring_mode_is(self.SpringModeEnum.NOSPRING):
             self.spring_x.positiveCoefficient = 0
             self.spring_x.negativeCoefficient = 0
 
-        elif self.pedal_spring_mode == 'Static Spring' or self.pedal_force_trim_enabled:
+        elif self.spring_mode_is(self.SpringModeEnum.STATIC):
             if self.pedal_force_trim_enabled:
                 if not self._update_pedal_force_trim(telem_data):
                     spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
@@ -1847,23 +1864,15 @@ class AircraftBase(object):
             else:
                 spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
                 self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
-                if self.pedal_trimming_enabled:
+                if self.pedal_trimming_enabled and self._sim_is_dcs():
                     self._update_pedal_trim(telem_data)
 
-        elif self.pedal_spring_mode == 'Dynamic Spring' and not self.pedal_force_trim_enabled:
+        elif self.spring_mode_is(self.SpringModeEnum.DYNAMIC) or self.spring_mode_is(self.SpringModeEnum.CUSTOM):
             tas = telem_data.get("TAS", 0)
-            # ac_perf = self.get_aircraft_perf(telem_data)
-            # if self.aircraft_vs_speed:
-                #If user has added the speeds to their config, use that value
-            vs = self.aircraft_vs_speed
-            # else:
-                #Otherwise, use the value from the internal table
-                # vs = ac_perf['Vs']
 
-            # if self.aircraft_vne_speed:
+            vs = self.aircraft_vs_speed
+
             vne = self.aircraft_vne_speed
-            # else:
-            #     vne = ac_perf['Vne']
 
             if vs > vne:
                 self.flag_error(f"Dynamic pedal forces error: Vs speed ({vs}) is configured with a larger value than Vne ({vne}) - Invalid configuration")
@@ -1876,7 +1885,7 @@ class AircraftBase(object):
             # print(f"coeff={spr_coeff}")
             self.spring_x.positiveCoefficient = spr_coeff
             self.spring_x.negativeCoefficient = spr_coeff
-            if self.pedal_trimming_enabled:
+            if self.pedal_trimming_enabled and self._sim_is_dcs():
                 self._update_pedal_trim(telem_data)
             # return
         spring = effects["pedal_spring"].spring()
@@ -1970,8 +1979,16 @@ class AircraftBase(object):
         spring.start(override=True)
 
     def modify_game_spring(self):
-        if not self.adv_spr_override_enabled:
+        if not self.spring_mode_is(self.SpringModeEnum.ADVANCED):
             self.spring_adjuster.stop()
+            return
+        # Verify the device firmware meets the minimum version required to execute this effect
+        # Flag error and abort if not met
+        supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+        if not supported:
+            self.flag_error('The Advanced/Custom Spring Override requires firmware v1.0.18 or higher.\n'
+                            f'The device is currently running version {G.device_firmware_version}\n'
+                            f'Please update your device firmware!')
             return
         if self.adv_spr_gains == 'none':
             self.flag_error('Please open and configure the advanced spring gain settings')

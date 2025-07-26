@@ -34,6 +34,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import hashlib
+import inspect
 from datetime import datetime, timedelta
 import math
 import os
@@ -60,7 +61,7 @@ import ssl
 import xml.etree.ElementTree as ET
 
 import numpy as np
-from scipy.interpolate import interp1d, Akima1DInterpolator
+import akima
 
 from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings, Qt
 from PyQt6.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
@@ -69,10 +70,19 @@ from PyQt6 import QtCore, QtGui
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 import stransi
 
+from enum import Enum, auto
+
 import telemffb.globals as G
 import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
 from .namedmutex import NamedMutex
+
+def check_min_firmware_version(dev_firmware_version, min_firmware_version):
+    """Check if device firmware version meets minimum requirements."""
+    minver = re.sub(r'\D', '', min_firmware_version)
+    devver = re.sub(r'\D', '', dev_firmware_version)
+    return devver >= minver
+
 
 def dbprint(color, msg, instance=None):
     if instance is not None:
@@ -91,6 +101,45 @@ def dbprint(color, msg, instance=None):
         case _:
             ccode = '\033[0m'
     print(f"{ccode}{msg}{reset}")
+
+def debug_timed(func):
+    """
+    import debug_timed from utils into any module
+    add '@debug_timed` decorator to any method
+    timing results will be logged along with the calling function and arguments that were passed
+
+
+    """
+
+    def wrapper(*args, **kwargs):
+        if not G.master_instance:
+            return func(*args, **kwargs)
+        # Get caller frame
+        caller_frame = inspect.stack()[1]
+        caller_name = caller_frame.function
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        arg_strs = [repr(a) for a in args]
+        kwarg_strs = [f"{k}={v!r}" for k, v in kwargs.items()]
+        all_args = ", ".join(arg_strs + kwarg_strs)
+        elapsed = (time.perf_counter() - start) * 1000
+
+        logging.info(f"[TIMER] {elapsed:.2f} ms taken by {func.__name__} - called by {caller_name} ({all_args})")
+        return result
+
+    return wrapper
+
+def debug_caller_args(color):
+    frame = inspect.currentframe().f_back
+    caller_frame = frame.f_back
+
+    callee = frame.f_code.co_name
+    caller = caller_frame.f_code.co_name if caller_frame else "<top-level>"
+
+    args, _, _, values = inspect.getargvalues(frame)
+    arg_list = ", ".join(f"{arg}={repr(values[arg])}" for arg in args)
+
+    dbprint(color, f'"{callee}" called by "{caller}" Args: {arg_list}')
 
 def overrides(interface_class):
     """Decorator to ensure that a method in a subclass overrides a method in its superclass or interface."""
@@ -115,6 +164,43 @@ def micros() -> int:
     :rtype: int
     """
     return time.perf_counter_ns() // 1000
+
+
+class Interp1D:
+    def __init__(self, x, y, bounds_error=False, fill_value=None):
+        self.x = np.asarray(x)
+        self.y = np.asarray(y)
+        self.bounds_error = bounds_error
+        self.fill_value = fill_value
+
+        if np.any(np.diff(self.x) <= 0):
+            raise ValueError("x values must be strictly increasing")
+
+    def __call__(self, x_new):
+        x_new = np.asarray(x_new)
+
+        # Interpolation for in-bounds
+        y_interp = np.interp(x_new, self.x, self.y)
+
+        # Out-of-bounds handling
+        if not self.bounds_error and self.fill_value is not None:
+            below = x_new < self.x[0]
+            above = x_new > self.x[-1]
+            y_interp = np.where(below, self.fill_value[0], y_interp)
+            y_interp = np.where(above, self.fill_value[1], y_interp)
+        elif self.bounds_error:
+            if np.any(x_new < self.x[0]) or np.any(x_new > self.x[-1]):
+                raise ValueError("A value in x_new is outside the interpolation range.")
+
+        return y_interp if x_new.ndim > 0 else y_interp.item()
+
+class Akima1DInterpolator:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+    def __call__(self, x_new):
+        return akima.interpolate(self.x, self.y, x_new)
+
 
 class Smoother:
     def __init__(self):
@@ -189,6 +275,7 @@ class EffectTranslator:
         "etlX": ["ETL Shaking", "etl_effect_intensity"],
         "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
         "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
+        "FI_vibration": ["FI Vibration", "FI_vibration_intensity"],
         "friction": ["Friction Override", "friction_force"],
         "boommovement" : ["Fuel Boom/Door","fuelboom_motion_intensity"],
         "gearbuffet": ["Gear Drag Buffeting", "gear_buffet_intensity"],
@@ -380,9 +467,9 @@ def create_support_bundle(userconfig_rootpath):
         os.makedirs(temp_folder, exist_ok=True)
 
         try:
-            # Save userconfig.xml to the temporary folder
-            userconfig_path = os.path.join(temp_folder, "userconfig.xml")
-            shutil.copy(os.path.join(userconfig_rootpath, "userconfig.xml"), userconfig_path)
+            # Save userconfig_v2.xml to the temporary folder
+            userconfig_path = os.path.join(temp_folder, "userconfig_v2.xml")
+            shutil.copy(os.path.join(userconfig_rootpath, "userconfig_v2.xml"), userconfig_path)
 
             # Save the contents of the 'log' folder to the temporary folder
             log_folder_path = os.path.join(temp_folder, "log")
@@ -397,8 +484,8 @@ def create_support_bundle(userconfig_rootpath):
 
             # Create the support zip file
             with zipfile.ZipFile(zip_file_path, 'w') as support_zip:
-                # Add userconfig.xml, log folder, and system settings .cfg file to the zip
-                support_zip.write(userconfig_path, "userconfig.xml")
+                # Add userconfig_v2.xml, log folder, and system settings .cfg file to the zip
+                support_zip.write(userconfig_path, "userconfig_v2.xml")
                 for folder_name, subfolders, filenames in os.walk(log_folder_path):
                     for filename in filenames:
                         file_path = os.path.join(folder_name, filename)
@@ -654,6 +741,8 @@ def scale(val, src: tuple, dst: tuple, return_round=False, return_int=False):
     """
     Scale the given value from the scale of src to the scale of dst.
     """
+    if src[0] == src[1]: # avoid div/0
+        return dst[1]
     result = (val - src[0]) * (dst[1] - dst[0]) / (src[1] - src[0]) + dst[0]
     if return_round:
         return round(result)
@@ -745,12 +834,12 @@ def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
     if smooth_curve_enabled:
         if len(x_values) < 4:
             # Fallback to linear interpolation for insufficient points
-            interpolation = interp1d(x_values, y_values, bounds_error=False,
+            interpolation = Interp1D(x_values, y_values, bounds_error=False,
                                      fill_value=(y_values[0], y_values[-1]))
         else:
             interpolation = Akima1DInterpolator(x_values, y_values)
     else:
-        interpolation = interp1d(x_values, y_values, bounds_error=False,
+        interpolation = Interp1D(x_values, y_values, bounds_error=False,
                                  fill_value=(y_values[0], y_values[-1]))
 
     return float(interpolation(input_x))
@@ -1601,11 +1690,150 @@ def get_version():
         pass
     return ver
 
+def convert_legacy_userconfig(path):
+    """
+    Upgrades a legacy userconfig file to the new format that includes profile tags and profileMappings.
+
+    This function performs the following:
+    - Identifies "User Default" entries based on 'type' settings.
+    - Identifies modified aircraft (with settings but no type) as "Auto User" entries.
+    - Appends appropriate <profile> tags to all models.
+    - Creates <models> entries for missing "Auto User" profiles.
+    - Adds <profileMappings> entries for all aircraft that were converted.
+    - Skips execution if conversion has already been applied.
+
+    Returns:
+        bool: True if conversion was applied, False otherwise.
+    """
+    tree = xmlutils.try_parse(path)
+    if tree is None:
+        logging.exception(f"Failed to parse: {path}")
+        return False
+
+    root = tree.getroot()
+
+    # Convert legacy root tag
+    new_root = ET.Element("TelemFFB_v2")
+    for child in list(root):
+        new_root.append(child)
+    tree._setroot(new_root)
+    root = new_root
+
+    # If already converted (profileMappings exist), exit
+    if root.find("profileMappings") is not None:
+        return False
+
+    # Check if there's anything to convert
+    if root.find("models") is None:
+        return False
+
+    """
+    # Find all user created models ('type' entries) - these models will become 'User Default'
+    """
+    user_default_list = []
+    user_default_models = root.findall('models[name="type"]')
+    for user_default in user_default_models:
+        model = user_default.findtext('model')
+        sim = user_default.findtext('sim')
+        if model and sim:
+            user_default_list.append((model, sim))
+
+    """
+    find all model/sim pairings that exist but don't have a 'type' parent entry.  These will become 'Auto User' profiles
+    """
+    user_settings_only_list = []
+    for entry in root.findall('models'):
+        model = entry.findtext('model')
+        sim = entry.findtext('sim')
+        if not model or not sim:
+            continue
+        if (model, sim) not in user_default_list and (model, sim) not in user_settings_only_list:
+            user_settings_only_list.append((model, sim))
+
+    """
+    We now have two lists:
+    user_default_models has (model, sim) tuples for aircraft that will become 'user defaults' (created by user)
+    user_settings_only_list has (model, sim) tuples for aircraft that will become 'auto user' profiles (settings modified from default aircraft)
+    """
+    for entry in root.findall('models'):
+        model = entry.findtext('model')
+        sim = entry.findtext('sim')
+        if not model or not sim:
+            continue
+
+        existing_profiles = entry.findall("profile")
+        if any(p.text in ("User Default", "Auto User") for p in existing_profiles):
+            continue  # Already patched
+
+        if (model, sim) in user_default_list:
+            ET.SubElement(entry, 'profile').text = "User Default"
+        elif (model, sim) in user_settings_only_list:
+            ET.SubElement(entry, 'profile').text = "Auto User"
+        else:
+            logging.warning(f"Unhandled model/sim: {model}/{sim}")
+
+    """
+    Each 'Auto User' profile gets a name='profile' entry that indicates a profile.
+    User Defaults have their name='type' entries.
+    """
+    existing_profile_defs = {(e.findtext("model"), e.findtext("sim"))
+                             for e in root.findall('models[name="profile"]')}
+
+    for model, sim in user_settings_only_list:
+        if (model, sim) in existing_profile_defs:
+            continue
+        cls = xmlutils.get_class_for_sim_model(sim, model)
+        profile_def = ET.SubElement(root, 'models')
+        ET.SubElement(profile_def, 'name').text = "profile"
+        ET.SubElement(profile_def, 'model').text = model
+        ET.SubElement(profile_def, 'value').text = cls
+        ET.SubElement(profile_def, 'sim').text = sim
+        ET.SubElement(profile_def, 'device').text = "any"
+        ET.SubElement(profile_def, 'profile').text = "Auto User"
+
+    """
+    Now we build the profileMappings table.
+    Each model will be set to its "profile" value (Auto User or User Default) depending on its type
+    """
+    seen_mappings = set()
+    for model, sim in user_default_list + user_settings_only_list:
+        if not model or not sim or (model, sim) in seen_mappings:
+            continue
+        seen_mappings.add((model, sim))
+
+        cls = xmlutils.get_class_for_sim_model(sim, model)
+        profile = "User Default" if (model, sim) in user_default_list else "Auto User"
+
+        mapping = ET.SubElement(root, "profileMappings")
+        ET.SubElement(mapping, "model").text = model
+        ET.SubElement(mapping, "sim").text = sim
+        ET.SubElement(mapping, "cls").text = cls
+        ET.SubElement(mapping, "active_profile").text = profile
+
+    xmlutils.consolidate_sort_and_write_userconfig(tree)
+    logging.info("Conversion complete: userconfig upgraded.")
+    return True
+
+def copy_legacy_config_to_new(path):
+    # path is the destination for the new v2 config file
+    if os.path.exists(path):
+        # new config already exists, don't copy
+        return
+
+    # get root of path
+    user_rootpath = os.path.dirname(path)
+    legacy_config_path = os.path.join(user_rootpath, "userconfig.xml")
+    if not os.path.exists(legacy_config_path):
+        # there is no legacy config to copy over
+        return
+    shutil.copy(legacy_config_path, path)
+    logging.info(f"Copied legacy userconfig.xml to {path}")
+
 
 def create_empty_userxml_file(path):
     if not os.path.isfile(path):
         # Create an empty XML file with the specified root element
-        root = ET.Element("TelemFFB")
+        root = ET.Element("TelemFFB_v2")
         tree = ET.ElementTree(root)
         # Create a backup directory if it doesn't exist
         if not os.path.exists(os.path.dirname(path)):
@@ -1867,7 +2095,7 @@ def load_custom_userconfig(new_path=""):
         _defaults_path=G.defaults_path,
     )
 
-    G.settings_mgr.init_ui()
+    # G.settings_mgr.init_ui()
 
     logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
 
@@ -2070,6 +2298,11 @@ def check_launch_instance(dev_type :str, master_port : int) -> subprocess.Popen:
         if G.system_settings.get(f'startHeadless{dev_type_cap}', False):
             args.append('--headless')
 
+        if G.args.darkmode:
+            args.append('--darkmode')
+        elif G.args.lightmode:
+            args.append('--lightmode')
+
         logging.info("Auto-Launch: starting instance: %s", args)
         proc = ChildPopen(args)
         proc.udp_port = 60000 + int(usbpid)
@@ -2118,3 +2351,4 @@ def hexdump(src, length=16, sep='.'):
         lines.append('{0:08x}  {1:{2}s} |{3:{4}s}|'.format(c, hex_, length * 3, printable, length))
 
     return ("\n".join(lines))
+

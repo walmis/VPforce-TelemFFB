@@ -77,6 +77,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseVPConfStartup.clicked.connect(lambda: self.browse_vpconf('startup'))
         self.browseVPConfExit.clicked.connect(lambda: self.browse_vpconf('exit'))
         self.buttonBox.rejected.connect(self.close)
+        for button in self.buttonBox.buttons():
+            button.setMinimumWidth(60)
 
         self.buttonChildSettings.setEnabled(False)
         self.buttonChildSettings.setVisible(False)

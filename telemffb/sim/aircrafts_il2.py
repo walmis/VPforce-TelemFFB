@@ -135,6 +135,8 @@ class Aircraft(AircraftBase):
         for e in effects.values(): e.destroy()
         effects.clear()
 
+        self.sprin_mode = self.SpringModeEnum.NONE.name
+
         # self.spring = HapticEffect().spring()
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         # self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)

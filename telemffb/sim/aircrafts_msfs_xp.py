@@ -48,6 +48,7 @@ from typing import Dict, List
 from telemffb.util.TurbulenceModulator import TurbulenceModulator
 from telemffb.util.Vector import Vector, Vector2D
 
+import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import (FFBReport_Input, FFBReport_SetCondition,
                                    HapticEffect)
@@ -98,27 +99,17 @@ class Aircraft(AircraftBase):
     rotor_blade_count = 2
     heli_engine_rumble_intensity=0.15
 
-    aircraft_is_spring_centered = 0
+    aircraft_is_spring_centered = 0   #deprecated
     spring_centered_elev_gain = 0.5
     spring_centered_ailer_gain = 0.5
     aileron_spring_gain = 0.25
     elevator_spring_gain = 0.25
     rudder_spring_gain = 0.25
 
-    aircraft_is_fbw = 0
+    aircraft_is_fbw = 0    #deprecated
     fbw_elevator_gain = 0.8
     fbw_aileron_gain = 0.8
     fbw_rudder_gain = 0.8
-
-    nosewheel_shimmy = 0
-    nosewheel_shimmy_intensity = 0.15
-    nosewheel_shimmy_min_speed = 7
-    nosewheel_shimmy_min_brakes = 0.6
-
-    steering_friction = 0
-    steering_friction_intensity = 0.8
-    steering_friction_spring = 0.5
-    steering_friction_expo = -0.4
 
     force_trim_enabled = 0
     cyclic_spring_gain = 1.0
@@ -147,6 +138,20 @@ class Aircraft(AircraftBase):
     rudder_expo: int = 0
 
     vne_override: int = 0
+
+    ######## PEDAL SPECIFIC
+
+    nosewheel_shimmy = 0
+    nosewheel_shimmy_intensity = 0.15
+    nosewheel_shimmy_min_speed = 7
+    nosewheel_shimmy_min_brakes = 0.6
+
+    steering_friction = 0
+    steering_friction_intensity = 0.8
+    steering_friction_spring = 0.5
+    steering_friction_expo = -0.4
+
+    ######## TRIMWHEEL SPECIFIC
 
     trimwheel_init = 0
     trimwheel_ap_spring_gain = 1
@@ -264,6 +269,8 @@ class Aircraft(AircraftBase):
 
         self.vne_override = 0
 
+        self.spring_mode = self.SpringModeEnum.BASIC.name
+
     def _update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
         # freq = 8
@@ -357,13 +364,14 @@ class Aircraft(AircraftBase):
             newvalue = (1 + k) * x + (-k) * (math.exp(expo_a * (x - 1)) - math.exp(-expo_a)) / (1 - math.exp(-expo_a))
         #print(f'expo input:{x} k:{k} output:{newvalue}')
         return newvalue
+
     def _update_turbulence(self):
         if self.turbulence_effect_enable:
             force, dir = turbulence_modulator.update(self.telem_data, self.turbulence_hpf_alpha, self.turbulence_smoothing_alpha, self.turbulence_sensitivity, self.turbulence_intensity)
             force = round(force, 4)
             effects['turbulence'].constant(force, dir).start()
 
-            print(f"force:{force} dir:{dir}")
+            #print(f"force:{force} dir:{dir}")
         else:
             effects['turbulence'].destroy()
 
@@ -627,7 +635,7 @@ class Aircraft(AircraftBase):
         if ffb_type == "collective":
             return
 
-        if self.aircraft_is_fbw or telem_data.get("ACisFBW", 0):
+        if self.spring_mode_is(self.SpringModeEnum.FBW) or telem_data.get("ACisFBW", 0):
             logging.debug ("FBW Setting enabled, running fbw_flight_controls")
             self._update_fbw_flight_controls(telem_data)
             return
@@ -644,7 +652,7 @@ class Aircraft(AircraftBase):
         else:
             effects["fbw_spring"].stop()
 
-        if self.aircraft_is_spring_centered:
+        if self.spring_mode_is(self.SpringModeEnum.CENTER):
             elev_base_gain = self.elevator_spring_gain
             ailer_base_gain = self.aileron_spring_gain
             rudder_base_gain = self.rudder_spring_gain
@@ -766,7 +774,7 @@ class Aircraft(AircraftBase):
         # elevator_coeff = a * (_elev_dyn_pressure ** 2) + b * _elev_dyn_pressure * self.elevator_gain + c * slip_gain
 
         # apply expo curve
-        if self.adv_spr_override_enabled:
+        if self.spring_mode_is(self.SpringModeEnum.ADVANCED):
             # calculate spd based on current elevator_coeff assuming linear from 0 to VNE
             adv_spr_stgs = json.loads(self.adv_spr_gains)
             scale = adv_spr_stgs.get('scale')
@@ -800,7 +808,7 @@ class Aircraft(AircraftBase):
         rudder_coeff = _rud_dyn_pressure * self.rudder_gain * _slip_gain
 
         # apply expo curve
-        if self.adv_spr_override_enabled:
+        if self.spring_mode_is(self.SpringModeEnum.ADVANCED):
             # calculate spd based on current elevator_coeff assuming linear from 0 to VNE
             adv_spr_stgs = json.loads(self.adv_spr_gains)
             scale = adv_spr_stgs.get('scale')
@@ -997,7 +1005,7 @@ class Aircraft(AircraftBase):
                 virtual_rudder_x_offs = 0
 
 
-            if self.adv_spr_override_enabled:
+            if self.spring_mode_is(self.SpringModeEnum.ADVANCED):
                 if self.adv_spr_gains == 'none':
                     self.flag_error('Please open and configure the advanced spring gain settings')
                 else:
@@ -2825,4 +2833,64 @@ class SASHelicopter(Helicopter):
         pass
 
 
+class FlyInsideHelicopter(Helicopter):
+    FI_vibration_enable = True
+    FI_vibration_intensity = 0
+    FI_vibration_expo = 0
+
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+
+        # input_data = HapticEffect.device.get_input()
+        # self.phys_x, self.phys_y = input_data.axisXY()
+        # self.cpO_y = round(self.phys_y * 4096)
+
+    def on_telemetry(self, telem_data):
+        super().on_telemetry(telem_data)
+        self._update_vibration()
+
+    def _calc_etl_effect(self, *args, **kwargs):
+        ## effect not used for FI Heli
+        pass
+
+    def _update_vrs_effect(self, *args, **kwargs):
+        ## effect not used for FI Heli
+        pass
+
+    def _update_vibration(self):
+        if not self.FI_vibration_enable:
+            effects['FI_vibration'].destroy()
+            return
+        rrpm = self.telem_data.get("RotorRPM", 0)
+        if self.is_joystick():
+            vx, vy = "FI_VibX", "FI_VibY"
+        elif self.is_pedals():
+            vx, vy = "FI_VibX", "FI_VibZ"
+        elif self.is_collective():
+            vx, vy = "FI_VibZ", "FI_VibY"
+        else:
+            return
+        x, y = self.telem_data.get(vx, 0), self.telem_data.get(vy, 0)
+
+        # FI vibration data is initially scaled in sc_overrides.
+        # tune there so that the max desired vibration (overspeed probably) is ~1.0
+
+        force = math.hypot(x, y)
+        direction = math.degrees(math.atan2(y, x))
+        # safety scaling if needed. tested at 50% configurator constant setting
+        force *= 1
+
+        # reduce at lower rotor rpm
+        force *= utils.scale_clamp(rrpm, (0, 150), (0, 1))
+
+        # crop input values to 1.0 because there may be higher numbers from crashes etc
+        force = min(force, 1.0)
+        force = self.expocurve(force, self.FI_vibration_expo)
+        force *= self.FI_vibration_intensity
+
+        force = round(force, 4)
+
+        effects['FI_vibration'].constant(force, direction).start()
+
+        # print(f"FI_vibration_force:{force} dir:{dir}")
 

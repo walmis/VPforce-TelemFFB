@@ -58,7 +58,7 @@ def config_has_changed(update=False) -> bool:
     # "hash" both mtimes together
     tm = int(os.path.getmtime(G.userconfig_path)) + int(os.path.getmtime(G.defaults_path))
     time_now = time.time()
-    update_delay = 0.4  # Delay added here to avoid file access errors with multiple instances
+    update_delay = 0.1  # Delay added here to avoid file access errors with multiple instances
 
     if not _config_mtime:
         # if the first time called, initialize times and return - to avoid double config load on first call
@@ -108,6 +108,11 @@ class TelemManager(QObject, threading.Thread):
         self._simconnect : Optional[SimConnectManager] = None
         self.gain_overrides_active = False
         self.stop_state = False
+        self.pause_state = False
+
+    def set_paused(self, pause_state: bool = False):
+        self.pause_state = pause_state
+
 
     def set_simconnect(self, sc : SimConnectManager):
         self._simconnect = sc
@@ -133,8 +138,10 @@ class TelemManager(QObject, threading.Thread):
                 input_modeltype = input[1]
             else:
                 the_sim = send_source
+            ptrn = xmlutils.get_pattern_by_sim_fullname(the_sim, aircraft_name)
 
             cls_name, pattern, result = xmlutils.read_single_model(the_sim, aircraft_name, input_modeltype, G.device_type)
+            active_profile = xmlutils.get_active_profile_for_model(the_sim, cls_name, pattern)
             #globals.settings_mgr.current_pattern = pattern
             if cls_name == '': 
                 cls_name = 'Aircraft'
@@ -160,7 +167,8 @@ class TelemManager(QObject, threading.Thread):
                 current_sim=the_sim,
                 current_aircraft_name=aircraft_name,
                 current_class=cls_name,
-                current_pattern=pattern)
+                current_pattern=pattern,
+                active_profile=active_profile)
 
             return params, cls_name
 
@@ -173,6 +181,7 @@ class TelemManager(QObject, threading.Thread):
         self.join()
 
     def submit_frame(self, data_in: bytes):
+        if self.pause_state: return  # don't process frames while paused state True
         data : str
         if isinstance(data_in, bytes):
             data = data_in.decode("utf-8")
@@ -218,7 +227,7 @@ class TelemManager(QObject, threading.Thread):
         """Main telemetry data processing pipeline."""
         parsed_data = self._parse_telemetry_data(data)
         aircraft_info = self._extract_aircraft_info(parsed_data)
-        
+
         self._handle_aircraft_changes(aircraft_info, parsed_data)
         self._handle_config_changes(aircraft_info)
         self._process_current_aircraft_telemetry(parsed_data)
@@ -229,10 +238,10 @@ class TelemManager(QObject, threading.Thread):
         """Parse raw telemetry data and calculate frame timing metrics."""
         data = data.split(";")
         telem_data = {"FFBType": G.device_type}
-        
+
         # Calculate frame timing
         self._update_frame_timing(telem_data)
-        
+
         # Parse telemetry parameters
         for param in data:
             try:
@@ -242,17 +251,17 @@ class TelemManager(QObject, threading.Thread):
                     telem_data[section] = [utils.to_number(v) for v in values] if len(values) > 1 else utils.to_number(conf)
             except Exception:
                 logging.exception("Error Parsing Parameter: %s", repr(param))
-        
+
         # Merge IPC telemetry data
         self._merge_ipc_telemetry(telem_data)
-        
+
         return telem_data
 
     def _update_frame_timing(self, telem_data):
         """Update frame timing metrics and add to telemetry data."""
         current_frame_time = int((time.perf_counter() - self.last_frame_time) * 1000)
         self.frame_times.append(current_frame_time)
-        
+
         if len(self.frame_times) > 500:
             self.frame_times.pop(0)
 
@@ -266,7 +275,7 @@ class TelemManager(QObject, threading.Thread):
         telem_data["frameTimes"] = [current_frame_time, max(self.frame_times)]
         telem_data["maxFrameTime"] = f"{round(self.max_frame_time, 3)}"
         telem_data["avgFrameTime"] = f"{round(sum(self.frame_times) / len(self.frame_times), 3):.3f}"
-        
+
         self.last_frame_time = time.perf_counter()
 
     def _merge_ipc_telemetry(self, telem_data):
@@ -281,7 +290,7 @@ class TelemManager(QObject, threading.Thread):
         """Extract aircraft information and determine the appropriate module."""
         aircraft_name = telem_data.get("N")
         data_source = telem_data.get("src", None)
-        
+
         # Determine aircraft module based on data source
         if data_source == "MSFS":
             module = aircrafts_msfs_xp
@@ -299,7 +308,7 @@ class TelemManager(QObject, threading.Thread):
             module = aircrafts_dcs
             sc_aircraft_type = None
             sc_engine_type = None
-            
+
         return AircraftInfo(
             name=aircraft_name,
             data_source=data_source,
@@ -311,7 +320,7 @@ class TelemManager(QObject, threading.Thread):
     def _handle_aircraft_changes(self, aircraft_info: AircraftInfo, telem_data):
         """Handle aircraft changes and initialization."""
         aircraft_name = aircraft_info.name
-        
+
         if aircraft_name and aircraft_name != self.currentAircraftName:
             if self.currentAircraft is None or aircraft_name != self.currentAircraftName:
                 self._initialize_new_aircraft(aircraft_info, telem_data)
@@ -321,37 +330,37 @@ class TelemManager(QObject, threading.Thread):
         """Initialize a new aircraft when it changes."""
         aircraft_name = aircraft_info.name
         data_source = aircraft_info.data_source
-        
+
         logging.info(f"New aircraft loaded {aircraft_name}: resetting current aircraft config")
         self.currentAircraftConfig = {}
 
         params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
         Aircraft_Class = self._resolve_aircraft_class(aircraft_info, cls_name, params)
-        
+
         self._handle_vpconf_setup(params)
         self._handle_command_runner(params)
         self._handle_configurator_overrides(params)
-        
+
         logging.info(f"Creating handler for {aircraft_name}: {Aircraft_Class.__module__}.{Aircraft_Class.__name__}")
-        
+
         # Create and configure new aircraft instance
         self.currentAircraft : AircraftBase = Aircraft_Class(aircraft_name)
         self.currentAircraft.apply_settings(params)
         self.currentAircraftConfig = params
-        
+
         self._setup_simconnect_overrides(aircraft_name, data_source)
-        self._update_settings_ui()
+        # self._update_settings_ui()
         self.aircraftUpdated.emit()
-    
+
     def _resolve_aircraft_class(self, aircraft_info: AircraftInfo, cls_name, params):
         """Resolve the appropriate aircraft class to use."""
         Aircraft_Class = getattr(aircraft_info.module, cls_name, None)
         if Aircraft_Class:
             logging.debug(f"CLASS={Aircraft_Class.__name__}")
-        
+
         if not Aircraft_Class or Aircraft_Class.__name__ == "Aircraft":
             Aircraft_Class = self.resolve_aircraft_class_from_sc(aircraft_info, params)
-        
+
         return Aircraft_Class
 
     def _handle_vpconf_setup(self, params):
@@ -408,18 +417,19 @@ class TelemManager(QObject, threading.Thread):
                 self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
             self._simconnect._resubscribe()
 
-    def _update_settings_ui(self):
-        """Update settings UI if visible."""
-        if G.settings_mgr.isVisible():
-            G.settings_mgr.b_getcurrentmodel.click()
+    # def _update_settings_ui(self):
+    #     """Update settings UI if visible."""
+    #     if G.settings_mgr.isVisible():
+    #         G.settings_mgr.b_getcurrentmodel.click()
 
     def _handle_config_changes(self, aircraft_info: AircraftInfo):
         """Handle configuration changes for existing aircraft."""
         if self.currentAircraft and config_has_changed():
+            xmlutils.update_roots()  # ride the same logic and Update the xml tree in xmlutils when the config changes
             logging.info("Configuration has changed, reloading")
             aircraft_name = aircraft_info.name
             data_source = aircraft_info.data_source
-            
+
             params, cls_name = self.get_aircraft_config(aircraft_name, data_source)
             updated_params = self.get_changed_params(params)
             self.currentAircraft.apply_settings(updated_params)
@@ -427,10 +437,10 @@ class TelemManager(QObject, threading.Thread):
             self._handle_vpconf_setup(params)
             self._handle_command_runner(params)
             self._handle_configurator_overrides_update(params)
-            
+
             if "type" in updated_params:
                 self._recreate_aircraft_with_new_type(aircraft_info, params, cls_name)
-            
+
             self._setup_simconnect_overrides(aircraft_name, data_source)
             self.aircraftUpdated.emit()
 
@@ -474,7 +484,7 @@ class TelemManager(QObject, threading.Thread):
             if ipc_telem:
                 G.ipc_instance.send_ipc_telem(ipc_telem)
                 self.currentAircraft._ipc_telem.clear()
-        
+
         # Handle plotting
         if G.args.plot:
             for item in G.args.plot:
@@ -489,8 +499,8 @@ class TelemManager(QObject, threading.Thread):
         try:
             self.telemetryReceived.emit(telem_data)
         except:
-            pass  # Qt object may be destroyed on exit    
-    
+            pass  # Qt object may be destroyed on exit
+
     def resolve_aircraft_class_from_sc(self, aircraft_info: AircraftInfo, params):
         """Resolve the aircraft class based on SimConnect data."""
         aircraftClass = None
@@ -499,7 +509,7 @@ class TelemManager(QObject, threading.Thread):
         module = aircraft_info.module
         sc_aircraft_type = aircraft_info.sc_aircraft_type
         sc_engine_type = aircraft_info.sc_engine_type
-        
+
         if data_source == "MSFS":
             if sc_aircraft_type == "Helicopter":
                 logging.warning("Aircraft definition not found, using SimConnect Data (Helicopter Type)")
@@ -537,6 +547,11 @@ class TelemManager(QObject, threading.Thread):
                     type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.TurbopropAircraft")
                     params.update(type_cfg)
                     aircraftClass = module.TurbopropAircraft
+                elif sc_engine_type == 6:   # Electric - just use PropellerAircraft type for this
+                    logging.warning("Aircraft definition not found, using SimConnect Data (Propeller Type)")
+                    type_cfg, cls_name = self.get_aircraft_config(aircraft_name, "MSFS.PropellerAircraft")
+                    params.update(type_cfg)
+                    aircraftClass = module.PropellerAircraft
             else:
                 logging.warning(f"Aircraft definition not found, using default class for {aircraft_name}")
                 aircraftClass = module.Aircraft

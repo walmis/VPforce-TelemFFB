@@ -16,7 +16,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from typing import TYPE_CHECKING, Dict, Optional, Any
 
 if TYPE_CHECKING:
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
     from .LogWindow import LogWindow
     from .IPCNetworkThread import IPCNetworkThread
     from .utils import SystemSettings, ChildPopen
-    from .settingsmanager import SettingsWindow
+    from .SettingsManager import SettingsManager
     from .telem.TelemManager import TelemManager
     from .telem.SimTelemListener import SimListenerManager
     from telemffb.MainWindow import MainWindow
@@ -38,16 +37,17 @@ is_exe: bool = False
 args : 'CmdLineArgs'
 
 # Version and build configuration
-release_version : bool = False
+release_version : bool = False  # When true, build version will be 'release_version_str' and will not look for updates
 release_version_str: str = "Vx.x.x"
-dev_build : bool = False # when True, build versions will use 'dev_build_str' as the version string and will not look for updates
+dev_build : bool = False # when True, build versions will use 'dev_build_str', will use a dev branded logo and will not look for updates
 dev_userconfig: bool = True  # will use/create userconfig.xml in root when True (dev_build must also be true)
 dev_build_str: str = "DEV_BUILD"
+allow_multi_instance: bool = False  # if true, will skip mutex lock checks and allow multiple instances to run simultaneously
 vpf_logo: str = ":/image/vpforcelogo.png"
 
 # UI components
 main_window :  'MainWindow' 
-settings_mgr : 'SettingsWindow' 
+settings_mgr : 'SettingsManager'
 log_window :   'LogWindow' 
 useDarkMode : bool = False
 
@@ -57,12 +57,16 @@ userconfig_path : str = ""
 defaults_path : str = ""
 current_vpconf_profile : Optional[str] = None
 current_device_config_scope: Optional[str] = None # add current device config scope to globals for tracking across telemffb modules
+current_offline_config_scope: Optional[str] = None  # Tracks scope of offline config mode for checking in settings_mgr
+offline_config_mode: bool = False  # Tracks offline config mode for checking in settings_mgr
 
 # Device information
 device_type : str = ""
 device_usbpid : str 
 device_usbvidpid : str  # "FFFF:2055"
 device_ident : str  #Joystick, Pedals, etc.. as set in configurator
+device_firmware_version : str  # Firmware version as reported by device
+device_connection_status: bool = False # status of HID connection to device
 
 # Gain management
 startup_configurator_gains: Optional[Any] = None  # Gain object direct from 'device.get_gains'.  Gains get read at TelemFFB startup fallback baseline values.
@@ -85,7 +89,7 @@ child_buttons: Dict[str, Any] = {}
 # System components
 system_settings : 'SystemSettings'
 telem_manager : 'TelemManager'
-sim_listeners : 'SimListenerManager' 
+sim_listeners : 'SimListenerManager'
 
 # Triggers and flags
 force_reload_aircraft_trigger: bool = False

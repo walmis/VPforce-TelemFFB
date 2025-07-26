@@ -41,8 +41,7 @@ Application Flow:
 import sys
 # import faulthandler
 # faulthandler.enable()
-from PyQt6.QtGui import QIcon, QColor
-
+from PyQt6.QtGui import QIcon, QColor, QFont
 
 from telemffb.CmdLineArgs import CmdLineArgs
 
@@ -74,7 +73,7 @@ from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino, HapticEffect
 from telemffb.IPCNetworkThread import IPCNetworkThread
 from telemffb.LogWindow import LogWindow
 from telemffb.MainWindow import MainWindow
-from telemffb.settingsmanager import SettingsWindow
+from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.SimTelemListener import SimListenerManager
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 #from telemffb.LogTailWindow import LogTailWindow
@@ -84,6 +83,7 @@ from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
 from telemffb.namedmutex import NamedMutex
 import styles
 resources # used
+mutex = None
 
 def send_test_message():
     if G.ipc_instance.running:
@@ -112,10 +112,10 @@ def _launch_children():
 def _check_master_instance_mutex():
     """
     Check if another master instance is already running.
-    
+
     Uses a named mutex to ensure only one master instance can run at a time.
     Displays warning dialog and exits if another master is detected.
-    
+
     Flow: Mutex check -> Warning dialog if conflict -> Exit if needed
     """
     msg_box = QMessageBox()
@@ -126,7 +126,7 @@ def _check_master_instance_mutex():
         "check the task manager for possible hung instances."
     )
     msg_box.setWindowIcon(QIcon(':/image/vpforceicon.png'))
-    
+    global mutex
     try:
         mutex = NamedMutex("VPforce_TelemFFB_Master_Instance", acquired=True, timeout=1)
         if not mutex.acquired:
@@ -139,7 +139,7 @@ def _check_master_instance_mutex():
 def _setup_device_configuration():
     """
     Configure device type and USB VID/PID based on args or system settings.
-    
+
     Flow:
     1. If no device specified in args, use system settings mapping
     2. Map device type to USB PID from configuration
@@ -148,7 +148,7 @@ def _setup_device_configuration():
     if G.args.device is None:
         mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
         master_rb = G.system_settings.get('masterInstance', 1)
-        
+
         try:
             d = mapping[master_rb]
             G.device_usbpid = str(G.system_settings.get(f'pid{d.capitalize()}', "2055"))
@@ -177,7 +177,7 @@ def _setup_device_configuration():
 def _setup_theme_and_styling(app):
     """
     Configure application theme and styling based on system settings.
-    
+
     Flow:
     1. Read theme preference (light/dark/system)
     2. Set Qt color scheme accordingly
@@ -186,6 +186,12 @@ def _setup_theme_and_styling(app):
     5. Apply custom stylesheets
     """
     theme_setting = G.system_settings.get('themeId', 2)
+
+    if G.args.darkmode:
+        theme_setting = 1
+
+    if G.args.lightmode:
+        theme_setting = 0
 
     match theme_setting:
         case 0: # Light Mode
@@ -213,7 +219,7 @@ def _setup_theme_and_styling(app):
 
     if G.useDarkMode:
         _apply_dark_mode_palette(app, palette)
-    
+
     _apply_custom_stylesheet(app)
 
 def _apply_dark_mode_palette(app, palette):
@@ -225,15 +231,10 @@ def _apply_dark_mode_palette(app, palette):
     palette.setColor(QtGui.QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
     palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QtGui.QColor('#dddddd'))
     palette.setColor(QtGui.QPalette.ColorRole.ToolTipText, QtGui.QColor('#dddddd'))
-    palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor('#dddddd'))
+    palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor("#cccccc"))
     palette.setColor(QtGui.QPalette.ColorRole.Button, QColor(53, 53, 53))
     palette.setColor(QtGui.QPalette.ColorRole.ButtonText, QtGui.QColor('#dddddd'))
     palette.setColor(QtGui.QPalette.ColorRole.BrightText, QtGui.QColor('red'))
-
-    # Link colors
-    palette.setColor(QtGui.QPalette.ColorRole.Link, QColor(42, 130, 218))
-    palette.setColor(QtGui.QPalette.ColorRole.Highlight, QColor(42, 130, 218))
-    palette.setColor(QtGui.QPalette.ColorRole.HighlightedText, QtGui.QColor('black'))
 
     # Disabled colors
     palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.Text, QColor(127, 127, 127))
@@ -253,12 +254,12 @@ def _apply_custom_stylesheet(app):
 def _determine_master_instance_status():
     """
     Determine if this instance should be the master based on device type.
-    
+
     Flow:
     1. Map device types to indices
     2. Compare current device with configured master device
     3. Set master instance flag accordingly
-    
+
     The master instance coordinates child instances and provides system tray interface.
     """
     index_dict = {
@@ -276,7 +277,7 @@ def _determine_master_instance_status():
 def _setup_config_paths():
     """
     Setup configuration file paths based on build type and mode.
-    
+
     Flow:
     1. Set defaults path from resources
     2. Configure logo based on build type and theme
@@ -284,7 +285,7 @@ def _setup_config_paths():
     4. Handle dev userconfig copying if needed
     """
     G.defaults_path = utils.get_resource_path('defaults.xml', prefer_root=True)
-    
+
     if G.dev_build:
         G.vpf_logo = ":/image/DEVlogo.png"
         if G.dev_userconfig:
@@ -301,21 +302,21 @@ def _setup_config_paths():
 def _setup_dev_userconfig_paths():
     """Setup development userconfig paths."""
     real_userconfig_path = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-    real_userconfig = os.path.join(real_userconfig_path, 'userconfig.xml')
-    
+    real_userconfig = os.path.join(real_userconfig_path, 'userconfig_v2.xml')
+
     if getattr(sys, 'frozen', False):
         G.userconfig_rootpath = os.path.dirname(sys.executable)
     else:
         G.userconfig_rootpath = os.path.dirname(os.path.abspath(__file__))
-    
-    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
+
+    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
     if not os.path.isfile(G.userconfig_path):
         shutil.copy(real_userconfig, G.userconfig_path)
 
 def _setup_standard_config_paths():
     """Setup standard configuration paths."""
     G.userconfig_rootpath = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
-    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig.xml')
+    G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
 
 def _initialize_device_connection():
     """
@@ -335,33 +336,36 @@ def _initialize_device_connection():
     dev_serial = None
     dev_firmware_version = 'ERROR'
     dev = None
-    
+
     try:
         vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
     except Exception:
         return dev, dev_serial, dev_firmware_version
-    
+
     _enumerate_and_log_devices()
-    
+
     try:
         dev = HapticEffect.open(vid_pid[0], vid_pid[1])
         if G.args.reset:
             dev.reset_effects()
         dev_firmware_version = dev.get_firmware_version()
+        G.device_firmware_version = dev_firmware_version
         dev_serial = dev.serial
-        
+
         if dev_firmware_version:
             logging.info(f"Rhino Firmware: {dev_firmware_version}")
             _check_firmware_version(dev_firmware_version, min_firmware_version)
-        
+
         G.device_ident = dev.info.ident
-        
+        G.device_connection_status = True
+
     except Exception as e:
+        G.device_connection_status = False
         logging.exception("Exception")
-        QMessageBox.warning(None, "Cannot connect to Rhino", 
+        QMessageBox.warning(None, "Cannot connect to Rhino",
                           f"Unable to open HID at {G.device_usbvidpid} for device: {G.device_type}\nError: {e}\n\n"
                           "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
-    
+
     return dev, dev_serial, dev_firmware_version
 
 def _enumerate_and_log_devices():
@@ -384,7 +388,7 @@ def _check_firmware_version(dev_firmware_version, min_firmware_version):
     minver = re.sub(r'\D', '', min_firmware_version)
     devver = re.sub(r'\D', '', dev_firmware_version)
     if devver < minver:
-        QMessageBox.warning(None, "Outdated Firmware", 
+        QMessageBox.warning(None, "Outdated Firmware",
                           f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\n"
                           f"The current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
 
@@ -402,21 +406,33 @@ def _setup_logging_level():
     logger.setLevel(log_levels.get(ll, logging.DEBUG))
     logging.info(f"Logging level set to:{logging.getLevelName(logger.getEffectiveLevel())}")
 
+def _convert_user_config():
+    """
+    Converts user config from legacy single user profile to multi-user profile capabilities.
+    """
+    if G.master_instance:
+        xmlutils.update_roots()
+        xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
+        utils.convert_legacy_userconfig(G.userconfig_path)
+
+
 def _initialize_settings_manager():
     """
     Initialize the settings manager with error handling for corrupted config.
-    
+
     Flow:
+    1. Initialize the xml root trees in XML Utils - is kept up to date when config changes
     1. Update XML variables with current device/paths
     2. Attempt to create settings manager
     3. If corruption detected, offer backup/reset option
     4. Create new default config if user agrees
     """
+    xmlutils.update_roots()
     xmlutils.update_vars(G.device_type, G.userconfig_path, G.defaults_path)
     try:
-        G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, 
-                                      userconfig_path=G.userconfig_path, 
-                                      defaults_path=G.defaults_path, 
+        G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type,
+                                      userconfig_path=G.userconfig_path,
+                                      defaults_path=G.defaults_path,
                                       system_settings=G.system_settings)
     except Exception:
         logging.exception("Error Reading user config file..")
@@ -424,25 +440,25 @@ def _initialize_settings_manager():
 
 def _handle_corrupted_config():
     """Handle corrupted configuration file with user interaction."""
-    ans = QMessageBox.question(None, "User Config Error", 
+    ans = QMessageBox.question(None, "User Config Error",
                              "There was an error reading the userconfig.  The file is likely corrupted.\n\n"
                              "Do you want to back-up the existing config and create a new default (empty) config?\n\n"
                              "If you chose No, TelemFFB will exit.")
     if ans == QMessageBox.StandardButton.Yes:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-        backup_file = os.path.join(G.userconfig_rootpath, 
+        backup_file = os.path.join(G.userconfig_rootpath,
                                  f'userconfig_{os.environ["USERNAME"]}_{timestamp}_corrupted.bak')
-        
+
         shutil.copy(G.userconfig_path, backup_file)
         logging.debug(f"Backup created: {backup_file}")
-        
+
         os.remove(G.userconfig_path)
         utils.create_empty_userxml_file(G.userconfig_path)
-        
+
         logging.info(f"User config Reset:  Backup file created: {backup_file}")
-        G.settings_mgr = SettingsWindow(datasource="Global", device=G.device_type, 
-                                      userconfig_path=G.userconfig_path, 
-                                      defaults_path=G.defaults_path, 
+        G.settings_mgr = SettingsManager(datasource="Global", device=G.device_type,
+                                      userconfig_path=G.userconfig_path,
+                                      defaults_path=G.defaults_path,
                                       system_settings=G.system_settings)
         QMessageBox.information(None, "New Userconfig created", f"A backup has been created: {backup_file}\n")
     else:
@@ -452,12 +468,12 @@ def _handle_corrupted_config():
 def _setup_ipc_and_connections():
     """
     Setup IPC network thread and connect all signals.
-    
+
     Flow:
     1. Create IPC network thread for inter-instance communication
     2. Connect all IPC signals to appropriate handlers
     3. Start IPC thread for message processing
-    
+
     Enables master-child coordination and remote control capabilities.
     """
     G.ipc_instance = IPCNetworkThread(dstport=G.args.masterport)
@@ -472,6 +488,12 @@ def _setup_ipc_and_connections():
     G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
     G.ipc_instance.reload_aircraft_signal.connect(G.main_window.force_reload_aircraft)
+    G.ipc_instance.toggle_offline_mode_signal.connect(G.main_window.toggle_offline_mode)
+    G.ipc_instance.set_offline_sim_signal.connect(G.main_window.offline_sim.setCurrentText)
+    G.ipc_instance.set_offline_class_signal.connect(G.main_window.offline_class.setCurrentText)
+    G.ipc_instance.set_offline_ac_signal.connect(G.main_window.offline_name.setCurrentText)
+    G.ipc_instance.set_offline_profile_signal.connect(G.main_window.offline_profile.setCurrentText)
+    G.ipc_instance.show_offline_model_signal.connect(G.main_window.load_single_offline_model)
     G.ipc_instance.start()
 
 def _setup_device_button_connections():
@@ -479,6 +501,13 @@ def _setup_device_button_connections():
     try:
         HapticEffect.device.buttonPressed.connect(G.main_window.get_active_buttons)
         HapticEffect.device.buttonReleased.connect(G.main_window.get_active_buttons)
+    except:
+        pass
+
+def _setup_device_connect_status():
+    """Setup device disconnect/reconnect status signals"""
+    try:
+        HapticEffect.device.deviceConnected.connect(G.main_window.update_device_status)
     except:
         pass
 
@@ -532,7 +561,7 @@ def _setup_async_initialization(dev, dev_serial):
 def _cleanup_on_exit(dev_serial):
     """
     Handle cleanup operations when application exits.
-    
+
     Flow:
     1. Notify child instances to close
     2. Stop IPC communication
@@ -547,13 +576,13 @@ def _cleanup_on_exit(dev_serial):
 
     G.sim_listeners.stop_all()
     G.telem_manager.quit()
-    
+
     if G.system_settings.get('enableVPConfExit', False):
         try:
             upload_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
-    
+
     if G.system_settings.get('enableResetGainsExit', False):
         try:
             G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
@@ -563,7 +592,7 @@ def _cleanup_on_exit(dev_serial):
 def main():
     """
     Main application entry point and initialization flow.
-    
+
     This function orchestrates the complete startup sequence:
     - Sets up Qt application and basic configuration
     - Determines master/child instance status
@@ -583,6 +612,7 @@ def main():
     # Initialize Qt application with Fusion style for consistent cross-platform appearance
     app = QApplication(sys.argv)
     app.setStyle('fusion')  # Set Fusion style
+    app.setFont(QFont('Segoe UI', 10))
 
     # ============================================================================
     # PHASE 2: Command Line Arguments and Instance Management
@@ -595,7 +625,8 @@ def main():
 
     # Ensure only one master instance can run at a time using named mutex
     if G.master_instance:
-        _check_master_instance_mutex()
+        if not G.allow_multi_instance:
+            _check_master_instance_mutex()
 
     # ============================================================================
     # PHASE 3: System Configuration and Device Setup
@@ -606,7 +637,7 @@ def main():
 
     # Configure application theme (light/dark/system) and apply custom styling
     _setup_theme_and_styling(app)
-    
+
     # Determine device type and USB VID/PID based on args or system settings
     _setup_device_configuration()
 
@@ -625,6 +656,11 @@ def main():
 
     # Setup configuration file paths (dev vs production, userconfig locations)
     _setup_config_paths()
+
+    # if legacy 'userconfig.xml' exists, copy it to 'userconfig_v2' for conversion
+    utils.copy_legacy_config_to_new(G.userconfig_path)
+
+    # check if userconfig exists.  If not, create empty one
     utils.create_empty_userxml_file(G.userconfig_path)
 
     # Determine if running from executable or source for logging
@@ -664,14 +700,19 @@ def main():
     # ============================================================================
     # Apply final styling and create log window for debug output
     _apply_custom_stylesheet(app)
-    
+
     # Initialize log window and redirect stdout/stderr for capture
     G.log_window = LogWindow()
     _init_logging(G.log_window.widget)
     G.log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
 
     # ============================================================================
-    # PHASE 7: Settings and Configuration Management
+    # PHASE 7: Convert Legacy userconfig to new format
+    # ============================================================================
+    _convert_user_config()
+
+    # ============================================================================
+    # PHASE 8: Settings and Configuration Management
     # ============================================================================
     # Initialize settings manager with error handling for corrupted configs
     _initialize_settings_manager()
@@ -679,7 +720,7 @@ def main():
     logging.info(f"TelemFFB (version {version}) Starting")
 
     # ============================================================================
-    # PHASE 8: Device Connection and Firmware Validation
+    # PHASE 9: Device Connection and Firmware Validation
     # ============================================================================
     # Connect to Rhino FFB device and validate firmware version
     dev, dev_serial, dev_firmware_version = _initialize_device_connection()
@@ -688,29 +729,32 @@ def main():
     _setup_logging_level()
 
     # ============================================================================
-    # PHASE 9: Core Component Initialization
+    # PHASE 10: Core Component Initialization
     # ============================================================================
     # Initialize telemetry manager for handling sim data
     G.telem_manager = TelemManager()
     G.telem_manager.start()
-    
+
     # Initialize simulation listener manager for multiple sim support
     G.sim_listeners = SimListenerManager()
-    
+
     # Create main application window
     G.main_window = MainWindow()
 
     # ============================================================================
-    # PHASE 10: Inter-Process Communication Setup
+    # PHASE 11: Inter-Process Communication Setup
     # ============================================================================
     # Setup IPC for master-child instance communication and connect all signals
     _setup_ipc_and_connections()
-    
+
     # Connect device button events to main window handlers
     _setup_device_button_connections()
 
+    # Connect device status events to main window handler:
+    _setup_device_connect_status()
+
     # ============================================================================
-    # PHASE 11: Child Instance Management (Master Only)
+    # PHASE 12: Child Instance Management (Master Only)
     # ============================================================================
     # Launch child instances if this is the master and auto-launch is enabled
     _launch_children()
@@ -720,7 +764,7 @@ def main():
     # ============================================================================
     # Show main window based on configuration (minimized, tray, normal)
     _handle_window_display(headless_mode)
-    
+
     # Check for version updates in background (non-release builds)
     _check_version_update()
 
@@ -732,13 +776,13 @@ def main():
     _check_system_settings_required()
 
     # ============================================================================
-    # PHASE 13: Background Initialization
+    # PHASE 14: Background Initialization
     # ============================================================================
     # Start background tasks that don't block UI appearance
     _setup_async_initialization(dev, dev_serial)
 
     # ============================================================================
-    # PHASE 14: Service Startup and Event Loop
+    # PHASE 15: Service Startup and Event Loop
     # ============================================================================
     # Start all simulation listeners to begin telemetry processing
     G.sim_listeners.start_all()
@@ -747,7 +791,7 @@ def main():
     app.exec()
 
     # ============================================================================
-    # PHASE 15: Cleanup and Shutdown
+    # PHASE 16: Cleanup and Shutdown
     # ============================================================================
     # Perform cleanup operations when application exits
     _cleanup_on_exit(dev_serial)

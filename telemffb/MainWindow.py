@@ -32,57 +32,60 @@ from collections import OrderedDict
 from datetime import datetime
 
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl
+from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl, pyqtSlot
 from PyQt6.QtGui import (QColor, QCursor, QDesktopServices, QIcon,
-                         QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut)
+                         QKeySequence, QPixmap, QFontMetrics, QAction, QShortcut, QFontDatabase, QFont)
 from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QComboBox, QFrame, QGridLayout, QGroupBox,
                              QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QTabWidget,
-                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu)
+                             QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu,
+                             QDialog, QStatusBar)
 
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
-from telemffb.config_utils import autoconvert_config
+# from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
-from telemffb.custom_widgets import (ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider,
-                                     NoWheelNumberSlider, SimStatusLabel, vpf_purple)
+from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, SimStatusLabel, vpf_purple, AppStatusWidget
+from telemffb.DevicePanel import DeviceIconPanel
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
-from telemffb.settingsmanager import UserModelDialog
+# from telemffb.UserModelDialog import UserModelDialog
+from telemffb.NewAircraftWizard import NewAircraftWizard
 from telemffb.sim.aircraft_base import effects
 from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
+from telemffb.ProfileManager import ProfileManagerDialog, NewProfileDialog
 from telemffb.utils import exit_application, overrides, HiDpiPixmap
 
 class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_notifications = {}
         self.new_craft_notification_sent = False
-
         self.error_state = False # True='error' key found in telem_data, False=clean telem_data
         self.error_clean_counter = 0 # counter to use as hysteresis for clearing error condition - not always 'error' from child instance on every loop
         self.telemetry_timed_out = True
-
         self.last_telemetry_refresh = utils.millis()
-
         self.show_simvars = False
-
         self.latest_version = None
         self._update_available = None
-
         self.show_new_craft_button = False
+        self.profile_mgr_dialog = None
+
+
+        """ Add font used for settngs area group labels """
+
+        QFontDatabase.addApplicationFont(':/image/BlackOpsOne-Regular.ttf')
+
         # Get the absolute path of the script's directory
         # script_dir = os.path.dirname(os.path.abspath(__file__))
         doc_url = 'https://vpforcecontrols.com/downloads/VPforce_Rhino_Manual.pdf'
-
         if G.release_version:
             dl_url = 'https://github.com/walmis/VPforce-TelemFFB/releases'
         else:
@@ -108,19 +111,14 @@ class MainWindow(QMainWindow):
                 'height': 530,
                 'width': 700,
             },
-            # "2": {  # log
-            #     'height': 530,
-            #     'width': 700,
-            # },
             "2": {  # hide
                 'height': 0,
                 'width': 0,
             }
         }
-        self.setMinimumWidth(600)
+
         self.tab_sizes = self.default_tab_sizes
 
-        self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
         match G.device_type:
             case 'joystick':
                 x_pos = 150
@@ -136,11 +134,13 @@ class MainWindow(QMainWindow):
                 y_pos = 30
 
         self.setGeometry(x_pos, y_pos, 530, 700)
+
         version = utils.get_version()
         if version:
-            self.setWindowTitle(f"TelemFFB ({G.device_type}) ({version})")
+            self.setWindowTitle(f"TelemFFB v2 ({G.device_type}) ({version})")
         else:
-            self.setWindowTitle(f"TelemFFB")
+            self.setWindowTitle(f"TelemFFB v2")
+
         # Construct the absolute path of the icon file
         icon = QIcon(":/image/vpforceicon.png")
 
@@ -152,28 +152,22 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         notes_row_layout = QHBoxLayout()
 
-        # Create the menu bar
-        menu_frame = QFrame()
-        menu_frame_layout = QVBoxLayout(menu_frame)
 
-        # Create the menu bar
+        """ Create the menu bar """
+
         menubar = self.menuBar()
         self.menu = menubar
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
 
-        # Add the "System" menu and its sub-option
+
+        """ Add the "System" menu and its sub-option """
+
         system_menu = self.menu.addMenu('&System')
 
         system_settings_action = QAction('System Settings', self)
         system_settings_action.triggered.connect(self.open_system_settings_dialog)
         system_menu.addAction(system_settings_action)
-
-        settings_manager_action = QAction('Edit Sim/Class Defaults && Offline Models', self)
-        settings_manager_action.triggered.connect(self.toggle_settings_window)
-        system_menu.addAction(settings_manager_action)
-
-
 
         cfg_log_folder_action = QAction('Open Config/Log Directory', self)
         def do_open_cfg_dir():
@@ -206,12 +200,26 @@ class MainWindow(QMainWindow):
         reset_geometry.triggered.connect(do_reset_window_size)
         system_menu.addAction(reset_geometry)
 
-        # self.menu.setStyleSheet("QMenu::item:selected { color: red; }")
         exit_app_action = QAction('Quit TelemFFB', self)
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
 
-        # Create the "Utilities" menu
+        if G.master_instance:
+            """
+            Create profiles menu - only for Master Instance
+            """
+            self.profiles_menu = self.menu.addMenu('Profiles')
+            self.offline_config_action = QAction(r'Offline Profile\Sim Default\Class Default Mode', self)
+            self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
+            self.profiles_menu.addAction(self.offline_config_action)
+
+            self.profile_manager_action = QAction('Profile Manager...', self)
+            self.profile_manager_action.triggered.connect(self.show_profile_manager)
+            self.profiles_menu.addAction(self.profile_manager_action)
+
+
+        """ Create the "Utilities" menu """
+
         utilities_menu = self.menu.addMenu('Utilities')
 
         # Add the "Reset" action to the "Utilities" menu
@@ -241,15 +249,10 @@ class MainWindow(QMainWindow):
         reload_action.triggered.connect(self.force_reload_aircraft)
         utilities_menu.addAction(reload_action)
 
-        # Add settings converter
-        _legacy_override_file = utils.get_legacy_override_file()
-        if _legacy_override_file is not None:
-            convert_settings_action = QAction('Convert legacy user config to XML', self)
-            _legacy_config_file = utils.get_resource_path('config.ini')
-            convert_settings_action.triggered.connect(lambda: autoconvert_config(self, _legacy_config_file, _legacy_override_file))
-            utilities_menu.addAction(convert_settings_action)
-
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
+            """
+            Add Window menu to manage child instances if it is a master instance
+            """
             self.window_menu = self.menu.addMenu('Window')
 
             def do_toggle_child_windows(toggle):
@@ -266,6 +269,9 @@ class MainWindow(QMainWindow):
             self.window_menu.addAction(self.hide_children_action)
 
         if G.child_instance:
+            """
+            Add Child instance window menu
+            """
             self.window_menu = self.menu.addMenu('Window')
             self.hide_window_action = QAction('Hide Window')
             def do_hide_window():
@@ -275,6 +281,9 @@ class MainWindow(QMainWindow):
                     logging.error(f"EXCEPTION: {e}")
             self.hide_window_action.triggered.connect(do_hide_window)
             self.window_menu.addAction(self.hide_window_action)
+
+
+        """ Add Log Menu """
 
         self.log_menu = self.menu.addMenu('Log')
         self.log_window_action = QAction("Open Console Log", self)
@@ -288,6 +297,9 @@ class MainWindow(QMainWindow):
 
         self.log_window_action.triggered.connect(do_toggle_log_window)
         self.log_menu.addAction(self.log_window_action)
+
+
+        """ Add Help Menu """
 
         help_menu = self.menu.addMenu('Help')
 
@@ -315,173 +327,95 @@ class MainWindow(QMainWindow):
         line.setFrameShadow(QFrame.Shadow.Sunken)
 
         # Add the line to the menu frame layout
-        menu_frame_layout.addWidget(menubar)
-        menu_frame_layout.addWidget(line)
-        menu_frame_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(line)
 
         # Set the layout of the menu frame as the main layout
-        layout.addWidget(menu_frame)
 
-        logo_status_layout = QHBoxLayout()
+        logo_status_layout = QGridLayout()
 
-        # Add a label for the image
-        # Construct the absolute path of the image file
-        self.logo_stack = QGroupBox()
-        self.vpflogo_label = QLabel(self.logo_stack)
-        self.devicetype_label = ClickLogo(self.logo_stack)
-        self.devicetype_label.clicked.connect(self.device_logo_click_event)
-        pixmap = HiDpiPixmap(G.vpf_logo)
-        pixmap = pixmap._scaled(271, 115, aspectRatioMode=QtCore.Qt.AspectRatioMode.KeepAspectRatio, transformMode=QtCore.Qt.TransformationMode.SmoothTransformation)
 
-        pixmap2 = HiDpiPixmap(utils.get_device_logo(G.device_type))
-        pixmap2 = pixmap2._scaled(round(pixmap2.width()), round(pixmap2.height()))
+        """ Create Main App Logo Label """
 
-        self.vpflogo_label.setPixmap(pixmap)
-        self.devicetype_label.setPixmap(pixmap2)
-        self.devicetype_label.setScaledContents(True)
+        t_logo = QLabel()
+        t_pixmap = HiDpiPixmap(":/image/TelemFFB_logo.png")
+        t_pixmap = t_pixmap._scaled(round(t_pixmap.width()/5), round(t_pixmap.height()/5))
+        t_logo.setPixmap(t_pixmap)
 
-        # Resize QGroupBox to match the size of the larger label
-        max_width = round(pixmap.width() / pixmap.devicePixelRatioF())
-        max_height = round(pixmap.height() / pixmap.devicePixelRatioF())
-        self.logo_stack.setFixedSize(max_width, max_height)
-        self.logo_stack.setStyleSheet("QGroupBox { border: none; }")
-        # Align self.image_label2 with the upper left corner of self.image_label
-        self.devicetype_label.move(self.vpflogo_label.pos())
 
-           
-        # Add the image labels to the layout
-        logo_status_layout.addWidget(self.logo_stack, alignment=Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        """ Create Device Panel """
 
-        rh_status_area = QWidget()
-        rh_status_layout = QVBoxLayout()
+        device_groupbox = QGroupBox("Active Devices")
 
-        sim_status_area = QWidget()
-        status_layout = QHBoxLayout()
-        status_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        device_groupbox_layout = QVBoxLayout()
+        device_groupbox_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.device_panel = DeviceIconPanel()
+        device_groupbox_layout.addWidget(self.device_panel)
+        device_groupbox.setLayout(device_groupbox_layout)
 
-        self.dcs_label_icon = SimStatusLabel("DCS")
-        self.il2_label_icon = SimStatusLabel("IL2")
-        self.msfs_label_icon = SimStatusLabel("MSFS")
-        self.xplane_label_icon = SimStatusLabel("X-PLANE")
+        if not G.master_instance:
+            self.device_panel.set_devices([G.device_type])
+            self.device_panel.set_device_status(G.device_type, "ok")
+            self.device_panel.set_active_device(G.device_type)
 
-        status_layout.addWidget(self.dcs_label_icon)
-        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum))
-        status_layout.addWidget(self.il2_label_icon)
-        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum))
-        status_layout.addWidget(self.msfs_label_icon)
-        status_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum))
-        status_layout.addWidget(self.xplane_label_icon)
 
-        self.label_icons = {
-            'DCS': self.dcs_label_icon,
-            'IL2': self.il2_label_icon,
-            'MSFS': self.msfs_label_icon,
-            'XPLANE': self.xplane_label_icon,
-        }
+        """ Create Status Panel """
 
-        def on_sims_changed(sim : SimTelemListener):
-            self.label_icons[sim.name].enabled = sim.started
+        self.status_container = AppStatusWidget(master_instance=G.master_instance)
+        status_group = QGroupBox("Application Status")
+        status_layout = QVBoxLayout(status_group)
+        status_layout.setContentsMargins(10, 18, 10, 8)
+        status_layout.addWidget(self.status_container)
+
+        self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
+        self.status_container.sim_status_label.set_waiting()
+
+        def on_sims_changed(sim: SimTelemListener):
+            self.status_container.update_enabled_sims(sim.name, sim.started)
             self.refresh_telem_status()
 
-        def on_event(event):
-            if event[0] == "Stop":
-                src = G.telem_manager.getTelemValue("src")
-                if src in self.label_icons:
-                    lb = self.label_icons[src]
-                    lb.active = False
-                    lb.paused = False
-                self.refresh_telem_status()
 
-        G.telem_manager.eventReceived.connect(on_event)
+        """ Connect sim listeners to sim change function """
 
         G.sim_listeners.simStarted.connect(on_sims_changed)
         G.sim_listeners.simStopped.connect(on_sims_changed)
 
-        status_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
-        sim_status_area.setLayout(status_layout)
+        """ Add spacer items to fill first row and 2nd column with 10x10 empty space """
 
-        rh_status_layout.addWidget(sim_status_area)
+        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 0, 1, 1)
+        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 1, 1, 1)
 
-        rh_status_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
-        ############
-        # current craft
-        self.craft_container = QWidget()
-        self.craft_layout = QVBoxLayout(self.craft_container)
-        self.craft_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        """ Add Logo to the top left cell """
 
-        cur_ac_lbl = QLabel()
-        cur_ac_lbl.setText("<b>Current Aircraft:</b>")
-        cur_ac_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        cur_ac_lbl.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; }")
+        logo_status_layout.addWidget(t_logo, 1, 0, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
-        self.cur_craft = QLabel()
-        self.cur_craft.setText('Unknown')
-        self.cur_craft.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
-        self.cur_craft.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        self.cur_pattern = QLabel()
-        self.cur_pattern.setText('(No Match)')
-        self.cur_pattern.setStyleSheet("QLabel { padding-left: 15px; padding-top: 2px; font-family: Cascadia mono; }")
-        self.cur_pattern.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        text_color = "#dddddd" if G.useDarkMode else "#000000"
-        secondary_color = "#bbbbbb" if G.useDarkMode else "#444444"
+        """ Add spacer in row 2 """
 
-        cur_ac_lbl.setStyleSheet(f"""
-            QLabel {{
-                padding-left: 10px;
-                padding-top: 2px;
-                color: {text_color};
-                font-weight: bold;
-            }}
-        """)
+        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 2, 0, 1, 1)
 
-        self.cur_craft.setStyleSheet(f"""
-            QLabel {{
-                padding-left: 15px;
-                padding-top: 2px;
-                font-family: 'Casciadia Mono';
-                color: {text_color};
-            }}
-        """)
 
-        self.cur_pattern.setStyleSheet(f"""
-            QLabel {{
-                padding-left: 15px;
-                padding-top: 2px;
-                font-family: 'Cascadia Mono';
-                color: {secondary_color};
-            }}
-        """)
-        self.craft_layout.addWidget(cur_ac_lbl)
-        self.craft_layout.addWidget(self.cur_craft)
-        self.craft_layout.addWidget(self.cur_pattern)
-        rh_status_layout.addWidget(self.craft_container)
-        rh_status_area.setLayout(rh_status_layout)
+        """ Add device panel to row 3 column 0 """
 
-        logo_status_layout.addWidget(rh_status_area)
+        logo_status_layout.addWidget(device_groupbox, 3, 0,alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+        """ Add Status widget to column 2, span 3 rows """
+
+        logo_status_layout.addWidget(status_group, 1, 2, 3, 1, alignment=Qt.AlignmentFlag.AlignTop)
+        logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 4, 0, 1, 1)
+
+        logo_status_layout.setColumnStretch(0, 1)
+        logo_status_layout.setColumnStretch(1, 1)
+
+
+        """ Add upper grid layout to main layout """
 
         layout.addLayout(logo_status_layout)
 
-        self.notification_label = QLabel('')
-        self.notification_label.setWordWrap(True)
-        self.notification_label.hide()
-        # self.notification_label.setStyleSheet("QLabel { padding-left: 10px; padding-top: 2px; color: red;}")
-        self.notification_label.setStyleSheet("""
-            QLabel {
-                padding-left: 10px;
-                padding-top: 2px;
-                color: #ff6b6b; /* Softer red for dark mode */
-                background-color: rgba(255, 50, 50, 30); /* Light red background tint */
-                border: 1px solid #c33;
-                border-radius: 4px;
-            }
-        """)
-        rh_status_layout.addWidget(self.notification_label)
 
-        ##################
-        #  new craft button
+        """ Create new craft button - pops when unknown aircraft is detected """
 
         new_craft_layout = QVBoxLayout()
         self.new_craft_button = QPushButton('Create/clone config for new aircraft')
@@ -500,87 +434,193 @@ class MainWindow(QMainWindow):
         self.new_craft_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         new_craft_layout.addWidget(self.new_craft_button)
         new_craft_layout.addSpacing(7)
-        self.new_craft_button.clicked.connect(self.show_user_model_dialog)
+
+
+        """ Add new craft button to main layout """
+
         layout.addLayout(new_craft_layout)
         self.new_craft_button.hide()
 
-        #####################
-        #  test loading buttons, set to true for debug
 
-        self.test_craft_area = QWidget()
-        test_craft_layout = QHBoxLayout()
-        test_sim_lbl = QLabel('Sim:')
-        test_sim_lbl.setMaximumWidth(30)
-        test_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        sims = ['', 'DCS', 'IL2', 'MSFS', 'XPLANE']
-        self.test_sim = QComboBox()
-        self.test_sim.setMaximumWidth(60)
-        self.test_sim.addItems(sims)
-        self.test_sim.currentTextChanged.connect(self.test_sim_changed)
-        test_name_lbl = QLabel('Aircraft Name:')
-        test_name_lbl.setMaximumWidth(90)
-        test_name_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self.test_name = QComboBox()
-        self.test_name.setMinimumWidth(100)
-        self.test_name.setEditable(False)
-        self.test_name.currentTextChanged.connect(self.test_aircraft_changed)
+        """ Create offline config control area QWidget """
 
-        self.test_button = QToolButton()
-        self.test_button.setMaximumWidth(20)
-        self.test_button.setText('>')
-        self.test_button.clicked.connect(self.force_sim_aircraft)
-        test_craft_layout.addWidget(test_sim_lbl)
-        test_craft_layout.addWidget(self.test_sim)
-        test_craft_layout.addWidget(test_name_lbl)
-        test_craft_layout.addWidget(self.test_name)
-        test_craft_layout.addWidget(self.test_button)
-        self.test_craft_area.setLayout(test_craft_layout)
-        self.test_craft_area.hide()
-        layout.addWidget(self.test_craft_area)
-        self.configmode_group = QButtonGroup()
-        self.cb_joystick = QCheckBox('Joystick')
-        self.cb_pedals = QCheckBox('Pedals')
-        self.cb_collective = QCheckBox('Collective')
-        self.cb_trimwheel = QCheckBox('Trim Wheel')
+        self.offline_config_area = QWidget()
+        self.offline_config_area.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        offline_config_layout = QVBoxLayout()  # vertical layout to hold both rows
 
-        self.config_scope_row = QHBoxLayout()
-        self.configmode_group.addButton(self.cb_joystick, 1)
-        self.configmode_group.addButton(self.cb_pedals, 2)
-        self.configmode_group.addButton(self.cb_collective, 3)
-        self.configmode_group.addButton(self.cb_trimwheel, 4)
-        self.configmode_group.buttonClicked.connect(self.change_config_scope)
-        self.config_scope_row.addWidget(self.cb_joystick)
-        self.config_scope_row.addWidget(self.cb_pedals)
-        self.config_scope_row.addWidget(self.cb_collective)
-        self.config_scope_row.addWidget(self.cb_trimwheel)
-        self.cb_joystick.setVisible(False)
-        self.cb_pedals.setVisible(False)
-        self.cb_collective.setVisible(False)
-        self.cb_trimwheel.setVisible(False)
 
-        layout.addLayout(self.config_scope_row)
+        # First row layout (existing widgets)
+        # --- Create the Offline Editor GroupBox ---
+        self.offline_groupbox = QGroupBox("Offline Editor Setup")
+        self.offline_groupbox.setStyleSheet("""
+            QGroupBox {
+            
+                font-weight: bold;
+                border: 1px solid gray;
+                border-radius: 5px;
+                margin-top: 6px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 3px 0 3px;
+            }
+        """)
+
+        offline_layout = QVBoxLayout(self.offline_groupbox)
+        offline_layout.setContentsMargins(10, 18, 10, 10)
+        offline_layout.setSpacing(10)
+
+
+        """ Create Offline controls layout """
+
+        offline_grid_layout = QGridLayout()
+
+        # --- Labels ---
+        offline_sim_lbl = QLabel('Sim:')
+        offline_sim_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        offline_class_lbl = QLabel('Class:')
+        offline_class_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        offline_name_lbl = QLabel('Aircraft Name:')
+        offline_name_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        offline_profile_lbl = QLabel('Profile:')
+        offline_profile_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+
+        """ Add label widgets to layout """
+
+        offline_grid_layout.addWidget(offline_sim_lbl, 0, 0)
+        offline_grid_layout.addWidget(offline_class_lbl, 0, 1)
+        offline_grid_layout.addWidget(offline_name_lbl, 0, 2)
+        offline_grid_layout.addWidget(offline_profile_lbl, 0, 3)
+
+
+        """ Create Offline controls combo boxes """
+
+        # --- ComboBoxes ---
+        self.offline_sim = QComboBox()
+        self.offline_sim.addItems([''] + xmlutils.get_sims())
+        self.offline_sim.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.offline_sim.setMinimumContentsLength(10)
+        self.offline_sim.setEditable(False)
+        self.offline_sim.currentTextChanged.connect(self.offline_sim_changed)
+
+        self.offline_class = QComboBox()
+        self.offline_class.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.offline_class.setMinimumContentsLength(15)
+        self.offline_class.setEditable(False)
+        self.offline_class.currentTextChanged.connect(self.offline_class_changed)
+
+        self.offline_name = QComboBox()
+        self.offline_name.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.offline_name.setMinimumContentsLength(20)
+        self.offline_name.setEditable(False)
+        self.offline_name.currentTextChanged.connect(self.offline_aircraft_changed)
+
+        self.offline_profile = QComboBox()
+        self.offline_profile.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.offline_profile.setMinimumContentsLength(15)
+        self.offline_profile.setEditable(False)
+        self.offline_profile.currentTextChanged.connect(self.offline_profile_changed)
+
+
+        """ Add offline combo box controls to layout """
+
+        offline_grid_layout.addWidget(self.offline_sim, 1, 0)
+        offline_grid_layout.addWidget(self.offline_class, 1, 1)
+        offline_grid_layout.addWidget(self.offline_name, 1, 2)
+        offline_grid_layout.addWidget(self.offline_profile, 1, 3)
+
+        # --- Column stretch ratios (1:2:4:2) ---
+        offline_grid_layout.setColumnStretch(0, 1)
+        offline_grid_layout.setColumnStretch(1, 2)
+        offline_grid_layout.setColumnStretch(2, 4)
+        offline_grid_layout.setColumnStretch(3, 2)
+
+        offline_layout.addLayout(offline_grid_layout)
+
+
+        """ Add layout for labels/buttons on bottom row of offline config area """
+
+        bottom_row = QHBoxLayout()
+
+
+        """ Create offline scope label """
+
+        offline_scope = QLabel("<b>Offline Scope:   </b>")
+        self.offline_scope_label = QLabel('None')
+
+
+        """
+        Create 'back to profile manager' button.  Only shows when edit is
+        activated via profile manager
+        """
+
+        self.back_to_profile_mgr_button = QPushButton('Back to Profile Manager')
+        self.back_to_profile_mgr_button.setVisible(False)
+        self.back_to_profile_mgr_button.clicked.connect(self.back_to_profile_mgr)
+
+
+        """ Create offline mode exit button """
+
+        self.exit_offline_button = QPushButton()
+        self.exit_offline_button.setText('Exit Offline Mode')
+        self.exit_offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
+
+
+        """ Add labels/buttons to bottom row layout """
+
+        bottom_row.addWidget(offline_scope, alignment=Qt.AlignmentFlag.AlignLeft)
+        bottom_row.addWidget(self.offline_scope_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        bottom_row.addStretch()
+        bottom_row.addWidget(self.back_to_profile_mgr_button, alignment=Qt.AlignmentFlag.AlignRight)
+        bottom_row.addWidget(self.exit_offline_button, alignment=Qt.AlignmentFlag.AlignRight)
+
+
+        """ Add bottom row to layout """
+
+        offline_layout.addLayout(bottom_row)
+
+
+        """ Add items to layout """
+
+        offline_config_layout.addWidget(self.offline_groupbox)
+        offline_config_layout.addLayout(offline_grid_layout)
+        offline_config_layout.addLayout(bottom_row)
+
+
+        """ Add layout to QWidget """
+
+        self.offline_config_area.setLayout(offline_config_layout)
+
+
+        """ Hide Offline config area (gets shown when it is enabled) """
+
+        self.offline_config_area.hide()
+
+
+        """ Add offline panel to main layout """
+
+        layout.addWidget(self.offline_config_area)
+
+
+        """ Create tab widget where monitor/settings/hide will live """
 
         self.tab_widget = QTabWidget(self)
-        # self.tab_widget.setTabShape(QTabWidget.TabShape.Triangular)  # Set triangular tab shape
-        # self.tab_widget.addTab(QWidget(), "Log")
-        # self.tab_widget.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-
-        # Set the main window area height to 0
-        # self.tab_widget.setMinimumHeight(14)
 
 
-        # Create a horizontal line widget
-        self.line_widget = QFrame(self)
-        self.line_widget.setFrameShape(QFrame.Shape.HLine)
-        self.line_widget.setFrameShadow(QFrame.Shadow.Sunken)
+        """ Add the tab widget to the main layout """
 
-        # Add the tab widget and line widget to the main layout
-        layout.addWidget(self.tab_widget)
+        layout.addWidget(self.tab_widget, stretch=1)
         layout.setSpacing(0)
-        layout.addWidget(self.line_widget)
 
-        ################
-        #  main scroll area
+
+        """ Create the monitor tab telemetry display panel """
 
         self.monitor_widget = QWidget()
         self.telem_area = QScrollArea()
@@ -588,12 +628,17 @@ class MainWindow(QMainWindow):
         self.telem_area.setWidgetResizable(True)
         self.telem_area.setMinimumHeight(100)
 
+
+        """ Create the active effects display panel """
+
         self.effects_area = QScrollArea()
         self.effects_area.setWidgetResizable(True)
         self.effects_area.setMinimumHeight(100)
         self.effects_area.setMaximumWidth(200)
 
-        # Create the QLabel widget and set its properties
+
+        """ Create the Telemetry Label widget and set its properties """
+
         self.lbl_telem_data = QLabel()
 
         self.refresh_telem_status()
@@ -606,7 +651,9 @@ class MainWindow(QMainWindow):
             font-family: Cascadia Mono;
         """)
 
-        # Set the QLabel widget as the widget inside the scroll area
+
+        """ Set the QLabel widget as the widget inside the scroll area """
+
         self.telem_area.setWidget(self.lbl_telem_data)
 
         self.lbl_effects_data = QLabel()
@@ -617,99 +664,98 @@ class MainWindow(QMainWindow):
             font-family: Cascadia Mono;
         """)
 
-        # Create telemetry header with label and filter
+
+        """ Create telemetry header with label and filter """
+
         telem_header_widget = QWidget()
         telem_header_layout = QHBoxLayout(telem_header_widget)
         telem_header_layout.setContentsMargins(0, 0, 0, 0)
         
         self.telem_lbl = QLabel('Telemetry:')
         self.telem_filter = QLineEdit()
+
+
+        """ Add placeholder for the filter """
+
         self.telem_filter.setPlaceholderText("Filter")
         self.telem_filter.setMaximumWidth(100)
-        
+
+
+        """ Add telemetry label and filter placeholder to the layout """
+
         telem_header_layout.addWidget(self.telem_lbl)
         telem_header_layout.addWidget(self.telem_filter)
         telem_header_layout.addStretch()  # Push everything to the left
-        
+
+
+        """ Add Active effects header label """
+
         self.effect_lbl = QLabel('Active Effects:')
         if G.master_instance:
             self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
-        
+
+
+        """ Add headers and labels to the monitor layout """
+
         monitor_area_layout.addWidget(telem_header_widget, 0, 0)
         monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
         monitor_area_layout.addWidget(self.telem_area, 1, 0)
         monitor_area_layout.addWidget(self.effects_area, 1, 1)
 
         self.monitor_widget.setLayout(monitor_area_layout)
-        # Add the scroll area to the layout
+
+
+        """ Add the monitor tab object to the tab widget"""
+
         self.tab_widget.addTab(self.monitor_widget, "Monitor")
 
-        # layout.addWidget(self.monitor_widget)
 
-        # Create a scrollable area
+        """ Create settings scroll area widget that will hold the settings page"""
+
         self.settings_area = NoKeyScrollArea()
-        self.settings_area.setObjectName('theScrollArea')
+        self.settings_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.settings_area.setWidgetResizable(True)
 
-        ##############
-        # settings
 
-        # Create a widget to hold the layout
-        scroll_widget = QWidget()
+        """ Create widget to hold the settings layout """
 
-        all_sliders = []
-        scroll_widget.setLayout(self.settings_layout)
+        settings_widget = QWidget()
 
-        self.settings_area.setWidget(scroll_widget)
 
+        """ Create settings layout instance """
+
+        self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
+
+
+        """ Add settings layout to the tab widget """
+
+        settings_widget.setLayout(self.settings_layout)
+        self.settings_area.setWidget(settings_widget)
         self.tab_widget.addTab(self.settings_area, "Settings")
+
+
+        """ Create the Hide tab and set its properties """
 
         self.tab_widget.addTab(QWidget(), "Hide")
         self.tab_widget.currentChanged.connect(self.switch_window_view)
-        tab_bar = self.tab_widget.tabBar()
-        fm = QFontMetrics(tab_bar.font())
-        ht = fm.height()
-        tb_height = ht + 8
-        style_sheet = f"""
-        QTabBar::tab {{
-            height: {tb_height}px;
-        }}
-        QTabBar::tab:selected {{
-            background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                                  stop: 0 #dca3f2, stop: 0.2 #c174e6,
-                                  stop: 0.5 #a13fb1, stop: 0.8 #822c94, stop: 1.0 #6b2378);
-            color: white;
-        }}
-    """
-        self.tab_widget.setStyleSheet(style_sheet)
-
         tb_height = self.tab_widget.tabBar().sizeHint().height()
         self.tab_widget.setMinimumHeight(tb_height)
 
 
-        # test buttons
-        show_clear_reload = False
-        if show_clear_reload:
-            test_layout = QHBoxLayout()
-            clear_button = QPushButton('clear')
-            clear_button.clicked.connect(self.settings_layout.clear_layout)
-            test_layout.addWidget(clear_button)
-            self.reload_button = QPushButton('reload')
-            self.reload_button.clicked.connect(self.settings_layout.reload_caller)
-            test_layout.addWidget(self.reload_button)
-            layout.addLayout(test_layout)
+        """ Create central widget to whole the entire layout """
 
         central_widget = QWidget()
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        self.instance_status_row = InstanceStatusRow()
-        self.instance_status_row.changeConfigScope.connect(self.change_config_scope)
-        self.instance_status_row.hide()
-        layout.addWidget(self.instance_status_row)          
 
-        version_row_layout = QHBoxLayout()
+        """ Add status bar to hold version information """
+
+        self.status_bar = QStatusBar(self)
+
+        """ Add version label to the status bar """
+
         self.version_label = QLabel()
 
         if G.release_version:
@@ -719,7 +765,7 @@ class MainWindow(QMainWindow):
 
         self.version_label.setText(f'Version Status: {status_text}')
         self.version_label.setOpenExternalLinks(True)
-
+        self.setStatusBar(self.status_bar)
         self.firmware_label = QLabel()
         try:
             f_vers = HapticEffect.device.get_firmware_version()
@@ -729,21 +775,24 @@ class MainWindow(QMainWindow):
 
         self.version_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.firmware_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        version_row_layout.addWidget(self.version_label)
-        version_row_layout.addWidget(self.firmware_label)
 
-        version_row_layout.setAlignment(Qt.AlignmentFlag.AlignBottom)
-        layout.addLayout(version_row_layout)
+        self.status_bar.addWidget(self.firmware_label)
+        self.status_bar.addPermanentWidget(self.version_label)
 
+
+        """ Setup hooks to update the telemetry and settings widgets """
 
         G.telem_manager.telemetryReceived.connect(self.on_update_telemetry)
         G.telem_manager.telemetryTimeout.connect(self.on_telemetry_timeout)
         G.telem_manager.aircraftUpdated.connect(self.update_settings)
 
-        central_widget.setLayout(layout)
 
-        # Load Stored Geomoetry
+        """  Load the stored window geometry from users registry keys """
+
         self.load_main_window_geometry()
+
+        """ Add Debug Menu to the menu bar - control visibility with Alt+D shortcut or via debug key in registry """
+
         debug_shortcut = QShortcut(QKeySequence('Alt+D'), self)
         debug_shortcut.activated.connect(self.add_debug_menu)
 
@@ -753,7 +802,10 @@ class MainWindow(QMainWindow):
         if G.system_settings.get('debug', False):
             # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
             self.add_debug_menu()
-        G.gain_override_dialog = ConfiguratorDialog(self) # create configurator gain dialog for use during TelemFFB session and store object in globals
+
+        """  Create configurator gain dialog for use during TelemFFB session and store object in globals """
+
+        G.gain_override_dialog = ConfiguratorDialog(self)
 
     def get_active_buttons(self):
         input_data = HapticEffect.device.get_input()
@@ -843,7 +895,6 @@ class MainWindow(QMainWindow):
         if G.launched_instances:
             show_menu = QMenu("Instances", self)
             show_child_window_action = {}
-            print(f"LAUNCHED:{G.launched_instances}")
             for d in ["joystick", "pedals", "collective", 'trimwheel']:
                 if d in G.launched_instances:
                     def do_show_child_window(child=d):
@@ -852,7 +903,6 @@ class MainWindow(QMainWindow):
                     show_child_window_action[d] = QAction(f'Show {d.capitalize()} Instance', self)
                     show_child_window_action[d].triggered.connect(lambda _, child=d: do_show_child_window(child))
                     show_menu.addAction(show_child_window_action[d])
-                    print(f"ADDED: {d}")
             tray_menu.addMenu(show_menu)
 
         quit_action = QAction("Quit TelemFFB", self)
@@ -939,6 +989,7 @@ class MainWindow(QMainWindow):
             f"X-Plane : {xplane_status}\n\n"
             "Enable or Disable in System -> System Settings"
         )
+
     def force_reload_aircraft(self):
         G.force_reload_aircraft_trigger = True
         G.telem_manager.currentAircraftName = None
@@ -953,9 +1004,6 @@ class MainWindow(QMainWindow):
             if action.text() == "Debug":
                 return
         debug_menu = self.menu.addMenu("Debug")
-        aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
-        aircraft_picker_action.triggered.connect(lambda: self.toggle_settings_window(dbg=True))
-        debug_menu.addAction(aircraft_picker_action)
 
         teleplot_action = QAction("Teleplot Setup", self)
         def do_open_teleplot_setup_dialog():
@@ -972,6 +1020,25 @@ class MainWindow(QMainWindow):
         show_simvar_action.triggered.connect(do_toggle_simvar_telemetry)
         show_simvar_action.setCheckable(True)
         debug_menu.addAction(show_simvar_action)
+
+        show_order_action = QAction("Show settings order numbering", self)
+        def do_toggle_order_numbering():
+            SettingsLayout.show_order_debug = not  SettingsLayout.show_order_debug
+            show_order_action.setChecked(SettingsLayout.show_order_debug)
+
+        show_order_action.triggered.connect(do_toggle_order_numbering)
+        show_order_action.setCheckable(True)
+        debug_menu.addAction(show_order_action)
+
+
+        show_settingname_action = QAction("Show settings internal name", self)
+        def do_toggle_settingsnames():
+            SettingsLayout.show_settings_names = not  SettingsLayout.show_settings_names
+            show_settingname_action.setChecked(SettingsLayout.show_settings_names)
+
+        show_settingname_action.triggered.connect(do_toggle_settingsnames)
+        show_settingname_action.setCheckable(True)
+        debug_menu.addAction(show_settingname_action)
 
         configurator_settings_action = QAction('Configurator Gain Override', self)
         def do_open_configurator_dialog():
@@ -1007,9 +1074,16 @@ class MainWindow(QMainWindow):
     def set_scrollbar(self, pos):
         self.settings_area.verticalScrollBar().setValue(pos)
 
+    @pyqtSlot(bool)
+    def update_device_status(self, connected):
+        G.device_connection_status = connected
+        status = "ACTIVE" if connected else "DISCONNECTED"
+        self.device_panel.set_device_status(G.device_type, status)
 
+    @pyqtSlot(str, str)
     def update_child_status(self, device, status):
-        self.instance_status_row.set_status(device, status)
+        # self.instance_status_row.set_status(device, status)
+        self.device_panel.set_device_status(device, status)
 
     def show_child_settings(self):
         G.ipc_instance.send_broadcast_message("SHOW SETTINGS")
@@ -1022,8 +1096,11 @@ class MainWindow(QMainWindow):
                 # Get the current timestamp
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M')
 
+                backup_path = os.path.join(G.userconfig_rootpath, 'cfg_backup')
+                os.makedirs(backup_path, exist_ok=True)
+
                 # Create the backup file name with the timestamp
-                backup_file = os.path.join(G.userconfig_rootpath, ('userconfig_' + timestamp + '.bak'))
+                backup_file = os.path.join(backup_path, ('userconfig_' + timestamp + '.bak'))
 
                 # Copy the file to the backup file
                 shutil.copy(G.userconfig_path, backup_file)
@@ -1044,24 +1121,31 @@ class MainWindow(QMainWindow):
 
 
     def setup_master_instance(self):
-        self.show_device_logo()
-        self.enable_device_logo_click(True)
+        # self.show_device_logo()
+        # self.enable_device_logo_click(True)
 
         #self.devicetype_label.hide()
         current_title = self.windowTitle()
         new_title = f"** MASTER INSTANCE ** {current_title}"
         self.setWindowTitle(new_title)
-        self.instance_status_row.show()
-        if "joystick" in G.launched_instances:
-            self.instance_status_row.joystick_status_icon.show()
-        if "pedals" in G.launched_instances:
-            self.instance_status_row.pedals_status_icon.show()
-        if "collective" in G.launched_instances:
-            self.instance_status_row.collective_status_icon.show()
-        if 'trimwheel' in G.launched_instances:
-            self.instance_status_row.trimwheel_status_icon.show()
+        # self.instance_status_row.show()
+        # if "joystick" in G.launched_instances:
+        #     self.instance_status_row.joystick_status_icon.show()
+        # if "pedals" in G.launched_instances:
+        #     self.instance_status_row.pedals_status_icon.show()
+        # if "collective" in G.launched_instances:
+        #     self.instance_status_row.collective_status_icon.show()
+        # if 'trimwheel' in G.launched_instances:
+        #     self.instance_status_row.trimwheel_status_icon.show()
         self.add_instance_log_menu()
         self.add_system_tray()
+        d_list = [G.device_type]
+        for d in G.launched_instances:
+            d_list.append(d)
+        self.device_panel.set_devices(d_list)
+        self.device_panel.set_device_status(G.device_type, "ok")
+        self.device_panel.DeviceClicked.connect(self.change_config_scope)
+        self.device_panel.set_active_device(G.device_type)
 
 
     def show_device_logo(self):
@@ -1170,37 +1254,300 @@ class MainWindow(QMainWindow):
 
         xmlutils.update_vars(types[arg], G.userconfig_path, G.defaults_path)
         G.current_device_config_scope = types[arg]
+        self.device_panel.set_active_device(types[arg])
 
-        pixmap = HiDpiPixmap(utils.get_device_logo(G.current_device_config_scope))
-        self.devicetype_label.setPixmap(pixmap)
+        # pixmap = HiDpiPixmap(utils.get_device_logo(G.current_device_config_scope))
+        # self.devicetype_label.setPixmap(pixmap)
         #self.devicetype_label.setFixedSize(pixmap.width(), pixmap.height())
 
         if G.master_instance:
             self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
+        self.settings_layout.reload_caller()
 
-        # for file in os.listdir(log_folder):
-        #     if file.endswith(G.current_device_config_scope + '_' + current_log_ts):
-        #         self.log_tail_thread.change_log_file(os.path.join(log_folder, file))
-        #         pass
-        # log_tail_window.setWindowTitle(f"Log File Monitor ({G.current_device_config_scope})")
+    def resize_offline_combos(self):
+        """
+            Dynamically resizes the minimum width of all offline mode combo boxes
+            based on the widest item in each. Adds 50 pixels padding to ensure space.
 
-        self.update_settings()
+            This ensures no items are truncated in display and helps with layout alignment.
+            """
+        for combo in [self.offline_sim, self.offline_class, self.offline_name, self.offline_profile]:
+            metrics = QFontMetrics(combo.font())
+            max_width = 0
 
-    def test_sim_changed(self):
-        models = xmlutils.read_models(self.test_sim.currentText())
-        self.test_name.blockSignals(True)
-        self.test_name.clear()
-        self.test_name.addItems(models)
-        self.test_name.blockSignals(False)
+            for i in range(combo.count()):
+                text = combo.itemText(i)
+                width = metrics.horizontalAdvance(text)
+                max_width = max(max_width, width)
+
+            # Add 2 pixels for spacing and set minimum width
+            combo.setMinimumWidth(max_width + 50)
+
+        self.settings_layout.reload_caller()
+
+    def show_profile_manager(self):
+        xmlutils.update_roots() # make sure roots get updated in case state is timedout and file has changed
+        self.profile_mgr_dialog = ProfileManagerDialog(self)
+        self.profile_mgr_dialog.raise_()
+        self.profile_mgr_dialog.activateWindow()
+        self.profile_mgr_dialog.show()
+
+    def exit_offline_mode(self):
+        self.toggle_offline_mode(False)
+        if self.profile_mgr_dialog:
+            self.profile_mgr_dialog.close()
+
+
+    def back_to_profile_mgr(self):
+        self.back_to_profile_mgr_button.setVisible(False)
+        try:
+            # in case it somehow got closed
+            self.profile_mgr_dialog.show()
+        except:
+            QMessageBox.warning(self, "Profile Manager", "IDK WHY THIS ERROR HAPPENED")
+            pass
+        self.toggle_offline_mode(False)
+
+
+    @pyqtSlot(bool)
+    def toggle_offline_mode(self, state):
+        if state == G.settings_mgr.offline_mode:
+            # if already in the same state, do nothing
+            return
+        if not state:
+            # Exiting Offline editing mode
+
+            G.settings_mgr.go_online()
+
+            # clear the layout after going back online
+            G.main_window.settings_layout.clear_layout()
+
+            # reset the craft area text to default
+            self.status_container.reset()
+            self.settings_layout.reload_caller()
+        else:
+            # Entering offline editing mode
+            G.settings_mgr.go_offline()
+            self.status_container.set_offline("None")
+            # clear the layout in case an aircraft was previously loaded live
+            G.main_window.settings_layout.clear_layout()
+
+            # Block signals so we don't trigger text change on .clear() calls
+            self.offline_name.blockSignals(True)
+            self.offline_class.blockSignals(True)
+            self.offline_name.blockSignals(True)
+
+            # clear contents of combo boxes so they can be repopulated
+            self.offline_name.clear()
+            self.offline_class.clear()
+            self.offline_sim.clear()
+
+            # unblock signals
+            self.offline_name.blockSignals(False)
+            self.offline_class.blockSignals(False)
+            self.offline_name.blockSignals(False)
+
+            # build sim list
+            sims = [''] + xmlutils.get_sims()
+            self.offline_sim.addItems(sims)
+
+            # force the settings tab to be active
+            self.tab_widget.setCurrentIndex(1)
+
         if G.master_instance:
-            G.ipc_instance.send_broadcast_message(f"DBG_SELECT_SIM:{self.test_sim.currentText()}")
+            # Show the offline mode widgets, but only for master instance
+            self.offline_config_area.setVisible(state)
 
-    def test_aircraft_changed(self):
+            # Send command to chile instance to replicate actions
+            G.ipc_instance.send_broadcast_message(f"TOGGLE OFFLINE:{state}")
+
+    @pyqtSlot(str, str, str, str)
+    def load_single_offline_model(self, sim, cls, model, profile):
+
+        self.toggle_offline_mode(True)
+        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
+            cb.blockSignals(True)
+            cb.clear()
+            cb.addItem('')
+
+        sim_list = xmlutils.get_sims()
+        for s in sim_list:
+            self.offline_sim.addItem(s)
+        self.offline_sim.setCurrentText(sim)
+
+        cls_list = xmlutils.get_classes_for_sim(sim)
+        for c in cls_list:
+            self.offline_class.addItem(c)
+        self.offline_class.setCurrentText(cls)
+
+        model_list = xmlutils.read_models(sim, cls)
+        for m in model_list:
+            self.offline_name.addItem(m)
+        self.offline_name.setCurrentText(model)
+
+        profile_list = xmlutils.get_available_profiles(sim, cls, model)
+        self.offline_profile.clear()
+        for p in profile_list:
+            if p != 'default':
+                self.offline_profile.addItem(p)
+        self.offline_profile.setCurrentText(profile)
+        self.offline_profile_changed(profile)
+
+        for cb in {self.offline_sim, self.offline_class, self.offline_name, self.offline_profile}:
+            cb.blockSignals(False)
+
+        G.settings_mgr.offline_scope = 'MODEL'
+
+        self.force_sim_aircraft()
         if G.master_instance:
-            G.ipc_instance.send_broadcast_message(f'DBG_SELECT_AC:{self.test_name.currentText()}')
-            print(f"DBG_SELECT_AC:{self.test_name.currentText()}")
+            self.back_to_profile_mgr_button.setVisible(True)
+            args = [sim, cls, model, profile]
+            G.ipc_instance.send_broadcast_message(f"SHOW_OFFLINE_MODEL:{json.dumps(args)} ")
+            self.resize_offline_combos()
 
 
+
+    def update_offline_labeling(self):
+        pass
+
+    def offline_sim_changed(self, sim=None):
+        """
+            Triggered when the offline 'Sim' combo box changes.
+
+            Updates all related combo boxes (class, aircraft, profile),
+            sets the configuration scope, and broadcasts the change
+            if in master mode.
+
+            Args:
+                sim (str, optional): The selected simulation name. If None or empty,
+                                     resets the offline editing UI.
+            """
+        self.offline_name.blockSignals(True)
+        self.offline_class.blockSignals(True)
+        self.offline_name.clear()
+        self.offline_class.clear()
+        self.offline_name.blockSignals(False)
+        self.offline_class.blockSignals(False)
+        if sim is None or sim == '':
+            # if sim combobox is cleared, reset everything and clear the layout
+            self.offline_class.clear()  # clear class field
+            self.offline_name.clear()
+            self.offline_profile.clear()
+            self.settings_layout.clear_layout()
+            self.offline_scope_label.setText(f"None")
+
+            return
+        self.offline_class.clear()  #clear class field
+        self.offline_class.addItem('')
+        self.offline_name.clear()
+        #self.offline_name.setMaximumWidth(200)
+        self.offline_profile.clear()
+        classes = xmlutils.get_classes_for_sim(sim)  # get classes based on chosen sim
+
+        for class_name in classes:
+            self.offline_class.addItem(class_name)  #populate class combobox based on results
+
+        self.offline_name.clear()  #clear aircraft selection combobox
+
+        models = xmlutils.read_models(sim)  # get all available models based on sim
+        for model_name in models:
+            # populate the combobox with the model names
+            self.offline_name.addItem(model_name)
+        if G.master_instance:
+            # send to child instances to mimic action
+            G.ipc_instance.send_broadcast_message(f"OFFLINE_SIM:{self.offline_sim.currentText()}")
+
+        G.settings_mgr.offline_scope = 'SIM'  # set config scope to SIM
+        self.offline_scope_label.setText(f"Editing SIM Defaults ({sim})")
+
+        self.resize_offline_combos()
+        self.force_sim_aircraft() # load settings based on sim
+
+    def offline_class_changed(self, class_name):
+        models = xmlutils.read_models(self.offline_sim.currentText(), class_name)  # get all available models based on sim and class
+        self.offline_name.clear()  # clear the aircraft selection combobox
+        self.offline_profile.clear()
+        for model_name in models:
+            # populate the combobox with the model names
+            self.offline_name.addItem(model_name)
+        if G.master_instance:
+            # send to child instances to mimic action
+            G.ipc_instance.send_broadcast_message(f"OFFLINE_CLASS:{self.offline_class.currentText()}")
+        if class_name == '':
+            # reset back to sim mode if class field is cleared
+            self.offline_sim_changed(self.offline_sim.currentText())
+        else:
+            G.settings_mgr.offline_scope = 'CLASS' # set config scope to CLASS
+            self.offline_scope_label.setText(f"Editing Class Defaults ({class_name})")
+
+        self.resize_offline_combos()
+        self.force_sim_aircraft() # load settings based on class and currently selected sim
+
+    def offline_aircraft_changed(self, ac_name=None):
+        cfg, cls = G.telem_manager.get_aircraft_config(ac_name, self.offline_sim.currentText()) # get class based on selected aircraft
+        profiles = xmlutils.get_available_profiles(self.offline_sim.currentText(), self.offline_class.currentText(), ac_name)
+        self.offline_profile.setEnabled(True)
+        self.offline_profile.clear()
+
+        for profile_name in profiles:
+            if profile_name != 'default':
+                self.offline_profile.addItem(profile_name)
+
+        if not self.offline_profile.count():
+            self.offline_profile.addItem('Auto User')  # manually add 'Auto User' so it is at the top and always present even if there is not yet a Auto User Profile
+            xmlutils.update_active_profile_entry(sim=self.offline_sim.currentText(), cls=cls, model=ac_name, new_profile="Auto User")
+        self.offline_class.blockSignals(True)  # block signals to prevent triggering of offline_class_changed
+        self.offline_class.setCurrentText(cls) # set class combobox to learned class from aircraft config
+        self.offline_class.blockSignals(False)  # unblock signals
+
+        if ac_name == '':
+            self.offline_class_changed(self.offline_class.currentText())
+        else:
+            G.settings_mgr.offline_scope = 'MODEL'
+
+        if G.master_instance:
+            G.ipc_instance.send_broadcast_message(f'OFFLINE_AC:{self.offline_name.currentText()}')
+
+        self.offline_scope_label.setText(f"Editing Aircraft ({ac_name} - {self.offline_profile.currentText()})")
+
+        self.resize_offline_combos()
+        self.force_sim_aircraft()
+
+    def offline_profile_changed(self, profile):
+        # self.update_craft_text_block(profile=profile)
+        if not profile:
+            return
+        G.settings_mgr.offline_scope = 'MODEL'
+        self.resize_offline_combos()
+        self.force_sim_aircraft()
+        if G.master_instance:
+            # send to child instances to mimic action
+            G.ipc_instance.send_broadcast_message(f"OFFLINE_PROFILE:{profile}")
+        self.offline_scope_label.setText(f"Editing Aircraft ({self.offline_name.currentText()} - {profile})")
+
+
+
+
+
+
+    def force_sim_aircraft(self):
+        G.settings_mgr.current_sim = self.offline_sim.currentText()
+        G.settings_mgr.current_class = self.offline_class.currentText()
+        G.settings_mgr.current_aircraft_name = self.offline_name.currentText()
+        G.settings_mgr.active_profile = self.offline_profile.currentText()
+        self.settings_layout.reload_caller()
+
+
+    def show_new_aircraft_wizard(self, manual=False, sim=None, name=None, cls=None):
+        # utils.debug_caller_args("red")
+        wizard = NewAircraftWizard(parent=self, manual=manual, auto_sim=sim, auto_name=name, auto_cls=cls)
+        wizard.accepted.connect(self.new_ac_wizard_finished)
+        if wizard.exec():
+            try:
+                # make sure no other calls are connected to avoid stacking lambda calls if user cancels and doesn't add new aircraft
+                self.new_craft_button.clicked.disconnect()
+            except TypeError:
+                pass  # No handler connected yet
 
     @overrides(QWidget)
     def closeEvent(self, event):
@@ -1310,16 +1657,6 @@ class MainWindow(QMainWindow):
                 
         self.setGeometry(x_pos, y_pos, 530, 700)
 
-    def force_sim_aircraft(self):
-        G.settings_mgr.current_sim = self.test_sim.currentText()
-        G.settings_mgr.current_aircraft_name = self.test_name.currentText()
-        self.settings_layout.expanded_items.clear()
-        self.monitor_widget.hide()
-        self.settings_layout.reload_caller()
-        if G.master_instance:
-            G.ipc_instance.send_broadcast_message(f"LOAD_DBG_AC")
-
-
     def open_system_settings_dialog(self):
         try:
             dialog = SystemSettingsDialog(self)
@@ -1331,14 +1668,10 @@ class MainWindow(QMainWindow):
         # dialog.exec_()
 
     def update_settings(self):
-        # caller_frame = inspect.currentframe().f_back
-        # caller_name = caller_frame.f_code.co_name
-        # utils.dbprint("yellow", f"UPDATE_SETTINGS was called by {caller_name}")
+        # utils.debug_caller_args('blue')
+        self.populate_profile_combo(None) # populate combo with any new profiles
+        self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
         self.settings_layout.reload_caller()
-
-    # def show_sub_menu(self):
-    #     edit_button = self.sender()
-    #     self.sub_menu.popup(edit_button.mapToGlobal(edit_button.rect().bottomLeft()))
 
     def open_url(self, url):
 
@@ -1356,50 +1689,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-    def toggle_settings_window(self, dbg=False):
-        try:
-            modifiers = QApplication.keyboardModifiers()
-            if ((modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier)) or dbg:
-                if self.test_craft_area.isVisible():
-                    self.test_craft_area.hide()
-                else:
-                    self.test_craft_area.show()
-                if G.master_instance:
-                    G.ipc_instance.send_broadcast_message("TOGGLE TESTCRAFT")
-            else:
-                sm = G.settings_mgr
-                if sm.isVisible():
-                    sm.hide()
-                else:
-                    sm.move(self.x() + 50, self.y() + 100)
-                    sm.show()
 
-        except Exception:
-            traceback.print_exc()
-
-    def show_user_model_dialog(self):
-        current_aircraft = self.cur_craft.text()
-        dialog = UserModelDialog(G.settings_mgr.current_sim, current_aircraft, G.settings_mgr.current_class, self)
-        result = dialog.exec()
-        if result == QtWidgets.QDialog.DialogCode.Accepted:
-            # Handle accepted
-            new_aircraft = dialog.tb_current_aircraft.currentText()
-            if new_aircraft == current_aircraft:
-                qm = QMessageBox()
-                ret = qm.question(self, 'Create Match Pattern', "Are you sure you want to match on the\nfull aircraft name and not a search pattern?", qm.StandardButton.Yes | qm.StandardButton.No)
-                if ret == qm.StandardButton.No:
-                    return
-            new_combo_box_value = dialog.combo_box.currentText()
-            pat_to_clone = dialog.models_combo_box.currentText()
-            if pat_to_clone == '':
-                logging.info(f"New: {new_aircraft} {new_combo_box_value}")
-                xmlutils.write_models_to_xml(G.settings_mgr.current_sim, new_aircraft, new_combo_box_value, 'type', None)
-            else:
-                logging.info(f"Cloning: {pat_to_clone} as {new_aircraft}")
-                xmlutils.clone_pattern(G.settings_mgr.current_sim, pat_to_clone, new_aircraft)
-        else:
-            # Handle canceled
-            pass
 
     def update_from_menu(self):
         if self.perform_update(auto=False):
@@ -1429,7 +1719,13 @@ class MainWindow(QMainWindow):
         if source is None:
             return
 
-        ic = self.label_icons[source]
+        if error:
+            self.status_container.set_error(source)
+        elif paused:
+            self.status_container.set_paused(source)
+        else:
+            self.status_container.set_running(source)
+
 
         if G.master_instance:
             if error:
@@ -1437,16 +1733,11 @@ class MainWindow(QMainWindow):
 
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_error.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
-                # utils.dbprint('blue', f"VPforce TelemFFB -- There is an error occurring:\n\n{message}")
-                self.notification_label.setText(message)
-                # Replace the "current aircraft" label with the message
-                container_height = self.craft_container.height()
-                self.notification_label.setFixedHeight(container_height)
-                self.craft_container.hide()
-                self.notification_label.show()
+
+                self.status_container.flag_error(message)
+
                 self.pop_tray_notification("Error", message, renew_period= 2)
 
-                ic.error_message = message  # set message for instance icon tooltip
 
             elif paused:
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_paused.png'))
@@ -1456,13 +1747,8 @@ class MainWindow(QMainWindow):
                 self.tray_icon.setIcon(QIcon(':/image/vpforceicon_run.png'))
                 self.tray_icon.setToolTip(f"VPforce TelemFFB\n{source} is Running ")
                 # re-show the "current aircraft" label once error cleared
-                self.notification_label.setText('')
-                self.notification_label.hide()
-                self.craft_container.show()
 
-        ic.error = error
-        ic.paused = paused
-        ic.active = True
+
 
 
 
@@ -1482,36 +1768,12 @@ class MainWindow(QMainWindow):
 
         elif index == 1:  # Settings Tab
             self.current_tab_index = 1
-            modifiers = QApplication.keyboardModifiers()
-            if (modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier):
-                self.cb_joystick.setVisible(True)
-                self.cb_pedals.setVisible(True)
-                self.cb_collective.setVisible(True)
-                self.cb_trimwheel.setVisible(True)
-                match G.device_type:
-                    case 'joystick':
-                        self.cb_joystick.setChecked(True)
-                    case 'pedals':
-                        self.cb_pedals.setChecked(True)
-                    case 'collective':
-                        self.cb_collective.setChecked(True)
-                    case 'trimwheel':
-                        self.cb_trimwheel.setChecked(True)
-
             try:
                 h = self.tab_sizes[str(index)]['height']
                 w = self.tab_sizes[str(index)]['width']
                 self.resize(int(w), int(h))
             except Exception:
                 pass
-
-        # elif index == 2:  # Log Tab
-        #     self.current_tab_index = 2
-        #     try:
-        #         h = self.tab_sizes[str(index)]['height']
-        #         w = self.tab_sizes[str(index)]['width']
-        #         self.resize(int(w), int(h))
-        #     except: pass
 
         elif index == 2:  # Hide Tab
             self.current_tab_index = 2
@@ -1534,9 +1796,106 @@ class MainWindow(QMainWindow):
 
         # Create and return the interpolated color
         return QColor(r, g, b, a)
-    
+
+    def populate_profile_combo(self, new_items: list[str]=None):
+        """
+        Updates the profile combo box only if its contents differ (excluding 'Add New...').
+
+        Args:
+            new_items (list[str]): List of profiles to populate.
+        """
+        SELECT_LABEL = 'Select...'
+        ADD_NEW_LABEL = "Add New..."
+        if not self.status_container.cb_selectProfileCombo.isEnabled():
+            self.status_container.cb_selectProfileCombo.setEnabled(True)
+        if new_items is None:
+            new_items = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
+
+        self.status_container.cb_selectProfileCombo.blockSignals(True)
+        self.status_container.cb_selectProfileCombo.clear()
+
+        self.status_container.cb_selectProfileCombo.addItem(SELECT_LABEL)
+        for item in new_items:
+                self.status_container.cb_selectProfileCombo.addItem(item)
+
+        self.status_container.cb_selectProfileCombo.addItem(ADD_NEW_LABEL)
+        index = self.status_container.cb_selectProfileCombo.findText(ADD_NEW_LABEL)
+        if index >= 0:
+            font = QFont()
+            font.setItalic(True)
+            self.status_container.cb_selectProfileCombo.setItemData(index, font, role=Qt.ItemDataRole.FontRole)
+
+        self.status_container.cb_selectProfileCombo.setCurrentIndex(0)
+        self.status_container.cb_selectProfileCombo.blockSignals(False)
+
+    def on_profile_change(self, index):
+        # utils.debug_caller_args("red")
+        """
+        Call to xmlutils to update the profile mapping for the aircraft when the user changes the profile
+        If the "add new" option is selected, pop a dialog asking for the new profile name.  If the user chooses
+        the "make active' option, make a further call to make the new profile the active one
+        Args:
+            index: The selected index in the combobox.
+
+        Returns: Nothing
+
+        """
+        if not G.master_instance:
+            return
+        if index == 0:
+            return
+
+        profile_name = self.status_container.cb_selectProfileCombo.itemText(index)
+
+        self.status_container.cb_selectProfileCombo.blockSignals(True)
+        self.status_container.cb_selectProfileCombo.setCurrentIndex(0)
+        self.status_container.cb_selectProfileCombo.blockSignals(False)
+
+        sim = G.settings_mgr.current_sim
+        cls = G.settings_mgr.current_class
+        pattern = G.settings_mgr.current_pattern
+
+        cur_txt = xmlutils.get_active_profile_for_model(sim, cls, pattern)
+        if profile_name == 'Add New...':
+            ## Quickly block signals and set it back to "Select".. then kick off new profile dialog
+
+
+            dlg = NewProfileDialog(self)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                # user canceled
+                return
+            new_profile, make_active, clone, profile_to_clone = dlg.get_data()
+            if not new_profile:
+                # user did not enter a string
+                return
+            # write new profile entry to user config file
+            if clone:
+                xmlutils.clone_profile_entry(
+                    sim=G.settings_mgr.current_sim,
+                    cls=G.settings_mgr.current_class,
+                    src_model=G.settings_mgr.current_pattern,
+                    src_profile=profile_to_clone,
+                    dst_profile=new_profile
+                )
+            else:
+                xmlutils.add_new_profile(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, new_profile)
+
+            if make_active:
+                # change the profileMapping for this aircraft to the new profile
+                xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, new_profile)
+                G.settings_mgr.update_state_vars(active_profile=new_profile)
+
+            if G.telem_manager.timed_out:
+                self.populate_profile_combo(xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern))
+                self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=G.settings_mgr.active_profile)
+        else:
+            xmlutils.update_active_profile_entry(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, profile_name)
+            if G.telem_manager.timed_out:
+                self.update_craft_text_block(craft=G.settings_mgr.current_aircraft_name, pattern=G.settings_mgr.current_pattern, profile=profile_name)
+        if G.telem_manager.timed_out:
+            self.settings_layout.reload_caller()
+
     def on_telemetry_timeout(self):
-        # self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
         self.lbl_effects_data.setText("")
         if not self.error_state:
             # Only set icon to pause if error condition is not present when pausing
@@ -1640,6 +1999,8 @@ class MainWindow(QMainWindow):
 
                 n_sliders = self.findChildren(NoWheelNumberSlider)
                 for my_slider in n_sliders:
+                    """This section updates the labels which are on the "NoWheelNumberSlider elements that reflect
+                    the current value of the coeff % values"""
                     slidername = my_slider.objectName().replace('sld_', '')
                     my_slider.blockSignals(True)
 
@@ -1679,14 +2040,16 @@ class MainWindow(QMainWindow):
             error_cond = data.get('error', None)
 
             if error_cond is None:  # no 'error' key in telemetry
-                if self.telemetry_timed_out or self.error_state:  # only set status to run if previously timed out or error status was true
+                if self.telemetry_timed_out or self.error_state:  # only set status to run if previously debug_timed out or error status was true
                     if not self.error_clean_counter:  # avoid flapping due to ipc_telem not populating on every frame due to thread timing between instances
                         self.update_sim_indicators(data.get('src'), paused=False)
                         self.error_state = False
                         self.telemetry_timed_out = False
+                        self.status_container.clear_error()
                     else:
                         self.error_clean_counter -= 1  # decrement the counter so that it will reach 0 once error is *truly* cleared
             elif error_cond is not None:
+
                 self.error_clean_counter = 5
                 if not self.error_state:  # only set error status once when there is error cond but state is not yet true
                     self.update_sim_indicators(data.get('src'), error=True, message=error_cond)
@@ -1698,32 +2061,61 @@ class MainWindow(QMainWindow):
 
             shown_pattern = G.settings_mgr.current_pattern
             if G.settings_mgr.current_pattern == '' and data.get('N', '') != '':
-                if not self.new_craft_notification_sent:
-                    shown_pattern = 'Using defaults'
-                    self.new_craft_button.show()
-                    if G.master_instance:
-                        self.pop_tray_notification(
-                            "** New Aircraft Found **",
-                            f"No profile was found for the aircraft\n{data.get('N')}\n\nClick to open TelemFFB.",
-                            10,
-                        )
-                        self.new_craft_notification_sent = True
+                shown_pattern = 'Using defaults'
+                new_sim = data.get('src', None)
+                new_aircraft = data.get('N', None)
+                new_class = G.settings_mgr.current_class
+                if G.master_instance:
+                    if not self.new_craft_button.isVisible():
+                        self.new_craft_button.clicked.connect(lambda: self.show_new_aircraft_wizard(manual=False,sim=new_sim,cls=new_class,name=new_aircraft))
+                        self.new_craft_button.show()
+
+                    if not data.get('STOP', False):
+                        if not self.new_craft_notification_sent:
+
+                            self.pop_tray_notification(
+                                "** New Aircraft Found **",
+                                f"No profile was found for the aircraft\n{data.get('N')}\n\nClick to open TelemFFB.",
+                                10,
+                            )
+                            self.new_craft_notification_sent = True
+                            self.show_new_aircraft_wizard(manual=False, sim=data.get('src', None), cls=G.settings_mgr.current_class, name=data.get('N', ''))
+
 
 
             else:
                 self.new_craft_button.hide()
                 self.new_craft_notification_sent = False
 
-            self.cur_craft.setText(data['N'])
-            self.cur_pattern.setText(f'Matched: <span style="font-family: Consolas, monospace;font-size: 14px">"{shown_pattern}"</span> ')
+            # Update the status labels and profile selection box
+            self.status_container.set_fullname(data['N'])
+            ap = G.settings_mgr.active_profile
+            active_profile = xmlutils.get_active_profile_for_model(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
+
+            self.update_craft_text_block(pattern=shown_pattern, profile=active_profile)
 
             if window_mode == 0:
                 self.lbl_telem_data.setText(telem_items)
-            # elif window_mode == self.effect_monitor_radio:
                 self.lbl_effects_data.setText(active_effects)
 
         except Exception:
             logging.exception("Exception")
+
+    def update_craft_text_block(self, craft=None, pattern=None, profile=None):
+        if craft is None:
+            craft = G.settings_mgr.current_aircraft_name
+        if pattern is None:
+            pattern = G.settings_mgr.current_pattern
+        if profile is None:
+            profile = G.settings_mgr.active_profile
+        self.status_container.cur_craft_label.setText(craft)
+        self.status_container.cur_pattern_label.setText(pattern)
+        self.status_container.active_profile_label.setText(profile)
+
+    def new_ac_wizard_finished(self):
+        self.new_craft_button.setVisible(False)
+        self.settings_layout.reload_layout(None)
+
 
     def perform_update(self, auto=True):
         if G.release_version:
@@ -1748,7 +2140,6 @@ class MainWindow(QMainWindow):
         if not is_exe: return False
 
         if self._update_available:
-            # vers, url = utils.fetch_latest_version()
             update_ans = QMessageBox.StandardButton.Yes
             if auto:
                 update_ans = QMessageBox.information(self, "Update Available!!",
