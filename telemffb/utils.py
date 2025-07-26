@@ -1976,6 +1976,13 @@ def convert_legacy_userconfig(path):
 
     root = tree.getroot()
 
+    # Convert legacy root tag
+    new_root = ET.Element("TelemFFB_v2")
+    for child in list(root):
+        new_root.append(child)
+    tree._setroot(new_root)
+    root = new_root
+
     # If already converted (profileMappings exist), exit
     if root.find("profileMappings") is not None:
         return False
@@ -2090,7 +2097,7 @@ def copy_legacy_config_to_new(path):
 def create_empty_userxml_file(path):
     if not os.path.isfile(path):
         # Create an empty XML file with the specified root element
-        root = ET.Element("TelemFFB")
+        root = ET.Element("TelemFFB_v2")
         tree = ET.ElementTree(root)
         # Create a backup directory if it doesn't exist
         if not os.path.exists(os.path.dirname(path)):
