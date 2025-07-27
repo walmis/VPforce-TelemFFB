@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QTabWidget,
                              QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu,
-                             QDialog, QStatusBar)
+                             QDialog, QStatusBar, QSplitter)
 
 import telemffb.globals as G
 import telemffb.utils as utils
@@ -634,7 +634,8 @@ class MainWindow(QMainWindow):
         self.effects_area = QScrollArea()
         self.effects_area.setWidgetResizable(True)
         self.effects_area.setMinimumHeight(100)
-        self.effects_area.setMaximumWidth(200)
+
+        # self.effects_area.setMaximumWidth(200)
 
 
         """ Create the Telemetry Label widget and set its properties """
@@ -656,7 +657,7 @@ class MainWindow(QMainWindow):
 
         self.telem_area.setWidget(self.lbl_telem_data)
 
-        self.lbl_effects_data = QLabel()
+        self.lbl_effects_data = QLabel("            ")  # Empty space placeholder so splitter weights work
         self.effects_area.setWidget(self.lbl_effects_data)
         self.lbl_effects_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.lbl_effects_data.setStyleSheet("""
@@ -668,6 +669,7 @@ class MainWindow(QMainWindow):
         """ Create telemetry header with label and filter """
 
         telem_header_widget = QWidget()
+        telem_header_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         telem_header_layout = QHBoxLayout(telem_header_widget)
         telem_header_layout.setContentsMargins(0, 0, 0, 0)
         
@@ -699,8 +701,12 @@ class MainWindow(QMainWindow):
 
         monitor_area_layout.addWidget(telem_header_widget, 0, 0)
         monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
-        monitor_area_layout.addWidget(self.telem_area, 1, 0)
-        monitor_area_layout.addWidget(self.effects_area, 1, 1)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(self.telem_area)
+        splitter.addWidget(self.effects_area)
+        splitter.setStretchFactor(0, 2)  # Wider telemetry
+        splitter.setStretchFactor(1, 3)  # Narrow effects
+        monitor_area_layout.addWidget(splitter, 1, 0, 1, 2)  # Span both columns
 
         self.monitor_widget.setLayout(monitor_area_layout)
 
