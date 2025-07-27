@@ -195,11 +195,39 @@ class Interp1D:
         return y_interp if x_new.ndim > 0 else y_interp.item()
 
 class Akima1DInterpolator:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+    """
+        A drop-in replacement for scipy.interpolate.Akima1DInterpolator
+        using the 'akima' package backend, but mimicking SciPy's behavior.
+
+        - No extrapolation by default: returns np.nan for out-of-bounds inputs.
+        - Accepts any input shape (scalar, list, or ndarray).
+        """
+
+    def __init__(self, x, y, extrapolate=False):
+        self.x = np.asarray(x, dtype=float)
+        self.y = np.asarray(y, dtype=float)
+        if len(self.x) != len(self.y):
+            raise ValueError("x and y must have the same length")
+
+        # Must be strictly increasing
+        sort_idx = np.argsort(self.x)
+        self.x = self.x[sort_idx]
+        self.y = self.y[sort_idx]
+
+        self._interp = akima.interpolate
+        self.extrapolate = extrapolate
+
     def __call__(self, x_new):
-        return akima.interpolate(self.x, self.y, x_new)
+        scalar_input = np.isscalar(x_new)
+        x_new = np.atleast_1d(x_new).astype(float)
+
+        y_new = self._interp(self.x, self.y, x_new)
+
+        if not self.extrapolate:
+            out_of_bounds = (x_new < self.x[0]) | (x_new > self.x[-1])
+            y_new = np.where(out_of_bounds, np.nan, y_new)
+
+        return y_new[0] if scalar_input else y_new
 
 
 class Smoother:
@@ -253,6 +281,7 @@ class EffectTranslator:
         "ab_rumble_1_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
         "ab_rumble_2_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
         "ab_rumble_2_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
+        'adv_spr': ["Advanced Spring Override", ""],
         "aoa": ["AoA Effect", "aoa_effect_gain"],
         "ap_spring": ["Autopilot Spring", ""],
         "buffeting": ["AoA\\Stall Buffeting", "buffeting_intensity"],
