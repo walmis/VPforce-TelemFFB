@@ -1004,27 +1004,49 @@ class SettingsLayout(QGridLayout):
         # Create the erase button
 
         erase_button.setObjectName(f"eb_{item['name']}")
-        erase_button.setMaximumSize(25, 25)
-        erase_button.setMinimumSize(25, 25)
         erase_button.setIcon(icon)
-        #erase_button.setIconSize(pixmap.rect().size())
         erase_button.setToolTip("")
         erase_button.clicked.connect(lambda _, name=item['name']: self.erase_setting(name))
-        self.addWidget(erase_button, i, erase_col)
         sp_retain = erase_button.sizePolicy()
         sp_retain.setRetainSizeWhenHidden(True)
         erase_button.setSizePolicy(sp_retain)
         erase_button.setVisible(False)
+        #
+        # create info icon for later use
+        info_icon = QIcon()
+        info_pixmap = HiDpiPixmap(":/image/info_icon.png")
+        info_pixmap = info_pixmap.scaled(16, 16, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        info_icon.addPixmap(info_pixmap)
+        info_label = QLabel()
+        info_label.setPixmap(info_pixmap)
+        # info_label.setMaximumSize(25, 25)
+        # info_label.setMinimumSize(25, 25)
 
-        replacematch = "Model (user)"
-        if G.settings_mgr.offline_mode:
-            replacematch = G.settings_mgr.offline_scope.lower() + " (user)"
+        replace_scope = "model" + " (user)" if not G.settings_mgr.offline_mode else G.settings_mgr.offline_scope.lower() + ' (user)'
+        action_item = erase_button
 
-        if item['replaced'].lower() == replacematch.lower():
+        if item['replaced'].lower() == replace_scope.lower():
             if item['name'] != 'type':  # dont erase type on mainwindow settings
                 logging.debug(f"show erase {G.settings_mgr.offline_scope}")
                 erase_button.setVisible(True)
                 erase_button.setToolTip("Reset to Default, Right-Click for more options")
+                action_item = erase_button
+
+        if item['replaced'].lower() == "class (user)" and (not G.settings_mgr.offline_mode or G.settings_mgr.offline_scope.lower() != "class"):
+            if item['name'] != 'type':
+                action_item = info_label
+                info_label.setVisible(True)
+                info_label.setToolTip("Class level user override is in use")
+                info_label.setEnabled(False)
+
+        elif item['replaced'].lower() == "sim (user)"  and (not G.settings_mgr.offline_mode or G.settings_mgr.offline_scope.lower() != "sim"):
+            if item['name'] != 'type':
+                action_item = info_label
+                info_label.setVisible(True)
+                info_label.setToolTip("Sim level user override is in use")
+                info_label.setEnabled(False)
+
+        self.addWidget(action_item, i, erase_col, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.setRowStretch(i, 0)
 
