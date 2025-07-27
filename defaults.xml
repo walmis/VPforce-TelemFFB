@@ -5218,7 +5218,21 @@
 		<var>L:switchForceTrim</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
-		<classdefaults_DCS>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>DCS</sim>
+			<class>Helicopter</class>
+			<validvalues>DCS_HELI_JOYSTICK_MODE</validvalues>
+			<device>joystick</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>DCS</sim>
+			<class>Helicopter</class>
+			<validvalues>DCS_HELI_PEDAL_MODE</validvalues>
+			<device>pedals</device>
+		</validvalues_overrides>
+<classdefaults_DCS>
 			<name>afterburner_effect_enabled</name>
 			<type>JetAircraft</type>
 			<value>true</value>

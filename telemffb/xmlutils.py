@@ -1318,7 +1318,7 @@ def read_models_data(which_root, sim, full_model_name, alldevices=False, instanc
         against the full model name. Can optionally merge settings from 'any' device or sim definitions.
 
         Args:
-            file_path (str): Path to the XML file.
+            which_root (str): 'user' or 'defaults'
             sim (str): Simulator identifier.
             full_model_name (str): Full aircraft model name (used for regex matching).
             alldevices (bool, optional): If True, includes all devices regardless of type. Defaults to False.
@@ -1436,7 +1436,7 @@ def read_models_sc_overrides(which_root, full_model_name, source):
         Matches based on exact or regex match against the model name.
 
         Args:
-            file_path (str): XML path to read from.
+            which_root (str): 'user' or 'defaults'
             full_model_name (str): Full model name to match (supports regex).
             source (str): A label indicating the source of the override (e.g., 'defaults', 'user').
 
@@ -1689,7 +1689,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
         final_result = def_craft_models_result
 
     final_result = [item for item in final_result if item['value'] != '' or item['name'] == 'vpconf']
-
+    apply_validvalue_overrides_from_root(final_result, the_sim, model_class, instance_device)
     prereq_list = read_prereqs()
     final_w_prereqs = check_prereq_value(prereq_list, final_result)
     final_wo_prereqs = eliminate_no_prereq(final_w_prereqs)
@@ -1699,6 +1699,30 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
 
     return model_class, model_pattern, sorted_data
 
+def apply_validvalue_overrides_from_root(data_list, sim, model_class, instance_device):
+    """
+    Modifies the 'validvalues' field of config items in-place based on validvalues_overrides
+    found in the provided parsed XML root (XiMpLe-style).
+
+    Args:
+        data_list (list of dict): The list of config items to modify.
+        sim (str): Current sim context.
+        model_class (str): Aircraft class context.
+        device (str): Device context (e.g., 'joystick').
+    """
+    instance_device = instance_device if instance_device != '' else device
+    overrides = auto_defaults_root.findall(".//validvalues_overrides")
+
+    for item in data_list:
+        for override in overrides:
+            name = override.findtext("name")
+            sim_ = override.findtext("sim")
+            class_ = override.findtext("class")
+            device_ = override.findtext("device")
+            validvalues = override.findtext("validvalues")
+
+            if (name == item['name'] and sim_ == sim and class_ == model_class and (device_ == instance_device or device_ == 'any')):
+                item['validvalues'] = validvalues
 
 def read_user_sim_data(the_sim, instance_device=''):
     """
