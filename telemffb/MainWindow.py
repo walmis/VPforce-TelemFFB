@@ -1038,11 +1038,11 @@ class MainWindow(QMainWindow):
 
         show_replaced = QAction("Show settings source", self)
         def do_toggle_replaced():
-            SettingsLayout.show_replaced = not  SettingsLayout.show_replaced
-            show_order_action.setChecked(SettingsLayout.show_replaced)
+            SettingsLayout.show_replaced = not SettingsLayout.show_replaced
+            show_replaced.setChecked(SettingsLayout.show_replaced)
 
-        show_order_action.triggered.connect(do_toggle_replaced)
-        show_order_action.setCheckable(True)
+        show_replaced.triggered.connect(do_toggle_replaced)
+        show_replaced.setCheckable(True)
         debug_menu.addAction(show_replaced)
 
 

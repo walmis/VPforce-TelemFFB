@@ -49,7 +49,7 @@ class SettingsLayout(QGridLayout):
     show_col_debug = False      # shows column, span, indent in label tooltip
     show_slider_debug = False   # set to true for slider values shown
     show_order_debug = False    # set to true for order numbers shown
-    show_replaced = True
+    show_replaced = False
     show_settings_names = False # show setting internal name instead of displayname
     bump_up = True              # set to false for no row bumping up
 
