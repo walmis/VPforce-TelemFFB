@@ -122,6 +122,7 @@ class SettingsManager(QObject):
         STATIC = auto()
         DYNAMIC = auto()
         CUSTOM = auto()
+        FORCETRIM = auto()
 
     # used for both joystick and pedals
     MSFS_XP_SPRING_MODE = {
@@ -148,6 +149,13 @@ class SettingsManager(QObject):
     DCS_HELI_JOYSTICK_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim"
+    }
+
+    DCS_HELI_PEDAL_MODE = {
+        SpringModeEnum.NONE: "None (Game Managed)",
+        SpringModeEnum.NOSPRING: "No Spring (Free Floating)",
+        SpringModeEnum.STATIC: "Static Spring",
+        SpringModeEnum.FORCETRIM: "Hardware Force Trim",
     }
 
     TEST_SPRING_MODE = {
