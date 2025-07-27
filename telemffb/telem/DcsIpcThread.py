@@ -18,9 +18,10 @@
 
 
 import logging
+import socket
 import threading
 from typing import Optional, Tuple, TYPE_CHECKING
-import zmq
+from telemffb.util.SharedMemReader import SharedMemoryReader
 
 if TYPE_CHECKING:
     from telemffb.telem.TelemManager import TelemManager
@@ -31,78 +32,59 @@ class DcsIpcThread(threading.Thread):
         assert telemetry is not None, "Telemetry manager must be provided"
         self._run: bool = False
         self._telem: 'TelemManager' = telemetry
-        self.zmq_context: Optional[zmq.Context] = zmq.Context()
-        self.recv_socket: Optional[zmq.Socket] = None
-        self.send_socket: Optional[zmq.Socket] = None
+
+        self._shm : SharedMemoryReader = SharedMemoryReader(b"telemffb_shared_memory", 65536)
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
         DcsIpcThread._instance = self
 
     def __del__(self) -> None:
         """
         Clean up ZMQ sockets and context when the instance is deleted.
         """
-        self._cleanup_sockets()
-        if self.zmq_context:
-            self.zmq_context.destroy()
-            self.zmq_context = None
+        if self._shm:
+            self._shm.close()
+            self._shm = None
+        self._socket.close()
 
     @classmethod
     def send_commands(cls, command: str) -> None:
         """
-        Send a command to the DCS ZMQ channel.
+        Send a command to the DCS UDP channel.
         :param command: Command string to send.
         """
         self = cls._instance
-        try:
-            if not self.send_socket:
-                self.send_socket = self.zmq_context.socket(zmq.PUB)
-                self.send_socket.connect("tcp://localhost:34385")
+        port = self._telem.getTelemValue("UDP_Port")
+        if port:
+            try:
+                self._socket.sendto(command.encode('utf-8'), ('localhost', port))
+            except socket.error as e:
+                logging.error(f"Failed to send command to DCS: {e}")
 
-            self.send_socket.send_string(command, zmq.NOBLOCK)
-        except zmq.Again:
-            logging.warning("Failed to send command: socket would block")
-        except zmq.ZMQError as e:
-            logging.error(f"Error sending command to DCS ZMQ channel: {e}")
-        except Exception as e:
-            logging.error(f"Unexpected error sending command to DCS ZMQ channel: {e}")
 
 
     def run(self) -> None:
         self._run = True
-        try:
-            if not self.recv_socket:
-                self.recv_socket = self.zmq_context.socket(zmq.SUB)
-                self.recv_socket.connect("tcp://localhost:34384")
-                self.recv_socket.setsockopt(zmq.SUBSCRIBE, b"")  # Subscribe to all messages
-                self.recv_socket.setsockopt(zmq.RCVTIMEO, 100)  # 100ms timeout
 
-            logging.info("Listening on DCS ZMQ channel")
-            
-            while self._run:
-                try:
-                    packet = self.recv_socket.recv()
-                    packet = packet.strip(b"\0")
-                    self._telem.submit_frame(packet)
-                except zmq.Again:
+        logging.info("Listening on DCS IPC channel")
+        
+        while self._run:
+            try:
+                packet = self._shm.read(1000)
+                #print(f"Read packet: {packet}")
+                if not packet:
                     continue
-                except zmq.ZMQError as e:
-                    logging.exception(f"Error receiving data from DCS ZMQ channel: {e}")
-                    continue
-        finally:
-            self._cleanup_sockets()
+                message = packet.message
+                self._telem.submit_frame(message)
+            except Exception as e:
+                logging.error(f"Error reading from shared memory: {e}")
+                continue
+
 
     def quit(self) -> None:
         if self._run:
             logging.info("DcsIpcThread stopping")
             self._run = False
 
-    def _cleanup_sockets(self) -> None:
-        """Clean up ZMQ sockets and context."""
-        if self.recv_socket:
-            self.recv_socket.close()
-        if self.send_socket:
-            self.send_socket.close()
-        
-        self.send_socket = None
-        self.recv_socket = None
 
 

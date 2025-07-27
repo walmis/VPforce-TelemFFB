@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>616</width>
-    <height>928</height>
+    <height>810</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -22,10 +22,19 @@
   <layout class="QVBoxLayout" name="verticalLayout_5">
    <item>
     <layout class="QVBoxLayout" name="verticalLayout_4">
+     <property name="spacing">
+      <number>2</number>
+     </property>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_10">
+       <property name="spacing">
+        <number>10</number>
+       </property>
        <item>
         <layout class="QVBoxLayout" name="verticalLayout_3">
+         <property name="spacing">
+          <number>2</number>
+         </property>
          <item>
           <widget class="QLabel" name="labelSystem">
            <property name="font">
@@ -41,6 +50,9 @@
          </item>
          <item>
           <layout class="QGridLayout" name="gridLayout">
+           <property name="verticalSpacing">
+            <number>2</number>
+           </property>
            <item row="2" column="0" colspan="2">
             <layout class="QHBoxLayout" name="horizontalLayout_14"/>
            </item>
@@ -178,6 +190,9 @@
          </item>
          <item>
           <layout class="QVBoxLayout" name="verticalLayout_2">
+           <property name="spacing">
+            <number>2</number>
+           </property>
            <item>
             <widget class="QLabel" name="labelTheme">
              <property name="text">
@@ -285,6 +300,9 @@
        </item>
        <item>
         <layout class="QVBoxLayout" name="verticalLayout">
+         <property name="spacing">
+          <number>2</number>
+         </property>
          <item>
           <layout class="QHBoxLayout" name="horizontalLayout_3">
            <item>
@@ -705,7 +723,7 @@ Headless:</string>
          <item>
           <layout class="QGridLayout" name="gridLayout_5">
            <property name="verticalSpacing">
-            <number>8</number>
+            <number>2</number>
            </property>
            <item row="1" column="0">
             <widget class="LabeledToggle" name="cb_startToTray">
@@ -775,7 +793,7 @@ Headless:</string>
      <item>
       <layout class="QGridLayout" name="gridLayout_3">
        <property name="verticalSpacing">
-        <number>6</number>
+        <number>2</number>
        </property>
        <item row="5" column="0">
         <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -1004,6 +1022,9 @@ Headless:</string>
        </item>
        <item row="4" column="0">
         <layout class="QHBoxLayout" name="horizontalLayout">
+         <property name="spacing">
+          <number>6</number>
+         </property>
          <item>
           <spacer name="horizontalSpacer_14">
            <property name="orientation">
@@ -1104,8 +1125,14 @@ Headless:</string>
      </item>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_11">
+       <property name="spacing">
+        <number>9</number>
+       </property>
        <item>
         <layout class="QGridLayout" name="gridLayout_6">
+         <property name="verticalSpacing">
+          <number>2</number>
+         </property>
          <item row="1" column="0">
           <widget class="LabeledToggle" name="cb_save_geometry">
            <property name="text">
@@ -1164,7 +1191,7 @@ Headless:</string>
        <item>
         <layout class="QGridLayout" name="gridLayout_4">
          <property name="verticalSpacing">
-          <number>6</number>
+          <number>2</number>
          </property>
          <item row="3" column="0" alignment="Qt::AlignLeft">
           <widget class="LabeledToggle" name="enableVPConfExit">

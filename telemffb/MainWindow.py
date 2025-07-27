@@ -40,7 +40,7 @@ from PyQt6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                              QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
                              QPushButton, QScrollArea, QTabWidget,
                              QToolButton, QVBoxLayout, QWidget, QSpacerItem, QSizePolicy, QSystemTrayIcon, QMenu,
-                             QDialog, QStatusBar)
+                             QDialog, QStatusBar, QSplitter)
 
 import telemffb.globals as G
 import telemffb.utils as utils
@@ -65,34 +65,27 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_notifications = {}
         self.new_craft_notification_sent = False
-
         self.error_state = False # True='error' key found in telem_data, False=clean telem_data
         self.error_clean_counter = 0 # counter to use as hysteresis for clearing error condition - not always 'error' from child instance on every loop
         self.telemetry_timed_out = True
-
         self.last_telemetry_refresh = utils.millis()
-
         self.show_simvars = False
-
         self.latest_version = None
         self._update_available = None
-
         self.show_new_craft_button = False
-
         self.profile_mgr_dialog = None
 
-        # self.aircraft_picker_action = QAction('Enable Manual Aircraft Selection', self)
+
+        """ Add font used for settngs area group labels """
 
         QFontDatabase.addApplicationFont(':/image/BlackOpsOne-Regular.ttf')
 
         # Get the absolute path of the script's directory
         # script_dir = os.path.dirname(os.path.abspath(__file__))
         doc_url = 'https://vpforcecontrols.com/downloads/VPforce_Rhino_Manual.pdf'
-
         if G.release_version:
             dl_url = 'https://github.com/walmis/VPforce-TelemFFB/releases'
         else:
@@ -123,10 +116,9 @@ class MainWindow(QMainWindow):
                 'width': 0,
             }
         }
-        # self.setMinimumWidth(600)
+
         self.tab_sizes = self.default_tab_sizes
 
-        self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
         match G.device_type:
             case 'joystick':
                 x_pos = 150
@@ -142,11 +134,13 @@ class MainWindow(QMainWindow):
                 y_pos = 30
 
         self.setGeometry(x_pos, y_pos, 530, 700)
+
         version = utils.get_version()
         if version:
-            self.setWindowTitle(f"TelemFFB ({G.device_type}) ({version})")
+            self.setWindowTitle(f"TelemFFB v2 ({G.device_type}) ({version})")
         else:
-            self.setWindowTitle(f"TelemFFB")
+            self.setWindowTitle(f"TelemFFB v2")
+
         # Construct the absolute path of the icon file
         icon = QIcon(":/image/vpforceicon.png")
 
@@ -158,26 +152,22 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
         notes_row_layout = QHBoxLayout()
 
-        # Create the menu bar
-        menu_frame = QFrame()
-        menu_frame_layout = QVBoxLayout(menu_frame)
 
-        # Create the menu bar
+        """ Create the menu bar """
+
         menubar = self.menuBar()
         self.menu = menubar
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
 
-        # Add the "System" menu and its sub-option
+
+        """ Add the "System" menu and its sub-option """
+
         system_menu = self.menu.addMenu('&System')
 
         system_settings_action = QAction('System Settings', self)
         system_settings_action.triggered.connect(self.open_system_settings_dialog)
         system_menu.addAction(system_settings_action)
-
-
-
-
 
         cfg_log_folder_action = QAction('Open Config/Log Directory', self)
         def do_open_cfg_dir():
@@ -210,13 +200,14 @@ class MainWindow(QMainWindow):
         reset_geometry.triggered.connect(do_reset_window_size)
         system_menu.addAction(reset_geometry)
 
-        # self.menu.setStyleSheet("QMenu::item:selected { color: red; }")
         exit_app_action = QAction('Quit TelemFFB', self)
         exit_app_action.triggered.connect(exit_application)
         system_menu.addAction(exit_app_action)
 
         if G.master_instance:
-            # Create "Profiles" menu
+            """
+            Create profiles menu - only for Master Instance
+            """
             self.profiles_menu = self.menu.addMenu('Profiles')
             self.offline_config_action = QAction(r'Offline Profile\Sim Default\Class Default Mode', self)
             self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
@@ -227,8 +218,8 @@ class MainWindow(QMainWindow):
             self.profiles_menu.addAction(self.profile_manager_action)
 
 
+        """ Create the "Utilities" menu """
 
-        # Create the "Utilities" menu
         utilities_menu = self.menu.addMenu('Utilities')
 
         # Add the "Reset" action to the "Utilities" menu
@@ -259,6 +250,9 @@ class MainWindow(QMainWindow):
         utilities_menu.addAction(reload_action)
 
         if G.master_instance and G.system_settings.get('autolaunchMaster', 0):
+            """
+            Add Window menu to manage child instances if it is a master instance
+            """
             self.window_menu = self.menu.addMenu('Window')
 
             def do_toggle_child_windows(toggle):
@@ -275,6 +269,9 @@ class MainWindow(QMainWindow):
             self.window_menu.addAction(self.hide_children_action)
 
         if G.child_instance:
+            """
+            Add Child instance window menu
+            """
             self.window_menu = self.menu.addMenu('Window')
             self.hide_window_action = QAction('Hide Window')
             def do_hide_window():
@@ -284,6 +281,9 @@ class MainWindow(QMainWindow):
                     logging.error(f"EXCEPTION: {e}")
             self.hide_window_action.triggered.connect(do_hide_window)
             self.window_menu.addAction(self.hide_window_action)
+
+
+        """ Add Log Menu """
 
         self.log_menu = self.menu.addMenu('Log')
         self.log_window_action = QAction("Open Console Log", self)
@@ -297,6 +297,9 @@ class MainWindow(QMainWindow):
 
         self.log_window_action.triggered.connect(do_toggle_log_window)
         self.log_menu.addAction(self.log_window_action)
+
+
+        """ Add Help Menu """
 
         help_menu = self.menu.addMenu('Help')
 
@@ -324,43 +327,28 @@ class MainWindow(QMainWindow):
         line.setFrameShadow(QFrame.Shadow.Sunken)
 
         # Add the line to the menu frame layout
-        menu_frame_layout.addWidget(menubar)
-        menu_frame_layout.addWidget(line)
-        menu_frame_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(line)
 
         # Set the layout of the menu frame as the main layout
-        layout.addWidget(menu_frame)
 
         logo_status_layout = QGridLayout()
 
-        ##
-        ##  Create Logo
-        ##
+
+        """ Create Main App Logo Label """
+
         t_logo = QLabel()
         t_pixmap = HiDpiPixmap(":/image/TelemFFB_logo.png")
         t_pixmap = t_pixmap._scaled(round(t_pixmap.width()/5), round(t_pixmap.height()/5))
         t_logo.setPixmap(t_pixmap)
 
-        ##
-        ##  Create Device Panel
-        ##
-        device_groupbox = QGroupBox("Active Devices")
-        device_groupbox.setStyleSheet("""
-                    QGroupBox {
 
-                        font-weight: bold;
-                        border: 1px solid gray;
-                        border-radius: 5px;
-                        margin-top: 6px;
-                    }
-                    QGroupBox::title {
-                        subcontrol-origin: margin;
-                        left: 10px;
-                        padding: 0 3px 0 3px;
-                    }
-                """)
+        """ Create Device Panel """
+
+        device_groupbox = QGroupBox("Active Devices")
+
         device_groupbox.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         device_groupbox_layout = QVBoxLayout()
+        device_groupbox_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.device_panel = DeviceIconPanel()
         device_groupbox_layout.addWidget(self.device_panel)
         device_groupbox.setLayout(device_groupbox_layout)
@@ -370,41 +358,64 @@ class MainWindow(QMainWindow):
             self.device_panel.set_device_status(G.device_type, "ok")
             self.device_panel.set_active_device(G.device_type)
 
-        ##
-        ##  Create Status Panel
-        ##-
+
+        """ Create Status Panel """
+
         self.status_container = AppStatusWidget(master_instance=G.master_instance)
+        status_group = QGroupBox("Application Status")
+        status_layout = QVBoxLayout(status_group)
+        status_layout.setContentsMargins(10, 18, 10, 8)
+        status_layout.addWidget(self.status_container)
+
         self.status_container.cb_selectProfileCombo.currentIndexChanged.connect(self.on_profile_change)
         self.status_container.sim_status_label.set_waiting()
 
         def on_sims_changed(sim: SimTelemListener):
             self.status_container.update_enabled_sims(sim.name, sim.started)
-            # utils.dbprint("blue", f"sim {sim.name} changed state to {sim.started}")
             self.refresh_telem_status()
+
+
+        """ Connect sim listeners to sim change function """
 
         G.sim_listeners.simStarted.connect(on_sims_changed)
         G.sim_listeners.simStopped.connect(on_sims_changed)
+
+
+        """ Add spacer items to fill first row and 2nd column with 10x10 empty space """
+
         logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 0, 1, 1)
         logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 0, 1, 1, 1)
 
+
+        """ Add Logo to the top left cell """
+
         logo_status_layout.addWidget(t_logo, 1, 0, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+
+        """ Add spacer in row 2 """
+
         logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 2, 0, 1, 1)
 
 
-        # --- Device GroupBox below logo
-        logo_status_layout.addWidget(device_groupbox, 3, 0,
-                                     alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        """ Add device panel to row 3 column 0 """
 
-        # --- AppStatusWidget spans two rows in right column
-        logo_status_layout.addWidget(self.status_container, 1, 2, 3, 1, alignment=Qt.AlignmentFlag.AlignTop)
+        logo_status_layout.addWidget(device_groupbox, 3, 0,alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+        """ Add Status widget to column 2, span 3 rows """
+
+        logo_status_layout.addWidget(status_group, 1, 2, 3, 1, alignment=Qt.AlignmentFlag.AlignTop)
         logo_status_layout.addItem(QSpacerItem(10, 10, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed), 4, 0, 1, 1)
 
         logo_status_layout.setColumnStretch(0, 1)
         logo_status_layout.setColumnStretch(1, 1)
+
+
+        """ Add upper grid layout to main layout """
+
         layout.addLayout(logo_status_layout)
 
-        ##################
-        #  new craft button
+
+        """ Create new craft button - pops when unknown aircraft is detected """
 
         new_craft_layout = QVBoxLayout()
         self.new_craft_button = QPushButton('Create/clone config for new aircraft')
@@ -423,24 +434,22 @@ class MainWindow(QMainWindow):
         self.new_craft_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
         new_craft_layout.addWidget(self.new_craft_button)
         new_craft_layout.addSpacing(7)
+
+
+        """ Add new craft button to main layout """
+
         layout.addLayout(new_craft_layout)
         self.new_craft_button.hide()
 
-        #####################
-        #  test loading buttons, set to true for debug
+
+        """ Create offline config control area QWidget """
 
         self.offline_config_area = QWidget()
         self.offline_config_area.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
         )
-        main_layout = QVBoxLayout()  # vertical layout to hold both rows
+        offline_config_layout = QVBoxLayout()  # vertical layout to hold both rows
 
-        self.banner_label = QLabel("Telemetry is paused while in offline editing mode")
-        self.banner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.banner_label.setObjectName('OfflineBannerLabel')
-
-
-        # main_layout.addWidget(self.banner_label)  # Add it above the combobox row
 
         # First row layout (existing widgets)
         # --- Create the Offline Editor GroupBox ---
@@ -464,7 +473,10 @@ class MainWindow(QMainWindow):
         offline_layout.setContentsMargins(10, 18, 10, 10)
         offline_layout.setSpacing(10)
 
-        top_row = QGridLayout()
+
+        """ Create Offline controls layout """
+
+        offline_grid_layout = QGridLayout()
 
         # --- Labels ---
         offline_sim_lbl = QLabel('Sim:')
@@ -479,10 +491,16 @@ class MainWindow(QMainWindow):
         offline_profile_lbl = QLabel('Profile:')
         offline_profile_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        top_row.addWidget(offline_sim_lbl, 0, 0)
-        top_row.addWidget(offline_class_lbl, 0, 1)
-        top_row.addWidget(offline_name_lbl, 0, 2)
-        top_row.addWidget(offline_profile_lbl, 0, 3)
+
+        """ Add label widgets to layout """
+
+        offline_grid_layout.addWidget(offline_sim_lbl, 0, 0)
+        offline_grid_layout.addWidget(offline_class_lbl, 0, 1)
+        offline_grid_layout.addWidget(offline_name_lbl, 0, 2)
+        offline_grid_layout.addWidget(offline_profile_lbl, 0, 3)
+
+
+        """ Create Offline controls combo boxes """
 
         # --- ComboBoxes ---
         self.offline_sim = QComboBox()
@@ -510,84 +528,99 @@ class MainWindow(QMainWindow):
         self.offline_profile.setEditable(False)
         self.offline_profile.currentTextChanged.connect(self.offline_profile_changed)
 
-        # --- Add widgets to layout ---
-        top_row.addWidget(self.offline_sim, 1, 0)
-        top_row.addWidget(self.offline_class, 1, 1)
-        top_row.addWidget(self.offline_name, 1, 2)
-        top_row.addWidget(self.offline_profile, 1, 3)
+
+        """ Add offline combo box controls to layout """
+
+        offline_grid_layout.addWidget(self.offline_sim, 1, 0)
+        offline_grid_layout.addWidget(self.offline_class, 1, 1)
+        offline_grid_layout.addWidget(self.offline_name, 1, 2)
+        offline_grid_layout.addWidget(self.offline_profile, 1, 3)
 
         # --- Column stretch ratios (1:2:4:2) ---
-        top_row.setColumnStretch(0, 1)
-        top_row.setColumnStretch(1, 2)
-        top_row.setColumnStretch(2, 4)
-        top_row.setColumnStretch(3, 2)
+        offline_grid_layout.setColumnStretch(0, 1)
+        offline_grid_layout.setColumnStretch(1, 2)
+        offline_grid_layout.setColumnStretch(2, 4)
+        offline_grid_layout.setColumnStretch(3, 2)
 
-        offline_layout.addLayout(top_row)
-        # Second row layout (button on the left)
+        offline_layout.addLayout(offline_grid_layout)
+
+
+        """ Add layout for labels/buttons on bottom row of offline config area """
+
         bottom_row = QHBoxLayout()
-        # bottom_row.addStretch()  # push button to the right
+
+
+        """ Create offline scope label """
 
         offline_scope = QLabel("<b>Offline Scope:   </b>")
         self.offline_scope_label = QLabel('None')
+
+
+        """
+        Create 'back to profile manager' button.  Only shows when edit is
+        activated via profile manager
+        """
+
         self.back_to_profile_mgr_button = QPushButton('Back to Profile Manager')
         self.back_to_profile_mgr_button.setVisible(False)
         self.back_to_profile_mgr_button.clicked.connect(self.back_to_profile_mgr)
-        self.offline_button = QPushButton()
-        # self.offline_button.setMaximumWidth(20)
-        self.offline_button.setText('Exit Offline Mode')
-        self.offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
-        # bottom_row.addWidget(self.manual_add_button)
+
+
+        """ Create offline mode exit button """
+
+        self.exit_offline_button = QPushButton()
+        self.exit_offline_button.setText('Exit Offline Mode')
+        self.exit_offline_button.clicked.connect(lambda: self.toggle_offline_mode(False))
+
+
+        """ Add labels/buttons to bottom row layout """
+
         bottom_row.addWidget(offline_scope, alignment=Qt.AlignmentFlag.AlignLeft)
         bottom_row.addWidget(self.offline_scope_label, alignment=Qt.AlignmentFlag.AlignLeft)
         bottom_row.addStretch()
         bottom_row.addWidget(self.back_to_profile_mgr_button, alignment=Qt.AlignmentFlag.AlignRight)
-        bottom_row.addWidget(self.offline_button, alignment=Qt.AlignmentFlag.AlignRight)
-        offline_layout.addLayout(bottom_row)
-        main_layout.addWidget(self.offline_groupbox)
-        main_layout.addLayout(top_row)
-        main_layout.addLayout(bottom_row)
+        bottom_row.addWidget(self.exit_offline_button, alignment=Qt.AlignmentFlag.AlignRight)
 
-        self.offline_config_area.setLayout(main_layout)
+
+        """ Add bottom row to layout """
+
+        offline_layout.addLayout(bottom_row)
+
+
+        """ Add items to layout """
+
+        offline_config_layout.addWidget(self.offline_groupbox)
+        offline_config_layout.addLayout(offline_grid_layout)
+        offline_config_layout.addLayout(bottom_row)
+
+
+        """ Add layout to QWidget """
+
+        self.offline_config_area.setLayout(offline_config_layout)
+
+
+        """ Hide Offline config area (gets shown when it is enabled) """
+
         self.offline_config_area.hide()
+
+
+        """ Add offline panel to main layout """
+
         layout.addWidget(self.offline_config_area)
 
-        self.configmode_group = QButtonGroup()
-        self.cb_joystick = QCheckBox('Joystick')
-        self.cb_pedals = QCheckBox('Pedals')
-        self.cb_collective = QCheckBox('Collective')
-        self.cb_trimwheel = QCheckBox('Trim Wheel')
 
-        self.config_scope_row = QHBoxLayout()
-        self.configmode_group.addButton(self.cb_joystick, 1)
-        self.configmode_group.addButton(self.cb_pedals, 2)
-        self.configmode_group.addButton(self.cb_collective, 3)
-        self.configmode_group.addButton(self.cb_trimwheel, 4)
-        self.configmode_group.buttonClicked.connect(self.change_config_scope)
-        self.config_scope_row.addWidget(self.cb_joystick)
-        self.config_scope_row.addWidget(self.cb_pedals)
-        self.config_scope_row.addWidget(self.cb_collective)
-        self.config_scope_row.addWidget(self.cb_trimwheel)
-        self.cb_joystick.setVisible(False)
-        self.cb_pedals.setVisible(False)
-        self.cb_collective.setVisible(False)
-        self.cb_trimwheel.setVisible(False)
-
-        layout.addLayout(self.config_scope_row)
+        """ Create tab widget where monitor/settings/hide will live """
 
         self.tab_widget = QTabWidget(self)
 
-        # Create a horizontal line widget
-        self.line_widget = QFrame(self)
-        self.line_widget.setFrameShape(QFrame.Shape.HLine)
-        self.line_widget.setFrameShadow(QFrame.Shadow.Sunken)
 
-        # Add the tab widget and line widget to the main layout
+        """ Add the tab widget to the main layout """
+
         layout.addWidget(self.tab_widget, stretch=1)
         layout.setSpacing(0)
-        layout.addWidget(self.line_widget)
 
-        ################
-        #  main scroll area
+
+        """ Create the monitor tab telemetry display panel """
 
         self.monitor_widget = QWidget()
         self.telem_area = QScrollArea()
@@ -595,12 +628,18 @@ class MainWindow(QMainWindow):
         self.telem_area.setWidgetResizable(True)
         self.telem_area.setMinimumHeight(100)
 
+
+        """ Create the active effects display panel """
+
         self.effects_area = QScrollArea()
         self.effects_area.setWidgetResizable(True)
         self.effects_area.setMinimumHeight(100)
-        self.effects_area.setMaximumWidth(200)
 
-        # Create the QLabel widget and set its properties
+        # self.effects_area.setMaximumWidth(200)
+
+
+        """ Create the Telemetry Label widget and set its properties """
+
         self.lbl_telem_data = QLabel()
 
         self.refresh_telem_status()
@@ -613,10 +652,12 @@ class MainWindow(QMainWindow):
             font-family: Cascadia Mono;
         """)
 
-        # Set the QLabel widget as the widget inside the scroll area
+
+        """ Set the QLabel widget as the widget inside the scroll area """
+
         self.telem_area.setWidget(self.lbl_telem_data)
 
-        self.lbl_effects_data = QLabel()
+        self.lbl_effects_data = QLabel("            ")  # Empty space placeholder so splitter weights work
         self.effects_area.setWidget(self.lbl_effects_data)
         self.lbl_effects_data.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.lbl_effects_data.setStyleSheet("""
@@ -624,83 +665,103 @@ class MainWindow(QMainWindow):
             font-family: Cascadia Mono;
         """)
 
-        # Create telemetry header with label and filter
+
+        """ Create telemetry header with label and filter """
+
         telem_header_widget = QWidget()
+        telem_header_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         telem_header_layout = QHBoxLayout(telem_header_widget)
         telem_header_layout.setContentsMargins(0, 0, 0, 0)
         
         self.telem_lbl = QLabel('Telemetry:')
         self.telem_filter = QLineEdit()
+
+
+        """ Add placeholder for the filter """
+
         self.telem_filter.setPlaceholderText("Filter")
         self.telem_filter.setMaximumWidth(100)
-        
+
+
+        """ Add telemetry label and filter placeholder to the layout """
+
         telem_header_layout.addWidget(self.telem_lbl)
         telem_header_layout.addWidget(self.telem_filter)
         telem_header_layout.addStretch()  # Push everything to the left
-        
+
+
+        """ Add Active effects header label """
+
         self.effect_lbl = QLabel('Active Effects:')
         if G.master_instance:
             self.effect_lbl.setText(f'Active Effects for: {G.current_device_config_scope}')
-        
+
+
+        """ Add headers and labels to the monitor layout """
+
         monitor_area_layout.addWidget(telem_header_widget, 0, 0)
         monitor_area_layout.addWidget(self.effect_lbl, 0, 1)
-        monitor_area_layout.addWidget(self.telem_area, 1, 0)
-        monitor_area_layout.addWidget(self.effects_area, 1, 1)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(self.telem_area)
+        splitter.addWidget(self.effects_area)
+        splitter.setStretchFactor(0, 2)  # Wider telemetry
+        splitter.setStretchFactor(1, 3)  # Narrow effects
+        monitor_area_layout.addWidget(splitter, 1, 0, 1, 2)  # Span both columns
 
         self.monitor_widget.setLayout(monitor_area_layout)
-        # Add the scroll area to the layout
+
+
+        """ Add the monitor tab object to the tab widget"""
+
         self.tab_widget.addTab(self.monitor_widget, "Monitor")
 
-        # layout.addWidget(self.monitor_widget)
 
-        # Create a scrollable area
+        """ Create settings scroll area widget that will hold the settings page"""
+
         self.settings_area = NoKeyScrollArea()
-        self.settings_area.setObjectName('theScrollArea')
+        self.settings_area.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.settings_area.setWidgetResizable(True)
 
-        ##############
-        # settings
 
-        # Create a widget to hold the layout
-        scroll_widget = QWidget()
+        """ Create widget to hold the settings layout """
 
-        all_sliders = []
-        scroll_widget.setLayout(self.settings_layout)
+        settings_widget = QWidget()
 
-        self.settings_area.setWidget(scroll_widget)
 
+        """ Create settings layout instance """
+
+        self.settings_layout = SettingsLayout(parent=self, mainwindow=self)
+
+
+        """ Add settings layout to the tab widget """
+
+        settings_widget.setLayout(self.settings_layout)
+        self.settings_area.setWidget(settings_widget)
         self.tab_widget.addTab(self.settings_area, "Settings")
+
+
+        """ Create the Hide tab and set its properties """
 
         self.tab_widget.addTab(QWidget(), "Hide")
         self.tab_widget.currentChanged.connect(self.switch_window_view)
-
         tb_height = self.tab_widget.tabBar().sizeHint().height()
         self.tab_widget.setMinimumHeight(tb_height)
 
 
-        # test buttons
-        show_clear_reload = False
-        if show_clear_reload:
-            test_layout = QHBoxLayout()
-            clear_button = QPushButton('clear')
-            clear_button.clicked.connect(self.settings_layout.clear_layout)
-            test_layout.addWidget(clear_button)
-            self.reload_button = QPushButton('reload')
-            self.reload_button.clicked.connect(self.settings_layout.reload_caller)
-            test_layout.addWidget(self.reload_button)
-            layout.addLayout(test_layout)
+        """ Create central widget to whole the entire layout """
 
         central_widget = QWidget()
         central_widget.setLayout(layout)
         self.setCentralWidget(central_widget)
         self.layout = QVBoxLayout(central_widget)
 
-        # self.instance_status_row = InstanceStatusRow()
-        # self.instance_status_row.changeConfigScope.connect(self.change_config_scope)
-        # self.instance_status_row.hide()
-        # layout.addWidget(self.instance_status_row)
+
+        """ Add status bar to hold version information """
+
         self.status_bar = QStatusBar(self)
-        version_row_layout = QHBoxLayout()
+
+        """ Add version label to the status bar """
+
         self.version_label = QLabel()
 
         if G.release_version:
@@ -720,22 +781,24 @@ class MainWindow(QMainWindow):
 
         self.version_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.firmware_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        # version_row_layout.addWidget(self.version_label)
-        # version_row_layout.addWidget(self.firmware_label)
 
-        # version_row_layout.setAlignment(Qt.AlignmentFlag.AlignBottom)
-        # layout.addLayout(version_row_layout)
         self.status_bar.addWidget(self.firmware_label)
         self.status_bar.addPermanentWidget(self.version_label)
+
+
+        """ Setup hooks to update the telemetry and settings widgets """
 
         G.telem_manager.telemetryReceived.connect(self.on_update_telemetry)
         G.telem_manager.telemetryTimeout.connect(self.on_telemetry_timeout)
         G.telem_manager.aircraftUpdated.connect(self.update_settings)
 
-        central_widget.setLayout(layout)
 
-        # Load Stored Geomoetry
+        """  Load the stored window geometry from users registry keys """
+
         self.load_main_window_geometry()
+
+        """ Add Debug Menu to the menu bar - control visibility with Alt+D shortcut or via debug key in registry """
+
         debug_shortcut = QShortcut(QKeySequence('Alt+D'), self)
         debug_shortcut.activated.connect(self.add_debug_menu)
 
@@ -745,7 +808,10 @@ class MainWindow(QMainWindow):
         if G.system_settings.get('debug', False):
             # debug manu is disabled by default.  change debug = true (1) in registry to permanently enable
             self.add_debug_menu()
-        G.gain_override_dialog = ConfiguratorDialog(self) # create configurator gain dialog for use during TelemFFB session and store object in globals
+
+        """  Create configurator gain dialog for use during TelemFFB session and store object in globals """
+
+        G.gain_override_dialog = ConfiguratorDialog(self)
 
     def get_active_buttons(self):
         input_data = HapticEffect.device.get_input()
@@ -1464,6 +1530,8 @@ class MainWindow(QMainWindow):
 
     def offline_profile_changed(self, profile):
         # self.update_craft_text_block(profile=profile)
+        if not profile:
+            return
         G.settings_mgr.offline_scope = 'MODEL'
         self.resize_offline_combos()
         self.force_sim_aircraft()
@@ -1715,22 +1783,6 @@ class MainWindow(QMainWindow):
 
         elif index == 1:  # Settings Tab
             self.current_tab_index = 1
-            modifiers = QApplication.keyboardModifiers()
-            if (modifiers & QtCore.Qt.KeyboardModifier.ControlModifier) and (modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier):
-                self.cb_joystick.setVisible(True)
-                self.cb_pedals.setVisible(True)
-                self.cb_collective.setVisible(True)
-                self.cb_trimwheel.setVisible(True)
-                match G.device_type:
-                    case 'joystick':
-                        self.cb_joystick.setChecked(True)
-                    case 'pedals':
-                        self.cb_pedals.setChecked(True)
-                    case 'collective':
-                        self.cb_collective.setChecked(True)
-                    case 'trimwheel':
-                        self.cb_trimwheel.setChecked(True)
-
             try:
                 h = self.tab_sizes[str(index)]['height']
                 w = self.tab_sizes[str(index)]['width']

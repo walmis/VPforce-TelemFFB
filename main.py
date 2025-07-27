@@ -79,10 +79,11 @@ from telemffb.ConfiguratorDialog import ConfiguratorDialog
 #from telemffb.LogTailWindow import LogTailWindow
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
-                            set_vpconf_profile)
+                            upload_vpconf_profile)
 from telemffb.namedmutex import NamedMutex
 import styles
 resources # used
+mutex = None
 
 def send_test_message():
     if G.ipc_instance.running:
@@ -125,7 +126,7 @@ def _check_master_instance_mutex():
         "check the task manager for possible hung instances."
     )
     msg_box.setWindowIcon(QIcon(':/image/vpforceicon.png'))
-
+    global mutex
     try:
         mutex = NamedMutex("VPforce_TelemFFB_Master_Instance", acquired=True, timeout=1)
         if not mutex.acquired:
@@ -185,6 +186,12 @@ def _setup_theme_and_styling(app):
     5. Apply custom stylesheets
     """
     theme_setting = G.system_settings.get('themeId', 2)
+
+    if G.args.darkmode:
+        theme_setting = 1
+
+    if G.args.lightmode:
+        theme_setting = 0
 
     match theme_setting:
         case 0: # Light Mode
@@ -540,7 +547,7 @@ def _setup_async_initialization(dev, dev_serial):
 
         if G.system_settings.get('enableVPConfStartup', False):
             try:
-                set_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
+                upload_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
             except Exception:
                 logging.exception("Unable to set VPConfigurator startup profile")
 
@@ -572,7 +579,7 @@ def _cleanup_on_exit(dev_serial):
 
     if G.system_settings.get('enableVPConfExit', False):
         try:
-            set_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
+            upload_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
 
@@ -650,7 +657,10 @@ def main():
     # Setup configuration file paths (dev vs production, userconfig locations)
     _setup_config_paths()
 
+    # if legacy 'userconfig.xml' exists, copy it to 'userconfig_v2' for conversion
     utils.copy_legacy_config_to_new(G.userconfig_path)
+
+    # check if userconfig exists.  If not, create empty one
     utils.create_empty_userxml_file(G.userconfig_path)
 
     # Determine if running from executable or source for logging
@@ -697,16 +707,20 @@ def main():
     G.log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
 
     # ============================================================================
-    # PHASE 7: Settings and Configuration Management
+    # PHASE 7: Convert Legacy userconfig to new format
+    # ============================================================================
+    _convert_user_config()
+
+    # ============================================================================
+    # PHASE 8: Settings and Configuration Management
     # ============================================================================
     # Initialize settings manager with error handling for corrupted configs
-    _convert_user_config()
     _initialize_settings_manager()
 
     logging.info(f"TelemFFB (version {version}) Starting")
 
     # ============================================================================
-    # PHASE 8: Device Connection and Firmware Validation
+    # PHASE 9: Device Connection and Firmware Validation
     # ============================================================================
     # Connect to Rhino FFB device and validate firmware version
     dev, dev_serial, dev_firmware_version = _initialize_device_connection()
@@ -715,7 +729,7 @@ def main():
     _setup_logging_level()
 
     # ============================================================================
-    # PHASE 9: Core Component Initialization
+    # PHASE 10: Core Component Initialization
     # ============================================================================
     # Initialize telemetry manager for handling sim data
     G.telem_manager = TelemManager()
@@ -728,7 +742,7 @@ def main():
     G.main_window = MainWindow()
 
     # ============================================================================
-    # PHASE 10: Inter-Process Communication Setup
+    # PHASE 11: Inter-Process Communication Setup
     # ============================================================================
     # Setup IPC for master-child instance communication and connect all signals
     _setup_ipc_and_connections()
@@ -740,7 +754,7 @@ def main():
     _setup_device_connect_status()
 
     # ============================================================================
-    # PHASE 11: Child Instance Management (Master Only)
+    # PHASE 12: Child Instance Management (Master Only)
     # ============================================================================
     # Launch child instances if this is the master and auto-launch is enabled
     _launch_children()
@@ -762,13 +776,13 @@ def main():
     _check_system_settings_required()
 
     # ============================================================================
-    # PHASE 13: Background Initialization
+    # PHASE 14: Background Initialization
     # ============================================================================
     # Start background tasks that don't block UI appearance
     _setup_async_initialization(dev, dev_serial)
 
     # ============================================================================
-    # PHASE 14: Service Startup and Event Loop
+    # PHASE 15: Service Startup and Event Loop
     # ============================================================================
     # Start all simulation listeners to begin telemetry processing
     G.sim_listeners.start_all()
@@ -777,7 +791,7 @@ def main():
     app.exec()
 
     # ============================================================================
-    # PHASE 15: Cleanup and Shutdown
+    # PHASE 16: Cleanup and Shutdown
     # ============================================================================
     # Perform cleanup operations when application exits
     _cleanup_on_exit(dev_serial)

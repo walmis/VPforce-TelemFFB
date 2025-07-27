@@ -217,6 +217,19 @@ QLabel#StatusLabel:!hover {
     text-decoration: underline; 
     background-color: transparent;
 }
+
+QGroupBox {
+    font-weight: bold;
+    border: 1px solid gray;
+    border-radius: 5px;
+    margin-top: 6px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 3px 0 3px;
+}
 """
 
 LIGHT_MODE_STYLESHEET = """
@@ -397,6 +410,20 @@ QLabel#StatusLabel:!hover {
     text-decoration: underline; 
     background-color: transparent;
 }
+
+QGroupBox {
+    font-weight: bold;
+    border: 1px solid gray;
+    border-radius: 5px;
+    margin-top: 6px;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 10px;
+    padding: 0 3px 0 3px;
+}
+
 """
 
 GROUP_LABEL_STYLESHEET = """

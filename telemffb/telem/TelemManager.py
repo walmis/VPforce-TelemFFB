@@ -35,7 +35,7 @@ import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
 from telemffb.telem.SimConnectManager import SimConnectManager
-from telemffb.utils import set_vpconf_profile
+from telemffb.utils import upload_vpconf_profile
 
 if TYPE_CHECKING:
     from telemffb.sim.aircraft_base import AircraftBase
@@ -367,7 +367,7 @@ class TelemManager(QObject, threading.Thread):
         """Handle VPConf profile setup for the aircraft."""
         if "vpconf" in params:
             if G.current_vpconf_profile != params.get('vpconf', None) or G.force_reload_aircraft_trigger:
-                set_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
+                upload_vpconf_profile(params['vpconf'], HapticEffect.device.serial)
                 G.vpconf_configurator_gains = HapticEffect.device.get_gains()
                 G.force_reload_aircraft_trigger = False
         else:
@@ -379,7 +379,7 @@ class TelemManager(QObject, threading.Thread):
         global_path = G.system_settings.get("pathVPConfStartup", "")
         if load_global and global_path != G.current_vpconf_profile:
             logging.info("Aircraft changed, current loaded vpconf no longer applicable, reloading configured global default profile")
-            set_vpconf_profile(global_path, HapticEffect.device.serial)
+            upload_vpconf_profile(global_path, HapticEffect.device.serial)
             G.vpconf_configurator_gains = HapticEffect.device.get_gains()
 
     def _handle_command_runner(self, params):

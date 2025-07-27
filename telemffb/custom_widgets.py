@@ -39,39 +39,19 @@ vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
 
-class AppStatusWidget(QGroupBox):
+class AppStatusWidget(QWidget):
     def __init__(self, master_instance=True, parent=None):
-        super().__init__("Application Status", parent)
+        super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         self.offline = False
         self.offline_recall_ac = ''
         self.offline_recall_ptn = ''
         self.offline_recall_pro = ''
-        self.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid gray;
-                border-radius: 5px;
-                margin-top: 6px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 3px 0 3px;
-            }
-            QComboBox {
-                margin-left: 10px;
-                padding: 0px;
-            }
-        """)
 
-        outer_layout = QVBoxLayout(self)
-        outer_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        outer_layout.setContentsMargins(10, 18, 10, 28)
-
-        grid = QGridLayout()
+        grid = QGridLayout(self)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        grid.setVerticalSpacing(10)  # consistent spacing
+        grid.setContentsMargins(10, 10, 10, 10)
+        grid.setVerticalSpacing(10)
         grid.setHorizontalSpacing(10)
 
         row = 0
@@ -86,6 +66,7 @@ class AppStatusWidget(QGroupBox):
         self.cur_craft_label = QLabel("None Detected")
         self.cur_pattern_label = QLabel("(No Match)")
         self.active_profile_label = QLabel("(None)")
+
         self.notification_label = QLabel('')
         self.notification_label.setWordWrap(True)
         self.notification_label.setMinimumHeight(60)
@@ -94,25 +75,23 @@ class AppStatusWidget(QGroupBox):
         self.notification_label.setSizePolicy(size_policy)
         self.notification_label.hide()
         self.notification_label.setStyleSheet("""
-                    QLabel {
-                        padding-left: 10px;
-                        padding-top: 2px;
-                        color: #ff6b6b; /* Softer red for dark mode */
-                        background-color: rgba(255, 50, 50, 30); /* Light red background tint */
-                        border: 1px solid #c33;
-                        border-radius: 4px;
-                    }
-                """)
+            QLabel {
+                padding-left: 10px;
+                padding-top: 2px;
+                color: #ff6b6b;
+                background-color: rgba(255, 50, 50, 30);
+                border: 1px solid #c33;
+                border-radius: 4px;
+            }
+        """)
 
         self.offline_label = QLabel('Telemetry is paused while in offline editing mode')
         self.offline_label.setWordWrap(True)
         self.offline_label.setMinimumHeight(60)
-        size_policy = self.offline_label.sizePolicy()
-        size_policy.setRetainSizeWhenHidden(True)
         self.offline_label.setSizePolicy(size_policy)
         self.offline_label.setStyleSheet("""
             QLabel {
-                background-color: rgba(255, 165, 0, 100);  /* Orange-ish translucent */
+                background-color: rgba(255, 165, 0, 100);
                 color: palette(windowText);
                 padding: 6px 10px;
                 font-weight: bold;
@@ -121,13 +100,14 @@ class AppStatusWidget(QGroupBox):
             }
         """)
 
-        # --- Stack the labels ---
+        # Stacked message layout
         self.message_stack = QStackedLayout()
-        self.message_stack.addWidget(QLabel('')) # Index 0
-        self.message_stack.addWidget(self.notification_label)  # index 1
-        self.message_stack.addWidget(self.offline_label)  # index 2
-        self.message_stack.setCurrentIndex(-1)  # Start with nothing visible
+        self.message_stack.addWidget(QLabel(''))  # Index 0
+        self.message_stack.addWidget(self.notification_label)  # Index 1
+        self.message_stack.addWidget(self.offline_label)  # Index 2
+        self.message_stack.setCurrentIndex(-1)
 
+        # Layout content
         grid.addWidget(sim_status_header, row, 0, alignment=label_align)
         grid.addWidget(self.sim_status_label, row, 1, alignment=value_align)
         row += 1
@@ -140,30 +120,25 @@ class AppStatusWidget(QGroupBox):
         grid.addWidget(self.cur_pattern_label, row, 1, alignment=value_align)
         row += 1
 
-        # if master_instance:
         self.cb_selectProfileCombo = QComboBox()
         self.cb_selectProfileCombo.addItems(['Select...'])
-        self.cb_selectProfileCombo.setCurrentIndex(0)
 
         profile_row_layout = QHBoxLayout()
         profile_row_layout.setContentsMargins(0, 0, 0, 0)
         profile_row_layout.setSpacing(6)
         profile_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
         profile_row_layout.addWidget(self.active_profile_label)
         profile_row_layout.addWidget(self.cb_selectProfileCombo)
 
         grid.addWidget(QLabel("Active Profile:"), row, 0, alignment=label_align)
-
         grid.addLayout(profile_row_layout, row, 1)
         row += 1
-        grid.addLayout(self.message_stack, row, 0,3,3)
+
+        grid.addLayout(self.message_stack, row, 0, 1, 2)
 
         if not master_instance:
             self.cb_selectProfileCombo.setDisabled(True)
             self.cb_selectProfileCombo.setVisible(False)
-
-        outer_layout.addLayout(grid)
 
     def reset(self):
         self.offline = False
@@ -290,9 +265,9 @@ class SimStatusWidget(QWidget):
         self.status_label.setVisible(True)
 
         status_color = {
-            "Running": "rgba(0, 200, 0, 100)",   # Green
-            "Paused": "rgba(255, 200, 0, 100)",  # Yellow
-            "Error": "rgba(255, 0, 0, 100)",      # Red
+            "Running": "rgba(0, 200, 0, 150)",   # Green
+            "Paused": "rgba(255, 200, 0, 150)",  # Yellow
+            "Error": "rgba(255, 0, 0, 120)",      # Red
             "Offline": "rgba(128,128,128, 100)",  # Grey
         }.get(status, "rgba(120, 120, 120, 150)")
 
@@ -301,7 +276,6 @@ class SimStatusWidget(QWidget):
             QLabel {{
                 padding: 2px 8px;
                 border-radius: 10px;
-                color: #dddddd;
                 background-color: {status_color};
                 font-weight: bold;
             }}
@@ -359,22 +333,6 @@ class NoKeyScrollArea(QScrollArea):
 
     def addSlider(self, slider):
         self.sliders.append(slider)
-    #
-    # def keyPressEvent(self, event):
-    #     # Forward keypress events to all sliders
-    #     for slider in self.sliders:
-    #         try:
-    #             slider.keyPressEvent(event)
-    #         except:
-    #             pass
-    #
-    # def keyReleaseEvent(self, event):
-    #     # Forward keypress events to all sliders
-    #     for slider in self.sliders:
-    #         try:
-    #             slider.keyReleaseEvent(event)
-    #         except:
-    #             pass
 
 
 class SliderWithLabel(QWidget):

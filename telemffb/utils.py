@@ -75,6 +75,7 @@ from enum import Enum, auto
 import telemffb.globals as G
 import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
+from .namedmutex import NamedMutex
 
 def check_min_firmware_version(dev_firmware_version, min_firmware_version):
     """Check if device firmware version meets minimum requirements."""
@@ -194,11 +195,39 @@ class Interp1D:
         return y_interp if x_new.ndim > 0 else y_interp.item()
 
 class Akima1DInterpolator:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+    """
+        A drop-in replacement for scipy.interpolate.Akima1DInterpolator
+        using the 'akima' package backend, but mimicking SciPy's behavior.
+
+        - No extrapolation by default: returns np.nan for out-of-bounds inputs.
+        - Accepts any input shape (scalar, list, or ndarray).
+        """
+
+    def __init__(self, x, y, extrapolate=False):
+        self.x = np.asarray(x, dtype=float)
+        self.y = np.asarray(y, dtype=float)
+        if len(self.x) != len(self.y):
+            raise ValueError("x and y must have the same length")
+
+        # Must be strictly increasing
+        sort_idx = np.argsort(self.x)
+        self.x = self.x[sort_idx]
+        self.y = self.y[sort_idx]
+
+        self._interp = akima.interpolate
+        self.extrapolate = extrapolate
+
     def __call__(self, x_new):
-        return akima.interpolate(self.x, self.y, x_new)
+        scalar_input = np.isscalar(x_new)
+        x_new = np.atleast_1d(x_new).astype(float)
+
+        y_new = self._interp(self.x, self.y, x_new)
+
+        if not self.extrapolate:
+            out_of_bounds = (x_new < self.x[0]) | (x_new > self.x[-1])
+            y_new = np.where(out_of_bounds, np.nan, y_new)
+
+        return y_new[0] if scalar_input else y_new
 
 
 class Smoother:
@@ -252,6 +281,7 @@ class EffectTranslator:
         "ab_rumble_1_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
         "ab_rumble_2_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
         "ab_rumble_2_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
+        'adv_spr': ["Advanced Spring Override", ""],
         "aoa": ["AoA Effect", "aoa_effect_gain"],
         "ap_spring": ["Autopilot Spring", ""],
         "buffeting": ["AoA\\Stall Buffeting", "buffeting_intensity"],
@@ -346,271 +376,6 @@ class Destroyable:
     def destroy(self):
         raise NotImplementedError
 
-
-class Vector2D:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-    def __str__(self):
-        return f"Vector2D({self.x}, {self.y})"
-
-    def __repr__(self):
-        return self.__str__()
-
-    def __add__(self, other):
-        return Vector2D(self.x + other.x, self.y + other.y)
-
-    def __sub__(self, other):
-        return Vector2D(self.x - other.x, self.y - other.y)
-
-    def __mul__(self, scalar):
-        return Vector2D(self.x * scalar, self.y * scalar)
-
-    def __rmul__(self, scalar):
-        return self.__mul__(scalar)
-
-    def __truediv__(self, scalar):
-        return Vector2D(self.x / scalar, self.y / scalar)
-
-    def magnitude(self):
-        return math.sqrt(self.x ** 2 + self.y ** 2)
-
-    def dot(self, other):
-        return self.x * other.x + self.y * other.y
-
-    def cross(self, other):
-        return self.x * other.y - self.y * other.x
-
-    def to_polar(self):
-        r = self.magnitude()
-        theta_radians = math.atan2(self.y, self.x)
-        return r, theta_radians
-
-    def normalize(self):
-        magnitude = self.magnitude()
-        if magnitude == 0:
-            raise ValueError("Cannot normalize a zero-length vector.")
-        return Vector2D(self.x / magnitude, self.y / magnitude)
-
-
-class Vector:
-    def __init__(self, x, y=0.0, z=0.0):
-        self.x : float
-        self.y : float
-        self.z : float
-        if isinstance(x, list):
-            self.x, self.y, self.z = x
-        else:
-            self.x = x
-            self.y = y
-            self.z = z
-
-    def __eq__(self, p):
-        return self.x == p.x and self.y == p.y and self.z == p.z
-
-    def __add__(self, p):
-        return Vector(self.x + p.x, self.y + p.y, self.z + p.z)
-
-    def __sub__(self, p):
-        return Vector(self.x - p.x, self.y - p.y, self.z - p.z)
-
-    def __unm__(self):
-        return Vector(-self.x, -self.y, -self.z)
-
-    def __iter__(self):
-        return iter((self.x, self.y, self.z))
-
-    def __mul__(self, s):
-        if isinstance(s, Vector):
-            return self.x * s.x + self.y * s.y + self.z * s.z
-        elif isinstance(s, (int, float)):
-            return Vector(self.x * s, self.y * s, self.z * s)
-
-    def __div__(self, s):
-        if isinstance(s, (int, float)):
-            return Vector(self.x / s, self.y / s, self.z / s)
-
-    def __concat__(self, p):
-        return self.x * p.x + self.y * p.y + self.z * p.z
-
-    def __pow__(self, p):
-        return Vector(
-            self.y * p.z - self.z * p.y,
-            self.z * p.x - self.x * p.z,
-            self.x * p.y - self.y * p.x
-        )
-
-    def ort(self):
-        l = self.length()
-        if l > 0:
-            return Vector(self.x / l, self.y / l, self.z / l)
-        else:
-            return self
-
-    def normalize(self):
-        l = self.length()
-        if l > 0:
-            self.x /= l
-            self.y /= l
-            self.z /= l
-
-    def set(self, xx, yy, zz):
-        self.x = xx
-        self.y = yy
-        self.z = zz
-
-    def translate(self, dx, dy, dz):
-        return Vector(self.x + dx, self.y + dy, self.z + dz)
-
-    def __str__(self):
-        return f'({self.x},{self.y},{self.z})'
-
-    def length(self):
-        return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
-
-    def rotZ(self, ang):
-        sina = math.sin(ang)
-        cosa = math.cos(ang)
-        return Vector(self.x * cosa - self.y * sina, self.x * sina + self.y * cosa, self.z)
-
-    def rotX(self, ang):
-        sina = math.sin(ang)
-        cosa = math.cos(ang)
-        return Vector(self.x, self.y * cosa - self.z * sina, self.y * sina + self.z * cosa)
-
-    def rotY(self, ang):
-        sina = math.sin(ang)
-        cosa = math.cos(ang)
-        return Vector(self.z * sina + self.x * cosa, self.y, self.z * cosa - self.x * sina)
-
-    def rotAxis(self, axis, ang):
-        ax = axis.ort()
-        cosa = math.cos(ang)
-        sina = math.sin(ang)
-        versa = 1.0 - cosa
-        xy = ax.x * ax.y
-        yz = ax.y * ax.z
-        zx = ax.z * ax.x
-        sinx = ax.x * sina
-        siny = ax.y * sina
-        sinz = ax.z * sina
-        m10 = ax.x * ax.x * versa + cosa
-        m11 = xy * versa + sinz
-        m12 = zx * versa - siny
-        m20 = xy * versa - sinz
-        m21 = ax.y * ax.y * versa + cosa
-        m22 = yz * versa + sinx
-        m30 = zx * versa + siny
-        m31 = yz * versa - sinx
-        m32 = ax.z * ax.z * versa + cosa
-        return Vector(
-            m10 * self.x + m20 * self.y + m30 * self.z,
-            m11 * self.x + m21 * self.y + m31 * self.z,
-            m12 * self.x + m22 * self.y + m32 * self.z
-        )
-
-
-class TurbulenceModulator:
-    """
-    Simulates atmospheric turbulence effects for force feedback by analyzing wind velocity changes.
-    
-    This class processes relative wind data to generate realistic turbulence forces that can be
-    applied to flight controls. It uses high-pass filtering to detect rapid wind changes and
-    converts them into force magnitude and direction suitable for haptic feedback systems.
-    
-    The turbulence simulation works by:
-    1. Monitoring changes in relative wind velocity (X and Z components)
-    2. High-pass filtering the wind changes to isolate turbulent fluctuations
-    3. Converting wind deltas to force magnitude using configurable sensitivity
-    4. Smoothing the output force to prevent jarring transitions
-    5. Calculating force direction based on wind gust angle
-    
-    Attributes:
-        prev_wind_x (float): Previous frame's wind X-component for delta calculation
-        prev_wind_z (float): Previous frame's wind Z-component for delta calculation  
-        hpf_x (float): High-pass filtered wind change in X direction
-        hpf_z (float): High-pass filtered wind change in Z direction
-        prev_force (float): Previous frame's force output for smoothing
-    """
-    
-    def __init__(self):
-        """
-        Initialize the turbulence modulator with default state.
-        
-        All wind history and filter states are reset to initial values.
-        """
-        self.prev_wind_x = None
-        self.prev_wind_z = None
-        self.hpf_x = 0.0
-        self.hpf_z = 0.0
-        self.prev_force = 0.0
-
-    def update(self, telem_data,
-               turbulence_hpf_alpha=0.95,
-               turbulence_smoothing_alpha=0.3,
-               turbulence_sensitivity=0.5,
-               turbulence_intensity=0.2):
-        """
-        Process telemetry data to generate turbulence force and direction.
-        
-        Args:
-            telem_data (dict): Telemetry data containing 'RelWind' key with [x, y, z] wind vector
-            turbulence_hpf_alpha (float, optional): High-pass filter coefficient (0.0-1.0).
-                Higher values = more aggressive filtering. Defaults to 0.95.
-            turbulence_smoothing_alpha (float, optional): Output smoothing coefficient (0.0-1.0).
-                Higher values = more responsive but less smooth. Defaults to 0.3.
-            turbulence_sensitivity (float, optional): Sensitivity to wind changes (0.0-1.0).
-                Lower values = more sensitive to small changes. Defaults to 0.5.
-            turbulence_intensity (float, optional): Maximum force intensity multiplier (0.0-1.0).
-                Higher values = stronger turbulence effects. Defaults to 0.2.
-        
-        Returns:
-            tuple: (force_magnitude, force_angle)
-                - force_magnitude (float): Normalized force strength (0.0-turbulence_intensity)
-                - force_angle (int): Force direction in degrees (0-359), where 0° is positive X-axis
-        
-        Note:
-            Returns (0.0, 0) if telemetry data is invalid or during initialization.
-            The force angle represents the direction opposite to the wind gust direction,
-            simulating the aircraft's resistance to the turbulent air mass.
-        """
-        try:
-            wind_x = telem_data['RelWind'][0]
-            wind_z = telem_data['RelWind'][2]
-        except (KeyError, IndexError, TypeError):
-            return 0.0, 0
-
-        if self.prev_wind_x is None or self.prev_wind_z is None:
-            self.prev_wind_x = wind_x
-            self.prev_wind_z = wind_z
-            return 0.0, 0
-
-        max_delta = (1.0 - turbulence_sensitivity) * 9.0 + 1.0
-
-        dx = wind_x - self.prev_wind_x
-        dz = wind_z - self.prev_wind_z
-
-        self.hpf_x = turbulence_hpf_alpha * (self.hpf_x + dx)
-        self.hpf_z = turbulence_hpf_alpha * (self.hpf_z + dz)
-
-        self.prev_wind_x = wind_x
-        self.prev_wind_z = wind_z
-
-        delta_mag = math.sqrt(self.hpf_x ** 2 + self.hpf_z ** 2)
-        normalized = min(delta_mag / max_delta, 1.0)
-        target_force = normalized * turbulence_intensity
-
-        smoothed_force = (
-            turbulence_smoothing_alpha * target_force
-            + (1 - turbulence_smoothing_alpha) * self.prev_force
-        )
-        self.prev_force = smoothed_force
-
-        gust_angle = np.degrees(np.arctan2(self.hpf_z, self.hpf_x))
-        force_angle = (gust_angle + 180 + 90 + 360) % 360
-
-        return smoothed_force, int(force_angle)
 
 def archive_logs(directory):
     today = datetime.today().strftime('%Y%m%d')
@@ -1976,6 +1741,13 @@ def convert_legacy_userconfig(path):
 
     root = tree.getroot()
 
+    # Convert legacy root tag
+    new_root = ET.Element("TelemFFB_v2")
+    for child in list(root):
+        new_root.append(child)
+    tree._setroot(new_root)
+    root = new_root
+
     # If already converted (profileMappings exist), exit
     if root.find("profileMappings") is not None:
         return False
@@ -2090,7 +1862,7 @@ def copy_legacy_config_to_new(path):
 def create_empty_userxml_file(path):
     if not os.path.isfile(path):
         # Create an empty XML file with the specified root element
-        root = ET.Element("TelemFFB")
+        root = ET.Element("TelemFFB_v2")
         tree = ET.ElementTree(root)
         # Create a backup directory if it doesn't exist
         if not os.path.exists(os.path.dirname(path)):
@@ -2360,7 +2132,7 @@ def load_custom_userconfig(new_path=""):
         G.ipc_instance.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
 
 
-def set_vpconf_profile(config_filepath, serial):
+def upload_vpconf_profile(config_filepath, serial):
     settings = QSettings("VPforce", "RhinoFFB")
     vpconf_path = settings.value("path")
 
@@ -2377,10 +2149,19 @@ def set_vpconf_profile(config_filepath, serial):
             logging.error(f"VPForce Config Error: ({config_filepath}) - The file failed validation!  Check the PID is correct for the device")
             return
 
-        logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
-
-        subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
+        logging.info(f"upload_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
         G.current_vpconf_profile = config_filepath
+
+        def exec():
+            # Use NamedMutex to ensure only one instance of the configurator is executed at a time
+            # This might help prevent issues with libusb race conditions when configurator tries to enumerate devices
+            with NamedMutex("vpconf_mutex", acquired=True):
+                ret = subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
+                logging.info(f"VPForce Configurator exited with code {ret}")
+
+        thread = threading.Thread(target=exec)
+        thread.start()
+
     else:
         logging.error("Unable to find VPforce Configurator installation location")
 
@@ -2545,6 +2326,11 @@ def check_launch_instance(dev_type :str, master_port : int) -> subprocess.Popen:
             args.append('--minimize')
         if G.system_settings.get(f'startHeadless{dev_type_cap}', False):
             args.append('--headless')
+
+        if G.args.darkmode:
+            args.append('--darkmode')
+        elif G.args.lightmode:
+            args.append('--lightmode')
 
         logging.info("Auto-Launch: starting instance: %s", args)
         proc = ChildPopen(args)

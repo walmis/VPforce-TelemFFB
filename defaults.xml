@@ -355,7 +355,7 @@
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>DCS_IL2_PEDAL_MODE</validvalues>
-		<value>DYNAMIC</value>
+		<value>NONE</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -365,7 +365,7 @@
 		<order>700.3</order>
 		<name>pedal_spring_gain</name>
 		<displayname>Pedal Spring Gain</displayname>
-		<prereq>spring_mode.STATIC.DYNAMIC.CUSTOM</prereq>
+		<prereq>spring_mode.STATIC.DYNAMIC.CUSTOM.FORCETRIM</prereq>
 		<info>Percent of spring setting in VPForce Configurator</info>
 		<DCS>true</DCS>
 		<IL2>true</IL2>
@@ -1833,12 +1833,23 @@
 		<parentgroup>basic</parentgroup>
 		<order>2900</order>
 		<name>pedal_force_trim_enabled</name>
-		<displayname>Pedal Force Trim (Overrides Pedal Mode)</displayname>
+		<displayname>Pedal Force Trim</displayname>
 		<prereq>basic_group</prereq>
 		<info>Enable static spring and allow binding of force trim button for pedals</info>
-		<DCS>true</DCS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2900</order>
+		<name>pedal_force_trim_enabled</name>
+		<displayname>Pedal Force Trim</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<info>Enable static spring and allow binding of force trim button for pedals</info>
+		<DCS>true</DCS>
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
@@ -5218,7 +5229,21 @@
 		<var>L:switchForceTrim</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
-		<classdefaults_DCS>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>DCS</sim>
+			<class>Helicopter</class>
+			<validvalues>DCS_HELI_JOYSTICK_MODE</validvalues>
+			<device>joystick</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>DCS</sim>
+			<class>Helicopter</class>
+			<validvalues>DCS_HELI_PEDAL_MODE</validvalues>
+			<device>pedals</device>
+		</validvalues_overrides>
+<classdefaults_DCS>
 			<name>afterburner_effect_enabled</name>
 			<type>JetAircraft</type>
 			<value>true</value>
@@ -5419,25 +5444,25 @@
 			<device>joystick</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
-			<name>gforce_effect_enable</name>
+			<name>gforce_effect_mode</name>
 			<type>Helicopter</type>
-			<value>false</value>
+			<value>DISABLED</value>
 			<sim>DCS</sim>
-			<device>joystick</device>
+			<device>any</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
-			<name>gforce_effect_enable</name>
+			<name>gforce_effect_mode</name>
 			<type>JetAircraft</type>
-			<value>true</value>
+			<value>LEGACY</value>
 			<sim>DCS</sim>
-			<device>joystick</device>
+			<device>any</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
-			<name>gforce_effect_enable</name>
+			<name>gforce_effect_mode</name>
 			<type>PropellerAircraft</type>
-			<value>true</value>
+			<value>LEGACY</value>
 			<sim>DCS</sim>
-			<device>joystick</device>
+			<device>any</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
 			<name>gforce_effect_max_intensity</name>
@@ -5609,21 +5634,21 @@
 			<device>pedals</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
-			<name>pedal_spring_mode</name>
+			<name>spring_mode</name>
 			<type>Helicopter</type>
 			<value>NOSPRING</value>
 			<sim>DCS</sim>
 			<device>pedals</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
-			<name>pedal_spring_mode</name>
+			<name>spring_mode</name>
 			<type>JetAircraft</type>
 			<value>STATIC</value>
 			<sim>DCS</sim>
 			<device>pedals</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
-			<name>pedal_spring_mode</name>
+			<name>spring_mode</name>
 			<type>PropellerAircraft</type>
 			<value>DYNAMIC</value>
 			<sim>DCS</sim>
@@ -5703,13 +5728,6 @@
 			<name>spoiler_motion_effect_enabled</name>
 			<type>PropellerAircraft</type>
 			<value>false</value>
-			<sim>DCS</sim>
-			<device>any</device>
-		</classdefaults_DCS>
-		<classdefaults_DCS>
-			<name>spring_mode</name>
-			<type>Helicopter</type>
-			<value>DCS_HELI_JOYSTICK_MODE</value>
 			<sim>DCS</sim>
 			<device>any</device>
 		</classdefaults_DCS>
