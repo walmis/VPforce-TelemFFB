@@ -970,6 +970,15 @@ class MainWindow(QMainWindow):
         show_order_action.setCheckable(True)
         debug_menu.addAction(show_order_action)
 
+        show_replaced = QAction("Show settings source", self)
+        def do_toggle_replaced():
+            SettingsLayout.show_replaced = not  SettingsLayout.show_replaced
+            show_order_action.setChecked(SettingsLayout.show_replaced)
+
+        show_order_action.triggered.connect(do_toggle_replaced)
+        show_order_action.setCheckable(True)
+        debug_menu.addAction(show_replaced)
+
 
         show_settingname_action = QAction("Show settings internal name", self)
         def do_toggle_settingsnames():

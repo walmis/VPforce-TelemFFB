@@ -49,6 +49,7 @@ class SettingsLayout(QGridLayout):
     show_col_debug = False      # shows column, span, indent in label tooltip
     show_slider_debug = False   # set to true for slider values shown
     show_order_debug = False    # set to true for order numbers shown
+    show_replaced = True
     show_settings_names = False # show setting internal name instead of displayname
     bump_up = True              # set to false for no row bumping up
 
@@ -469,6 +470,12 @@ class SettingsLayout(QGridLayout):
             order_lbl = QLabel()
             order_lbl.setText(item['order'])
             order_lbl.setMaximumWidth(45)
+            self.addWidget(order_lbl, i, ord_col)
+
+        if self.show_replaced:
+            order_lbl = QLabel()
+            order_lbl.setText(item['replaced'])
+            order_lbl.setMaximumWidth(70)
             self.addWidget(order_lbl, i, ord_col)
 
         # right click erase button to move the setting up in hierarchy
