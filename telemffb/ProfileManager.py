@@ -1418,6 +1418,24 @@ class NewProfileDialog(QDialog):
 
         self.layout.addWidget(self.lineEdit)
 
+        self.layout.addWidget(self.lineEdit)
+
+        # Inline error label (initially hidden)
+        self.error_label = QLabel()
+        self.error_label.setStyleSheet("""
+            QLabel {
+                color: #ff4444;
+                background-color: rgba(255, 80, 80, 30%);
+                border: 1px solid #ff4444;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-weight: bold;
+            }
+        """)
+        self.error_label.setWordWrap(True)
+        self.error_label.setVisible(False)
+        self.layout.addWidget(self.error_label)
+
         self.checkBox = QCheckBox("Make this the active profile")
         self.layout.addWidget(self.checkBox)
 
@@ -1446,16 +1464,24 @@ class NewProfileDialog(QDialog):
             self.combo_clone.setEnabled(True)
 
     def on_profile_name_changed(self, txt):
-        if txt.lower() == 'default':
-            QMessageBox.critical(self, "Error", "'Default' is not a valid profile name.")
+        name = txt.lower().strip()
+        if name == 'default':
+            self.error_label.setText("'Default' is not a valid profile name. You may keep typing to make it unique")
+            self.error_label.setVisible(True)
             self.ok_button.setEnabled(False)
             return
-        if txt.lower() in (item.lower() for item in self.profiles):
-            QMessageBox.critical(self, "Error", f"{txt} conflicts with an existing profile name for this aircraft.")
+        print(f"name: {name}, profiles: {self.profiles}")
+        if name in (item.lower() for item in self.profiles):
+            self.error_label.setText(f"'{txt}' conflicts with an existing profile name for this aircraft.  You may keep typing to make it unique")
+            self.error_label.setVisible(True)
             self.ok_button.setEnabled(False)
             return
-        if txt != '':
+        if name != '':
+            self.error_label.hide()
+            self.error_label.clear()
             self.ok_button.setEnabled(True)
+            self.adjustSize()
+
     def get_data(self):
         """
         Returns:
