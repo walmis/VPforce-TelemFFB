@@ -5955,21 +5955,7 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>collective_ap_spring_gain</name>
-			<type>Helicopter</type>
-			<value>1.0</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>collective_ap_spring_gain</name>
 			<type>HPGHelicopter</type>
-			<value>1.0</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>collective_ap_spring_gain</name>
-			<type>SASHelicopter</type>
 			<value>1.0</value>
 			<sim>MSFS</sim>
 			<device>collective</device>
