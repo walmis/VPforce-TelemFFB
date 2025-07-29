@@ -1019,34 +1019,38 @@ class SettingsLayout(QGridLayout):
         info_icon.addPixmap(info_pixmap)
         info_label = QLabel()
         info_label.setPixmap(info_pixmap)
+        info_label.setVisible(False)
         # info_label.setMaximumSize(25, 25)
         # info_label.setMinimumSize(25, 25)
 
         replace_scope = "model" + " (user)" if not G.settings_mgr.offline_mode else G.settings_mgr.offline_scope.lower() + ' (user)'
         action_item = erase_button
-
+        include_action = False
         if item['replaced'].lower() == replace_scope.lower():
             if item['name'] != 'type':  # dont erase type on mainwindow settings
                 logging.debug(f"show erase {G.settings_mgr.offline_scope}")
-                erase_button.setVisible(True)
                 erase_button.setToolTip("Reset to Default, Right-Click for more options")
                 action_item = erase_button
+                include_action = True
 
         if item['replaced'].lower() == "class (user)" and (not G.settings_mgr.offline_mode or G.settings_mgr.offline_scope.lower() != "class"):
             if item['name'] != 'type':
                 action_item = info_label
-                info_label.setVisible(True)
                 info_label.setToolTip("Class level user override is in use")
                 info_label.setEnabled(False)
+                include_action = True
 
         elif item['replaced'].lower() == "sim (user)"  and (not G.settings_mgr.offline_mode or G.settings_mgr.offline_scope.lower() != "sim"):
             if item['name'] != 'type':
                 action_item = info_label
-                info_label.setVisible(True)
                 info_label.setToolTip("Sim level user override is in use")
                 info_label.setEnabled(False)
+                include_action = True
 
         self.addWidget(action_item, i, erase_col, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        if include_action:
+            action_item.setVisible(True)
 
         self.setRowStretch(i, 0)
 
