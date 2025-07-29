@@ -125,14 +125,26 @@ class SettingsManager(QObject):
         FORCETRIM = auto()
 
     # used for both joystick and pedals
-    MSFS_XP_SPRING_MODE = {
+    MSFS_XP_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.BASIC: "Basic Dynamic",
         SpringModeEnum.CENTER: "Basic Dynamic with Spring Centering",
         SpringModeEnum.FBW: "FlyByWire (FBW)",
         SpringModeEnum.ADVANCED: "Advanced Dynamic"
     }
 
-    DCS_IL2_PEDAL_MODE = {
+    MSFS_XP_PEDAL_SPRING_MODE = {
+        SpringModeEnum.BASIC: "Basic Dynamic",
+        SpringModeEnum.CENTER: "Basic Dynamic with Spring Centering",
+        SpringModeEnum.FBW: "FlyByWire (FBW)",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+
+    MSFS_XP_HELI_PEDAL_SPRING_MODE = {
+        SpringModeEnum.NOSPRING: "No Spring (Free Floating)",
+        SpringModeEnum.FORCETRIM: "Hardware Force Trim",
+    }
+
+    DCS_IL2_PEDAL_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.NOSPRING: "No Spring (Free Floating)",
         SpringModeEnum.STATIC: "Static Spring",
@@ -140,29 +152,22 @@ class SettingsManager(QObject):
         SpringModeEnum.CUSTOM: "Dynamic with Custom Speeds",
         SpringModeEnum.ADVANCED: "Advanced Dynamic"
     }
-    DCS_IL2_JOYSTICK_MODE = {
+    DCS_IL2_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim",
         SpringModeEnum.ADVANCED: "Advanced Dynamic"
     }
 
-    DCS_HELI_JOYSTICK_MODE = {
+    DCS_HELI_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.CUSTOM: "Static Override w/ Hardware Trim"
     }
 
-    DCS_HELI_PEDAL_MODE = {
+    DCS_HELI_PEDAL_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.NOSPRING: "No Spring (Free Floating)",
         SpringModeEnum.STATIC: "Static Spring",
         SpringModeEnum.FORCETRIM: "Hardware Force Trim",
-    }
-
-    TEST_SPRING_MODE = {
-        SpringModeEnum.BASIC: "TEST Dynamic",
-        SpringModeEnum.CENTER: "TEST Dynamic with Spring Centering",
-        SpringModeEnum.ADVANCED: "TEST Advanced Dynamic",
-        SpringModeEnum.FBW: "TEST (FBW)"
     }
 
     class GEffectModeEnum(Enum):

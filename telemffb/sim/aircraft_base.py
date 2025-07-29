@@ -1857,15 +1857,15 @@ class AircraftBase(object):
             self.spring_x.negativeCoefficient = 0
 
         elif self.spring_mode_is(self.SpringModeEnum.STATIC):
-            if self.pedal_force_trim_enabled:
-                if not self._update_pedal_force_trim(telem_data):
-                    spring_coeff = round(utils.clamp((self.pedal_spring_gain *4096), 0, 4096))
-                    self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
-            else:
+            spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
+            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
+            if self.pedal_trimming_enabled and self._sim_is_dcs():
+                self._update_pedal_trim(telem_data)
+
+        elif self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
+            if not self._update_pedal_force_trim(telem_data):
                 spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
                 self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
-                if self.pedal_trimming_enabled and self._sim_is_dcs():
-                    self._update_pedal_trim(telem_data)
 
         elif self.spring_mode_is(self.SpringModeEnum.DYNAMIC) or self.spring_mode_is(self.SpringModeEnum.CUSTOM):
             tas = telem_data.get("TAS", 0)

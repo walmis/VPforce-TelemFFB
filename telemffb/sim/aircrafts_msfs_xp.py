@@ -2019,7 +2019,7 @@ class Helicopter(Aircraft):
                     # dont start sending position until physical pedals have centered
                     self.pedals_init = 1
                     logging.info("Pedals Initialized")
-                    if not self.pedal_force_trim_enabled:
+                    if not self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
                         self._spring_handle.stop()
                 else:
                     if self._sim_is_msfs():
@@ -2031,7 +2031,7 @@ class Helicopter(Aircraft):
                         self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
                     return
 
-            if self.pedal_force_trim_enabled:
+            if self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
                 if not self._spring_handle.started:
                     self._spring_handle.start()
 
