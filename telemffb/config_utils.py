@@ -39,6 +39,7 @@ def convert_system_settings(sys_dict):
         "msfs_enabled": "enableMSFS",
         "dcs_enabled": "enableDCS",
         "il2_enabled": "enableIL2",
+        "bms_enabled": "enableBMS",
         "il2_telem_port": "portIL2",
         "il2_cfg_validation": "validateIL2",
         "il2_path": "pathIL2",

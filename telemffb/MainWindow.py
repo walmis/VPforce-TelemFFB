@@ -980,19 +980,22 @@ class MainWindow(QMainWindow):
         il2_enabled = G.system_settings.get('enableIL2')
         msfs_enabled = G.system_settings.get('enableMSFS')
         xplane_enabled = G.system_settings.get('enableXPLANE')
+        bms_enabled = G.system_settings.get('enableBMS')
 
         # Convert True/False to "enabled" or "disabled"
         dcs_status = "Enabled" if dcs_enabled else "Disabled"
         il2_status = "Enabled" if il2_enabled else "Disabled"
         msfs_status = "Enabled" if msfs_enabled else "Disabled"
         xplane_status = "Enabled" if xplane_enabled else "Disabled"
+        bms_status = "Enabled" if bms_enabled else "Disabled"
 
         self.lbl_telem_data.setText(
             f"Waiting for data...\n\n"
             f"DCS     : {dcs_status}\n"
             f"IL2     : {il2_status}\n"
             f"MSFS    : {msfs_status}\n"
-            f"X-Plane : {xplane_status}\n\n"
+            f"X-Plane : {xplane_status}\n"
+            f"BMS     : {bms_status}\n\n"
             "Enable or Disable in System -> System Settings"
         )
 
