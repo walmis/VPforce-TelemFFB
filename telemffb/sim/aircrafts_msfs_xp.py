@@ -54,17 +54,7 @@ from telemffb.hw.ffb_rhino import (FFBReport_Input, FFBReport_SetCondition,
                                    HapticEffect)
 from telemffb.sim.aircraft_base import AircraftBase, HPFs, LPFs, effects
 from telemffb.utils import Derivative, Dispenser, HighPassFilter, clamp, overrides
-
-deg = 180 / math.pi
-slugft3 = 0.00194032  # SI to slugft3
-rad = 0.0174532925
-ft = 3.28084  # m to ft
-kt = 1.94384  # ms to kt
-kt2ms = 0.514444  # knots to m/s
-ms2kt = 1.943844  # m/s to knot
-vsound = 290.07 # m/s, speed of sound at sea level in ISA condition
-P0 = 101325 # Pa, ISA static pressure at sealevel
-std_air_pressure = 1.225  # kg/m^3
+from telemffb.util.conversions import *
 
 EFFECT_SQUARE = 3
 EFFECT_SINE = 4
@@ -72,8 +62,6 @@ EFFECT_TRIANGLE = 5
 EFFECT_SAWTOOTHUP = 6
 EFFECT_SAWTOOTHDOWN = 7
 turbulence_modulator = TurbulenceModulator()
-
-
 
 
 class Aircraft(AircraftBase):
@@ -271,7 +259,7 @@ class Aircraft(AircraftBase):
 
         self.spring_mode = self.SpringModeEnum.BASIC.name
 
-    def _update_nosewheel_shimmy(self, telem_data):
+    def msfs_update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
         # freq = 8
         freq_lo = 8
@@ -294,7 +282,7 @@ class Aircraft(AircraftBase):
         else:
             effects.dispose("nw_shimmy")
 
-    def update_steering_friction_effect(self, telem_data):
+    def msfs_update_steering_friction_effect(self, telem_data):
         if not self.steering_friction:
             if self.friction_effect_overridden and effects['friction'].name == 'steering_friction':
                 # If effect is disabled but was previously active, clean up and pass override control back to base friction effect
@@ -365,7 +353,7 @@ class Aircraft(AircraftBase):
         #print(f'expo input:{x} k:{k} output:{newvalue}')
         return newvalue
 
-    def _update_turbulence(self):
+    def msfs_update_turbulence(self):
         if self.turbulence_effect_enable:
             force, dir = turbulence_modulator.update(self.telem_data, self.turbulence_hpf_alpha, self.turbulence_smoothing_alpha, self.turbulence_sensitivity, self.turbulence_intensity)
             force = round(force, 4)
@@ -617,7 +605,7 @@ class Aircraft(AircraftBase):
             self._spring_handle.setCondition(self.spring_x)
         self._spring_handle.start()
 
-    def _update_flight_controls(self, telem_data):
+    def msfs_update_flight_controls(self, telem_data):
         # calculations loosely based on FLightGear FFB page:
         # https://wiki.flightgear.org/Force_feedback
         # https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
@@ -1091,7 +1079,7 @@ class Aircraft(AircraftBase):
             self.const_force.constant(rud_force, 270).start()
             self._spring_handle.start()
 
-    def _update_trimwheel(self, telem_data):
+    def msfs_update_trimwheel(self, telem_data):
         if not self.is_trimwheel():
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -1242,7 +1230,7 @@ class Aircraft(AircraftBase):
             self._spring_handle.setCondition(self.spring_y)
             self._spring_handle.start(override=True)
 
-    def _update_stick_shaker(self, telem_data):
+    def msfs_update_stick_shaker(self, telem_data):
         if not self._sim_is_msfs():
             return
 
@@ -1295,7 +1283,7 @@ class Aircraft(AircraftBase):
             logging.info(f"Sending to XPLANE: >>{sendstr}<<")
             self.xplane_axis_override_active = False
 
-    def _override_collective_spring(self):
+    def msfs_override_collective_spring(self):
         """
         Method specifically intended to start a spring with force=0 for use in fixed wing aircraft so it may be stowed
         and kept out of the way
@@ -1337,9 +1325,7 @@ class Aircraft(AircraftBase):
         if self._sim_is_xplane():
             self.toggle_xp_control()
 
-        super().on_telemetry(telem_data)
-
-        if telem_data['src'] == "XPLANE":
+        if self._sim_is_xplane():
             incidence_vec = Vector(telem_data["VelAcf"])
         else:
             incidence_vec = Vector(telem_data["VelWorld"])
@@ -1357,47 +1343,23 @@ class Aircraft(AircraftBase):
         if not "AircraftClass" in telem_data:
             telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
 
+        super().on_telemetry(telem_data)
+
         if self.is_joystick():
-            self._update_turbulence()
+            self.msfs_update_turbulence()
 
         if self.is_trimwheel():
-            self._update_trimwheel(telem_data)
+            self.msfs_update_trimwheel(telem_data)
             return
 
-        hyd_loss = self._update_hydraulic_loss_effect(telem_data)
-        if not hyd_loss: self._update_ffb_forces(telem_data)
-        self._update_stick_shaker(telem_data)
-        self._update_runway_rumble(telem_data)
-        self._update_buffeting(telem_data)
-        self._update_flight_controls(telem_data)
-        self._decel_effect(telem_data)
-        self._update_touchdown_effect(telem_data)
-        if self._sim_is_xplane():
-            self._update_canopy(telem_data.get("CanopyPos", 0))
-        #
-        if self.flaps_motion_intensity > 0:
-            flps = telem_data.get("Flaps", 0)
-            if isinstance(flps, list):
-                flps = max(flps)
+        self.msfs_update_stick_shaker(telem_data)
+        self.msfs_update_flight_controls(telem_data)
 
-            self._update_flaps(flps)
-        retracts = telem_data.get("RetractableGear", 0)
-        if isinstance(retracts, list):
-            retracts = max(retracts)
-        if (self.gear_motion_intensity > 0) and (retracts):
-            gear = max(telem_data.get("Gear", 0))
-            self._update_landing_gear(gear, telem_data.get("IAS"))
-
-        self._aoa_reduction_force_effect(telem_data)
         if self._sim_is_msfs():
-            if self.nosewheel_shimmy and telem_data.get("FFBType") == "pedals" and not telem_data.get("IsTaildragger", 0):
-                self._update_nosewheel_shimmy(telem_data)
+            if self.nosewheel_shimmy and self.is_pedals() and not telem_data.get("IsTaildragger", 0):
+                self.msfs_update_nosewheel_shimmy(telem_data)
             if self.is_pedals():
-                self.update_steering_friction_effect(telem_data)
-
-        self._gforce_effect(telem_data)
-        self.set_deadzone()
-
+                self.msfs_update_steering_friction_effect(telem_data)
 
 
     def on_timeout(self):
@@ -1440,17 +1402,9 @@ class PropellerAircraft(Aircraft):
 
         if self.is_trimwheel():
             return
-
-        self.update_piston_engine_rumble(telem_data)
-        if self._sim_is_msfs():
-            if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-                sp = max(telem_data.get("Spoilers", 0))
-                self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=80*kt2ms, spd_thresh_hi=140*kt2ms )
-        if self._sim_is_xplane():
-            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=80 * kt2ms)
-        self._gforce_effect(telem_data)
+       
         if self.is_collective():
-            self._override_collective_spring()
+            self.msfs_override_collective_spring()
 
 class JetAircraft(Aircraft):
     """Generic Class for Jets"""
@@ -1475,21 +1429,16 @@ class JetAircraft(Aircraft):
         if self.is_trimwheel():
             return
 
-        if self._sim_is_xplane():
-            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=150*kt2ms)
-        if self._sim_is_msfs():
-            if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-                sp = max(telem_data.get("Spoilers", 0))
-                self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=150*kt2ms, spd_thresh_hi=300*kt2ms )
-        self._update_jet_engine_rumble(telem_data)
-        self._gforce_effect(telem_data)
-        self._update_ab_effect(telem_data)
         if self.is_collective():
-            self._override_collective_spring()
+            self.msfs_override_collective_spring()
 
 class TurbopropAircraft(PropellerAircraft):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
+
+        self.spoiler_spd_thresh_low = 120 * kt2ms
+        self.spoiler_spd_thresh_hi = 260 * kt2ms
+        self.speedbrake_speed_thresh = 120 * kt2ms
 
     @overrides(PropellerAircraft)
     def on_telemetry(self, telem_data):
@@ -1502,23 +1451,14 @@ class TurbopropAircraft(PropellerAircraft):
         if self.is_trimwheel():
             return
 
-        if self._sim_is_xplane():
-            self._update_speed_brakes(telem_data.get("SpeedbrakePos", 0), telem_data.get("IAS"), spd_thresh=120*kt2ms)
-        if self._sim_is_msfs():
-            if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-                sp = max(telem_data.get("Spoilers", 0))
-                self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=120*kt2ms, spd_thresh_hi=260*kt2ms )
-        self._gforce_effect(telem_data)
-
-        self._update_jet_engine_rumble(telem_data)
         if self.is_collective():
-            self._override_collective_spring()
+            self.msfs_override_collective_spring()
 
 class GliderAircraft(Aircraft):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
-    def _update_force_trim(self, telem_data, x_axis=True, y_axis=True):
+    def msfs_update_force_trim(self, telem_data, x_axis=True, y_axis=True):
         if not self.force_trim_enabled: 
             return
         
@@ -1626,23 +1566,15 @@ class GliderAircraft(Aircraft):
         telem_data["AircraftClass"] = "GliderAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
+
         if self.is_trimwheel():
             return
 
         if self.force_trim_enabled:
-            self._update_force_trim(telem_data, x_axis=self.aileron_force_trim, y_axis=self.elevator_force_trim)
-        if self._sim_is_msfs():
-            sp = max(telem_data.get("Spoilers", 0))
-        if self._sim_is_xplane():
-            sp = telem_data.get("SpeedbrakePos", 0)
-            if isinstance(sp, list):
-                sp = max(sp)
-        if self.spoiler_motion_intensity > 0 or self.spoiler_buffet_intensity > 0:
-            self._update_spoiler(sp, telem_data.get("IAS"), spd_thresh_low=60*kt2ms, spd_thresh_hi=120*kt2ms )
-        self._gforce_effect(telem_data)
+            self.msfs_update_force_trim(telem_data, x_axis=self.aileron_force_trim, y_axis=self.elevator_force_trim)
 
         if self.is_collective():
-            self._override_collective_spring()
+            self.msfs_override_collective_spring()
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
@@ -1712,18 +1644,12 @@ class Helicopter(Aircraft):
         if self.is_trimwheel():
             return
 
-        self._update_heli_controls(telem_data)
-        self._update_collective(telem_data)
+        self.msfs_update_heli_controls(telem_data)
+        self.msfs_update_collective(telem_data)
         # # self._update_cyclic_trim(telem_data)
-        self._update_pedals(telem_data)
-        self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
-        self._update_jet_engine_rumble(telem_data)
-        self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
-        self._update_vrs_effect(telem_data)
+        self.msfs_update_pedals(telem_data)
 
-        self._gforce_effect(telem_data)
-
-    def _update_heli_controls(self, telem_data):
+    def msfs_update_heli_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
         if self._sim_is_msfs():
             ap_active = telem_data.get("APMaster", 0)
@@ -1981,7 +1907,7 @@ class Helicopter(Aircraft):
         self.cyclic_virtual_trim_y_offs = cyclic_y_trim - (cyclic_y_trim * self.joystick_trim_follow_gain_virtual_y)
 
 
-    def _update_pedals(self, telem_data):
+    def msfs_update_pedals(self, telem_data):
         if telem_data.get("FFBType") != 'pedals':
             return
 
@@ -2035,7 +1961,7 @@ class Helicopter(Aircraft):
                 if not self._spring_handle.started:
                     self._spring_handle.start()
 
-                if not self._update_pedal_force_trim(telem_data):
+                if not self.ac_update_pedal_force_trim(telem_data):
                     spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
                     self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
 
@@ -2068,7 +1994,7 @@ class Helicopter(Aircraft):
                 self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
                 self.last_pos_x_pos = pos_x_pos
 
-    def _update_collective(self, telem_data):
+    def msfs_update_collective(self, telem_data):
         if not self.is_collective():
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -2123,7 +2049,7 @@ class Helicopter(Aircraft):
 
         if self.collective_ft_ovd_enabled:
             self._spring_handle.name = "collective_ft"
-            self.collective_force_trim_override(telem_data, self._spring_handle)
+            self.ac_collective_force_trim_override(telem_data, self._spring_handle)
         else:
             self._spring_handle.name = "collective_ap_spring"
 
@@ -2265,8 +2191,8 @@ class HPGHelicopter(Helicopter):
 
         return result
     
-    def _update_heli_controls(self, telem_data):
-        super()._update_heli_controls(telem_data)
+    def msfs_update_heli_controls(self, telem_data):
+        super().msfs_update_heli_controls(telem_data)
         ffb_type = telem_data.get("FFBType", "joystick")
         ap_active = telem_data.get("APMaster", 0)
         # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
@@ -2385,7 +2311,7 @@ class HPGHelicopter(Helicopter):
         # Trimming is handled by the AFCS integration - override parent class function
         pass
 
-    def _update_pedals(self, telem_data):
+    def msfs_update_pedals(self, telem_data):
 
         if telem_data.get("FFBType") != 'pedals':
             return
@@ -2497,7 +2423,7 @@ class HPGHelicopter(Helicopter):
 
             self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
-    def _update_collective(self, telem_data):
+    def msfs_update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -2629,7 +2555,7 @@ class HPGHelicopter(Helicopter):
                 self._spring_handle.setCondition(self.spring_y)
                 self._spring_handle.start(override=True)
 
-    def _update_vrs_effect(self, telem_data):
+    def ac_update_vrs_effect(self, telem_data):
         vrs_onset = telem_data.get("hpgVRSDatum", 0)
         vrs_certain = telem_data.get("hpgVRSIsInVRS", 0)
 
@@ -2717,8 +2643,8 @@ class SASHelicopter(Helicopter):
 
         return result
 
-    def _update_heli_controls(self, telem_data):
-        super()._update_heli_controls(telem_data)
+    def msfs_update_heli_controls(self, telem_data):
+        super().msfs_update_heli_controls(telem_data)
         ffb_type = telem_data.get("FFBType", "joystick")
         ap_active = telem_data.get("APMaster", 0)
         # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
@@ -2849,11 +2775,11 @@ class FlyInsideHelicopter(Helicopter):
         super().on_telemetry(telem_data)
         self._update_vibration()
 
-    def _calc_etl_effect(self, *args, **kwargs):
+    def ac_calc_etl_effect(self, *args, **kwargs):
         ## effect not used for FI Heli
         pass
 
-    def _update_vrs_effect(self, *args, **kwargs):
+    def ac_update_vrs_effect(self, *args, **kwargs):
         ## effect not used for FI Heli
         pass
 

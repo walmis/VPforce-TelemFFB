@@ -45,8 +45,7 @@ import logging
 import random
 from .aircraft_base import AircraftBase, effects
 import json
-import socket
-
+from telemffb.utils import overrides
 #unit conversions (to m/s)
 knots = 0.514444
 kmh = 1.0/3.6
@@ -140,7 +139,12 @@ class Aircraft(AircraftBase):
         # self.spring = HapticEffect().spring()
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         # self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
-    def _update_cm_weapons(self, telem):
+
+    @overrides(AircraftBase)
+    def ac_update_cm_weapons(self, telem):
+        if not self.il2_shake_master: return
+        if not self.il2_enable_weapons: return
+
         ## IL2 does not deliver telemetry in the same way as DCS.  As a result, modified/different effects logic is required
         canon_rof = 600
         canon_hz = canon_rof/60
@@ -166,15 +170,24 @@ class Aircraft(AircraftBase):
             effects["il2_rockets"].periodic(50, self.il2_rocket_release_intensity, direction, effect_type=EFFECT_SQUARE, duration=80).start(force=True)
         if not self.anything_has_changed("Rockets", rockets, delta_ms=160):
             effects["il2_rockets"].stop()
-    def _update_runway_rumble(self, telem_data):
+
+    @overrides(AircraftBase)
+    def ac_update_runway_rumble(self, telem_data):
+        if not self.il2_shake_master: return
+        if not self.il2_enable_runway_rumble: return
+
         if telem_data.get("TAS") > 1.0 and telem_data.get("AGL") < 10.0 and utils.average(telem_data.get("GearPos")) == 1:
             self.runway_rumble_intensity = self.il2_runway_rumble_intensity
-            super()._update_runway_rumble(telem_data)
+            super().ac_update_runway_rumble(telem_data)
         else:
             self.runway_rumble_intensity = 0
             effects.dispose("runway0", "runway1")
 
-    def _update_buffeting(self, telem_data: dict):
+    @overrides(AircraftBase)
+    def ac_update_buffeting(self, telem_data: dict):
+        if not self.il2_shake_master: return
+        if not self.il2_enable_buffet: return
+
         direction = 90 if self.is_pedals() else 0
         freq = telem_data.get("BuffetFrequency", 0)
         amp = utils.clamp(telem_data.get("BuffetAmplitude", 0) * self.il2_buffeting_factor, 0.0, 1.0)
@@ -186,7 +199,7 @@ class Aircraft(AircraftBase):
         else:
             effects.dispose("il2_buffet", "il2_buffet2")
 
-    def _update_damage(self, telem_data):
+    def il2_update_damage(self, telem_data):
         if not self.damage_effect_enabled or not self.damage_effect_intensity:
             effects.dispose("hit", "damage")
             return
@@ -207,6 +220,7 @@ class Aircraft(AircraftBase):
         elif not self.anything_has_changed("damage", damage, delta_ms=120):
             effects.dispose("damage")
 
+    @overrides(AircraftBase)
     def on_telemetry(self, telem_data : dict):
         ## Generic Aircraft Telemetry Handler
         """when telemetry frame is received, aircraft class receives data in dict format
@@ -220,84 +234,42 @@ class Aircraft(AircraftBase):
             self.stop_state = True
             G.telem_manager.telemetryTimeout.emit(True)
             return
+        
         self.stop_state = False
 
         if telem_data["AircraftClass"] == "unknown":
-            telem_data["AircraftClass"] = "GenericAircraft"#inject aircraft class into telemetry
+            telem_data["AircraftClass"] = "GenericAircraft" #inject aircraft class into telemetry
         self._telem_data = telem_data
 
         if telem_data.get("N") == None:
             return
 
-
+        # call Base class handler
+        super().on_telemetry(telem_data)
         # self._update_focus_loss(telem_data)
-        if self.deceleration_effect_enable:
-            self._decel_effect(telem_data)
+
         if self.damage_effect_intensity > 0:
-            self._update_damage(telem_data)
-        if self.il2_shake_master:
-            if self.il2_enable_buffet:
-                self._update_buffeting(telem_data)
-            if self.il2_enable_runway_rumble:
-                self._update_runway_rumble(telem_data)
-            if self.il2_enable_weapons:
-                self._update_cm_weapons(telem_data)
-        if self.speedbrake_motion_intensity > 0 or self.speedbrake_buffet_intensity > 0:
-            self._update_speed_brakes(telem_data.get("Speedbrakes"), telem_data.get("TAS"))
-        if self.gear_motion_intensity > 0:
-            self._update_landing_gear(telem_data.get("GearPos"), 0)
-        if self.flaps_motion_intensity > 0:
-            self._update_flaps(telem_data.get("Flaps"))
-        if self.is_pedals():
-            self._override_pedal_spring(telem_data)
-
-        self.modify_game_spring()
-        self.set_deadzone()
+            self.il2_update_damage(telem_data)
 
 
+    @overrides(AircraftBase)
     def on_event(self, event, *args):
         logging.info(f"on_event: {event}")
         if event == "Stop":
             effects.clear()
 
-    def on_timeout(self):
-        super().on_timeout()
-
                    
-
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop/WW2 aircraft"""
 
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
 
-
     # run on every telemetry frame
+    @overrides(AircraftBase)
     def on_telemetry(self, telem_data):
-        ## Propeller Aircraft Telemetry Handler
-        if telem_data.get('SimPaused', False) or telem_data.get('MPMenu') or not telem_data.get('Focus', False):
-
-            if not self.stop_state:
-                self.on_timeout()
-            self.stop_state = True
-            G.telem_manager.telemetryTimeout.emit(True)
-            return
-        self.stop_state = False
-
-        if telem_data.get("N") == None:
-            return
-
-
         telem_data["AircraftClass"] = "PropellerAircraft"   #inject aircraft class into telemetry
-
         super().on_telemetry(telem_data)
-
-        self.update_piston_engine_rumble(telem_data)
-        if self.is_joystick():
-            self.override_elevator_droop(telem_data)
-            self._gforce_effect(telem_data)
-
-
 
 class JetAircraft(Aircraft):
     """Generic Class for Jets"""
@@ -306,27 +278,7 @@ class JetAircraft(Aircraft):
     _ab_is_playing = 0
 
       # run on every telemetry frame
+    @overrides(AircraftBase)
     def on_telemetry(self, telem_data):
-        ## Jet Aircraft Telemetry Handler
-        if telem_data.get('SimPaused', False) or telem_data.get('MPMenu') or not telem_data.get('Focus', False):
-
-            if not self.stop_state:
-                self.on_timeout()
-            self.stop_state = True
-            G.telem_manager.telemetryTimeout.emit(True)
-            return
-        self.stop_state = False
-
-        if telem_data.get("N")== None:
-            return
-
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
-
-        self._update_jet_engine_rumble(telem_data)
-
-        if self.is_joystick():
-            self._gforce_effect(telem_data)
-
-
-

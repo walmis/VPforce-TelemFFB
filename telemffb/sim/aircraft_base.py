@@ -21,6 +21,7 @@ import logging
 import time
 import math
 import random
+from telemffb import telem
 import telemffb.utils as utils
 from typing import List, Dict
 # from utils import clamp, HighPassFilter, Derivative, Dispenser
@@ -30,6 +31,7 @@ from telemffb.hw.ffb_rhino import EFFECT_SPRING,EFFECT_DAMPER, EFFECT_INERTIA, E
 from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN
 import telemffb.globals as G
 from telemffb.globals import master_instance, master_buttons
+from telemffb.util.conversions import kt2ms
 
 # by accessing effects dict directly new effects will be automatically allocated
 # example: effects["myUniqueName"]
@@ -57,6 +59,8 @@ EFFECT_SAWTOOTHDOWN = 7
 
 
 class AircraftBase(object):
+    rotor_blade_count = 2
+
     cpO_x = 0
     cpO_y = 0
     aoa_buffet_freq = 13
@@ -79,9 +83,12 @@ class AircraftBase(object):
 
     speedbrake_motion_intensity : float = 0.12      # peak vibration intensity when speed brake is moving, 0 to disable
     speedbrake_buffet_intensity : float = 0.15      # peak buffeting intensity when speed brake deployed,  0 to disable
+    speedbrake_speed_thresh :   float = 80 * kt2ms  # speed threshold for speedbrake to start buffeting
 
     spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
     spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
+    spoiler_spd_thresh_low: float = 80 * kt2ms  # speed threshold for spoilers to start buffeting
+    spoiler_spd_thresh_hi: float = 140 * kt2ms  # speed threshold for spoilers to stop buffeting
 
     aoa_buffeting_enabled: bool = True
     buffeting_intensity : float = 0.2               # peak AoA buffeting intensity  0 to disable
@@ -584,7 +591,7 @@ class AircraftBase(object):
     ######                            ######
     ########################################
 
-    def _update_touchdown_effect(self, telem_data):
+    def ac_update_touchdown_effect(self, telem_data):
         """Generates a g-based force upon landing or as a result of large bumps"""
 
         max_force = 0.5
@@ -613,7 +620,7 @@ class AircraftBase(object):
         effects['touchdown'].constant(force, 180).start()
 
 
-    def _update_runway_rumble(self, telem_data):
+    def ac_update_runway_rumble(self, telem_data):
         """Add wheel based rumble effects for immersion
         Generates bumps/etc on touchdown, rolling, field landing etc
         """
@@ -643,7 +650,7 @@ class AircraftBase(object):
         else:
             effects.dispose("runway0", "runway1")
 
-    def new_gforce_effect(self, telem_data):
+    def _ac_run_new_gforce_effect(self, telem_data):
         """Apply new G-force effects based on aircraft acceleration.
 
         Generates force feedback effects that vary with G-forces experienced by the aircraft.
@@ -727,14 +734,14 @@ class AircraftBase(object):
         effects["new_gforce"].constant(g_factor, direction).start()
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
-    def _gforce_effect(self, telem_data, adv_spr=False):
+    def ac_update_gforce_effect(self, telem_data, adv_spr=False):
         if self.gforce_effect_mode_is(self.GEffectModeEnum.DISABLED):
             effects.dispose('gforce', 'new_gforce')
             return
         if self.gforce_effect_mode_is(self.GEffectModeEnum.NEW):
             # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
             effects.dispose("gforce")
-            self.new_gforce_effect(telem_data)
+            self._ac_run_new_gforce_effect(telem_data)
             return
         else:
             effects.dispose("new_gforce")
@@ -846,7 +853,7 @@ class AircraftBase(object):
             return
 
 
-    def _aoa_reduction_force_effect(self, telem_data):
+    def ac_update_aoa_reduction_force_effect(self, telem_data):
         if not self.aoa_reduction_effect_enabled:
             return
         if self._should_skip_joystick_effect():
@@ -872,7 +879,7 @@ class AircraftBase(object):
             effects.dispose("crit_aoa")
         return
 
-    def _decel_effect(self, telem_data):
+    def ac_update_decel_effect(self, telem_data):
         if not self.deceleration_effect_enable or not self.is_joystick():
             effects.dispose("decel")
             return
@@ -957,7 +964,7 @@ class AircraftBase(object):
         else:
             effects.dispose("decel")
 
-    def _calc_buffeting(self, aoa, speed, telem_data) -> tuple:
+    def _ac_calc_buffeting(self, aoa, speed, telem_data) -> tuple:
         """Calculate buffeting amount and frequency
 
         :param aoa: Angle of attack in degrees
@@ -988,7 +995,7 @@ class AircraftBase(object):
         # todo calc frequency
         return (self.aoa_buffet_freq, airflow_factor * buffeting_factor * self.buffeting_intensity)
 
-    def _update_buffeting(self, telem_data: dict):
+    def ac_update_buffeting(self, telem_data: dict):
         if not self.buffeting_intensity or not self.aoa_buffeting_enabled:
             return
         
@@ -1040,13 +1047,13 @@ class AircraftBase(object):
 
         telem_data["_buffeting"] = mag  # save debug value
 
-    def _update_drag_buffet(self, telem_data: dict, type: str):
+    def ac_update_drag_buffet(self, telem_data: dict, type: str):
         drag_buffet_threshold = 100  # indicated TAS via telemetry
         tas = telem_data.get("TAS", 0)
         if tas < drag_buffet_threshold:
             return 0
 
-    def _update_cm_weapons(self, telem):
+    def ac_update_cm_weapons(self, telem):
         payload = telem.get("PayloadInfo")
         gun = telem.get("Gun")
         flares = telem.get("Flares")
@@ -1071,9 +1078,15 @@ class AircraftBase(object):
                  self.anything_has_changed("Chaff", chaff, delta_ms=160)) or not self.countermeasure_effect_enabled:
             effects["cm"].stop()
 
-    def _update_flaps(self, flapspos):
-
-        # flapspos = data.get("Flaps")
+    def ac_update_flaps(self, telem_data):
+        flapspos = telem_data.get("Flaps")
+        if flapspos is None:
+            flapspos = telem_data.get("flaps_value")
+        if flapspos is None:
+            return
+        
+        if isinstance(flapspos, list):
+            flapspos = max(flapspos)
         if self.anything_has_changed("Flaps", flapspos, delta_ms=100) and self.flaps_motion_intensity > 0 and self.flaps_motion_effect_enabled:
             logging.debug(f"Flaps Pos: {flapspos}")
             direction = 90 if self.is_pedals() else 0
@@ -1081,8 +1094,12 @@ class AircraftBase(object):
         else:
             effects["flapsmovement"].stop(destroy_after=5000)
 
-    def _update_canopy(self, canopypos):
-
+    def ac_update_canopy(self, telem_data):
+        canopypos = telem_data.get("Canopy")
+        if canopypos is None:
+            canopypos = telem_data.get("canopy_value")
+        if canopypos is None:
+            return
         # canopypos = self._telem_data.get("canopy_value", 0)
         if self.anything_has_changed("Canopy", canopypos, delta_ms=100) and self.canopy_motion_intensity > 0 and self.canopy_motion_effect_enabled:
             logging.debug(f"Canopy Pos: {canopypos}")
@@ -1095,7 +1112,23 @@ class AircraftBase(object):
             # stop movement effect
             effects["canopymovement"].stop(destroy_after=5000)
 
-    def _update_landing_gear(self, gearpos, tas):
+    def ac_update_landing_gear(self, telem_data):
+        gearpos = telem_data.get("gear_value", telem_data.get("GearPos", None))
+
+        if self._sim_is_msfs() or self._sim_is_xplane():
+            retracts = telem_data.get("RetractableGear", 0)
+            if isinstance(retracts, list):
+                retracts = max(retracts)
+            if (self.gear_motion_intensity > 0) and (retracts):
+                gearpos = max(telem_data.get("Gear", 0))
+        
+        if gearpos is None:
+            return
+        
+        airspd = telem_data.get("IAS", telem_data.get("TAS", None)) # IAS or TAS ?
+        if airspd is None:
+            return
+        
         if self._sim_is_xplane():
             self.gear_buffet_speed_low = 0.9 * self.telem_data.get("Vle", 10000) #set stupid high in case of telemetry failure
             self.gear_buffet_speed_high = self.gear_buffet_speed_low * 1.3
@@ -1115,21 +1148,31 @@ class AircraftBase(object):
             effects.dispose("gearmovement", "gearmovement2")
 
         # Gear Buffeting Effect
-        if (tas > self.gear_buffet_speed_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
+        if (airspd > self.gear_buffet_speed_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
             # intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
-
-            realtime_intensity = utils.scale(tas, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),(0, self.gear_buffet_intensity)) * gearpos
+            realtime_intensity = utils.scale(airspd, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),(0, self.gear_buffet_intensity)) * gearpos
             effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, 4).start()
             effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, 4).start()
             logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
         else:
             effects.dispose("gearbuffet", "gearbuffet2")
 
-    def _update_speed_brakes(self, spdbrk, tas, spd_thresh=70):
+    def ac_update_speed_brakes(self, telem_data):
         if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
             return
 
+        spd_thresh = self.speedbrake_speed_thresh
+        spdbrk = telem_data.get("SpeedbrakePos")
+        if spdbrk is None:
+            spdbrk = telem_data.get("speedbrakes_value", None)
+
+        if spdbrk is None:
+            return
+
+        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
+        if airspd is None:
+            return
         # Speed brake motion effect
         if self.anything_has_changed("speedbrakes_value", spdbrk, 50) and self.speedbrake_motion_intensity > 0 and self.speedbrake_motion_effect_enabled:
             logging.debug(f"Speedbrake Pos: {spdbrk}")
@@ -1153,29 +1196,29 @@ class AircraftBase(object):
         # Create a temporary telem_data with speedbrake value
         temp_telem = dict(self._telem_data)
         temp_telem['speedbrakes_value'] = spdbrk
-        temp_telem['TAS'] = tas
+        temp_telem['TAS'] = airspd
         self._create_buffeting_effect(temp_telem, config)
 
-    def _update_spoiler(self, spoiler, tas, spd_thresh_low=25, spd_thresh_hi=60):
+    def ac_update_spoilers(self, telem_data):
         if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
             return
 
-        # tas = self._telem_data.get("TAS",0)
-        tas_intensity = utils.clamp_minmax(utils.scale(tas, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
+        spd_thresh_low = self.spoiler_spd_thresh_low
+        spd_thresh_hi  = self.spoiler_spd_thresh_hi
 
-        # spoiler = self._telem_data.get("Spoilers", 0)
+        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
+        if airspd is None:
+            return
+
+        tas_intensity = utils.clamp_minmax(utils.scale(airspd, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
+        spoiler = telem_data.get("Spoilers")
+
         if spoiler == 0 or spoiler == None:
             effects.dispose("spoilermovement", "spoilermovement2")
             return
         # average all spoiler values together
         if isinstance(spoiler, list):
-            if "F-14" in self._telem_data.get("N") and self._telem_data.get('src') == 'DCS':
-                # give %85 weight to inner spoilers for intensity calculation
-                spoiler_inner = (spoiler[1], spoiler[2])
-                spoiler_outer = (spoiler[0], spoiler[3])
-                spoiler = (0.85 * sum(spoiler_inner) + 0.15 * sum(spoiler_outer)) / 2
-            else:
-                spoiler = sum(spoiler) / len(spoiler)
+            spoiler = sum(spoiler) / len(spoiler)
 
         if self.spoiler_motion_intensity > 0 and self.spoiler_motion_intensity > 0 and self.spoiler_motion_effect_enabled:
             if self.anything_has_changed("Spoilers", spoiler, delta_ms=50):
@@ -1187,7 +1230,7 @@ class AircraftBase(object):
                 for effect in ["spoilermovement", "spoilermovement2"]:
                     effects[effect].stop(1000)
 
-        if tas > spd_thresh_low and spoiler > .1 and self.spoiler_buffet_intensity > 0 and self.spoiler_buffet_effect_enabled:
+        if airspd > spd_thresh_low and spoiler > .1 and self.spoiler_buffet_intensity > 0 and self.spoiler_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
             realtime_intensity = self.spoiler_buffet_intensity * spoiler * tas_intensity
             logging.debug(f"PLAYING SPOILER RUMBLE | intensity: {realtime_intensity}, d-factor: {spoiler}, s-factor: {tas_intensity}")
@@ -1199,7 +1242,7 @@ class AircraftBase(object):
             for effect in ["spoilerbuffet1-1", "spoilerbuffet1-2", "spoilerbuffet2-1", "spoilerbuffet2-2"]:
                 effects[effect].stop(1000)
 
-    def _update_tailhook_effect(self, telem_data):
+    def ac_update_tailhook_effect(self, telem_data):
         """
         Tailhook motion effect:
             Checks for presense of Tailhook telemetery and type of device.  If effect disabled or intensty set to 0,
@@ -1228,7 +1271,7 @@ class AircraftBase(object):
             # stop the effect
             effects.dispose("hookmovement")
 
-    def _update_fuelboom_effect(self, telem_data):
+    def ac_update_fuelboom_effect(self, telem_data):
         """Fuel Boom motion effect using generic motion effect handler."""
         config = {
             'telem_key': 'FuelBoom',
@@ -1245,7 +1288,7 @@ class AircraftBase(object):
         }
         self._create_motion_effect(telem_data, config)
 
-    def _update_wingfold_effect(self, telem_data):
+    def ac_update_wingfold_effect(self, telem_data):
         """Wing Fold motion effect using generic motion effect handler."""
         config = {
             'telem_key': 'WingFold',
@@ -1265,7 +1308,7 @@ class AircraftBase(object):
         }
         self._create_motion_effect(telem_data, config)
 
-    def _update_wind_effect(self, telem_data):
+    def ac_update_wind_effect(self, telem_data):
         if not self.is_joystick(): return
         if not self.wind_effect_enabled:
             effects.dispose("wnd")
@@ -1284,7 +1327,7 @@ class AircraftBase(object):
         logging.debug(f"Adding wind effect intensity:{v}")
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
-    def _update_hydraulic_loss_effect(self, telem_data):
+    def ac_update_hydraulic_loss_effect(self, telem_data):
 
         telem_data['_hyd_factor'] = self.hydraulic_factor
 
@@ -1353,7 +1396,7 @@ class AircraftBase(object):
 
         return True
 
-    def _update_ffb_forces(self, telem_data):
+    def ac_update_ffb_forces(self, telem_data):
 
         if self.enable_damper_ovd:
             if self.anything_has_changed('damper_value', self.damper_force) or not effects['damper'].started:
@@ -1386,7 +1429,7 @@ class AircraftBase(object):
     ######                            ######
     ########################################
 
-    def override_elevator_droop(self, telem_data):
+    def ac_override_elevator_droop(self, telem_data):
         if not self.is_joystick():
             return
         if not self.elevator_droop_enabled or not self.elevator_droop_force:
@@ -1400,9 +1443,11 @@ class AircraftBase(object):
         else:
             effects.dispose('elev_droop')
 
-    def _update_aoa_effect(self, telem_data, minspeed=50*kmh, maxspeed=140*kmh):
+    def ac_update_aoa_effect(self, telem_data, minspeed=50*kmh, maxspeed=140*kmh):
+        if not self.aoa_effect_enabled: return
         if not self.is_joystick(): return
         if self.spring_mode_is(self.SpringModeEnum.FBW) or telem_data.get("ACisFBW"): return
+
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
         local_stall_aoa = self.stall_aoa
@@ -1421,7 +1466,7 @@ class AircraftBase(object):
             logging.debug(f"AOA EFFECT:{mag}")
             effects["aoa"].constant(mag, dir).start()
 
-    def update_piston_engine_rumble(self, telem_data):
+    def ac_update_piston_engine_rumble(self, telem_data):
         if not self.engine_prop_rumble_enabled:
             effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
             return
@@ -1457,7 +1502,7 @@ class AircraftBase(object):
 
         if frequency > 0:
             force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
-            dynamic_rumble_intensity = utils.clamp(self._calc_engine_intensity(rpm), 0, force_limit)
+            dynamic_rumble_intensity = utils.clamp(self.ac_calc_engine_intensity(rpm), 0, force_limit)
             logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
 
             effects["prop_rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()  # vib on X axis
@@ -1467,7 +1512,7 @@ class AircraftBase(object):
         else:
             effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
 
-    def _calc_engine_intensity(self, rpm) -> float:
+    def ac_calc_engine_intensity(self, rpm) -> float:
         """
         Calculate the intensity to use based on the configurable high and low intensity settings and high and low RPM settings
         intensity will decrease from max to min settings as the RPM increases from min to max settings
@@ -1495,7 +1540,7 @@ class AircraftBase(object):
     ######    Jet Aircraft Effects    ######
     ######                            ######
     ########################################
-    def _update_ab_effect(self, telem_data):
+    def ac_update_ab_effect(self, telem_data):
         if not self.afterburner_effect_intensity or not self.afterburner_effect_enabled:
             effects.dispose("ab_rumble_1_1", "ab_rumble_2_1")
             return
@@ -1529,7 +1574,7 @@ class AircraftBase(object):
             effects.dispose("ab_rumble_2_1")
             # effects.dispose("ab_rumble_2_2")
 
-    def _update_jet_engine_rumble(self, telem_data):
+    def ac_update_jet_engine_rumble(self, telem_data):
         if not self.engine_jet_rumble_enabled or not self.jet_engine_rumble_intensity > 0:
             effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
             return
@@ -1573,7 +1618,7 @@ class AircraftBase(object):
     ######                            ######
     ########################################
 
-    def _calc_etl_effect(self, telem_data, blade_ct=None):
+    def ac_calc_etl_effect(self, telem_data, blade_ct=None):
         #  rotor = 245
         mod = telem_data.get("N")
         tas = telem_data.get("TAS", 0)
@@ -1621,7 +1666,7 @@ class AircraftBase(object):
         else:
             effects.dispose("overspeedX", "overspeedY")
 
-    def _update_vrs_effect(self, telem_data):
+    def ac_update_vrs_effect(self, telem_data):
         vs = telem_data.get("VerticalSpeed", 0)
         if self._sim_is_dcs():
             # spd = abs(telem_data.get("VlctVectors")[0])
@@ -1652,7 +1697,7 @@ class AircraftBase(object):
         else:
             effects.dispose("vrs_buffet", "vrs_buffet2")
 
-    def _update_heli_engine_rumble(self, telem_data, blade_ct=None):
+    def ac_update_heli_engine_rumble(self, telem_data, blade_ct=None):
         if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:
             effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
             return
@@ -1710,13 +1755,13 @@ class AircraftBase(object):
             input_data = HapticEffect.device.get_input()
             return input_data.isButtonPressed(button)
 
-    def _update_pedal_trim(self, telem_data):
+    def ac_update_pedal_trim(self, telem_data):
         """Update the pedal trim effect based on telemetry data and user input.
         This method should be overridden in subclasses to implement specific pedal trim logic.
         """
         pass
 
-    def _update_pedal_force_trim(self, telem_data):
+    def ac_update_pedal_force_trim(self, telem_data):
         if not self.is_pedals(): return
 
         input_data = HapticEffect.device.get_input()
@@ -1758,7 +1803,7 @@ class AircraftBase(object):
             return True
         return False
 
-    def _override_pedal_spring(self, telem_data):
+    def ac_override_pedal_spring(self, telem_data):
         if not self.is_pedals(): return
 
         input_data = HapticEffect.device.get_input()
@@ -1777,10 +1822,10 @@ class AircraftBase(object):
             spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
             self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
             if self.pedal_trimming_enabled and self._sim_is_dcs():
-                self._update_pedal_trim(telem_data)
+                self.ac_update_pedal_trim(telem_data)
 
         elif self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
-            if not self._update_pedal_force_trim(telem_data):
+            if not self.ac_update_pedal_force_trim(telem_data):
                 spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
                 self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
 
@@ -1803,7 +1848,7 @@ class AircraftBase(object):
             self.spring_x.positiveCoefficient = spr_coeff
             self.spring_x.negativeCoefficient = spr_coeff
             if self.pedal_trimming_enabled and self._sim_is_dcs():
-                self._update_pedal_trim(telem_data)
+                self.ac_update_pedal_trim(telem_data)
             # return
         spring = effects["pedal_spring"].spring()
         damper_coeff = round(utils.clamp((self.pedal_dampening_gain * 4096), 0, 4096))
@@ -1812,7 +1857,7 @@ class AircraftBase(object):
         spring.setCondition(self.spring_x)
         spring.start(override=True)
 
-    def collective_force_trim_override(self, telem_data, spring):
+    def ac_collective_force_trim_override(self, telem_data, spring):
         '''
         Generic effect enabling spring force and hardware trim for collective axis.
         '''
@@ -1895,7 +1940,7 @@ class AircraftBase(object):
         # ensure spring is started with override = true
         spring.start(override=True)
 
-    def modify_game_spring(self):
+    def ac_modify_game_spring(self):
         if not self.spring_mode_is(self.SpringModeEnum.ADVANCED):
             self.spring_adjuster.stop()
             return
@@ -1942,7 +1987,7 @@ class AircraftBase(object):
             self.override_spring_cp0_x = round(utils.clamp(self.override_spring_cp0_x, -4096, 4096))
             self.override_spring_cp0_y = round(utils.clamp(self.override_spring_cp0_y, -4096, 4096))
 
-        offset = self._gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
+        offset = self.ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
         self.g_y_offset = offset if offset is not None else 0
         self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]
         self.spring_adjuster_y.cpOffset = round(self.override_spring_cp0_y + self.g_y_offset)
@@ -1952,7 +1997,7 @@ class AircraftBase(object):
         self.spring_adjuster.setCondition(self.spring_adjuster_x)
         self.spring_adjuster.start()
 
-    def set_deadzone(self):
+    def ac_set_deadzone(self):
         if not self.enable_deadzone:
             if self.active_deadzone_pct != 0.0:
                 HapticEffect.device.set_deadzone(0)
@@ -1982,7 +2027,59 @@ class AircraftBase(object):
             effect.stop()
 
     def on_telemetry(self, telem_data): 
-        pass
+        aircraft_type = telem_data.get("AircraftType", "Unknown")
+
+        # the methods should decide if they want to run based on the telemetry data
+        if aircraft_type == "JetAircraft":
+            self.ac_update_ab_effect(telem_data)
+
+        elif aircraft_type == "PropellerAircraft":
+            self.ac_update_piston_engine_rumble(telem_data)
+
+        self.ac_update_aoa_reduction_force_effect(telem_data)
+        self.ac_update_gforce_effect(telem_data)
+        self.ac_update_wind_effect(telem_data)
+        self.ac_update_jet_engine_rumble(telem_data)
+
+        if aircraft_type == "Helicopter":
+            self.ac_calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
+            self.ac_update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
+            self.ac_update_vrs_effect(telem_data)
+        else:
+            # not helicopter
+            vs0 = self.aircraft_vs_speed
+            vne = self.aircraft_vne_speed
+            # print(f"Got Vs0={vs0}, Vne={vne}")
+            self.ac_update_aoa_effect(telem_data, minspeed=vs0, maxspeed=vne)
+
+        if self.is_joystick():
+            self.ac_override_elevator_droop(telem_data)
+
+        if self.is_pedals():
+            self.ac_override_pedal_spring(telem_data)
+
+        self.ac_update_buffeting(telem_data)
+        self.ac_update_cm_weapons(telem_data)
+
+        hyd_loss = self.ac_update_hydraulic_loss_effect(telem_data)
+        if not hyd_loss: 
+            self.ac_update_ffb_forces(telem_data)
+        
+        self.ac_modify_game_spring()
+        self.ac_set_deadzone()
+
+        self.ac_update_tailhook_effect(telem_data)
+        self.ac_update_fuelboom_effect(telem_data)
+        self.ac_update_wingfold_effect(telem_data)
+        self.ac_update_touchdown_effect(telem_data)
+        self.ac_update_runway_rumble(telem_data)
+        self.ac_update_decel_effect(telem_data)
+
+        self.ac_update_speed_brakes(telem_data)
+        self.ac_update_landing_gear(telem_data)
+        self.ac_update_flaps(telem_data)
+        self.ac_update_canopy(telem_data)
+        self.ac_update_spoilers(telem_data)
 
     # Helper methods for code reuse
     def _get_random_direction(self):
