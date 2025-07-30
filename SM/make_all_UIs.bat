@@ -1,4 +1,4 @@
-pyuic6 system_settings.ui -o ../telemffb/ui/Ui_SystemDialog.py
+pyuic6 system_settings_new.ui -o ../telemffb/ui/Ui_SystemDialog.py
 pyuic6 teleplot.ui -o ../telemffb/ui/Ui_TeleplotDialog.py
 pyuic6 settingswindow.ui -o ../telemffb/ui/Ui_SettingsWindow.py
 pyuic6 new_aircraft_wizard.ui -o ../telemffb/ui/Ui_NewAircraftWizard.py
