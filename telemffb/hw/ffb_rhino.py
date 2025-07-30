@@ -251,7 +251,33 @@ class FFBReport_SetCondition(BaseStructure):
                ]
     _defaults_ = { "reportId": HID_REPORT_ID_SET_CONDITION }
 
-    def set_coefficient(self, coefficient: (int|float)):
+    def set_offset(self, offset: (int|float)) -> None:
+        """
+        Set the center position offset for the FFB device.
+        
+        This method sets the center position offset which adjusts the neutral position
+        of the force feedback device. The offset can be provided as either an integer
+        or float value.
+        
+        Args:
+            offset (int | float): The offset value to set. If provided as a float,
+                it will be scaled by 4096 and rounded to the nearest integer.
+                The final value is clamped to the range [-4096, 4096].
+        
+        Returns:
+            None
+        
+        Note:
+            - Float values are automatically converted to integer by multiplying by 4096
+            - The offset is automatically clamped to prevent values outside the valid range
+            - The processed offset is stored in the cpOffset attribute
+        """
+        if isinstance(offset, float):
+            offset = round(offset * 4096)
+        offset = utils.clamp(offset, -4096, 4096)
+        self.cpOffset = offset
+
+    def set_coefficient(self, coefficient: (int|float), clamp: bool = True) -> None:
         """
         Sets the positive and negative coefficients based on the input coefficient value.
 
@@ -262,7 +288,9 @@ class FFBReport_SetCondition(BaseStructure):
             None
         """
         if isinstance(coefficient, float):
-            coefficient: int = int(coefficient * 4096)
+            coefficient = round(coefficient * 4096)
+        if clamp:
+            coefficient = utils.clamp(coefficient, 0, 4096)
         self.positiveCoefficient = coefficient
         self.negativeCoefficient = coefficient
 

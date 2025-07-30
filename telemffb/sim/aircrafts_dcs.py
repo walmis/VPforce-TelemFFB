@@ -254,8 +254,8 @@ class Aircraft(AircraftBase):
 
         # self.damper = effects["collective_damper"].damper()
         if not self.force_disable_collective_gain:
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
-            self.spring_y.cpOffset = 0
+            self.spring_y.set_coefficient(1.0)
+            self.spring_y.set_offset(0)
             self.spring.setCondition(self.spring_y)
             self.spring.start(override=True)
             return
@@ -266,7 +266,7 @@ class Aircraft(AircraftBase):
         if not self.collective_init:
             self.spring = effects["collective_ap_spring"].spring()
 
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
+            self.spring_y.set_coefficient(1.0)
             if max(telem_data.get("WeightOnWheels")):
                 self.cpO_y = 4096
             elif self.last_collective_y is None:
@@ -275,7 +275,7 @@ class Aircraft(AircraftBase):
             else:
                 self.cpO_y = round(4096 * self.last_collective_y)
 
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.set_offset(self.cpO_y)
 
             self.spring.setCondition(self.spring_y)
             # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
@@ -295,10 +295,10 @@ class Aircraft(AircraftBase):
         else:
             self.spring.name = "collective_ap_spring"
             self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.set_offset(self.cpO_y)
 
             # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
+            self.spring_y.set_coefficient(0)
 
             self.spring.setCondition(self.spring_y)
             self.spring.start(override=True)
@@ -339,10 +339,8 @@ class Aircraft(AircraftBase):
         telem_data["X"] = x
         telem_data["Y"] = y
 
-        self.spring_x.positiveCoefficient = 4096
-        self.spring_x.negativeCoefficient = 4096
-        self.spring_y.positiveCoefficient = 4096
-        self.spring_y.negativeCoefficient = 4096
+        self.spring_x.set_coefficient(1.0)
+        self.spring_y.set_coefficient(1.0)
 
         # trim signal needs to be slow to avoid positive feedback
         lp_y = LPFs.get("y", 5)
@@ -351,9 +349,9 @@ class Aircraft(AircraftBase):
         # estimate trim from real stick position and virtual stick position
         offs_x = lp_x.update(telem_data['StickX'] - x + lp_x.value)
         offs_y = lp_y.update(telem_data['StickY'] - y + lp_y.value)
-        
-        self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
-        self.spring_y.cpOffset = utils.clamp_minmax(round(offs_y * 4096), 4096)
+
+        self.spring_x.set_offset(offs_x)
+        self.spring_y.set_offset(offs_y)
 
         spring = effects["trim_spring"].spring()
         # upload effect parameters to stick
@@ -437,8 +435,8 @@ class Aircraft(AircraftBase):
                 return
 
         coeff = int(self.cp_spr_override_spring_gain * 4096)
-        self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = coeff
-        self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = coeff
+        self.spring_x.set_coefficient(coeff)
+        self.spring_y.set_coefficient(coeff)
         effects['cp_ovd_spring'].spring(coeff, coeff).start(override=True)
         self.cp_spr_override_active = True
 
@@ -472,17 +470,14 @@ class Aircraft(AircraftBase):
                 # as it is moved while spring force is enabled.
                 # return from method so default spring gains do not get applied at the end of the method
                 gain = int (self.override_spring_tr_damper * 4096)
-                self.spring_x.positiveCoefficient = gain
-                self.spring_x.negativeCoefficient = gain
-
-                self.spring_y.positiveCoefficient = gain
-                self.spring_y.negativeCoefficient = gain
+                self.spring_x.set_coefficient(gain)
+                self.spring_y.set_coefficient(gain)
 
                 self.override_spring_cp0_x = round(x * 4096)
-                self.spring_x.cpOffset = self.override_spring_cp0_x
+                self.spring_x.set_offset(self.override_spring_cp0_x)
 
                 self.override_spring_cp0_y = round(y * 4096)
-                self.spring_y.cpOffset = self.override_spring_cp0_y
+                self.spring_y.set_offset(self.override_spring_cp0_y)
                 spring.setCondition(self.spring_x)
                 spring.setCondition(self.spring_y)
                 spring.start(override=True)
@@ -540,8 +535,8 @@ class Aircraft(AircraftBase):
         self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y)]
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
-        self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = int(self.override_spring_gain * 4096)
-        self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = int(self.override_spring_gain * 4096)
+        self.spring_x.set_coefficient(self.override_spring_gain)
+        self.spring_y.set_coefficient(self.override_spring_gain)
 
         spring.setCondition(self.spring_x)
         spring.setCondition(self.spring_y)
@@ -626,11 +621,10 @@ class Helicopter(Aircraft):
 
         if force_trim_pressed:
             x, y = input_data.axisXY()
-            coeff = int(self.dcs_tr_damper_force * 4096)
-            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = coeff
-            self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = coeff
-            self.spring_x.cpOffset = int(x * 4096)
-            self.spring_y.cpOffset = int(y * 4096)
+            self.spring_x.set_coefficient(self.dcs_tr_damper_force)
+            self.spring_y.set_coefficient(self.dcs_tr_damper_force)
+            self.spring_x.set_offset(x)
+            self.spring_y.set_offset(y)
 
             # tr_spring = effects['TR Damper'].spring(coeff, coeff)
             self.spring.setCondition(self.spring_x)

@@ -759,8 +759,7 @@ def sock_readable(s) -> bool:
 
 
 def clamp(n, minn, maxn):
-    return sorted((minn, n, maxn))[1]
-
+    return type(n)(sorted((minn, n, maxn))[1])
 
 def clamp_minmax(n, max):
     return clamp(n, -max, max)

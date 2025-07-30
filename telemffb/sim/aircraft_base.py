@@ -1780,18 +1780,17 @@ class AircraftBase(object):
         #
         #     trim_reset_pressed = input_data.isButtonPressed(self.pedal_ft_reset_button) if self.pedal_ft_reset_button else False
         if force_trim_pressed:
-
             if self.pedal_ft_damper_enabled:
-                self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = round(self.pedal_ft_damper_force * 4096)
+                self.spring_x.set_coefficient(self.pedal_ft_damper_force)
             else:
-                self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = 0
+                self.spring_x.set_coefficient(0)
 
             self.cpO_x = round(phys_x * 4096)
             self.spring_x.cpOffset = self.cpO_x
             return True
 
         if trim_reset_pressed or not self.pedal_trim_reset_complete:
-            self.spring_x.negativeCoefficient = self.spring_x.positiveCoefficient = 4096
+            self.spring_x.set_coefficient(4096)
             self.cpO_x = self.step_value_over_time("center_x", self.cpO_x, 1000, 0)
 
             self.spring_x.cpOffset = self.cpO_x
@@ -1815,19 +1814,18 @@ class AircraftBase(object):
             return
 
         if self.spring_mode_is(self.SpringModeEnum.NOSPRING):
-            self.spring_x.positiveCoefficient = 0
-            self.spring_x.negativeCoefficient = 0
+            self.spring_x.set_coefficient(0)
 
         elif self.spring_mode_is(self.SpringModeEnum.STATIC):
-            spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
-            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
+            spring_coeff = utils.clamp(self.pedal_spring_gain, 0, 1.0)
+            self.spring_x.set_coefficient(spring_coeff)
             if self.pedal_trimming_enabled and self._sim_is_dcs():
                 self.ac_update_pedal_trim(telem_data)
 
         elif self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
             if not self.ac_update_pedal_force_trim(telem_data):
-                spring_coeff = round(utils.clamp((self.pedal_spring_gain * 4096), 0, 4096))
-                self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = spring_coeff
+                spring_coeff = utils.clamp(self.pedal_spring_gain, 0, 1.0)
+                self.spring_x.set_coefficient(spring_coeff)
 
         elif self.spring_mode_is(self.SpringModeEnum.DYNAMIC) or self.spring_mode_is(self.SpringModeEnum.CUSTOM):
             tas = telem_data.get("TAS", 0)
@@ -1845,8 +1843,7 @@ class AircraftBase(object):
             spr_coeff = round(spr_coeff * self.pedal_spring_gain)
             spr_coeff = utils.clamp(spr_coeff, 0, 4096)
             # print(f"coeff={spr_coeff}")
-            self.spring_x.positiveCoefficient = spr_coeff
-            self.spring_x.negativeCoefficient = spr_coeff
+            self.spring_x.set_coefficient(spr_coeff)
             if self.pedal_trimming_enabled and self._sim_is_dcs():
                 self.ac_update_pedal_trim(telem_data)
             # return
@@ -1887,8 +1884,7 @@ class AircraftBase(object):
             # return from method so default spring gains do not get applied at the end of the method
             gain = int(self.collective_ft_ovd_tr_damper * 4096)
 
-            self.spring_y.positiveCoefficient = gain
-            self.spring_y.negativeCoefficient = gain
+            self.spring_y.set_coefficient(gain)
 
             self.collective_ft_ovd_cp0_y = round(y * 4096)
             self.spring_y.cpOffset = self.collective_ft_ovd_cp0_y
@@ -1934,7 +1930,7 @@ class AircraftBase(object):
         self.telem_data['_coll_ft_trim_pos'] = round(self.collective_ft_ovd_cp0_y)
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
-        self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = int(self.collective_ft_ovd_spring_gain * 4096)
+        self.spring_y.set_coefficient(self.collective_ft_ovd_spring_gain)
 
         spring.setCondition(self.spring_y)
         # ensure spring is started with override = true
@@ -1959,8 +1955,8 @@ class AircraftBase(object):
         gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.get('IAS', 0))
 
         self.spring_adjuster.name = 'adv_spr'
-        self.spring_adjuster_y.positiveCoefficient = self.spring_adjuster_y.negativeCoefficient = round(4096 * gains.get('y', 0))
-        self.spring_adjuster_x.positiveCoefficient = self.spring_adjuster_x.negativeCoefficient = round(4096 * gains.get('x', 0))
+        self.spring_adjuster_y.set_coefficient(gains.get('y', 0))
+        self.spring_adjuster_x.set_coefficient(gains.get('x', 0))
 
         if self.adv_spr_use_hardware_trim:
             dt = perftracker.get_time_delta('override_spring_perf')
