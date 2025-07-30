@@ -274,10 +274,10 @@ class FFBReport_SetCondition(BaseStructure):
         """
         if isinstance(offset, float):
             offset = round(offset * 4096)
-        offset = utils.clamp(offset, -4096, 4096)
+        offset = clamp(offset, -4096, 4096)
         self.cpOffset = offset
 
-    def set_coefficient(self, coefficient: (int|float), clamp: bool = True) -> None:
+    def set_coefficient(self, coefficient: (int|float), do_clamp: bool = True) -> None:
         """
         Sets the positive and negative coefficients based on the input coefficient value.
 
@@ -289,8 +289,8 @@ class FFBReport_SetCondition(BaseStructure):
         """
         if isinstance(coefficient, float):
             coefficient = round(coefficient * 4096)
-        if clamp:
-            coefficient = utils.clamp(coefficient, 0, 4096)
+        if do_clamp:
+            coefficient = clamp(coefficient, 0, 4096)
         self.positiveCoefficient = coefficient
         self.negativeCoefficient = coefficient
 
