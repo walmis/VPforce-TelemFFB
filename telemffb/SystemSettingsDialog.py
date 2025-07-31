@@ -93,14 +93,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.setTabIcon(self.IL2_TAB, self.IL2_ICON_DISABLED)
 
         # BMS
-        BMS_PIXMAP = HiDpiPixmap(':/image/icon_BMS.png')
+        BMS_PIXMAP = HiDpiPixmap(':/image/icon_BMS.png') if G.useDarkMode else HiDpiPixmap(':/image/icon_BMS_lm.png')
         self.BMS_ICON_ENABLED, self.BMS_ICON_DISABLED = self.make_icons(BMS_PIXMAP, style)
         self.BMS_TAB = self.simTabWidget.indexOf(self.tab_BMS)
         self.simTabWidget.setTabText(self.BMS_TAB, "")
         self.simTabWidget.setTabIcon(self.BMS_TAB, self.BMS_ICON_DISABLED)
 
         # Optional: set uniform icon size once
-        self.simTabWidget.setIconSize(QSize(48, 48))
+        self.simTabWidget.setIconSize(QSize(64, 64))
 
         tab_format = """
             QTabWidget::pane {
@@ -115,8 +115,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 border-radius: 10px;
                 margin: 4px;
                 padding: 4px;
-                width: 48px;
-                height: 48px;
+                width: 64px;
+                height: 64px;
             }
 
             QTabBar::tab:hover {
@@ -232,6 +232,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_startToTray.clicked.connect(self.toggle_headless)
         self.cb_startToTray.clicked.connect(self.toggle_start_mode)
         self.cb_masterStartMin.clicked.connect(self.toggle_start_mode)
+
+        self.simTabWidget.tabBar().setExpanding(False)
+        self.simTabWidget.tabBar().setUsesScrollButtons(False)
+        self.simTabWidget.tabBar().setDocumentMode(True)
 
 
 
