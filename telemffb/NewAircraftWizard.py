@@ -53,6 +53,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
 
     friendly_sim_names = {  # Build list to get friendly names from internal names
         "DCS": "DCS World",
+        "BMS": "Falcon BMS",
         "MSFS": "Microsoft Flight Simulator 20/24",
         "XPLANE": "X-Plane 11/12",
         "IL2": "IL-2 Sturmovik"

@@ -8,6 +8,7 @@
 		<displayname>Basic Settings</displayname>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -32,6 +33,22 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<validvalues>PropellerAircraft,JetAircraft,Helicopter</validvalues>
+	</defaults>
+	<defaults>
+		<datatype>list</datatype>
+		<grouping>Basic</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>100</order>
+		<name>type</name>
+		<displayname>Class</displayname>
+		<prereq>basic_group</prereq>
+		<info>Aircraft Type</info>
+		<any>true</any>
+		<BMS>true</BMS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<validvalues>JetAircraft</validvalues>
 	</defaults>
 	<defaults>
 		<datatype>list</datatype>
@@ -353,6 +370,7 @@
 		<name>spring_mode</name>
 		<displayname>Joystick Spring Mode</displayname>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<validvalues>DCS_IL2_JOYSTICK_SPRING_MODE</validvalues>
@@ -366,6 +384,7 @@
 		<name>spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>DCS_IL2_PEDAL_SPRING_MODE</validvalues>
@@ -381,6 +400,7 @@
 		<prereq>spring_mode.STATIC.DYNAMIC.CUSTOM</prereq>
 		<info>Percent of spring setting in VPForce Configurator</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
@@ -398,6 +418,7 @@
 		<info>Stall Speed</info>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>m/s,kt,mph,kph</validvalues>
@@ -415,6 +436,7 @@
 		<prereq>spring_mode.CUSTOM</prereq>
 		<info>Spring gain when aircraft at Vs</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
@@ -432,6 +454,7 @@
 		<info>Never Exceed Speed</info>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>m/s,kt,mph,kph</validvalues>
@@ -449,6 +472,7 @@
 		<prereq>spring_mode.CUSTOM</prereq>
 		<info>Spring gain when aircraft is at Vne</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
@@ -464,6 +488,7 @@
 		<displayname>Advanced Spring Override</displayname>
 		<prereq>spring_mode.ADVANCED</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -480,6 +505,7 @@
 		<exclusive_with>pedal_trimming_enabled</exclusive_with>
 		<prereq>spring_mode.ADVANCED</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -495,6 +521,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -508,6 +535,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -521,6 +549,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>0</value>
@@ -535,6 +564,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>adv_spr_use_hardware_trim</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<value>0</value>
@@ -550,6 +580,7 @@
 		<prereq>adv_spr_use_hardware_trim</prereq>
 		<info>Rate at which the trim will move.&lt;br&gt;&lt;br&gt;Calculated as "steps per second" (1 step =1/8192 of total throw)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<sliderfactor>1</sliderfactor>
@@ -568,6 +599,7 @@
 		<prereq>basic_group</prereq>
 		<info>Enable pedal trimming feedback for fixed wing aircfraft</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
@@ -580,6 +612,7 @@
 		<displayname>Override DCS Spring Gain</displayname>
 		<prereq>spring_mode.CUSTOM</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
@@ -595,6 +628,7 @@
 		<prereq>spring_mode.CUSTOM</prereq>
 		<info>Bindings and other options for force trim release and hat based hardware trim</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -608,6 +642,7 @@
 		<displayname>Trim Release</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -622,6 +657,7 @@
 		<prereq>override_spring_ft_enabled</prereq>
 		<info>Dampening force while trim release is active</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
@@ -636,6 +672,7 @@
 		<displayname>Trim Reset</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -649,6 +686,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -662,6 +700,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -675,6 +714,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E6;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -688,6 +728,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E8;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>override_spring_ft_enabled</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -702,6 +743,7 @@
 		<prereq>override_spring_ft_enabled</prereq>
 		<info>Rate at which the trim will move.&lt;br&gt;&lt;br&gt;Calculated as "steps per second" (1 step =1/8192 of total throw)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,1000</validvalues>
@@ -724,6 +766,7 @@
 		<prereq>basic_group</prereq>
 		<info>Option to enable/disable TelemFFB from setting &lt;br&gt; the spring gain on the collective to 0 (Fixed wing only)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -738,6 +781,7 @@
 		<displayname>Trim Release Damper</displayname>
 		<prereq>spring_mode.NONE</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -751,6 +795,7 @@
 		<prereq>dcs_tr_damper_enabled</prereq>
 		<info>Trim release button (mirror what is configured in DCS)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -764,6 +809,7 @@
 		<prereq>dcs_tr_damper_enabled</prereq>
 		<info>Damper force applied while TR is pressed</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 	</defaults>
@@ -777,6 +823,7 @@
 		<displayname>Force Trim</displayname>
 		<prereq>basic_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -836,6 +883,7 @@
 		<prereq>force_trim_enabled</prereq>
 		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from collective (grip or  loopback app).</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -912,6 +960,7 @@
 		<prereq>basic_group</prereq>
 		<info>Enable hardware force trim for collective axis</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -927,6 +976,7 @@
 		<prereq>collective_ft_ovd_enabled</prereq>
 		<info>Spring Gain</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -944,6 +994,7 @@
 		<prereq>collective_ft_ovd_enabled</prereq>
 		<info>Trim Release Damper Gain</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -961,6 +1012,7 @@
 		<prereq>collective_ft_ovd_enabled</prereq>
 		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from collective (grip or  loopback app).</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -977,6 +1029,7 @@
 		<prereq>collective_ft_ovd_enabled</prereq>
 		<info>Trim Release Button</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -993,6 +1046,7 @@
 		<prereq>collective_ft_ovd_enabled</prereq>
 		<info>Trim Reset Button (full down)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -1008,6 +1062,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>collective_ft_ovd_enabled</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -1023,6 +1078,7 @@
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
 		<prereq>collective_ft_ovd_enabled</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -1039,6 +1095,7 @@
 		<prereq>collective_ft_ovd_enabled</prereq>
 		<info>Affects rate at which trim will move when button held</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -1096,6 +1153,7 @@
 		<prereq>basic_group</prereq>
 		<info>Apply artificial trim movement - only for aircraft that do not support native FFB trim&lt;b&gt;&lt;b&gt;(AV8B, Mig-19)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -1863,6 +1921,7 @@
 		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from pedals (use loopback app).</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -1878,6 +1937,7 @@
 		<displayname>Trim Release Button</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -1893,6 +1953,7 @@
 		<displayname>Trim Reset Button</displayname>
 		<prereq>spring_mode.FORCETRIM</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -1909,6 +1970,7 @@
 		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Percent of spring setting in VPForce Configurator</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -1925,6 +1987,7 @@
 		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Enable dampening force while trim release is pressed</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -1941,6 +2004,7 @@
 		<prereq>pedal_ft_damper_enabled</prereq>
 		<info>Enable dampening force while trim release is pressed</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<pedals>true</pedals>
@@ -1958,6 +2022,7 @@
 		<prereq>basic_group</prereq>
 		<info>Will temporarily override the spring gain on the joystick when the user is *not* sitting in the Pilot seat.</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -1972,6 +2037,7 @@
 		<prereq>cp_spr_override_enabled</prereq>
 		<info>Seat ID when sitting in Pilot's seat.  Effect will beome active any time the Seat ID does not match this ID value&lt;br&gt;See the Telemetry monitor page to get the proper value when sitting in the pilots seat&lt;br&gt;&lt;img src=":/image/dcs_seat_id.png"&gt;&lt;/&gt;</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<validvalues>0,1,2,3,4</validvalues>
 		<value>0</value>
@@ -1987,6 +2053,7 @@
 		<prereq>cp_spr_override_enabled</prereq>
 		<info>Spring gain while effect is active</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2002,6 +2069,7 @@
 		<prereq>cp_spr_override_enabled</prereq>
 		<info>Only activate override if button is held (must configure button in resulting setting once this setting is enabled)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -2016,6 +2084,7 @@
 		<prereq>cp_spr_override_button_enabled</prereq>
 		<info>Click to configure the override button</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -2025,9 +2094,9 @@
 		<order>10000</order>
 		<name>airflow_group</name>
 		<displayname>Aerodynamics</displayname>
-		<info>Airflow effects max intensity controlled by Constant slider in Configurator</info>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2063,6 +2132,7 @@
 		<prereq>airflow_group</prereq>
 		<info>Enable or disable the AoA reduction force effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2078,6 +2148,7 @@
 		<prereq>aoa_reduction_effect_enabled</prereq>
 		<info>Max constant force to apply for AoA Reduction Effect&lt;br&gt;&lt;br&gt;This is a percentage of the constant force value in VPforce Configurator</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2095,6 +2166,7 @@
 		<prereq>aoa_reduction_effect_enabled</prereq>
 		<info>AoA at which applied force maxes out</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2113,6 +2185,7 @@
 		<prereq>aoa_reduction_effect_enabled</prereq>
 		<info>AoA at which to begin applying force</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2131,6 +2204,7 @@
 		<prereq>aoa_effect_enabled</prereq>
 		<info>Maximum constant force to apply for the AoA effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -2147,6 +2221,7 @@
 		<prereq>airflow_group</prereq>
 		<info>Simulate Elevator droop at low speeds &lt;20Kt</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 	</defaults>
@@ -2161,6 +2236,7 @@
 		<prereq>elevator_droop_enabled</prereq>
 		<info>Simulate Elevator droop at low speeds &lt;20Kt</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<sliderfactor>0.5</sliderfactor>
@@ -2221,6 +2297,7 @@
 		<prereq>airflow_group</prereq>
 		<info>Enable or disable the dynamic Angle of Attack (AoA) based force effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 	</defaults>
@@ -2250,6 +2327,7 @@
 		<prereq>airflow_group</prereq>
 		<info>Enable Effective Translational Lift Shimmy</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2267,6 +2345,7 @@
 		<prereq>etl_effect_enable</prereq>
 		<info>Effective Translational Lift Shimmy Intensity</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2285,6 +2364,7 @@
 		<prereq>etl_effect_enable</prereq>
 		<info>speed at which the ETL effect will start - m/s</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2304,6 +2384,7 @@
 		<prereq>etl_effect_enable</prereq>
 		<info>speed at which the ETL effect will stop - m/s</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2323,6 +2404,7 @@
 		<prereq>airflow_group</prereq>
 		<info>Vortex Ring State Effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -2340,6 +2422,7 @@
 		<prereq>vrs_effect_enable</prereq>
 		<info>Max intensity of VRS effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -2359,6 +2442,7 @@
 		<prereq>vrs_effect_enable</prereq>
 		<info>Airspeed above which VRS will not occur</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -2377,6 +2461,7 @@
 		<prereq>vrs_effect_enable</prereq>
 		<info>Vertical Speed where VRS effect rumble will start</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -2395,6 +2480,7 @@
 		<prereq>vrs_effect_enable</prereq>
 		<info>Vertical Speed where VRS effect rumble will max out</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -2412,6 +2498,7 @@
 		<displayname>AoA/Stall Buffeting</displayname>
 		<prereq>airflow_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2430,6 +2517,7 @@
 		<prereq>aoa_buffeting_enabled</prereq>
 		<info>Peak AoA buffeting intensity</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2449,6 +2537,7 @@
 		<prereq>aoa_buffeting_enabled</prereq>
 		<info>Frequency of buffeting effect (Hz)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2469,6 +2558,7 @@
 		<prereq>aoa_buffeting_enabled</prereq>
 		<info>AoA when buffeting starts</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2487,6 +2577,7 @@
 		<prereq>aoa_buffeting_enabled</prereq>
 		<info>Stall Angle of Attack</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -2504,6 +2595,7 @@
 		<displayname>Overpeed Shake </displayname>
 		<prereq>airflow_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2521,6 +2613,7 @@
 		<prereq>overspeed_effect_enable</prereq>
 		<info>Maximum overspeed shake intensity</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2539,6 +2632,7 @@
 		<prereq>overspeed_effect_enable</prereq>
 		<info>Threshold at which overspeed shake will start to ramp up</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2630,6 +2724,7 @@
 		<displayname>Wind Effect</displayname>
 		<prereq>airflow_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -2644,6 +2739,7 @@
 		<prereq>wind_effect_enabled</prereq>
 		<info>Adjust the maximum intensity the wind effect can attain</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
@@ -2660,6 +2756,7 @@
 		<prereq>wind_effect_enabled</prereq>
 		<info>Adjust the overall intensity of the wind effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>1.0</value>
@@ -2676,9 +2773,9 @@
 		<order>20000</order>
 		<name>inertial_group</name>
 		<displayname>Inertial</displayname>
-		<info>Acceleration effects max intensity controlled by Constant slider in Configurator</info>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2712,6 +2809,7 @@
 		<displayname>G-Force Effect</displayname>
 		<prereq>inertial_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<validvalues>DCS_IL2_G_EFFECT_MODE</validvalues>
@@ -2728,6 +2826,7 @@
 		<prereq>gforce_effect_mode.LEGACY</prereq>
 		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
@@ -2744,6 +2843,7 @@
 		<prereq>gforce_effect_mode.LEGACY</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Affects the onset characteristics of the overall effect&lt;br&gt;&lt;img src=":/image/g-force-curve.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<sliderfactor>0.1</sliderfactor>
@@ -2761,6 +2861,7 @@
 		<prereq>gforce_effect_mode.LEGACY</prereq>
 		<info>G loading where effect will start</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<sliderfactor>0.1</sliderfactor>
@@ -2778,6 +2879,7 @@
 		<prereq>gforce_effect_mode.LEGACY</prereq>
 		<info>G loading where effect will max out</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<sliderfactor>0.1</sliderfactor>
@@ -2796,6 +2898,7 @@
 		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2814,6 +2917,7 @@
 		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>G loading where effect will start</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2833,6 +2937,7 @@
 		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>G loading where effect will max out</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2852,6 +2957,7 @@
 		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>Y Axis deflection that will result in %100 of calculated force based on current g loading and min/max settings</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2869,6 +2975,7 @@
 		<displayname>Advanced</displayname>
 		<prereq>gforce_effect_mode.ADVANCED</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2886,6 +2993,7 @@
 		<prereq>gforce_effect_mode.NEW</prereq>
 		<info>Enable effect for negative Gs</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2903,6 +3011,7 @@
 		<prereq>new_gforce_enable_neg_gs</prereq>
 		<info>Max force to apply during effect (% of VPf Conf 'constant')</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2921,6 +3030,7 @@
 		<prereq>new_gforce_enable_neg_gs</prereq>
 		<info>G loading where effect will start</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2940,6 +3050,7 @@
 		<prereq>new_gforce_enable_neg_gs</prereq>
 		<info>G loading where effect will max out</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2959,6 +3070,7 @@
 		<prereq>new_gforce_enable_neg_gs</prereq>
 		<info>Y Axis deflection that will result in %100 of calculated force based on current g loading and min/max settings</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2977,6 +3089,7 @@
 		<prereq>inertial_group</prereq>
 		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -2994,6 +3107,7 @@
 		<prereq>deceleration_effect_enable</prereq>
 		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3012,6 +3126,7 @@
 		<prereq>deceleration_effect_enable</prereq>
 		<info>Artificially increase the G forces in the direction of deceleration</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3031,6 +3146,7 @@
 		<prereq>deceleration_effect_enable</prereq>
 		<info>Invert the frame of reference (direction of force) for the effect.  I.e. stick moving away from pilot vs. pilot moving towards stick.</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3048,6 +3164,7 @@
 		<prereq>deceleration_effect_enable</prereq>
 		<info>Disable effect while airborne</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3092,9 +3209,9 @@
 		<order>30000</order>
 		<name>ground_group</name>
 		<displayname>Ground</displayname>
-		<info>Rumble effects max intensity controlled by Constant slider in Configurator</info>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3114,6 +3231,7 @@
 		<prereq>ground_group</prereq>
 		<info>Enable/disable runway rumble effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3131,6 +3249,7 @@
 		<prereq>runway_rumble_enabled</prereq>
 		<info>Peak runway rumble intensity</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3149,6 +3268,7 @@
 		<displayname>Touch-Down Effect</displayname>
 		<prereq>ground_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<value>false</value>
@@ -3164,6 +3284,7 @@
 		<prereq>touchdown_effect_enabled</prereq>
 		<info>Max force that will be used to generate effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
@@ -3180,6 +3301,7 @@
 		<prereq>touchdown_effect_enabled</prereq>
 		<info>G loading where max force will be reached</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<sliderfactor>0.1</sliderfactor>
@@ -3321,9 +3443,9 @@
 		<order>40000</order>
 		<name>mechanical_group</name>
 		<displayname>Mechanical\Airframe</displayname>
-		<info>Rumble effects max intensity controlled by Constant slider in Configurator</info>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3341,6 +3463,7 @@
 		<prereq>mechanical_group</prereq>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3358,6 +3481,7 @@
 		<displayname>Heli Engine/Rotor Rumble</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3375,6 +3499,7 @@
 		<prereq>engine_rotor_rumble_enabled</prereq>
 		<info>peak rumble intensity for helicopter engine/rotor effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3395,6 +3520,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Enable afterburner rumble effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3413,6 +3539,7 @@
 		<prereq>afterburner_effect_enabled</prereq>
 		<info>Max intensity of afterburner rumble effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3433,6 +3560,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Enable Propeller Rumble</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3451,6 +3579,7 @@
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<info>low RPM threshold for low rpm intensity setting</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3472,6 +3601,7 @@
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<info>peak intenstiy of engine rumble at low RPM threshold</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3493,6 +3623,7 @@
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<info>high RPM threshold for high rpm intensity setting</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3514,6 +3645,7 @@
 		<prereq>engine_prop_rumble_enabled</prereq>
 		<info>peak intensity of engine rumble at high RPM threshold</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3534,6 +3666,7 @@
 		<displayname>Jet Engine Rumble</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3551,6 +3684,7 @@
 		<displayname>Jet Engine Rumble</displayname>
 		<prereq>engine_jet_rumble_enabled</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3571,6 +3705,7 @@
 		<prereq>engine_jet_rumble_enabled</prereq>
 		<info>Most DCS helos are jet driven, enable the jet engine effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3591,6 +3726,7 @@
 		<displayname>Canopy Motion</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3608,6 +3744,7 @@
 		<prereq>canopy_motion_effect_enabled</prereq>
 		<info>Peak vibration intensity when canopy is moving</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3626,6 +3763,7 @@
 		<displayname>Damage Effect</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3643,6 +3781,7 @@
 		<prereq>damage_effect_enabled</prereq>
 		<info>Peak intensity of damage effect shake</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3660,6 +3799,7 @@
 		<displayname>Flaps Motion</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3678,6 +3818,7 @@
 		<prereq>flaps_motion_effect_enabled</prereq>
 		<info>Peak vibration intensity when flaps are moving</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3699,6 +3840,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Effect while fuel boom/door  is deploying/retracting</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -3712,6 +3854,7 @@
 		<prereq>fuelboom_motion_effect_enabled</prereq>
 		<info>Effect while fuel boom/door  is deploying/retracting</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -3727,6 +3870,7 @@
 		<displayname>Gear Buffet</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3745,6 +3889,7 @@
 		<prereq>gear_buffet_effect_enabled</prereq>
 		<info>Peak intensity for gear drag buffeting effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3765,6 +3910,7 @@
 		<prereq>gear_buffet_effect_enabled</prereq>
 		<info>Frequency of buffeting effect (Hz)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3785,6 +3931,7 @@
 		<prereq>gear_buffet_effect_enabled</prereq>
 		<info>Minimum intensity (low) speed for gear buffeting effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3802,6 +3949,7 @@
 		<prereq>gear_buffet_effect_enabled</prereq>
 		<info>Maximum intensity (high) speed for gear buffeting effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3818,6 +3966,7 @@
 		<displayname>Gear Motion</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3837,6 +3986,7 @@
 		<prereq>gear_motion_effect_enabled</prereq>
 		<info>Peak vibration intensity when gear is moving</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3857,6 +4007,7 @@
 		<displayname>Speedbrake Buffet</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3873,6 +4024,7 @@
 		<prereq>speedbrake_buffet_effect_enabled</prereq>
 		<info>Peak intensity for speed brake buffeting effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3891,6 +4043,7 @@
 		<displayname>Speedbrake Motion</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3907,6 +4060,7 @@
 		<prereq>speedbrake_motion_effect_enabled</prereq>
 		<info>Peak intensity for speed brake motion effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3925,6 +4079,7 @@
 		<displayname>Spoiler Buffet</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3942,6 +4097,7 @@
 		<prereq>spoiler_buffet_effect_enabled</prereq>
 		<info>peak buffeting intensity when spoilers deployed</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -3961,6 +4117,7 @@
 		<displayname>Spoiler Motion</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3977,6 +4134,7 @@
 		<prereq>spoiler_motion_effect_enabled</prereq>
 		<info>F14 Only, peak vibration intensity when spoilers are moving</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -4009,6 +4167,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Enable stick shaker stall warning device</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -4022,6 +4181,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Enable stick shaker stall warning device</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
@@ -4050,6 +4210,7 @@
 		<prereq>enable_stick_shaker</prereq>
 		<info>Enable stick shaker stall warning device</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
@@ -4067,6 +4228,7 @@
 		<info>AoA at which stick shaker activates</info>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
@@ -4083,6 +4245,7 @@
 		<prereq>enable_stick_shaker</prereq>
 		<info>Freqency in Hz of the effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<validvalues>0,100</validvalues>
@@ -4099,6 +4262,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Effect while tailhook is deploying/retracting</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 	</defaults>
@@ -4113,6 +4277,7 @@
 		<prereq>tailhook_motion_effect_enabled</prereq>
 		<info>Effect while tailhook is deploying/retracting</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<sliderfactor>0.4</sliderfactor>
@@ -4130,6 +4295,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Effect while wing-fold  is deploying/retracting</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -4143,6 +4309,7 @@
 		<prereq>wingfold_motion_effect_enabled</prereq>
 		<info>Effect while wing-fold  is deploying/retracting</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -4159,6 +4326,7 @@
 		<prereq>mechanical_group</prereq>
 		<info>Simulate high damper forces when hydraulic pressure is low/0&lt;br&gt;** REQUIRES damper/inertia/friction overrides to be enabled **</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -4176,6 +4344,7 @@
 		<prereq>enable_hydraulic_loss_effect</prereq>
 		<info>"Hydraulic System Integrity" (HydSys in monitor)  value to consider "low".  Forces will start increasing below this value</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -4194,6 +4363,7 @@
 		<prereq>enable_hydraulic_loss_effect</prereq>
 		<info>Damper force when hydraulic system pressure reaches 0</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -4212,6 +4382,7 @@
 		<prereq>enable_hydraulic_loss_effect</prereq>
 		<info>Inertia  force when hydraulic system pressure reaches 0</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -4230,6 +4401,7 @@
 		<prereq>enable_hydraulic_loss_effect</prereq>
 		<info>Friction  force when hydraulic system pressure reaches 0</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -4296,6 +4468,7 @@
 		<info>Weapons effects max intensity controlled by Periodic slider in Configurator</info>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4311,6 +4484,7 @@
 		<displayname>Countermeasures</displayname>
 		<prereq>weapons_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4327,6 +4501,7 @@
 		<prereq>countermeasure_effect_enabled</prereq>
 		<info>Peak intensity for countermeasure release effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4343,6 +4518,7 @@
 		<displayname>Gunfire</displayname>
 		<prereq>weapons_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4359,6 +4535,7 @@
 		<prereq>gunfire_effect_enabled</prereq>
 		<info>Peak intenstiy for gunfire effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4375,6 +4552,7 @@
 		<displayname>Weapons Release</displayname>
 		<prereq>weapons_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4391,6 +4569,7 @@
 		<prereq>weapon_release_effect_enabled</prereq>
 		<info>Peak intensity for weapons release effect</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4407,6 +4586,7 @@
 		<displayname>Weapon Effects Direction</displayname>
 		<prereq>weapons_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4423,6 +4603,7 @@
 		<prereq>dummy_weapon_direction</prereq>
 		<info>Direction of applied force for weapons effects&lt;br&gt;&lt;br&gt;Rrange 0-359 or set to -1 for random</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
@@ -4437,9 +4618,9 @@
 		<order>60000</order>
 		<name>ffb_group</name>
 		<displayname>Basic FFB Effects</displayname>
-		<info>Override Configurator sliders for Damper, Inertia &amp; Friction.  Required for some effects.</info>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4460,6 +4641,7 @@
 		<prereq>ffb_group</prereq>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4480,6 +4662,7 @@
 		<prereq>enable_damper_ovd</prereq>
 		<info>Apply damper to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4501,6 +4684,7 @@
 		<prereq>ffb_group</prereq>
 		<info>Apply inertia to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4521,6 +4705,7 @@
 		<prereq>enable_inertia_ovd</prereq>
 		<info>Apply inertia to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4542,6 +4727,7 @@
 		<prereq>ffb_group</prereq>
 		<info>Apply friction to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4562,6 +4748,7 @@
 		<prereq>enable_friction_ovd</prereq>
 		<info>Apply friction to axes.&lt;br&gt;Results in percent of configurator slider value</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4581,6 +4768,7 @@
 		<displayname>Enable Configurator Deadzone</displayname>
 		<prereq>ffb_group</prereq>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4600,6 +4788,7 @@
 		<prereq>enable_deadzone</prereq>
 		<info>Always on circular deadzone equivalent to setting deadzone in configurator </info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4621,6 +4810,7 @@
 		<displayname>System</displayname>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4640,6 +4830,7 @@
 		<prereq>system_group</prereq>
 		<any>true</any>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4658,6 +4849,7 @@
 		<prereq>system_group</prereq>
 		<info>Load a specific .vpconf file (created with VPForce Configurator)&lt;br&gt;&lt;br&gt;When using this function, it will remain active until set again by another sim, class, or model setting, or is defaulted back to "Global Default" profile  from System Settings</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4676,6 +4868,7 @@
 		<prereq>system_group</prereq>
 		<info>Change VPConfigurator Sliders</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4695,6 +4888,7 @@
 		<prereq>configurator_override_enabled</prereq>
 		<info>Directly modify the per-effect type  gain values on the VPforce device.&lt;br&gt;&lt;br&gt;Please read the manual to understand how it works and how it interacts with the "Configurator File" feature (these gains will override any pushed in a configurator profile)</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4715,6 +4909,7 @@
 		<prereq>system_group</prereq>
 		<info>Enable execution of any command when aircraft loads</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4733,6 +4928,7 @@
 		<prereq>command_runner_enabled</prereq>
 		<info>Enter a command to be executed when an aircraft loads.  There is no path or validation checking.  Command will be executed as is.&lt;br&gt;&lt;br&gt;Enter the command with the full path exactly as if running from a command prompt</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -4768,6 +4964,7 @@
 		<prereq>system_group</prereq>
 		<info>Keep damper/inertia/friction force active during pause</info>
 		<DCS>true</DCS>
+		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -9285,6 +9482,225 @@
 			<sim>IL2</sim>
 			<device>pedals</device>
 		</classdefaults_IL2>
+<classdefaults_BMS>
+			<name>afterburner_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>BMS</sim>
+			<device>any</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>aoa_effect_enabled</name>
+			<type>JetrAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>aoa_reduction_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>aoa_reduction_max_force</name>
+			<type>JetAircraft</type>
+			<value>1.0</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>critical_aoa_max</name>
+			<type>JetAircraft</type>
+			<value>25</value>
+			<unit>deg</unit>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>critical_aoa_start</name>
+			<type>JetAircraft</type>
+			<value>22</value>
+			<unit>deg</unit>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>elevator_droop_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>enable_stick_shaker</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>enable_stick_shaker</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>pedals</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>force_disable_collective_gain</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>BMS</sim>
+			<device>collective</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>fuelboom_motion_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>gforce_effect_curvature</name>
+			<type>JetAircraft</type>
+			<value>2.5</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>gforce_effect_mode</name>
+			<type>JetAircraft</type>
+			<value>LEGACY</value>
+			<sim>BMS</sim>
+			<device>any</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>gforce_effect_max_intensity</name>
+			<type>JetAircraft</type>
+			<value>0.8</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>gforce_max_gs</name>
+			<type>JetAircraft</type>
+			<value>7.0</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>gforce_min_gs</name>
+			<type>JetAircraft</type>
+			<value>1.1</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>jet_engine_rumble_intensity</name>
+			<type>JetAircraft</type>
+			<value>0.05</value>
+			<sim>BMS</sim>
+			<device>any</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>new_gforce_effect_enable</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>new_gforce_enable_neg_gs</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>new_gforce_max_gs</name>
+			<type>JetAircraft</type>
+			<value>7.0</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>new_gforce_max_gs_neg</name>
+			<type>JetAircraft</type>
+			<value>-4.0</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>pedal_spring_gain</name>
+			<type>JetAircraft</type>
+			<value>0.6</value>
+			<sim>BMS</sim>
+			<device>pedals</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>spring_mode</name>
+			<type>JetAircraft</type>
+			<value>STATIC</value>
+			<sim>BMS</sim>
+			<device>pedals</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>spring_mode</name>
+			<type>JetAircraft</type>
+			<value>NONE</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>pedal_trimming_enabled</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>BMS</sim>
+			<device>pedals</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>speedbrake_buffet_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>BMS</sim>
+			<device>any</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>speedbrake_motion_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>BMS</sim>
+			<device>any</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>spoiler_buffet_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>BMS</sim>
+			<device>any</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>spoiler_motion_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>BMS</sim>
+			<device>any</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>tailhook_motion_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
+			<name>wingfold_motion_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>BMS</sim>
+			<device>joystick</device>
+		</classdefaults_BMS>
 		<classdefaults_any>
 			<name>adv_spr_override_enabled</name>
 			<type>!Helicopter</type>
@@ -16964,6 +17380,10 @@
 		<class_name>Helicopter</class_name>
 	</classes>
 	<classes>
+		<sim>BMS</sim>
+		<class_name>JetAircraft</class_name>
+	</classes>
+	<classes>
 		<sim>IL2</sim>
 		<class_name>PropellerAircraft</class_name>
 	</classes>
@@ -17025,6 +17445,9 @@
 		</classes>
 	<sims>
 		<sim>DCS</sim>
+	</sims>
+	<sims>
+		<sim>BMS</sim>
 	</sims>
 	<sims>
 		<sim>IL2</sim>
