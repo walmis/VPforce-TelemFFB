@@ -790,7 +790,9 @@ class AircraftBase(object):
             derivative_k = 0.1  # derivative gain value, or damping ratio
 
             dGs = getattr(self, "_dGs", None)
-            if not dGs: dGs = self._dGs = utils.Derivative(derivative_hz)
+            if not dGs: 
+                dGs = self._dGs = utils.Derivative(derivative_hz)
+                
             dGs.lpf.cutoff_freq_hz = derivative_hz
 
             g_deriv = - dGs.update(g_factor) * derivative_k
@@ -841,9 +843,9 @@ class AircraftBase(object):
                     return adjuster_cpOy
 
                 self.offset_adjuster.name = 'gforce_spr'
-                self.offset_adjuster_y.cpOffset = adjuster_cpOy
-                self.offset_adjuster_y.negativeSaturation = self.offset_adjuster_y.positiveSaturation = 4096
-                self.offset_adjuster_x.negativeSaturation = self.offset_adjuster_x.positiveSaturation = 4096
+                self.offset_adjuster_y.set_offset(adjuster_cpOy)
+                self.offset_adjuster_y.set_saturation(4096)
+                self.offset_adjuster_x.set_saturation(4096)
                 self.offset_adjuster.setCondition(self.offset_adjuster_y)
                 self.offset_adjuster.setCondition(self.offset_adjuster_x)
                 self.offset_adjuster.start()
@@ -1882,12 +1884,10 @@ class AircraftBase(object):
             # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
             # as it is moved while spring force is enabled.
             # return from method so default spring gains do not get applied at the end of the method
-            gain = int(self.collective_ft_ovd_tr_damper * 4096)
-
-            self.spring_y.set_coefficient(gain)
+            self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
 
             self.collective_ft_ovd_cp0_y = round(y * 4096)
-            self.spring_y.cpOffset = self.collective_ft_ovd_cp0_y
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
             spring.setCondition(self.spring_y)
             spring.start(override=True)
             return
@@ -1896,7 +1896,8 @@ class AircraftBase(object):
         elif self.check_button_press(self.collective_ft_ovd_reset, self.collective_ft_use_master_buttons):
             # if trim reset button pressed, set offsets back to 0
             # print("TRIM RESET")
-            self.spring_y.cpOffset = self.collective_ft_ovd_cp0_y = 4096
+            self.collective_ft_ovd_cp0_y = 4096
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
             spring.setCondition(self.spring_y)
 
         # calculate step size based on configured rate and delta time
@@ -1910,21 +1911,16 @@ class AircraftBase(object):
         if self.check_button_press(self.collective_ft_ovd_trim_down, self.collective_ft_use_master_buttons):
             # shift offset based on previously calculated step size.  Ensure value does not exceed limits
             # print("TRIM DOWN")
-            if self.collective_ft_ovd_cp0_y + trim_step_size > 4096:
-                self.collective_ft_ovd_cp0_y = 4096
-            else:
-                self.collective_ft_ovd_cp0_y += trim_step_size
-            self.spring_y.cpOffset = round(self.collective_ft_ovd_cp0_y)
+            self.collective_ft_ovd_cp0_y += trim_step_size
+            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
+            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
         # elif self.collective_ft_ovd_trim_up and self.collective_ft_ovd_trim_up in current_buttons:
         elif self.check_button_press(self.collective_ft_ovd_trim_up, self.collective_ft_use_master_buttons):
             # shift offset based on previously calculated step size.  Ensure value does not exceed limits
             # print("TRIM UP")
-            if self.collective_ft_ovd_cp0_y - trim_step_size < -4096:
-                self.collective_ft_ovd_cp0_y = -4096
-            else:
-                self.collective_ft_ovd_cp0_y -= trim_step_size
-            self.spring_y.cpOffset = round(self.collective_ft_ovd_cp0_y)
-
+            self.collective_ft_ovd_cp0_y -= trim_step_size
+            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
+            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
 
 
         self.telem_data['_coll_ft_trim_pos'] = round(self.collective_ft_ovd_cp0_y)
@@ -1986,8 +1982,8 @@ class AircraftBase(object):
         offset = self.ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
         self.g_y_offset = offset if offset is not None else 0
         self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]
-        self.spring_adjuster_y.cpOffset = round(self.override_spring_cp0_y + self.g_y_offset)
-        self.spring_adjuster_x.cpOffset = round(self.override_spring_cp0_x)
+        self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + self.g_y_offset))
+        self.spring_adjuster_x.set_offset(round(self.override_spring_cp0_x))
 
         self.spring_adjuster.setCondition(self.spring_adjuster_y)
         self.spring_adjuster.setCondition(self.spring_adjuster_x)
@@ -2005,8 +2001,6 @@ class AircraftBase(object):
             HapticEffect.device.set_deadzone(dz)
             self.active_deadzone_pct = self.deadzone_base_pct
             logging.info(f"Setting Deadzone to %{self.deadzone_base_pct}")
-
-
 
 
     def on_event(self, event, *args):

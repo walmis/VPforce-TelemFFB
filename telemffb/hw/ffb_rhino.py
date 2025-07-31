@@ -277,6 +277,23 @@ class FFBReport_SetCondition(BaseStructure):
         offset = clamp(offset, -4096, 4096)
         self.cpOffset = offset
 
+    def set_saturation(self, saturation: (int|float), do_clamp: bool = True) -> None:
+        """
+        Sets the positive and negative saturation based on the input saturation value.
+
+        Args:
+            saturation (int|float): The saturation value to set. If it's a float, it's converted to an integer by multiplying it by 4096.
+
+        Returns:
+            None
+        """
+        if isinstance(saturation, float):
+            saturation = round(saturation * 4096)
+        if do_clamp:
+            saturation = clamp(saturation, 0, 4096)
+        self.positiveSaturation = saturation
+        self.negativeSaturation = saturation
+
     def set_coefficient(self, coefficient: (int|float), do_clamp: bool = True) -> None:
         """
         Sets the positive and negative coefficients based on the input coefficient value.
