@@ -2024,7 +2024,10 @@ class AircraftBase(object):
 
     def on_telemetry(self, telem_data): 
         aircraft_type = telem_data.get("AircraftType", "Unknown")
-
+        fx,fy = HapticEffect.device.get_input().forceXY()
+        self.telem_data['ForceXY'] = [fx,fy]
+        jx, jy = HapticEffect.device.get_input().axisXY()
+        self.telem_data['JoyXY'] = [jx, jy]
         # the methods should decide if they want to run based on the telemetry data
         if aircraft_type == "JetAircraft":
             self.ac_update_ab_effect(telem_data)
