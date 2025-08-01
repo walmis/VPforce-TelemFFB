@@ -5319,6 +5319,12 @@
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>
+		<name>hpgFollowupTrimMode</name>
+		<model>Airbus H145.*</model>
+		<var>L:H145_PERSIST_ATT_FOLLOWUP_MODE_V2</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
 		<name>hpgVRSDatum</name>
 		<model>Airbus H145.*</model>
 		<var>L:DEBUG_VRS2_DATUM</var>
@@ -5388,6 +5394,12 @@
 		<name>hpgHandsOnCyclic</name>
 		<model>Airbus H160.*</model>
 		<var>L:H160_SDK_AFCS_CYCLIC_USER_PUSHING_ON_SPRINGS</var>
+		<sc_unit>enum</sc_unit>
+	</sc_overrides>
+	<sc_overrides>
+		<name>hpgFollowupTrimMode</name>
+		<model>Airbus H160.*</model>
+		<var>L:H160_PERSIST_ATT_FOLLOWUP_MODE_V2</var>
 		<sc_unit>enum</sc_unit>
 	</sc_overrides>
 	<sc_overrides>

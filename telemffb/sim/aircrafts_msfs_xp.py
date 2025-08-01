@@ -2137,8 +2137,7 @@ class HPGHelicopter(Helicopter):
         raw_deviation_y = phys_y - ref_y
 
         # Check if either phys_x or phys_y exceeds the threshold
-        # x_exceeds_threshold = abs(round(deviation_x, 2)) > percent
-        # y_exceeds_threshold = abs(round(deviation_y, 2)) > percent
+
         x_exceeds_threshold = abs(phys_x - ref_x) > threshold
         y_exceeds_threshold = abs(phys_y - ref_y) > threshold
         master_exceeds_threshold = x_exceeds_threshold or y_exceeds_threshold
@@ -2153,14 +2152,12 @@ class HPGHelicopter(Helicopter):
             "y_deviation_raw": raw_deviation_y,
 
         }
-        # utils.dbprint('yellow', f"x:{round(deviation_x, 3)}, y:{round(deviation_y, 3)}")
         return result
     
     def msfs_update_heli_controls(self, telem_data):
         super().msfs_update_heli_controls(telem_data)
         ffb_type = telem_data.get("FFBType", "joystick")
         ap_active = telem_data.get("APMaster", 0)
-        # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
         if self.cyclic_spring_init:
             trim_reset = telem_data.get("hpgTrimRelease", 0)
         else:
@@ -2176,9 +2173,6 @@ class HPGHelicopter(Helicopter):
 
             sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=100)
             sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=100)
-            #sema_x_avg = sema_x
-            #sema_y_avg = sema_y
-            # hands_off_deadzone = 0.02
 
             if telem_data.get("hpgHandsOnCyclic", 0):
                 hands_on_dict = self.check_hands_on(self.hands_off_deadzone)
@@ -2193,8 +2187,6 @@ class HPGHelicopter(Helicopter):
             dev_y_raw = hands_on_dict["y_deviation_raw"]
 
             if not trim_reset:
-
-
 
                 sx = round(abs(sema_x_avg), 3)
                 sy = round(abs(sema_y_avg), 3)
@@ -2235,13 +2227,11 @@ class HPGHelicopter(Helicopter):
                     case _:
                         activate_followup_trim = False
 
-                # disabled for testing on ground
-                # if telem_data.get('SimOnGround', 1):
-                #     activate_followup_trim = False
+                # disable below for testing on ground
+                if telem_data.get('SimOnGround', 1):
+                    activate_followup_trim = False
 
-                #trimmed = False
                 if not (self.hands_on_x_active or self.hands_on_active):
-                    # self.afcsx_step_size = -self.afcsx_step_size if self.hands_on_x_active else self.afcsx_step_size
                     if sema_x_avg > 0:
                         self.cpO_x -= self.afcsx_step_size
                     elif sema_x_avg < 0:
@@ -2255,7 +2245,6 @@ class HPGHelicopter(Helicopter):
 
 
                 if not (self.hands_on_y_active or self.hands_on_active):
-                    # self.afcsy_step_size = -self.afcsy_step_size if self.hands_on_y_active else self.afcsy_step_size
                     if sema_y_avg > 0:
                         self.cpO_y -= self.afcsy_step_size
                     elif sema_y_avg < 0:
@@ -2267,12 +2256,6 @@ class HPGHelicopter(Helicopter):
                     elif dev_y_raw < 0:
                         self.cpO_y -= followup_trim_step_size
 
-                # if trimmed and not self.tracker_var:
-                #     logging.info("Trimming Started")
-                #     self.tracker_var = True
-                # elif not trimmed and self.tracker_var:
-                #     logging.info("Trimming Stopped")
-                #     self.tracker_var = False
 
             self.spring_x.cpOffset = round(self.cpO_x)
             self.spring_y.cpOffset = round(self.cpO_y)
