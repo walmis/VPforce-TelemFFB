@@ -77,6 +77,7 @@ class MainWindow(QMainWindow):
         self._update_available = None
         self.show_new_craft_button = False
         self.profile_mgr_dialog = None
+        self.all_offline_models = []
 
 
         """ Add font used for settngs area group labels """
@@ -492,13 +493,18 @@ class MainWindow(QMainWindow):
         offline_profile_lbl = QLabel('Profile:')
         offline_profile_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
+        # Create filter box
+        self.offline_name_filter = QLineEdit()
+        self.offline_name_filter.setPlaceholderText("Filter")
+        self.offline_name_filter.textChanged.connect(self.filter_offline_name_list)
 
         """ Add label widgets to layout """
 
         offline_grid_layout.addWidget(offline_sim_lbl, 0, 0)
         offline_grid_layout.addWidget(offline_class_lbl, 0, 1)
         offline_grid_layout.addWidget(offline_name_lbl, 0, 2)
-        offline_grid_layout.addWidget(offline_profile_lbl, 0, 3)
+        offline_grid_layout.addWidget(self.offline_name_filter, 0, 3)
+        offline_grid_layout.addWidget(offline_profile_lbl, 0, 4)
 
 
         """ Create Offline controls combo boxes """
@@ -534,14 +540,14 @@ class MainWindow(QMainWindow):
 
         offline_grid_layout.addWidget(self.offline_sim, 1, 0)
         offline_grid_layout.addWidget(self.offline_class, 1, 1)
-        offline_grid_layout.addWidget(self.offline_name, 1, 2)
-        offline_grid_layout.addWidget(self.offline_profile, 1, 3)
+        offline_grid_layout.addWidget(self.offline_name, 1, 2, 1, 2)
+        offline_grid_layout.addWidget(self.offline_profile, 1, 4)
 
         # --- Column stretch ratios (1:2:4:2) ---
         offline_grid_layout.setColumnStretch(0, 1)
         offline_grid_layout.setColumnStretch(1, 2)
         offline_grid_layout.setColumnStretch(2, 4)
-        offline_grid_layout.setColumnStretch(3, 2)
+        offline_grid_layout.setColumnStretch(4, 2)
 
         offline_layout.addLayout(offline_grid_layout)
 
@@ -1400,8 +1406,8 @@ class MainWindow(QMainWindow):
         self.offline_class.setCurrentText(cls)
 
         model_list = xmlutils.read_models(sim, cls)
-        for m in model_list:
-            self.offline_name.addItem(m)
+        self.all_offline_models = model_list
+        self.filter_offline_name_list(self.offline_name_filter.text())
         self.offline_name.setCurrentText(model)
 
         profile_list = xmlutils.get_available_profiles(sim, cls, model)
@@ -1442,10 +1448,13 @@ class MainWindow(QMainWindow):
                                      resets the offline editing UI.
             """
         self.offline_name.blockSignals(True)
+        self.offline_name_filter.blockSignals(True)
         self.offline_class.blockSignals(True)
         self.offline_name.clear()
+        self.offline_name_filter.clear()
         self.offline_class.clear()
         self.offline_name.blockSignals(False)
+        self.offline_name_filter.blockSignals(False)
         self.offline_class.blockSignals(False)
         if sim is None or sim == '':
             # if sim combobox is cleared, reset everything and clear the layout
@@ -1468,10 +1477,10 @@ class MainWindow(QMainWindow):
 
         self.offline_name.clear()  #clear aircraft selection combobox
 
-        models = xmlutils.read_models(sim)  # get all available models based on sim
-        for model_name in models:
-            # populate the combobox with the model names
-            self.offline_name.addItem(model_name)
+        model_list = xmlutils.read_models(sim)
+        self.all_offline_models = model_list
+        self.filter_offline_name_list(self.offline_name_filter.text())
+
         if G.master_instance:
             # send to child instances to mimic action
             G.ipc_instance.send_broadcast_message(f"OFFLINE_SIM:{self.offline_sim.currentText()}")
@@ -1483,12 +1492,15 @@ class MainWindow(QMainWindow):
         self.force_sim_aircraft() # load settings based on sim
 
     def offline_class_changed(self, class_name):
-        models = xmlutils.read_models(self.offline_sim.currentText(), class_name)  # get all available models based on sim and class
+        self.offline_name_filter.blockSignals(True)
+        self.offline_name_filter.clear()
+        self.offline_name_filter.blockSignals(False)
+        model_list = xmlutils.read_models(self.offline_sim.currentText(), class_name)  # get all available models based on sim and class
+        self.all_offline_models = model_list
         self.offline_name.clear()  # clear the aircraft selection combobox
         self.offline_profile.clear()
-        for model_name in models:
-            # populate the combobox with the model names
-            self.offline_name.addItem(model_name)
+        self.filter_offline_name_list(self.offline_name_filter.text())
+
         if G.master_instance:
             # send to child instances to mimic action
             G.ipc_instance.send_broadcast_message(f"OFFLINE_CLASS:{self.offline_class.currentText()}")
@@ -1544,10 +1556,16 @@ class MainWindow(QMainWindow):
             G.ipc_instance.send_broadcast_message(f"OFFLINE_PROFILE:{profile}")
         self.offline_scope_label.setText(f"Editing Aircraft ({self.offline_name.currentText()} - {profile})")
 
-
-
-
-
+    def filter_offline_name_list(self, text):
+        self.offline_name.blockSignals(True)
+        self.offline_name.clear()
+        filtered = [name for name in self.all_offline_models if text.lower() in name.lower()]
+        self.offline_name.addItems(filtered)
+        if len(filtered) == 1:
+            self.offline_name.setCurrentIndex(0)
+            # Manually trigger the downstream handler
+            self.offline_aircraft_changed(filtered[0])
+        self.offline_name.blockSignals(False)
 
     def force_sim_aircraft(self):
         G.settings_mgr.current_sim = self.offline_sim.currentText()
