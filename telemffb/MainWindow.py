@@ -496,6 +496,7 @@ class MainWindow(QMainWindow):
         # Create filter box
         self.offline_name_filter = QLineEdit()
         self.offline_name_filter.setPlaceholderText("Filter")
+        self.offline_name_filter.setEnabled(False)
         self.offline_name_filter.textChanged.connect(self.filter_offline_name_list)
 
         """ Add label widgets to layout """
@@ -1463,8 +1464,9 @@ class MainWindow(QMainWindow):
             self.offline_profile.clear()
             self.settings_layout.clear_layout()
             self.offline_scope_label.setText(f"None")
-
+            self.offline_name_filter.setEnabled(False)
             return
+        self.offline_name_filter.setEnabled(True)
         self.offline_class.clear()  #clear class field
         self.offline_class.addItem('')
         self.offline_name.clear()
@@ -1535,11 +1537,10 @@ class MainWindow(QMainWindow):
             self.offline_class_changed(self.offline_class.currentText())
         else:
             G.settings_mgr.offline_scope = 'MODEL'
+            self.offline_scope_label.setText(f"Editing Aircraft ({ac_name} - {self.offline_profile.currentText()})")
 
         if G.master_instance:
             G.ipc_instance.send_broadcast_message(f'OFFLINE_AC:{self.offline_name.currentText()}')
-
-        self.offline_scope_label.setText(f"Editing Aircraft ({ac_name} - {self.offline_profile.currentText()})")
 
         self.resize_offline_combos()
         self.force_sim_aircraft()
@@ -1559,13 +1560,17 @@ class MainWindow(QMainWindow):
     def filter_offline_name_list(self, text):
         self.offline_name.blockSignals(True)
         self.offline_name.clear()
+        self.offline_profile.blockSignals(True)
+        self.offline_profile.clear()
+        self.offline_name.addItems([''])
         filtered = [name for name in self.all_offline_models if text.lower() in name.lower()]
         self.offline_name.addItems(filtered)
         if len(filtered) == 1:
-            self.offline_name.setCurrentIndex(0)
+            self.offline_name.setCurrentIndex(1)
             # Manually trigger the downstream handler
             self.offline_aircraft_changed(filtered[0])
         self.offline_name.blockSignals(False)
+        self.offline_profile.blockSignals(False)
 
     def force_sim_aircraft(self):
         G.settings_mgr.current_sim = self.offline_sim.currentText()
