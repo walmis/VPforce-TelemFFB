@@ -15,14 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import os.path
 
 from PyQt6.QtGui import QAction, QWheelEvent, QPalette
 
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QHBoxLayout, QSlider, QCheckBox, QFrame, \
-    QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox, QStackedLayout, QSizePolicy
+    QComboBox, QMessageBox, QMenu, QPushButton, QStyleOptionButton, QGridLayout, QGroupBox, QStackedLayout, QSizePolicy, \
+    QGraphicsColorizeEffect
 from PyQt6.QtCore import pyqtSignal, Qt, QSize, QRect, QPointF, QPropertyAnimation, QRectF, QPoint, \
-    QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer
+    QSequentialAnimationGroup, QEasingCurve, pyqtSlot, pyqtProperty, QTimer, QAbstractAnimation
 from PyQt6.QtGui import QPixmap, QPainter, QColor, QCursor, QGuiApplication, QBrush, QPen, QPaintEvent, QRadialGradient, \
     QLinearGradient, QFont
 from PyQt6.QtWidgets import QStyle, QStyleOptionSlider
@@ -32,7 +34,7 @@ from PyQt6.QtCore import Qt
 import numpy as np
 
 import telemffb.globals as G
-from telemffb.utils import HiDpiPixmap, Akima1DInterpolator
+from telemffb.utils import HiDpiPixmap, Akima1DInterpolator, debug_caller_args
 import styles
 
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
@@ -40,6 +42,8 @@ t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
 
 class AppStatusWidget(QWidget):
+    request_set_active_vpconf = pyqtSignal(str)  # <- emit from anywhere
+
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -47,6 +51,9 @@ class AppStatusWidget(QWidget):
         self.offline_recall_ac = ''
         self.offline_recall_ptn = ''
         self.offline_recall_pro = ''
+
+        # connect signal to slot (QueuedConnection by default across threads)
+        self.request_set_active_vpconf.connect(self.set_active_vpconf)
 
         grid = QGridLayout(self)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
@@ -66,6 +73,33 @@ class AppStatusWidget(QWidget):
         self.cur_craft_label = QLabel("None Detected")
         self.cur_pattern_label = QLabel("(No Match)")
         self.active_profile_label = QLabel("(None)")
+        self.active_vpconf_header = QLabel('VPconf File:')
+        self.active_vpconf_label = QLabel('')
+        self.active_vpconf_label.hide()
+
+        self.active_vpconf_label.setStyleSheet(f"""
+                    QLabel {{
+                        padding: 2px 8px;
+                        border-radius: 10px;
+                        background-color: rgba(128,128,128, 100);
+                        font-weight: bold;
+                    }}
+                """)
+
+        self.active_vpconf_header.hide()
+
+        self.active_configurator_header = QLabel('Gains Ovd:')
+        self.active_configurator_label = QLabel('Active')
+        self.active_configurator_label.setStyleSheet(f"""
+                            QLabel {{
+                                padding: 2px 8px;
+                                border-radius: 10px;
+                                background-color: rgba(128,128,128, 100);
+                                font-weight: bold;
+                            }}
+                        """)
+        self.active_configurator_label.hide()
+        self.active_configurator_header.hide()
 
         self.notification_label = QLabel('')
         self.notification_label.setWordWrap(True)
@@ -134,6 +168,14 @@ class AppStatusWidget(QWidget):
         grid.addLayout(profile_row_layout, row, 1)
         row += 1
 
+        grid.addWidget(self.active_vpconf_header, row, 0, alignment=label_align)
+        grid.addWidget(self.active_vpconf_label, row, 1, alignment=value_align)
+        row += 1
+
+        grid.addWidget(self.active_configurator_header, row, 0, alignment=label_align)
+        grid.addWidget(self.active_configurator_label, row, 1, alignment=value_align)
+        row += 1
+
         grid.addLayout(self.message_stack, row, 0, 1, 2)
 
         if not master_instance:
@@ -157,17 +199,20 @@ class AppStatusWidget(QWidget):
         self.sim_status_label.set_status(source, 'Running')
         self.cb_selectProfileCombo.setDisabled(False)
         self.message_stack.setCurrentIndex(0)
+        self.pulse_label(self.sim_status_label.status_label, pulses=2, duration_ms=1000, color=QColor(0,200,0))
 
     def set_paused(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Paused')
         self.cb_selectProfileCombo.setDisabled(False)
         self.message_stack.setCurrentIndex(0)
+        self.pulse_label(self.sim_status_label.status_label, pulses=2, duration_ms=1000, color=QColor(255,200,0))
 
     def set_error(self, source):
         if self.offline: return
         self.sim_status_label.set_status(source, 'Error')
         self.cb_selectProfileCombo.setDisabled(False)
+        self.pulse_label(self.sim_status_label.status_label, pulses=20000, color=QColor(200,0,0))
 
     def set_offline(self, source):
         self.offline = True
@@ -180,6 +225,7 @@ class AppStatusWidget(QWidget):
         self.active_profile_label.setText('Offline')
         self.cb_selectProfileCombo.setDisabled(True)
         self.message_stack.setCurrentIndex(2)
+        self.pulse_label(self.sim_status_label.status_label, stop=True)
 
     def flag_error(self, message):
         self.notification_label.setText(message)
@@ -201,6 +247,29 @@ class AppStatusWidget(QWidget):
 
     def set_profile_name(self, profile_name):
         self.active_profile_label.setText(profile_name)
+
+    @pyqtSlot(str)
+    def set_active_vpconf(self, file):
+        self.active_vpconf_label.setText(os.path.splitext(os.path.basename(file))[0])
+        self.active_vpconf_label.setToolTip(f"Last profile pushed by TelemFFB:\n{file}")
+        self.active_vpconf_header.setVisible(True)
+        self.active_vpconf_label.setVisible(True)
+        self.pulse_label(self.active_vpconf_label, color=QColor(0, 200, 0))
+
+    def set_active_configurator(self, active=True):
+        #debug_caller_args('blue')
+        if active:
+            self.active_configurator_header.show()
+            self.active_configurator_label.show()
+            self.active_configurator_label.setText('Active')
+            self.active_configurator_label.setToolTip('The configurator gains have been modified from the currently\nactive configurator profile (if any)')
+            self.pulse_label(self.active_configurator_label, color=QColor(0, 200, 0))
+        else:
+            self.active_configurator_label.setText('None')
+            self.active_configurator_label.setToolTip('Configurator gains have been reset to those applied by\nthe current vpconf profile (if active) or the gains learned on startup')
+            self.pulse_label(self.active_configurator_label, color=QColor(0, 200, 0))
+
+
 
     def update_enabled_sims(self, sim: str, state: bool):
         # Maintain state map across calls
@@ -227,6 +296,71 @@ class AppStatusWidget(QWidget):
 
         # Set the updated tooltip
         self.findChild(InfoLabel).setToolTip(tooltip)
+
+    def pulse_label(self, widget: QWidget, *, pulses: int | None = 3, duration_ms: int = 600, color: QColor | None = None, stop: bool = False, auto_stop_after_ms: int | None = None) -> None:
+        """
+        Briefly tint a widget with a pulse using a colorize effect.
+        - pulses: how many up+down pulses
+        - duration_ms: total time for one pulse (up&down)
+        - color: optional QColor for the tint
+        """
+        # ---- STOP path ----
+        if stop:
+            effect = getattr(widget, "_pulse_effect", None)
+            anim = getattr(widget, "_pulse_anim", None)
+            if anim:
+                anim.stop()
+            if effect:
+                effect.setStrength(0.0)
+                widget.setGraphicsEffect(None)
+            widget._pulse_effect = None
+            widget._pulse_anim = None
+            return
+
+        if color is None:
+            color = QColor(0, 200, 0)
+
+            # restart cleanly if already pulsing
+        self.pulse_label(widget, stop=True)
+
+        # effect
+        effect = QGraphicsColorizeEffect(widget)
+        effect.setColor(color)
+        effect.setStrength(0.0)
+        widget.setGraphicsEffect(effect)
+        widget._pulse_effect = effect
+
+        # animation (one pulse 0 -> 1 -> 0)
+        anim = QPropertyAnimation(effect, b"strength", widget)
+        anim.setDuration(duration_ms)
+        anim.setKeyValueAt(0.0, 0.0)
+        anim.setKeyValueAt(0.5, 1.0)
+        anim.setKeyValueAt(1.0, 0.0)
+        anim.setEasingCurve(QEasingCurve.Type.InOutSine)
+
+        if pulses is None:
+            # Seamless infinite loop; use fallback if attr missing
+            infinite = getattr(QAbstractAnimation, "Infinite", -1)
+            anim.setLoopCount(infinite)
+        else:
+            anim.setLoopCount(max(1, int(pulses)))
+
+            def cleanup():
+                if getattr(widget, "_pulse_anim", None) is anim:
+                    effect.setStrength(0.0)
+                    widget.setGraphicsEffect(None)
+                    widget._pulse_anim = None
+                    widget._pulse_effect = None
+
+            anim.finished.connect(cleanup)
+
+        widget._pulse_anim = anim
+        anim.start()
+
+        if auto_stop_after_ms and auto_stop_after_ms > 0 and pulses is None:
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(auto_stop_after_ms, lambda: self.pulse_label(widget, stop=True))
+
 
 class SimStatusWidget(QWidget):
     def __init__(self, parent=None):

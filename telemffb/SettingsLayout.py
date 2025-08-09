@@ -1169,8 +1169,8 @@ class SettingsLayout(QGridLayout):
 
         if file_path:
             cfg_scope = xmlutils.device
-            key = "pid" + cfg_scope.capitalize()
-            pid = G.system_settings.get(key, '')
+            # key = "pid" + cfg_scope.capitalize()
+            pid = G.device_usbpid
 
             if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
                 #lprint(f"Selected File: {file_path}")
@@ -1351,6 +1351,7 @@ class SettingsLayout(QGridLayout):
         else:
             G.gain_override_dialog.revert_gains()
             G.gain_override_dialog.reset_to_vpconf()
+            G.main_window.status_container.set_active_configurator(active=False)
 
     def update_advanced_g_effect(self, g_effect_curves: str):
         self.trigger_form_reload = True
