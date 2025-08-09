@@ -7554,6 +7554,30 @@
 			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>trimwheel</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>trimwheel</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>trimwheel</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
+			<type>!SASHelicopter</type>
+			<sim>MSFS</sim>
+			<device>trimwheel</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>trim_following</name>
 			<type>GliderAircraft</type>
 			<value>true</value>

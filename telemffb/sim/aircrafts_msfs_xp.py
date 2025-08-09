@@ -1626,6 +1626,10 @@ class Helicopter(Aircraft):
         # # self._update_cyclic_trim(telem_data)
         self.msfs_update_pedals(telem_data)
 
+    @overrides(Aircraft)
+    def msfs_update_trimwheel(self, *args, **kwargs):
+        pass
+
     def msfs_update_heli_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
         if self._sim_is_msfs():
