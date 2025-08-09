@@ -1453,7 +1453,7 @@ class GliderAircraft(Aircraft):
         super().__init__(name, **kwargs)
 
     def msfs_update_force_trim(self, telem_data, x_axis=True, y_axis=True):
-        if not self.force_trim_enabled: 
+        if not self.spring_mode_is(self.SpringModeEnum.CNTR_FT):
             return
         
         ffb_type = telem_data.get("FFBType", "joystick")
@@ -1546,7 +1546,7 @@ class GliderAircraft(Aircraft):
         if self.is_trimwheel():
             return
 
-        if self.force_trim_enabled:
+        if self.spring_mode_is(self.SpringModeEnum.CNTR_FT):
             self.msfs_update_force_trim(telem_data, x_axis=self.aileron_force_trim, 
                                                     y_axis=self.elevator_force_trim)
 
@@ -2501,7 +2501,7 @@ class HPGHelicopter(Helicopter):
         self._spring_handle.name = "collective_ap_spring"
         # self.damper = effects["collective_damper"].damper()
         force_trim_pressed = False
-        if self.force_trim_enabled and self.force_trim_button:
+        if self.spring_mode_is(self.SpringModeEnum.FORCETRIM) and self.force_trim_button:
             input_data = HapticEffect.device.get_input()
             force_trim_pressed = self.check_button_press(self.force_trim_button, self.collective_ft_use_master_buttons)
             # force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)

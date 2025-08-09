@@ -154,7 +154,7 @@
 		<order>200.2</order>
 		<name>max_aileron_coeff</name>
 		<displayname>Aileron Max Force</displayname>
-		<prereq>spring_mode.BASIC.CENTER</prereq>
+		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
 		<info>Aileron maximum value for use in dynamic forces calculationst&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -185,7 +185,7 @@
 		<order>420.2</order>
 		<name>aileron_expo</name>
 		<displayname>Aileron Expo</displayname>
-		<prereq>spring_mode.BASIC.CENTER</prereq>
+		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Aileron exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -201,7 +201,7 @@
 		<order>430.2</order>
 		<name>max_elevator_coeff</name>
 		<displayname>Elevator Max Force</displayname>
-		<prereq>spring_mode.BASIC.CENTER</prereq>
+		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
 		<info>Elevator maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -217,7 +217,7 @@
 		<order>440.2</order>
 		<name>elevator_expo</name>
 		<displayname>Elevator Expo</displayname>
-		<prereq>spring_mode.BASIC.CENTER</prereq>
+		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Elevator exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -233,7 +233,7 @@
 		<order>450.2</order>
 		<name>max_rudder_coeff</name>
 		<displayname>Rudder Max Force</displayname>
-		<prereq>spring_mode.BASIC.CENTER</prereq>
+		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
 		<info>Rudder maximum value for use in dynamic forces calculations&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator&lt;br&gt;&lt;br&gt;The % shown in the slider is current force applied. 100% occurs near Vne</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -249,7 +249,7 @@
 		<order>460.2</order>
 		<name>rudder_expo</name>
 		<displayname>Rudder Expo</displayname>
-		<prereq>spring_mode.BASIC.CENTER</prereq>
+		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
 		<info>&lt;html&gt;&lt;body&gt;Rudder exponential value.  0 = linear gain, at 0.5, it rises 2x as much in the low end.  Negative values decrease force up to 1/3x. &lt;br&gt;&lt;img src=":/image/expo.png"&gt;&lt;/&gt;&lt;/body&gt;&lt;/html&gt;</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -265,7 +265,7 @@
 		<order>470.2</order>
 		<name>vne_override</name>
 		<displayname>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;V&lt;span style=" vertical-align:sub;"&gt;NE&lt;/span&gt; Override&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>spring_mode.BASIC.CENTER</prereq>
+		<prereq>spring_mode.BASIC.CENTER.CNTR_FT</prereq>
 		<info>Override Vne if plane data is incorrect.  Leave blank or delete setting to use sim Vne data &lt;br&gt;&lt;br&gt;Enter Vne Airspeed (IAS) where dynamic forces max out</info>
 		<any>true</any>
 		<MSFS>true</MSFS>
@@ -283,7 +283,7 @@
 		<order>550.2</order>
 		<name>aileron_spring_gain</name>
 		<displayname>Base Aileron Spring Gain</displayname>
-		<prereq>spring_mode.CENTER</prereq>
+		<prereq>spring_mode.CENTER.CNTR_FT</prereq>
 		<info>Aileron spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -300,7 +300,7 @@
 		<order>550.3</order>
 		<name>elevator_spring_gain</name>
 		<displayname>Base Elevator Spring Gain</displayname>
-		<prereq>spring_mode.CENTER</prereq>
+		<prereq>spring_mode.CENTER.CNTR_FT</prereq>
 		<info>Elevator spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -317,7 +317,7 @@
 		<order>550.4</order>
 		<name>rudder_spring_gain</name>
 		<displayname>Base Rudder Spring Gain</displayname>
-		<prereq>spring_mode.CENTER</prereq>
+		<prereq>spring_mode.CENTER.CNTR_FT</prereq>
 		<info>Rudder spring gain when "aircraft is spring centered" is enabled&lt;br&gt;&lt;br&gt;This is a percentage of the spring force value in VPforce Configurator</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -860,7 +860,7 @@
 		<order>1200</order>
 		<name>cyclic_spring_gain</name>
 		<displayname>Cyclic Spring Gain</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<info>Strength of cyclic spring</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -875,7 +875,7 @@
 		<order>1205</order>
 		<name>elevator_force_trim</name>
 		<displayname>Elevator Axis</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<info>Enable force tirm for elevator axis</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -889,7 +889,7 @@
 		<order>1210</order>
 		<name>aileron_force_trim</name>
 		<displayname>Aileron Axis</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<info>Enable force tirm for aileron axis</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -903,7 +903,7 @@
 		<order>1215</order>
 		<name>collective_ft_use_master_buttons</name>
 		<displayname>Use buttons from master device</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from collective (grip or  loopback app).</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -918,7 +918,7 @@
 		<order>1220</order>
 		<name>force_trim_button</name>
 		<displayname>Force Trim Release Button</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<info>Button # to hold to release spring while moving axis</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -933,7 +933,7 @@
 		<order>1225</order>
 		<name>force_trim_button</name>
 		<displayname>Trim Release Button</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<info>Button # to hold to release spring while moving axis</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -947,7 +947,7 @@
 		<order>1230</order>
 		<name>force_trim_reset_button</name>
 		<displayname>Force Trim Reset Button</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<info>Button # to recenter spring trims</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -961,7 +961,7 @@
 		<order>1235</order>
 		<name>trim_release_spring_gain</name>
 		<displayname>Trim Release Damper</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<info>Spring gain while trim release is pressed&lt;br&gt;&lt;br&gt; Acts as dampening force when trim release is depressed</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -978,7 +978,7 @@
 		<order>1240</order>
 		<name>custom_ft_sw_var_enabled</name>
 		<displayname>Force Trim Switch Simvar</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
 		<info>Enable toggle of Force Trim via Simconnect L:var</info>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
@@ -1043,23 +1043,6 @@
 		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0.15</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>Basic</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>1310</order>
-		<name>collective_ft_use_master_buttons</name>
-		<displayname>Use buttons from master device</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
-		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from collective (grip or  loopback app).</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<collective>true</collective>
-		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -5606,6 +5589,13 @@
 		<validvalues_overrides>
 			<name>spring_mode</name>
 			<sim>MSFS</sim>
+			<class>GliderAircraft</class>
+			<validvalues>MSFS_XP_GILDER_JOYSTICK_SPRING_MODE</validvalues>
+			<device>joystick</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
 			<class>Helicopter</class>
 			<validvalues>MSFS_XP_HELI_JOYSTICK_SPRING_MODE</validvalues>
 			<device>joystick</device>
@@ -5642,6 +5632,41 @@
 			<name>spring_mode</name>
 			<sim>MSFS</sim>
 			<class>FlyInsideHelicopter</class>
+			<validvalues>MSFS_XP_HELI_COLLECTIVE_SPRING_MODE</validvalues>
+			<device>collective</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>HPGHelicopter</class>
+			<validvalues>MSFS_XP_FT_ONLY_JOYSTICK_SPRING_MODE</validvalues>
+			<device>joystick</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>HPGHelicopter</class>
+			<validvalues>MSFS_XP_FT_ONLY_COLLECTIVE_SPRING_MODE</validvalues>
+			<device>collective</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>SASHelicopter</class>
+			<validvalues>MSFS_XP_FT_ONLY_JOYSTICK_SPRING_MODE</validvalues>
+			<device>joystick</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>SASHelicopter</class>
+			<validvalues>MSFS_XP_HELI_PEDAL_SPRING_MODE</validvalues>
+			<device>pedals</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>SASHelicopter</class>
 			<validvalues>MSFS_XP_HELI_COLLECTIVE_SPRING_MODE</validvalues>
 			<device>collective</device>
 		</validvalues_overrides>
@@ -6288,6 +6313,54 @@
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>collective_ft_ovd_spring_gain</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_tr_damper</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_release</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_reset</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_trim_down</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_trim_up</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>collective_ft_ovd_trim_rate</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>aoa_buffeting_enabled</name>
 			<type>!FlyInsideHelicopter</type>
 			<sim>MSFS</sim>
@@ -6389,6 +6462,18 @@
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>trimwheel</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>force_trim_button</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>trim_release_spring_gain</name>
+			<type>!Helicopter</type>
+			<sim>MSFS</sim>
+			<device>collective</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>collective_ap_spring_gain</name>
@@ -7822,15 +7907,44 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spring_mode</name>
-			<type>!HPGHelicopter</type>
+			<type>HPGHelicopter</type>
+			<value>FORCETRIM</value>
 			<sim>MSFS</sim>
-			<device>any</device>
+			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spring_mode</name>
-			<type>!SASHelicopter</type>
+			<type>HPGHelicopter</type>
+			<value>FORCETRIM</value>
 			<sim>MSFS</sim>
-			<device>any</device>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>SASHelicopter</type>
+			<value>FORCETRIM</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>SASHelicopter</type>
+			<value>NOSPRING</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>SASHelicopter</type>
+			<value>NOSPRING</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spring_mode</name>

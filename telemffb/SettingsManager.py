@@ -115,6 +115,7 @@ class SettingsManager(QObject):
         NONE = auto()
         BASIC = auto()
         CENTER = auto()
+        CNTR_FT = auto()
         ADVANCED = auto()
         FBW = auto()
         DEFAULT = auto()
@@ -139,6 +140,14 @@ class SettingsManager(QObject):
         SpringModeEnum.ADVANCED: "Advanced Dynamic"
     }
 
+    MSFS_XP_GILDER_JOYSTICK_SPRING_MODE = {
+        SpringModeEnum.BASIC: "Basic Dynamic",
+        SpringModeEnum.CENTER: "Basic Dynamic with Spring Centering",
+        SpringModeEnum.CNTR_FT: "Basic Dynamic with Spring Centering + Force Trim",
+        SpringModeEnum.FBW: "FlyByWire (FBW)",
+        SpringModeEnum.ADVANCED: "Advanced Dynamic"
+    }
+
     MSFS_XP_HELI_PEDAL_SPRING_MODE = {
         SpringModeEnum.NOSPRING: "No Spring",
         SpringModeEnum.FORCETRIM: "Hardware Force Trim",
@@ -152,6 +161,14 @@ class SettingsManager(QObject):
     MSFS_XP_HELI_COLLECTIVE_SPRING_MODE = {
         SpringModeEnum.NOSPRING: "No Spring",
         SpringModeEnum.FORCETRIM: "Hardware Force Trim",
+    }
+
+    MSFS_XP_FT_ONLY_JOYSTICK_SPRING_MODE = {
+        SpringModeEnum.FORCETRIM: "Force Trim",
+    }
+
+    MSFS_XP_FT_ONLY_COLLECTIVE_SPRING_MODE = {
+        SpringModeEnum.FORCETRIM: "Force Trim",
     }
 
     DCS_IL2_PEDAL_SPRING_MODE = {
