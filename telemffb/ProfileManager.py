@@ -23,7 +23,7 @@ import re
 
 
 from PyQt6.QtCore import Qt, QThread, QObject, pyqtSignal, pyqtSlot, QRegularExpression
-from PyQt6.QtGui import QAction, QIcon, QRegularExpressionValidator
+from PyQt6.QtGui import QAction, QIcon, QRegularExpressionValidator, QFont, QBrush, QPalette
 from PyQt6.QtWidgets import QDialog, QMessageBox, QTreeWidgetItem, QHeaderView, QStyle, QMenu, QFileDialog, QTreeWidget, \
     QInputDialog, QTableWidgetItem, QComboBox, QVBoxLayout, QLabel, QLineEdit, QCheckBox, QHBoxLayout, QPushButton, \
     QRadioButton, QButtonGroup, QApplication, QListWidget, QListWidgetItem, QTableWidget, QAbstractItemView
@@ -39,6 +39,12 @@ import telemffb.xmlutils as xmlutils
 import time
 
 class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
+    # --- column indexes ---
+    COL_AIRCRAFT = 0
+    COL_SOURCE = 1  # hidden
+    COL_TYPE = 2
+    COL_PROFILE = 3
+    COL_ACTIVE = 4
     def __init__(self, parent=None):
         super(ProfileManagerDialog, self).__init__(parent)
         self.sorted_column = -1
@@ -52,18 +58,27 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         # self.populate_aircraft_tree(self.treeWidget)
         self.treeWidget.setSelectionMode(QTreeWidget.SelectionMode.ExtendedSelection)
 
-        self.treeWidget.setColumnCount(4)
-        self.treeWidget.setHeaderLabels(["Aircraft Name", "Source", "Profile Name", "Active"])
-        self.treeWidget.headerItem().setToolTip(0, "Click to sort on Aircraft Name")
-        self.treeWidget.headerItem().setToolTip(1, "Click to sort on Source")
-        self.treeWidget.headerItem().setToolTip(1, "Click to sort on Profile Name")
+        self.treeWidget.setColumnCount(5)
+        self.treeWidget.setHeaderLabels(["Aircraft Name", "Source", "Type", "Profile Name", "Active"])
+
+        # Hide Source
+        self.treeWidget.setColumnHidden(self.COL_SOURCE, True)
+
+        # Tooltips
+        self.treeWidget.headerItem().setToolTip(self.COL_AIRCRAFT, "Click to sort on Aircraft Name")
+        self.treeWidget.headerItem().setToolTip(self.COL_TYPE, "Click to sort on Type")
+        self.treeWidget.headerItem().setToolTip(self.COL_PROFILE, "Click to sort on Profile Name")
+        self.treeWidget.headerItem().setToolTip(self.COL_ACTIVE, "Click to sort on Active")
+
         self.header = self.treeWidget.header()
         self.header.setStretchLastSection(False)
         self.header.setSortIndicatorShown(True)
-        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # First column: stretch to fill
-        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Second column: shrink to fit
-        self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Second column: shrink to fit
-        self.header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Second column: shrink to fit
+
+        self.header.setSectionResizeMode(self.COL_AIRCRAFT, QHeaderView.ResizeMode.Stretch)
+        self.header.setSectionResizeMode(self.COL_TYPE, QHeaderView.ResizeMode.ResizeToContents)
+        self.header.setSectionResizeMode(self.COL_PROFILE, QHeaderView.ResizeMode.ResizeToContents)
+        self.header.setSectionResizeMode(self.COL_ACTIVE, QHeaderView.ResizeMode.ResizeToContents)
+
         self.header.show()
         self.header.setSectionsClickable(True)
         self.header.sectionClicked.connect(self.on_header_clicked)
@@ -130,7 +145,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         # Save selected item text (column 0), or use custom data if more precise identification is needed
         selected_item = self.treeWidget.currentItem()
-        self._last_selected_text = selected_item.text(0) if selected_item else None
+        self._last_selected_text = selected_item.text(self.COL_AIRCRAFT) if selected_item else None
 
         # Start thread
         self.thread.start()
@@ -164,11 +179,34 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                 sim_item.addChild(cls_item)
 
                 for ac in cls["aircraft"]:
+                    if ac["source"].lower() == "user":
+                        if ac["profile"].lower() == 'user default':
+                            profile_display_name = ''
+                        else:
+                            profile_display_name = ac['profile']
+                    else:
+                        profile_display_name = ''
+
+                    if ac["source"].lower() == "default":
+                        type_text = "Built-in"
+                    else:
+                        type_text = "User Aircraft" if ac["profile"].lower() == "user default" else "Settings Profile"
+
                     ac_item = QTreeWidgetItem([
-                        ac["aircraft"],
-                        ac["source"],
-                        ac["profile"] if ac["source"] == "User" else ""
+                        ac["aircraft"],  # COL_AIRCRAFT
+                        ac["source"],  # COL_SOURCE (hidden)
+                        type_text,  # COL_TYPE (new)
+                        profile_display_name  # COL_PROFILE
+                        # COL_ACTIVE text will be set via update_active_column_text
                     ])
+
+                    if ac["source"].lower() == "default":
+                        self._style_row_as_default(ac_item, user=False)
+
+                    if ac["source"].lower() == 'user' and ac['profile'].lower() == 'user default':
+                        self._style_row_as_default(ac_item, user=True)
+
+
                     ac_item.setData(0, Qt.ItemDataRole.UserRole, {
                         "type": ac["type"],
                         "sim_name": sim["name"],
@@ -212,7 +250,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
             for i in range(parent_item.childCount()):
                 child = parent_item.child(i)
-                if child.text(0) == text:
+                if child.text(self.COL_AIRCRAFT) == text:
                     return child
                 result = find_item_by_text(text, child)
                 if result:
@@ -233,6 +271,20 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.pb_Activate.setEnabled(False)
 
         self.pb_Export.clicked.connect(self.export_selected_profile)
+
+    def _style_row_as_default(self, item: QTreeWidgetItem, user=False):
+        pal = self.treeWidget.palette()
+        disabled_color = pal.color(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text)
+        brush = QBrush(disabled_color)
+        italic_font = QFont()
+        italic_font.setItalic(True)
+
+        for col in (self.COL_TYPE, self.COL_PROFILE):
+            if not user:
+                item.setForeground(col, brush)
+            item.setFont(col, italic_font)
+        if not user:
+            item.setForeground(self.COL_AIRCRAFT, brush)
 
     def reapply_active_radio_button(self):
         """Programmatically re-triggers the currently selected radio button's toggled logic."""
@@ -287,8 +339,8 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                 return False
 
             # 3. Text filters
-            ac_text = item.text(0).lower()
-            profile_text = item.text(2).lower()
+            ac_text = item.text(self.COL_AIRCRAFT).lower()
+            profile_text = item.text(self.COL_PROFILE).lower()
             if aircraft_query not in ac_text or profile_query not in profile_text:
                 return False
 
@@ -379,6 +431,14 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                     self.pb_Export.setEnabled(False)
             else:
                 # only one item is selected
+                item = selected_item[0]
+                is_user = self.get_metadata(item, "type") == "user"
+                profile_name = self.get_metadata(item, "profile_name") or ""
+                # Enable only if single, user type, and not "User Default"
+                if is_user and profile_name.lower() != "user default":
+                    self.pb_Rename.setEnabled(True)
+                else:
+                    self.pb_Rename.setEnabled(False)
                 self.pb_Clone.setEnabled(True)
                 self.pb_Edit.setEnabled(True)
                 if self.get_metadata(selected_item[0], 'active'):
@@ -405,6 +465,8 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
 
     def on_header_clicked(self, logicalIndex):
+        if logicalIndex == self.COL_SOURCE:
+            return
         if self.sorted_column == logicalIndex:
             self.sort_order = (
                 Qt.SortOrder.DescendingOrder
@@ -431,8 +493,8 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         profile_query = self.tb_profile_filter.text().lower()
 
         def matches(item):
-            aircraft = item.text(0).lower()
-            profile = item.text(2).lower()
+            aircraft = item.text(self.COL_AIRCRAFT).lower()
+            profile = item.text(self.COL_PROFILE).lower()
             return aircraft_query in aircraft and profile_query in profile
 
         def recurse(item):
@@ -449,50 +511,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         self.prune_empty_tree_items(self.treeWidget)
 
-    # def apply_radio_filter(self):
-    #     button = self.filterButtonGroup.checkedButton()
-    #
-    #     if button == self.rb_showAll:
-    #         self.clear_sim_class_model_filter()
-    #     elif button == self.rb_showDefaults:
-    #         self.clear_sim_class_model_filter()
-    #         self.toggle_show_defaults(True)
-    #     elif button == self.rb_showUser:
-    #         self.clear_sim_class_model_filter()
-    #         self.filter_active_profiles(True)
-    #     elif button == self.rb_showCurrentAircraft:
-    #         self.toggle_show_defaults(False)
-    #         self.filter_by_sim_class_model(
-    #             G.settings_mgr.current_sim,
-    #             G.settings_mgr.current_class,
-    #             G.settings_mgr.current_pattern
-    #         )
-
-    # def clear_sim_class_model_filter(self):
-    #     for i in range(self.treeWidget.topLevelItemCount()):
-    #         sim_item = self.treeWidget.topLevelItem(i)
-    #         sim_item.setHidden(False)
-    #         for j in range(sim_item.childCount()):
-    #             cls_item = sim_item.child(j)
-    #             cls_item.setHidden(False)
-    #             for k in range(cls_item.childCount()):
-    #                 ac_item = cls_item.child(k)
-    #                 ac_item.setHidden(False)
-    #
-    #     # Re-apply whatever the currently selected radio button is
-    #     active_button = self.filterButtonGroup.checkedButton()
-    #     if active_button == self.rb_showDefaults:
-    #         self.toggle_show_defaults(True)
-    #     elif active_button == self.rb_showUser:
-    #         self.filter_active_profiles(True)
-    #     elif active_button == self.rb_showCurrentAircraft:
-    #         self.filter_by_sim_class_model(
-    #             G.settings_mgr.current_sim,
-    #             G.settings_mgr.current_class,
-    #             G.settings_mgr.current_pattern
-    #         )
-
-    def sort_aircraft_items(self, by_column=0, order=Qt.SortOrder.AscendingOrder):
+    def sort_aircraft_items(self, by_column=COL_AIRCRAFT, order=Qt.SortOrder.AscendingOrder):
         reverse = order == Qt.SortOrder.DescendingOrder
         for i in range(self.treeWidget.topLevelItemCount()):
             sim_item = self.treeWidget.topLevelItem(i)
@@ -500,7 +519,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                 cls_item = sim_item.child(j)
                 aircraft_items = [cls_item.child(k) for k in range(cls_item.childCount())]
 
-                if by_column == 2:  # Profile Name
+                if by_column == self.COL_PROFILE:  # Profile Name
                     with_profile = [item for item in aircraft_items if item.text(by_column)]
                     without_profile = [item for item in aircraft_items if not item.text(by_column)]
                     with_profile.sort(key=lambda item: item.text(by_column).lower(), reverse=reverse)
@@ -513,11 +532,13 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                 for ac in sorted_items:
                     cls_item.addChild(ac)
 
-    def mark_item_as_active(self, item, column=3):
-        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)  # Remove user toggle ability
+    def mark_item_as_active(self, item, column=None):
+        column = self.COL_ACTIVE if column is None else column
+        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
         item.setData(column, Qt.ItemDataRole.CheckStateRole, Qt.CheckState.Checked)
 
-    def unmark_item_as_active(self, item, column=3):
+    def unmark_item_as_active(self, item, column=None):
+        column = self.COL_ACTIVE if column is None else column
         item.setData(column, Qt.ItemDataRole.CheckStateRole, Qt.CheckState.Unchecked)
 
 
@@ -540,34 +561,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
             sim_item.setHidden(not sim_visible)
 
-    # def toggle_show_defaults(self, checked):
-    #     """
-    #     If checked, only show default profiles. All user profiles are hidden.
-    #     If unchecked, visibility is not altered.
-    #     """
-    #     for i in range(self.treeWidget.topLevelItemCount()):
-    #         sim_item = self.treeWidget.topLevelItem(i)
-    #         for j in range(sim_item.childCount()):
-    #             cls_item = sim_item.child(j)
-    #
-    #             for k in range(cls_item.childCount()):
-    #                 item = cls_item.child(k)
-    #                 item_type = self.get_metadata(item, "type")
-    #                 is_active = self.get_metadata(item, "active")
-    #
-    #                 if checked:
-    #                     # Show only default profiles
-    #                     if item_type == "default":
-    #                         item.setHidden(False)
-    #                     else:
-    #                         item.setHidden(True)
-    #                 else:
-    #                     # Reset visibility (handled elsewhere)
-    #                     item.setHidden(False)
-    #
-    #     self.prune_empty_tree_items(self.treeWidget)
-
-    def update_active_column_text(self, item, active: bool, column=3):
+    def update_active_column_text(self, item, active: bool, column=None):
         """
         Sets an invisible Unicode hint in the 'Active' column for proper sorting.
         The hint ensures active profiles sort differently, even if the column has no visible text.
@@ -578,6 +572,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             column (int): The column index to update (default is 3).
         """
         # ZWNJ ("\u200C") will sort after ZWSP ("\u200B") but neither is visible.
+        column = self.COL_ACTIVE if column is None else column
         sort_hint = "\u200C" if active else "\u200B"
         item.setText(column, sort_hint)
 
@@ -611,7 +606,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             is_target = (child is target_item)
 
             # Update UI check state
-            child.setData(3, Qt.ItemDataRole.CheckStateRole,
+            child.setData(self.COL_ACTIVE, Qt.ItemDataRole.CheckStateRole,
                           Qt.CheckState.Checked if is_target else Qt.CheckState.Unchecked)
 
             # Update metadata
@@ -677,7 +672,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         for item in profiles:
             sim = get_metadata(item, "sim_name")
             cls = get_metadata(item, "cls_name")
-            model = item.text(0)
+            model = item.text(self.COL_AIRCRAFT)
             profile = get_metadata(item, "profile_name")
 
             root = ET.Element("TelemFFB_v2")
@@ -753,7 +748,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         for item in profiles:
             sim = get_metadata(item, "sim_name")
             cls = get_metadata(item, "cls_name")
-            model = item.text(0)
+            model = item.text(self.COL_AIRCRAFT)
             profile = get_metadata(item, "profile_name")
 
 
@@ -1070,7 +1065,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         # Block default profile deletions
         default_items = [i for i in items if self.get_metadata(i, "type") == "default"]
         if default_items:
-            names = "\n".join(f"{i.text(0)} (Default)" for i in default_items)
+            names = "\n".join(f"{i.text(self.COL_AIRCRAFT)} (Default)" for i in default_items)
             QMessageBox.warning(
                 self,
                 "Cannot Delete Default Profiles",
@@ -1092,8 +1087,8 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             active_item = items[0]
             sim = active_item.parent().parent().text(0)
             cls = self.get_metadata(active_item, "cls_name")
-            model = active_item.text(0)
-            profile = active_item.text(2)
+            model = active_item.text(self.COL_AIRCRAFT)
+            profile = active_item.text(self.COL_PROFILE)
             cls_item = active_item.parent()
 
             # Get sibling profiles for same aircraft
@@ -1167,7 +1162,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             return
 
         # Handle standard deletions
-        names = "\n".join(f"{i.text(0)} ({i.text(2)})" for i in items)
+        names = "\n".join(f"{i.text(self.COL_AIRCRAFT)} ({i.text(self.COL_PROFILE)})" for i in items)
         resp = QMessageBox.question(
             self, "Confirm Deletion",
             f"Delete the following profiles?\n\n{names}",
@@ -1178,8 +1173,8 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         for item in items:
             sim = item.parent().parent().text(0)
-            model = item.text(0)
-            profile = item.text(2)
+            model = item.text(self.COL_AIRCRAFT)
+            profile = item.text(self.COL_PROFILE)
             xmlutils.erase_model_profile(sim, model, profile)
             item.parent().removeChild(item)
 
@@ -1344,16 +1339,26 @@ class NewProfileDialog(QDialog):
 
         # Inline error label (initially hidden)
         self.error_label = QLabel()
-        self.error_label.setStyleSheet("""
-            QLabel {
-                color: #ff4444;
-                background-color: rgba(255, 80, 80, 30%);
-                border: 1px solid #ff4444;
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-weight: bold;
-            }
-        """)
+        if G.useDarkMode:
+            fg = "#FFE3E3"  # soft light red/pink (good contrast on dark)
+            bg = "rgba(255, 99, 99, 0.16)"  # faint red tint
+            bd = "#FF6B6B"  # border a bit brighter
+        else:
+            fg = "#B00020"  # material-ish error red
+            bg = "rgba(176, 0, 32, 0.10)"  # faint tint
+            bd = "rgba(176, 0, 32, 0.35)"
+
+        self.error_label.setStyleSheet(f"""
+                QLabel {{
+                    color: {fg};
+                    background-color: {bg};
+                    border: 1px solid {bd};
+                    border-radius: 4px;
+                    padding: 4px 8px;
+                    font-weight: 600;
+                }}
+            """)
+
         self.error_label.setWordWrap(True)
         self.error_label.setVisible(False)
         self.layout.addWidget(self.error_label)
