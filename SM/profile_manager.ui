@@ -14,7 +14,7 @@
    <string>TelemFFB Profile Manager</string>
   </property>
   <layout class="QGridLayout" name="gridLayout_2">
-   <item row="0" column="0" colspan="2">
+   <item row="0" column="0" colspan="3">
     <widget class="QTreeWidget" name="treeWidget">
      <property name="minimumSize">
       <size>
@@ -29,7 +29,7 @@
      </column>
     </widget>
    </item>
-   <item row="0" column="2">
+   <item row="0" column="3">
     <layout class="QVBoxLayout" name="verticalLayout">
      <property name="spacing">
       <number>20</number>
@@ -68,6 +68,12 @@
      </item>
      <item>
       <widget class="StyledButton" name="pb_Activate">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="toolTip">
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Make the currently selected profile active for the aircraft&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
@@ -77,7 +83,29 @@
       </widget>
      </item>
      <item>
+      <widget class="StyledButton" name="pb_Rename">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="toolTip">
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Rename Profile&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;Q</string>
+       </property>
+       <property name="text">
+        <string>Rename</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="StyledButton" name="pb_Edit">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="toolTip">
         <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Open the selected profile in the offline editor&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
@@ -133,7 +161,7 @@
      </item>
     </layout>
    </item>
-   <item row="1" column="0" colspan="2">
+   <item row="1" column="0" colspan="3">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <property name="rightMargin">
       <number>14</number>
@@ -197,7 +225,7 @@
      </item>
     </layout>
    </item>
-   <item row="2" column="0" colspan="2">
+   <item row="2" column="0" colspan="3">
     <layout class="QGridLayout" name="gridLayout">
      <item row="0" column="0">
       <widget class="QRadioButton" name="rb_showAll">
@@ -269,7 +297,7 @@
      <item row="1" column="0">
       <widget class="QRadioButton" name="rb_showDefaults">
        <property name="text">
-        <string>Show Default Profiles</string>
+        <string>Show Built-in Profiles</string>
        </property>
        <attribute name="buttonGroup">
         <string notr="true">filterButtonGroup</string>
@@ -340,6 +368,13 @@
      </item>
     </layout>
    </item>
+   <item row="3" column="0">
+    <widget class="Line" name="line">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
    <item row="3" column="1">
     <spacer name="verticalSpacer">
      <property name="orientation">
@@ -356,14 +391,7 @@
      </property>
     </spacer>
    </item>
-   <item row="4" column="0" colspan="3">
-    <widget class="Line" name="line">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="5" column="0" colspan="3">
+   <item row="4" column="0" colspan="4">
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
       <widget class="QPushButton" name="pb_newAircraft">

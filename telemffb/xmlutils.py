@@ -1934,6 +1934,44 @@ def add_new_profile(sim, class_name, match_string, profile_name):
     if not exists:
         write_models_to_xml(sim, match_string, class_name, the_device='any', setting_name='profile', profile_name=profile_name)
 
+def rename_profile(sim, class_name, match_string, existing_name, new_name):
+    """
+    Rename a profile for a given (sim, class_name, model-pattern) across:
+      1) All <models> rows with matching sim/model and profile==existing_name
+      2) The <profileMappings> entry for (sim, cls, model) if active_profile==existing_name
+
+    Args:
+        sim (str): Simulator name (e.g. "MSFS", "DCS")
+        class_name (str): Aircraft class (e.g. "PropellerAircraft")
+        match_string (str): The model regex/name used in <models><model>...</model>
+        existing_name (str): Current profile name
+        new_name (str): New profile name
+    """
+    changed = False
+
+    root = auto_user_root
+    tree = auto_user_tree
+    for model_elem in root.findall(f'models[sim="{sim}"][model="{match_string}"][profile="{existing_name}"]'):
+        prof = model_elem.find('profile')
+        if prof is not None:
+            prof.text = new_name
+            changed = True
+
+    mapping = root.find(f'profileMappings[sim="{sim}"][cls="{class_name}"][model="{match_string}"][active_profile="{existing_name}"]')
+    if mapping is not None:
+        active = mapping.find('active_profile')
+        active.text = new_name
+        changed = True
+
+    if changed:
+        consolidate_sort_and_write_userconfig(tree)
+        logging.info(f"Renamed profile '{existing_name}' -> '{new_name}' for sim='{sim}', cls='{class_name}', model='{match_string}' ")
+    else:
+        logging.info(
+            f"No matching entries found to rename from '{existing_name}' to '{new_name}' "
+            f"for sim='{sim}', cls='{class_name}', model='{match_string}'"
+        )
+
 def remove_dicts_by_names(data_list, removal_list):
     """
        Removes dictionaries from a list based on the 'name' key matching any entry in removal_list.
@@ -2046,8 +2084,8 @@ def get_active_profile_for_model(sim, cls, model, users_root=None):
         if m == model and s == sim and c == cls:
             return profile.findtext('active_profile')
 
-    # 2. Check <models> section for a profile tag
-    for model_entry in auto_user_root.findall('.//models'):
+    # 2. Check <models> section for a user created aircraft default
+    for model_entry in auto_user_root.findall('models[name="type"]'):
         m = model_entry.findtext('model')
         s = model_entry.findtext('sim')
 
@@ -2055,9 +2093,9 @@ def get_active_profile_for_model(sim, cls, model, users_root=None):
             p = model_entry.findtext('profile')
             if p:
                 return p
-    # 3. Nothing found in user profile, look for aircraft entry in defaults
 
-    for model_entry in auto_defaults_root.findall('.//models'):
+    # 3. Nothing found in user profile, look for aircraft entry in defaults
+    for model_entry in auto_defaults_root.findall('models[name="type"]'):
         m = model_entry.findtext('model')
         s = model_entry.findtext('sim')
         if m == model and s == sim:

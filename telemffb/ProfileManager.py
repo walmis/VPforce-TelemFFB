@@ -80,6 +80,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.pb_Clone.clicked.connect(self.on_clone_clicked)
         self.pb_Activate.clicked.connect(self.on_activate_clicked)
         self.pb_Edit.clicked.connect(self.on_edit_clicked)
+        self.pb_Rename.clicked.connect(self.on_rename_clicked)
 
         self.pb_newAircraft.clicked.connect(self.on_new_wizard_clicked)
 
@@ -227,6 +228,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         self.pb_Delete.setEnabled(False)
         self.pb_Export.setEnabled(False)
         self.pb_Clone.setEnabled(False)
+        self.pb_Rename.setEnabled(False)
         self.pb_Edit.setEnabled(False)
         self.pb_Activate.setEnabled(False)
 
@@ -369,6 +371,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
                 # more than one item is selcted
                 self.pb_Clone.setEnabled(False)
                 self.pb_Edit.setEnabled(False)
+                self.pb_Rename.setEnabled(False)
                 self.pb_Activate.setEnabled(False)
                 if any(self.get_metadata(item, "type") == "user" for item in selected_item):
                     self.pb_Export.setEnabled(True)
@@ -396,6 +399,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             self.pb_Delete.setEnabled(False)
             self.pb_Export.setEnabled(False)
             self.pb_Edit.setEnabled(False)
+            self.pb_Rename.setEnabled(False)
             self.pb_Clone.setEnabled(False)
             self.pb_Activate.setEnabled(False)
 
@@ -416,133 +420,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
         self.sort_aircraft_items(by_column=logicalIndex, order=self.sort_order)
 
-    # def on_filter_mode_changed(self, button, checked):
-    #     if not checked:
-    #         return  # Ignore button uncheck events
-    #
-    #     if button == self.rb_showAll:
-    #         self.clear_sim_class_model_filter()
-    #         return
-    #
-    #     if button == self.rb_showDefaults:
-    #         self.clear_sim_class_model_filter()
-    #         self.toggle_show_defaults(True)
-    #
-    #     elif button == self.rb_showUser:
-    #         self.clear_sim_class_model_filter()
-    #         self.filter_active_profiles(True)
-    #
-    #     elif button == self.rb_showCurrentAircraft:
-    #         self.toggle_show_defaults(False)  # Hide defaults before filtering
-    #         self.filter_by_sim_class_model(
-    #             G.settings_mgr.current_sim,
-    #             G.settings_mgr.current_class,
-    #             G.settings_mgr.current_pattern
-    #         )
 
-    # def apply_combined_filters(self):
-    #     """Apply radio button, search text, and activation status filters."""
-    #     self.apply_radio_filter()
-    #     self.apply_text_filters()
-    #     self.apply_active_filter()
-
-    # def apply_active_filter(self):
-    #     """Filter items based on activation status using cb_Active and cb_Inactive."""
-    #     show_active = self.cb_active.isChecked()
-    #     show_inactive = self.cb_inactive.isChecked()
-    #
-    #     def should_show(item):
-    #         if item.isHidden():
-    #             return False  # Already filtered out
-    #         active = self.get_metadata(item, "active")
-    #         return (active and show_active) or (not active and show_inactive)
-    #
-    #     def recurse(item):
-    #         if item.childCount() == 0:  # Leaf
-    #             item.setHidden(not should_show(item))
-    #         else:
-    #             for i in range(item.childCount()):
-    #                 recurse(item.child(i))
-    #
-    #     for i in range(self.treeWidget.topLevelItemCount()):
-    #         recurse(self.treeWidget.topLevelItem(i))
-    #
-    #     self.prune_empty_tree_items(self.treeWidget)
-
-    # def filter_active_profiles(self, show_only_active_user):
-    #     """
-    #     Filters the tree view to display only active user-created profiles when toggled.
-    #
-    #     If the toggle is on:
-    #         - Only user profiles with an active status are shown.
-    #         - Default profiles are hidden regardless of the 'Show Defaults' checkbox unless the default profile is active
-    #           and there are other active user profiles for that aircraft .
-    #
-    #     If the toggle is off:
-    #         - Default profiles are shown or hidden based on 'Show Defaults' checkbox.
-    #         - All user profiles are shown.
-    #
-    #     Args:
-    #         show_only_active_user (bool): True if filtering for active user profiles only.
-    #     """
-    #     def process_leaf(item):
-    #         item_type = self.get_metadata(item, "type")
-    #         ac_name = self.get_metadata(item, "aircraft_name")
-    #         cls = item.parent()
-    #         siblings = [cls.child(k) for k in range(cls.childCount())
-    #                     if self.get_metadata(cls.child(k), "aircraft_name") == ac_name]
-    #         has_user = any(self.get_metadata(s, "type") == "user" for s in siblings)
-    #         is_active = item.checkState(3) == Qt.CheckState.Checked
-    #
-    #         if show_only_active_user:
-    #             if item_type == "user":
-    #                 item.setHidden(not is_active)
-    #             elif item_type == "default":
-    #                 item.setHidden(not (is_active and has_user))
-    #         else:
-    #             if item_type == "default":
-    #                 item.setHidden(not (is_active and has_user))
-    #             else:
-    #                 item.setHidden(False)
-    #
-    #     def recurse(node):
-    #         if node.childCount() == 0:
-    #             process_leaf(node)
-    #         else:
-    #             for i in range(node.childCount()):
-    #                 recurse(node.child(i))
-    #
-    #     for idx in range(self.treeWidget.topLevelItemCount()):
-    #         recurse(self.treeWidget.topLevelItem(idx))
-    #
-    #     self.prune_empty_tree_items(self.treeWidget)
-    #
-    # def filter_by_sim_class_model(self, target_sim, target_class, target_model):
-    #     """
-    #     Filters the tree to show only items matching the specified sim, class, and model.
-    #     All unrelated branches will be hidden.
-    #
-    #     Args:
-    #         target_sim (str): Simulator name (e.g., 'MSFS').
-    #         target_class (str): Aircraft class (e.g., 'Fighter').
-    #         target_model (str): Aircraft model name (e.g., 'F-16').
-    #     """
-    #     for i in range(self.treeWidget.topLevelItemCount()):
-    #         sim_item = self.treeWidget.topLevelItem(i)
-    #         sim_match = sim_item.text(0) == target_sim
-    #         sim_item.setHidden(not sim_match)
-    #
-    #         for j in range(sim_item.childCount()):
-    #             cls_item = sim_item.child(j)
-    #             cls_match = cls_item.text(0) == target_class
-    #             cls_item.setHidden(not (sim_match and cls_match))
-    #
-    #             for k in range(cls_item.childCount()):
-    #                 ac_item = cls_item.child(k)
-    #                 ac_name = self.get_metadata(ac_item, "aircraft_name")
-    #                 ac_item.setHidden(not (sim_match and cls_match and ac_name == target_model))
-    #
-    #     self.prune_empty_tree_items(self.treeWidget)
 
     def clear_text_filters(self):
         self.tb_aircraft_filter.setText('')
@@ -1310,6 +1188,51 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         QMessageBox.information(self, "Deleted", f"Deleted {len(items)} profile(s).")
 
     @pyqtSlot()
+    def on_rename_clicked(self):
+        selected = [i for i in self.treeWidget.selectedItems() if i.childCount() == 0]
+        if len(selected) != 1:
+            return
+
+        item = selected[0]
+        # safety checks (should already be enforced by button enable logic)
+        if self.get_metadata(item, "type") != "user":
+            return
+        current_name = self.get_metadata(item, "profile_name") or ""
+        if current_name.lower() == "user default":
+            return
+
+        sim = self.get_metadata(item, "sim_name")
+        cls = self.get_metadata(item, "cls_name")
+        model = self.get_metadata(item, "aircraft_name")
+        is_active = bool(self.get_metadata(item, "active"))
+
+        # profiles for this aircraft to check duplicates
+        existing_profiles = xmlutils.get_available_profiles(sim, cls, model)
+
+        dlg = RenameProfileDialog(self, existing_profiles, current_name)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        new_name = dlg.value()
+        if not new_name or new_name == current_name:
+            return
+
+        # try:
+        xmlutils.rename_profile(sim, cls, model, current_name, new_name)
+
+        # if this profile was active, keep it active under the new name
+        if is_active:
+            xmlutils.update_active_profile_entry(sim, cls, model, new_name)
+
+        # refresh
+        self.start_tree_population()
+        QApplication.processEvents()
+        QMessageBox.information(self, "Renamed",
+                                f"Profile '{current_name}' renamed to '{new_name}'.")
+        # except Exception as e:
+        #     QMessageBox.critical(self, "Rename Failed", f"Could not rename profile:\n{e}")
+
+    @pyqtSlot()
     def on_clone_clicked(self):
         items = [i for i in self.treeWidget.selectedItems() if i.childCount() == 0]
         if len(items) != 1:
@@ -1495,6 +1418,104 @@ class NewProfileDialog(QDialog):
         to_clone = self.combo_clone.currentText() if self.radio_clone.isChecked() else None
         return profile_name, make_active, clone_existing, to_clone
 
+class RenameProfileDialog(QDialog):
+    def __init__(self, parent, existing_names, current_name):
+        super().__init__(parent)
+        self.setWindowTitle(f"Rename Profile '{current_name}'")
+        self.setModal(True)
+        self.setMinimumWidth(320)
+
+        self._existing = {n.lower() for n in existing_names if n}
+
+        lay = QVBoxLayout(self)
+
+        lay.addWidget(QLabel("New profile name:"))
+        self.le = QLineEdit(current_name, self)
+        # same character policy you used before
+        rx = QRegularExpression(r"^[ a-zA-Z0-9_\-()]+$")
+        self.le.setValidator(QRegularExpressionValidator(rx, self))
+        lay.addWidget(self.le)
+
+        # inline error (theme-aware)
+        self.err = QLabel("", self)
+        self.err.setWordWrap(True)
+        err_retain = self.err.sizePolicy()
+        err_retain.setRetainSizeWhenHidden(True)
+        self.err.setSizePolicy(err_retain)
+        self.err.hide()
+        if G.useDarkMode:
+            fg = "#FFE3E3"  # soft light red/pink (good contrast on dark)
+            bg = "rgba(255, 99, 99, 0.16)"  # faint red tint
+            bd = "#FF6B6B"  # border a bit brighter
+        else:
+            fg = "#B00020"  # material-ish error red
+            bg = "rgba(176, 0, 32, 0.10)"  # faint tint
+            bd = "rgba(176, 0, 32, 0.35)"
+
+        self.err.setStyleSheet(f"""
+                QLabel {{
+                    color: {fg};
+                    background-color: {bg};
+                    border: 1px solid {bd};
+                    border-radius: 4px;
+                    padding: 4px 8px;
+                    font-weight: 600;
+                }}
+            """)
+
+        lay.addWidget(self.err)
+
+        row = QHBoxLayout()
+        self.ok = QPushButton("OK", self)
+        self.ok.setEnabled(False)
+        cancel = QPushButton("Cancel", self)
+        row.addStretch(1)
+        row.addWidget(self.ok)
+        row.addWidget(cancel)
+        lay.addLayout(row)
+
+        # signals
+        self.le.textChanged.connect(self._validate)
+        self.ok.clicked.connect(self.accept)
+        cancel.clicked.connect(self.reject)
+
+        # run initial validation
+        self._validate(self.le.text())
+
+    def _validate(self, txt: str):
+        name = txt.strip()
+        if not name:
+            self.err.setText('')
+            self.err.hide()
+            self.ok.setEnabled(False)
+            return
+        reserved = ['built-in', 'built_in', 'builtin', 'built in', 'user default', 'user-default','user_default', 'userdefault', 'auto user','autouser','auto-user','auto_user', 'default']
+        if name.lower() in reserved:
+            self.err.setText(f"'{name}' is a reserved profile name.")
+            self.err.show()
+            self.ok.setEnabled(False)
+            return
+
+        if name.lower() in self._existing:
+            self.err.setText(f"'{name}' already exists. Choose a different name.")
+            self.err.show()
+            self.ok.setEnabled(False)
+            return
+
+        # validator result
+        st = self.le.validator().validate(name, 0)[0]
+        if st != QRegularExpressionValidator.State.Acceptable:
+            self.err.setText("Only letters, numbers, spaces, _ - ( ) are allowed.")
+            self.err.show()
+            self.ok.setEnabled(False)
+            return
+
+        self.err.hide()
+        self.err.clear()
+        self.ok.setEnabled(True)
+
+    def value(self) -> str:
+        return self.le.text().strip()
 
 class ExportOptionsDialog(QDialog):
     def __init__(self, selected_items, get_metadata, parent=None):
