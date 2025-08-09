@@ -1881,6 +1881,13 @@ def convert_legacy_userconfig(path):
 
     # If already converted (profileMappings exist), exit
     if root.find("profileMappings") is not None:
+        logging.info('Userconfig is already v2, conversion not needed')
+        return False
+
+    # check if there are profile entries, if so this is a new config that has had profiles added but nothing configured as active profile
+    p = root.findall('models[name="profile"]')
+    if p:
+        logging.info('Found profile entries in userconfig is already v2, conversion not needed')
         return False
 
     # Check if there's anything to convert
@@ -1971,7 +1978,7 @@ def convert_legacy_userconfig(path):
         ET.SubElement(mapping, "active_profile").text = profile
 
     xmlutils.consolidate_sort_and_write_userconfig(tree)
-    logging.info("Conversion complete: userconfig upgraded.")
+    logging.info("Conversion complete: userconfig upgraded to v2.")
     return True
 
 def copy_legacy_config_to_new(path):
