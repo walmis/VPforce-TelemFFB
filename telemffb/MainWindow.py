@@ -209,13 +209,14 @@ class MainWindow(QMainWindow):
             Create profiles menu - only for Master Instance
             """
             self.profiles_menu = self.menu.addMenu('Profiles')
-            self.offline_config_action = QAction(r'Offline Profile\Sim Default\Class Default Mode', self)
-            self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
-            self.profiles_menu.addAction(self.offline_config_action)
 
             self.profile_manager_action = QAction('Profile Manager...', self)
             self.profile_manager_action.triggered.connect(self.show_profile_manager)
             self.profiles_menu.addAction(self.profile_manager_action)
+
+            self.offline_config_action = QAction(r'Offline Profile\Sim Default\Class Default Mode', self)
+            self.offline_config_action.triggered.connect(lambda: self.toggle_offline_mode(True))
+            self.profiles_menu.addAction(self.offline_config_action)
 
 
         """ Create the "Utilities" menu """
@@ -1406,7 +1407,7 @@ class MainWindow(QMainWindow):
         profile_list = xmlutils.get_available_profiles(sim, cls, model)
         self.offline_profile.clear()
         for p in profile_list:
-            if p != 'default':
+            if p != 'Built-In':
                 self.offline_profile.addItem(p)
         self.offline_profile.setCurrentText(profile)
         self.offline_profile_changed(profile)
@@ -1508,7 +1509,7 @@ class MainWindow(QMainWindow):
         self.offline_profile.clear()
 
         for profile_name in profiles:
-            if profile_name != 'default':
+            if profile_name != 'Built-In':
                 self.offline_profile.addItem(profile_name)
 
         if not self.offline_profile.count():

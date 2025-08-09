@@ -432,7 +432,7 @@ def write_models_to_xml(the_sim, the_model, the_value, setting_name, unit='', th
     is_profile_used = profile_name is not None and profile_name.lower() != 'none'
 
     # If trying to write under "default", redirect to "Auto User"
-    if is_profile_used and profile_name.lower() == 'default':
+    if is_profile_used and profile_name.lower() == 'built-in':
         # default is not a writable profile.. if a user modifies the config when default is loaded, write it to "Auto User' profile
         # first check if there is a "profile" entry for "Auto User" for this sim/model
         cls = get_class_for_sim_model(the_sim, the_model)
@@ -651,7 +651,7 @@ def clone_profile_entry(sim, cls, src_model, src_profile, dst_profile):
     This method clones *only* the profile entry and any profile specific settings.  To copy an entire model to another use 'clone_whole_model'
     """
 
-    if src_profile == 'default':
+    if src_profile == 'Built-In':
         # we are cloning a default profile, so we only need to create a placeholder entry for the profile in the userconfig_v2.xml
         def_entry = auto_defaults_root.find(f'models[sim="{sim}"][value="{cls}"][model="{src_model}"][name="type"]')
         if def_entry is not None:
@@ -776,7 +776,7 @@ def erase_models_from_xml(the_sim, the_model, setting_name, the_device='', profi
         the_device = 'any'
     profile_name = profile_name if profile_name else G.settings_mgr.active_profile
 
-    if profile_name.lower() == 'default':
+    if profile_name.lower() == 'built-in':
         # Profile name should never be 'default', but protect against issues and log a warning
         logging.warning(f"Attempted to erase a model from the default profile: {the_sim} {the_model} {setting_name}")
         return
@@ -1243,7 +1243,7 @@ def read_user_models(sim, cls, default_only=False, user_only=True, both=False):
                 # get all models of type 'cls' for the given sim.  Create a list of aircraft names matching the type and sim (i.e. ("P-51D", "P47D")
                 model_name = model_elem.findtext("model")
                 model_value = model_elem.findtext("value")
-                total_aircraft.append((model_name, "default"))
+                total_aircraft.append((model_name, "Built-In"))
         if default_only:
             return sorted(total_aircraft)
     if user_only or both:
@@ -2061,7 +2061,7 @@ def get_active_profile_for_model(sim, cls, model, users_root=None):
         m = model_entry.findtext('model')
         s = model_entry.findtext('sim')
         if m == model and s == sim:
-            return "default"
+            return "Built-In"
     # 4. Fallback default
     logging.debug(f"No active or default profile found for model {model} in sim {sim}.")
     return None
@@ -2088,7 +2088,7 @@ def get_available_profiles(sim, cls, model):
     # add a "default" profile to the list if found
     model_elem = auto_defaults_root.find(f'.//models[sim="{sim}"][model="{model}"][name="type"][value="{cls}"]')
     if model_elem is not None:
-        profile_list.append('default')
+        profile_list.append('Built-In')
 
     return profile_list
 
@@ -2289,7 +2289,7 @@ def old_write_models_to_xml(the_sim, the_model, the_value, setting_name, unit=''
     if profile_name is None:
         profile_name = 'none'
 
-    if profile_name.lower() == 'default':
+    if profile_name.lower() == 'built-in':
         cls = get_class_for_sim_model(the_sim, the_model)
         # default is not a writable profile.. if a user modifies the config when default is loaded, write it to "Auto User' profile
         # first check if there is a "profile" entry for "Auto User" for this sim/model

@@ -1263,7 +1263,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
             options = [self.get_metadata(s, "profile_name") for s in user_siblings]
             has_default = any(self.get_metadata(s, "type") == "default" for s in siblings)
             if has_default:
-                options.insert(0, "Default")
+                options.insert(0, "Built-In")
 
             new_active, ok = QInputDialog.getItem(
                 self, "Choose Replacement Active Profile",
@@ -1275,7 +1275,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
 
             # Make selected replacement profile active
             for sib in siblings:
-                if (new_active == "Default" and self.get_metadata(sib, "type") == "default") or \
+                if (new_active == "Built-In" and self.get_metadata(sib, "type") == "default") or \
                         self.get_metadata(sib, "profile_name") == new_active:
                     self.make_active_profile(sib)
                     break
@@ -1322,7 +1322,7 @@ class ProfileManagerDialog(QDialog, Ui_ProfileManagerDialog):
         model = meta["aircraft_name"]
         profile_type = meta["type"]
         if profile_type == "default":
-            old_profile = "default"
+            old_profile = "Built-In"
         else:
             old_profile = meta["profile_name"]
 
@@ -1382,16 +1382,15 @@ class NewProfileDialog(QDialog):
             self.radio_new.hide()
             self.radio_clone.hide()
             self.combo_clone.hide()
+        else:
+            self.profiles = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
-        # elif type != 'new':
-
-        self.profiles = xmlutils.get_available_profiles(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
         if not len(self.profiles):
             self.combo_clone.setEnabled(False)
             self.radio_clone.setEnabled(False)
         p = []
         for profile in self.profiles:
-            if profile.lower() != "default":
+            if profile.lower() != "built-in":
                 p.append(profile)
 
         if not p:
@@ -1465,14 +1464,17 @@ class NewProfileDialog(QDialog):
 
     def on_profile_name_changed(self, txt):
         name = txt.lower().strip()
-        if name == 'default':
-            self.error_label.setText("'Default' is not a valid profile name. You may keep typing to make it unique")
+        reserved = ['built-in', 'built_in', 'builtin', 'built in', 'user default', 'user-default', 'user_default', 'userdefault', 'auto user', 'autouser', 'auto-user', 'auto_user', 'default']
+
+        if name in reserved:
+            self.error_label.setText(f"'{name}' is a reserved profile name.")
             self.error_label.setVisible(True)
             self.ok_button.setEnabled(False)
             return
-        print(f"name: {name}, profiles: {self.profiles}")
+
+        # print(f"name: {name}, profiles: {self.profiles}")
         if name in (item.lower() for item in self.profiles):
-            self.error_label.setText(f"'{txt}' conflicts with an existing profile name for this aircraft.  You may keep typing to make it unique")
+            self.error_label.setText(f"'{txt}' conflicts with an existing profile name for this aircraft.")
             self.error_label.setVisible(True)
             self.ok_button.setEnabled(False)
             return
@@ -1681,15 +1683,16 @@ class TreePopulationWorker(QObject):
 
                 # default profiles
                 for aircraft, _ in xmlutils.read_user_models(sim, cls, default_only=True):
-                    active = xmlutils.get_active_profile_for_model(sim, cls, aircraft) == 'default'
+                    active = xmlutils.get_active_profile_for_model(sim, cls, aircraft) == 'Built-In'
                     cls_data["aircraft"].append({
                         "aircraft": aircraft,
                         "source": "default",
-                        "profile": "default",
+                        "profile": "Built-In",
                         "type": "default",
                         "active": active,
                         "show": True
                     })
+                    # print(f"Default: {aircraft} is {active}")
 
                 # User profiles
                 for aircraft, profile_name in xmlutils.read_user_models(sim, cls):
@@ -1702,6 +1705,8 @@ class TreePopulationWorker(QObject):
                         "active": active,
                         "show": True
                     })
+                    # print(f"User: {aircraft} {profile_name} ta={ta} is {active}")
+
 
                 sim_data["classes"].append(cls_data)
             result_data.append(sim_data)
