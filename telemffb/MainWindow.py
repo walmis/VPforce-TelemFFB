@@ -339,7 +339,7 @@ class MainWindow(QMainWindow):
         """ Create Main App Logo Label """
 
         t_logo = QLabel()
-        t_pixmap = HiDpiPixmap(":/image/TelemFFB_logo.png")
+        t_pixmap = HiDpiPixmap(G.vpf_logo)
         t_pixmap = t_pixmap._scaled(round(t_pixmap.width()/5), round(t_pixmap.height()/5))
         t_logo.setPixmap(t_pixmap)
 

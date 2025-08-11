@@ -43,7 +43,7 @@ dev_build : bool = False # when True, build versions will use 'dev_build_str', w
 dev_userconfig: bool = True  # will use/create userconfig.xml in root when True (dev_build must also be true)
 dev_build_str: str = "DEV_BUILD"
 allow_multi_instance: bool = False  # if true, will skip mutex lock checks and allow multiple instances to run simultaneously
-vpf_logo: str = ":/image/vpforcelogo.png"
+vpf_logo: str = ":/image/TelemFFB_Logo.png"
 
 # UI components
 main_window :  'MainWindow' 

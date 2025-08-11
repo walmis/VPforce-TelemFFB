@@ -293,16 +293,13 @@ def _setup_config_paths():
         else:
             _setup_standard_config_paths()
     else:
-        if G.useDarkMode:
-            G.vpf_logo = ":/image/vpforcelogo_dm.png"
-        else:
-            G.vpf_logo = ":/image/vpforcelogo.png"
         _setup_standard_config_paths()
 
 def _setup_dev_userconfig_paths():
     """Setup development userconfig paths."""
     real_userconfig_path = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB")
     real_userconfig = os.path.join(real_userconfig_path, 'userconfig_v2.xml')
+    real_legacy_userconfig = os.path.join(real_userconfig_path, 'userconfig.xml')
 
     if getattr(sys, 'frozen', False):
         G.userconfig_rootpath = os.path.dirname(sys.executable)
@@ -310,8 +307,12 @@ def _setup_dev_userconfig_paths():
         G.userconfig_rootpath = os.path.dirname(os.path.abspath(__file__))
 
     G.userconfig_path = os.path.join(G.userconfig_rootpath, 'userconfig_v2.xml')
-    if not os.path.isfile(G.userconfig_path):
+    if not os.path.isfile(G.userconfig_path) and os.path.exists(real_userconfig):
         shutil.copy(real_userconfig, G.userconfig_path)
+
+    if not os.path.isfile(os.path.join(G.userconfig_rootpath, 'userconfig_.xml')) and os.path.exists(real_legacy_userconfig):
+        shutil.copy(real_legacy_userconfig, os.path.join(G.userconfig_rootpath, 'userconfig.xml'))
+
 
 def _setup_standard_config_paths():
     """Setup standard configuration paths."""
