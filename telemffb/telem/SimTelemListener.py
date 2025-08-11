@@ -27,8 +27,10 @@ import telemffb.utils as utils
 from telemffb.sim.aircrafts_msfs_xp import Aircraft
 from telemffb.telem.IL2Manager import IL2Manager
 from telemffb.telem.NetworkThread import NetworkThread
+from telemffb.telem.SharedMemThread import SharedMemThread
 from telemffb.telem.SimConnectSock import SimConnectSock
 from telemffb.telem.DcsIpcThread import DcsIpcThread
+from telemffb.telem.BMSTelemManager import BMSManager
 from telemffb.utils import overrides
 
 
@@ -113,6 +115,32 @@ class SimIL2(SimTelemListener):
             self.telem.quit()
             self.telem = None
             self.started = False
+
+
+class SimBMS(SimTelemListener):
+    def __init__(self) -> None:
+        super().__init__("BMS")
+
+    @overrides(SimTelemListener)
+    def start(self):
+        if not self.is_enabled:
+            return
+        self.telem = SharedMemThread(G.telem_manager, telem_parser=BMSManager())
+        logging.info("Starting BMS Telemetry Listener")
+        self.telem.start()
+        self.started = True
+
+    @overrides(SimTelemListener)
+    def validate(self):
+        return
+
+    @overrides(SimTelemListener)
+    def stop(self):
+        if self.telem:
+            self.telem.quit()
+            self.telem = None
+            self.started = False
+
 
 class SimDCS(SimTelemListener):
     def __init__(self) -> None:
@@ -219,6 +247,7 @@ class SimListenerManager(QtCore.QObject):
             SimDCS(),
             SimMSFS(),
             SimIL2(),
+            SimBMS(),
             SimXPLANE()
         ]
 

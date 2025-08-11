@@ -138,6 +138,8 @@ class BMSManager(TelemParserBase):
         # Connection state
         self._connected = False
         self._connection_attempts = 0
+
+        self._pause_state = False
         
     def process_packet(self, packet: bytes) -> bytes:
         """
@@ -160,9 +162,18 @@ class BMSManager(TelemParserBase):
             self._process_ivibe_data()
             
             # Format and return telemetry data
+            pause = self.telem_data.get('SimPaused')
             packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in self.telem_data.items()]), "utf-8")
-            return packet
-            
+            if pause and not self._pause_state:
+                self._pause_state = True
+                return packet
+            elif not pause:
+                self._pause_state = False
+                return packet
+            else:
+                return None
+
+
         except Exception as e:
             logger.error(f"Error processing BMS data: {e}")
             self._connected = False

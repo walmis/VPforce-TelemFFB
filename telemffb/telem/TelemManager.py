@@ -304,7 +304,11 @@ class TelemManager(QObject, threading.Thread):
             module = aircrafts_msfs_xp
             sc_aircraft_type = None
             sc_engine_type = None
-        else:
+        elif data_source == 'BMS':
+            module = aircrafts_dcs
+            sc_aircraft_type = None
+            sc_engine_type = None
+        elif data_source == 'DCS':
             module = aircrafts_dcs
             sc_aircraft_type = None
             sc_engine_type = None

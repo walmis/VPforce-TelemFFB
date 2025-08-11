@@ -1017,7 +1017,10 @@ class AircraftBase(object):
             
         local_stall_aoa = telem_data.get("StallAoA", None)
         if local_stall_aoa is not None:
-            flaps = utils.average(telem_data.get("Flaps", 0)) * 0.2 # flaps down increases stall threshold by 20%
+            if isinstance(local_stall_aoa, list):
+                flaps = utils.average(telem_data.get("Flaps", 0)) * 0.2 # flaps down increases stall threshold by 20%
+            else:
+                flaps = telem_data.get("Flaps", 0) * 0.2
             stall_buffet_threshold_percent = 0.5 + flaps
             local_buffet_aoa = local_stall_aoa * stall_buffet_threshold_percent
         else:
