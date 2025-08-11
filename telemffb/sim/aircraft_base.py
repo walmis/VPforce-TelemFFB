@@ -1116,6 +1116,8 @@ class AircraftBase(object):
 
     def ac_update_landing_gear(self, telem_data):
         gearpos = telem_data.get("gear_value", telem_data.get("GearPos", None))
+        if isinstance(gearpos, list):
+            gearpos = max(gearpos)
 
         if self._sim_is_msfs() or self._sim_is_xplane():
             retracts = telem_data.get("RetractableGear", 0)
@@ -2017,7 +2019,7 @@ class AircraftBase(object):
             effect.stop()
 
     def on_telemetry(self, telem_data): 
-        aircraft_type = telem_data.get("AircraftType", "Unknown")
+        aircraft_type = telem_data.get("AircraftClass", "Unknown")
         fx,fy = HapticEffect.device.get_input().forceXY()
         self.telem_data['ForceXY'] = [fx,fy]
         jx, jy = HapticEffect.device.get_input().axisXY()
