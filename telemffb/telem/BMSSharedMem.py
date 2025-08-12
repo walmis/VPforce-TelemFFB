@@ -50,6 +50,7 @@ Usage:
 import ctypes
 import ctypes.wintypes
 import logging
+import struct
 import time
 from typing import Optional, Dict, Any
 from threading import Lock
@@ -118,6 +119,50 @@ kernel32.UnmapViewOfFile.restype = ctypes.wintypes.BOOL
 kernel32.CloseHandle.argtypes = [ctypes.wintypes.HANDLE]
 kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
 
+class StringMap():
+    name = "FalconSharedMemoryAreaString"
+    area_size_max = 1024 * 1024
+    id = [
+        "BmsExe",
+        "KeyFile",
+        "BmsBasedir",
+        "BmsBinDirectory",
+        "BmsDataDirectory",
+        "BmsUIArtDirectory",
+        "BmsUserDirectory",
+        "BmsAcmiDirectory",
+        "BmsBriefingsDirectory",
+        "BmsConfigDirectory",
+        "BmsLogsDirectory",
+        "BmsPatchDirectory",
+        "BmsPictureDirectory",
+        "ThrName",
+        "ThrCampaigndir",
+        "ThrTerraindir",
+        "ThrArtdir",
+        "ThrMoviedir",
+        "ThrUisounddir",
+        "ThrObjectdir",
+        "Thr3ddatadir",
+        "ThrMisctexdir",
+        "ThrSounddir",
+        "ThrTacrefdir",
+        "ThrSplashdir",
+        "ThrCockpitdir",
+        "ThrSimdatadir",
+        "ThrSubtitlesdir",
+        "ThrTacrefpicsdir",
+        "AcName",
+        "AcNCTR",
+        "ButtonsFile",
+        "CockpitFile",
+        "NavPoint",
+        "ThrTerrdatadir",
+        "VoiceHelpers"
+    ]
+
+    def add(self, id, value):
+        setattr(self, id, value)
 
 class StringIdentifier:
     """String identifier enumeration for BMS string data"""
@@ -856,8 +901,171 @@ class BMSSharedMemory:
         except Exception as e:
             logger.error(f"Error reading string data: {e}")
             return None
-    
-    def get_bms_strings(self) -> Dict[int, str]:
+
+    def get_string_by_name(self, name: str) -> Optional[str]:
+        """
+        Retrieve a specific named string from BMS's shared memory string table.
+
+        The Falcon BMS shared memory provides a set of strings (aircraft name,
+        mission name, callsign, etc.) in a compact ID-indexed format.
+        The `StringMap.id` list defines the mapping of human-readable names
+        (e.g., "AcName") to numeric string IDs used internally by BMS.
+
+        This method:
+            1. Looks up the numeric ID corresponding to the given `name`
+               using `StringMap.id`.
+            2. Fetches all current strings from shared memory via `get_bms_strings()`.
+            3. Returns the matching string value if found.
+
+        Args:
+            name (str): The symbolic string identifier (e.g., "AcName").
+
+        Returns:
+            Optional[str]: The string value if found, or None if:
+                - The `name` is not in `StringMap.id`.
+                - The corresponding string has not been published by BMS yet.
+        """
+        try:
+            idx = StringMap.id.index(name)  # e.g., 'AcName'
+        except ValueError:
+            return None
+
+        strings = self.get_bms_strings()
+        return strings.get(idx)
+
+    def _read_string_area_bytes(self) -> tuple[int, int, bytes] | None:
+        """
+        Read the raw bytes from the Falcon BMS "string area" shared memory block.
+
+        The Falcon BMS shared memory has a separate region ("FalconSharedMemoryAreaString")
+        dedicated to storing variable-length strings. This area begins with a fixed-size
+        header, followed by the encoded string data.
+
+        This method:
+            - Validates that the string area is mapped.
+            - Uses FlightData2 to determine the size of the string area.
+            - Reads the complete block of bytes from shared memory.
+            - Extracts header values: version, number of strings, and data size.
+            - Returns just the string data portion (excluding the header).
+
+        Header layout (little-endian, 4-byte aligned):
+            uint32 VersionNum    : Version of the string block format
+            uint32 NoOfStrings   : Number of strings present
+            uint32 dataSize      : Length in bytes of the following data block
+
+        Args:
+            None
+
+        Returns:
+            tuple[int, int, bytes] | None:
+                (version, no_of_strings, data_bytes)
+                or None if the area could not be read or validation failed.
+
+        Notes:
+            - The returned `data_bytes` contains only the packed string entries;
+              you must parse them to extract actual strings.
+            - Each string entry is encoded as:
+                uint32 ID
+                uint32 Length (number of bytes in string payload, excluding NUL)
+                UTF-8 string payload
+                uint8  NUL terminator (1 byte)
+        """
+        sd_ptr = self.string_data_ptr
+        if not sd_ptr:
+            return None
+
+        fd2 = self.get_flight_data2()
+        if not fd2 or not getattr(fd2, "StringAreaSize", 0):
+            return None
+
+        # Read the whole string area as bytes (much safer than a fixed ctypes array)
+        raw = ctypes.string_at(sd_ptr, fd2.StringAreaSize)
+
+        # The header is 3 little-endian uint32: VersionNum, NoOfStrings, dataSize
+        if len(raw) < 12:
+            return None
+
+        version, no_of_strings, data_size = struct.unpack_from("<III", raw, 0)
+
+        # Sanity checks
+        if 12 + data_size > len(raw):
+            # Something’s off (bad size or partial map)
+            return None
+
+        return version, no_of_strings, raw[12:12 + data_size]
+
+    def get_bms_strings(self) -> dict[int, str]:
+        """
+        Parse and return all current Falcon BMS strings from shared memory.
+
+        This method:
+            - Reads the raw string area bytes from shared memory via
+              `_read_string_area_bytes()`.
+            - Parses each entry in the block, extracting the string ID and UTF-8 value.
+            - Caches the result, keyed by `FlightData2.StringAreaTime`, to avoid
+              re-parsing if the data has not changed.
+            - Returns a defensive copy of the string dictionary so callers can
+              safely modify it without affecting the cache.
+
+        String entry format in `data_bytes`:
+            uint32 ID       : Numeric string identifier (matches index in StringMap.id)
+            uint32 Length   : Number of bytes in string payload (excludes NUL terminator)
+            UTF-8 payload   : `Length` bytes of text
+            uint8  NUL      : 1-byte null terminator (skip with `+1` offset)
+
+        Args:
+            None
+
+        Returns:
+            dict[int, str]: Mapping of string ID to UTF-8 decoded string value.
+
+        Notes:
+            - IDs are integers matching `StringMap.id` indices.
+            - Use `get_string_by_name()` if you want to look up by symbolic name.
+            - Returns an empty dict if no string data is available or readable.
+            - Skips parsing and reuses the last cached copy if:
+                - `StringAreaTime` has not changed since the last call.
+                - Cached strings are non-empty.
+        """
+        fd2 = self.get_flight_data2()
+        if not fd2:
+            return {}
+
+        # reuse cache only if it's non-empty and the timestamp matches
+        sat = fd2.StringAreaTime
+        if sat == getattr(self, "_cached_string_area_time", None) and getattr(self, "_cached_strings", None):
+            return self._cached_strings.copy()
+
+        got = self._read_string_area_bytes()  # returns (version, count, data) or None
+        if not got:
+            return {}
+
+        _, no_of_strings, data = got
+        strings: dict[int, str] = {}
+
+        off = 0
+        for _ in range(no_of_strings):
+            if off + 8 > len(data):
+                break
+
+            sid, slen = struct.unpack_from("<II", data, off)
+            off += 8
+
+            # +1 for the terminating NUL byte after the payload
+            if off + slen + 1 > len(data):
+                break
+
+            sbytes = data[off:off + slen]
+            off += slen + 1  # <-- IMPORTANT: skip the trailing NUL
+
+            strings[sid] = sbytes.decode("utf-8", errors="ignore")
+
+        # update cache and return a defensive copy
+        self._cached_string_area_time = sat
+        self._cached_strings = strings.copy()
+        return strings.copy()
+
+    def orig_get_bms_strings(self) -> Dict[int, str]:
         """
         Parse and return BMS strings from string data
         Uses caching based on StringAreaTime to avoid unnecessary parsing

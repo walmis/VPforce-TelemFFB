@@ -220,8 +220,12 @@ class BMSManager(TelemParserBase):
     def _process_flight_data_struct(self, data: FlightData):
         """Process FlightData structure"""
         # Aircraft identification
-        self.ac_name = "F-16C"  # BMS is primarily F-16
-        
+        ac_from_sm = self.bms_memory.get_string_by_name("AcName")
+        if ac_from_sm and ac_from_sm.strip():
+            self.ac_name = ac_from_sm.strip()
+        else:
+            self.ac_name = self.ac_name or "UNKNOWN AIRCRAFT"
+
         # Engine data - match aircraft_base format
         self.engine_rpm = [data.rpm]
         self.engine_ftit = [data.ftit]
