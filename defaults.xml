@@ -10944,6 +10944,29 @@
 	</models>
 	<models>
 		<name>type</name>
+		<model>F-15C</model>
+		<value>JetAircraft</value>
+		<sim>BMS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>aircraft_vne_speed</name>
+		<model>F-15C</model>
+		<value>800</value>
+		<unit>kt</unit>
+		<sim>BMS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>aircraft_vs_speed</name>
+		<model>F-15C</model>
+		<value>130</value>
+		<unit>kt</unit>
+		<sim>BMS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
 		<model>F-16C</model>
 		<value>JetAircraft</value>
 		<sim>BMS</sim>
@@ -10964,34 +10987,6 @@
 		<unit>kt</unit>
 		<sim>BMS</sim>
 		<device>pedals</device>
-	</models>
-	<models>
-		<name>flaps_motion_effect_enabled</name>
-		<model>F-16C</model>
-		<value>false</value>
-		<sim>BMS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>flaps_motion_intensity</name>
-		<model>F-16C</model>
-		<value>0.0</value>
-		<sim>BMS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>gforce_effect_enable</name>
-		<model>F-16C</model>
-		<value>false</value>
-		<sim>BMS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>runway_rumble_intensity</name>
-		<model>F-16C</model>
-		<value>3.0</value>
-		<sim>BMS</sim>
-		<device>any</device>
 	</models>
 <models>
 		<name>type</name>

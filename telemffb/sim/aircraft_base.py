@@ -566,6 +566,15 @@ class AircraftBase(object):
         """
         return self._telem_data.get("src") == "DCS"
 
+    def _sim_is_bms(self, *unused):
+        """
+        Check if the current simulator is BMS.
+
+        Returns:
+            bool: True if DCS, False otherwise
+        """
+        return self._telem_data.get("src") == "BMS"
+
     def _sim_is_il2(self, *unused):
         """Check if the current simulator is IL2 Sturmovik..
 
@@ -598,7 +607,7 @@ class AircraftBase(object):
         max_g = 2
         if self.is_collective() or self.is_pedals():
             return
-        if self._sim_is("DCS") or self._sim_is("IL2"):
+        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
             gs = round(telem_data.get("ACCs")[1] - 1, 2)  # subtract nominal G to align with zero based data from MSFS
         elif self._sim_is("MSFS") or self._sim_is("XPLANE"):
             gs = round(telem_data.get("AccBody")[1], 2)
@@ -892,7 +901,7 @@ class AircraftBase(object):
             effects.dispose('decel')
             return
 
-        if self._sim_is("DCS") or self._sim_is("IL2"):
+        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is("BMS"):
             if self.decel_airborne_disable:
                 # We are on the ground, calculate using G vectors
                 y_gs = telem_data.get("ACCs", 0)[0]
@@ -2108,7 +2117,7 @@ class AircraftBase(object):
 
     def _get_gs_data(self, telem_data: dict) -> tuple:
         """Get G-force data based on simulator type."""
-        if self._sim_is("DCS") or self._sim_is("IL2"):
+        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
             accs = telem_data.get("ACCs")
             if not accs:
                 return None, None, None
