@@ -426,8 +426,8 @@ class BMSManager(TelemParserBase):
         # System states from IVibe
         if hasattr(ivibe, 'IsOnGround'):
             self.on_ground = ivibe.IsOnGround
-        if hasattr(ivibe, 'IsPaused'):
-            self.telem_data["SimPaused"] = 1 if ivibe.IsPaused else 0
+        if hasattr(ivibe, 'IsPaused') and hasattr(ivibe, 'IsEndFlight'):
+            self.telem_data["SimPaused"] = 1 if ivibe.IsPaused or ivibe.IsEndFlight else 0
         if hasattr(ivibe, 'In3D'):
             self.telem_data["In3D"] = 1 if ivibe.In3D else 0
     
