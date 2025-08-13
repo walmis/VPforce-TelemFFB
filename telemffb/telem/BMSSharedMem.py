@@ -741,9 +741,7 @@ class BMSSharedMemory:
                 
                 if self._connected:
                     logger.info("Connected to BMS shared memory")
-                else:
-                    logger.warning("Failed to connect to BMS shared memory - is BMS running?")
-                    
+
                 return self._connected
                 
             except Exception as e:

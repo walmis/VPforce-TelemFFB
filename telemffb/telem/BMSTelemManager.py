@@ -181,6 +181,8 @@ class BMSManager(TelemParserBase):
     
     def _try_connect(self) -> bool:
         """Try to connect to BMS shared memory"""
+        if self._connection_attempts % 6 == 0:  # Log every 6th attempt (1 minute)
+            logger.info(f"Trying to connect to BMS shared memory...")
         try:
             if self.bms_memory.connect():
                 self._connected = True
@@ -188,9 +190,10 @@ class BMSManager(TelemParserBase):
                 logger.info("Connected to BMS shared memory")
                 return True
             else:
+                if self._connection_attempts % 6 == 0:  # Log every 6th attempt (1 minute)
+                    logger.info(f"Failed to connect to BMS - is BMS Running?")
                 self._connection_attempts += 1
-                if self._connection_attempts % 10 == 0:  # Log every 10th attempt
-                    logger.debug(f"Failed to connect to BMS (attempt {self._connection_attempts})")
+                time.sleep(10)
                 return False
         except Exception as e:
             self._connection_attempts += 1

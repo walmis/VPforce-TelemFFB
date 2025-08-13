@@ -375,6 +375,7 @@ class SimConnectManager(threading.Thread):
         self.def_id = os.getpid()
         self.sv_dict = {}
         self.connected_version = None
+        self._connect_attempts = 0
 
 
 
@@ -795,7 +796,11 @@ class SimConnectManager(threading.Thread):
         """
         while not self._quit:
             try:
-                logging.info("Trying SimConnect")
+                if self._connect_attempts % 6 == 0:
+                    # only log every 6th attempt (60 seconds)
+                    logging.info(f"Trying SimConnect...")
+
+
                 with SimConnect(f"TelemFFB-{G.device_type}") as self.sc:
                     self.sc.SubscribeToSystemEvent(EV_PAUSED, "Pause")
                     self.sc.SubscribeToSystemEvent(EV_STARTED, "SimStart")
@@ -806,6 +811,10 @@ class SimConnectManager(threading.Thread):
                     self._read_telem()
 
             except OSError:
+                if self._connect_attempts % 6 == 0:
+                    # only log every 6th attempt (60 seconds)
+                    logging.info(f"Failed to connect to SimConnect - is MSFS running?")
+                self._connect_attempts += 1
                 time.sleep(10)
                 pass
 
