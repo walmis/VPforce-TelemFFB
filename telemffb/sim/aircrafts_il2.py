@@ -121,11 +121,13 @@ class Aircraft(AircraftBase):
     il2_enable_runway_rumble = 0  # not yet implemented
     il2_enable_buffet = 0  # not yet impelemnted
     il2_buffeting_factor: float  = 1.0
+    il2_dynamic_gunfire_mode = False
     stop_state = False
 
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
         self.gun_is_firing = 0
+        self.gun_is_firing_dict = {}
         #clear any existing effects
         self.spring = effects["spring"].spring()
         # self.damper = effects["damper"].damper()
@@ -157,14 +159,30 @@ class Aircraft(AircraftBase):
         elif not self.anything_has_changed("Bombs", bombs, delta_ms=160):
             effects["il2_bombs"].stop()
 
-        if self.anything_has_changed("Gun", gun) and not self.gun_is_firing:
-            effects["il2_gunfire"].periodic(canon_hz, self.il2_weapon_release_intensity, direction, effect_type=EFFECT_SQUARE).start(force=True)
-            self.gun_is_firing = 1
-            logging.debug(f"Gunfire={self.il2_weapon_release_intensity}")
-        elif not self.anything_has_changed("Gun", gun, delta_ms=100):
-            # effects["gunfire"].stop()
-            effects.dispose("il2_gunfire")
-            self.gun_is_firing = 0
+        if self.il2_dynamic_gunfire_mode:
+            gunfire_dict = json.loads(telem.get('GunFireData', '{}'))
+
+            for weapon, rounds in json.loads(telem.get('GunFireData', '{}')).items():
+                is_firing = self.gun_is_firing_dict.get(weapon, False)
+                weapon_l = [float(x.strip()) for x in weapon.split(",")]
+                if self.anything_has_changed(weapon, rounds, delta_ms=100) and not is_firing:
+                    rate, factor = self.gun_effect_from_mv(weapon_l[0], weapon_l[1])
+                    print(f"rate:{int(rate)}, rpm:{int(rate)*60}, factor:{round(factor, 3)}")
+                    effects[f"il2_gunfire_{weapon}"].periodic(int(rate), utils.clamp(self.il2_weapon_release_intensity * factor, 0, 1), direction, effect_type=EFFECT_SQUARE).start(force=True)
+                    self.gun_is_firing_dict[weapon] = True
+                elif not self.anything_has_changed(weapon, rounds, delta_ms=100):
+                    effects.dispose(f"il2_gunfire_{weapon}")
+                    self.gun_is_firing_dict[weapon] = False
+
+        else:
+            if self.anything_has_changed("Gun", gun) and not self.gun_is_firing:
+                effects["il2_gunfire"].periodic(canon_hz, self.il2_weapon_release_intensity, direction, effect_type=EFFECT_SQUARE).start(force=True)
+                self.gun_is_firing = 1
+                logging.debug(f"Gunfire={self.il2_weapon_release_intensity}")
+            elif not self.anything_has_changed("Gun", gun, delta_ms=100):
+                # effects["gunfire"].stop()
+                effects.dispose("il2_gunfire")
+                self.gun_is_firing = 0
 
         if self.anything_has_changed("Rockets", rockets):
             effects["il2_rockets"].periodic(50, self.il2_rocket_release_intensity, direction, effect_type=EFFECT_SQUARE, duration=80).start(force=True)
@@ -257,6 +275,79 @@ class Aircraft(AircraftBase):
         logging.info(f"on_event: {event}")
         if event == "Stop":
             effects.clear()
+
+    def gun_effect_from_mv(self, m_kg: float, v_mps: float):
+        """
+        Aircraft gun feel from projectile mass & velocity:
+          - sps: shots per second (for your effect timer, Hz)
+          - rfac: recoil multiplier to apply on top of the user's 0..1 intensity
+
+        Approach
+        --------
+        1) Compute effective impulse (p_eff, N·s) including propellant gases:
+             p_eff = (1 + K_GAS) * m * v
+           Using K_GAS=1.5 (aircraft guns run high-pressure loads).
+        2) Map p_eff to a believable sps using aircraft-centric bands:
+             - Low p_eff  (rifle/7.62-class aircraft MG)       -> very fast  (≈ 15–25 sps)
+             - Medium     (12.7/.50–13mm HMG)                  -> fast       (≈ 14–22 sps)
+             - Higher     (20mm class)                         -> moderate   (≈ 10–16 sps)
+             - Heavy      (23–30mm light/high-performance)     -> mod–fast   (≈  9–15 sps)
+             - Very heavy (30–40mm, low-vel/WW2 cannons)       -> slow–mod   (≈  5–12 sps)
+           We interpolate within each band so results scale smoothly.
+        3) Compute a compact recoil multiplier rfac using a tanh-compressed log ratio
+           relative to a .50-cal-ish reference impulse (P_REF ≈ 120 N·s). This keeps
+           final intensity practical, e.g. base 0.30 → big cannon ~0.45–0.55.
+
+        Returns
+        -------
+        sps : float
+            Shots per second (Hz) for your haptic timer.
+        rfac : float
+            Recoil multiplier (~0.8–1.8) to scale user's intensity.
+
+        Notes
+        -----
+        - This is tuned for aircraft-mounted weapons (WW2 & modern fighters).
+        - Rotary cannons (M61/GAU-8) are outliers; without weapon identity,
+          they will map to the 20–30mm bands (i.e., not 60–100 sps).
+        """
+
+        # --- Constants (aircraft-centric) ---
+        K_GAS = 1.5  # propellant gas momentum fraction
+        # Recoil compressor (tight range for a 0..1 intensity system)
+        P_REF = 120.0  # N·s, ~.50 BMG aircraft round baseline
+        SPAN = 0.6  # max ±60% gain around 1.0
+        S = 0.9  # response steepness
+        RF_MIN, RF_MAX = 0.8, 2.0
+
+        # Band edges in p_eff (N·s) and their target sps ranges (min,max)
+        # Tuned to feel like aircraft guns, not infantry MGs.
+        bands = [
+            # (edge_low, edge_high, sps_low, sps_high)
+            (0.0, 60.0, 20.0, 25.0),  # 7.62/low-impulse aircraft MG (rare)
+            (60.0, 140.0, 18.0, 22.0),  # .50 / 12.7–13mm aircraft HMG (M3 ~20 sps)
+            (140.0, 300.0, 10.0, 16.0),  # 20mm class (Hispano/MG151/ShVAK)
+            (300.0, 600.0, 9.0, 15.0),  # 23–30mm light/high-perf (GSh-23, GSh-30-1)
+            (600.0, 1e9, 5.0, 12.0),  # 30–40mm heavy/low-vel (MK 108, MK 103, etc.)
+        ]
+
+        # --- Effective impulse (N·s) ---
+        p_eff = (1.0 + K_GAS) * m_kg * v_mps
+
+        # --- sps from p_eff via banded interpolation ---
+        # Find the band and interpolate sps linearly within it
+        for lo, hi, sps_lo, sps_hi in bands:
+            if p_eff <= hi:
+                t = 0.0 if hi == lo else (max(lo, min(p_eff, hi)) - lo) / (hi - lo)
+                sps = sps_lo + t * (sps_hi - sps_lo)
+                break
+
+        # --- Compact recoil factor (tanh on log ratio), clamped ---
+        ratio = max(1e-12, p_eff / P_REF)
+        rfac = 1.0 + SPAN * math.tanh(S * math.log(ratio))
+        rfac = max(RF_MIN, min(RF_MAX, rfac))
+
+        return sps, rfac
 
                    
 class PropellerAircraft(Aircraft):

@@ -1253,10 +1253,26 @@
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
-		<datatype>float</datatype>
+		<datatype>bool</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2000.42</order>
+		<name>il2_dynamic_gunfire_mode</name>
+		<displayname>Dynamic Gunfire Mode</displayname>
+		<prereq>il2_enable_weapons</prereq>
+		<info>Reads gun data (mass, velocity) from telemetry and plays a stonger/weaker, faster/slower effect based on the data</info>
+		<IL2>true</IL2>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>periodic</effecttype>
+		<datatype>float</datatype>
+		<grouping>Weapons</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2000.43</order>
 		<name>il2_weapon_release_intensity</name>
 		<displayname>Gunfire</displayname>
 		<prereq>il2_enable_weapons</prereq>
@@ -1273,7 +1289,7 @@
 		<datatype>float</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2000.43</order>
+		<order>2000.44</order>
 		<name>il2_bomb_release_intensity</name>
 		<displayname>Bombs</displayname>
 		<prereq>il2_enable_weapons</prereq>
@@ -1290,7 +1306,7 @@
 		<datatype>float</datatype>
 		<grouping>Weapons</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2000.44</order>
+		<order>2000.45</order>
 		<name>il2_rocket_release_intensity</name>
 		<displayname>Rockets</displayname>
 		<prereq>il2_enable_weapons</prereq>

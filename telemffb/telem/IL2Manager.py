@@ -43,6 +43,7 @@ import telemffb.globals as G
 import pygetwindow as get_focus_window
 
 from telemffb.utils import hexdump
+import json
 
 
 knots = 0.514444
@@ -186,7 +187,9 @@ class IL2Manager(TelemParserBase):
         self.engine_maxrpm: list = []
         self.rpm_pcts: list = [0]
         self.gun_data: list = []
+        self.gun_data_dict: dict = {}
         self.guns_fired: list = [0]
+        self.gunfire_dict: dict = {}
         self.wheel_data: list = []
         self.bombs_data: list = []
         self.bombs_released: list = [0,0]
@@ -263,6 +266,8 @@ class IL2Manager(TelemParserBase):
         self.telem_data['Flaps'] = self.state.flaps_position
         self.telem_data['Speedbrakes'] = self.state.air_brake_position
         self.telem_data["GunData"] = self.gun_data
+        self.telem_data['GunDict'] = self.gun_data_dict
+        self.telem_data["GunFireData"] = json.dumps(self.gunfire_dict)
         self.telem_data["Gun"] = self.guns_fired
         self.telem_data["Bombs"] = self.bombs_released
         self.telem_data["Rockets"] = self.rockets_fired
@@ -452,9 +457,11 @@ class IL2Manager(TelemParserBase):
                 dbg(1,"GunData", f"{index=} {offset=} {mass=} {velocity=}")
 
                 if len(self.gun_data) <= index:
-                    self.gun_data.append([round(mass,4), velocity])
+                    self.gun_data.append([index, round(mass, 4), velocity])
                 else:
-                    self.gun_data[index] = ([round(mass, 4), velocity])
+                    self.gun_data[index] = ([index, round(mass, 4), velocity])
+
+                self.gun_data_dict[index] = f"{round(mass, 4)}, {velocity}"
 
 
             elif eventType == EventType.GunFired:
@@ -464,6 +471,12 @@ class IL2Manager(TelemParserBase):
                     self.guns_fired.append(0)
                 else:
                     self.guns_fired[gun_index] += 1
+                gun_key = self.gun_data_dict.get(gun_index, None)
+                if gun_key:
+                    if gun_key in self.gunfire_dict.keys():
+                        self.gunfire_dict[gun_key] += 1
+                    else:
+                        self.gunfire_dict[gun_key] = 1
 
             elif eventType == EventType.WheelData:
                 index = data.get_uint16()
