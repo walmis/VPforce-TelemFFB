@@ -111,6 +111,7 @@ class SimIL2(SimTelemListener):
 
     @overrides(SimTelemListener)
     def stop(self):
+        logging.info("Stopping IL2 Telemetry Listener")
         if self.telem:
             self.telem.quit()
             self.telem = None
@@ -136,6 +137,7 @@ class SimBMS(SimTelemListener):
 
     @overrides(SimTelemListener)
     def stop(self):
+        logging.info("Stopping BMS Telemetry Listener")
         if self.telem:
             self.telem.quit()
             self.telem = None
@@ -170,6 +172,7 @@ class SimDCS(SimTelemListener):
 
     @overrides(SimTelemListener)
     def stop(self):
+        logging.info("Stopping DCS Telemetry Listener")
         if self.telem_udp:
             self.telem_udp.quit()
             self.telem_udp = None
@@ -204,6 +207,7 @@ class SimXPLANE(SimTelemListener):
 
     @overrides(SimTelemListener)
     def stop(self):
+        logging.info("Stopping XPlane Telemetry Listener")
         if self.telem:
             self.telem.quit()
             self.telem = None
@@ -227,6 +231,7 @@ class SimMSFS(SimTelemListener):
 
     @overrides(SimTelemListener)
     def stop(self):
+        logging.info("Stopping MSFS Telemetry Listener")
         if self.telem:
             self.telem.quit()
             self.telem = None
@@ -240,6 +245,7 @@ class SimMSFS(SimTelemListener):
 class SimListenerManager(QtCore.QObject):
     simStarted = QtCore.pyqtSignal(object)
     simStopped = QtCore.pyqtSignal(object)
+    allStarted = QtCore.pyqtSignal()
 
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -260,7 +266,13 @@ class SimListenerManager(QtCore.QObject):
         else:
             self.simStopped.emit(self.sender())
 
+    def stop_inactive(self, active_sim):
+        logging.info(f"Started receiving telemetry from {active_sim} - stopping other sim listeners")
+        for sim in self.sims:
+            if sim.name != active_sim:
+                sim.stop()
     def start_all(self):
+        self.allStarted.emit()
         for sim in self.sims:
             sim.start()
 

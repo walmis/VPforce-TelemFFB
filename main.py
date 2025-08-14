@@ -511,6 +511,9 @@ def _setup_device_connect_status():
         HapticEffect.device.deviceConnected.connect(G.main_window.update_device_status)
     except:
         pass
+def _sim_connected_events():
+    G.sim_listeners.allStarted.connect(G.telem_manager.reset_sim_connected)
+    G.telem_manager.first_frame_received.connect(G.sim_listeners.stop_inactive)
 
 def _handle_window_display(headless_mode):
     """Handle initial window display based on configuration."""
@@ -753,6 +756,9 @@ def main():
 
     # Connect device status events to main window handler:
     _setup_device_connect_status()
+
+    # Connect sim start/stop signals
+    _sim_connected_events()
 
     # ============================================================================
     # PHASE 12: Child Instance Management (Master Only)

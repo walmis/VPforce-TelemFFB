@@ -83,6 +83,8 @@ class TelemManager(QObject, threading.Thread):
     aircraftUpdated = pyqtSignal()
     telemetryTimeout = pyqtSignal(bool)
 
+    first_frame_received = pyqtSignal(str)
+
     currentAircraft: Optional['AircraftBase'] = None
     currentAircraftName: Optional[str] = None
     currentAircraftConfig: dict
@@ -109,10 +111,14 @@ class TelemManager(QObject, threading.Thread):
         self.gain_overrides_active = False
         self.stop_state = False
         self.pause_state = False
+        self._first_frame_from_sim = False
+
 
     def set_paused(self, pause_state: bool = False):
         self.pause_state = pause_state
 
+    def reset_sim_connected(self):
+        self._first_frame_from_sim = False
 
     def set_simconnect(self, sc : SimConnectManager):
         self._simconnect = sc
@@ -233,6 +239,9 @@ class TelemManager(QObject, threading.Thread):
         self._process_current_aircraft_telemetry(parsed_data)
         self._handle_ipc_and_plotting(parsed_data)
         self._emit_telemetry(parsed_data)
+        if not self._first_frame_from_sim:
+            self._first_frame_from_sim = True
+            self.first_frame_received.emit(parsed_data.get('src', None))
 
     def _parse_telemetry_data(self, data):
         """Parse raw telemetry data and calculate frame timing metrics."""
