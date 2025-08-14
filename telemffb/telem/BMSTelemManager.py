@@ -48,6 +48,7 @@ import pygetwindow as get_focus_window
 from .BMSSharedMem import BMSSharedMemory, FlightData, FlightData2, IVibeData, LightBits, LightBits2, LightBits3, HsiBits
 from .TelemParserBase import TelemParserBase
 import telemffb.globals as G
+import telemffb.utils as utils
 
 logger = logging.getLogger(__name__)
 
@@ -319,11 +320,8 @@ class BMSManager(TelemParserBase):
         self.telem_data['NozzlePos'] = self.nozzle_pos
         
         # Afterburner status (estimate from nozzle position)
-        if self.nozzle_pos[0] > 0.8:  # Assume AB if nozzle > 80% open
-            self.telem_data['Afterburner'] = [self.nozzle_pos[0]]
-        else:
-            self.telem_data['Afterburner'] = [0.0]
-        
+        self.telem_data['Afterburner'] = utils.scale_clamp(self.nozzle_pos[0], (0.8, 1.0), (0.0, 1.0)) # Assume AB if nozzle > 80% open
+
         # Landing gear - match aircraft_base format
         self.telem_data['Gear'] = self.gear_positions  # For MSFS compatibility
         self.telem_data['GearPos'] = self.gear_positions  # For DCS compatibility
