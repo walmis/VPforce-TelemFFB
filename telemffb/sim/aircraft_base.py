@@ -361,6 +361,9 @@ class AircraftBase(object):
         value from "a to b" over a period of time across multiple passes through the effects loop.
         '''
 
+        if value == dst_val:
+            return value
+
         current_time_ms = time.perf_counter() * 1000  # Start time for the current step
         # current_time_end = current_time_start  # End time for the current step (initially the same as start time)
 
@@ -399,6 +402,12 @@ class AircraftBase(object):
 
         step_size = (iteration_ms / time_to_go) * delta_to_go  # calculate step size to reach target at time
 
+        if ((data['dst_val'] - data['value']) * (data['dst_val'] - (data['value'] + step_size))) <= 0:
+            # We crossed the target
+            data['value'] = data['dst_val']
+            del self.stepper_dict[key]
+            return data['dst_val']
+
         if data['value'] == data['dst_val']:  # if we have reached the dst value, delete the key and return the value
             del self.stepper_dict[key]
             return data['value']
@@ -407,6 +416,7 @@ class AircraftBase(object):
 
         if elapsed_time_ms >= timeframe_ms:  # if the elapsed time is greater than the given timeframe, return the destination value
             data['value'] = data['dst_val']
+            del self.stepper_dict[key]
             return data['dst_val']
 
         val = value + step_size

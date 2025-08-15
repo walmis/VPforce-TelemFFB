@@ -1666,6 +1666,12 @@ class Helicopter(Aircraft):
                 telem_data['phys_x'] = x
                 telem_data['phys_y'] = y
 
+                # Add: remember previous "pressed" to detect edge
+                force_trim_pressed_prev = getattr(self, "force_trim_pressed_prev", False)
+                force_trim_pressed = input_data.isButtonPressed(self.force_trim_button) if self.cyclic_spring_init else False
+                self.tr_state_change = (force_trim_pressed != force_trim_pressed_prev)
+                self.force_trim_pressed_prev = force_trim_pressed
+
                 if not self.cyclic_spring_init:
                     # print("CYCLIC INIT LOOP")
                     self.cyclic_center = [0.0, 0.0]
@@ -1680,7 +1686,7 @@ class Helicopter(Aircraft):
                     self.spring_x.set_coefficient(self.cyclic_spring_gain, True)
                     self.spring_y.set_coefficient(self.cyclic_spring_gain, True)
 
-                    if telem_data.get("SimOnGround", 1):
+                    if telem_data.get("SimOnGround", 1) and self.trim_reset_complete:
                         self.cpO_x = 0
                         self.cpO_y = 0
                         self.last_pos_x_pos = 0
@@ -1714,68 +1720,89 @@ class Helicopter(Aircraft):
                             self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
                         return
                 elif force_trim_pressed:
+                    if self.tr_state_change:
+                        # compute total center currently applied to device
+                        total_x = int(self.cpO_x) + int(self.cyclic_physical_trim_x_offs)
+                        total_y = int(self.cpO_y) + int(self.cyclic_physical_trim_y_offs)
+
+                        # move that total into cpO_*, then zero trim-following contributions
+                        self.cpO_x = total_x
+                        self.cpO_y = total_y
+                        self.cyclic_physical_trim_x_offs = 0
+                        self.cyclic_physical_trim_y_offs = 0
+                        self.cyclic_virtual_trim_x_offs = 0.0
+                        self.cyclic_virtual_trim_y_offs = 0.0
+
+                        # tell MSFS to reset rotor trim ONCE on edge
+                        if self._sim_is_msfs():
+                            self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 1)
+
+                        logging.info(f"Force Trim Disengaged total={self.cpO_x}:{self.cpO_y}")
+
+                    # Soften the spring while held (keep your scaling if that's intentional)
                     gain = int(self.trim_release_spring_gain * 4096)
                     self.spring_x.set_coefficient(gain)
                     self.spring_y.set_coefficient(gain)
 
+                    # Continuously re-center spring to live stick while held
                     self.cpO_x = round(x * 4096)
-                    self.spring_x.cpOffset = self.cpO_x
-
                     self.cpO_y = round(y * 4096)
+
+                    self.spring_x.cpOffset = self.cpO_x
                     self.spring_y.cpOffset = self.cpO_y
 
                     self.cyclic_center = [x, y]
-
-                    if self.tr_state_change:
-                        logging.info(f"Force Trim Disengaged:{round(x * 4096)}:{round(y * 4096)}, gain:{gain}")
-
                     self.cyclic_trim_release_active = 1
-                    if self._sim_is_msfs():
-                        self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 1)
 
                 elif not force_trim_pressed and self.cyclic_trim_release_active:
+                    # --- on release: restore normal spring gain and lock new center ---
                     self.spring_x.set_coefficient(self.cyclic_spring_gain, True)
                     self.spring_y.set_coefficient(self.cyclic_spring_gain, True)
 
                     self.cpO_x = round(x * 4096)
-                    self.spring_x.set_offset(self.cpO_x)
-
                     self.cpO_y = round(y * 4096)
+                    self.spring_x.set_offset(self.cpO_x)
                     self.spring_y.set_offset(self.cpO_y)
 
                     self.cyclic_center = [x, y]
 
-                    if self.tr_state_change:
-                        logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
-
                     if self._sim_is_msfs():
+                        # turn off the reset flag ONCE on edge
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
-
+                    logging.info(f"Force Trim Engaged :{self.cpO_x}:{self.cpO_y}")
                     self.cyclic_trim_release_active = 0
 
                 elif trim_reset_pressed or not self.trim_reset_complete:
-                    self.cpO_x = self.step_value_over_time("center_x", self.cpO_x, 1000, 0)
-                    self.cpO_y = self.step_value_over_time("center_y", self.cpO_y, 1000, 0)
+
+                    if not hasattr(self, '_trim_reset_in_progress'):
+                        self._trim_reset_in_progress = True
+                        logging.info("Trim Reset Pressed")
+
+
+                    self.cpO_x = self.step_value_over_time("center_x", self.cpO_x, 500, 0)
+                    self.cpO_y = self.step_value_over_time("center_y", self.cpO_y, 500, 0)
 
                     if self.cpO_x == 0 and self.cpO_y == 0:
                         self.trim_reset_complete = 1
+                        if self._trim_reset_in_progress:
+                            logging.info("Trim Reset Complete")
+                        self._trim_reset_in_progress = False
                     else:
                         self.trim_reset_complete = 0
-                    # self.cpO_x, self.cpO_y = 0, 0
+                        if not self._trim_reset_in_progress:
+                            logging.info("Trim Reset Pressed")
+                        self._trim_reset_in_progress = True
 
                     self.spring_x.set_coefficient(self.cyclic_spring_gain)
                     self.spring_y.set_coefficient(self.cyclic_spring_gain)
 
-                    # self.cpO_x = round(self.cyclic_center[0] * 4096)
-                    # self.cpO_y = round(self.cyclic_center[1] * 4096)
-
                     self.spring_x.set_offset(round(self.cpO_x))
                     self.spring_y.set_offset(round(self.cpO_y))
+
                     if self._sim_is_msfs():
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
-                    logging.info("Trim Reset Pressed")
 
                 telem_data["StickXY"] = [x, y]
                 telem_data["StickXY_offset"] = self.cyclic_center
@@ -1843,12 +1870,17 @@ class Helicopter(Aircraft):
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
             if self.force_trim_enabled and force_trim_active:
-                self._spring_handle.start()
+                if not self._spring_handle.started:
+                    self._spring_handle.start()
 
     def _update_cyclic_trim(self, telem_data):
         if telem_data.get("FFBType", None) != 'joystick':
             return
         if not self.trim_following:
+            return
+
+        # NEW: don't mutate offsets while trim-release is active
+        if getattr(self, "cyclic_trim_release_active", 0):
             return
         if self._sim_is_msfs():
             cyclic_x_trim = telem_data.get("CyclicTrimX", 0)
