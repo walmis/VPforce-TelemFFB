@@ -168,7 +168,7 @@ class Aircraft(AircraftBase):
                 if self.anything_has_changed(weapon, rounds, delta_ms=100) and not is_firing:
                     rate, factor = self.gun_effect_from_mv(weapon_l[0], weapon_l[1])
                     print(f"rate:{int(rate)}, rpm:{int(rate)*60}, factor:{round(factor, 3)}")
-                    effects[f"il2_gunfire_{weapon}"].periodic(int(rate), utils.clamp(self.il2_weapon_release_intensity * factor, 0, 1), direction, effect_type=EFFECT_SQUARE).start(force=True)
+                    effects[f"il2_gunfire_{weapon}"].periodic(int(rate), utils.clamp(self.il2_weapon_release_intensity * factor, 0, 1), direction, effect_type=EFFECT_SAWTOOTHUP).start()
                     self.gun_is_firing_dict[weapon] = True
                 elif not self.anything_has_changed(weapon, rounds, delta_ms=100):
                     effects.dispose(f"il2_gunfire_{weapon}")
@@ -278,71 +278,50 @@ class Aircraft(AircraftBase):
 
     def gun_effect_from_mv(self, m_kg: float, v_mps: float):
         """
-        Aircraft gun feel from projectile mass & velocity:
-          - sps: shots per second (for your effect timer, Hz)
-          - rfac: recoil multiplier to apply on top of the user's 0..1 intensity
+        Returns:
+          sps  : shots per second (Hz) for your haptic timer
+          rfac : recoil multiplier (tight range, ~0.8–2.0)
 
-        Approach
-        --------
-        1) Compute effective impulse (p_eff, N·s) including propellant gases:
-             p_eff = (1 + K_GAS) * m * v
-           Using K_GAS=1.5 (aircraft guns run high-pressure loads).
-        2) Map p_eff to a believable sps using aircraft-centric bands:
-             - Low p_eff  (rifle/7.62-class aircraft MG)       -> very fast  (≈ 15–25 sps)
-             - Medium     (12.7/.50–13mm HMG)                  -> fast       (≈ 14–22 sps)
-             - Higher     (20mm class)                         -> moderate   (≈ 10–16 sps)
-             - Heavy      (23–30mm light/high-performance)     -> mod–fast   (≈  9–15 sps)
-             - Very heavy (30–40mm, low-vel/WW2 cannons)       -> slow–mod   (≈  5–12 sps)
-           We interpolate within each band so results scale smoothly.
-        3) Compute a compact recoil multiplier rfac using a tanh-compressed log ratio
-           relative to a .50-cal-ish reference impulse (P_REF ≈ 120 N·s). This keeps
-           final intensity practical, e.g. base 0.30 → big cannon ~0.45–0.55.
-
-        Returns
-        -------
-        sps : float
-            Shots per second (Hz) for your haptic timer.
-        rfac : float
-            Recoil multiplier (~0.8–1.8) to scale user's intensity.
-
-        Notes
-        -----
-        - This is tuned for aircraft-mounted weapons (WW2 & modern fighters).
-        - Rotary cannons (M61/GAU-8) are outliers; without weapon identity,
-          they will map to the 20–30mm bands (i.e., not 60–100 sps).
+        Method:
+          1) p_eff = (1 + K_GAS) * m * v  (impulse -> band)
+          2) sps within band = linear interp by p_eff, then
+             apply a small velocity bias so light/fast rounds are a bit faster,
+             heavy/slow rounds a bit slower (removes collisions).
+          3) rfac = tanh-compressed function of p_eff (unchanged).
         """
-
-        # --- Constants (aircraft-centric) ---
+        # --- constants ---
         K_GAS = 1.5  # propellant gas momentum fraction
-        # Recoil compressor (tight range for a 0..1 intensity system)
-        P_REF = 120.0  # N·s, ~.50 BMG aircraft round baseline
-        SPAN = 0.6  # max ±60% gain around 1.0
-        S = 0.9  # response steepness
+        P_REF = 120.0  # N·s (≈ aircraft .50 cal baseline)
+        SPAN, S = 0.6, 0.9
         RF_MIN, RF_MAX = 0.8, 2.0
 
-        # Band edges in p_eff (N·s) and their target sps ranges (min,max)
-        # Tuned to feel like aircraft guns, not infantry MGs.
+        # bands: (p_eff_lo, p_eff_hi, sps_lo, sps_hi, (v_min, v_max) for biasing)
         bands = [
-            # (edge_low, edge_high, sps_low, sps_high)
-            (0.0, 60.0, 20.0, 25.0),  # 7.62/low-impulse aircraft MG (rare)
-            (60.0, 140.0, 18.0, 22.0),  # .50 / 12.7–13mm aircraft HMG (M3 ~20 sps)
-            (140.0, 300.0, 10.0, 16.0),  # 20mm class (Hispano/MG151/ShVAK)
-            (300.0, 600.0, 9.0, 15.0),  # 23–30mm light/high-perf (GSh-23, GSh-30-1)
-            (600.0, 1e9, 5.0, 12.0),  # 30–40mm heavy/low-vel (MK 108, MK 103, etc.)
+            (0.0, 60.0, 20.0, 25.0, (700.0, 900.0)),  # 7.62-ish aircraft MG (rare)
+            (60.0, 140.0, 18.0, 22.0, (750.0, 900.0)),  # .50 / 12.7–13 mm
+            (140.0, 300.0, 10.0, 16.0, (600.0, 900.0)),  # 20 mm class
+            (300.0, 600.0, 9.0, 15.0, (700.0, 900.0)),  # 23–30 mm light/high-perf
+            (600.0, 1e9, 5.0, 12.0, (500.0, 800.0)),  # 30–40 mm heavy/low-vel
         ]
 
-        # --- Effective impulse (N·s) ---
+        # --- effective impulse ---
         p_eff = (1.0 + K_GAS) * m_kg * v_mps
 
-        # --- sps from p_eff via banded interpolation ---
-        # Find the band and interpolate sps linearly within it
-        for lo, hi, sps_lo, sps_hi in bands:
+        # --- sps from band + velocity bias ---
+        for lo, hi, sps_lo, sps_hi, (vmin, vmax) in bands:
             if p_eff <= hi:
-                t = 0.0 if hi == lo else (max(lo, min(p_eff, hi)) - lo) / (hi - lo)
-                sps = sps_lo + t * (sps_hi - sps_lo)
+                # base interpolation by impulse (higher p -> slower)
+                t = 0.0 if hi == lo else (max(lo, min(p_eff, hi)) - lo) / (hi - lo)  # 0..1
+                # velocity normalization inside a plausible window per band
+                v_clamped = max(min(v_mps, vmax), vmin)
+                v_norm = (v_clamped - vmin) / (vmax - vmin) if vmax > vmin else 0.5
+                # bias: higher v -> slightly faster (reduce t), lower v -> slower (increase t)
+                W_V = 0.25  # <= main tuning knob; 0.15–0.30 is a good range
+                t_biased = min(1.0, max(0.0, t - W_V * (v_norm - 0.5)))
+                sps = sps_lo + (1.0 - t_biased) * (sps_hi - sps_lo)
                 break
 
-        # --- Compact recoil factor (tanh on log ratio), clamped ---
+        # --- recoil factor (same as before) ---
         ratio = max(1e-12, p_eff / P_REF)
         rfac = 1.0 + SPAN * math.tanh(S * math.log(ratio))
         rfac = max(RF_MIN, min(RF_MAX, rfac))
