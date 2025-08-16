@@ -62,6 +62,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableVPConfExit.setToolTip('Select VPforce Configurator profile to load when TelemFFB Exits')
         self.cb_logPrune.setToolTip('Auto delete archived logs after time frame')
 
+        self.lb_configProfile.setText(f'<b><u>Configurator Profile Options ({G.device_type.capitalize()})</u></b>')
+
         style = self.style()  # Grab the current style engine
 
         # DCS
@@ -100,7 +102,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.setTabIcon(self.BMS_TAB, self.BMS_ICON_DISABLED)
 
         # Optional: set uniform icon size once
-        self.simTabWidget.setIconSize(QSize(64, 64))
+        self.simTabWidget.setIconSize(QSize(48, 48))
+
 
         tab_format = """
             QTabWidget::pane {
@@ -115,8 +118,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 border-radius: 10px;
                 margin: 4px;
                 padding: 4px;
-                width: 64px;
-                height: 64px;
+                width: 48px;
+                height: 48px;
             }
 
             QTabBar::tab:hover {
@@ -125,7 +128,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             }
 
             QTabBar::tab:selected {
-                border: 1px solid palette(highlight);
+                border: 3px solid palette(highlight);
                 background-color: palette(button);
                 border-radius: 10px;
             }
@@ -228,6 +231,25 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             self.buttonChildSettings.setEnabled(True)
             self.buttonChildSettings.clicked.connect(self.launch_child_settings_windows)
 
+        if G.child_instance:
+            simtab = self.tabWidget.indexOf(self.tab_Simulators)
+            self.tabWidget.setTabVisible(simtab, False)
+            self.tab_Simulators.setVisible(False)
+            self.ignoreUpdate.setVisible(False)
+            self.cb_startWithWindows.setVisible(False)
+            self.cb_startToTray.setVisible(False)
+            self.cb_masterStartMin.setVisible(False)
+            self.cb_closeToTray.setVisible(False)
+            sp1 = self.themeOptions.sizePolicy()
+            sp1.setRetainSizeWhenHidden(False)
+            self.themeOptions.setSizePolicy(sp1)
+            self.themeOptions.setVisible(False)
+
+            sp2 = self.masterLaunchOptions.sizePolicy()
+            sp2.setRetainSizeWhenHidden(False)
+            self.masterLaunchOptions.setSizePolicy(sp2)
+            self.masterLaunchOptions.setVisible(False)
+
         # Enabling start with windows should force headless mode for children
         self.cb_startToTray.clicked.connect(self.toggle_headless)
         self.cb_startToTray.clicked.connect(self.toggle_start_mode)
@@ -237,7 +259,16 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.tabBar().setUsesScrollButtons(False)
         self.simTabWidget.tabBar().setDocumentMode(True)
 
+        self.select_enabled_sim()
 
+    def select_enabled_sim(self):
+        for sim in ('DCS', 'MSFS', 'XPLANE', 'IL2', 'BMS'):
+            cb = getattr(self, f'enable{sim}')
+            if cb.isChecked():
+                # Find first enabled sim in the list and make that the default selected tab
+                tab_index = getattr(self, f'{sim}_TAB')
+                self.simTabWidget.setCurrentIndex(tab_index)
+                return
 
     def make_icons(self, pixmap, style):
         icon_enabled = QIcon()
@@ -775,6 +806,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
             'pidTrimWheel': str(self.tb_pid_t.text()),
+            'themeId': self.themeButtonGroup.checkedId(),
         }
 
     def browse_vpconf(self, mode):
