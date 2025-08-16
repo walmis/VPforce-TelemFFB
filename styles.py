@@ -131,6 +131,12 @@ QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus {
     border: 1px solid #ab37c8;  /* match your accent */
 }
 
+QLineEdit:disabled, QPlainTextEdit:disabled, QTextEdit:disabled {
+    color: palette(disabled, text);
+    background-color: #3a3a3a;     /* optional, a touch darker */
+    border-color: #555555;         /* optional */
+}
+
 QSlider::handle:horizontal {
     background: #ab37c8;
     border: 1px solid #565a5e;
@@ -191,10 +197,6 @@ QMenu::item:selected {
 
 QCheckBox:disabled {
   color: rgb(155, 155, 155);  /* lighter grey for better visibility */
-}
-QLabel {
-    color: palette(text);
-    background: transparent;
 }
 
 QLabel#OfflineBannerLabel {

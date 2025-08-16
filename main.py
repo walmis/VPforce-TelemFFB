@@ -237,6 +237,7 @@ def _apply_dark_mode_palette(app, palette):
     palette.setColor(QtGui.QPalette.ColorRole.BrightText, QtGui.QColor('red'))
 
     # Disabled colors
+    palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.WindowText, QColor(127, 127, 127))
     palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.Text, QColor(127, 127, 127))
     palette.setColor(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.ButtonText, QColor(127, 127, 127))
     palette.setColor(QtGui.QPalette.ColorRole.ToolTipBase, QColor(43, 43, 43))  # or #2b2b2b
