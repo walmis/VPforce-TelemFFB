@@ -42,8 +42,8 @@ t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
 
 class AppStatusWidget(QWidget):
-    request_set_active_vpconf = pyqtSignal(str)  # <- emit from anywhere
-
+    request_set_active_vpconf = pyqtSignal(str)
+    request_set_active_configurator = pyqtSignal(bool)
     def __init__(self, master_instance=True, parent=None):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
@@ -54,6 +54,7 @@ class AppStatusWidget(QWidget):
 
         # connect signal to slot (QueuedConnection by default across threads)
         self.request_set_active_vpconf.connect(self.set_active_vpconf)
+        self.request_set_active_configurator.connect(self.set_active_configurator)
 
         grid = QGridLayout(self)
         grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
