@@ -68,7 +68,7 @@ class AircraftBase(object):
     buffeting_intensity: float = 0.2  # peak AoA buffeting intensity  0 to disable
     buffet_aoa: float = 10.0  # AoA when buffeting starts
     stall_aoa: float = 15.0  # Stall AoA
-    aoa_effect_enabled: int = 1
+    aoa_effect_enabled: bool = False
 
     runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
     runway_rumble_enabled: bool = True
@@ -97,8 +97,6 @@ class AircraftBase(object):
     wind_effect_enabled : int = 0
     wind_effect_scaling: int = 0
     wind_effect_max_intensity: int = 0
-
-    aoa_buffeting_enabled: bool = True
     aoa_effect_gain: float = 1.0
     uncoordinated_turn_effect_enabled: int = 1
 
@@ -1177,7 +1175,7 @@ class AircraftBase(object):
         if (airspd > self.gear_buffet_speed_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
             # calculate insensity based on deployment percentage
             # intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
-            realtime_intensity = utils.scale(airspd, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),(0, self.gear_buffet_intensity)) * gearpos
+            realtime_intensity = utils.scale_clamp(airspd, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),(0, self.gear_buffet_intensity)) * gearpos
             effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, 4).start()
             effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, 4).start()
             logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")

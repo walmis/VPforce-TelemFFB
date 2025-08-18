@@ -102,6 +102,7 @@ class BMSManager(TelemParserBase):
         self.acceleration_Gs: List[float] = [0, 0, 0]
         self.airspeed_kias: float = 0.0
         self.airspeed_mach: float = 0.0
+        self.alpha_deg: float = 0.0
         self.altitude_agl: float = 0.0
         self.altitude_msl: float = 0.0
         
@@ -250,6 +251,9 @@ class BMSManager(TelemParserBase):
         self.altitude_msl = abs(data.z) * ft_to_m
         # Calculate AGL from radar altimeter if available, otherwise estimate
         self.altitude_agl = self.altitude_msl  # Simplified - BMS doesn't provide direct AGL in basic FlightData
+
+        # AoA for ownship
+        self.alpha_deg = data.alpha
         
         # Landing gear - match aircraft_base format
         self.gear_positions = [data.NoseGearPos, data.LeftGearPos, data.RightGearPos]
@@ -312,7 +316,7 @@ class BMSManager(TelemParserBase):
         self.telem_data['MSL'] = self.altitude_msl
         
         # Angle of attack (estimate for F-16)
-        self.telem_data['AoA'] = 0.0  # BMS doesn't provide direct AoA in basic telemetry
+        self.telem_data['AoA'] = self.alpha_deg
         
         # Engine data - match aircraft_base expectations
         if len(self.engine_rpm) == 1:
@@ -371,8 +375,8 @@ class BMSManager(TelemParserBase):
         # Additional fields for aircraft_base compatibility
         self.telem_data["RetractableGear"] = [1, 1, 1]  # F-16 has retractable gear
         self.telem_data["VerticalSpeed"] = 0.0  # Not available in basic BMS telemetry
-        self.telem_data["StallAoA"] = 25.0  # F-16 approximate stall AoA
-        self.telem_data["DesignSpeed"] = [250.0, 150.0, 180.0]  # Approximate F-16 speeds (vc, vs0, vs1)
+        # self.telem_data["StallAoA"] = 25.0  # F-16 approximate stall AoA
+        # self.telem_data["DesignSpeed"] = [250.0, 150.0, 180.0]  # Approximate F-16 speeds (vc, vs0, vs1)
 
     def _process_ivibe_data(self):
         """Process IVibe data for haptic feedback"""

@@ -82,8 +82,6 @@ class Aircraft(AircraftBase):
     damage_effect_enabled = 0
     damage_effect_intensity: float = 0.0
 
-    aoa_effect_enabled = 1
-
     force_disable_collective_gain = 1
     collective_dampening_gain = 0
     collective_init = 0
