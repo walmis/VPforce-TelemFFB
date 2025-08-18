@@ -2096,6 +2096,9 @@ class MainWindow(QMainWindow):
         try:
 
             telem_items = ""
+            # Parse filter once per update
+            raw = (self.telem_filter.text() or "")
+            tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
             for k, v in data.items():
 
                 # check for msfs and debug mode (alt-d pressed), change to simvar name
@@ -2105,9 +2108,12 @@ class MainWindow(QMainWindow):
                         # s = simvarnames.get_var_name(k)
                         if s is not None:
                             k = s
-                            
-                if self.telem_filter.text() and not self.telem_filter.text().lower() in k.lower():
-                    continue
+
+                # Apply simple OR filtering against the key only
+                if tokens:
+                    k_cf = str(k).lower()
+                    if not any(tok in k_cf for tok in tokens):
+                        continue
 
                 if isinstance(v, float):
                     telem_items += f"{k}: {v:.3f}\n"
