@@ -79,7 +79,9 @@ class BMSManager(TelemParserBase):
         self.engine_ftit2: List[float] = [0.0]
         self.nozzle_pos: List[float] = [0.0]
         self.nozzle_pos2: List[float] = [0.0]
-        
+        self.fuel_flow: float = 0.0
+        self.fuel_flow2: float = 0.0
+
         # Weapon systems - match aircraft_base expectations
         self.gun_data: List = []
         self.guns_fired: List[int] = [0]
@@ -228,13 +230,14 @@ class BMSManager(TelemParserBase):
         if ac_from_sm and ac_from_sm.strip():
             self.ac_name = ac_from_sm.strip()
         else:
-            self.ac_name = self.ac_name or "UNKNOWN AIRCRAFT"
+            self.ac_name = self.ac_name or "F-16"
 
         # Engine data - match aircraft_base format
         self.engine_rpm = [data.rpm]
         self.engine_ftit = [data.ftit]
         self.nozzle_pos = [data.nozzlePos]
-        
+        self.fuel_flow = [data.fuelFlow]
+
         # Flight parameters
         self.airspeed_kias = data.kias
         self.airspeed_mach = data.mach
@@ -278,6 +281,8 @@ class BMSManager(TelemParserBase):
         self.engine_rpm2 = [data.rpm2] if hasattr(data, 'rpm2') else [0.0]
         self.engine_ftit2 = [data.ftit2] if hasattr(data, 'ftit2') else [0.0]
         self.nozzle_pos2 = [data.nozzlePos2] if hasattr(data, 'nozzlePos2') else [0.0]
+        self.fuel_flow2 = [data.fuelFlow2] if hasattr(data, 'fuelFlow2') else [0.0]
+
         
         # Control surfaces - match aircraft_base field names
         if hasattr(data, 'lefPos'):
@@ -317,10 +322,17 @@ class BMSManager(TelemParserBase):
         
         self.telem_data['RPM'] = self.engine_rpm  # For prop aircraft compatibility
         self.telem_data['FTIT'] = self.engine_ftit
-        self.telem_data['NozzlePos'] = self.nozzle_pos
+        self.telem_data['NozzlePos'] = self.nozzle_pos + self.nozzle_pos2
         
         # Afterburner status (estimate from nozzle position)
         self.telem_data['Afterburner'] = utils.scale_clamp(self.nozzle_pos[0], (0.8, 1.0), (0.0, 1.0)) # Assume AB if nozzle > 80% open
+        max_noz = max(self.nozzle_pos + self.nozzle_pos2)
+        max_ff = max(self.fuel_flow + self.fuel_flow2)
+        if max_noz >= 0.1 and max_ff >= 8000:
+            self.telem_data['Afterburner'] = utils.scale_clamp(max(self.nozzle_pos + self.nozzle_pos2), (0.1, 1.0), (0.0, 1.0)) # Assume AB if nozzle > 80% open
+        else:
+            self.telem_data['Afterburner'] = 0.0
+        # self.telem_data['Afterburner'] = utils.scale_clamp(self.nozzle_pos[0], (0.8, 1.0), (0.0, 1.0)) # Assume AB if nozzle > 80% open
 
         # Landing gear - match aircraft_base format
         self.telem_data['Gear'] = self.gear_positions  # For MSFS compatibility
