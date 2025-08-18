@@ -47,7 +47,8 @@ import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
-from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, SimStatusLabel, vpf_purple, AppStatusWidget
+from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
+    SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow
 from telemffb.DevicePanel import DeviceIconPanel
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
@@ -673,8 +674,39 @@ class MainWindow(QMainWindow):
             font-family: Cascadia Mono;
         """)
 
+        """ Create Monitor Page detach toolbar"""
 
-        """ Create telemetry header with label and filter """
+        self.monitor_detach_tb = QtWidgets.QToolBar(self.monitor_widget)
+        self.monitor_detach_tb.setObjectName("monitorInlineToolbar")
+        self.monitor_detach_tb.setMovable(False)
+        self.monitor_detach_tb.setFloatable(False)
+        self.monitor_detach_tb.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.monitor_detach_tb.setIconSize(QtCore.QSize(16, 16))
+        self.monitor_detach_tb.setStyleSheet("QToolBar { border: 0; background: transparent; }")
+
+        self.monitor_detach_act = self.monitor_detach_tb.addAction("Detach")
+        self.monitor_detach_act.setToolTip('Detach the Monitor Tab from the main window\ninto a separate window.')
+        self.monitor_detach_act.triggered.connect(lambda: self.detach_tab(0))
+
+        btn = self.monitor_detach_tb.widgetForAction(self.monitor_detach_act)
+        if isinstance(btn, QtWidgets.QToolButton):
+            btn.setAutoRaise(False)
+            btn.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            btn.setStyleSheet("""
+                QToolButton {
+                    border: 1px solid palette(mid);
+                    border-radius: 4px;
+                    padding: 3px 9px;
+                    background: palette(button);
+                    color: palette(button-text);
+                }
+                QToolButton:hover { background: palette(midlight); }
+                QToolButton:pressed {
+                    background: palette(dark);
+                    color: palette(highlight);
+                }
+                QToolButton:disabled { color: palette(mid); border-color: palette(mid); }
+            """)
 
         telem_header_widget = QWidget()
         telem_header_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
@@ -683,6 +715,7 @@ class MainWindow(QMainWindow):
         
         self.telem_lbl = QLabel('Telemetry:')
         self.telem_filter = QLineEdit()
+        self.telem_filter.setToolTip("Comma Separated, Case Insensitive list of telemetry items to show (e.g. 'aoa, ias, rpm')")
 
 
         """ Add placeholder for the filter """
@@ -692,7 +725,7 @@ class MainWindow(QMainWindow):
 
 
         """ Add telemetry label and filter placeholder to the layout """
-
+        telem_header_layout.addWidget(self.monitor_detach_tb)
         telem_header_layout.addWidget(self.telem_lbl)
         telem_header_layout.addWidget(self.telem_filter)
         telem_header_layout.addStretch()  # Push everything to the left
@@ -723,6 +756,7 @@ class MainWindow(QMainWindow):
 
         self.tab_widget.addTab(self.monitor_widget, "Monitor")
 
+        self._install_detachable_tabs()
 
         """ Create settings scroll area widget that will hold the settings page"""
 
@@ -820,6 +854,95 @@ class MainWindow(QMainWindow):
         """  Create configurator gain dialog for use during TelemFFB session and store object in globals """
 
         G.gain_override_dialog = ConfiguratorDialog(self)
+
+    def _install_detachable_tabs(self):
+        """Enable context menu on the tab bar for detaching/reattaching."""
+        self._detached_tabs = {}  # title -> {"win": DetachedTabWindow, "index": int, "widget": QWidget}
+
+        bar = self.tab_widget.tabBar()
+        bar.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
+        bar.customContextMenuRequested.connect(self._show_tab_context_menu)
+
+        # Optional: keyboard shortcut to detach the Monitor tab
+        detach_shortcut = QShortcut(QKeySequence("Ctrl+Shift+M"), self)
+        detach_shortcut.activated.connect(self._detach_monitor_via_shortcut)
+
+    def _detach_monitor_via_shortcut(self):
+        idx = self.tab_widget.indexOf(self.monitor_widget)
+        if idx != -1:
+            self.detach_tab(idx)
+
+    def _show_tab_context_menu(self, pos: QtCore.QPoint):
+        bar = self.tab_widget.tabBar()
+        index = bar.tabAt(pos)
+        ## Montor page only supported for now
+        if index != 0:
+            return
+        title = self.tab_widget.tabText(index)
+
+        menu = QtWidgets.QMenu(bar)
+        detach_act = QAction("Detach", self)
+        reattach_act = QAction("Reattach", self)
+
+        # Only allow detach/reattach for the Monitor tab (per your request)
+        is_monitor = (title == "Monitor")
+        is_detached = title in self._detached_tabs
+
+        detach_act.setEnabled(is_monitor and not is_detached)
+        reattach_act.setEnabled(is_monitor and is_detached)
+
+        detach_act.triggered.connect(lambda: self.detach_tab(index))
+        reattach_act.triggered.connect(lambda: self.reattach_tab(title))
+
+        menu.addAction(detach_act)
+        menu.addAction(reattach_act)
+        menu.exec(bar.mapToGlobal(pos))
+
+    def detach_tab(self, index: int):
+        if index == 0:  # Monitor Tab
+            self.monitor_detach_tb.setVisible(False)
+        title = self.tab_widget.tabText(index)
+        if hasattr(self, "_detached_tabs") and title in self._detached_tabs:
+            return
+        page = self.tab_widget.widget(index)
+        if page is None:
+            return
+
+        self.tab_widget.removeTab(index)
+        page.setParent(None)
+        page.show()
+
+        win = DetachedTabWindow(title, self)
+        win.reattachRequested.connect(self.reattach_tab)
+        win.adopt_page(page)
+        win.show()
+
+        self._detached_tabs = getattr(self, "_detached_tabs", {})
+        self._detached_tabs[title] = {"win": win, "index": index}
+
+    def reattach_tab(self, title: str):
+        entry = getattr(self, "_detached_tabs", {}).pop(title, None)
+        if not entry:
+            return
+
+        if title == 'Monitor':
+            self.monitor_detach_tb.setVisible(True)
+
+        win: DetachedTabWindow = entry["win"]
+        original_index: int = entry["index"]
+
+        page = win.release_page()
+        if page is None:
+            win.deleteLater()
+            return
+
+        win.deleteLater()
+
+        insert_at = max(0, min(original_index, self.tab_widget.count()))
+        page.setParent(self.tab_widget)
+        self.tab_widget.insertTab(insert_at, page, title)
+        self.tab_widget.setCurrentWidget(page)
+        page.show()
 
     def get_active_buttons(self):
         input_data = HapticEffect.device.get_input()

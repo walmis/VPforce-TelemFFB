@@ -40,6 +40,40 @@ import styles
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
 
+class DetachedTabWindow(QtWidgets.QMainWindow):
+    reattachRequested = pyqtSignal(str)  # emit the tab title
+
+    def __init__(self, title: str, parent=None):
+        super().__init__(parent)
+        self._title = title
+        self.setWindowTitle(title)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose, True)
+
+        # Same look your screenshot shows
+        tb = self.addToolBar("Tab")
+        tb.setMovable(False)
+        tb.setFloatable(False)
+        tb.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextOnly)
+        tb.setIconSize(QtCore.QSize(16, 16))
+
+        act = tb.addAction("Reattach")
+        act.triggered.connect(lambda: self.reattachRequested.emit(self._title))
+
+    def adopt_page(self, page: QtWidgets.QWidget):
+        self.setCentralWidget(page)
+        page.show()
+
+    def release_page(self) -> QtWidgets.QWidget | None:
+        page = self.takeCentralWidget()
+        if page:
+            page.setParent(None)
+            page.show()
+        return page
+
+    def closeEvent(self, e: QtGui.QCloseEvent) -> None:
+        if self.centralWidget() is not None:
+            self.reattachRequested.emit(self._title)
+        super().closeEvent(e)
 
 class AppStatusWidget(QWidget):
     request_set_active_vpconf = pyqtSignal(str)
