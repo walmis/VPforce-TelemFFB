@@ -2038,7 +2038,6 @@
 		<prereq>basic_group</prereq>
 		<info>Will temporarily override the spring gain on the joystick when the user is *not* sitting in the Pilot seat.</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -2053,7 +2052,6 @@
 		<prereq>cp_spr_override_enabled</prereq>
 		<info>Seat ID when sitting in Pilot's seat.  Effect will beome active any time the Seat ID does not match this ID value&lt;br&gt;See the Telemetry monitor page to get the proper value when sitting in the pilots seat&lt;br&gt;&lt;img src=":/image/dcs_seat_id.png"&gt;&lt;/&gt;</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<validvalues>0,1,2,3,4</validvalues>
 		<value>0</value>
@@ -2069,7 +2067,6 @@
 		<prereq>cp_spr_override_enabled</prereq>
 		<info>Spring gain while effect is active</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
@@ -2085,7 +2082,6 @@
 		<prereq>cp_spr_override_enabled</prereq>
 		<info>Only activate override if button is held (must configure button in resulting setting once this setting is enabled)</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -2100,7 +2096,6 @@
 		<prereq>cp_spr_override_button_enabled</prereq>
 		<info>Click to configure the override button</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<value>0</value>
 	</defaults>
@@ -2312,10 +2307,9 @@
 		<displayname>AoA Effect</displayname>
 		<prereq>airflow_group</prereq>
 		<info>Enable or disable the dynamic Angle of Attack (AoA) based force effect</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
+		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -3123,7 +3117,6 @@
 		<prereq>deceleration_effect_enable</prereq>
 		<info>Deceleration effect pulls the stick forward when on the ground and decelerating</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3142,7 +3135,6 @@
 		<prereq>deceleration_effect_enable</prereq>
 		<info>Artificially increase the G forces in the direction of deceleration</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3162,7 +3154,6 @@
 		<prereq>deceleration_effect_enable</prereq>
 		<info>Invert the frame of reference (direction of force) for the effect.  I.e. stick moving away from pilot vs. pilot moving towards stick.</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3180,7 +3171,6 @@
 		<prereq>deceleration_effect_enable</prereq>
 		<info>Disable effect while airborne</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<IL2>true</IL2>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -3742,7 +3732,6 @@
 		<displayname>Canopy Motion</displayname>
 		<prereq>mechanical_group</prereq>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3760,7 +3749,6 @@
 		<prereq>canopy_motion_effect_enabled</prereq>
 		<info>Peak vibration intensity when canopy is moving</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
@@ -3856,7 +3844,6 @@
 		<prereq>mechanical_group</prereq>
 		<info>Effect while fuel boom/door  is deploying/retracting</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -3870,7 +3857,6 @@
 		<prereq>fuelboom_motion_effect_enabled</prereq>
 		<info>Effect while fuel boom/door  is deploying/retracting</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -4278,7 +4264,6 @@
 		<prereq>mechanical_group</prereq>
 		<info>Effect while tailhook is deploying/retracting</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 	</defaults>
@@ -4293,7 +4278,6 @@
 		<prereq>tailhook_motion_effect_enabled</prereq>
 		<info>Effect while tailhook is deploying/retracting</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<sliderfactor>0.4</sliderfactor>
@@ -4311,7 +4295,6 @@
 		<prereq>mechanical_group</prereq>
 		<info>Effect while wing-fold  is deploying/retracting</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -4325,7 +4308,6 @@
 		<prereq>wingfold_motion_effect_enabled</prereq>
 		<info>Effect while wing-fold  is deploying/retracting</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 		<sliderfactor>0.4</sliderfactor>
 		<validvalues>0,100</validvalues>
@@ -10960,14 +10942,14 @@
 	</models>
 	<models>
 		<name>type</name>
-		<model>F-15C</model>
+		<model>F-15.*</model>
 		<value>JetAircraft</value>
 		<sim>BMS</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
-		<model>F-15C</model>
+		<model>F-15.*</model>
 		<value>800</value>
 		<unit>kt</unit>
 		<sim>BMS</sim>
@@ -10975,7 +10957,7 @@
 	</models>
 	<models>
 		<name>aircraft_vs_speed</name>
-		<model>F-15C</model>
+		<model>F-15.*</model>
 		<value>130</value>
 		<unit>kt</unit>
 		<sim>BMS</sim>
@@ -10983,14 +10965,14 @@
 	</models>
 	<models>
 		<name>type</name>
-		<model>F-16C</model>
+		<model>F-16.*</model>
 		<value>JetAircraft</value>
 		<sim>BMS</sim>
 		<device>any</device>
 	</models>
 	<models>
 		<name>aircraft_vne_speed</name>
-		<model>F-16C</model>
+		<model>F-16.*</model>
 		<value>915</value>
 		<unit>kt</unit>
 		<sim>BMS</sim>
@@ -10998,7 +10980,7 @@
 	</models>
 	<models>
 		<name>aircraft_vs_speed</name>
-		<model>F-16C</model>
+		<model>F-16.*</model>
 		<value>140</value>
 		<unit>kt</unit>
 		<sim>BMS</sim>
