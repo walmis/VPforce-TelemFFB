@@ -325,7 +325,6 @@ class BMSManager(TelemParserBase):
         self.telem_data['NozzlePos'] = self.nozzle_pos + self.nozzle_pos2
         
         # Afterburner status (estimate from nozzle position)
-        self.telem_data['Afterburner'] = utils.scale_clamp(self.nozzle_pos[0], (0.8, 1.0), (0.0, 1.0)) # Assume AB if nozzle > 80% open
         max_noz = max(self.nozzle_pos + self.nozzle_pos2)
         max_ff = max(self.fuel_flow + self.fuel_flow2)
         if max_noz >= 0.1 and max_ff >= 8000:
@@ -333,6 +332,8 @@ class BMSManager(TelemParserBase):
         else:
             self.telem_data['Afterburner'] = 0.0
         # self.telem_data['Afterburner'] = utils.scale_clamp(self.nozzle_pos[0], (0.8, 1.0), (0.0, 1.0)) # Assume AB if nozzle > 80% open
+
+        self.telem_data['FuelFlow'] = self.fuel_flow + self.fuel_flow2
 
         # Landing gear - match aircraft_base format
         self.telem_data['Gear'] = self.gear_positions  # For MSFS compatibility
@@ -440,7 +441,7 @@ class BMSManager(TelemParserBase):
         if hasattr(ivibe, 'IsOnGround'):
             self.on_ground = ivibe.IsOnGround
         if hasattr(ivibe, 'IsPaused') and hasattr(ivibe, 'IsEndFlight'):
-            self.telem_data["SimPaused"] = 1 if ivibe.IsPaused or ivibe.IsEndFlight else 0
+            self.telem_data["SimPaused"] = 1 if ivibe.IsPaused or ivibe.IsEndFlight or ivibe.IsEjecting else 0
         if hasattr(ivibe, 'In3D'):
             self.telem_data["In3D"] = 1 if ivibe.In3D else 0
     
