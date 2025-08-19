@@ -9582,6 +9582,11 @@
 			<device>pedals</device>
 		</classdefaults_BMS>
 		<classdefaults_BMS>
+grou			<name>flaps_motion_effect_enabled</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+		</classdefaults_BMS>
+		<classdefaults_BMS>
 			<name>force_disable_collective_gain</name>
 			<type>JetAircraft</type>
 			<value>true</value>

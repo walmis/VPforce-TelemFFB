@@ -438,7 +438,7 @@ class AircraftBase(object):
             if k in ["type"]: continue
             if k.endswith("_group"): continue
             if getattr(self, k, None) is None and k != 'vpconf' and 'dummy' not in k and 'command_runner' not in k:
-                logging.info(f"WARNING: Unknown parameter {k} in config")
+                # logging.info(f"WARNING: Unknown parameter {k} in config")  # This log is no longer relevant since we moved away from ini files
                 continue
             logging.info(f"set {k} = {v}")
             setattr(self, k, v)
@@ -636,11 +636,27 @@ class AircraftBase(object):
         # telem_data["_force"] = force
         effects['touchdown'].constant(force, 180).start()
 
+    def bms_taxi_bumps(self, telem_data):
+        """Generates a bump effect in response to bumpIntensity telemetry for Falcon BMS simulator"""
+        if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
+            effects.dispose("runway_bump0", "runway_bump1")
+            return
+        bump = telem_data.get("BumpIntensity")
+        if bump and self.anything_has_changed("BumpIntensity", bump):
+            intensity = utils.clamp(bump * self.runway_rumble_intensity, 0, 1)
+            effects['runway_bump0'].periodic(15, intensity * .75, direction=0, effect_type=EFFECT_SQUARE, duration=80).start()
+            effects['runway_bump1'].periodic(15, intensity, direction=0, effect_type=EFFECT_SQUARE, phase=180, duration=160).start()
+
 
     def ac_update_runway_rumble(self, telem_data):
         """Add wheel based rumble effects for immersion
         Generates bumps/etc on touchdown, rolling, field landing etc
         """
+        if self._sim_is_bms():
+            # Fake it since BMS does not have weight on wheels - only has 'bumps' telemetry
+            self.bms_taxi_bumps(telem_data)
+            return
+
         if self.is_collective(): return
         if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
             effects.dispose("runway0", "runway1")

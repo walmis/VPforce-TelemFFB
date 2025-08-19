@@ -109,6 +109,7 @@ class BMSManager(TelemParserBase):
         # Landing gear
         self.gear_positions: List[float] = [1.0, 1.0, 1.0]  # nose, left, right
         self.weight_on_wheels: List[float] = [0.0, 0.0, 0.0]
+        self.bump_intensity: float = 0.0
         
         # Control surfaces
         self.flaps_position: float = 0.0
@@ -286,6 +287,7 @@ class BMSManager(TelemParserBase):
         self.engine_ftit2 = [data.ftit2] if hasattr(data, 'ftit2') else [0.0]
         self.nozzle_pos2 = [data.nozzlePos2] if hasattr(data, 'nozzlePos2') else [0.0]
         self.fuel_flow2 = [data.fuelFlow2] if hasattr(data, 'fuelFlow2') else [0.0]
+        self.bump_intensity = data.bumpIntensity
 
         
         # Control surfaces - match aircraft_base field names
@@ -345,7 +347,8 @@ class BMSManager(TelemParserBase):
         self.telem_data['gear_value'] = max(self.gear_positions)  # Single value version
         self.telem_data['WeightOnWheels'] = self.weight_on_wheels
         self.telem_data['SimOnGround'] = 1 if self.on_ground else 0
-        
+        self.telem_data['BumpIntensity'] = self.bump_intensity
+
         # G-forces - match aircraft_base format exactly
         self.telem_data['ACCs'] = self.acceleration_Gs  # DCS/IL2 format
         self.telem_data['G'] = self.acceleration_Gs[1]  # MSFS format (normal G only)
