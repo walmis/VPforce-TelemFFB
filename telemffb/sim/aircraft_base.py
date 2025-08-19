@@ -1099,10 +1099,10 @@ class AircraftBase(object):
 
         # Use helper method for weapon effects
         self._create_weapon_effect("payload_rel", "PayloadInfo", payload,
-                                 self.weapon_release_effect_enabled, self.weapon_release_intensity)
+                                 self.weapon_release_effect_enabled, self.weapon_release_intensity, shape=EFFECT_SQUARE)
 
         self._create_weapon_effect("gunfire", "Gun", gun,
-                                 self.gunfire_effect_enabled, self.gun_vibration_intensity)
+                                 self.gunfire_effect_enabled, self.gun_vibration_intensity, shape=EFFECT_SAWTOOTHUP)
 
         # Countermeasures effect (combined flares and chaff)
         cm_changed = (self.anything_has_changed("Flares", flares) or
@@ -2016,7 +2016,9 @@ class AircraftBase(object):
 
             self.override_spring_cp0_x = round(utils.clamp(self.override_spring_cp0_x, -4096, 4096))
             self.override_spring_cp0_y = round(utils.clamp(self.override_spring_cp0_y, -4096, 4096))
-
+        else:
+            self.override_spring_cp0_x = 0
+            self.override_spring_cp0_y = 0
         offset = self.ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
         self.g_y_offset = offset if offset is not None else 0
         self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]
@@ -2167,7 +2169,7 @@ class AircraftBase(object):
 
     def _create_weapon_effect(self, effect_name: str, telem_key: str, telem_value,
                              enabled_flag: bool, intensity: float, frequency: int = 10,
-                             duration: int = 80, delta_ms: int = 160):
+                             duration: int = 80, delta_ms: int = 160, shape: int = EFFECT_SINE):
         """Generic method for weapon-related effects (gun, payload, countermeasures)."""
         if not enabled_flag:
             effects[effect_name].stop()
@@ -2177,7 +2179,7 @@ class AircraftBase(object):
             direction = self._get_effect_direction(self.weapon_effect_direction)
             if self.weapon_effect_direction == -1:
                 logging.info(f"{effect_name.title()} Effect Direction is randomized: {direction} deg")
-            effects[effect_name].periodic(frequency, intensity, direction, duration=duration).start(force=True)
+            effects[effect_name].periodic(frequency, intensity, direction, effect_type=shape, duration=duration).start(force=True)
         elif not self.anything_has_changed(telem_key, telem_value, delta_ms=delta_ms):
             effects[effect_name].stop()
 

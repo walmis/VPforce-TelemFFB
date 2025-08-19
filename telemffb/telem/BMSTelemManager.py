@@ -366,7 +366,7 @@ class BMSManager(TelemParserBase):
         self.telem_data["Gun"] = self.guns_fired
         self.telem_data["Bombs"] = self.bombs_released
         self.telem_data["Missiles"] = self.missiles_fired
-        self.telem_data["PayloadInfo"] = self.bombs_released  # For weapon release effects
+        self.telem_data["PayloadInfo"] = self.bombs_released  + self.missiles_fired
         self.telem_data["Flares"] = [int(self.flare_count)]  # Current count as list
         self.telem_data["Chaff"] = [int(self.chaff_count)]   # Current count as list
         
@@ -389,14 +389,21 @@ class BMSManager(TelemParserBase):
         ivibe = self.ivibe_data
         
         # Update weapon firing counts - detect changes for effects
-        if hasattr(ivibe, 'BulletsFired'):
-            bullets_fired = ivibe.BulletsFired - self.last_bullets_fired
-            if bullets_fired > 0:
-                self.guns_fired = [bullets_fired]
+        ## ivibe 'bullets_fired' seems to be dead in the telemetry (confirmed in bmsflightdata test tool)
+        ## just monitor ivibe.IsFiringGun and increment the guns_fired counter
+        # if hasattr(ivibe, 'BulletsFired'):
+        #     bullets_fired = ivibe.BulletsFired - self.last_bullets_fired
+        #     if bullets_fired > 0:
+        #         self.guns_fired = [bullets_fired]
+        #     else:
+        #         self.guns_fired = [0]
+        #     self.last_bullets_fired = ivibe.BulletsFired
+        if hasattr(ivibe, 'IsFiringGun'):
+            if ivibe.IsFiringGun:
+                self.guns_fired = [self.guns_fired[0] + 1]
             else:
                 self.guns_fired = [0]
-            self.last_bullets_fired = ivibe.BulletsFired
-            
+
         if hasattr(ivibe, 'BombDropped'):
             bombs_dropped = ivibe.BombDropped - self.last_bombs_dropped
             if bombs_dropped > 0:
