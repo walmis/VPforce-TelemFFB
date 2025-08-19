@@ -5309,24 +5309,66 @@
 	</sc_overrides>
 	<sc_overrides>
 		<name>FI_VibX</name>
+		<model>FlyInside B206.*</model>
+		<var>L:Aircraft.Vibrations.X</var>
+		<sc_unit>number</sc_unit>
+		<scale>5000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibY</name>
+		<model>FlyInside B206.*</model>
+		<var>L:Aircraft.Vibrations.Y</var>
+		<sc_unit>number</sc_unit>
+		<scale>5000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibZ</name>
+		<model>FlyInside B206.*</model>
+		<var>L:Aircraft.Vibrations.Z</var>
+		<sc_unit>number</sc_unit>
+		<scale>5000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibX</name>
+		<model>FlyInside - B206.*</model>
+		<var>L:Aircraft.Vibrations.X</var>
+		<sc_unit>number</sc_unit>
+		<scale>5000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibY</name>
+		<model>FlyInside - B206.*</model>
+		<var>L:Aircraft.Vibrations.Y</var>
+		<sc_unit>number</sc_unit>
+		<scale>5000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibZ</name>
+		<model>FlyInside - B206.*</model>
+		<var>L:Aircraft.Vibrations.Z</var>
+		<sc_unit>number</sc_unit>
+		<scale>5000</scale>
+	</sc_overrides>
+	<sc_overrides>
+		<name>FI_VibX</name>
 		<model>FlyInside B47.*</model>
 		<var>L:Aircraft.Vibrations.X</var>
 		<sc_unit>number</sc_unit>
-		<scale>1000</scale>
+		<scale>5000</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>FI_VibY</name>
 		<model>FlyInside B47.*</model>
 		<var>L:Aircraft.Vibrations.Y</var>
 		<sc_unit>number</sc_unit>
-		<scale>10000</scale>
+		<scale>5000</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>FI_VibZ</name>
 		<model>FlyInside B47.*</model>
 		<var>L:Aircraft.Vibrations.Z</var>
 		<sc_unit>number</sc_unit>
-		<scale>10000</scale>
+		<scale>5000</scale>
 	</sc_overrides>
 	<sc_overrides>
 		<name>EngRPM</name>

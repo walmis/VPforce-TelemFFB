@@ -2857,9 +2857,9 @@ class FlyInsideHelicopter(Helicopter):
             return
         rrpm = self.telem_data.get("RotorRPM", 0)
         if self.is_joystick():
-            vx, vy = "FI_VibX", "FI_VibY"
+            vx, vy = "FI_VibY", "FI_VibX"
         elif self.is_pedals():
-            vx, vy = "FI_VibX", "FI_VibZ"
+            vx, vy = "FI_VibZ", "FI_VibX"
         elif self.is_collective():
             vx, vy = "FI_VibZ", "FI_VibY"
         else:
