@@ -135,6 +135,10 @@ class Aircraft(AircraftBase):
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = None
 
+        self.ap_active_deadzone_enabled = False
+        self.ap_active_deadzone = 0.0
+        self.deadzone_updated = False
+
     @overrides(AircraftBase)
     def ac_update_gforce_effect(self, telem_data, adv_spr=False):
         # don't run if override is active
@@ -202,6 +206,7 @@ class Aircraft(AircraftBase):
         self.dcs_update_stick_shaker(telem_data)
         self.dcs_override_spring()
         self.dcs_override_copilot_spring(telem_data)
+        self.dcs_update_ap_deadzone(telem_data)
 
     @overrides(AircraftBase)
     def on_event(self, event, *args):
@@ -391,6 +396,47 @@ class Aircraft(AircraftBase):
         else:
             effects['stick_shaker1'].destroy()
             effects['stick_shaker2'].destroy()
+
+    def dcs_update_ap_deadzone(self, telem_data):
+        """
+        Updates the dead-zone when the AP is active.  Useful for aircraft that are sensitive to joystick input when AP is active.
+
+        Args:
+            telem_data:  Expects 'APEnabled' key in the dictionary
+
+        Returns: None
+
+        """
+        if not self.is_joystick(): return
+
+        ap_active = telem_data.get("APEnabled", 0)
+
+        #  We can't call set_deadzone repeatedly
+        #  Only flag for update if one of the following conditions have changed
+        if not hasattr(self, 'deadzone_updated'):
+            self.deadzone_updated = False
+
+        if self.anything_has_changed('ap_active', ap_active):
+            self.deadzone_updated = False
+
+        if self.anything_has_changed('ap_active_deadzone_enabled', self.ap_active_deadzone_enabled):
+            self.deadzone_updated = False
+
+        if self.anything_has_changed('ap_active_deadzone', self.ap_active_deadzone):
+            self.deadzone_updated = False
+
+
+        if not self.ap_active_deadzone_enabled or not ap_active:
+            if not self.deadzone_updated:
+                HapticEffect.device.set_deadzone(0)
+                self.deadzone_updated = True
+            return
+
+        if ap_active and not self.deadzone_updated:
+            HapticEffect.device.set_deadzone(round(utils.clamp(self.ap_active_deadzone * 4096, 0, 4096)))
+            self.deadzone_updated = True
+
+
 
     def dcs_override_copilot_spring(self, telem_data):
         if not self.is_joystick():return

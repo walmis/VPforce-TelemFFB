@@ -2058,6 +2058,34 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>3150</order>
+		<name>ap_active_deadzone_enabled</name>
+		<displayname>Autopilot Deadzone</displayname>
+		<prereq>basic_group</prereq>
+		<info>Enable a configurator axis deadzone when AutoPilot is active to reduce false disconnects\n\n- Supported on limited modules</info>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>float</datatype>
+		<grouping>Spring Override</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>3150.1</order>
+		<name>ap_active_deadzone</name>
+		<displayname>Autopilot Deadzone</displayname>
+		<prereq>ap_active_deadzone_enabled</prereq>
+		<DCS>true</DCS>
+		<joystick>true</joystick>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
 		<datatype>float</datatype>
 		<grouping>Spring Override</grouping>
 		<parentgroup>basic</parentgroup>
@@ -5470,6 +5498,13 @@
 			<value>true</value>
 			<sim>DCS</sim>
 			<device>any</device>
+		</classdefaults_DCS>
+<classdefaults_DCS>
+	<name>ap_active_deadzone_enabled</name>
+	<type>!Helicopter</type>
+	<value>false</value>
+	<sim>DCS</sim>
+	<device>any</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
 			<name>aoa_effect_enabled</name>
@@ -9581,10 +9616,11 @@
 			<sim>BMS</sim>
 			<device>pedals</device>
 		</classdefaults_BMS>
-		<classdefaults_BMS>
-grou			<name>flaps_motion_effect_enabled</name>
+		<classdefaults_BMS><name>flaps_motion_effect_enabled</name>
 			<type>JetAircraft</type>
 			<value>false</value>
+			<sim>BMS</sim>
+			<device>any</device>
 		</classdefaults_BMS>
 		<classdefaults_BMS>
 			<name>force_disable_collective_gain</name>
