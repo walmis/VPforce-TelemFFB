@@ -140,6 +140,11 @@ class SettingsManager(QObject):
     }
 
     MSFS_XP_HELI_PEDAL_SPRING_MODE = {
+        SpringModeEnum.NOSPRING: "No Spring",
+        SpringModeEnum.FORCETRIM: "Hardware Force Trim",
+    }
+
+    MSFS_XP_HELI_JOYSTICK_SPRING_MODE = {
         SpringModeEnum.NOSPRING: "No Spring (Free Floating)",
         SpringModeEnum.FORCETRIM: "Hardware Force Trim",
     }

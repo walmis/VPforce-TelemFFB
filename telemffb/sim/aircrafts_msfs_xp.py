@@ -1599,8 +1599,13 @@ class Helicopter(Aircraft):
     cyclic_virtual_trim_x_offs = 0
     cyclic_virtual_trim_y_offs = 0
 
+    # Vars for custom force trim switch L:var
+    custom_ft_sw_var_enabled = False
+    custom_ft_sw_var = "L:TelemFFBHeliFT"
+
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
+        self.subscribe_simvars()
     
     @overrides(Aircraft)
     def on_timeout(self):
@@ -1630,6 +1635,14 @@ class Helicopter(Aircraft):
     def msfs_update_trimwheel(self, *args, **kwargs):
         pass
 
+    def subscribe_simvars(self):
+        if not hasattr(self, "_simconnect"):
+            return
+
+        if 'ForceTrimSW' not in self._simconnect.sv_dict.keys():
+            self._simconnect.add_simvar(name='ForceTrimSW', var="L:TelemFFBHeliFT", sc_unit="enum")
+            self._simconnect._resubscribe()
+
     def msfs_update_heli_controls(self, telem_data):
         ffb_type = telem_data.get("FFBType", "joystick")
         if self._sim_is_msfs():
@@ -1637,16 +1650,23 @@ class Helicopter(Aircraft):
         if self._sim_is_xplane():
             ap_active = telem_data.get("APServos", 0)
 
-        # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
+        if self._sim_is_msfs():
+            if (self.custom_ft_sw_var_enabled and self.anything_has_changed('custom_ft_sw_var', self.custom_ft_sw_var)) or self.anything_has_changed('custom_ft_sw_var_enabled', self.custom_ft_sw_var_enabled):
+                self._simconnect.add_simvar(name='ForceTrimSW', var=self.custom_ft_sw_var, sc_unit="enum")
+                self._simconnect._resubscribe()
+
         self._spring_handle.name = "cyclic_spring"
-        force_trim_active = telem_data.get('ForceTrimSW', True)  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
+        force_trim_active = telem_data.get('ForceTrimSW', True) if self.custom_ft_sw_var_enabled else True  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
         if ffb_type == "joystick":
-            if self.force_trim_enabled and force_trim_active:
+            input_data = HapticEffect.device.get_input()
+            x, y = input_data.axisXY()
+            telem_data['phys_x'] = x
+            telem_data['phys_y'] = y
+            if self.spring_mode_is(self.SpringModeEnum.FORCETRIM) and force_trim_active:
 
                 if self.force_trim_button == 0:
                     self.flag_error("Force trim enabled but buttons not configured")
                     return
-                input_data = HapticEffect.device.get_input()
                 if self.cyclic_spring_init:
                     force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
                 else:
@@ -1662,10 +1682,6 @@ class Helicopter(Aircraft):
                 if self.anything_has_changed('ft_tracker', force_trim_pressed):
                     self.tr_state_change = True
 
-                x, y = input_data.axisXY()
-                telem_data['phys_x'] = x
-                telem_data['phys_y'] = y
-
                 # Add: remember previous "pressed" to detect edge
                 force_trim_pressed_prev = getattr(self, "force_trim_pressed_prev", False)
                 force_trim_pressed = input_data.isButtonPressed(self.force_trim_button) if self.cyclic_spring_init else False
@@ -1673,6 +1689,9 @@ class Helicopter(Aircraft):
                 self.force_trim_pressed_prev = force_trim_pressed
 
                 if not self.cyclic_spring_init:
+                    """This clause uses spring force to initialize the cyclic to one of two positions
+                    If on the ground, the cyclic will always initialize to center
+                    If in the air, the cyclic will initialize to the last position before pause or center if no saved position"""
                     # print("CYCLIC INIT LOOP")
                     self.cyclic_center = [0.0, 0.0]
 
@@ -1720,6 +1739,9 @@ class Helicopter(Aircraft):
                             self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
                         return
                 elif force_trim_pressed:
+                    """This clause executes when the force trim button is depressed
+                    It calculates the total offset including the trim data
+                    It applies a 'following spring' that induces a damper effect on the joystick"""
                     if self.tr_state_change:
                         # compute total center currently applied to device
                         total_x = int(self.cpO_x) + int(self.cyclic_physical_trim_x_offs)
@@ -1755,6 +1777,8 @@ class Helicopter(Aircraft):
                     self.cyclic_trim_release_active = 1
 
                 elif not force_trim_pressed and self.cyclic_trim_release_active:
+                    """This clause executes when the force trim button is released
+                    It reapplies the spring force with the spring center at the current stick position"""
                     # --- on release: restore normal spring gain and lock new center ---
                     self.spring_x.set_coefficient(self.cyclic_spring_gain, True)
                     self.spring_y.set_coefficient(self.cyclic_spring_gain, True)
@@ -1774,6 +1798,8 @@ class Helicopter(Aircraft):
                     self.cyclic_trim_release_active = 0
 
                 elif trim_reset_pressed or not self.trim_reset_complete:
+                    """This clause executes when the trim reset button is pressed
+                    It drives the stock back to center over a 500ms period"""
 
                     if not hasattr(self, '_trim_reset_in_progress'):
                         self._trim_reset_in_progress = True
@@ -1803,9 +1829,31 @@ class Helicopter(Aircraft):
                     if self._sim_is_msfs():
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
+                else:
+                    if getattr(self, 'ft_was_inactive', True):
+                        self.spring_x.set_coefficient(self.cyclic_spring_gain, True)
+                        self.spring_y.set_coefficient(self.cyclic_spring_gain, True)
+                        self.ft_was_inactive = False
 
                 telem_data["StickXY"] = [x, y]
                 telem_data["StickXY_offset"] = self.cyclic_center
+
+            elif self.spring_mode_is(self.SpringModeEnum.FORCETRIM) and not force_trim_active:
+                self.ft_was_inactive = True
+
+                gain = int(self.trim_release_spring_gain * 4096)
+                self.spring_x.set_coefficient(gain)
+                self.spring_y.set_coefficient(gain)
+
+                # Continuously re-center spring to live stick while held
+                self.cpO_x = round(x * 4096)
+                self.cpO_y = round(y * 4096)
+
+                self.spring_x.cpOffset = self.cpO_x
+                self.spring_y.cpOffset = self.cpO_y
+
+                self.cyclic_center = [x, y]
+
             else:
                 self._spring_handle.stop()
 
@@ -1827,7 +1875,7 @@ class Helicopter(Aircraft):
                     pos_y_pos = y_pos * y_scale
                     self.send_xp_command(f'AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}')
 
-                if self.cyclic_spring_init or not (self.force_trim_enabled and force_trim_active):
+                if self.cyclic_spring_init or not (self.spring_mode_is(self.SpringModeEnum.FORCETRIM) and force_trim_active):
                     if self._sim_is_msfs():
                         if self.enable_custom_x_axis:
                             x_var = self.custom_x_axis
@@ -1869,7 +1917,7 @@ class Helicopter(Aircraft):
             self.spring_y.set_offset(int(self.cpO_y) + self.cyclic_physical_trim_y_offs)
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
-            if self.force_trim_enabled and force_trim_active:
+            if self.spring_mode_is(self.SpringModeEnum.FORCETRIM) and force_trim_active:
                 if not self._spring_handle.started:
                     self._spring_handle.start()
 
@@ -1877,6 +1925,13 @@ class Helicopter(Aircraft):
         if telem_data.get("FFBType", None) != 'joystick':
             return
         if not self.trim_following:
+            return
+
+        if not telem_data.get('ForceTrimSW', True):
+            self.cyclic_physical_trim_x_offs = 0
+            self.cyclic_physical_trim_y_offs = 0
+            self.cyclic_virtual_trim_x_offs = 0
+            self.cyclic_virtual_trim_y_offs = 0
             return
 
         # NEW: don't mutate offsets while trim-release is active
@@ -1910,13 +1965,21 @@ class Helicopter(Aircraft):
             phys_x, phys_y = input_data.axisXY()
             x_scale = clamp(self.rudder_x_axis_scale, 0.0, 1.0)
 
-            self._spring_handle.name = "pedal_ap_spring"
+            self._spring_handle.name = "pedal_spring"
             # self.damper = effects["pedal_damper"].damper()
 
             pedal_pos = telem_data.get("TailRotorPedalPos")
             input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
             telem_data['phys_x'] = phys_x
+
+            if self._sim_is_msfs():
+                if (self.custom_ft_sw_var_enabled and self.anything_has_changed('custom_ft_sw_var', self.custom_ft_sw_var)) or self.anything_has_changed('custom_ft_sw_var_enabled', self.custom_ft_sw_var_enabled):
+                    self._simconnect.add_simvar(name='ForceTrimSW', var=self.custom_ft_sw_var, sc_unit="enum")
+                    self._simconnect._resubscribe()
+
+            force_trim_active = telem_data.get('ForceTrimSW', True) if self.custom_ft_sw_var_enabled else True  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
+
             if not self.pedals_init:
 
                 self.spring_x.set_coefficient(self.pedal_spring_coeff_x)
@@ -1951,17 +2014,15 @@ class Helicopter(Aircraft):
                     return
 
             if self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
-                if not self._spring_handle.started:
-                    self._spring_handle.start()
-
-                if not self.ac_update_pedal_force_trim(telem_data):
+                if not self.ac_update_pedal_force_trim(telem_data, ft_active=force_trim_active):
                     self.spring_x.set_coefficient(self.pedal_spring_gain, True)
-
                 self._spring_handle.setCondition(self.spring_x)
             else:
-                if self._spring_handle.started:
-                    self._spring_handle.stop()
+                self.spring_x.set_coefficient(0)
+                self._spring_handle.setCondition(self.spring_x)
 
+            if not self._spring_handle.started:
+                self._spring_handle.start()
 
             self.last_pedal_x = phys_x
 

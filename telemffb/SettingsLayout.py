@@ -882,9 +882,10 @@ class SettingsLayout(QGridLayout):
                 # dropbox.lineEdit().removeEventFilter(dropbox) # Disable expand of items when clicking on lineEdit area (req'd for custom widget type)
                 dropbox.setDisabled(True)
             else:
-                if item['datatype'] == 'list':
+                if item['datatype'] == 'anylist':
                     # dropbox.lineEdit().setReadOnly(True)
-                    dropbox.editTextChanged.connect(self.dropbox_changed)
+                    dropbox.lineEdit().setObjectName(f"db_{item['name']}")
+                    dropbox.lineEdit().editingFinished.connect(self.dropbox_changed)
                 else:
                     dropbox.currentTextChanged.connect(self.dropbox_changed)
                 dropbox.blockSignals(False)
@@ -1204,18 +1205,31 @@ class SettingsLayout(QGridLayout):
     def dropbox_changed(self):
         self.trigger_form_reload = True
         sender = self.sender()
-        object_name = sender.objectName()
+
+        if isinstance(sender, QtWidgets.QLineEdit):
+            # True when sender is a editable ComboBox (i.e. 'anylist')
+            combo = sender.parent()  # QComboBox is the parent of the QLineEdit
+        else:
+            combo = sender
+
+        object_name = combo.objectName()
         setting_name = object_name.replace('edb_', '').replace('db_', '')  # handle both db_ and edb_
 
         # If it's an enum dropbox, get the enum member name
         if object_name.startswith("edb_"):
-            enum_member = sender.itemData(sender.currentIndex())
-            value = enum_member.name if enum_member else sender.currentText()
+            enum_member = combo.itemData(combo.currentIndex())
+            value = enum_member.name if enum_member else combo.currentText()
         else:
-            value = sender.currentText()
+            value = combo.currentText()
 
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
-        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
+        G.settings_mgr.write_to_xml(
+            G.settings_mgr.current_sim,
+            G.settings_mgr.current_class,
+            G.settings_mgr.current_pattern,
+            value,
+            setting_name
+        )
 
         self.show_erase_button()
         if G.settings_mgr.timed_out:

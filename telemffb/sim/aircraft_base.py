@@ -1050,7 +1050,9 @@ class AircraftBase(object):
             
         local_stall_aoa = telem_data.get("StallAoA", None)
         if local_stall_aoa is not None:
-            if isinstance(local_stall_aoa, list):
+            flaps = telem_data.get("Flaps", 0)
+
+            if isinstance(flaps, list):
                 flaps = utils.average(telem_data.get("Flaps", 0)) * 0.2 # flaps down increases stall threshold by 20%
             else:
                 flaps = telem_data.get("Flaps", 0) * 0.2
@@ -1801,7 +1803,7 @@ class AircraftBase(object):
         """
         pass
 
-    def ac_update_pedal_force_trim(self, telem_data):
+    def ac_update_pedal_force_trim(self, telem_data, ft_active=True):
         if not self.is_pedals(): return
 
         input_data = HapticEffect.device.get_input()
@@ -1810,16 +1812,8 @@ class AircraftBase(object):
         force_trim_pressed = self.check_button_press(self.pedal_ft_release_button, self.pedal_ft_use_master_buttons)
         trim_reset_pressed = self.check_button_press(self.pedal_ft_reset_button, self.pedal_ft_use_master_buttons)
 
-        # if self.pedal_ft_use_master_buttons:
-        #     force_trim_pressed = self.check_master_button_press(self.pedal_ft_release_button) if self.pedal_ft_release_button else False
-        #
-        #     trim_reset_pressed = self.check_master_button_press(self.pedal_ft_reset_button) if self.pedal_ft_reset_button else False
-        # else:
-        #
-        #     force_trim_pressed = input_data.isButtonPressed(self.pedal_ft_release_button) if self.pedal_ft_release_button else False
-        #
-        #     trim_reset_pressed = input_data.isButtonPressed(self.pedal_ft_reset_button) if self.pedal_ft_reset_button else False
-        if force_trim_pressed:
+
+        if force_trim_pressed or not ft_active:
             if self.pedal_ft_damper_enabled:
                 self.spring_x.set_coefficient(self.pedal_ft_damper_force)
             else:
@@ -2089,7 +2083,9 @@ class AircraftBase(object):
             self.ac_override_elevator_droop(telem_data)
 
         if self.is_pedals():
-            self.ac_override_pedal_spring(telem_data)
+            if not self._sim_is_msfs() and not self._sim_is_xplane():
+                self.ac_override_pedal_spring(telem_data)
+
 
         self.ac_update_buffeting(telem_data)
         self.ac_update_cm_weapons(telem_data)

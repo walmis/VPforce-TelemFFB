@@ -344,6 +344,7 @@ class SimConnectManager(threading.Thread):
         SimVar("_IS AIRCRAFT", "IS AIRCRAFT", "bool"),
         SimVar("CenterSteerAnglePct", "CONTACT POINT STEER ANGLE PCT", "percent over 100"),
         SimVar("WaterRudderExt", "WATER LEFT RUDDER EXTENDED", "percent over 100"),
+        SimVar("ForceTrimSW", "L:TelemFFBHeliFT", "bool"),
     ]
 
     def __init__(self):

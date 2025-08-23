@@ -821,23 +821,17 @@
 		<order>1200</order>
 		<name>force_trim_enabled</name>
 		<displayname>Force Trim</displayname>
-		<prereq>basic_group</prereq>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<joystick>true</joystick>
-		<collective>true</collective>
+		<prereq>do_not_show</prereq>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
 		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1200.2</order>
+		<order>1200</order>
 		<name>cyclic_spring_gain</name>
 		<displayname>Cyclic Spring Gain</displayname>
-		<prereq>force_trim_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Strength of cyclic spring</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -849,10 +843,10 @@
 		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1200.3</order>
+		<order>1205</order>
 		<name>elevator_force_trim</name>
 		<displayname>Elevator Axis</displayname>
-		<prereq>force_trim_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Enable force tirm for elevator axis</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -863,10 +857,10 @@
 		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1200.4</order>
+		<order>1210</order>
 		<name>aileron_force_trim</name>
 		<displayname>Aileron Axis</displayname>
-		<prereq>force_trim_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Enable force tirm for aileron axis</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -877,13 +871,11 @@
 		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1200.5</order>
+		<order>1215</order>
 		<name>collective_ft_use_master_buttons</name>
 		<displayname>Use buttons from master device</displayname>
-		<prereq>force_trim_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from collective (grip or  loopback app).</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<collective>true</collective>
@@ -894,10 +886,10 @@
 		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1200.6</order>
+		<order>1220</order>
 		<name>force_trim_button</name>
 		<displayname>Force Trim Release Button</displayname>
-		<prereq>force_trim_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Button # to hold to release spring while moving axis</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -909,10 +901,10 @@
 		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1200.6</order>
+		<order>1225</order>
 		<name>force_trim_button</name>
 		<displayname>Trim Release Button</displayname>
-		<prereq>force_trim_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Button # to hold to release spring while moving axis</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -923,10 +915,10 @@
 		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1200.7</order>
+		<order>1230</order>
 		<name>force_trim_reset_button</name>
 		<displayname>Force Trim Reset Button</displayname>
-		<prereq>force_trim_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Button # to recenter spring trims</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -937,10 +929,10 @@
 		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1200.8</order>
+		<order>1235</order>
 		<name>trim_release_spring_gain</name>
 		<displayname>Trim Release Damper</displayname>
-		<prereq>force_trim_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Spring gain while trim release is pressed&lt;br&gt;&lt;br&gt; Acts as dampening force when trim release is depressed</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
@@ -948,6 +940,33 @@
 		<collective>true</collective>
 		<validvalues>0,100</validvalues>
 		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Basic</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1240</order>
+		<name>custom_ft_sw_var_enabled</name>
+		<displayname>Force Trim Switch Simvar</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<info>Enable toggle of Force Trim via Simconnect L:var</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>anylist</datatype>
+		<grouping>Basic</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1240.1</order>
+		<name>custom_ft_sw_var</name>
+		<displayname>Force Trim Switch Simvar</displayname>
+		<prereq>custom_ft_sw_var_enabled</prereq>
+		<info>Toggle this L:Var externally to toggle Force Trim on (1) or off (0).&lt;br&gt;&lt;br&gt; Alternatively,set to the L:var which is mapped to the switch in the helicopter cockpit if one exists</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>L:TelemFFBHeliFT</validvalues>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -1155,6 +1174,147 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<joystick>true</joystick>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1900</order>
+		<name>pedal_force_trim_enabled</name>
+		<displayname>Pedal Force Trim</displayname>
+		<prereq>basic_group</prereq>
+		<info>Enable static spring and allow binding of force trim button for pedals</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1905</order>
+		<name>pedal_ft_use_master_buttons</name>
+		<displayname>Use buttons from master device</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from pedals (use loopback app).</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>button</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1910</order>
+		<name>pedal_ft_release_button</name>
+		<displayname>Trim Release Button</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>button</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1915</order>
+		<name>pedal_ft_reset_button</name>
+		<displayname>Trim Reset Button</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>float</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1920</order>
+		<name>pedal_spring_gain</name>
+		<displayname>Pedal Spring Gain</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<info>Percent of spring setting in VPForce Configurator</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1950</order>
+		<name>pedal_ft_damper_enabled</name>
+		<displayname>Trim Release Damper</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<info>Enable dampening force while trim release is pressed</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>float</datatype>
+		<grouping>SpringCenter</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1950.1</order>
+		<name>pedal_ft_damper_force</name>
+		<displayname>Trim Release Damper</displayname>
+		<prereq>pedal_ft_damper_enabled</prereq>
+		<info>Enable dampening force while trim release is pressed</info>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<pedals>true</pedals>
+		<validvalues>0,100</validvalues>
+		<value>0</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Basic</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1955</order>
+		<name>custom_ft_sw_var_enabled</name>
+		<displayname>Force Trim Switch Simvar</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<info>Enable toggle of Force Trim via Simconnect L:var</info>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>anylist</datatype>
+		<grouping>Basic</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1955.1</order>
+		<name>custom_ft_sw_var</name>
+		<displayname>Force Trim Switch Simvar</displayname>
+		<prereq>custom_ft_sw_var_enabled</prereq>
+		<info>Toggle this L:Var externally to toggle Force Trim on (1) or off (0).&lt;br&gt;&lt;br&gt; Alternatively,set to the L:var which is mapped to the switch in the helicopter cockpit if one exists</info>
+		<MSFS>true</MSFS>
+		<pedals>true</pedals>
+		<validvalues>L:TelemFFBHeliFT</validvalues>
 	</defaults>
 	<defaults>
 		<datatype>bool</datatype>
@@ -1912,120 +2072,6 @@
 		<pedals>true</pedals>
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,100</validvalues>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2900</order>
-		<name>pedal_force_trim_enabled</name>
-		<displayname>Pedal Force Trim</displayname>
-		<prereq>basic_group</prereq>
-		<info>Enable static spring and allow binding of force trim button for pedals</info>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2905</order>
-		<name>pedal_ft_use_master_buttons</name>
-		<displayname>Use buttons from master device</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
-		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from pedals (use loopback app).</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<value>false</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2910</order>
-		<name>pedal_ft_release_button</name>
-		<displayname>Trim Release Button</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<value>0</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>button</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2915</order>
-		<name>pedal_ft_reset_button</name>
-		<displayname>Trim Reset Button</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<value>0</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2920</order>
-		<name>pedal_spring_gain</name>
-		<displayname>Pedal Spring Gain</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
-		<info>Percent of spring setting in VPForce Configurator</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>bool</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2950</order>
-		<name>pedal_ft_damper_enabled</name>
-		<displayname>Trim Release Damper</displayname>
-		<prereq>spring_mode.FORCETRIM</prereq>
-		<info>Enable dampening force while trim release is pressed</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<value>false</value>
-	</defaults>
-	<defaults>
-		<effecttype>spring</effecttype>
-		<datatype>float</datatype>
-		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
-		<order>2950.1</order>
-		<name>pedal_ft_damper_force</name>
-		<displayname>Trim Release Damper</displayname>
-		<prereq>pedal_ft_damper_enabled</prereq>
-		<info>Enable dampening force while trim release is pressed</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<pedals>true</pedals>
-		<validvalues>0,100</validvalues>
-		<value>0</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -5468,8 +5514,22 @@
 			<name>spring_mode</name>
 			<sim>MSFS</sim>
 			<class>Helicopter</class>
+			<validvalues>MSFS_XP_HELI_JOYSTICK_SPRING_MODE</validvalues>
+			<device>joystick</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>Helicopter</class>
 			<validvalues>MSFS_XP_HELI_PEDAL_SPRING_MODE</validvalues>
 			<device>pedals</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>XPLANE</sim>
+			<class>Helicopter</class>
+			<validvalues>MSFS_XP_HELI_JOYSTICK_SPRING_MODE</validvalues>
+			<device>joystick</device>
 		</validvalues_overrides>
 		<validvalues_overrides>
 			<name>spring_mode</name>
@@ -6259,6 +6319,62 @@
 			<value>0.8</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>Helicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>Helicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>FlyInsideHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>FlyInsideHelicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>FlyInsideHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>FlyInsideHelicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>elevator_droop_moment</name>
@@ -7529,16 +7645,17 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spring_mode</name>
+			<type>Helicopter</type>
+			<value>NOSPRING</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
 			<type>FlyInsideHelicopter</type>
 			<value>NOSPRING</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>spring_mode</name>
-			<type>!Helicopter</type>
-			<sim>MSFS</sim>
-			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spring_mode</name>
@@ -7633,15 +7750,7 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>trim_following</name>
-			<type>Helicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>trim_following</name>
-			<type>Helicopter</type>
-			<value>false</value>
+			<type>!Helicopter</type>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
@@ -7654,6 +7763,18 @@
 		<classdefaults_MSFS>
 			<name>trim_following</name>
 			<type>!HPGHelicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>trim_following</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>trim_following</name>
+			<type>!SASHelicopter</type>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
@@ -13446,6 +13567,34 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>custom_ft_sw_var_enabled</name>
+		<model>205-A1B.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_ft_sw_var</name>
+		<model>205-A1B.*</model>
+		<value>L:switchForceTrim</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_ft_sw_var_enabled</name>
+		<model>205-A1B.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_ft_sw_var</name>
+		<model>205-A1B.*</model>
+		<value>L:switchForceTrim</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>205-A1B.*</model>
 		<value>Helicopter</value>
@@ -17191,6 +17340,34 @@
 		<value>2</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>custom_ft_sw_var_enabled</name>
+		<model>UH-1H.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_ft_sw_var</name>
+		<model>UH-1H.*</model>
+		<value>L:switchForceTrim</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>custom_ft_sw_var_enabled</name>
+		<model>UH-1H.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_ft_sw_var</name>
+		<model>UH-1H.*</model>
+		<value>L:switchForceTrim</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
