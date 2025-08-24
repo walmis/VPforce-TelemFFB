@@ -1894,12 +1894,11 @@ class AircraftBase(object):
         '''
 
         if not self.is_collective(): return
-        if not self.collective_ft_ovd_enabled:
+        if not self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
             # If feature disabled, ensure spring is stopped and abort
             effects['collective_ft'].stop()
             return
 
-        # spring = effects['collective_ft'].spring()
 
         dt = perftracker.get_time_delta('collective_ft_perf')
         self.telem_data['_coll_ft_dt'] = dt
@@ -1910,8 +1909,17 @@ class AircraftBase(object):
         _, y = input_data.axisXY()
         current_buttons = input_data.getPressedButtons()
 
+        force_trim_active = telem_data.get('ForceTrimSW', True)
+
+        if not force_trim_active:
+            # Force trim is enabled, but the 'ForceTrimSW' flag is false, just move
+            self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
+            self.collective_ft_ovd_cp0_y = round(y * 4096)
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
+            spring.setCondition(self.spring_y)
+            return
+
         # decide what to do depending on which button is pressed
-        # if self.collective_ft_ovd_release and self.collective_ft_ovd_release in current_buttons:
         if self.check_button_press(self.collective_ft_ovd_release, self.collective_ft_use_master_buttons):
             # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
             # as it is moved while spring force is enabled.
@@ -1924,7 +1932,6 @@ class AircraftBase(object):
             spring.start(override=True)
             return
 
-        # elif self.collective_ft_ovd_reset and self.collective_ft_ovd_reset in current_buttons:
         elif self.check_button_press(self.collective_ft_ovd_reset, self.collective_ft_use_master_buttons):
             # if trim reset button pressed, set offsets back to 0
             # print("TRIM RESET")
@@ -1937,16 +1944,13 @@ class AircraftBase(object):
 
         self.telem_data['_coll_ft_step'] = trim_step_size
 
-        # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
-        # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
-        # if self.collective_ft_ovd_trim_down and self.collective_ft_ovd_trim_down in current_buttons:
+
         if self.check_button_press(self.collective_ft_ovd_trim_down, self.collective_ft_use_master_buttons):
             # shift offset based on previously calculated step size.  Ensure value does not exceed limits
             # print("TRIM DOWN")
             self.collective_ft_ovd_cp0_y += trim_step_size
             self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
             self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
-        # elif self.collective_ft_ovd_trim_up and self.collective_ft_ovd_trim_up in current_buttons:
         elif self.check_button_press(self.collective_ft_ovd_trim_up, self.collective_ft_use_master_buttons):
             # shift offset based on previously calculated step size.  Ensure value does not exceed limits
             # print("TRIM UP")

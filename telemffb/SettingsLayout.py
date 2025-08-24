@@ -279,7 +279,38 @@ class SettingsLayout(QGridLayout):
                     )
                     self.set_mode(mode, "spring_mode", datalist)
 
-    def convert_pedal_to_springmode(self, datalist):
+    def convert_msfs_forcetrim_to_springmode(self, datalist):
+        mode_map = {
+            "force_trim_enabled": "FORCETRIM",
+        }
+        for item in datalist:
+            for name, mode in mode_map.items():
+                if item['name'] == name and item['value'] == 'true':
+                    G.settings_mgr.erase_from_xml(
+                        G.settings_mgr.current_sim,
+                        G.settings_mgr.current_class,
+                        G.settings_mgr.current_pattern,
+                        name
+                    )
+                    self.set_mode(mode, "spring_mode", datalist)
+
+    def convert_collective_to_springmode(self, datalist):
+        mode_map = {
+            "collective_ft_ovd_enabled": "FORCETRIM",
+        }
+
+        for item in datalist:
+            for name, mode in mode_map.items():
+                if item['name'] == name and item['value'] == 'true':
+                    G.settings_mgr.erase_from_xml(
+                        G.settings_mgr.current_sim,
+                        G.settings_mgr.current_class,
+                        G.settings_mgr.current_pattern,
+                        name
+                    )
+                    self.set_mode(mode, "spring_mode", datalist)
+
+    def convert_dcs_il2_pedal_to_springmode(self, datalist):
         mode_map = {
             "Dynamic Spring": "DYNAMIC",
             "Static Spring": "STATIC",
@@ -330,7 +361,9 @@ class SettingsLayout(QGridLayout):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         # self.prereq_list = xmlutils.read_prereqs()
         self.convert_to_springmode(sorted_data)
-        self.convert_pedal_to_springmode(sorted_data)
+        self.convert_dcs_il2_pedal_to_springmode(sorted_data)
+        self.convert_msfs_forcetrim_to_springmode(sorted_data)
+        self.convert_collective_to_springmode(sorted_data)
         self.convert_to_gforcemode(sorted_data)
         self.prereq_list = self.read_active_prereqs(sorted_data)
         self.has_bump(sorted_data)

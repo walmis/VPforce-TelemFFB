@@ -106,7 +106,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>200.0</order>
 		<name>spring_mode</name>
-		<displayname>Spring Mode</displayname>
+		<displayname>Joystick Spring Mode</displayname>
 		<prereq>basic_group</prereq>
 		<info>Spring Mode</info>
 		<MSFS>true</MSFS>
@@ -122,7 +122,7 @@
 		<parentgroup>basic</parentgroup>
 		<order>200.0</order>
 		<name>spring_mode</name>
-		<displayname>Spring Mode</displayname>
+		<displayname>Pedal Spring Mode</displayname>
 		<prereq>basic_group</prereq>
 		<info>Spring Mode</info>
 		<MSFS>true</MSFS>
@@ -130,6 +130,21 @@
 		<pedals>true</pedals>
 		<validvalues>MSFS_XP_PEDAL_SPRING_MODE</validvalues>
 		<value>BASIC</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>enumlist</datatype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>200.0</order>
+		<name>spring_mode</name>
+		<displayname>Collective Spring Mode</displayname>
+		<prereq>basic_group</prereq>
+		<info>Spring Mode</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<collective>true</collective>
+		<validvalues>MSFS_XP_HELI_COLLECTIVE_SPRING_MODE</validvalues>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -388,6 +403,20 @@
 		<IL2>true</IL2>
 		<pedals>true</pedals>
 		<validvalues>DCS_IL2_PEDAL_SPRING_MODE</validvalues>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>enumlist</datatype>
+		<grouping>Spring Mode</grouping>
+		<parentgroup>baslic</parentgroup>
+		<order>700.0</order>
+		<name>spring_mode</name>
+		<displayname>Collective Spring Mode</displayname>
+		<DCS>true</DCS>
+		<BMS>true</BMS>
+		<IL2>true</IL2>
+		<collective>true</collective>
+		<validvalues>DCS_HELI_COLLECTIVE_SPRING_MODE</validvalues>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
@@ -976,23 +1005,18 @@
 		<order>1300</order>
 		<name>collective_ft_ovd_enabled</name>
 		<displayname>Collective Force Trim</displayname>
-		<prereq>basic_group</prereq>
+		<prereq>do_not_show</prereq>
 		<info>Enable hardware force trim for collective axis</info>
-		<DCS>true</DCS>
-		<BMS>true</BMS>
-		<MSFS>true</MSFS>
-		<XPLANE>true</XPLANE>
-		<collective>true</collective>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
 		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1300.2</order>
+		<order>1300</order>
 		<name>collective_ft_ovd_spring_gain</name>
 		<displayname>Spring Gain</displayname>
-		<prereq>collective_ft_ovd_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Spring Gain</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
@@ -1007,10 +1031,10 @@
 		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1300.3</order>
+		<order>1305</order>
 		<name>collective_ft_ovd_tr_damper</name>
 		<displayname>Trim Release Damper Gain</displayname>
-		<prereq>collective_ft_ovd_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Trim Release Damper Gain</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
@@ -1025,10 +1049,10 @@
 		<datatype>bool</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1300.4</order>
+		<order>1310</order>
 		<name>collective_ft_use_master_buttons</name>
 		<displayname>Use buttons from master device</displayname>
-		<prereq>collective_ft_ovd_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Use the button inputs from the master device (likely your joystick).  If disabled, feature will expect to receive inputs from collective (grip or  loopback app).</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
@@ -1042,10 +1066,10 @@
 		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1300.5</order>
+		<order>1315</order>
 		<name>collective_ft_ovd_release</name>
 		<displayname>Trim Release Button</displayname>
-		<prereq>collective_ft_ovd_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Trim Release Button</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
@@ -1059,10 +1083,10 @@
 		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1300.6</order>
+		<order>1320</order>
 		<name>collective_ft_ovd_reset</name>
 		<displayname>Trim Reset Button (full down)</displayname>
-		<prereq>collective_ft_ovd_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Trim Reset Button (full down)</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
@@ -1076,10 +1100,10 @@
 		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1300.7</order>
+		<order>1325</order>
 		<name>collective_ft_ovd_trim_down</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E7;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>collective_ft_ovd_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
@@ -1092,10 +1116,10 @@
 		<datatype>button</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1300.8</order>
+		<order>1330</order>
 		<name>collective_ft_ovd_trim_up</name>
 		<displayname>&lt;html&gt;&lt;body&gt;&lt;table cellpadding="0" cellspacing="0" border="0"&gt;&lt;tr&gt;&lt;td style="vertical-align: middle;"&gt;Trim&lt;/td&gt;&lt;td&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&lt;/td&gt;&lt;td style="font-size: 24px; vertical-align: middle; font-weight: bold;"&gt;&#x21E9;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/body&gt;&lt;/html&gt;</displayname>
-		<prereq>collective_ft_ovd_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
@@ -1108,10 +1132,10 @@
 		<datatype>d_int</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>1300.9</order>
+		<order>1335</order>
 		<name>collective_ft_ovd_trim_rate</name>
 		<displayname>Trim Slew Rate</displayname>
-		<prereq>collective_ft_ovd_enabled</prereq>
+		<prereq>spring_mode.FORCETRIM</prereq>
 		<info>Affects rate at which trim will move when button held</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
@@ -1121,6 +1145,33 @@
 		<sliderfactor>1</sliderfactor>
 		<validvalues>0,1000</validvalues>
 		<value>200</value>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>bool</datatype>
+		<grouping>Basic</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1340</order>
+		<name>custom_ft_sw_var_enabled</name>
+		<displayname>Force Trim Switch Simvar</displayname>
+		<prereq>spring_mode.FORCETRIM</prereq>
+		<info>Enable toggle of Force Trim via Simconnect L:var</info>
+		<MSFS>true</MSFS>
+		<collective>true</collective>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<datatype>anylist</datatype>
+		<grouping>Basic</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1340.1</order>
+		<name>custom_ft_sw_var</name>
+		<displayname>Force Trim Switch Simvar</displayname>
+		<prereq>custom_ft_sw_var_enabled</prereq>
+		<info>Toggle this L:Var externally to toggle Force Trim on (1) or off (0).&lt;br&gt;&lt;br&gt; Alternatively,set to the L:var which is mapped to the switch in the helicopter cockpit if one exists</info>
+		<MSFS>true</MSFS>
+		<collective>true</collective>
+		<validvalues>L:TelemFFBHeliFT</validvalues>
 	</defaults>
 	<defaults>
 		<datatype>bool</datatype>
@@ -5526,6 +5577,34 @@
 		</validvalues_overrides>
 		<validvalues_overrides>
 			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>Helicopter</class>
+			<validvalues>MSFS_XP_HELI_COLLECTIVE_SPRING_MODE</validvalues>
+			<device>collective</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>FlyInsideHelicopter</class>
+			<validvalues>MSFS_XP_HELI_JOYSTICK_SPRING_MODE</validvalues>
+			<device>joystick</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>FlyInsideHelicopter</class>
+			<validvalues>MSFS_XP_HELI_PEDAL_SPRING_MODE</validvalues>
+			<device>pedals</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>FlyInsideHelicopter</class>
+			<validvalues>MSFS_XP_HELI_COLLECTIVE_SPRING_MODE</validvalues>
+			<device>collective</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
 			<sim>XPLANE</sim>
 			<class>Helicopter</class>
 			<validvalues>MSFS_XP_HELI_JOYSTICK_SPRING_MODE</validvalues>
@@ -5540,6 +5619,13 @@
 		</validvalues_overrides>
 		<validvalues_overrides>
 			<name>spring_mode</name>
+			<sim>XPLANE</sim>
+			<class>Helicopter</class>
+			<validvalues>MSFS_XP_HELI_COLLECTIVE_SPRING_MODE</validvalues>
+			<device>collective</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
 			<sim>DCS</sim>
 			<class>Helicopter</class>
 			<validvalues>DCS_HELI_JOYSTICK_SPRING_MODE</validvalues>
@@ -5551,6 +5637,13 @@
 			<class>Helicopter</class>
 			<validvalues>DCS_HELI_PEDAL_SPRING_MODE</validvalues>
 			<device>pedals</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>DCS</sim>
+			<class>Helicopter</class>
+			<validvalues>DCS_HELI_COLLECTIVE_SPRING_MODE</validvalues>
+			<device>collective</device>
 		</validvalues_overrides>
 <classdefaults_DCS>
 			<name>afterburner_effect_enabled</name>
@@ -5593,13 +5686,6 @@
 			<value>1.0</value>
 			<sim>DCS</sim>
 			<device>joystick</device>
-		</classdefaults_DCS>
-		<classdefaults_DCS>
-			<name>collective_ft_ovd_enabled</name>
-			<type>Helicopter</type>
-			<value>false</value>
-			<sim>DCS</sim>
-			<device>collective</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
 			<name>critical_aoa_max</name>
@@ -5954,6 +6040,13 @@
 			<type>Helicopter</type>
 			<value>NOSPRING</value>
 			<sim>DCS</sim>
+			<device>collective</device>
+		</classdefaults_DCS>
+		<classdefaults_DCS>
+			<name>spring_mode</name>
+			<type>Helicopter</type>
+			<value>NOSPRING</value>
+			<sim>DCS</sim>
 			<device>pedals</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
@@ -6263,27 +6356,6 @@
 			<device>collective</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
-			<name>collective_ft_ovd_enabled</name>
-			<type>SASHelicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>collective_ft_ovd_enabled</name>
-			<type>FlyInsideHelicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>collective_ft_ovd_enabled</name>
-			<type>Helicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
 			<name>critical_aoa_max</name>
 			<type>JetAircraft</type>
 			<value>25</value>
@@ -6350,6 +6422,20 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var_enabled</name>
+			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>Helicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
 			<type>FlyInsideHelicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
@@ -6375,6 +6461,20 @@
 			<value>L:TelemFFBHeliFT</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>FlyInsideHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>FlyInsideHelicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>elevator_droop_moment</name>
@@ -7652,6 +7752,13 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spring_mode</name>
+			<type>Helicopter</type>
+			<value>NOSPRING</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
 			<type>FlyInsideHelicopter</type>
 			<value>NOSPRING</value>
 			<sim>MSFS</sim>
@@ -7659,9 +7766,17 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spring_mode</name>
-			<type>!FlyInsideHelicopter</type>
+			<type>FlyInsideHelicopter</type>
+			<value>NOSPRING</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>spring_mode</name>
+			<type>FlyInsideHelicopter</type>
+			<value>NOSPRING</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spring_mode</name>
@@ -8368,13 +8483,6 @@
 			<name>collective_ap_spring_gain</name>
 			<type>Helicopter</type>
 			<value>1.0</value>
-			<sim>XPLANE</sim>
-			<device>collective</device>
-		</classdefaults_XPLANE>
-		<classdefaults_XPLANE>
-			<name>collective_ft_ovd_enabled</name>
-			<type>Helicopter</type>
-			<value>false</value>
 			<sim>XPLANE</sim>
 			<device>collective</device>
 		</classdefaults_XPLANE>
@@ -9206,9 +9314,24 @@
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>spring_mode</name>
-			<type>!Helicopter</type>
+			<type>Helicopter</type>
+			<value>NOSPRING</value>
 			<sim>XPLANE</sim>
-			<device>any</device>
+			<device>joystick</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>spring_mode</name>
+			<type>Helicopter</type>
+			<value>NOSPRING</value>
+			<sim>XPLANE</sim>
+			<device>pedals</device>
+		</classdefaults_XPLANE>
+		<classdefaults_XPLANE>
+			<name>spring_mode</name>
+			<type>Helicopter</type>
+			<value>NOSPRING</value>
+			<sim>XPLANE</sim>
+			<device>collective</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
 			<name>spring_mode</name>

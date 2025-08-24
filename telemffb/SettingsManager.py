@@ -145,7 +145,12 @@ class SettingsManager(QObject):
     }
 
     MSFS_XP_HELI_JOYSTICK_SPRING_MODE = {
-        SpringModeEnum.NOSPRING: "No Spring (Free Floating)",
+        SpringModeEnum.NOSPRING: "No Spring",
+        SpringModeEnum.FORCETRIM: "Hardware Force Trim",
+    }
+
+    MSFS_XP_HELI_COLLECTIVE_SPRING_MODE = {
+        SpringModeEnum.NOSPRING: "No Spring",
         SpringModeEnum.FORCETRIM: "Hardware Force Trim",
     }
 
@@ -172,6 +177,11 @@ class SettingsManager(QObject):
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.NOSPRING: "No Spring (Free Floating)",
         SpringModeEnum.STATIC: "Static Spring",
+        SpringModeEnum.FORCETRIM: "Hardware Force Trim",
+    }
+
+    DCS_HELI_COLLECTIVE_SPRING_MODE = {
+        SpringModeEnum.NOSPRING: "No Spring",
         SpringModeEnum.FORCETRIM: "Hardware Force Trim",
     }
 

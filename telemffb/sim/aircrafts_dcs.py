@@ -292,7 +292,7 @@ class Aircraft(AircraftBase):
                 return
         self.last_collective_y = phys_y
 
-        if self.collective_ft_ovd_enabled:
+        if self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
             self.spring.name = "collective_ft"
             self.ac_collective_force_trim_override(telem_data, self.spring)
         else:
