@@ -168,7 +168,12 @@ class SimDCS(SimTelemListener):
     def validate(self):
         # check and install/update export lua script
         logging.info("Checking DCS export script")
-        utils.install_export_lua(G.main_window)
+        if G.system_settings.get('dbg_use_dll') is None:
+            G.system_settings.setValue('dbg_use_dll', True)
+
+        use_dll = G.system_settings.get('dbg_use_dll', False)
+
+        utils.install_export_lua(G.main_window, use_dll)
 
     @overrides(SimTelemListener)
     def stop(self):
