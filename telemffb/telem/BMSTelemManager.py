@@ -247,11 +247,8 @@ class BMSManager(TelemParserBase):
         # G-forces - BMS provides normal G in flight data
         # aircraft_base expects [lateral, normal, longitudinal] format
         self.acceleration_Gs = [0.0, data.gs, 0.0]  # Normal G in middle position
-        
-        # Position and altitude (convert from feet to meters)
-        self.altitude_msl = abs(data.z) * ft_to_m
-        # Calculate AGL from radar altimeter if available, otherwise estimate
-        self.altitude_agl = self.altitude_msl  # Simplified - BMS doesn't provide direct AGL in basic FlightData
+
+        self.altitude_agl = data.z * ft_to_m  # Simplified - BMS doesn't provide direct AGL in basic FlightData
 
         # AoA for ownship
         self.alpha_deg = data.alpha
@@ -289,6 +286,8 @@ class BMSManager(TelemParserBase):
         self.fuel_flow2 = [data.fuelFlow2] if hasattr(data, 'fuelFlow2') else [0.0]
         self.bump_intensity = data.bumpIntensity
 
+        # Position and altitude (convert from feet to meters)
+        self.altitude_msl = abs(data.AAUZ) * ft_to_m
         
         # Control surfaces - match aircraft_base field names
         if hasattr(data, 'lefPos'):
@@ -297,7 +296,9 @@ class BMSManager(TelemParserBase):
             
         # Radar altitude for better AGL calculation
         if hasattr(data, 'RALT'):
-            self.altitude_agl = data.RALT * ft_to_m  # Convert radar altitude to meters
+            if data.RALT > 0:
+                # RALT data appears to be - when inactive/unavailable
+                self.altitude_agl = abs(data.RALT * ft_to_m)  # Convert radar altitude to meters
 
     def _process_flight_data(self):
         """Process and format flight data for telemetry output"""
@@ -454,8 +455,16 @@ class BMSManager(TelemParserBase):
         # System states from IVibe
         if hasattr(ivibe, 'IsOnGround'):
             self.on_ground = ivibe.IsOnGround
-        if hasattr(ivibe, 'IsPaused') and hasattr(ivibe, 'IsEndFlight'):
-            self.telem_data["SimPaused"] = 1 if ivibe.IsPaused or ivibe.IsEndFlight or ivibe.IsEjecting else 0
+        if hasattr(ivibe, 'IsPaused') and hasattr(ivibe, 'IsEndFlight') and hasattr(ivibe, 'IsEjecting') and hasattr(ivibe, 'In3D'):
+            if ivibe.IsPaused or ivibe.IsEndFlight or ivibe.IsEjecting:
+                # When sim is paused or pilot ejected/died
+                self.telem_data["SimPaused"] = 1
+            elif not ivibe.IsPaused and not ivibe.IsPaused and not ivibe.IsEjecting and not ivibe.In3D:
+                # When sim is started, all flags are false
+                self.telem_data["SimPaused"] = 1
+            else:
+                self.telem_data["SimPaused"] = 0
+
         if hasattr(ivibe, 'In3D'):
             self.telem_data["In3D"] = 1 if ivibe.In3D else 0
     
