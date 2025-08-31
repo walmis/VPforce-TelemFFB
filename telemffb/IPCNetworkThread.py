@@ -50,6 +50,7 @@ class IPCNetworkThread(QObject, threading.Thread):
     set_offline_ac_signal = pyqtSignal(str)
     set_offline_profile_signal = pyqtSignal(str)
     show_offline_model_signal = pyqtSignal(str, str, str, str)
+    reload_caller_signal = pyqtSignal()
 
     def __init__(self, host="127.0.0.1", dstport=0, keepalive_sec=1, missed_keepalive=3):
         QObject.__init__(self)
@@ -209,6 +210,11 @@ class IPCNetworkThread(QObject, threading.Thread):
             if dev == G.device_type:
                 logging.info("Erase configurator overrides command received via IPC")
                 self.erase_cfg_ovds_signal.emit()
+        elif msg.startswith('RELOAD CALLER:'):
+            dev = msg.removeprefix('RELOAD CALLER:')
+            if dev == G.device_type:
+                logging.info("Reload Caller command received via IPC")
+                self.reload_caller_signal.emit()
         elif msg == 'SHOW WINDOW':
             logging.info("Show command received via IPC")
             self.show_signal.emit()

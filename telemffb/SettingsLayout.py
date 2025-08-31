@@ -411,6 +411,8 @@ class SettingsLayout(QGridLayout):
         # caller_frame = inspect.currentframe().f_back
         # caller_name = caller_frame.f_code.co_name
         # dbprint("blue", f"RELOAD_CALLER was called by {caller_name}")
+        if G.master_instance and G.device_type != G.current_device_config_scope and G.settings_mgr.timed_out:
+            G.ipc_instance.send_broadcast_message(f'RELOAD CALLER:{G.current_device_config_scope}')
         if not self.trigger_form_reload:
             self.trigger_form_reload = True  # reset back to true for next iteration
         else:
@@ -989,6 +991,13 @@ class SettingsLayout(QGridLayout):
             self.configurator_button.setMaximumHeight(25)
             self.configurator_button.setObjectName(f"config_{item['name']}")
             self.configurator_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            cfg_value = item['value']
+
+            try:
+                self.configurator_button.clicked.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+
             self.configurator_button.clicked.connect(self.configurator_button_clicked)
             erase_button.clicked.connect(self.erase_configurator_overrides)
             self.addWidget(self.configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -1385,12 +1394,19 @@ class SettingsLayout(QGridLayout):
         if G.master_instance and G.device_type != G.current_device_config_scope:
             G.ipc_instance.send_broadcast_message(f'SHOW GAIN OVD:{G.current_device_config_scope}')
         else:
+            # utils.dbprint('red', f"CFG Clicked: {value}")
             # dbprint("red", f"Device = {G.device_type}")
             # dbprint("green", f"Scope = {G.current_device_config_scope}")
+            value = G.settings_mgr.read_setting_from_xml("configurator_gains", G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
+            if not value or value == 'none':
+                gains_state = None
+                # utils.dbprint('green', f'{G.device_type}" RESET UI!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            else:
+                gains_state = json.loads(value)
+                # utils.dbprint('blue', f'{G.device_type}" LOADING SETTINGS!!!!{gains_state}')
+
             G.gain_override_dialog.accepted.connect(self.update_configurator_overrides)
-            G.gain_override_dialog.raise_()
-            G.gain_override_dialog.activateWindow()
-            G.gain_override_dialog.show()
+            G.gain_override_dialog.load_and_show(gains_state)
 
     def erase_configurator_overrides(self):
         if G.master_instance and G.device_type != G.current_device_config_scope:
@@ -1431,8 +1447,11 @@ class SettingsLayout(QGridLayout):
         """
         gain_dict_json = json.dumps(gain_dict)
         G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, gain_dict_json, "configurator_gains")
+        self.reload_layout(None)
         self.show_erase_button("config_configurator_gains")
-        self.configurator_button.setText("Edit Gain Overrides")
+        if hasattr(self, 'configurator_button'):
+            # button may not exist in child instance if master is setting on behalf of child instance
+            self.configurator_button.setText("Edit Gain Overrides")
 
     def slider_changed(self, write=True):
         self.trigger_form_reload = False

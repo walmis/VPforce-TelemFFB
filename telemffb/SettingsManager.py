@@ -76,6 +76,17 @@ class SettingsManager(QObject):
             self._online_mode_backup = None
             self.offline_scope = None
 
+    def read_setting_from_xml(self, setting, sim, class_name = '', model = '', the_device = '', active_profile=None):
+
+        _, _, result = xmlutils.read_single_model(the_sim=sim, aircraft_name=model, input_modeltype = class_name, instance_device=the_device, active_profile=self.active_profile)
+        value = None
+        if result:
+            for item in result:
+                if item['name'] == setting:
+                    value = item.get('value', None)
+
+        return value
+
     def write_to_xml(self, sim, class_name, model, value, setting, unit='', the_device='', scope='MODEL'):
         if not self.offline_mode:
 

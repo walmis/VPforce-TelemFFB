@@ -489,6 +489,7 @@ def _setup_ipc_and_connections():
     G.ipc_instance.show_adv_spr_signal.connect(G.main_window.settings_layout.advanced_spring_button_clicked)
     G.ipc_instance.show_cfg_ovds_signal.connect(G.main_window.settings_layout.configurator_button_clicked)
     G.ipc_instance.erase_cfg_ovds_signal.connect(G.main_window.settings_layout.erase_configurator_overrides)
+    G.ipc_instance.reload_caller_signal.connect(G.main_window.settings_layout.reload_caller)
     G.ipc_instance.reload_aircraft_signal.connect(G.main_window.force_reload_aircraft)
     G.ipc_instance.toggle_offline_mode_signal.connect(G.main_window.toggle_offline_mode)
     G.ipc_instance.set_offline_sim_signal.connect(G.main_window.offline_sim.setCurrentText)
