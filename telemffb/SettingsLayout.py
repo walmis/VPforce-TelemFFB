@@ -1193,7 +1193,7 @@ class SettingsLayout(QGridLayout):
         starting_dir = os.getcwd()
         if calling_button:
             tooltip_text = calling_button.toolTip()
-            print(f"Tooltip text of the calling button: {tooltip_text}")
+            # print(f"Tooltip text of the calling button: {tooltip_text}")
             if os.path.isfile(tooltip_text):
                 # Use the existing file path as the starting point
                 starting_dir = os.path.dirname(tooltip_text)
@@ -1203,10 +1203,10 @@ class SettingsLayout(QGridLayout):
 
         if file_path:
             cfg_scope = xmlutils.device
-            # key = "pid" + cfg_scope.capitalize()
-            pid = G.device_usbpid
+            dev_type_cap = cfg_scope.capitalize()
+            usbpid = str(G.system_settings.get(f'pid{dev_type_cap}', '2055'))
 
-            if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
+            if validate_vpconf_profile(file_path, pid=usbpid, dev_type=cfg_scope):
                 #lprint(f"Selected File: {file_path}")
                 G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, file_path, 'vpconf')
 
