@@ -67,6 +67,7 @@ device_usbvidpid : str  # "FFFF:2055"
 device_ident : str  #Joystick, Pedals, etc.. as set in configurator
 device_firmware_version : str  # Firmware version as reported by device
 device_connection_status: bool = False # status of HID connection to device
+vpconf_init_pending: bool = False # switch to True when async device init is complete
 
 # Gain management
 startup_configurator_gains: Optional[Any] = None  # Gain object direct from 'device.get_gains'.  Gains get read at TelemFFB startup fallback baseline values.

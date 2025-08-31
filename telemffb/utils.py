@@ -2448,6 +2448,8 @@ def upload_vpconf_profile(config_filepath, serial):
             with NamedMutex("vpconf_mutex", acquired=True):
                 ret = subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
                 logging.info(f"VPForce Configurator exited with code {ret}")
+                G.vpconf_init_pending = False
+
 
         thread = threading.Thread(target=exec)
         thread.start()
