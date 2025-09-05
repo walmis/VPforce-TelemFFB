@@ -9924,6 +9924,34 @@
 			<device>joystick</device>
 		</classdefaults_IL2>
 		<classdefaults_IL2>
+			<name>spring_mode</name>
+			<type>JetAircraft</type>
+			<value>NONE</value>
+			<sim>IL2</sim>
+			<device>joystick</device>
+		</classdefaults_IL2>
+		<classdefaults_IL2>
+			<name>spring_mode</name>
+			<type>PropellerAircraft</type>
+			<value>NONE</value>
+			<sim>IL2</sim>
+			<device>joystick</device>
+		</classdefaults_IL2>
+		<classdefaults_IL2>
+			<name>spring_mode</name>
+			<type>JetAircraft</type>
+			<value>DYNAMIC</value>
+			<sim>IL2</sim>
+			<device>pedals</device>
+		</classdefaults_IL2>
+		<classdefaults_IL2>
+			<name>spring_mode</name>
+			<type>PropellerAircraft</type>
+			<value>DYNAMIC</value>
+			<sim>IL2</sim>
+			<device>pedals</device>
+		</classdefaults_IL2>
+		<classdefaults_IL2>
 			<name>pedal_spring_gain</name>
 			<type>JetAircraft</type>
 			<value>1.0</value>
@@ -9931,23 +9959,9 @@
 			<device>pedals</device>
 		</classdefaults_IL2>
 		<classdefaults_IL2>
-			<name>pedal_spring_mode</name>
-			<type>JetAircraft</type>
-			<value>DYNAMIC</value>
-			<sim>IL2</sim>
-			<device>pedals</device>
-</classdefaults_IL2>
-		<classdefaults_IL2>
 			<name>pedal_spring_gain</name>
 			<type>PropellerAircraft</type>
 			<value>1.0</value>
-			<sim>IL2</sim>
-			<device>pedals</device>
-		</classdefaults_IL2>
-		<classdefaults_IL2>
-			<name>pedal_spring_mode</name>
-			<type>PropellerAircraft</type>
-			<value>DYNAMIC</value>
 			<sim>IL2</sim>
 			<device>pedals</device>
 		</classdefaults_IL2>
@@ -11879,9 +11893,9 @@
 		<device>any</device>
 	</models>
 	<models>
-		<name>gforce_effect_enable</name>
+		<name>gforce_effect_mode</name>
 		<model>F-16C_50</model>
-		<value>false</value>
+		<value>DISABLED</value>
 		<sim>DCS</sim>
 		<device>any</device>
 	</models>
@@ -11954,6 +11968,13 @@
 		<name>gforce_effect_enable</name>
 		<model>F-4E-45MC</model>
 		<value>false</value>
+		<sim>DCS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>gforce_effect_mode</name>
+		<model>F-4E-45MC</model>
+		<value>DISABLED</value>
 		<sim>DCS</sim>
 		<device>any</device>
 	</models>
