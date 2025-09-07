@@ -1741,7 +1741,7 @@
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
-		<validvalues>1,256,4096,16384</validvalues>
+		<validvalues>1,100,256,4096,16384</validvalues>
 		<value>16384</value>
 	</defaults>
 	<defaults>
@@ -5594,6 +5594,12 @@
 		<var>L:switchForceTrim</var>
 		<sc_unit>bool</sc_unit>
 	</sc_overrides>
+		<sc_overrides>
+			<name>HydSwitch</name>
+			<model>R66(?! Turbine).*</model>
+			<var>L:CSR66_Hyd_Switch</var>
+			<sc_unit>bool</sc_unit>
+		</sc_overrides>
 		<validvalues_overrides>
 			<name>spring_mode</name>
 			<sim>MSFS</sim>
@@ -17252,13 +17258,6 @@
 	</models>
 	<models>
 		<name>type</name>
-		<model>R66 Turbine.*</model>
-		<value>Helicopter</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>type</name>
 		<model>Robin CAP10.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
@@ -17358,6 +17357,106 @@
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
+	<models>
+		<name>force_trim_enabled</name>
+		<model>R66 Turbine.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>jet_engine_rumble_freq</name>
+		<model>R66 Turbine.*</model>
+		<value>20</value>
+		<unit>hz</unit>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>jet_engine_rumble_intensity</name>
+		<model>R66 Turbine.*</model>
+		<value>0.04</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>R66 Turbine.*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>R66(?! Turbine).*</model>
+		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>custom_x_axis</name>
+		<model>R66(?! Turbine).*</model>
+		<value>L:COWANSIM_CYCLIC_X_POSITION</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>custom_y_axis</name>
+		<model>R66(?! Turbine).*</model>
+		<value>L:COWANSIM_CYCLIC_Y_POSITION</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_x_axis</name>
+		<model>R66(?! Turbine).*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_custom_y_axis</name>
+		<model>R66(?! Turbine).*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>raw_x_axis_scale</name>
+		<model>R66(?! Turbine).*</model>
+		<value>100</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>raw_y_axis_scale</name>
+		<model>R66(?! Turbine).*</model>
+		<value>100</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>spring_mode</name>
+		<model>R66(?! Turbine).*</model>
+		<value>FORCETRIM</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>jet_engine_rumble_freq</name>
+		<model>R66(?! Turbine).*</model>
+		<value>20</value>
+		<unit>hz</unit>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>jet_engine_rumble_intensity</name>
+		<model>R66(?! Turbine).*</model>
+		<value>0.04</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
 	<models>
 		<name>type</name>
 		<model>S12-G:.*</model>
