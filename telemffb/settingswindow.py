@@ -106,6 +106,7 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
         self.drp_class.addItem('HPGHelicopter')
         self.drp_class.addItem('SASHelicopter')
         self.drp_class.addItem('FlyInsideHelicopter')
+        self.drp_class.addItem('CowanSimHelicopter')
         self.drp_device.addItem('any')
         self.drp_device.addItem('joystick')
         self.drp_device.addItem('pedals')
@@ -1214,17 +1215,20 @@ class SettingsWindow(QtWidgets.QMainWindow, Ui_SettingsWindow):
     def skip_bad_combos(self, craft):
         if self.sim == 'DCS' and craft == 'HPGHelicopter': return True
         if self.sim == 'DCS' and craft == 'SASHelicopter': return True
+        if self.sim == 'DCS' and craft == 'CowanSimHelicopter': return True
         if self.sim == 'DCS' and craft == 'FlyInsideHelicopter': return True
         if self.sim == 'DCS' and craft == 'TurbopropAircraft': return True
         if self.sim == 'DCS' and craft == 'GliderAircraft': return True
         if self.sim == 'IL2' and craft == 'GliderAircraft': return True
         if self.sim == 'IL2' and craft == 'HPGHelicopter': return True
         if self.sim == 'IL2' and craft == 'SASHelicopter': return True
+        if self.sim == 'IL2' and craft == 'CowanSimHelicopter': return True
         if self.sim == 'IL2' and craft == 'FlyInsideHelicopter': return True
         if self.sim == 'IL2' and craft == 'Helicopter': return True
         if self.sim == 'IL2' and craft == 'TurbopropAircraft': return True
         if self.sim == 'XPLANE' and craft == 'HPGHelicopter': return True
         if self.sim == 'XPLANE' and craft == 'SASHelicopter': return True
+        if self.sim == 'XPLANE' and craft == 'CowanSimHelicopter': return True
         if self.sim == 'XPLANE' and craft == 'FlyInsideHelicopter': return True
 
         return False

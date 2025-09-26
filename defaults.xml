@@ -81,7 +81,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
-		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,GliderAircraft,Helicopter,HPGHelicopter,SASHelicopter,FlyInsideHelicopter</validvalues>
+		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,GliderAircraft,Helicopter,HPGHelicopter,SASHelicopter,FlyInsideHelicopter,CowanSimHelicopter</validvalues>
 	</defaults>
 	<defaults>
 		<datatype>list</datatype>
@@ -6515,6 +6515,104 @@
 			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>Helicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>Helicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>Helicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>FlyInsideHelicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>FlyInsideHelicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var</name>
+			<type>FlyInsideHelicopter</type>
+			<value>L:TelemFFBHeliFT</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>FlyInsideHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>FlyInsideHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_ft_sw_var_enabled</name>
+			<type>FlyInsideHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_x_axis</name>
+			<type>CowanSimHelicopter</type>
+			<value>L:COWANSIM_CYCLIC_X_POSITION</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>custom_y_axis</name>
+			<type>CowanSimHelicopter</type>
+			<value>L:COWANSIM_CYCLIC_Y_POSITION</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>cyclic_spring_gain</name>
 			<type>Helicopter</type>
 			<value>0.8</value>
@@ -6534,90 +6632,6 @@
 			<value>0.8</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var_enabled</name>
-			<type>Helicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var</name>
-			<type>Helicopter</type>
-			<value>L:TelemFFBHeliFT</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var_enabled</name>
-			<type>Helicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>pedals</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var</name>
-			<type>Helicopter</type>
-			<value>L:TelemFFBHeliFT</value>
-			<sim>MSFS</sim>
-			<device>pedals</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var_enabled</name>
-			<type>Helicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var</name>
-			<type>Helicopter</type>
-			<value>L:TelemFFBHeliFT</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var_enabled</name>
-			<type>FlyInsideHelicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var</name>
-			<type>FlyInsideHelicopter</type>
-			<value>L:TelemFFBHeliFT</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var_enabled</name>
-			<type>FlyInsideHelicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>pedals</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var</name>
-			<type>FlyInsideHelicopter</type>
-			<value>L:TelemFFBHeliFT</value>
-			<sim>MSFS</sim>
-			<device>pedals</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var_enabled</name>
-			<type>FlyInsideHelicopter</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>custom_ft_sw_var</name>
-			<type>FlyInsideHelicopter</type>
-			<value>L:TelemFFBHeliFT</value>
-			<sim>MSFS</sim>
-			<device>collective</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>elevator_droop_moment</name>
@@ -6707,6 +6721,20 @@
 			<name>elevator_spring_gain</name>
 			<type>TurbopropAircraft</type>
 			<value>0.5</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>enable_custom_x_axis</name>
+			<type>CowanSimHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>enable_custom_y_axis</name>
+			<type>CowanSimHelicopter</type>
+			<value>true</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>
@@ -6895,6 +6923,27 @@
 			<value>0.05</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>FI_vibration_enable</name>
+			<type>FlyInsideHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>FI_vibration_expo</name>
+			<type>FlyInsideHelicopter</type>
+			<value>0.1</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>FI_vibration_intensity</name>
+			<type>FlyInsideHelicopter</type>
+			<value>0.5</value>
+			<sim>MSFS</sim>
+			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>force_disable_collective_gain</name>
@@ -7677,10 +7726,18 @@
 			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
-			<name>runway_rumble_enabled</name>
-			<type>!FlyInsideHelicopter</type>
+			<name>raw_x_axis_scale</name>
+			<type>CowanSimHelicopter</type>
+			<value>100</value>
 			<sim>MSFS</sim>
-			<device>any</device>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>raw_y_axis_scale</name>
+			<type>CowanSimHelicopter</type>
+			<value>100</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>rotor_blade_count</name>
@@ -7820,6 +7877,12 @@
 			<value>0.2</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>runway_rumble_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>spoiler_buffet_effect_enabled</name>
@@ -8013,6 +8076,12 @@
 			<device>trimwheel</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>touchdown_effect_enabled</name>
+			<type>!FlyInsideHelicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>trim_following</name>
 			<type>GliderAircraft</type>
 			<value>true</value>
@@ -8279,12 +8348,6 @@
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>trimwheel</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>touchdown_effect_enabled</name>
-			<type>!FlyInsideHelicopter</type>
-			<sim>MSFS</sim>
-			<device>any</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>type</name>
@@ -8506,27 +8569,6 @@
 			<name>vrs_effect_intensity</name>
 			<type>SASHelicopter</type>
 			<value>0.12</value>
-			<sim>MSFS</sim>
-			<device>any</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>FI_vibration_enable</name>
-			<type>FlyInsideHelicopter</type>
-			<value>true</value>
-			<sim>MSFS</sim>
-			<device>any</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>FI_vibration_intensity</name>
-			<type>FlyInsideHelicopter</type>
-			<value>0.5</value>
-			<sim>MSFS</sim>
-			<device>any</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>FI_vibration_expo</name>
-			<type>FlyInsideHelicopter</type>
-			<value>0.1</value>
 			<sim>MSFS</sim>
 			<device>any</device>
 		</classdefaults_MSFS>
@@ -14047,9 +14089,16 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>spring_mode</name>
+		<model>500E.*</model>
+		<value>FORCETRIM</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>500E.*</model>
-		<value>Helicopter</value>
+		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 		</models>
@@ -16675,8 +16724,15 @@
 	</models>
 	<models>
 		<name>type</name>
-		<model>H125.*</model>
+		<model>H125 (AerialApp|Cargo|Passengers|Rescue).*</model>
 		<value>Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>H125 (?!AerialApp|Cargo|Passengers|Rescue).*</model>
+		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -17388,52 +17444,17 @@
 	</models>
 	<models>
 		<name>type</name>
-		<model>R66(?! Turbine).*</model>
-		<value>Helicopter</value>
+		<model>R22.*</model>
+		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
 	<models>
-		<name>custom_x_axis</name>
+		<name>type</name>
 		<model>R66(?! Turbine).*</model>
-		<value>L:COWANSIM_CYCLIC_X_POSITION</value>
+		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>custom_y_axis</name>
-		<model>R66(?! Turbine).*</model>
-		<value>L:COWANSIM_CYCLIC_Y_POSITION</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>enable_custom_x_axis</name>
-		<model>R66(?! Turbine).*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>enable_custom_y_axis</name>
-		<model>R66(?! Turbine).*</model>
-		<value>true</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>raw_x_axis_scale</name>
-		<model>R66(?! Turbine).*</model>
-		<value>100</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
-	</models>
-	<models>
-		<name>raw_y_axis_scale</name>
-		<model>R66(?! Turbine).*</model>
-		<value>100</value>
-		<sim>MSFS</sim>
-		<device>joystick</device>
+		<device>any</device>
 	</models>
 	<models>
 		<name>spring_mode</name>
@@ -18137,6 +18158,10 @@
 	<classes>
 		<sim>MSFS</sim>
 		<class_name>SASHelicopter</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>CowanSimHelicopter</class_name>
 	</classes>
 	<classes>
 		<sim>MSFS</sim>

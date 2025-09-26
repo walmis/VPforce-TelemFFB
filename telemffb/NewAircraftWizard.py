@@ -66,6 +66,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
         "JetAircraft": "Jet Powered Aircraft",
         "GliderAircraft": "Glider",
         "Helicopter": "Helicopter",
+        "CowanSimHelicopter": "CowanSim Helicopter",
         "FlyInsideHelicopter": "FlyInside Helicopter",
         "HPGHelicopter": "Hype Group Airbus Helicopter",
         "SASHelicopter": "SimFocus SAS Helicopter"

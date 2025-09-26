@@ -2826,6 +2826,11 @@ class SASHelicopter(Helicopter):
         # Trimming is handled by the AFCS integration - override parent class function
         pass
 
+class CowanSimHelicopter(Helicopter):
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+        # Cowan Helis now have LVAR cyclics
+        # Grouped for simplicity
 
 class FlyInsideHelicopter(Helicopter):
     FI_vibration_enable = True
