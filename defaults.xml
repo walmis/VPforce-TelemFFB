@@ -7732,7 +7732,6 @@
 			<name>rudder_expo</name>
 			<type>TurbopropAircraft</type>
 			<value>0</value>
-			<unit>s</unit>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
@@ -7754,7 +7753,6 @@
 			<name>rudder_spring_gain</name>
 			<type>GliderAircraft</type>
 			<value>0.25</value>
-			<unit>s</unit>
 			<sim>MSFS</sim>
 			<device>pedals</device>
 		</classdefaults_MSFS>
