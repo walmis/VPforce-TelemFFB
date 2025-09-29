@@ -3389,6 +3389,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -3405,6 +3406,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0.5</value>
@@ -3422,6 +3424,7 @@
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<sliderfactor>0.1</sliderfactor>
 		<validvalues>0,70</validvalues>
@@ -13872,6 +13875,13 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>spring_mode</name>
+		<model>205-A1B.*</model>
+		<value>FORCETRIM</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>custom_ft_sw_var_enabled</name>
 		<model>205-A1B.*</model>
 		<value>true</value>
@@ -17645,6 +17655,13 @@
 		<value>2</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>spring_mode</name>
+		<model>UH-1H.*</model>
+		<value>FORCETRIM</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>custom_ft_sw_var_enabled</name>
