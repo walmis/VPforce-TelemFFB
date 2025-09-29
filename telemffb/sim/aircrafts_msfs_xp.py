@@ -353,7 +353,7 @@ class Aircraft(AircraftBase):
         #print(f'expo input:{x} k:{k} output:{newvalue}')
         return newvalue
 
-    def msfs_update_turbulence(self):
+    def update_turbulence(self):
         if self.turbulence_effect_enable:
             force, dir = turbulence_modulator.update(self.telem_data, self.turbulence_hpf_alpha, self.turbulence_smoothing_alpha, self.turbulence_sensitivity, self.turbulence_intensity)
             force = round(force, 4)
@@ -1340,7 +1340,7 @@ class Aircraft(AircraftBase):
         super().on_telemetry(telem_data)
 
         if self.is_joystick():
-            self.msfs_update_turbulence()
+            self.update_turbulence()
 
         if self.is_trimwheel():
             self.msfs_update_trimwheel(telem_data)

@@ -2769,6 +2769,7 @@
 		<displayname>Turbulence Effect &lt;br&gt;( &lt;b&gt;Experimental&lt;/b&gt; )</displayname>
 		<prereq>airflow_group</prereq>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
@@ -2783,6 +2784,7 @@
 		<prereq>turbulence_effect_enable</prereq>
 		<info>Controls how long wind gusts continue to influence the joystick</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0.9</value>
@@ -2798,6 +2800,7 @@
 		<prereq>turbulence_effect_enable</prereq>
 		<info>Controls how quickly the output furce changes</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0.3</value>
@@ -2813,6 +2816,7 @@
 		<prereq>turbulence_effect_enable</prereq>
 		<info>Controls the wind gust speed required to trigger full force</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0.5</value>
@@ -2828,6 +2832,7 @@
 		<prereq>turbulence_effect_enable</prereq>
 		<info>Caps the maximum constant force applied to the joystick</info>
 		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>
 		<value>0.3</value>
