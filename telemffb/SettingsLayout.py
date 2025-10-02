@@ -256,8 +256,8 @@ class SettingsLayout(QGridLayout):
                 G.settings_mgr.write_to_xml(G.settings_mgr.current_sim,
                               G.settings_mgr.current_class,
                               G.settings_mgr.current_pattern,
-                              item['name'],
-                              item['value'])
+                              item['value'],
+                              item['name'])
 
     def convert_to_springmode(self, datalist):
         # read old value from xml, remap & erase old setting
@@ -355,7 +355,8 @@ class SettingsLayout(QGridLayout):
                         G.settings_mgr.current_pattern,
                         name
                     )
-                    self.set_mode(mode, 'gforce_effect', datalist)
+                    self.set_mode(mode, "gforce_effect_mode", datalist)
+
 
     def build_rows(self, datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))

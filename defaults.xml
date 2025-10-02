@@ -5119,29 +5119,36 @@
 		<effecttype>constant</effecttype>
 		<datatype>convert</datatype>
 		<grouping>Acceleration</grouping>
-		<parentgroup>inertial</parentgroup>
 		<order>91091</order>
 		<name>gforce_effect_enable</name>
 		<displayname>G Force Effect (Legacy)</displayname>
 		<info>See manual for details</info>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>constant</effecttype>
 		<datatype>convert</datatype>
 		<grouping>Acceleration</grouping>
-		<parentgroup>inertial</parentgroup>
 		<order>91092</order>
 		<name>new_gforce_effect_enable</name>
 		<displayname>G Force Effect (Legacy **New**)</displayname>
 		<info>Alternate G Force Effec - Enabling will override legacy G Force Effect&lt;br&gt;&lt;br&gt;See manual for details</info>
+		<DCS>true</DCS>
+		<IL2>true</IL2>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
 		<value>false</value>
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
 		<datatype>convert</datatype>
 		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
 		<order>91093</order>
 		<name>pedal_spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
@@ -5151,7 +5158,6 @@
 		<effecttype>spring</effecttype>
 		<datatype>convert</datatype>
 		<grouping>Spring Override</grouping>
-		<parentgroup>basic</parentgroup>
 		<order>91094</order>
 		<name>adv_spr_override_enabled</name>
 		<displayname>Advanced Spring Override</displayname>
@@ -5161,7 +5167,6 @@
 		<effecttype>spring</effecttype>
 		<datatype>convert</datatype>
 		<grouping>Sim Options</grouping>
-		<parentgroup>basic</parentgroup>
 		<order>91095</order>
 		<name>override_spring_enabled</name>
 		<displayname>Override DCS Spring</displayname>
@@ -5172,7 +5177,6 @@
 		<effecttype>spring</effecttype>
 		<datatype>bool</datatype>
 		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
 		<order>91990</order>
 		<name>pedal_mode_dummy</name>
 		<displayname>Pedal Mode Settings</displayname>
@@ -5183,7 +5187,6 @@
 		<effecttype>spring</effecttype>
 		<datatype>bool</datatype>
 		<grouping>SpringCenter</grouping>
-		<parentgroup>basic</parentgroup>
 		<order>91991</order>
 		<name>pedal_advanced_dummy</name>
 		<displayname>Advanced Pedal Mode Settings (Dynamic Mode Only)</displayname>
@@ -5195,7 +5198,6 @@
 		<effecttype>spring</effecttype>
 		<datatype>bool</datatype>
 		<grouping>Dynamic Forces</grouping>
-		<parentgroup> </parentgroup>
 		<order>99300</order>
 		<name>dummy_dynamic_spring_settings</name>
 		<displayname>Dynamic Spring Settings</displayname>
