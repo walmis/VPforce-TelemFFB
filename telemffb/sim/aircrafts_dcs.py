@@ -634,6 +634,17 @@ class JetAircraft(Aircraft):
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
+class TurbopropAircraft(PropellerAircraft):
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+
+    @overrides(PropellerAircraft)
+    def on_telemetry(self, telem_data):
+        if telem_data.get("N") == None:
+            return
+        telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
+
+        super().on_telemetry(telem_data)
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
