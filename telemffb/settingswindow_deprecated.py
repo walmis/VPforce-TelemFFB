@@ -40,6 +40,12 @@ from . import xmlutils
 # from .UserModelDialog import UserModelDialog
 from .ui.Ui_SettingsWindow import Ui_SettingsWindow
 
+"""
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+This file has been deprecated.  It is no longe used within TelemFFB.  It is being retained for legacy purposes.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+"""
+
 print_debugs = False
 print_method_calls = False
 

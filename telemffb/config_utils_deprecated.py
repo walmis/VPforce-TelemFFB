@@ -27,6 +27,11 @@ from PyQt6.QtWidgets import QMessageBox, QPushButton
 from configobj import ConfigObj
 import textwrap
 
+"""
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+This file has been deprecated.  It is no longe used within TelemFFB.  It is being retained for legacy purposes.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+"""
 
 def convert_system_settings(sys_dict):
     map_dev_dict = {

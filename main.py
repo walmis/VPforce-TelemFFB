@@ -68,7 +68,6 @@ import resources
 import telemffb.globals as G
 import telemffb.utils as utils
 import telemffb.xmlutils as xmlutils
-# from telemffb.config_utils import autoconvert_config
 from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino, HapticEffect
 from telemffb.IPCNetworkThread import IPCNetworkThread
 from telemffb.LogWindow import LogWindow
@@ -76,7 +75,6 @@ from telemffb.MainWindow import MainWindow
 from telemffb.SettingsManager import SettingsManager
 from telemffb.telem.SimTelemListener import SimListenerManager
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
-#from telemffb.LogTailWindow import LogTailWindow
 from telemffb.telem.TelemManager import TelemManager
 from telemffb.utils import (AnsiColors, LoggingFilter, exit_application,
                             upload_vpconf_profile)
