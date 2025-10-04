@@ -1688,7 +1688,9 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
     else:
         final_result = def_craft_models_result
 
-    final_result = [item for item in final_result if item['value'] != '' or item['name'] == 'vpconf']
+    final_result = [item for item in final_result if item['value'] != ''
+                    or item['name'] == 'vpconf'
+                    or item['name'] == 'vne_override']
     apply_validvalue_overrides_from_root(final_result, the_sim, model_class, instance_device)
     prereq_list = read_prereqs()
     final_w_prereqs = check_prereq_value(prereq_list, final_result)
