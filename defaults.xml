@@ -14137,12 +14137,26 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>206B3.*</model>
+		<value>CowanSimHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>206L3.*</model>
+		<value>CowanSimHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>etl_effect_intensity</name>
 		<model>222B.*</model>
 		<value>0.1</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		</models>
+	</models>
 	<models>
 		<name>etl_start_speed</name>
 		<model>222B.*</model>
@@ -14173,18 +14187,70 @@
 		<value>2</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		</models>
+	</models>
 	<models>
 		<name>runway_rumble_intensity</name>
 		<model>222B.*</model>
 		<value>0.5</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
-		</models>
+	</models>
 	<models>
 		<name>type</name>
 		<model>222B.*</model>
-		<value>Helicopter</value>
+		<value>CowanSimHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_effect_intensity</name>
+		<model>222UT.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>etl_start_speed</name>
+		<model>222UT.*</model>
+		<value>7</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>etl_stop_speed</name>
+		<model>222UT.*</model>
+		<value>14</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>overspeed_shake_start</name>
+		<model>222UT.*</model>
+		<value>70</value>
+		<unit>m/s</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>rotor_blade_count</name>
+		<model>222UT.*</model>
+		<value>2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+		</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>222UT.*</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+		</models>
+	<models>
+		<name>type</name>
+		<model>222UT.*</model>
+		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -16904,6 +16970,13 @@
 	<models>
 		<name>type</name>
 		<model>H125 (?!AerialApp|Cargo|Passengers|Rescue).*</model>
+		<value>CowanSimHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>H130.*</model>
 		<value>CowanSimHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
