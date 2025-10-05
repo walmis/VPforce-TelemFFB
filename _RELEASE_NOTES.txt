@@ -1,4 +1,81 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
+
+############################################
+##  October 5, 2025
+############################################
+# Big TelemFFB 2.0 Update
+## Platform
+- Updated UI framework leveraging the latest PyQt6 libraries
+- Brand new look and feel
+  - Settings are categorized for easier access
+  - New, better management of multiple devices with easy to see icons compared to legacy clickable device labels
+  - Easier to switch between various effect mode settings (like different spring or g-effect types)
+    - relevant sub-options are displayed only if mode is active
+  - Detachable Monitor tab
+    - Now you can see the 'Active Effects' and edit settings at the same time
+- Support for Dark Mode theme
+  - Light-mode, Dark-mode or system-controlled setting can be configured in System settings
+    - Defaults to system controlled so will pick up your current windows theme setting
+  - Can force light/dark mode with '--lightmode' or '--darkmode' runtime flags
+- All new Offline & Sim/Class default editor
+  - Same interface as typical real-time configuration
+  - Legacy offline interface has been retired
+  - Easily move a model setting into a class/sim default by right-clicking on the delete button and selecting 'move to'
+- New Profile Manager capability
+  - Easily create additional settings profiles for any aircraft.
+  - Profiles can be created as new or cloned from an existing one
+  - Easily switch between profiles in the Profile Manager window or in real-time from the main App.
+  - Profiles can be exported/imported individually or en masse with or without supporting class/sim default settings
+  - Previously exported profiles can be imported.  Options to include, exclude or rename profiles in the import file are available
+  - ** On first load of new version, your existing configurations will be converted to a new profile based config.  Legacy config will be retained for use with previous versions of TelemFFB.
+    - All of your existing settings will be converted into 'Auto User' profiles for each aircraft
+    - Please READ THE MANUAL
+
+## All Sims
+- New 'Advanced Spring Override'
+  - New custom widget allows precise smoothed curve definition with multiple points
+  - You can now define a custom spring curve over a given airspeed envelope
+  - Separate defitions for X/Y axes
+  - Supported on Pedals and Joystick
+  - Curve configurations are exportable/importable for easier sharing between users.
+- New 'Advanced G-Effect'
+  - Leverages the same custom curve widget as the new advanced spring curve
+  - Defines the effect force over a given G-loading range
+  - Supports two effect modes
+    - Constant Force:  Similar to legacy G-effect
+    - Spring Offset:  Uses new firmware capabilities to drive the spring-center forward/back to create a strengthening effect on the spring when the stick is held still
+
+## BMS (Beta)
+- Newly added support for Falcon BMS
+  - Support is considered Beta at this time.  Basic effects (engine rumble, afterburner, gunfire, etc) are tested.  Many effects are untested.
+  - Use it and report found issues/non-working effects please
+
+## DCS
+- Support added for F4U-Corsair
+- New high-performance compiled telemetry exporter.
+  - Performs same function as legacy lua script, but with a fraction of the overhead
+  - Reduces likelyhood of potential negative interactions with (or from) other DCS export scripts
+- Dynamic 'Autopilot Deadzone' - Can dynamically apply a axis deadzone via the configurator API when AP is activated
+  - Requires new DLL based telemetry export
+  - Available on select aircraft currently:  F-14, F-18, A-10, F-4
+
+## MSFS
+- Steering Friction
+  - Adds a small to moderate amount of friction effect while on the ground and below a speed threshold.  Friction will increase as airspeed decreases
+- New Turbulence Effect
+  - Monitors relative wind data and reacts to gusts, providing a small to moderate constant force effect based on the wind data in the x/y polar axes
+- New 'FlyInsideHelicopter' sub-type to support effects leveraging FFB specific data available from Fly Inside helicopters
+  - Currently includes shake type effects for things like blade slap, ETL and VRS.
+- Fix case in MSFS24 where aircraft with 'electric' engine types were not properly being processed
+- Helicopters -  Simvar based force trim toggle
+  - Enable 'Force Trim Switch' while Force Trim spring mode is selected
+  - Toggle "L:TelemFFBHeliFT" with Spad.nExt, AoA or other external tool
+  - If heli has force trim switch in cockpit, replace the L:Var config with the applicable L:Var to control using in-cockpit switch
+## IL2
+- Enhanced telemetry based gunfire effect
+  - Gun data (mass, velocity) is read from telementry and used to create a dynamic intensity/fire rate effect
+  - Smaller/faster rounds will produce a higher frequency effect while larger/slower rounds will pack more of a punch at a lower rate
+
 ############################################
 ##  May 6, 2025
 ############################################

@@ -41,12 +41,14 @@ Pedal behavior with TelemFFB will vary based on the sim in question.  None of th
 In addition to most of the haptic effects listed above, the following is also supported:
 - MSFS / XPLANE
   - Auto switching between FBW (fixed spring), Dynamic spring force w/ dynamic slip based forces, and un-sprung for helicopters (configurable dampening)
+  - Advanced spring gain curve control
   - Rudder trim following
   - Rudder autopilot following
   - Nose-wheel shimmy effect
 - DCS / IL2
   - Auto switching between pedal spring modes (mode override and spring force configuration options available per aircraft)
     - Dynamic spring force based on individual aircraft speed envelope (Warbird default)
+    - Advanced spring gain curve control
     - Fixed spring (Jet default)
     - Un-sprung with configurable dampening (Helicopter default)
   - Rudder trim following for fixed wing aircraft
@@ -92,6 +94,8 @@ TelemFFB will automatically install the export plugin when you configure and ena
 Similar to DCS, IL-2 has native FFB joystick support.  TelemFFB implements many of the same effects listed above for IL-2.  
 Note that there are several effects implemented in TelemFFB that are duplications of effects already supported by IL-2 (Gunfire, Stall/Drag buffeting and ground-roll).  If you chose to enable these effects in TelemFFB, it is recommended to disable the 'shake' force in the IL-2 FFB settings.
 
+## Force feedback support for Falcon BMS
+The primary aircraft in BMS (F16) is fly-by-wire, and as such does not have "force feedback" in the traditional sense.  However, there are many other effects which can be generated from telemetry that aide in immersion. 
 ## Requirements
 - Python 3.11+
 - Git (https://git-scm.com/) to download the source from Github
@@ -99,7 +103,7 @@ Note that there are several effects implemented in TelemFFB that are duplication
 - VPforce Rhino FFB Joystick/kit, DIY Pedals or DIY Collective
 
 ## Documentation
-- The latest documentation can be found here:  https://vpforce.eu/downloads/VPforce_Rhino_Manual.pdf 
+- The latest documentation can be found here:  https://docs.google.com/document/d/1YL5DLkiTxlaNx_zKHEYSs25PjmGtQ6_WZDk58_SGt8Y/edit 
 <br>
 Note that the documentation may be in-flux between 'wip' releases and may show features that are not yet released.
 
@@ -155,8 +159,7 @@ optional arguments:
 - `--help` show the available parameters
 - `--teleplot` is the destination IP:port address for teleplot.fr telemetry plotting service (default is "127.0.0.1:47269"). This service allows you to plot telemetry data over time.
 - `-p` or `--plot` is used to specify telemetry item names to send to teleplot, separated by spaces
-- `-D` or `--device` is used to specify the Rhino device USB VID:PID (default is "ffff:2055")
-- `-c` or `--configfile` is used to specify a config file to load (default is "config.ini")
+
 
 2. Telemetry effects mainly uses Constant Force and Periodic effects. On the Rhino it was tested with **50% Periodic** effect slider, and **100% CF** effect slider setting.
 3. Run DCS World
