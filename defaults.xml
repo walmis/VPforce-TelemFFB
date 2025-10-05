@@ -625,10 +625,9 @@
 		<name>pedal_trimming_enabled</name>
 		<displayname>Pedal Trimming</displayname>
 		<exclusive_with>adv_spr_use_hardware_trim</exclusive_with>
-		<prereq>basic_group</prereq>
+		<prereq>spring_mode.STATIC.DYNAMIC.CUSTOM</prereq>
 		<info>Enable pedal trimming feedback for fixed wing aircfraft</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<pedals>true</pedals>
 	</defaults>
 	<defaults>
@@ -1206,7 +1205,6 @@
 		<prereq>basic_group</prereq>
 		<info>Apply artificial trim movement - only for aircraft that do not support native FFB trim&lt;b&gt;&lt;b&gt;(AV8B, Mig-19)</info>
 		<DCS>true</DCS>
-		<BMS>true</BMS>
 		<joystick>true</joystick>
 	</defaults>
 	<defaults>
@@ -3805,6 +3803,7 @@
 		<name>jet_engine_rumble_intensity</name>
 		<displayname>Jet Engine Rumble</displayname>
 		<prereq>engine_jet_rumble_enabled</prereq>
+		<info>Intensity setting for the jet engine rumble effect</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
@@ -3825,7 +3824,7 @@
 		<name>jet_engine_rumble_freq</name>
 		<displayname>Jet Engine Rumble Freq</displayname>
 		<prereq>engine_jet_rumble_enabled</prereq>
-		<info>Most DCS helos are jet driven, enable the jet engine effect</info>
+		<info>Frequency in Hz of the engine rumble effect</info>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
 		<IL2>true</IL2>
@@ -5098,7 +5097,6 @@
 		<effecttype>constant</effecttype>
 		<datatype>convert</datatype>
 		<grouping>Acceleration</grouping>
-		<parentgroup>inertial</parentgroup>
 		<order>91089</order>
 		<name>gforce_effect_advanced_enabled</name>
 		<displayname>Advanced G Force Effect</displayname>
@@ -5108,7 +5106,6 @@
 		<effecttype>constant</effecttype>
 		<datatype>convert</datatype>
 		<grouping>Acceleration</grouping>
-		<parentgroup>inertial</parentgroup>
 		<order>91090</order>
 		<name>gforce_effect_master</name>
 		<displayname>G-Force Effect</displayname>
