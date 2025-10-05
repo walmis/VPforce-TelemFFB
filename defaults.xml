@@ -8678,6 +8678,7 @@
 		<classdefaults_MSFS>
 			<name>vne_override</name>
 			<type>GliderAircraft</type>
+			<value></value>
 			<unit>kt</unit>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8685,6 +8686,7 @@
 		<classdefaults_MSFS>
 			<name>vne_override</name>
 			<type>JetAircraft</type>
+			<value></value>
 			<unit>kt</unit>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8692,6 +8694,7 @@
 		<classdefaults_MSFS>
 			<name>vne_override</name>
 			<type>PropellerAircraft</type>
+			<value></value>
 			<unit>kt</unit>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -8699,6 +8702,7 @@
 		<classdefaults_MSFS>
 			<name>vne_override</name>
 			<type>TurbopropAircraft</type>
+			<value></value>
 			<unit>kt</unit>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -9972,6 +9976,7 @@
 		<classdefaults_XPLANE>
 			<name>vne_override</name>
 			<type>GliderAircraft</type>
+			<value></value>
 			<unit>kt</unit>
 			<sim>XPLANE</sim>
 			<device>any</device>
@@ -9979,6 +9984,7 @@
 		<classdefaults_XPLANE>
 			<name>vne_override</name>
 			<type>JetAircraft</type>
+			<value></value>
 			<unit>kt</unit>
 			<sim>XPLANE</sim>
 			<device>any</device>
@@ -9986,6 +9992,7 @@
 		<classdefaults_XPLANE>
 			<name>vne_override</name>
 			<type>PropellerAircraft</type>
+			<value></value>
 			<unit>kt</unit>
 			<sim>XPLANE</sim>
 			<device>any</device>
@@ -9993,6 +10000,7 @@
 		<classdefaults_XPLANE>
 			<name>vne_override</name>
 			<type>TurbopropAircraft</type>
+			<value></value>
 			<unit>kt</unit>
 			<sim>XPLANE</sim>
 			<device>any</device>
