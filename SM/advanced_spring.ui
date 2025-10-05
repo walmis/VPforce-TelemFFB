@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>601</width>
+    <width>723</width>
     <height>835</height>
    </rect>
   </property>
@@ -351,9 +351,15 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="pb_get_vne">
+        <widget class="QToolButton" name="pb_get_vne">
          <property name="text">
           <string>Import VNE</string>
+         </property>
+         <property name="popupMode">
+          <enum>QToolButton::MenuButtonPopup</enum>
+         </property>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextBesideIcon</enum>
          </property>
         </widget>
        </item>
@@ -610,14 +616,14 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>LabeledToggle</class>
-   <extends>QCheckBox</extends>
-   <header>telemffb.custom_widgets</header>
-  </customwidget>
-  <customwidget>
    <class>StyledButton</class>
    <extends>QPushButton</extends>
    <header location="global">telemffb.custom_widgets.h</header>
+  </customwidget>
+  <customwidget>
+   <class>LabeledToggle</class>
+   <extends>QCheckBox</extends>
+   <header>telemffb.custom_widgets</header>
   </customwidget>
   <customwidget>
    <class>Toggle</class>

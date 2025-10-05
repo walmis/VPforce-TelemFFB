@@ -159,6 +159,7 @@ class NewAircraftWizard(QDialog, Ui_NewAircraftWizard):
             self.cb_sim.setEnabled(False)
             if self.auto_cls is not None and self.auto_cls != '':
                 self.cb_class.setCurrentText(self.friendly_class_names.get(self.auto_cls))
+                self.lbl_actype_discovery.setText(f"<i>Type auto-detected.. Please validate</i>")
                 self.lbl_actype_discovery.setVisible(True)
             if self.auto_name is not None and self.auto_name != '':
                 self.tb_manual_full_name.setText(self.auto_name)

@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_AdvancedSpringDialog(object):
     def setupUi(self, AdvancedSpringDialog):
         AdvancedSpringDialog.setObjectName("AdvancedSpringDialog")
-        AdvancedSpringDialog.resize(601, 835)
+        AdvancedSpringDialog.resize(723, 835)
         self.gridLayout_2 = QtWidgets.QGridLayout(AdvancedSpringDialog)
         self.gridLayout_2.setObjectName("gridLayout_2")
         self.label_4 = QtWidgets.QLabel(parent=AdvancedSpringDialog)
@@ -162,7 +162,9 @@ class Ui_AdvancedSpringDialog(object):
         self.pb_airspeed_pos_hundred.setMaximumSize(QtCore.QSize(25, 16777215))
         self.pb_airspeed_pos_hundred.setObjectName("pb_airspeed_pos_hundred")
         self.horizontalLayout_5.addWidget(self.pb_airspeed_pos_hundred)
-        self.pb_get_vne = QtWidgets.QPushButton(parent=AdvancedSpringDialog)
+        self.pb_get_vne = QtWidgets.QToolButton(parent=AdvancedSpringDialog)
+        self.pb_get_vne.setPopupMode(QtWidgets.QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        self.pb_get_vne.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.pb_get_vne.setObjectName("pb_get_vne")
         self.horizontalLayout_5.addWidget(self.pb_get_vne)
         spacerItem4 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)

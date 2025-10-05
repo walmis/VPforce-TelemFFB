@@ -93,6 +93,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         self.pb_airspeed_neg_hundred.setText('')
         self.pb_airspeed_neg_hundred.setToolTip('Minus 100')
         self.pb_airspeed_neg_hundred.clicked.connect(lambda: self.change_airspeed_scale(-100))
+        self.pb_airspeed_neg_hundred.setFixedWidth(25)
 
         self.pb_airspeed_pos_ten.setIcon(QIcon(":/image/right_grey.png"))
         self.pb_airspeed_pos_ten.setText('')
@@ -176,6 +177,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         G.telem_manager.telemetryTimeout.connect(lambda: self.toggle_vne_import_button(False))
         self.pb_get_vne.setMenu(self.create_option_menu())
 
+        self.pb_get_vne.clicked.connect(self.pb_get_vne.showMenu)
 
     def create_option_menu(self):
         menu = QMenu(self)
