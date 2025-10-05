@@ -380,7 +380,7 @@
 		<effecttype>spring</effecttype>
 		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
-		<parentgroup>baslic</parentgroup>
+		<parentgroup>basic</parentgroup>
 		<order>700.0</order>
 		<name>spring_mode</name>
 		<displayname>Joystick Spring Mode</displayname>
@@ -394,7 +394,7 @@
 		<effecttype>spring</effecttype>
 		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
-		<parentgroup>baslic</parentgroup>
+		<parentgroup>basic</parentgroup>
 		<order>700.0</order>
 		<name>spring_mode</name>
 		<displayname>Pedal Spring Mode</displayname>
@@ -408,7 +408,7 @@
 		<effecttype>spring</effecttype>
 		<datatype>enumlist</datatype>
 		<grouping>Spring Mode</grouping>
-		<parentgroup>baslic</parentgroup>
+		<parentgroup>basic</parentgroup>
 		<order>700.0</order>
 		<name>spring_mode</name>
 		<displayname>Collective Spring Mode</displayname>
@@ -2780,7 +2780,7 @@
 		<name>turbulence_hpf_alpha</name>
 		<displayname>Gust Memory</displayname>
 		<prereq>turbulence_effect_enable</prereq>
-		<info>Controls how long wind gusts continue to influence the joystick</info>
+		<info>How long each wind gust continues to affect the controls — higher values feel more “rolling” and bumpy.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2796,7 +2796,7 @@
 		<name>turbulence_smoothing_alpha</name>
 		<displayname>Attack Speed</displayname>
 		<prereq>turbulence_effect_enable</prereq>
-		<info>Controls how quickly the output furce changes</info>
+		<info>How quickly new gusts take effect — higher values make turbulence feel sharper and more immediate.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2812,7 +2812,7 @@
 		<name>turbulence_sensitivity</name>
 		<displayname>Sensitivity</displayname>
 		<prereq>turbulence_effect_enable</prereq>
-		<info>Controls the wind gust speed required to trigger full force</info>
+		<info>How easily small wind changes create motion — lower values pick up finer gusts, higher values react only to stronger ones.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>
@@ -2828,7 +2828,7 @@
 		<name>turbulence_intensity</name>
 		<displayname>Intensity</displayname>
 		<prereq>turbulence_effect_enable</prereq>
-		<info>Caps the maximum constant force applied to the joystick</info>
+		<info>The overall strength of the turbulence forces — controls how powerful each gust feels on your controls.</info>
 		<MSFS>true</MSFS>
 		<XPLANE>true</XPLANE>
 		<joystick>true</joystick>

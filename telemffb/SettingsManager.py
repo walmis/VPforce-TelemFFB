@@ -221,7 +221,7 @@ class SettingsManager(QObject):
 
     MSFS_XP_G_EFFECT_MODE = {
         GEffectModeEnum.DISABLED: "Disabled",
-        GEffectModeEnum.LEGACY: "Exponential Curve",
+        GEffectModeEnum.NEW: "Linear + Deflection Based",
         GEffectModeEnum.ADVANCED: "Custom Curve"
     }
 
