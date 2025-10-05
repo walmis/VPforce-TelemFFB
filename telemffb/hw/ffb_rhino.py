@@ -251,7 +251,50 @@ class FFBReport_SetCondition(BaseStructure):
                ]
     _defaults_ = { "reportId": HID_REPORT_ID_SET_CONDITION }
 
-    def set_coefficient(self, coefficient: (int|float)):
+    def set_offset(self, offset: (int|float)) -> None:
+        """
+        Set the center position offset for the FFB device.
+        
+        This method sets the center position offset which adjusts the neutral position
+        of the force feedback device. The offset can be provided as either an integer
+        or float value.
+        
+        Args:
+            offset (int | float): The offset value to set. If provided as a float,
+                it will be scaled by 4096 and rounded to the nearest integer.
+                The final value is clamped to the range [-4096, 4096].
+        
+        Returns:
+            None
+        
+        Note:
+            - Float values are automatically converted to integer by multiplying by 4096
+            - The offset is automatically clamped to prevent values outside the valid range
+            - The processed offset is stored in the cpOffset attribute
+        """
+        if isinstance(offset, float):
+            offset = round(offset * 4096)
+        offset = clamp(offset, -4096, 4096)
+        self.cpOffset = offset
+
+    def set_saturation(self, saturation: (int|float), do_clamp: bool = True) -> None:
+        """
+        Sets the positive and negative saturation based on the input saturation value.
+
+        Args:
+            saturation (int|float): The saturation value to set. If it's a float, it's converted to an integer by multiplying it by 4096.
+
+        Returns:
+            None
+        """
+        if isinstance(saturation, float):
+            saturation = round(saturation * 4096)
+        if do_clamp:
+            saturation = clamp(saturation, 0, 4096)
+        self.positiveSaturation = saturation
+        self.negativeSaturation = saturation
+
+    def set_coefficient(self, coefficient: (int|float), do_clamp: bool = True) -> None:
         """
         Sets the positive and negative coefficients based on the input coefficient value.
 
@@ -262,7 +305,9 @@ class FFBReport_SetCondition(BaseStructure):
             None
         """
         if isinstance(coefficient, float):
-            coefficient: int = int(coefficient * 4096)
+            coefficient = round(coefficient * 4096)
+        if do_clamp:
+            coefficient = clamp(coefficient, 0, 4096)
         self.positiveCoefficient = coefficient
         self.negativeCoefficient = coefficient
 
@@ -332,6 +377,8 @@ class FFBReport_Input(BaseStructure):
     Button48_63: int
     CP_offsetX: int
     CP_offsetY: int
+    ForceX: int # force output (sping + friction), for improved hands-on detection
+    ForceY: int
 
     _pack_ = 1
     _fields_ = [
@@ -349,6 +396,8 @@ class FFBReport_Input(BaseStructure):
                 ("Button48_63", ctypes.c_uint16), # added in fw v1.0.17
                 ("CP_offsetX", ctypes.c_int16), # added in fw v1.0.17
                 ("CP_offsetY", ctypes.c_int16), # added in fw v1.0.17
+                ("ForceX", ctypes.c_int16), # added in fw v1.0.17b13
+                ("ForceY", ctypes.c_int16), # added in fw v1.0.17b13
                ]
     _defaults_ = {}
 
@@ -442,6 +491,12 @@ class FFBReport_Input(BaseStructure):
         cpY = self.CP_offsetY/4096.0 if self.CP_offsetY <= 4096.0 else None
         
         return (cpX, cpY)
+    
+    def forceXY(self) -> tuple[float, float]:
+        """
+        Returns the force X and Y values as a tuple of two floats in the range [-1.0 .. 1.0]
+        """
+        return (self.ForceX / 4096.0, self.ForceY / 4096.0)
 
     def CP_scaled_axisXY(self) -> tuple[float, float]:
         """
@@ -688,6 +743,7 @@ class DeviceInfo:
 class FFBRhino(QObject):
     buttonPressed = pyqtSignal(int)
     buttonReleased = pyqtSignal(int)
+    deviceConnected = pyqtSignal(bool)
 
     def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> None:
 
@@ -793,7 +849,9 @@ class FFBRhino(QObject):
                 try:
                     self.reconnect()
                     logging.info("HID connected!")
+                    self.deviceConnected.emit(True)
                 except Exception:
+                    self.deviceConnected.emit(False)
                     logging.warn("Reconnecting HID device in 1s")
                     QTimer.singleShot(1000, do_reconnect)
 

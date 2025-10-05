@@ -34,6 +34,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import hashlib
+import inspect
 from datetime import datetime, timedelta
 import math
 import os
@@ -60,7 +61,7 @@ import ssl
 import xml.etree.ElementTree as ET
 
 import numpy as np
-from scipy.interpolate import interp1d, Akima1DInterpolator
+import akima
 
 from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings, Qt
 from PyQt6.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
@@ -69,9 +70,19 @@ from PyQt6 import QtCore, QtGui
 from PyQt6.QtWidgets import QFileDialog, QMessageBox
 import stransi
 
+from enum import Enum, auto
+
 import telemffb.globals as G
 import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
+from .namedmutex import NamedMutex
+
+def check_min_firmware_version(dev_firmware_version, min_firmware_version):
+    """Check if device firmware version meets minimum requirements."""
+    minver = re.sub(r'\D', '', min_firmware_version)
+    devver = re.sub(r'\D', '', dev_firmware_version)
+    return devver >= minver
+
 
 def dbprint(color, msg, instance=None):
     if instance is not None:
@@ -90,6 +101,45 @@ def dbprint(color, msg, instance=None):
         case _:
             ccode = '\033[0m'
     print(f"{ccode}{msg}{reset}")
+
+def debug_timed(func):
+    """
+    import debug_timed from utils into any module
+    add '@debug_timed` decorator to any method
+    timing results will be logged along with the calling function and arguments that were passed
+
+
+    """
+
+    def wrapper(*args, **kwargs):
+        if not G.master_instance:
+            return func(*args, **kwargs)
+        # Get caller frame
+        caller_frame = inspect.stack()[1]
+        caller_name = caller_frame.function
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        arg_strs = [repr(a) for a in args]
+        kwarg_strs = [f"{k}={v!r}" for k, v in kwargs.items()]
+        all_args = ", ".join(arg_strs + kwarg_strs)
+        elapsed = (time.perf_counter() - start) * 1000
+
+        logging.info(f"[TIMER] {elapsed:.2f} ms taken by {func.__name__} - called by {caller_name} ({all_args})")
+        return result
+
+    return wrapper
+
+def debug_caller_args(color):
+    frame = inspect.currentframe().f_back
+    caller_frame = frame.f_back
+
+    callee = frame.f_code.co_name
+    caller = caller_frame.f_code.co_name if caller_frame else "<top-level>"
+
+    args, _, _, values = inspect.getargvalues(frame)
+    arg_list = ", ".join(f"{arg}={repr(values[arg])}" for arg in args)
+
+    dbprint(color, f'"{callee}" called by "{caller}" Args: {arg_list}')
 
 def overrides(interface_class):
     """Decorator to ensure that a method in a subclass overrides a method in its superclass or interface."""
@@ -114,6 +164,71 @@ def micros() -> int:
     :rtype: int
     """
     return time.perf_counter_ns() // 1000
+
+
+class Interp1D:
+    def __init__(self, x, y, bounds_error=False, fill_value=None):
+        self.x = np.asarray(x)
+        self.y = np.asarray(y)
+        self.bounds_error = bounds_error
+        self.fill_value = fill_value
+
+        if np.any(np.diff(self.x) <= 0):
+            raise ValueError("x values must be strictly increasing")
+
+    def __call__(self, x_new):
+        x_new = np.asarray(x_new)
+
+        # Interpolation for in-bounds
+        y_interp = np.interp(x_new, self.x, self.y)
+
+        # Out-of-bounds handling
+        if not self.bounds_error and self.fill_value is not None:
+            below = x_new < self.x[0]
+            above = x_new > self.x[-1]
+            y_interp = np.where(below, self.fill_value[0], y_interp)
+            y_interp = np.where(above, self.fill_value[1], y_interp)
+        elif self.bounds_error:
+            if np.any(x_new < self.x[0]) or np.any(x_new > self.x[-1]):
+                raise ValueError("A value in x_new is outside the interpolation range.")
+
+        return y_interp if x_new.ndim > 0 else y_interp.item()
+
+class Akima1DInterpolator:
+    """
+        A drop-in replacement for scipy.interpolate.Akima1DInterpolator
+        using the 'akima' package backend, but mimicking SciPy's behavior.
+
+        - No extrapolation by default: returns np.nan for out-of-bounds inputs.
+        - Accepts any input shape (scalar, list, or ndarray).
+        """
+
+    def __init__(self, x, y, extrapolate=False):
+        self.x = np.asarray(x, dtype=float)
+        self.y = np.asarray(y, dtype=float)
+        if len(self.x) != len(self.y):
+            raise ValueError("x and y must have the same length")
+
+        # Must be strictly increasing
+        sort_idx = np.argsort(self.x)
+        self.x = self.x[sort_idx]
+        self.y = self.y[sort_idx]
+
+        self._interp = akima.interpolate
+        self.extrapolate = extrapolate
+
+    def __call__(self, x_new):
+        scalar_input = np.isscalar(x_new)
+        x_new = np.atleast_1d(x_new).astype(float)
+
+        y_new = self._interp(self.x, self.y, x_new)
+
+        if not self.extrapolate:
+            out_of_bounds = (x_new < self.x[0]) | (x_new > self.x[-1])
+            y_new = np.where(out_of_bounds, np.nan, y_new)
+
+        return y_new[0] if scalar_input else y_new
+
 
 class Smoother:
     def __init__(self):
@@ -162,13 +277,11 @@ class EffectTranslator:
     """
 
     effect_dict = {
-        "ab_rumble_1_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
-        "ab_rumble_1_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
-        "ab_rumble_2_1": ["Afterburner Rumble", "afterburner_effect_intensity"],
-        "ab_rumble_2_2": ["Afterburner Rumble", "afterburner_effect_intensity"],
+        "ab_rumble_.*": ["Afterburner Rumble", "afterburner_effect_intensity"],
+        'adv_spr': ["Advanced Spring Override", ""],
         "aoa": ["AoA Effect", "aoa_effect_gain"],
         "ap_spring": ["Autopilot Spring", ""],
-        "buffeting": ["AoA\\Stall Buffeting", "buffeting_intensity"],
+        "buffeting": ["AoA/Stall Buffeting", "buffeting_intensity"],
         "bombs": ["Bomb Release", "weapon_release_intensity"],
         "canopymovement": ["Canopy Motion", "canopy_motion_intensity"],
         "collective_ap_spring": ["Collective Spring", "collective_ap_spring_gain"],
@@ -184,346 +297,69 @@ class EffectTranslator:
         "decel": ["Decelleration Force", "deceleration_max_force"],
         "dynamic_spring": ["Dynamic Spring Force", ".*_spring_gain"],
         "elev_droop": ["Elevator Droop", "elevator_droop_moment"],
-        "etlY": ["ETL Shaking", "etl_effect_intensity"],
-        "etlX": ["ETL Shaking", "etl_effect_intensity"],
+        "etl.*": ["ETL Shaking", "etl_effect_intensity"],
         "fbw_spring": ["Fly-by-wire Spring Force", "fbw_.*_gain"],
         "flapsmovement": ["Flap Motion", "flaps_motion_intensity"],
+        "FI_vibration": ["FI Vibration", "FI_vibration_intensity"],
         "friction": ["Friction Override", "friction_force"],
         "boommovement" : ["Fuel Boom/Door","fuelboom_motion_intensity"],
-        "gearbuffet": ["Gear Drag Buffeting", "gear_buffet_intensity"],
-        "gearbuffet2": ["Gear Drag Buffeting", "gear_buffet_intensity"],
-        "gearmovement": ["Gear Motion", "gear_motion_intensity"],
-        "gearmovement2": ["Gear Motion", "gear_motion_intensity"],
+        "gearbuffet.*": ["Gear Drag Buffeting", "gear_buffet_intensity"],
+        "gearmovement.*": ["Gear Motion", "gear_motion_intensity"],
         "gforce": ["G-Force Loading", "gforce_effect_max_intensity"],
         "new_gforce": ["G-Force Loading V2", "new_gforce_effect_max_intensity"],
         "gunfire": ["Gunfire Rumble", "gun_vibration_intensity"],
         "hit": ["Aircraft Hit Event", ""],
-        "je_rumble_1_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
-        "je_rumble_1_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
-        "je_rumble_2_1": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
-        "je_rumble_2_2": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
-        "il2_buffet": ["Buffeting", "il2_buffeting_factor"],
-        "il2_buffet2": ["Buffeting", "il2_buffeting_factor"],
-        "il2_gunfire": ["Gunfire Rumble", "il2_weapon_release_intensity"],
+        "je_rumble_.*": ["Jet Engine Rumble", "jet_engine_rumble_intensity"],
+        "il2_buffet.*": ["Buffeting", "il2_buffeting_factor"],
+        "il2_gunfire.*": ["Gunfire Rumble", "il2_weapon_release_intensity"],
         "il2_bombs": ["Bomb Release", "il2_bomb_release_intensity"],
         "il2_rockets": ["Rocket Fire", "il2_rocket_release_intensity"],
         "inertia": ["Inertia Override", "inertia_force"],
         "nw_shimmy": ["Nosewheel Shimmy", "nosewheel_shimmy_intensity"],
-        "overspeedY": ["Overspeed Shake", "overspeed_shake_intensity"],
-        "overspeedX": ["Overspeed Shake", "overspeed_shake_intensity"],
+        "overspeed.*": ["Overspeed Shake", "overspeed_shake_intensity"],
         "payload_rel": ["Payload Release", "weapon_release_intensity"],
         "pause_spring": ["Pause/Slew Spring Force", ""],
         "pedal_spring": ["Pedal Spring", "pedal_spring_gain"],
         "pedal_ap_spring": ["Pedal AP Spring", "hpg_pedal_spring_gain"],
         "pedal_damper": ["Pedal Damper", "pedal_dampening_gain"],
-        "prop_rpm0-1": ["Propeller Engine Rumble", "engine_rumble_.*"],
-        "prop_rpm0-2": ["Propeller Engine Rumble", "engine_rumble_.*"],
-        "prop_rpm1-1": ["Propeller Engine Rumble", "engine_rumble_.*"],
-        "prop_rpm1-2": ["Propeller Engine Rumble", "engine_rumble_.*"],
+        "prop_rpm.*": ["Propeller Engine Rumble", "engine_rumble_.*"],
         "rockets": ["Rocket Fire", "il2_weapon_release_intensity"],
-        "rotor_rpm0-1": ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity"],
-        "rotor_rpm1-1": ["Rotor RPM\\Engine Rumble", "heli_engine_rumble_intensity"],
-        "runway0": ["Runway Rumble", "runway_rumble_intensity"],
-        "runway1": ["Runway Rumble", "runway_rumble_intensity"],
-        "speedbrakebuffet": ["Speedbrake Buffeting", "speedbrake_buffet_intensity"],
-        "speedbrakebuffet2": ["Speedbrake Buffeting", "speedbrake_buffet_intensity"],
+        "rotor_rpm.*": ["Rotor RPM/Engine Rumble", "heli_engine_rumble_intensity"],
+        "runway.*": ["Runway Rumble", "runway_rumble_intensity"],
+        "speedbrakebuffet.*": ["Speedbrake Buffeting", "speedbrake_buffet_intensity"],
         "speedbrakemovement": ["Speedbrake Motion", "speedbrake_motion_intensity"],
-        "spoilerbuffet1-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
-        "spoilerbuffet1-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
-        "spoilerbuffet2-1": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
-        "spoilerbuffet2-2": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
+        "spoilerbuffet.*": ["Spoiler Buffeting", "spoiler_buffet_intensity"],
         "spoilermovement": ["Spoiler Motion", "spoiler_motion_intensity"],
         "steering_friction": ["Steering Friction", "steering_friction_intensity"],
-        "stick_shaker" : ["Stick Shaker","stick_shaker_intensity"],
-        "stick_shaker1" : ["Stick Shaker","stick_shaker_intensity"],
-        "stick_shaker2" : ["Stick Shaker","stick_shaker_intensity"],
+        "stick_shaker.*" : ["Stick Shaker","stick_shaker_intensity"],
         "hookmovement" : ["Tail Hook","tailhook_motion_intensity"],
         "touchdown": ["Touch-down Effect", "touchdown_effect_max_force"],
         "trim_spring": ["Trim Override Spring", ""],
         "control_weight": ["Control Weight", ""],
-        "vrs_buffet": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
-        "vrs_buffet2": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
+        "vrs_buffet.*": ["Vortex Ring State Buffeting", "vrs_effect_intensity"],
         "wnd": ["Wind Effect", "wind_effect_max_intensity"],
-        "wingfoldmovement_1": ["Wing Fold", "wingfold_motion_intensity"],
-        "wingfoldmovement_2": ["Wing Fold", "wingfold_motion_intensity"],
+        "wingfoldmovement.*": ["Wing Fold", "wingfold_motion_intensity"],
         "hyd_loss_damper": ["Low Hydraulic Damper", "hydraulic_loss_damper"],
         "hyd_loss_inertia": ["Low Hydraulic Inertia", "hydraulic_loss_inertia"],
         "hyd_loss_friction": ["Low Hydraulic Friction", "hydraulic_loss_friction"],
     }
     @classmethod
     def get_translation(cls, key):
-        return cls.effect_dict.get(key, [f"No Lookup: {key}", ''])
+        e = cls.effect_dict.get(key, None)
+        if e is not None:
+            return e
+        else:
+            for k in cls.effect_dict.keys():
+                if re.match(k, key):
+                    return cls.effect_dict.get(k, [f"No Lookup: {k}", ''])
+
+        return [f"No Lookup: {key}", '']
 
 
 class Destroyable:
     def destroy(self):
         raise NotImplementedError
 
-
-class Vector2D:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-    def __str__(self):
-        return f"Vector2D({self.x}, {self.y})"
-
-    def __repr__(self):
-        return self.__str__()
-
-    def __add__(self, other):
-        return Vector2D(self.x + other.x, self.y + other.y)
-
-    def __sub__(self, other):
-        return Vector2D(self.x - other.x, self.y - other.y)
-
-    def __mul__(self, scalar):
-        return Vector2D(self.x * scalar, self.y * scalar)
-
-    def __rmul__(self, scalar):
-        return self.__mul__(scalar)
-
-    def __truediv__(self, scalar):
-        return Vector2D(self.x / scalar, self.y / scalar)
-
-    def magnitude(self):
-        return math.sqrt(self.x ** 2 + self.y ** 2)
-
-    def dot(self, other):
-        return self.x * other.x + self.y * other.y
-
-    def cross(self, other):
-        return self.x * other.y - self.y * other.x
-
-    def to_polar(self):
-        r = self.magnitude()
-        theta_radians = math.atan2(self.y, self.x)
-        return r, theta_radians
-
-    def normalize(self):
-        magnitude = self.magnitude()
-        if magnitude == 0:
-            raise ValueError("Cannot normalize a zero-length vector.")
-        return Vector2D(self.x / magnitude, self.y / magnitude)
-
-
-class Vector:
-    def __init__(self, x, y=0.0, z=0.0):
-        self.x : float
-        self.y : float
-        self.z : float
-        if isinstance(x, list):
-            self.x, self.y, self.z = x
-        else:
-            self.x = x
-            self.y = y
-            self.z = z
-
-    def __eq__(self, p):
-        return self.x == p.x and self.y == p.y and self.z == p.z
-
-    def __add__(self, p):
-        return Vector(self.x + p.x, self.y + p.y, self.z + p.z)
-
-    def __sub__(self, p):
-        return Vector(self.x - p.x, self.y - p.y, self.z - p.z)
-
-    def __unm__(self):
-        return Vector(-self.x, -self.y, -self.z)
-
-    def __iter__(self):
-        return iter((self.x, self.y, self.z))
-
-    def __mul__(self, s):
-        if isinstance(s, Vector):
-            return self.x * s.x + self.y * s.y + self.z * s.z
-        elif isinstance(s, (int, float)):
-            return Vector(self.x * s, self.y * s, self.z * s)
-
-    def __div__(self, s):
-        if isinstance(s, (int, float)):
-            return Vector(self.x / s, self.y / s, self.z / s)
-
-    def __concat__(self, p):
-        return self.x * p.x + self.y * p.y + self.z * p.z
-
-    def __pow__(self, p):
-        return Vector(
-            self.y * p.z - self.z * p.y,
-            self.z * p.x - self.x * p.z,
-            self.x * p.y - self.y * p.x
-        )
-
-    def ort(self):
-        l = self.length()
-        if l > 0:
-            return Vector(self.x / l, self.y / l, self.z / l)
-        else:
-            return self
-
-    def normalize(self):
-        l = self.length()
-        if l > 0:
-            self.x /= l
-            self.y /= l
-            self.z /= l
-
-    def set(self, xx, yy, zz):
-        self.x = xx
-        self.y = yy
-        self.z = zz
-
-    def translate(self, dx, dy, dz):
-        return Vector(self.x + dx, self.y + dy, self.z + dz)
-
-    def __str__(self):
-        return f'({self.x},{self.y},{self.z})'
-
-    def length(self):
-        return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
-
-    def rotZ(self, ang):
-        sina = math.sin(ang)
-        cosa = math.cos(ang)
-        return Vector(self.x * cosa - self.y * sina, self.x * sina + self.y * cosa, self.z)
-
-    def rotX(self, ang):
-        sina = math.sin(ang)
-        cosa = math.cos(ang)
-        return Vector(self.x, self.y * cosa - self.z * sina, self.y * sina + self.z * cosa)
-
-    def rotY(self, ang):
-        sina = math.sin(ang)
-        cosa = math.cos(ang)
-        return Vector(self.z * sina + self.x * cosa, self.y, self.z * cosa - self.x * sina)
-
-    def rotAxis(self, axis, ang):
-        ax = axis.ort()
-        cosa = math.cos(ang)
-        sina = math.sin(ang)
-        versa = 1.0 - cosa
-        xy = ax.x * ax.y
-        yz = ax.y * ax.z
-        zx = ax.z * ax.x
-        sinx = ax.x * sina
-        siny = ax.y * sina
-        sinz = ax.z * sina
-        m10 = ax.x * ax.x * versa + cosa
-        m11 = xy * versa + sinz
-        m12 = zx * versa - siny
-        m20 = xy * versa - sinz
-        m21 = ax.y * ax.y * versa + cosa
-        m22 = yz * versa + sinx
-        m30 = zx * versa + siny
-        m31 = yz * versa - sinx
-        m32 = ax.z * ax.z * versa + cosa
-        return Vector(
-            m10 * self.x + m20 * self.y + m30 * self.z,
-            m11 * self.x + m21 * self.y + m31 * self.z,
-            m12 * self.x + m22 * self.y + m32 * self.z
-        )
-
-
-class TurbulenceModulator:
-    """
-    Simulates atmospheric turbulence effects for force feedback by analyzing wind velocity changes.
-    
-    This class processes relative wind data to generate realistic turbulence forces that can be
-    applied to flight controls. It uses high-pass filtering to detect rapid wind changes and
-    converts them into force magnitude and direction suitable for haptic feedback systems.
-    
-    The turbulence simulation works by:
-    1. Monitoring changes in relative wind velocity (X and Z components)
-    2. High-pass filtering the wind changes to isolate turbulent fluctuations
-    3. Converting wind deltas to force magnitude using configurable sensitivity
-    4. Smoothing the output force to prevent jarring transitions
-    5. Calculating force direction based on wind gust angle
-    
-    Attributes:
-        prev_wind_x (float): Previous frame's wind X-component for delta calculation
-        prev_wind_z (float): Previous frame's wind Z-component for delta calculation  
-        hpf_x (float): High-pass filtered wind change in X direction
-        hpf_z (float): High-pass filtered wind change in Z direction
-        prev_force (float): Previous frame's force output for smoothing
-    """
-    
-    def __init__(self):
-        """
-        Initialize the turbulence modulator with default state.
-        
-        All wind history and filter states are reset to initial values.
-        """
-        self.prev_wind_x = None
-        self.prev_wind_z = None
-        self.hpf_x = 0.0
-        self.hpf_z = 0.0
-        self.prev_force = 0.0
-
-    def update(self, telem_data,
-               turbulence_hpf_alpha=0.95,
-               turbulence_smoothing_alpha=0.3,
-               turbulence_sensitivity=0.5,
-               turbulence_intensity=0.2):
-        """
-        Process telemetry data to generate turbulence force and direction.
-        
-        Args:
-            telem_data (dict): Telemetry data containing 'RelWind' key with [x, y, z] wind vector
-            turbulence_hpf_alpha (float, optional): High-pass filter coefficient (0.0-1.0).
-                Higher values = more aggressive filtering. Defaults to 0.95.
-            turbulence_smoothing_alpha (float, optional): Output smoothing coefficient (0.0-1.0).
-                Higher values = more responsive but less smooth. Defaults to 0.3.
-            turbulence_sensitivity (float, optional): Sensitivity to wind changes (0.0-1.0).
-                Lower values = more sensitive to small changes. Defaults to 0.5.
-            turbulence_intensity (float, optional): Maximum force intensity multiplier (0.0-1.0).
-                Higher values = stronger turbulence effects. Defaults to 0.2.
-        
-        Returns:
-            tuple: (force_magnitude, force_angle)
-                - force_magnitude (float): Normalized force strength (0.0-turbulence_intensity)
-                - force_angle (int): Force direction in degrees (0-359), where 0° is positive X-axis
-        
-        Note:
-            Returns (0.0, 0) if telemetry data is invalid or during initialization.
-            The force angle represents the direction opposite to the wind gust direction,
-            simulating the aircraft's resistance to the turbulent air mass.
-        """
-        try:
-            wind_x = telem_data['RelWind'][0]
-            wind_z = telem_data['RelWind'][2]
-        except (KeyError, IndexError, TypeError):
-            return 0.0, 0
-
-        if self.prev_wind_x is None or self.prev_wind_z is None:
-            self.prev_wind_x = wind_x
-            self.prev_wind_z = wind_z
-            return 0.0, 0
-
-        max_delta = (1.0 - turbulence_sensitivity) * 9.0 + 1.0
-
-        dx = wind_x - self.prev_wind_x
-        dz = wind_z - self.prev_wind_z
-
-        self.hpf_x = turbulence_hpf_alpha * (self.hpf_x + dx)
-        self.hpf_z = turbulence_hpf_alpha * (self.hpf_z + dz)
-
-        self.prev_wind_x = wind_x
-        self.prev_wind_z = wind_z
-
-        delta_mag = math.sqrt(self.hpf_x ** 2 + self.hpf_z ** 2)
-        normalized = min(delta_mag / max_delta, 1.0)
-        target_force = normalized * turbulence_intensity
-
-        smoothed_force = (
-            turbulence_smoothing_alpha * target_force
-            + (1 - turbulence_smoothing_alpha) * self.prev_force
-        )
-        self.prev_force = smoothed_force
-
-        gust_angle = np.degrees(np.arctan2(self.hpf_z, self.hpf_x))
-        force_angle = (gust_angle + 180 + 90 + 360) % 360
-
-        return smoothed_force, int(force_angle)
 
 def archive_logs(directory):
     today = datetime.today().strftime('%Y%m%d')
@@ -644,9 +480,9 @@ def create_support_bundle(userconfig_rootpath):
         os.makedirs(temp_folder, exist_ok=True)
 
         try:
-            # Save userconfig.xml to the temporary folder
-            userconfig_path = os.path.join(temp_folder, "userconfig.xml")
-            shutil.copy(os.path.join(userconfig_rootpath, "userconfig.xml"), userconfig_path)
+            # Save userconfig_v2.xml to the temporary folder
+            userconfig_path = os.path.join(temp_folder, "userconfig_v2.xml")
+            shutil.copy(os.path.join(userconfig_rootpath, "userconfig_v2.xml"), userconfig_path)
 
             # Save the contents of the 'log' folder to the temporary folder
             log_folder_path = os.path.join(temp_folder, "log")
@@ -661,8 +497,8 @@ def create_support_bundle(userconfig_rootpath):
 
             # Create the support zip file
             with zipfile.ZipFile(zip_file_path, 'w') as support_zip:
-                # Add userconfig.xml, log folder, and system settings .cfg file to the zip
-                support_zip.write(userconfig_path, "userconfig.xml")
+                # Add userconfig_v2.xml, log folder, and system settings .cfg file to the zip
+                support_zip.write(userconfig_path, "userconfig_v2.xml")
                 for folder_name, subfolders, filenames in os.walk(log_folder_path):
                     for filename in filenames:
                         file_path = os.path.join(folder_name, filename)
@@ -739,6 +575,7 @@ class SystemSettings(QSettings):
         'validateDCS': True,
         'pathIL2': 'C:/Program Files/IL-2 Sturmovik Great Battles',
         'portIL2': 34385,
+        'enableBMS': False,
         'masterInstance': 1,
         'autolaunchMaster': False,
         'autolaunchJoystick': False,
@@ -907,8 +744,7 @@ def sock_readable(s) -> bool:
 
 
 def clamp(n, minn, maxn):
-    return sorted((minn, n, maxn))[1]
-
+    return type(n)(sorted((minn, n, maxn))[1])
 
 def clamp_minmax(n, max):
     return clamp(n, -max, max)
@@ -918,6 +754,8 @@ def scale(val, src: tuple, dst: tuple, return_round=False, return_int=False):
     """
     Scale the given value from the scale of src to the scale of dst.
     """
+    if src[0] == src[1]: # avoid div/0
+        return dst[1]
     result = (val - src[0]) * (dst[1] - dst[0]) / (src[1] - src[0]) + dst[0]
     if return_round:
         return round(result)
@@ -1009,12 +847,12 @@ def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
     if smooth_curve_enabled:
         if len(x_values) < 4:
             # Fallback to linear interpolation for insufficient points
-            interpolation = interp1d(x_values, y_values, bounds_error=False,
+            interpolation = Interp1D(x_values, y_values, bounds_error=False,
                                      fill_value=(y_values[0], y_values[-1]))
         else:
             interpolation = Akima1DInterpolator(x_values, y_values)
     else:
-        interpolation = interp1d(x_values, y_values, bounds_error=False,
+        interpolation = Interp1D(x_values, y_values, bounds_error=False,
                                  fill_value=(y_values[0], y_values[-1]))
 
     return float(interpolation(input_x))
@@ -1298,12 +1136,13 @@ class Dispenser:
     def values(self):
         return self.dict.values()
 
-    def dispose(self, name):
-        if name in self.dict:
-            v = self.dict[name]
-            if isinstance(v, Destroyable):
-                v.destroy()
-            del self.dict[name]
+    def dispose(self, *names):
+        for name in names:
+            if name in self.dict:
+                v = self.dict[name]
+                if isinstance(v, Destroyable):
+                    v.destroy()
+                del self.dict[name]
 
     def foreach(self, func):
         for i in self.values():
@@ -1575,61 +1414,358 @@ def install_xplane_plugin(path, window):
         return False
     return True
 
+def get_dcs_variant():
+    """
+    Resolve the active DCS variant from the registry and dcs_variant.txt.
 
-def install_export_lua(window):
+    Tries these registry keys under HKCU (in order):
+      - Software\\Eagle Dynamics\\DCS World OpenBeta
+      - Software\\Eagle Dynamics\\DCS World
+
+    Logic:
+      1) Find the first key that exists; read its 'Path'.
+      2) If <Path>\\dcs_variant.txt exists and has content, return that (e.g., "openbeta").
+      3) Otherwise, infer from the registry key name ("openbeta" for OpenBeta; None for stable).
+
+    Returns:
+        str | None
+    """
+    logging.info("DCS Variant Check: Starting variant discovery via registry and dcs_variant.txt")
+
+    # Try OpenBeta first, then Stable.
+    candidate_keys = [
+        r"Software\Eagle Dynamics\DCS World OpenBeta",
+        r"Software\Eagle Dynamics\DCS World",
+    ]
+
+    for subkey in candidate_keys:
+        try:
+            logging.debug(f"DCS Variant Check: Trying HKCU\\{subkey}")
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey) as reg_key:
+                install_path, _ = winreg.QueryValueEx(reg_key, "Path")
+            logging.info(f"DCS Variant Check: Install path found in registry HKCU\\{subkey}: {install_path!r}")
+
+            variant_file = os.path.join(install_path, "dcs_variant.txt")
+            logging.debug(f"DCS Variant Check: Checking for variant file at: {variant_file}")
+
+            if os.path.exists(variant_file):
+                try:
+                    with open(variant_file, "r", encoding="utf-8") as f:
+                        variant = f.read().strip()
+                    if variant:
+                        logging.info(f"DCS Variant Check: Variant detected from file: '{variant}'")
+                        return variant
+                    else:
+                        logging.info("DCS Variant Check: Variant file present but empty; will infer from registry key name")
+                except Exception as ex:
+                    logging.warning(f"DCS Variant Check: Failed to read variant file {variant_file}: {ex}; will infer from registry key name")
+            else:
+                logging.info(f"DCS Variant Check: Variant file not found at {variant_file}; will infer from registry key name")
+
+            # Fallback: infer from the registry key name
+            if "OpenBeta" in subkey:
+                logging.info("DCS Variant Check: Inferring variant as 'openbeta' from registry key name")
+                return "openbeta"
+            else:
+                logging.info("DCS Variant Check: No explicit variant in registry key name; treating as stable (no variant)")
+                return None
+
+        except FileNotFoundError:
+            logging.debug(f"DCS Variant Check: Registry key not found: HKCU\\{subkey}")
+            continue
+        except OSError as ex:
+            logging.debug(f"DCS Variant Check: Could not open HKCU\\{subkey}: {ex}")
+            continue
+        except Exception as ex:
+            logging.error(f"DCS Variant Check: Unexpected error while reading HKCU\\{subkey}: {ex}")
+            continue
+
+    logging.info("DCS Variant Check: No known DCS registry keys found under HKCU")
+    return None
+
+
+def install_export_lua(window, dll=False):
+    """
+    Installs or updates the TelemFFB export integration into DCS installation directories.
+
+    Behavior:
+        - Dynamically finds 'DCS' and optionally 'DCS.<variant>' subfolders inside Saved Games.
+        - Modifies or creates 'Export.lua' with correct integration logic.
+        - Copies or removes 'TelemFFB.lua' and 'TelemFFB.dll' depending on the integration type.
+
+    Args:
+        window: Parent Qt window for QMessageBox prompts
+        dll (bool):
+            - If True: installs .DLL style integration, removes Lua style.
+            - If False: installs .Lua style integration, removes DLL style.
+    """
+    mode = "DLL" if dll else "Lua"
+    logging.info(f"DCS Export Installer: Starting DCS Export integration in {mode} mode")
+
     saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
-    logging.info(f"DCS Export Installer: Found Saved Games directory: {saved_games}")
-    logging.info("DCS Export Installer: Checking for standard 'DCS' and 'DCS.openbeta' directories")
-    for dirname in ["DCS", "DCS.openbeta"]:
+    logging.info(f"DCS Export Installer: Saved Games directory detected: {saved_games}")
+
+    dcs_variant = get_dcs_variant()
+    if dcs_variant:
+        logging.info(f"DCS Export Installer: Active DCS variant resolved as: {dcs_variant!r}")
+    else:
+        logging.info("DCS Export Installer: No DCS variant detected; will check base 'DCS' only")
+
+    # Build target directories list
+    dirlist = ['DCS']
+    if dcs_variant:
+        dirlist.append(f'DCS.{dcs_variant}')
+
+    logging.debug(f"DCS Export Installer: Candidate DCS folders under Saved Games: {dirlist}")
+
+    # Integration strings
+    dll_script = (
+        'package.cpath = package.cpath .. ";"..require(\'lfs\').writedir().."\\\\Scripts\\\\?.dll"\n'
+        'require("telemffb")'
+    )
+    lua_line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
+
+    # Local resources
+    local_telemffb = get_resource_path('export/TelemFFB.lua', prefer_root=True)
+    source_dll_path = os.path.join(os.path.dirname(local_telemffb), "TelemFFB.dll")
+    logging.debug(f"DCS Export Installer: Local Lua path: {local_telemffb}")
+    logging.debug(f"DCS Export Installer: Local DLL path: {source_dll_path}")
+
+    any_changes = False  # Track across all variants for a final summary
+
+    for dirname in dirlist:
         p = os.path.join(saved_games, dirname)
         if not os.path.exists(p):
-            logging.info(f"DCS Export Installer: {p} does not exist, ignoring")
+            logging.info(f"DCS Export Installer: '{p}' does not exist; skipping this DCS folder")
             continue
+
+        logging.info(f"DCS Export Installer: Processing DCS folder: {p}")
+
+        scripts_dir = os.path.join(p, 'Scripts')
+        if not os.path.exists(scripts_dir):
+            os.makedirs(scripts_dir, exist_ok=True)
+            logging.info(f"DCS Export Installer: Created Scripts directory: {scripts_dir}")
         else:
-            logging.info(f"DCS Export Installer: Found {p}, checking export script")
+            logging.debug(f"DCS Export Installer: Scripts directory already exists: {scripts_dir}")
 
-        path = os.path.join(saved_games, dirname, 'Scripts')
-        os.makedirs(path, exist_ok=True)
-        out_path = os.path.join(path, "TelemFFB.lua")
+        export_lua_path = os.path.join(scripts_dir, "Export.lua")
+        lua_script_path = os.path.join(scripts_dir, "TelemFFB.lua")
+        target_dll_path = os.path.join(scripts_dir, "TelemFFB.dll")
 
-        logging.info(f"DCS Export Installer: Checking {path}")
-
+        # Read export.lua (if exists)
         try:
-            data = open(os.path.join(path, "Export.lua")).read()
-        except Exception:
-            data = ""
+            with open(export_lua_path, "r", encoding="utf-8") as f:
+                export_data = f.read()
+            logging.info(f"DCS Export Installer: Found existing Export.lua at {export_lua_path}")
+        except FileNotFoundError:
+            export_data = ""
+            logging.info(f"DCS Export Installer: No Export.lua found at {export_lua_path}; will create if needed")
 
-        local_telemffb = get_resource_path('export/TelemFFB.lua', prefer_root=True)
+        updated = False  # Track per-folder
 
-        def write_script():
-            data = open(local_telemffb, "rb").read()
-            logging.info(f"DCS Export Installer: Writing to {out_path}")
-            open(out_path, "wb").write(data)
-
-        export_installed = "telemffblfs" in data
-
-        if export_installed and os.path.exists(out_path):
-
-            crc_a, crc_b = calculate_checksum(out_path), calculate_checksum(local_telemffb)
-
-            if crc_a != crc_b:
-                dia = QMessageBox.question(window, "Contents of TelemFFB.lua export script have changed",
-                                           f"Update export script {out_path} ?")
-                if dia == QMessageBox.StandardButton.Yes:
-                    write_script()
+        # --- DLL MODE ---
+        if dll:
+            logging.debug("DCS Export Installer: Ensuring Lua-style integration is removed (if present)")
+            # Remove LUA integration
+            if lua_line in export_data:
+                before_len = len(export_data)
+                export_data = export_data.replace(lua_line + "\n", "").replace(lua_line, "")
+                after_len = len(export_data)
+                updated = True
+                logging.info("DCS Export Installer: Removed Lua integration line from Export.lua ")
             else:
-                logging.info(f"DCS Export Installer: TelemFFB entry is present in export script located at {path}, no update required")
-        else:
-            dia = QMessageBox.question(window, "Confirm", f"Install export script into {path}?")
-            if dia == QMessageBox.StandardButton.Yes:
-                if not export_installed:
-                    logging.info("DCS Export Installer: Updating export.lua")
-                    line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
-                    f = open(os.path.join(path, "Export.lua"), "a+")
-                    f.write("\n" + line)
-                    f.close()
-                write_script()
+                logging.debug("DCS Export Installer: Lua integration not found in Export.lua")
 
+            if os.path.exists(lua_script_path):
+                try:
+                    os.remove(lua_script_path)
+                    updated = True
+                    logging.info(f"DCS Export Installer: Removed Lua script file: {lua_script_path}")
+                except Exception as e:
+                    logging.error(f"DCS Export Installer: Failed to remove Lua script {lua_script_path}: {e}")
+
+            # Add DLL integration if missing
+            if 'require("telemffb")' not in export_data:
+                logging.info("DCS Export Installer: DLL integration not present in Export.lua")
+                reply = QMessageBox.question(
+                    window, "Confirm",
+                    f"Install TelemFFB DLL export entries into {export_lua_path}?"
+                )
+                logging.info(f"DCS Export Installer: User response for adding DLL lines: {reply.name}")
+                if reply == QMessageBox.StandardButton.Yes:
+                    # Ensure a trailing newline if file not empty
+                    if export_data and not export_data.endswith("\n"):
+                        export_data += "\n"
+                    export_data += dll_script + "\n"
+                    updated = True
+                    logging.info("DCS Export Installer: Added DLL-style lines to Export.lua")
+            else:
+                logging.debug("DCS Export Installer: DLL integration already present in Export.lua")
+
+            # Copy or update DLL
+            if os.path.exists(source_dll_path):
+                logging.debug("DCS Export Installer: Checking whether TelemFFB.dll update is needed")
+                try:
+                    needs_copy = False
+                    if not os.path.exists(target_dll_path):
+                        logging.info(f"DCS Export Installer: DLL not found at {target_dll_path}; will copy")
+                        needs_copy = True
+                    else:
+                        src_crc = calculate_checksum(source_dll_path)
+                        dst_crc = calculate_checksum(target_dll_path)
+                        logging.debug(f"DCS Export Installer: CRC source={src_crc} target={dst_crc}")
+                        if src_crc != dst_crc:
+                            logging.info("DCS Export Installer: DLL differs from local copy; update recommended")
+                            needs_copy = True
+                        else:
+                            logging.info("DCS Export Installer: DLL already up-to-date")
+
+                    if needs_copy:
+                        reply = QMessageBox.question(
+                            window, "DLL update",
+                            f"The TelemFFB DLL will be copied to {target_dll_path}. Proceed?"
+                        )
+                        logging.info(f"DCS Export Installer: User response for DLL copy: {reply.name}")
+                        if reply == QMessageBox.StandardButton.Yes:
+                            if os.path.exists(target_dll_path):
+                                try:
+                                    os.remove(target_dll_path)
+                                    logging.info(f"DCS Export Installer: Removed existing DLL at {target_dll_path}")
+                                except Exception as e:
+                                    QMessageBox.critical(
+                                        window, "DLL Update Error",
+                                        f"Failed to delete the existing DLL:\n{e}\n\nPlease ensure DCS is not running."
+                                    )
+                                    logging.error(f"DCS Export Installer: Error deleting DLL: {e}")
+                                    return
+                            try:
+                                shutil.copy2(source_dll_path, target_dll_path)
+                                updated = True
+                                logging.info(f"DCS Export Installer: Copied DLL to {target_dll_path}")
+                            except Exception as e:
+                                QMessageBox.critical(
+                                    window, "DLL Copy Error",
+                                    f"Failed to copy the new DLL:\n{e}\n\nPlease ensure DCS is not running."
+                                )
+                                logging.error(f"DCS Export Installer: Error copying DLL: {e}")
+                                return
+                except Exception as e:
+                    logging.error(f"DCS Export Installer: Unexpected error during DLL update: {e}")
+            else:
+                logging.warning(f"DCS Export Installer: TelemFFB.dll not found at source: {source_dll_path}")
+
+        # --- LUA MODE ---
+        else:
+            logging.debug("DCS Export Installer: Ensuring DLL-style integration is removed (if present)")
+            # Remove DLL integration lines
+            if 'require("telemffb")' in export_data or "package.cpath" in export_data:
+                before_lines = export_data.splitlines()
+                after_lines = [
+                    line for line in before_lines
+                    if 'require("telemffb")' not in line and "package.cpath" not in line
+                ]
+                removed = len(before_lines) - len(after_lines)
+                export_data = "\n".join(after_lines) + ("\n" if after_lines else "")
+                updated = True
+                logging.info(f"DCS Export Installer: Removed {removed} DLL-style line(s) from Export.lua")
+            else:
+                logging.debug("DCS Export Installer: DLL integration lines not present in Export.lua")
+
+            # Remove DLL file (if present)
+            if os.path.exists(target_dll_path):
+                try:
+                    os.remove(target_dll_path)
+                    updated = True
+                    logging.info(f"DCS Export Installer: Removed DLL file: {target_dll_path}")
+                except Exception as e:
+                    QMessageBox.critical(
+                        window, "DLL Removal Error",
+                        f"Failed to delete existing DLL:\n{e}\n\nPlease ensure DCS is not running."
+                    )
+                    logging.error(f"DCS Export Installer: Error removing DLL: {e}")
+                    return
+            else:
+                logging.debug("DCS Export Installer: DLL file not present; nothing to remove")
+
+            # Add or update Lua integration
+            if lua_line not in export_data:
+                logging.info("DCS Export Installer: Lua integration not present in Export.lua")
+                reply = QMessageBox.question(
+                    window, "Confirm",
+                    f"Install TelemFFB export entries into {export_lua_path}?"
+                )
+                logging.info(f"DCS Export Installer: User response for adding Lua line: {reply.name}")
+                if reply == QMessageBox.StandardButton.Yes:
+                    if export_data and not export_data.endswith("\n"):
+                        export_data += "\n"
+                    export_data += lua_line + "\n"
+                    updated = True
+                    logging.info("DCS Export Installer: Added Lua-style export line to Export.lua")
+                    # Ensure script is written
+                    try:
+                        with open(local_telemffb, "rb") as src, open(lua_script_path, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+                        logging.info(f"DCS Export Installer: Wrote Lua script to {lua_script_path}")
+                    except Exception as e:
+                        logging.error(f"DCS Export Installer: Failed writing Lua script {lua_script_path}: {e}")
+                        return
+            else:
+                logging.debug("DCS Export Installer: Lua integration already present in Export.lua")
+                # If script exists but differs, offer to update
+                if os.path.exists(lua_script_path):
+                    try:
+                        crc_existing = calculate_checksum(lua_script_path)
+                        crc_local = calculate_checksum(local_telemffb)
+                        logging.debug(f"DCS Export Installer: Lua CRC existing={crc_existing} local={crc_local}")
+                        if crc_existing != crc_local:
+                            logging.info("DCS Export Installer: Lua script differs from local copy; update recommended")
+                            reply = QMessageBox.question(
+                                window, "Lua script update",
+                                f"The DCS Export script 'TelemFFB.lua' has changed. Update {lua_script_path}?"
+                            )
+                            logging.info(f"DCS Export Installer: User response for Lua script update: {reply.name}")
+                            if reply == QMessageBox.StandardButton.Yes:
+                                try:
+                                    with open(local_telemffb, "rb") as src, open(lua_script_path, "wb") as dst:
+                                        shutil.copyfileobj(src, dst)
+                                    updated = True
+                                    logging.info(f"DCS Export Installer: Updated Lua script at {lua_script_path}")
+                                except Exception as e:
+                                    logging.error(f"DCS Export Installer: Error updating Lua script: {e}")
+                                    return
+                        else:
+                            logging.info("DCS Export Installer: Lua script already up-to-date")
+                    except Exception as e:
+                        logging.error(f"DCS Export Installer: Error during Lua script CRC comparison: {e}")
+                else:
+                    logging.info("DCS Export Installer: Lua integration present but script file missing; writing fresh copy")
+                    try:
+                        with open(local_telemffb, "rb") as src, open(lua_script_path, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+                        updated = True
+                        logging.info(f"DCS Export Installer: Wrote missing Lua script to {lua_script_path}")
+                    except Exception as e:
+                        logging.error(f"DCS Export Installer: Failed writing Lua script {lua_script_path}: {e}")
+                        return
+
+        # Persist Export.lua if modified
+        if updated:
+            try:
+                with open(export_lua_path, "w", encoding="utf-8") as f:
+                    f.write(export_data)
+                any_changes = True
+                logging.info(f"DCS Export Installer: Export.lua written to {export_lua_path} ")
+            except Exception as e:
+                logging.error(f"DCS Export Installer: Failed writing Export.lua at {export_lua_path}: {e}")
+                return
+        else:
+            logging.info(f"DCS Export Installer: No changes required for {export_lua_path}")
+
+    # Final summary for the whole run
+    if any_changes:
+        logging.info(f"DCS Export Installer: Completed with changes applied (mode={mode})")
+    else:
+        logging.info(f"DCS Export Installer: Completed; nothing to change (mode={mode})")
 
 class AnsiColors:
     """ ANSI color codes """
@@ -1865,11 +2001,157 @@ def get_version():
         pass
     return ver
 
+def convert_legacy_userconfig(path):
+    """
+    Upgrades a legacy userconfig file to the new format that includes profile tags and profileMappings.
+
+    This function performs the following:
+    - Identifies "User Default" entries based on 'type' settings.
+    - Identifies modified aircraft (with settings but no type) as "Auto User" entries.
+    - Appends appropriate <profile> tags to all models.
+    - Creates <models> entries for missing "Auto User" profiles.
+    - Adds <profileMappings> entries for all aircraft that were converted.
+    - Skips execution if conversion has already been applied.
+
+    Returns:
+        bool: True if conversion was applied, False otherwise.
+    """
+    tree = xmlutils.try_parse(path)
+    if tree is None:
+        logging.exception(f"Failed to parse: {path}")
+        return False
+
+    root = tree.getroot()
+
+    # Convert legacy root tag
+    new_root = ET.Element("TelemFFB_v2")
+    for child in list(root):
+        new_root.append(child)
+    tree._setroot(new_root)
+    root = new_root
+
+    # If already converted (profileMappings exist), exit
+    if root.find("profileMappings") is not None:
+        logging.info('Userconfig is already v2, conversion not needed')
+        return False
+
+    # check if there are profile entries, if so this is a new config that has had profiles added but nothing configured as active profile
+    p = root.findall('models[name="profile"]')
+    if p:
+        logging.info('Found profile entries in userconfig is already v2, conversion not needed')
+        return False
+
+    # Check if there's anything to convert
+    if root.find("models") is None:
+        return False
+
+    """
+    # Find all user created models ('type' entries) - these models will become 'User Default'
+    """
+    user_default_list = []
+    user_default_models = root.findall('models[name="type"]')
+    for user_default in user_default_models:
+        model = user_default.findtext('model')
+        sim = user_default.findtext('sim')
+        if model and sim:
+            user_default_list.append((model, sim))
+
+    """
+    find all model/sim pairings that exist but don't have a 'type' parent entry.  These will become 'Auto User' profiles
+    """
+    user_settings_only_list = []
+    for entry in root.findall('models'):
+        model = entry.findtext('model')
+        sim = entry.findtext('sim')
+        if not model or not sim:
+            continue
+        if (model, sim) not in user_default_list and (model, sim) not in user_settings_only_list:
+            user_settings_only_list.append((model, sim))
+
+    """
+    We now have two lists:
+    user_default_models has (model, sim) tuples for aircraft that will become 'user defaults' (created by user)
+    user_settings_only_list has (model, sim) tuples for aircraft that will become 'auto user' profiles (settings modified from default aircraft)
+    """
+    for entry in root.findall('models'):
+        model = entry.findtext('model')
+        sim = entry.findtext('sim')
+        if not model or not sim:
+            continue
+
+        existing_profiles = entry.findall("profile")
+        if any(p.text in ("User Default", "Auto User") for p in existing_profiles):
+            continue  # Already patched
+
+        if (model, sim) in user_default_list:
+            ET.SubElement(entry, 'profile').text = "User Default"
+        elif (model, sim) in user_settings_only_list:
+            ET.SubElement(entry, 'profile').text = "Auto User"
+        else:
+            logging.warning(f"Unhandled model/sim: {model}/{sim}")
+
+    """
+    Each 'Auto User' profile gets a name='profile' entry that indicates a profile.
+    User Defaults have their name='type' entries.
+    """
+    existing_profile_defs = {(e.findtext("model"), e.findtext("sim"))
+                             for e in root.findall('models[name="profile"]')}
+
+    for model, sim in user_settings_only_list:
+        if (model, sim) in existing_profile_defs:
+            continue
+        cls = xmlutils.get_class_for_sim_model(sim, model)
+        profile_def = ET.SubElement(root, 'models')
+        ET.SubElement(profile_def, 'name').text = "profile"
+        ET.SubElement(profile_def, 'model').text = model
+        ET.SubElement(profile_def, 'value').text = cls
+        ET.SubElement(profile_def, 'sim').text = sim
+        ET.SubElement(profile_def, 'device').text = "any"
+        ET.SubElement(profile_def, 'profile').text = "Auto User"
+
+    """
+    Now we build the profileMappings table.
+    Each model will be set to its "profile" value (Auto User or User Default) depending on its type
+    """
+    seen_mappings = set()
+    for model, sim in user_default_list + user_settings_only_list:
+        if not model or not sim or (model, sim) in seen_mappings:
+            continue
+        seen_mappings.add((model, sim))
+
+        cls = xmlutils.get_class_for_sim_model(sim, model)
+        profile = "User Default" if (model, sim) in user_default_list else "Auto User"
+
+        mapping = ET.SubElement(root, "profileMappings")
+        ET.SubElement(mapping, "model").text = model
+        ET.SubElement(mapping, "sim").text = sim
+        ET.SubElement(mapping, "cls").text = cls
+        ET.SubElement(mapping, "active_profile").text = profile
+
+    xmlutils.consolidate_sort_and_write_userconfig(tree)
+    logging.info("Conversion complete: userconfig upgraded to v2.")
+    return True
+
+def copy_legacy_config_to_new(path):
+    # path is the destination for the new v2 config file
+    if os.path.exists(path):
+        # new config already exists, don't copy
+        return
+
+    # get root of path
+    user_rootpath = os.path.dirname(path)
+    legacy_config_path = os.path.join(user_rootpath, "userconfig.xml")
+    if not os.path.exists(legacy_config_path):
+        # there is no legacy config to copy over
+        return
+    shutil.copy(legacy_config_path, path)
+    logging.info(f"Copied legacy userconfig.xml to {path}")
+
 
 def create_empty_userxml_file(path):
     if not os.path.isfile(path):
         # Create an empty XML file with the specified root element
-        root = ET.Element("TelemFFB")
+        root = ET.Element("TelemFFB_v2")
         tree = ET.ElementTree(root)
         # Create a backup directory if it doesn't exist
         if not os.path.exists(os.path.dirname(path)):
@@ -2131,7 +2413,7 @@ def load_custom_userconfig(new_path=""):
         _defaults_path=G.defaults_path,
     )
 
-    G.settings_mgr.init_ui()
+    # G.settings_mgr.init_ui()
 
     logging.info(f"Custom Configuration was loaded via debug menu: {G.userconfig_path}")
 
@@ -2139,7 +2421,7 @@ def load_custom_userconfig(new_path=""):
         G.ipc_instance.send_broadcast_message(f"LOADCONFIG:{G.userconfig_path}")
 
 
-def set_vpconf_profile(config_filepath, serial):
+def upload_vpconf_profile(config_filepath, serial):
     settings = QSettings("VPforce", "RhinoFFB")
     vpconf_path = settings.value("path")
 
@@ -2156,10 +2438,22 @@ def set_vpconf_profile(config_filepath, serial):
             logging.error(f"VPForce Config Error: ({config_filepath}) - The file failed validation!  Check the PID is correct for the device")
             return
 
-        logging.info(f"set_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
-
-        subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
+        logging.info(f"upload_vpconf_profile - Loading vpconf for with: {vpconf_path} -config {config_filepath} -serial {serial}")
         G.current_vpconf_profile = config_filepath
+        G.main_window.status_container.request_set_active_vpconf.emit(config_filepath)
+
+        def exec():
+            # Use NamedMutex to ensure only one instance of the configurator is executed at a time
+            # This might help prevent issues with libusb race conditions when configurator tries to enumerate devices
+            with NamedMutex("vpconf_mutex", acquired=True):
+                ret = subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
+                logging.info(f"VPForce Configurator exited with code {ret}")
+                G.vpconf_init_pending = False
+
+
+        thread = threading.Thread(target=exec)
+        thread.start()
+
     else:
         logging.error("Unable to find VPforce Configurator installation location")
 
@@ -2325,6 +2619,11 @@ def check_launch_instance(dev_type :str, master_port : int) -> subprocess.Popen:
         if G.system_settings.get(f'startHeadless{dev_type_cap}', False):
             args.append('--headless')
 
+        if G.args.darkmode:
+            args.append('--darkmode')
+        elif G.args.lightmode:
+            args.append('--lightmode')
+
         logging.info("Auto-Launch: starting instance: %s", args)
         proc = ChildPopen(args)
         proc.udp_port = 60000 + int(usbpid)
@@ -2373,3 +2672,4 @@ def hexdump(src, length=16, sep='.'):
         lines.append('{0:08x}  {1:{2}s} |{3:{4}s}|'.format(c, hex_, length * 3, printable, length))
 
     return ("\n".join(lines))
+

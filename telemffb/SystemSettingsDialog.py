@@ -22,13 +22,14 @@ import logging
 import os
 
 from PyQt6 import QtCore
-from PyQt6.QtGui import QIntValidator
-from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QIntValidator, QIcon, QPixmap
+from PyQt6.QtWidgets import QButtonGroup, QDialog, QFileDialog, QMessageBox, QSizePolicy, QStyleOption
 
 from . import globals as G
 from . import utils
 from .ui.Ui_SystemDialog import Ui_SystemDialog
-from .utils import validate_vpconf_profile
+from .utils import validate_vpconf_profile, HiDpiPixmap
 
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
@@ -61,11 +62,98 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.enableVPConfExit.setToolTip('Select VPforce Configurator profile to load when TelemFFB Exits')
         self.cb_logPrune.setToolTip('Auto delete archived logs after time frame')
 
+        self.lb_configProfile.setText(f'<b><u>Configurator Profile Options ({G.device_type.capitalize()})</u></b>')
+
+        style = self.style()  # Grab the current style engine
+
+        # DCS
+        DCS_PIXMAP = HiDpiPixmap(':/image/icon_DCS.png')
+        self.DCS_ICON_ENABLED, self.DCS_ICON_DISABLED = self.make_icons(DCS_PIXMAP, style)
+        self.DCS_TAB = self.simTabWidget.indexOf(self.tab_DCS)
+        self.simTabWidget.setTabText(self.DCS_TAB, "")
+        self.simTabWidget.setTabIcon(self.DCS_TAB, self.DCS_ICON_DISABLED)
+
+        # MSFS
+        MSFS_PIXMAP = HiDpiPixmap(':/image/icon_MSFS.png')
+        self.MSFS_ICON_ENABLED, self.MSFS_ICON_DISABLED = self.make_icons(MSFS_PIXMAP, style)
+        self.MSFS_TAB = self.simTabWidget.indexOf(self.tab_MSFS)
+        self.simTabWidget.setTabText(self.MSFS_TAB, "")
+        self.simTabWidget.setTabIcon(self.MSFS_TAB, self.MSFS_ICON_DISABLED)
+
+        # XPLANE
+        XPLANE_PIXMAP = HiDpiPixmap(':/image/icon_XPLANE.png')
+        self.XPLANE_ICON_ENABLED, self.XPLANE_ICON_DISABLED = self.make_icons(XPLANE_PIXMAP, style)
+        self.XPLANE_TAB = self.simTabWidget.indexOf(self.tab_XPLANE)
+        self.simTabWidget.setTabText(self.XPLANE_TAB, "")
+        self.simTabWidget.setTabIcon(self.XPLANE_TAB, self.XPLANE_ICON_DISABLED)
+
+        # IL2
+        IL2_PIXMAP = HiDpiPixmap(':/image/icon_IL2.png')
+        self.IL2_ICON_ENABLED, self.IL2_ICON_DISABLED = self.make_icons(IL2_PIXMAP, style)
+        self.IL2_TAB = self.simTabWidget.indexOf(self.tab_IL2)
+        self.simTabWidget.setTabText(self.IL2_TAB, "")
+        self.simTabWidget.setTabIcon(self.IL2_TAB, self.IL2_ICON_DISABLED)
+
+        # BMS
+        BMS_PIXMAP = HiDpiPixmap(':/image/icon_BMS.png') if G.useDarkMode else HiDpiPixmap(':/image/icon_BMS_lm.png')
+        self.BMS_ICON_ENABLED, self.BMS_ICON_DISABLED = self.make_icons(BMS_PIXMAP, style)
+        self.BMS_TAB = self.simTabWidget.indexOf(self.tab_BMS)
+        self.simTabWidget.setTabText(self.BMS_TAB, "")
+        self.simTabWidget.setTabIcon(self.BMS_TAB, self.BMS_ICON_DISABLED)
+
+        # Optional: set uniform icon size once
+        self.simTabWidget.setIconSize(QSize(48, 48))
+
+
+        tab_format = """
+            QTabWidget::pane {
+                border: 1px solid transparent;  /* Use theme color */
+                padding: 0px;
+                margin: 0px;
+            }
+
+            QTabBar::tab {
+                background: palette(window);      /* Use default theme bg */
+                border: 1px solid palette(midlight);
+                border-radius: 10px;
+                margin: 4px;
+                padding: 4px;
+                width: 48px;
+                height: 48px;
+            }
+
+            QTabBar::tab:hover {
+                border: 2px solid palette(midlight);
+                border-radius: 10px;
+            }
+
+            QTabBar::tab:selected {
+                border: 3px solid palette(highlight);
+                background-color: palette(button);
+                border-radius: 10px;
+            }
+        """
+        self.simTabWidget.setStyleSheet(tab_format)
+
+        main_tab_format = """
+            QTabWidget::pane {
+                border: 1px solid palette(mid);  /* Use theme color */
+                padding: 0px;
+                margin: 0px;
+            }
+        """
+        self.tabWidget.setStyleSheet(main_tab_format)
+
+        self.tabWidget.setCurrentIndex(0)
+        self.simTabWidget.setCurrentIndex(0)
+
         # Connect signals to slots
         self.cb_logPrune.stateChanged.connect(self.toggle_log_prune_widgets)
         self.enableDCS.stateChanged.connect(self.toggle_dcs_widgets)
         self.enableIL2.stateChanged.connect(self.toggle_il2_widgets)
+        self.enableMSFS.stateChanged.connect(self.toggle_msfs_widgets)
         self.enableXPLANE.stateChanged.connect(self.toggle_xplane_widgets)
+        self.enableBMS.stateChanged.connect(self.toggle_bms_widgets)
         self.browseXPLANE.clicked.connect(self.select_xplane_directory)
         self.browseIL2.clicked.connect(self.select_il2_directory)
         self.buttonBox.accepted.connect(self.save_settings)
@@ -77,6 +165,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseVPConfStartup.clicked.connect(lambda: self.browse_vpconf('startup'))
         self.browseVPConfExit.clicked.connect(lambda: self.browse_vpconf('exit'))
         self.buttonBox.rejected.connect(self.close)
+        for button in self.buttonBox.buttons():
+            button.setMinimumWidth(60)
 
         self.buttonChildSettings.setEnabled(False)
         self.buttonChildSettings.setVisible(False)
@@ -86,6 +176,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.toggle_dcs_widgets()
         self.toggle_il2_widgets()
         self.toggle_xplane_widgets()
+        self.toggle_msfs_widgets()
         self.toggle_al_widgets()
         self.parent_window = parent
         # Load settings from the registry and update widget states
@@ -132,20 +223,62 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if (G.master_instance and G.launched_instances) or G.child_instance:
             self.labelSystem.setText("System (Per Instance):")
             self.labelLaunch.setText("Launch Options (Global):")
-            self.labelSim.setText("Sim Setup (Global):")
-            self.labelOther.setText("Other Settings (Per Instance):")
+            # self.labelSim.setText("Sim Setup (Global):")
+            # self.labelOther.setText("Other Settings (Per Instance):")
 
         if G.master_instance and G.launched_instances:
             self.buttonChildSettings.setVisible(True)
             self.buttonChildSettings.setEnabled(True)
             self.buttonChildSettings.clicked.connect(self.launch_child_settings_windows)
 
+        if G.child_instance:
+            simtab = self.tabWidget.indexOf(self.tab_Simulators)
+            self.tabWidget.setTabVisible(simtab, False)
+            self.tab_Simulators.setVisible(False)
+            self.ignoreUpdate.setVisible(False)
+            self.cb_startWithWindows.setVisible(False)
+            self.cb_startToTray.setVisible(False)
+            self.cb_masterStartMin.setVisible(False)
+            self.cb_closeToTray.setVisible(False)
+            sp1 = self.themeOptions.sizePolicy()
+            sp1.setRetainSizeWhenHidden(False)
+            self.themeOptions.setSizePolicy(sp1)
+            self.themeOptions.setVisible(False)
+
+            sp2 = self.masterLaunchOptions.sizePolicy()
+            sp2.setRetainSizeWhenHidden(False)
+            self.masterLaunchOptions.setSizePolicy(sp2)
+            self.masterLaunchOptions.setVisible(False)
+
         # Enabling start with windows should force headless mode for children
         self.cb_startToTray.clicked.connect(self.toggle_headless)
         self.cb_startToTray.clicked.connect(self.toggle_start_mode)
         self.cb_masterStartMin.clicked.connect(self.toggle_start_mode)
 
+        self.simTabWidget.tabBar().setExpanding(False)
+        self.simTabWidget.tabBar().setUsesScrollButtons(False)
+        self.simTabWidget.tabBar().setDocumentMode(True)
 
+        self.select_enabled_sim()
+
+    def select_enabled_sim(self):
+        for sim in ('DCS', 'MSFS', 'XPLANE', 'IL2', 'BMS'):
+            cb = getattr(self, f'enable{sim}')
+            if cb.isChecked():
+                # Find first enabled sim in the list and make that the default selected tab
+                tab_index = getattr(self, f'{sim}_TAB')
+                self.simTabWidget.setCurrentIndex(tab_index)
+                return
+
+    def make_icons(self, pixmap, style):
+        icon_enabled = QIcon()
+        icon_enabled.addPixmap(pixmap, QIcon.Mode.Normal, QIcon.State.On)
+
+        icon_disabled = QIcon()
+        disabled_pixmap = style.generatedIconPixmap(QIcon.Mode.Disabled, pixmap, QStyleOption())
+        icon_disabled.addPixmap(disabled_pixmap, QIcon.Mode.Normal, QIcon.State.On)
+
+        return icon_enabled, icon_disabled
 
     def closeEvent(self, event):
         self.hide()
@@ -283,18 +416,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_c.setEnabled(al_enabled)
         self.cb_headless_t.setEnabled(al_enabled)
 
+    def toggle_msfs_widgets(self):
+        msfs_enabled = self.enableMSFS.isChecked()
+        icon = self.MSFS_ICON_ENABLED if msfs_enabled else self.MSFS_ICON_DISABLED
+        self.simTabWidget.setTabIcon(self.MSFS_TAB, icon)
+
     def toggle_xplane_widgets(self):
         xplane_enabled = self.enableXPLANE.isChecked()
         self.validateXPLANE.setEnabled(xplane_enabled)
         self.lab_pathXPLANE.setEnabled(xplane_enabled)
         self.pathXPLANE.setEnabled(xplane_enabled)
         self.browseXPLANE.setEnabled(xplane_enabled)
+        icon = self.XPLANE_ICON_ENABLED if xplane_enabled else self.XPLANE_ICON_DISABLED
+        self.simTabWidget.setTabIcon(self.XPLANE_TAB, icon)
 
     def toggle_dcs_widgets(self):
         # show/hide DCS related widgets based on checkbox state
         dcs_enabled = self.enableDCS.isChecked()
-        self.validateDCS.setEnabled(dcs_enabled
-                                    )
+        self.validateDCS.setEnabled(dcs_enabled)
+        icon = self.DCS_ICON_ENABLED if dcs_enabled else self.DCS_ICON_DISABLED
+        self.simTabWidget.setTabIcon(self.DCS_TAB, icon)
+
     def toggle_il2_widgets(self):
         # Show/hide IL-2 related widgets based on checkbox state
         il2_enabled = self.enableIL2.isChecked()
@@ -306,7 +448,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.browseIL2.setEnabled(il2_enabled)
         self.lab_portIL2.setEnabled(il2_enabled)
         self.portIL2.setEnabled(il2_enabled)
+        icon = self.IL2_ICON_ENABLED if il2_enabled else self.IL2_ICON_DISABLED
+        self.simTabWidget.setTabIcon(self.IL2_TAB, icon)
 
+    def toggle_bms_widgets(self):
+        bms_enabled = self.enableBMS.isChecked()
+        icon = self.BMS_ICON_ENABLED if bms_enabled else self.BMS_ICON_DISABLED
+        self.simTabWidget.setTabIcon(self.BMS_TAB, icon)
 
     def toggle_log_prune_widgets(self):
         prune = self.cb_logPrune.isChecked()
@@ -429,6 +577,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             "focus_pauseIL2": self.focus_pauseIL2.isChecked(),
             "pathIL2": self.pathIL2.text(),
             "portIL2": str(self.portIL2.text()),
+            'enableBMS': self.enableBMS.isChecked(),
             'masterInstance': self.master_button_group.checkedId(),
             'autolaunchMaster': self.cb_al_enable.isChecked(),
             'autolaunchJoystick': self.cb_al_enable_j.isChecked(),
@@ -573,6 +722,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.validateDCS.setChecked(settings_dict.get('validateDCS', True))
 
         self.enableMSFS.setChecked(settings_dict.get('enableMSFS', False))
+        self.toggle_msfs_widgets()
 
         self.enableXPLANE.setChecked(settings_dict.get('enableXPLANE', False))
         self.toggle_xplane_widgets()
@@ -591,6 +741,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.pathIL2.setText(settings_dict.get('pathIL2', 'C:/Program Files/IL-2 Sturmovik Great Battles'))
 
         self.portIL2.setText(str(settings_dict.get('portIL2', 34385)))
+
+        self.enableBMS.setChecked(settings_dict.get('enableBMS', False))
+        self.toggle_bms_widgets()
 
         self.cb_save_geometry.setChecked(settings_dict.get('saveWindow', True))
 
@@ -653,6 +806,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
             'pidTrimWheel': str(self.tb_pid_t.text()),
+            'themeId': self.themeButtonGroup.checkedId(),
         }
 
     def browse_vpconf(self, mode):

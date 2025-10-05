@@ -27,8 +27,10 @@ import telemffb.utils as utils
 from telemffb.sim.aircrafts_msfs_xp import Aircraft
 from telemffb.telem.IL2Manager import IL2Manager
 from telemffb.telem.NetworkThread import NetworkThread
+from telemffb.telem.SharedMemThread import SharedMemThread
 from telemffb.telem.SimConnectSock import SimConnectSock
 from telemffb.telem.DcsIpcThread import DcsIpcThread
+from telemffb.telem.BMSTelemManager import BMSManager
 from telemffb.utils import overrides
 
 
@@ -109,10 +111,38 @@ class SimIL2(SimTelemListener):
 
     @overrides(SimTelemListener)
     def stop(self):
+        logging.info("Stopping IL2 Telemetry Listener")
         if self.telem:
             self.telem.quit()
             self.telem = None
             self.started = False
+
+
+class SimBMS(SimTelemListener):
+    def __init__(self) -> None:
+        super().__init__("BMS")
+
+    @overrides(SimTelemListener)
+    def start(self):
+        if not self.is_enabled:
+            return
+        self.telem = SharedMemThread(G.telem_manager, telem_parser=BMSManager())
+        logging.info("Starting BMS Telemetry Listener")
+        self.telem.start()
+        self.started = True
+
+    @overrides(SimTelemListener)
+    def validate(self):
+        return
+
+    @overrides(SimTelemListener)
+    def stop(self):
+        logging.info("Stopping BMS Telemetry Listener")
+        if self.telem:
+            self.telem.quit()
+            self.telem = None
+            self.started = False
+
 
 class SimDCS(SimTelemListener):
     def __init__(self) -> None:
@@ -138,10 +168,16 @@ class SimDCS(SimTelemListener):
     def validate(self):
         # check and install/update export lua script
         logging.info("Checking DCS export script")
-        utils.install_export_lua(G.main_window)
+        if G.system_settings.get('dbg_use_dll') is None:
+            G.system_settings.setValue('dbg_use_dll', True)
+
+        use_dll = G.system_settings.get('dbg_use_dll', False)
+
+        utils.install_export_lua(G.main_window, use_dll)
 
     @overrides(SimTelemListener)
     def stop(self):
+        logging.info("Stopping DCS Telemetry Listener")
         if self.telem_udp:
             self.telem_udp.quit()
             self.telem_udp = None
@@ -176,6 +212,7 @@ class SimXPLANE(SimTelemListener):
 
     @overrides(SimTelemListener)
     def stop(self):
+        logging.info("Stopping XPlane Telemetry Listener")
         if self.telem:
             self.telem.quit()
             self.telem = None
@@ -199,6 +236,7 @@ class SimMSFS(SimTelemListener):
 
     @overrides(SimTelemListener)
     def stop(self):
+        logging.info("Stopping MSFS Telemetry Listener")
         if self.telem:
             self.telem.quit()
             self.telem = None
@@ -212,6 +250,7 @@ class SimMSFS(SimTelemListener):
 class SimListenerManager(QtCore.QObject):
     simStarted = QtCore.pyqtSignal(object)
     simStopped = QtCore.pyqtSignal(object)
+    allStarted = QtCore.pyqtSignal()
 
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -219,6 +258,7 @@ class SimListenerManager(QtCore.QObject):
             SimDCS(),
             SimMSFS(),
             SimIL2(),
+            SimBMS(),
             SimXPLANE()
         ]
 
@@ -231,7 +271,13 @@ class SimListenerManager(QtCore.QObject):
         else:
             self.simStopped.emit(self.sender())
 
+    def stop_inactive(self, active_sim):
+        logging.info(f"Started receiving telemetry from {active_sim} - stopping other sim listeners")
+        for sim in self.sims:
+            if sim.name != active_sim:
+                sim.stop()
     def start_all(self):
+        self.allStarted.emit()
         for sim in self.sims:
             sim.start()
 

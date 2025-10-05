@@ -25,29 +25,32 @@ import re
 
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCursor, QIcon, QColor, QPixmap
-from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle,
+from PyQt6.QtGui import QCursor, QIcon, QFont, QColor, QPixmap
+from PyQt6.QtWidgets import (QGridLayout, QLabel, QPushButton, QStyle, QMessageBox,
                              QToolButton, QCheckBox, QComboBox, QLineEdit, QFileDialog, QSpinBox, QHBoxLayout)
 
 from telemffb.ButtonPressThread import ButtonPressThread
-from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle)
+from telemffb.custom_widgets import (InfoLabel, NoWheelSlider, NoWheelNumberSlider, vpf_purple, t_purple, Toggle, EraseButton, NoWheelComboBox)
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.AdvancedSpringDialog import AdvancedSpringDialog
 from telemffb.AdvancedGDialog import AdvancedGDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.utils import validate_vpconf_profile, dbprint, HiDpiPixmap
-
+import telemffb.utils as utils
+import styles
 from . import globals as G
 from . import xmlutils
-
 
 class SettingsLayout(QGridLayout):
     expanded_items = []
     prereq_list = []
     ##########
     # debug settings
+    show_col_debug = False      # shows column, span, indent in label tooltip
     show_slider_debug = False   # set to true for slider values shown
     show_order_debug = False    # set to true for order numbers shown
+    show_replaced = False
+    show_settings_names = False # show setting internal name instead of displayname
     bump_up = True              # set to false for no row bumping up
 
     all_sliders = []
@@ -91,15 +94,47 @@ class SettingsLayout(QGridLayout):
 
             if p_count > 1 or (p_count == 1 and item['hasbump'] != 'true'):
                 item['has_expander'] = 'true'
+            if '.0' in item['order']:
+                item['has_expander'] = 'false'
 
     def has_bump(self, datalist):
         for item in datalist:
             item['hasbump'] = ''
-            bumped_up = item['order'][-2:] == '.1'
+            bumped_up = item['order'][-1:] == '1' and '.' in item['order']
             if bumped_up:
                 for b in datalist:
                     if item['prereq'] == b['name']:
                         b['hasbump'] = 'true'
+
+    def get_parent_indent(self, datalist):
+        name_map = {item['name']: item for item in datalist}
+
+        for item in datalist:
+            indent = 0
+            parent_name = item.get('prereq')
+
+            # Check if order meets the ".endswith('1')" and contains '.' condition
+            order = item.get('order', '')
+            skip_increment = (
+                    isinstance(order, str) and
+                    '.' in order and
+                    order.strip().endswith('1')
+            )
+
+            while parent_name in name_map:
+                parent = name_map[parent_name]
+
+                # If parent is a group, force indent = 0 and stop
+                if parent.get('datatype') == 'group':
+                    break
+
+                if not skip_increment:
+                    indent += 1
+                skip_increment = False  # Only skip increment for the first level
+
+                parent_name = parent.get('prereq')
+
+            item['indent'] = indent
 
     def add_expanded(self, datalist):
         for item in datalist:
@@ -110,37 +145,70 @@ class SettingsLayout(QGridLayout):
                 else:
                     item['parent_expanded'] = 'false'
 
-    def is_visible(self, datalist):
+    def is_top_level_expanded(self, item, datalist):
+        """
+        Recursively check if the top-level parent of `item` is in self.expanded_items.
+        """
+        prereq = item.get('prereq', '')
+        if not prereq:
+            # Reached the top-level item
+            if '.0' in item['order']:
+                return True
+            else:
+                return item['name'] in self.expanded_items
 
+        # Find the parent item by its name
+        parent_item = next((x for x in datalist if x['name'] in prereq), None)
+
+        if parent_item is None:
+            # Broken link; treat as not expanded
+            return False
+
+        # Recurse upward
+        return self.is_top_level_expanded(parent_item, datalist)
+
+    def is_visible(self, datalist):
         for item in datalist:
-            bumped_up = item['order'][-2:] == '.1'
+            bumped_up = item['order'][-1:] == '1' and '.' in item['order']
             iv = 'false'
             cond = ''
+
             if item['prereq'] == '':
                 iv = 'true'
                 cond = 'no prereq needed'
+                pcount = 0
+                if item['datatype'] == 'group':
+                    for prereqs in datalist:
+                        if item['name'] in prereqs['prereq']:
+                            pcount += 1
+                    if pcount == 0:
+                        iv = 'false'
             else:
-                for p in datalist:
-                    if item['prereq'] == p['name']:
-                        if p['value'].lower() == 'true':
-                            if p['has_expander'].lower() == 'true':
-                                if p['name'] in self.expanded_items and p['is_visible'] == 'true':
-                                    iv = 'true'
-                                    cond = 'item parent expanded'
-                                else:
-                                    if p['hasbump'].lower() == 'true':
-                                        if bumped_up:
-                                            iv = 'true'
-                                            cond = 'parent hasbump & bumped'
-                            else:
-                                if p['is_visible'].lower() == 'true':
-                                    if p['hasbump'].lower() == 'true':
-                                        if bumped_up:
-                                            iv = 'true'
-                                            cond = 'parent hasbump & bumped no expander par vis'
-                        break
-
+                if not self.is_top_level_expanded(item, datalist):
+                    iv = 'false'
+                else:
+                    for p in datalist:
+                        if p['name'] in item['prereq']:
+                            #  check if the parent's value is part of the prereq string
+                            if p['value'] in item['prereq'] or p['value'].lower() == 'true':
+                                if p.get('has_expander', 'false').lower() == 'true':
+                                    if p['name'] in self.expanded_items and p.get('is_visible', 'false') == 'true':
+                                        iv = 'true'
+                                        cond = 'item parent expanded'
+                                    elif p.get('hasbump', 'false').lower() == 'true' and bumped_up:
+                                        iv = 'true'
+                                        cond = 'parent hasbump & bumped'
+                                elif p.get('is_visible', 'false').lower() == 'true':
+                                    if p.get('hasbump', 'false').lower() == 'true' and bumped_up:
+                                        iv = 'true'
+                                        cond = 'parent hasbump & bumped no expander par vis'
+                                    if '.0' in p['order']:
+                                        iv = 'true'
+                            break
+            if item['datatype'] == 'convert':
+                iv = 'false'
             item['is_visible'] = iv
+
             # for things not showing debugging:
             # if iv.lower() == 'true':
             #     print (f"{item['displayname']} visible because {cond}")
@@ -168,23 +236,142 @@ class SettingsLayout(QGridLayout):
         for item in datalist:
             found = False
             count = 0
+            itemname = item.get('name','')
             for p in datalist:
-                if item['name'] == p['prereq']:
-                    count += 1
-                    found = True
+                prereq = p.get('prereq', '')
+                if itemname in prereq:
+                    if ('.' in prereq or itemname == prereq):
+                        count += 1
+                        found = True
                 # If 'prereq' is not in the list, add a new entry
             if found:
-                p_list.append({'prereq': item['name'], 'value': 'False', 'count': count})
+                p_list.append({'prereq': item['name'], 'value': item['value'], 'count': count})
         return p_list
+
+    def set_mode(self, mode, setting, datalist):
+        #save the new mode to file
+        for item in datalist:
+            if item['name'] == setting:
+                item['value'] = mode
+                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim,
+                              G.settings_mgr.current_class,
+                              G.settings_mgr.current_pattern,
+                              item['value'],
+                              item['name'])
+
+    def convert_to_springmode(self, datalist):
+        # read old value from xml, remap & erase old setting
+        # List of (name, new_mode)
+        mode_map = {
+            "adv_spr_override_enabled": "ADVANCED",
+            "aircraft_is_spring_centered": "CENTER",
+            "aircraft_is_fbw": "FBW",
+            "override_spring_enabled": "CUSTOM"
+        }
+        for item in datalist:
+            for name, mode in mode_map.items():
+                if item['name'] == name and item['value'] == 'true':
+                    G.settings_mgr.erase_from_xml(
+                        G.settings_mgr.current_sim,
+                        G.settings_mgr.current_class,
+                        G.settings_mgr.current_pattern,
+                        name
+                    )
+                    self.set_mode(mode, "spring_mode", datalist)
+
+    def convert_msfs_forcetrim_to_springmode(self, datalist):
+        mode_map = {
+            "force_trim_enabled": "FORCETRIM",
+        }
+        for item in datalist:
+            for name, mode in mode_map.items():
+                if item['name'] == name and item['value'] == 'true':
+                    G.settings_mgr.erase_from_xml(
+                        G.settings_mgr.current_sim,
+                        G.settings_mgr.current_class,
+                        G.settings_mgr.current_pattern,
+                        name
+                    )
+                    self.set_mode(mode, "spring_mode", datalist)
+
+    def convert_collective_to_springmode(self, datalist):
+        mode_map = {
+            "collective_ft_ovd_enabled": "FORCETRIM",
+        }
+
+        for item in datalist:
+            for name, mode in mode_map.items():
+                if item['name'] == name and item['value'] == 'true':
+                    G.settings_mgr.erase_from_xml(
+                        G.settings_mgr.current_sim,
+                        G.settings_mgr.current_class,
+                        G.settings_mgr.current_pattern,
+                        name
+                    )
+                    self.set_mode(mode, "spring_mode", datalist)
+
+    def convert_dcs_il2_pedal_to_springmode(self, datalist):
+        mode_map = {
+            "Dynamic Spring": "DYNAMIC",
+            "Static Spring": "STATIC",
+            "No Spring": "NOSPRING",
+            "Sim Default": "NONE",
+        }
+
+        for item in datalist:
+            if item['name'] == 'pedal_spring_mode':
+                spring_mode = mode_map.get(item['value'])
+                if spring_mode:
+                    G.settings_mgr.erase_from_xml(
+                        G.settings_mgr.current_sim,
+                        G.settings_mgr.current_class,
+                        G.settings_mgr.current_pattern,
+                        item['name']
+                    )
+                    self.set_mode(spring_mode, 'spring_mode', datalist)
+
+    def set_gforce_effect(self, mode, datalist):
+        for item in datalist:
+            if item['name'] == 'gforce_effect':
+                item['value'] = mode
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim,
+                              G.settings_mgr.current_class,
+                              G.settings_mgr.current_pattern,
+                              item['name'],
+                              item['value'])
+
+    def convert_to_gforcemode(self, datalist):
+        mode_map = {
+            'gforce_effect_enable': 'LEGACY',
+            'new_gforce_effect_enable': 'NEW',
+        }
+
+        for item in datalist:
+            for name, mode in mode_map.items():
+                if item['name'] == name and item['value'] == 'true':
+                    G.settings_mgr.erase_from_xml(
+                        G.settings_mgr.current_sim,
+                        G.settings_mgr.current_class,
+                        G.settings_mgr.current_pattern,
+                        name
+                    )
+                    self.set_mode(mode, "gforce_effect_mode", datalist)
+
 
     def build_rows(self, datalist):
         sorted_data = sorted(datalist, key=lambda x: float(x['order']))
         # self.prereq_list = xmlutils.read_prereqs()
+        self.convert_to_springmode(sorted_data)
+        self.convert_dcs_il2_pedal_to_springmode(sorted_data)
+        self.convert_msfs_forcetrim_to_springmode(sorted_data)
+        self.convert_collective_to_springmode(sorted_data)
+        self.convert_to_gforcemode(sorted_data)
         self.prereq_list = self.read_active_prereqs(sorted_data)
         self.has_bump(sorted_data)
         self.append_prereq_count(sorted_data)
         self.add_expanded(sorted_data)
         self.is_visible(sorted_data)
+        self.get_parent_indent(sorted_data)
         newlist = self.eliminate_invisible(sorted_data)
 
         def is_expanded(item):
@@ -197,7 +384,7 @@ class SettingsLayout(QGridLayout):
 
         i = 0
         for item in newlist:
-            bumped_up = item['order'][-2:] == '.1'
+            bumped_up = item['order'][-1:] == '1' and '.' in item['order']
             rowdisabled = False
             addrow = False
             is_expnd = is_expanded(item)
@@ -211,9 +398,13 @@ class SettingsLayout(QGridLayout):
 
         spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
         self.addItem(spacerItem, i+1, 1, 1, 1)
+
+        # set expander column minimum size so it does not shrink and shift layout when no expanders are visible
+        self.setColumnMinimumWidth(0, 30)
+
         # Give entry column a high stretch factor, all others remain default 0.
         # When window is resized, the entry column will grow to take up all the new space
-        self.setColumnStretch(4, 10)
+        self.setColumnStretch(5, 10)
 
         # print (f"{i} rows with {self.count()} widgets")
 
@@ -221,6 +412,8 @@ class SettingsLayout(QGridLayout):
         # caller_frame = inspect.currentframe().f_back
         # caller_name = caller_frame.f_code.co_name
         # dbprint("blue", f"RELOAD_CALLER was called by {caller_name}")
+        if G.master_instance and G.device_type != G.current_device_config_scope and G.settings_mgr.timed_out:
+            G.ipc_instance.send_broadcast_message(f'RELOAD CALLER:{G.current_device_config_scope}')
         if not self.trigger_form_reload:
             self.trigger_form_reload = True  # reset back to true for next iteration
         else:
@@ -232,7 +425,7 @@ class SettingsLayout(QGridLayout):
         #     dbprint("green", f"Function {frame_info.function} in {frame_info.filename} at line {frame_info.lineno}")
         self.clear_layout()
         if result is None:
-            cls, pat, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name)
+            cls, pat, result = xmlutils.read_single_model(G.settings_mgr.current_sim, G.settings_mgr.current_aircraft_name, G.settings_mgr.current_class)
             G.settings_mgr.current_pattern = pat
         if result is not None:
             self.build_rows(result)
@@ -263,18 +456,47 @@ class SettingsLayout(QGridLayout):
                     self._clear_sub_layout(sub_layout)
                     sub_layout.deleteLater()
 
-    def generate_settings_row(self, item, i, rowdisabled=False):
+    def do_move_to_class(self, csim, cclass, value, setting, model, unit):
+
+        reply = QMessageBox.question(
+            None,
+            "Confirmation",
+            f"Are you sure you want to move {setting} ({value}) from {model} to all {csim} {cclass} class aircraft?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No  # Default button
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            logging.info(f"Moving {setting} setting ({value}) from {model} to all {csim} {cclass} class aircraft")
+            xmlutils.write_class_to_xml(csim, cclass, value, setting, unit)
+            xmlutils.erase_models_from_xml(csim, model, setting)
+
+    def do_move_to_sim(self, csim, value, setting, model, unit):
+
+        reply = QMessageBox.question(
+            None,
+            "Confirmation",
+            f"Are you sure you want to move {setting} ({value}) from {model} to ALL {csim} aircraft?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No  # Default button
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            logging.info(f"Moving {setting} setting ({value}) from {model} to {csim} Sim for all aircraft")
+            xmlutils.write_sim_to_xml(csim,value,setting, unit)
+            xmlutils.erase_models_from_xml(csim,model,setting)
+
+    def generate_settings_row(self, item, i,  rowdisabled=False ):
         self.setRowMinimumHeight(i, 25)
         entry_colspan = 2
-        lbl_colspan = 2
+        lbl_colspan = 3
 
         exp_col = 0
         chk_col = 1
         lbl_col = 2
-        entry_col = 4
-        unit_col = 5
-        val_col = 6
-        erase_col = 7
+        entry_col = 5
+        unit_col = entry_col + 1
+        val_col = unit_col + 1
+        erase_col = val_col + 1
         fct_col = 10
         ord_col = 11
 
@@ -283,10 +505,50 @@ class SettingsLayout(QGridLayout):
         if self.show_order_debug:
             order_lbl = QLabel()
             order_lbl.setText(item['order'])
-            order_lbl.setMaximumWidth(30)
+            order_lbl.setMaximumWidth(45)
             self.addWidget(order_lbl, i, ord_col)
 
-        erase_button = QPushButton() # Create erase button at beginning so behavior can be modified per widget type if necessary
+        if self.show_replaced:
+            order_lbl = QLabel()
+            order_lbl.setText(item['replaced'])
+            order_lbl.setMaximumWidth(70)
+            self.addWidget(order_lbl, i, ord_col)
+
+        # right click erase button to move the setting up in hierarchy
+        show_move_menu = True if item['replaced'] == 'Model (user)' else False
+        erase_button = EraseButton(csim=G.settings_mgr.current_sim,
+                                   cclass=G.settings_mgr.current_class,
+                                   cmodel=G.settings_mgr.current_pattern,
+                                   csetting=item['name'],
+                                   cvalue=item['value'],
+                                   cunit=item['unit'],
+                                   enable_context_menu=show_move_menu) # Create erase button at beginning so behavior can be modified per widget type if necessary
+        if show_move_menu:
+            erase_button.move_to_class_signal.connect(self.do_move_to_class)
+            erase_button.move_to_sim_signal.connect(self.do_move_to_sim)
+
+        # everything has a name, except for things that have a checkbox *and* slider
+        # some labels show Move right click menu
+
+        label = InfoLabel(text=f"{item['name']}") if self.show_settings_names else (
+            InfoLabel(text=f"{item['displayname']}"))
+
+        label.setObjectName(f'namelabel_{item["name"]}')
+        label.setToolTip(item['info'])
+        label.setMinimumHeight(20)
+        label.setMinimumWidth(20)
+
+        #determine indentation
+
+        if item['datatype'] == 'group':
+            lbl_col = 0
+            item['indent'] = -1
+        else:
+            exp_col = item['indent']
+            chk_col = exp_col + 1
+            lbl_col = chk_col + 1
+        lbl_colspan = entry_col - lbl_col
+
 
         # booleans get a checkbox
         if item['datatype'] == 'bool':
@@ -315,14 +577,15 @@ class SettingsLayout(QGridLayout):
             else:
                 checkbox.setChecked(2)
             checkbox.blockSignals(False)
-            if item['prereq'] != '':
-                chk_col += 1
+
+            if self.show_col_debug:
+                checkbox.setToolTip(f"{chk_col}")
             self.addWidget(checkbox, i, chk_col)
             checkbox.stateChanged.connect(lambda state, name=item['name']: self.checkbox_changed(name, state))
 
         if item['unit'] is not None and item['unit'] != '':
             entry_colspan = 1
-            unit_dropbox = QComboBox()
+            unit_dropbox = NoWheelComboBox()
             unit_dropbox.blockSignals(True)
             if item['unit'] == 'hz':
                 unit_dropbox.addItem('hz')
@@ -339,26 +602,14 @@ class SettingsLayout(QGridLayout):
             unit_dropbox.blockSignals(False)
             unit_dropbox.setDisabled(rowdisabled)
 
-        # everything has a name, except for things that have a checkbox *and* slider
-        label = InfoLabel(text=f"{item['displayname']}")
-        label.setObjectName(f'namelabel_{item["name"]}')
-        label.setToolTip(item['info'])
-        label.setMinimumHeight(20)
-        label.setMinimumWidth(20)
-        # label.setMaximumWidth(150)
-        if item['order'][-2:] == '.1':
+
+        if item['order'][-1:] == '1' and '.' in item['order']:
             olditem = self.itemAtPosition(i, lbl_col)
             if olditem is not None:
                 self.remove_widget(olditem)
-            # for p_item in self.prereq_list:
-            #     if p_item['prereq'] == item['prereq'] and p_item['count'] == 1:
-            #         olditem = self.itemAtPosition(i, self.exp_col)
-            #         if olditem is not None:
-            #             self.remove_widget(olditem)
-        if item['prereq'] != '' and item['hasbump'] != 'true' and item['order'][-2:] != '.1':
-            # label.setStyleSheet("QLabel { padding-left: 20px; }")
-            lbl_colspan = 1
-            lbl_col += 1
+
+        cdb = f"{lbl_col} {lbl_colspan} ind:{item['indent']} " if self.show_col_debug else ''
+        label.setToolTip(f"{cdb}{item['info']}")
         self.addWidget(label, i, lbl_col, 1, lbl_colspan)
 
         slider = NoWheelSlider()
@@ -378,87 +629,13 @@ class SettingsLayout(QGridLayout):
         df_slider.setObjectName(f"dfsld_{item['name']}")
 
         m_butt = QPushButton("-")
+        m_butt.setProperty('buttonType', 'p_m_button')
         m_butt.setFixedSize(20, 20)
-        if G.useDarkMode:
-            m_butt.setStyleSheet("""
-                QPushButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: #ab37c8;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QPushButton:hover {
-                    background-color: #666;  /* Optional: Change background on hover */
-                }
-                QPushButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
-        else:
-            m_butt.setStyleSheet("""
-                QPushButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: black;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QPushButton:hover {
-                    background-color: #ddd;  /* Optional: Change background on hover */
-                }
-                QPushButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
 
         # Create the "+" button
         p_butt = QPushButton("+")
+        p_butt.setProperty('buttonType', 'p_m_button')
         p_butt.setFixedSize(20, 20)
-        if G.useDarkMode:
-            p_butt.setStyleSheet("""
-                QPushButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: #ab37c8;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QPushButton:hover {
-                    background-color: #666;  /* Optional: Change background on hover */
-                }
-                QPushButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
-        else:
-            p_butt.setStyleSheet("""
-                QPushButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: black;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QPushButton:hover {
-                    background-color: #ddd;  /* Optional: Change background on hover */
-                }
-                QPushButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
 
         line_edit = QLineEdit()
         line_edit.blockSignals(True)
@@ -471,6 +648,7 @@ class SettingsLayout(QGridLayout):
         line_edit.editingFinished.connect(self.line_edit_changed)
 
         expand_button = QToolButton()
+        expand_button.setProperty('buttonType', 'expand_button')
         if item['name'] in self.expanded_items:
             expand_button.setArrowType(Qt.ArrowType.DownArrow)
         else:
@@ -479,44 +657,6 @@ class SettingsLayout(QGridLayout):
         expand_button.setMinimumWidth(24)
         expand_button.setObjectName(f"ex_{item['name']}")
         expand_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
-        if G.useDarkMode:
-            expand_button.setStyleSheet("""
-                QToolButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: #ab37c8;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QToolButton:hover {
-                    background-color: #666;  /* Optional: Change background on hover */
-                }
-                QToolButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
-        else:
-            expand_button.setStyleSheet("""
-                QToolButton {
-                    font-size: 16px;  /* Adjust the font size */
-                    font-family: Cascadia Code;
-                    font-weight: bold;
-                    color: black;
-                    padding: 0px;
-                    border: none;  /* Remove any border */
-                    margin: 0px;   /* Remove any margin */
-                    background-color: transparent;  /* Transparent background */
-                }
-                QToolButton:hover {
-                    background-color: #ddd;  /* Optional: Change background on hover */
-                }
-                QToolButton:pressed {
-                    background-color: #bbb;  /* Optional: Change background on press */
-                }
-            """)
         expand_button.clicked.connect(self.expander_clicked)
 
         usb_button_text = f"Button {item['value']}"
@@ -539,8 +679,7 @@ class SettingsLayout(QGridLayout):
             sliderfactor.setMaximumWidth(0)
         sliderfactor.setObjectName(f"sf_{item['name']}")
 
-        if item['datatype'] == 'float' or \
-                item['datatype'] == 'negfloat':
+        if item['datatype'] == 'float' or item['datatype'] == 'negfloat':
 
             # print(f"label {value_label.objectName()} for slider {slider.objectName()}")
             factor = float(item['sliderfactor'])
@@ -721,21 +860,71 @@ class SettingsLayout(QGridLayout):
             spin_box.valueChanged.connect(self.spin_box_changed)
             self.addWidget(spin_box, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        if item['datatype'] == 'list' or item['datatype'] == 'anylist':
-            dropbox = QComboBox()
+        if item['datatype'] in ('list', 'anylist', 'enumlist'):
+            dropbox = NoWheelComboBox()
+
+            if item['datatype'] == 'anylist':
+                dropbox.setEditable(True)
+                dropbox.lineEdit().setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
+            # else:
+            #     dropbox = CenteredClickableComboBox()
             dropbox.setMinimumWidth(150)
-            dropbox.setEditable(True)
-            dropbox.lineEdit().setAlignment(QtCore.Qt.AlignmentFlag.AlignHCenter)
-            dropbox.setObjectName(f"db_{item['name']}")
-            dropbox.addItems(validvalues)
             dropbox.blockSignals(True)
-            dropbox.setCurrentText(item['value'])
-            if item['datatype'] == 'list':
-                dropbox.lineEdit().setReadOnly(True)
-                dropbox.editTextChanged.connect(self.dropbox_changed)
+
+            if item['datatype'] == 'enumlist':
+                dropbox.setObjectName(f"edb_{item['name']}")
+
+                label_dict_name = item['validvalues']
+                label_dict = getattr(G.settings_mgr, label_dict_name, None)
+
+                if not isinstance(label_dict, dict):
+                    dropbox.addItem(f"Label dict '{label_dict_name}' not found or invalid")
+                else:
+                    try:
+                        enum_class = type(next(iter(label_dict)))
+                    except StopIteration:
+                        dropbox.addItem("Label dictionary is empty")
+                        enum_class = None
+
+                    for enum_member, the_label in label_dict.items():
+                        dropbox.addItem(the_label, enum_member)
+
+                    if enum_class and item['value']:
+                        try:
+                            enum_member = enum_class[item['value']]
+                            for index in range(dropbox.count()):
+                                if dropbox.itemData(index) == enum_member:
+                                    dropbox.setCurrentIndex(index)
+                                    break
+                        except (KeyError, ValueError):
+                            for index in range(dropbox.count()):
+                                if dropbox.itemText(index) == item['value']:
+                                    dropbox.setCurrentIndex(index)
+                                    enum_member = dropbox.itemData(index)
+                                    if enum_member:
+                                        item['value'] = enum_member.name
+                                    break
+                            else:
+                                dropbox.addItem(f"Invalid enum value: {item['value']}")
+
+
             else:
-                dropbox.currentTextChanged.connect(self.dropbox_changed)
-            dropbox.blockSignals(False)
+                dropbox.setObjectName(f"db_{item['name']}")
+                dropbox.addItems(validvalues)
+                dropbox.setCurrentText(item['value'])
+
+            if item['name'] == 'type' and 'Default' in item['replaced']:
+                # block editing of type for default craft
+                # dropbox.lineEdit().removeEventFilter(dropbox) # Disable expand of items when clicking on lineEdit area (req'd for custom widget type)
+                dropbox.setDisabled(True)
+            else:
+                if item['datatype'] == 'anylist':
+                    # dropbox.lineEdit().setReadOnly(True)
+                    dropbox.lineEdit().setObjectName(f"db_{item['name']}")
+                    dropbox.lineEdit().editingFinished.connect(self.dropbox_changed)
+                else:
+                    dropbox.currentTextChanged.connect(self.dropbox_changed)
+                dropbox.blockSignals(False)
             self.addWidget(dropbox, i, entry_col, 1, entry_colspan)
             # dropbox.currentTextChanged.connect(self.dropbox_changed)
 
@@ -803,30 +992,41 @@ class SettingsLayout(QGridLayout):
             self.configurator_button.setMaximumHeight(25)
             self.configurator_button.setObjectName(f"config_{item['name']}")
             self.configurator_button.setCursor(QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+            cfg_value = item['value']
+
+            try:
+                self.configurator_button.clicked.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+
             self.configurator_button.clicked.connect(self.configurator_button_clicked)
             erase_button.clicked.connect(self.erase_configurator_overrides)
             self.addWidget(self.configurator_button, i, entry_col, 1, entry_colspan, alignment=Qt.AlignmentFlag.AlignLeft)
 
 
-        if item['has_expander'] == 'true' and item['prereq'] != '':
-            exp_col += 1
+
+        if item['has_expander'].lower() == 'true':
+            self.addWidget(expand_button, i, exp_col)
+            expand_button.setHidden(rowdisabled)
+
         if not rowdisabled:
             # for p_item in self.prereq_list:
             #     if p_item['prereq'] == item['name'] : # and p_item['count'] > 1:
             p_count = 0
             if item['prereq_count'] != '':
                 p_count = int(item['prereq_count'])
-
+            if self.show_col_debug:
+                expand_button.setToolTip(f"{exp_col}")
             if item['has_expander'].lower() == 'true':
                 if item['name'] in self.expanded_items:
                     row_count = p_count
                     if item['hasbump'].lower() != 'true':
                         row_count += 1
                     expand_button.setMaximumHeight(200)
-                    # self.addWidget(expand_button, i, exp_col, row_count, 1)
-                    self.addWidget(expand_button, i, exp_col)
-                else:
-                    self.addWidget(expand_button, i, exp_col)
+        # grouping collapsible header
+        if item['datatype'] == 'group':
+            expand_button.setVisible(False)
+
 
         label.setDisabled(rowdisabled)
         slider.setDisabled(rowdisabled)
@@ -848,69 +1048,91 @@ class SettingsLayout(QGridLayout):
         # Create the erase button
 
         erase_button.setObjectName(f"eb_{item['name']}")
-        erase_button.setMaximumSize(25, 25)
-        erase_button.setMinimumSize(25, 25)
         erase_button.setIcon(icon)
-        #erase_button.setIconSize(pixmap.rect().size())
         erase_button.setToolTip("")
         erase_button.clicked.connect(lambda _, name=item['name']: self.erase_setting(name))
-        self.addWidget(erase_button, i, erase_col)
         sp_retain = erase_button.sizePolicy()
         sp_retain.setRetainSizeWhenHidden(True)
         erase_button.setSizePolicy(sp_retain)
-
         erase_button.setVisible(False)
-        if item['replaced'] == 'Model (user)':
+        #
+        # create info icon for later use
+        info_icon = QIcon()
+        info_pixmap = HiDpiPixmap(":/image/info_icon.png")
+        info_pixmap = info_pixmap.scaled(16, 16, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        info_icon.addPixmap(info_pixmap)
+        info_label = QLabel()
+        info_label.setPixmap(info_pixmap)
+        info_label.setVisible(False)
+        # info_label.setMaximumSize(25, 25)
+        # info_label.setMinimumSize(25, 25)
+
+        replace_scope = "model" + " (user)" if not G.settings_mgr.offline_mode else G.settings_mgr.offline_scope.lower() + ' (user)'
+        action_item = erase_button
+        include_action = False
+        if item['replaced'].lower() == replace_scope.lower():
             if item['name'] != 'type':  # dont erase type on mainwindow settings
-                erase_button.setVisible(True)
-                erase_button.setToolTip("Reset to Default")
+                logging.debug(f"show erase {G.settings_mgr.offline_scope}")
+                erase_button.setToolTip("Reset to Default, Right-Click for more options")
+                action_item = erase_button
+                include_action = True
+
+        if item['replaced'].lower() == "class (user)" and (not G.settings_mgr.offline_mode or G.settings_mgr.offline_scope.lower() != "class"):
+            if item['name'] != 'type':
+                action_item = info_label
+                info_label.setToolTip("Class level user override is in use")
+                info_label.setEnabled(False)
+                include_action = True
+
+        elif item['replaced'].lower() == "sim (user)"  and (not G.settings_mgr.offline_mode or G.settings_mgr.offline_scope.lower() != "sim"):
+            if item['name'] != 'type':
+                action_item = info_label
+                info_label.setToolTip("Sim level user override is in use")
+                info_label.setEnabled(False)
+                include_action = True
+
+        self.addWidget(action_item, i, erase_col, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        if include_action:
+            action_item.setVisible(True)
+
         self.setRowStretch(i, 0)
-        erase_button.setStyleSheet("""
-            QPushButton {
-                font-size: 16px;  /* Adjust the font size */
-                font-family: Arial Black;
-                font-weight: bold;
-                color: black;
-                padding: 0px;
-                border: none;  /* Remove any border */
-                margin: 0px;   /* Remove any margin */
-                background-color: transparent;  /* Transparent background */
-            }
-            QPushButton:hover {
-                background-color: #ddd;  /* Optional: Change background on hover */
-            }
-            QPushButton:pressed {
-                background-color: #bbb;  /* Optional: Change background on press */
-            }
-        """)
 
-        if item['has_expander'].lower() == 'true':
-            # These are top level config sections that have an expander button but do not have any ".1" sliders
-            label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-            label.text_label.setOpenExternalLinks(False)
-            if G.useDarkMode:
-                label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{item["displayname"]}</a>')
+
+        if item['has_expander'].lower() == 'true' or item['datatype'] == 'group':
+
+            labeltext = item["name"] if self.show_settings_names else item["displayname"]
+            if '.0' not in item['order']:
+                # label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
+                clickaction = "Expand" if item['name'] not in self.expanded_items else "Collapse"
+                label.text_label.setToolTip(f'Click to {clickaction}')
+                label.setClickable(True)
+                label.clicked.connect(expand_button.click)
+                if item['datatype'] == 'group':
+                    label.text_label.setStyleSheet(styles.GROUP_LABEL_STYLESHEET)
+                else:
+                    label.text_label.setStyleSheet(styles.EXPAND_LABEL_STYLESHEET)
+
             else:
-                label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{item["displayname"]}</a>')
-            label.text_label.setToolTip('Click to Expand')
-            label.text_label.linkActivated.connect(expand_button.click)
+                label.text_label.setStyleSheet(styles.LOCKED_GROUP_LABEL_STYLESHEET)
 
-        if item['order'][-2:] == '.1':
+        if item['order'][-1:] == '1' and '.' in item['order']:
             # For ".1" config objects, they take the place of the parent setting in the row when enabled so #we
             # need to find the expander button from the prerequisite object
             parent = item['prereq']
             parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
             if parent_expand_button is not None:
-                label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-                label.text_label.setOpenExternalLinks(False)
-                if G.useDarkMode:
-                    label.text_label.setText(f'<a href="#" style="color: #cc7ee0;">{item["displayname"]}</a>')
-                else:
-                    label.text_label.setText(f'<a href="#" style="color: #ab37c8;">{item["displayname"]}</a>')
-                label.text_label.linkActivated.connect(lambda href, parent_name=parent: self.expander_hyperlink_clicked(parent_name))
+                # label.text_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+                # label.text_label.setOpenExternalLinks(False)
+                labeltext = item["name"] if self.show_settings_names else item["displayname"]
+                color = "#cc7ee0" if G.useDarkMode else "#ab37c8"
+                # label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
+                label.text_label.setStyleSheet(styles.EXPAND_LABEL_STYLESHEET)
+                label.setClickable(True)
+                label.clicked.connect(lambda parent_name=parent: self.expander_hyperlink_clicked(parent_name))
 
     def expander_hyperlink_clicked(self, parent):
-        # dbprint("red", f"EXPANDER: {parent}")
+        dbprint("red", f"EXPANDER: {parent}")
         parent_expand_button = self.mainwindow.findChild(QToolButton, f"ex_{parent}")
         if parent_expand_button is not None:
             parent_expand_button.click()
@@ -959,16 +1181,17 @@ class SettingsLayout(QGridLayout):
         if value == 'true' and enforce_list is not None:
             for exclusive in enforce_list:
                 #enforce_list is a list of settings that must not be true if 'value' is true (per exclusive attribute in defauls.xml)
-                xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, "false", exclusive)
+                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, "false", exclusive)
 
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, name)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, name)
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
     def erase_setting(self, name):
         self.trigger_form_reload = True
+        logging.debug(G.settings_mgr.offline_scope)
         logging.debug(f"Erase {name} clicked")
-        xmlutils.erase_models_from_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, name)
+        G.settings_mgr.erase_from_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, name, )
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
@@ -980,7 +1203,7 @@ class SettingsLayout(QGridLayout):
         starting_dir = os.getcwd()
         if calling_button:
             tooltip_text = calling_button.toolTip()
-            print(f"Tooltip text of the calling button: {tooltip_text}")
+            # print(f"Tooltip text of the calling button: {tooltip_text}")
             if os.path.isfile(tooltip_text):
                 # Use the existing file path as the starting point
                 starting_dir = os.path.dirname(tooltip_text)
@@ -990,12 +1213,12 @@ class SettingsLayout(QGridLayout):
 
         if file_path:
             cfg_scope = xmlutils.device
-            key = "pid" + cfg_scope.capitalize()
-            pid = G.system_settings.get(key, '')
+            dev_type_cap = cfg_scope.capitalize()
+            usbpid = str(G.system_settings.get(f'pid{dev_type_cap}', '2055'))
 
-            if validate_vpconf_profile(file_path, pid=pid, dev_type=cfg_scope):
+            if validate_vpconf_profile(file_path, pid=usbpid, dev_type=cfg_scope):
                 #lprint(f"Selected File: {file_path}")
-                xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, file_path, 'vpconf')
+                G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, file_path, 'vpconf')
 
                 self.show_erase_button('config_vpconf')
                 self.vpconf_browse_button.setText(os.path.basename(file_path))
@@ -1007,7 +1230,7 @@ class SettingsLayout(QGridLayout):
         setting_name = self.sender().objectName().replace('sb_', '')
         value = str(self.sender().value())
         logging.debug(f"Spin Box {setting_name} changed. New value: {value}")
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1017,17 +1240,40 @@ class SettingsLayout(QGridLayout):
         setting_name = self.sender().objectName().replace('le_', '')
         value = self.sender().text()
         logging.debug(f"Textbox {setting_name} changed. New value: {value}")
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
 
     def dropbox_changed(self):
-        self.trigger_form_reload = False
-        setting_name = self.sender().objectName().replace('db_', '')
-        value = self.sender().currentText()
+        self.trigger_form_reload = True
+        sender = self.sender()
+
+        if isinstance(sender, QtWidgets.QLineEdit):
+            # True when sender is a editable ComboBox (i.e. 'anylist')
+            combo = sender.parent()  # QComboBox is the parent of the QLineEdit
+        else:
+            combo = sender
+
+        object_name = combo.objectName()
+        setting_name = object_name.replace('edb_', '').replace('db_', '')  # handle both db_ and edb_
+
+        # If it's an enum dropbox, get the enum member name
+        if object_name.startswith("edb_"):
+            enum_member = combo.itemData(combo.currentIndex())
+            value = enum_member.name if enum_member else combo.currentText()
+        else:
+            value = combo.currentText()
+
         logging.debug(f"Dropbox {setting_name} changed. New value: {value}")
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name)
+        G.settings_mgr.write_to_xml(
+            G.settings_mgr.current_sim,
+            G.settings_mgr.current_class,
+            G.settings_mgr.current_pattern,
+            value,
+            setting_name
+        )
+
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1042,7 +1288,7 @@ class SettingsLayout(QGridLayout):
         if line_edit is not None:
             value = line_edit.text()
         logging.debug(f"Unit {self.sender().objectName()} changed. New value: {value}{unit}")
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name, unit)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1051,13 +1297,13 @@ class SettingsLayout(QGridLayout):
         self.trigger_form_reload = False
         setting_name = self.sender().objectName().replace('vle_', '')
         unit_dropbox_name = 'ud_' + self.sender().objectName().replace('vle_', '')
-        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
+        unit_dropbox = self.mainwindow.findChild(NoWheelComboBox, unit_dropbox_name)
         unit = ''
         if unit_dropbox is not None:
             unit = unit_dropbox.currentText()
         value = self.sender().text()
         logging.debug(f"Text box {self.sender().objectName()} changed. New value: {value}{unit}")
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value, setting_name, unit)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value, setting_name, unit)
         self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1105,7 +1351,7 @@ class SettingsLayout(QGridLayout):
         the_button = self.mainwindow.findChild(QPushButton, f'pb_{button_name}')
         the_button.setText(str(value))
         if str(value) != '0':
-            xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, str(value), button_name)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, str(value), button_name)
             self.show_erase_button(setting_name=f'pb_{button_name}')
         else:
             the_button.setText("Click to Configure")
@@ -1149,12 +1395,19 @@ class SettingsLayout(QGridLayout):
         if G.master_instance and G.device_type != G.current_device_config_scope:
             G.ipc_instance.send_broadcast_message(f'SHOW GAIN OVD:{G.current_device_config_scope}')
         else:
+            # utils.dbprint('red', f"CFG Clicked: {value}")
             # dbprint("red", f"Device = {G.device_type}")
             # dbprint("green", f"Scope = {G.current_device_config_scope}")
+            value = G.settings_mgr.read_setting_from_xml("configurator_gains", G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
+            if not value or value == 'none':
+                gains_state = None
+                # utils.dbprint('green', f'{G.device_type}" RESET UI!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            else:
+                gains_state = json.loads(value)
+                # utils.dbprint('blue', f'{G.device_type}" LOADING SETTINGS!!!!{gains_state}')
+
             G.gain_override_dialog.accepted.connect(self.update_configurator_overrides)
-            G.gain_override_dialog.raise_()
-            G.gain_override_dialog.activateWindow()
-            G.gain_override_dialog.show()
+            G.gain_override_dialog.load_and_show(gains_state)
 
     def erase_configurator_overrides(self):
         if G.master_instance and G.device_type != G.current_device_config_scope:
@@ -1162,13 +1415,14 @@ class SettingsLayout(QGridLayout):
         else:
             G.gain_override_dialog.revert_gains()
             G.gain_override_dialog.reset_to_vpconf()
+            G.main_window.status_container.set_active_configurator(active=False)
 
     def update_advanced_g_effect(self, g_effect_curves: str):
         self.trigger_form_reload = True
         """
         Called when signal received that user saved the advanced g-effect settings
         """
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, g_effect_curves,"gforce_effect_adv_curve")
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, g_effect_curves,"gforce_effect_adv_curve")
         self.show_erase_button("config_gforce_effect_adv_curve")
         # self.adv_spr_button.setText("Edit Spring Gains")
         # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
@@ -1179,8 +1433,8 @@ class SettingsLayout(QGridLayout):
         """
         Called when signal received that user saved the advanced spring gain settings
         """
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, spring_gain_curves, "adv_spr_gains")
-        # xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, str(scale), "vne_override", unit=units)
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, spring_gain_curves, "adv_spr_gains")
+        # G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, str(scale), "vne_override", unit=units)
         self.show_erase_button("config_adv_spr_gains")
         # self.adv_spr_button.setText("Edit Spring Gains")
         # self.adv_spr_button.clicked.disconnect(lambda: self.advanced_spring_button_clicked(spring_gain_curves))
@@ -1193,9 +1447,12 @@ class SettingsLayout(QGridLayout):
         convert dictionary to text string and write to config.
         """
         gain_dict_json = json.dumps(gain_dict)
-        xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, gain_dict_json, "configurator_gains")
+        G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, gain_dict_json, "configurator_gains")
+        self.reload_layout(None)
         self.show_erase_button("config_configurator_gains")
-        self.configurator_button.setText("Edit Gain Overrides")
+        if hasattr(self, 'configurator_button'):
+            # button may not exist in child instance if master is setting on behalf of child instance
+            self.configurator_button.setText("Edit Gain Overrides")
 
     def slider_changed(self, write=True):
         self.trigger_form_reload = False
@@ -1215,7 +1472,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}")
         if write:
-            xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
             self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1236,7 +1493,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"Slider {self.sender().objectName()} cfg changed. New value: {value}  saving: {value_to_save}")
         if write:
-            xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name)
             self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1247,7 +1504,7 @@ class SettingsLayout(QGridLayout):
         value_label_name = 'vl_' + self.sender().objectName().replace('dsld_', '')
         sliderfactor_name = 'sf_' + self.sender().objectName().replace('dsld_', '')
         unit_dropbox_name = 'ud_' + self.sender().objectName().replace('dsld_', '')
-        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
+        unit_dropbox = self.mainwindow.findChild(NoWheelComboBox, unit_dropbox_name)
         unit = ''
         if unit_dropbox is not None:
             unit = unit_dropbox.currentText()
@@ -1263,7 +1520,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"d_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         if write:
-            xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
             self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()
@@ -1274,7 +1531,7 @@ class SettingsLayout(QGridLayout):
         value_label_name = 'vl_' + self.sender().objectName().replace('dfsld_', '')
         sliderfactor_name = 'sf_' + self.sender().objectName().replace('dfsld_', '')
         unit_dropbox_name = 'ud_' + self.sender().objectName().replace('dfsld_', '')
-        unit_dropbox = self.mainwindow.findChild(QComboBox, unit_dropbox_name)
+        unit_dropbox = self.mainwindow.findChild(NoWheelComboBox, unit_dropbox_name)
         unit = ''
         if unit_dropbox is not None:
             unit = unit_dropbox.currentText()
@@ -1290,7 +1547,7 @@ class SettingsLayout(QGridLayout):
         if self.show_slider_debug:
             logging.debug(f"df_Slider {self.sender().objectName()} changed. New value: {value} factor: {factor}  saving: {value_to_save}{unit}")
         if write:
-            xmlutils.write_models_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
+            G.settings_mgr.write_to_xml(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern, value_to_save, setting_name, unit)
             self.show_erase_button()
         if G.settings_mgr.timed_out:
             self.reload_caller()

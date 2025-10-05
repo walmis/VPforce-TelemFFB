@@ -44,7 +44,6 @@ import time
 from telemffb import utils
 from telemffb.utils import overrides
 from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
-
 from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects, perftracker
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 #unit conversions (to m/s)
@@ -82,8 +81,6 @@ class Aircraft(AircraftBase):
     trim_workaround = False
     damage_effect_enabled = 0
     damage_effect_intensity: float = 0.0
-
-    aoa_effect_enabled = 1
 
     force_disable_collective_gain = 1
     collective_dampening_gain = 0
@@ -138,6 +135,26 @@ class Aircraft(AircraftBase):
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = None
 
+        self.ap_active_deadzone_enabled = False
+        self.ap_active_deadzone = 0.0
+        self.deadzone_updated = False
+
+    @overrides(AircraftBase)
+    def ac_update_gforce_effect(self, telem_data, adv_spr=False):
+        # don't run if override is active
+        if self.cp_spr_override_active: return
+        return super().ac_update_gforce_effect(telem_data, adv_spr)
+    
+    @overrides(AircraftBase)
+    def ac_update_runway_rumble(self, telem_data):
+        if self.cp_spr_override_active: return
+        return super().ac_update_runway_rumble(telem_data)
+
+    @overrides(AircraftBase)
+    def ac_update_decel_effect(self, telem_data):
+        if self.cp_spr_override_active: return
+        return super().ac_update_decel_effect(telem_data)
+
 
     @overrides(AircraftBase)
     def on_telemetry(self, telem_data : dict):
@@ -174,40 +191,22 @@ class Aircraft(AircraftBase):
         self._telem_data = telem_data
         if telem_data.get("N") == None:
             return
+        
+        # call base class telemetry handler
+        super().on_telemetry(telem_data)
 
-        if not self.cp_spr_override_active:
-            self._update_runway_rumble(telem_data)
-            self._decel_effect(telem_data)
-
-        self._update_buffeting(telem_data)
-        self._update_cm_weapons(telem_data)
-        hyd_loss = self._update_hydraulic_loss_effect(telem_data)
-        if not hyd_loss: 
-            self._update_ffb_forces(telem_data)
-        self._update_damage(telem_data)
-        self._update_speed_brakes(telem_data.get("speedbrakes_value"), telem_data.get("TAS"))
-        self._update_landing_gear(telem_data.get("gear_value"), telem_data.get("TAS"))
-        self._update_flaps(telem_data.get("flaps_value"))
-        self._update_canopy(telem_data.get("canopy_value"))
-        self._update_spoiler(telem_data.get("Spoilers"), telem_data.get("TAS"))
-        self._update_jet_engine_rumble(telem_data)
+        # run dcs specific telemetry handlers
         if self.is_joystick():
-            self._update_stick_position(telem_data)
-        if self.is_pedals():
-            self._override_pedal_spring(telem_data)
+            self.dcs_update_stick_position(telem_data)
+
         if self.is_collective():
-            self._override_collective_spring(telem_data)
-        self._update_tailhook_effect(telem_data)
-        self._update_fuelboom_effect(telem_data)
-        self._update_wingfold_effect(telem_data)
-        self._update_touchdown_effect(telem_data)
-        self._update_stick_shaker(telem_data)
-        self.override_spring()
+            self.dcs_override_collective_spring(telem_data)
 
-        self.modify_game_spring()
-
-        self.override_copilot_spring(telem_data)
-        self.set_deadzone()
+        self.dcs_update_damage(telem_data)
+        self.dcs_update_stick_shaker(telem_data)
+        self.dcs_override_spring()
+        self.dcs_override_copilot_spring(telem_data)
+        self.dcs_update_ap_deadzone(telem_data)
 
     @overrides(AircraftBase)
     def on_event(self, event, *args):
@@ -233,7 +232,7 @@ class Aircraft(AircraftBase):
         cmds = "\n".join(cmds)
         DcsIpcThread.send_commands(cmds)
 
-    def _update_damage(self, telem_data):
+    def dcs_update_damage(self, telem_data):
         if not self.damage_effect_enabled: return
         damage = telem_data.get("Damage")
         damage_freq = 10
@@ -249,7 +248,7 @@ class Aircraft(AircraftBase):
         elif not self.anything_has_changed("damage", damage, delta_ms=50):
             effects.dispose("damage")
 
-    def _override_collective_spring(self, telem_data):
+    def dcs_override_collective_spring(self, telem_data):
         """
         Overrides the spring on a collective to avoid DCS sending FFB events for the Y Axis.  By default sets gain to 0
         with option to override with gain = 4096
@@ -258,8 +257,8 @@ class Aircraft(AircraftBase):
 
         # self.damper = effects["collective_damper"].damper()
         if not self.force_disable_collective_gain:
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
-            self.spring_y.cpOffset = 0
+            self.spring_y.set_coefficient(1.0)
+            self.spring_y.set_offset(0)
             self.spring.setCondition(self.spring_y)
             self.spring.start(override=True)
             return
@@ -270,7 +269,7 @@ class Aircraft(AircraftBase):
         if not self.collective_init:
             self.spring = effects["collective_ap_spring"].spring()
 
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
+            self.spring_y.set_coefficient(1.0)
             if max(telem_data.get("WeightOnWheels")):
                 self.cpO_y = 4096
             elif self.last_collective_y is None:
@@ -279,7 +278,7 @@ class Aircraft(AircraftBase):
             else:
                 self.cpO_y = round(4096 * self.last_collective_y)
 
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.set_offset(self.cpO_y)
 
             self.spring.setCondition(self.spring_y)
             # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
@@ -293,23 +292,26 @@ class Aircraft(AircraftBase):
                 return
         self.last_collective_y = phys_y
 
-        if self.collective_ft_ovd_enabled:
+        if self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
             self.spring.name = "collective_ft"
-            self.collective_force_trim_override(telem_data, self.spring)
+            self.ac_collective_force_trim_override(telem_data, self.spring)
         else:
             self.spring.name = "collective_ap_spring"
             self.cpO_y = round(4096 * utils.clamp(phys_y, -1, 1))
-            self.spring_y.cpOffset = self.cpO_y
+            self.spring_y.set_offset(self.cpO_y)
 
             # self.damper.damper(coef_y=int(4096 * self.collective_dampening_gain)).start()
-            self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 0
+            self.spring_y.set_coefficient(0)
 
             self.spring.setCondition(self.spring_y)
             self.spring.start(override=True)
 
 
+    @overrides(AircraftBase)
+    def ac_update_pedal_trim(self, telem_data):
+        return self.dcs_update_pedal_trim(telem_data)
 
-    def _update_pedal_trim(self, telem_data):
+    def dcs_update_pedal_trim(self, telem_data):
         if not self.is_pedals(): return
 
         input_data = HapticEffect.device.get_input()
@@ -328,7 +330,7 @@ class Aircraft(AircraftBase):
 
         self.send_commands([f"LoSetCommand(2003, {x - offs_x})"])
 
-    def _update_stick_position(self, telem_data):
+    def dcs_update_stick_position(self, telem_data):
         if not self.is_joystick(): return
 
         if not self.trim_workaround: return
@@ -340,10 +342,8 @@ class Aircraft(AircraftBase):
         telem_data["X"] = x
         telem_data["Y"] = y
 
-        self.spring_x.positiveCoefficient = 4096
-        self.spring_x.negativeCoefficient = 4096
-        self.spring_y.positiveCoefficient = 4096
-        self.spring_y.negativeCoefficient = 4096
+        self.spring_x.set_coefficient(1.0)
+        self.spring_y.set_coefficient(1.0)
 
         # trim signal needs to be slow to avoid positive feedback
         lp_y = LPFs.get("y", 5)
@@ -352,9 +352,9 @@ class Aircraft(AircraftBase):
         # estimate trim from real stick position and virtual stick position
         offs_x = lp_x.update(telem_data['StickX'] - x + lp_x.value)
         offs_y = lp_y.update(telem_data['StickY'] - y + lp_y.value)
-        
-        self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
-        self.spring_y.cpOffset = utils.clamp_minmax(round(offs_y * 4096), 4096)
+
+        self.spring_x.set_offset(offs_x)
+        self.spring_y.set_offset(offs_y)
 
         spring = effects["trim_spring"].spring()
         # upload effect parameters to stick
@@ -367,7 +367,7 @@ class Aircraft(AircraftBase):
         self.send_commands([f"LoSetCommand(2001, {y - offs_y})", 
                             f"LoSetCommand(2002, {x - offs_x})"])
 
-    def _update_stick_shaker(self, telem_data):
+    def dcs_update_stick_shaker(self, telem_data):
         if not self.enable_stick_shaker:
             effects['stick_shaker1'].destroy()
             effects['stick_shaker2'].destroy()
@@ -397,7 +397,48 @@ class Aircraft(AircraftBase):
             effects['stick_shaker1'].destroy()
             effects['stick_shaker2'].destroy()
 
-    def override_copilot_spring(self, telem_data):
+    def dcs_update_ap_deadzone(self, telem_data):
+        """
+        Updates the dead-zone when the AP is active.  Useful for aircraft that are sensitive to joystick input when AP is active.
+
+        Args:
+            telem_data:  Expects 'APEnabled' key in the dictionary
+
+        Returns: None
+
+        """
+        if not self.is_joystick(): return
+
+        ap_active = telem_data.get("APEnabled", 0)
+
+        #  We can't call set_deadzone repeatedly
+        #  Only flag for update if one of the following conditions have changed
+        if not hasattr(self, 'deadzone_updated'):
+            self.deadzone_updated = False
+
+        if self.anything_has_changed('ap_active', ap_active):
+            self.deadzone_updated = False
+
+        if self.anything_has_changed('ap_active_deadzone_enabled', self.ap_active_deadzone_enabled):
+            self.deadzone_updated = False
+
+        if self.anything_has_changed('ap_active_deadzone', self.ap_active_deadzone):
+            self.deadzone_updated = False
+
+
+        if not self.ap_active_deadzone_enabled or not ap_active:
+            if not self.deadzone_updated:
+                HapticEffect.device.set_deadzone(0)
+                self.deadzone_updated = True
+            return
+
+        if ap_active and not self.deadzone_updated:
+            HapticEffect.device.set_deadzone(round(utils.clamp(self.ap_active_deadzone * 4096, 0, 4096)))
+            self.deadzone_updated = True
+
+
+
+    def dcs_override_copilot_spring(self, telem_data):
         if not self.is_joystick():return
 
 
@@ -408,6 +449,18 @@ class Aircraft(AircraftBase):
             # self.spring.stop()
             return
 
+        if self.dcs_tr_damper_enabled:
+            self.flag_error(
+                'Co-Pilot/RIO Spring Override is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
+            self.cp_spr_override_active = False
+            effects['cp_ovd_spring'].stop()
+            return
+        if self.trim_workaround:
+            self.flag_error(
+                'Co-Pilot/RIO Spring Override is not compatible with the Trim Workaround feature.  Please disable one or the other.')
+            self.cp_spr_override_active = False
+            effects['cp_ovd_spring'].stop()
+            return
 
         if self.cp_spr_override_button_enabled:
 
@@ -415,21 +468,6 @@ class Aircraft(AircraftBase):
                 self.flag_error("Please bind a button to the Co-Pilot/RIO spring override setting or disable the button control option")
                 effects['cp_ovd_spring'].stop()
                 self.cp_spr_override_active = False
-                return
-            if self.override_spring_enabled:
-                self.flag_error("Co-Pilot/RIO Spring Override is not compatible with \"DCS Spring Override\"\n  Please disable one or the other")
-                effects['cp_ovd_spring'].stop()
-                self.cp_spr_override_active = False
-                return
-            if self.dcs_tr_damper_enabled:
-                self.flag_error('Co-Pilot/RIO Spring Override is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
-                self.cp_spr_override_active = False
-                effects['cp_ovd_spring'].stop()
-                return
-            if self.trim_workaround:
-                self.flag_error('Co-Pilot/RIO Spring Override is not compatible with the Trim Workaround feature.  Please disable one or the other.')
-                self.cp_spr_override_active = False
-                effects['cp_ovd_spring'].stop()
                 return
 
             input_data = HapticEffect.device.get_input()
@@ -441,28 +479,22 @@ class Aircraft(AircraftBase):
                 return
 
         coeff = int(self.cp_spr_override_spring_gain * 4096)
-        self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = coeff
-        self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = coeff
+        self.spring_x.set_coefficient(coeff)
+        self.spring_y.set_coefficient(coeff)
         effects['cp_ovd_spring'].spring(coeff, coeff).start(override=True)
         self.cp_spr_override_active = True
 
-    def override_spring(self):
+    def dcs_override_spring(self):
         if not self.is_joystick(): return
-        if not self.override_spring_enabled:
+        if not self.spring_mode_is(self.SpringModeEnum.CUSTOM):
             # If feature disabled, ensure spring is stopped and abort
             effects['dcs_spr_override'].stop()
             return
-        # Since override_spring overtakes DCS spring already, both the TR damper and trim workaround features are not
-        # needed and would conflict with the override of the spring effect
-        if self.dcs_tr_damper_enabled:
-            self.flag_error('Override DCS Spring is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
-            return
+
         if self.trim_workaround:
             self.flag_error('Override DCS Spring is not compatible with the Trim Workaround feature.  Please disable one or the other.')
             return
-        if self.cp_spr_override_enabled:
-            self.flag_error('Override DCS Spring is not compatible with the Co-Pilot/RIO Spring Override feature.  Please disable one or the other.')
-            return
+
 
         spring = effects['dcs_spr_override'].spring()
 
@@ -482,21 +514,19 @@ class Aircraft(AircraftBase):
                 # as it is moved while spring force is enabled.
                 # return from method so default spring gains do not get applied at the end of the method
                 gain = int (self.override_spring_tr_damper * 4096)
-                self.spring_x.positiveCoefficient = gain
-                self.spring_x.negativeCoefficient = gain
-
-                self.spring_y.positiveCoefficient = gain
-                self.spring_y.negativeCoefficient = gain
+                self.spring_x.set_coefficient(gain)
+                self.spring_y.set_coefficient(gain)
 
                 self.override_spring_cp0_x = round(x * 4096)
-                self.spring_x.cpOffset = self.override_spring_cp0_x
+                self.spring_x.set_offset(self.override_spring_cp0_x)
 
                 self.override_spring_cp0_y = round(y * 4096)
-                self.spring_y.cpOffset = self.override_spring_cp0_y
+                self.spring_y.set_offset(self.override_spring_cp0_y)
                 spring.setCondition(self.spring_x)
                 spring.setCondition(self.spring_y)
                 spring.start(override=True)
                 return
+            
             elif self.override_spring_trim_reset and self.override_spring_trim_reset in current_buttons:
                 # if trim reset button pressed, set offsets back to 0
                 # print("TRIM RESET")
@@ -549,8 +579,8 @@ class Aircraft(AircraftBase):
         self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y)]
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
-        self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = int(self.override_spring_gain * 4096)
-        self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = int(self.override_spring_gain * 4096)
+        self.spring_x.set_coefficient(self.override_spring_gain)
+        self.spring_y.set_coefficient(self.override_spring_gain)
 
         spring.setCondition(self.spring_x)
         spring.setCondition(self.spring_y)
@@ -564,13 +594,7 @@ class PropellerAircraft(Aircraft):
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
     # pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
-
-    # run on every telemetry frame
-    def on_telemetry(self, telem_data):
-        ## Propeller Aircraft Telemetry Handler
-        if telem_data.get("N") == None:
-            return
-        telem_data["AircraftClass"] = "PropellerAircraft"   #inject aircraft class into telemetry
+    def dcs_update_actual_rpm(self, telem_data):
         if not "ActualRPM" in telem_data:
             rpm = telem_data.get("EngRPM", 0)
             if isinstance(rpm, list):
@@ -579,23 +603,16 @@ class PropellerAircraft(Aircraft):
                 rpm = (rpm / 100) * self.engine_max_rpm
             telem_data["ActualRPM"] = rpm # inject ActualRPM into telemetry
 
+    # run on every telemetry frame
+    @overrides(AircraftBase)
+    def on_telemetry(self, telem_data):
+        ## Propeller Aircraft Telemetry Handler
+        if telem_data.get("N") == None:
+            return
+        telem_data["AircraftClass"] = "PropellerAircraft"   #inject aircraft class into telemetry
+        self.dcs_update_actual_rpm(telem_data)
+
         super().on_telemetry(telem_data)
-        
-        if self.is_joystick():
-            self.override_elevator_droop(telem_data)
-
-        self.update_piston_engine_rumble(telem_data)
-        
-        self._update_wind_effect(telem_data)
-        if self.aoa_effect_enabled:
-            # ac_perf = self.get_aircraft_perf(telem_data)
-            vs0 = self.aircraft_vs_speed
-            vne = self.aircraft_vne_speed
-            # print(f"Got Vs0={vs0}, Vne={vne}")
-            self._update_aoa_effect(telem_data, minspeed=vs0, maxspeed=vne)
-        if not self.cp_spr_override_active:
-            self._gforce_effect(telem_data)
-
 
 
 class JetAircraft(Aircraft):
@@ -607,8 +624,9 @@ class JetAircraft(Aircraft):
 
     jet_engine_rumble_intensity = 0.05
     afterburner_effect_intensity = 0.2
-    
+
     # run on every telemetry frame
+    @overrides(AircraftBase)
     def on_telemetry(self, telem_data):
         ## Jet Aircraft Telemetry Handler
         if telem_data.get("N")== None:
@@ -616,11 +634,17 @@ class JetAircraft(Aircraft):
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
-        self._update_ab_effect(telem_data)
-        if self.aoa_reduction_effect_enabled:
-            self._aoa_reduction_force_effect(telem_data)
-        if not self.cp_spr_override_active:
-            self._gforce_effect(telem_data)
+class TurbopropAircraft(PropellerAircraft):
+    def __init__(self, name, **kwargs):
+        super().__init__(name, **kwargs)
+
+    @overrides(PropellerAircraft)
+    def on_telemetry(self, telem_data):
+        if telem_data.get("N") == None:
+            return
+        telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
+
+        super().on_telemetry(telem_data)
 
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
@@ -628,6 +652,7 @@ class Helicopter(Aircraft):
 
     pedal_spring_mode = 'No Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
+    @overrides(AircraftBase)
     def on_telemetry(self, telem_data):
         self.speedbrake_motion_intensity = 0.0
         ## Helicopter Aircraft Telemetry Handler
@@ -636,30 +661,25 @@ class Helicopter(Aircraft):
         telem_data["AircraftClass"] = "Helicopter"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
-        self._calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
-        self._update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
-        self._update_vrs_effect(telem_data)
-        self.update_tr_damper()
+        self.dcs_update_trim_damper()
 
-        if not self.cp_spr_override_active:
-            self._gforce_effect(telem_data)
-
-
-    def update_tr_damper(self):
+    def dcs_update_trim_damper(self):
         if not self.is_joystick(): return
+        if not self.spring_mode_is(self.SpringModeEnum.NONE): return  # only supported when spring mode is NONE (game managed)
         if not self.dcs_tr_damper_enabled: return
-        if not self.dcs_tr_button: return
+        if not self.dcs_tr_button:
+            self.flag_error('Please configure the trim-release button.  It must match that which is bound as trim release in the sim.')
+            return
 
         input_data = HapticEffect.device.get_input()
         force_trim_pressed = input_data.isButtonPressed(self.dcs_tr_button)
 
         if force_trim_pressed:
             x, y = input_data.axisXY()
-            coeff = int(self.dcs_tr_damper_force * 4096)
-            self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = coeff
-            self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = coeff
-            self.spring_x.cpOffset = int(x * 4096)
-            self.spring_y.cpOffset = int(y * 4096)
+            self.spring_x.set_coefficient(self.dcs_tr_damper_force)
+            self.spring_y.set_coefficient(self.dcs_tr_damper_force)
+            self.spring_x.set_offset(x)
+            self.spring_y.set_offset(y)
 
             # tr_spring = effects['TR Damper'].spring(coeff, coeff)
             self.spring.setCondition(self.spring_x)

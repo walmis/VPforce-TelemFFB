@@ -1,6 +1,18 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource>
+        <file>image/TelemFFB_Logo.png</file>
+        <file>image/icon_joystick.png</file>
+        <file>image/icon_pedals.png</file>
+        <file>image/icon_collective.png</file>
+        <file>image/icon_trimwheel.png</file>
+        <file>image/info_icon.png</file>
+        <file>image/icon_DCS.png</file>
+        <file>image/icon_MSFS.png</file>
+        <file>image/icon_XPLANE.png</file>
+        <file>image/icon_IL2.png</file>
+        <file>image/icon_BMS.png</file>
+        <file>image/icon_BMS_lm.png</file>
         <file>image/disabledcheckbox.png</file>
         <file>image/down-down.png</file>
         <file>image/up-up.png</file>
@@ -36,6 +48,7 @@
         <file>image/gain-force.png</file>
         <file>image/g-force-curve.png</file>
         <file>image/dcs_seat_id.png</file>
+        <file>image/BlackOpsOne-Regular.ttf</file>
         <!-- Add other image files as needed -->
     </qresource>
 </RCC>

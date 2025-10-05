@@ -93,6 +93,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         self.pb_airspeed_neg_hundred.setText('')
         self.pb_airspeed_neg_hundred.setToolTip('Minus 100')
         self.pb_airspeed_neg_hundred.clicked.connect(lambda: self.change_airspeed_scale(-100))
+        self.pb_airspeed_neg_hundred.setFixedWidth(25)
 
         self.pb_airspeed_pos_ten.setIcon(QIcon(":/image/right_grey.png"))
         self.pb_airspeed_pos_ten.setText('')
@@ -176,6 +177,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
         G.telem_manager.telemetryTimeout.connect(lambda: self.toggle_vne_import_button(False))
         self.pb_get_vne.setMenu(self.create_option_menu())
 
+        self.pb_get_vne.clicked.connect(self.pb_get_vne.showMenu)
 
     def create_option_menu(self):
         menu = QMenu(self)
@@ -285,7 +287,6 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
             current_json = json.dumps(settings, sort_keys=True)
             baseline_json = json.dumps(json.loads(self.init_settings), sort_keys=True)
             result = (current_json != baseline_json)
-            utils.dbprint("red", f"DIRTYCHECK: {result}")
             if apply:
                 self.set_dirty_state(result)
             else :
