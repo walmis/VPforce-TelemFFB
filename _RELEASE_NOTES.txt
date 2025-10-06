@@ -3,6 +3,10 @@ This is not an exhaustive change log (see github for that).  This file only outl
 ############################################
 ##  October 5, 2025
 ############################################
+# Hot Fix Oct 6, 2025
+- Fix issue with helicopter class for XPlane
+- Add device firmware version warning on startup if not 1.0.18+
+- Minor updates to DCS A/P deadzone logic - ensure device is left in clean state on aircraft change/application exit
 # Big TelemFFB 2.0 Update
 ## Platform
 - Updated UI framework leveraging the latest PyQt6 libraries
