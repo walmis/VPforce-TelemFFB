@@ -332,7 +332,7 @@ def _initialize_device_connection():
     Returns:
         tuple: (device_object, serial_number, firmware_version)
     """
-    min_firmware_version = 'v1.0.17'
+    min_firmware_version = 'v1.0.18'
     dev_serial = None
     dev_firmware_version = 'ERROR'
     dev = None
@@ -388,9 +388,19 @@ def _check_firmware_version(dev_firmware_version, min_firmware_version):
     minver = re.sub(r'\D', '', min_firmware_version)
     devver = re.sub(r'\D', '', dev_firmware_version)
     if devver < minver:
-        QMessageBox.warning(None, "Outdated Firmware",
-                          f"This version of TelemFFB requires Rhino Firmware version {min_firmware_version} or later.\n\n"
-                          f"The current version installed is {dev_firmware_version}\n\n\n Please update to avoid errors!")
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Icon.Warning)
+        msg.setWindowTitle("Outdated Firmware")
+        msg.setTextFormat(Qt.TextFormat.RichText)  # Enable HTML formatting
+        msg.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        msg.setText(
+            f"This version of TelemFFB requires Rhino Firmware version <b>{minver}</b> or later.<br><br>"
+            f"The current version installed is <b>{devver}</b>.<br><br>"
+            "Please update to avoid errors.<br>"
+            '<a href="https://vpforcecontrols.com/usb/rhino/">Web USB Updater</a>'
+        )
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.exec()
 
 def _setup_logging_level():
     """Configure logging level based on system settings."""
