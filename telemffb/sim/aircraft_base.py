@@ -325,6 +325,7 @@ class AircraftBase(object):
         self.adv_g_settings_dict: dict = {}
         self.adv_spr_settings_dict: dict = {}
         self.active_deadzone_pct: float = 0.0
+        self.deadzone_active = False
 
         self.hydraulic_factor = 0.000
         #clear any existing effects
@@ -2028,18 +2029,19 @@ class AircraftBase(object):
         self.spring_adjuster.start()
 
     def ac_set_deadzone(self):
-        if not self.enable_deadzone:
+        if not self.enable_deadzone and self.deadzone_active:
             if self.active_deadzone_pct != 0.0:
                 HapticEffect.device.set_deadzone(0)
                 self.active_deadzone_pct = 0.0
                 logging.info('Disabling deadzone')
+                self.deadzone_active = False
             return
         if self.active_deadzone_pct != self.deadzone_base_pct:
             dz = utils.clamp(round((self.deadzone_base_pct / 100) * 4096), 0, 4096)
             HapticEffect.device.set_deadzone(dz)
             self.active_deadzone_pct = self.deadzone_base_pct
             logging.info(f"Setting Deadzone to %{self.deadzone_base_pct}")
-
+            self.deadzone_active = True
 
     def on_event(self, event, *args):
         pass
@@ -2053,6 +2055,10 @@ class AircraftBase(object):
                 if effect.effect_type in [EFFECT_SPRING, EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION, EFFECT_SPRING_ADJUSTER]:
                     continue
             effect.stop()
+        if self.deadzone_active:
+            HapticEffect.device.set_deadzone(0)
+            self.deadzone_updated = False
+            self.deadzone_active = False
 
     def on_telemetry(self, telem_data): 
         aircraft_type = telem_data.get("AircraftClass", "Unknown")

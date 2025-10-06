@@ -2143,7 +2143,7 @@
 		<name>ap_active_deadzone_enabled</name>
 		<displayname>Autopilot Deadzone</displayname>
 		<prereq>basic_group</prereq>
-		<info>Enable a configurator axis deadzone when AutoPilot is active to reduce false disconnects\n\n- Supported on limited modules</info>
+		<info>Enable a configurator axis deadzone when AutoPilot is active to reduce false disconnects&lt;br&gt;&lt;br&gt; Supported on limited modules</info>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<value>false</value>
@@ -2157,6 +2157,7 @@
 		<name>ap_active_deadzone</name>
 		<displayname>Autopilot Deadzone</displayname>
 		<prereq>ap_active_deadzone_enabled</prereq>
+		<info>Enable a configurator axis deadzone when AutoPilot is active to reduce false disconnects&lt;br&gt;&lt;br&gt;Supported on limited modules</info>
 		<DCS>true</DCS>
 		<joystick>true</joystick>
 		<validvalues>0,100</validvalues>

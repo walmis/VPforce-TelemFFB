@@ -138,6 +138,7 @@ class Aircraft(AircraftBase):
         self.ap_active_deadzone_enabled = False
         self.ap_active_deadzone = 0.0
         self.deadzone_updated = False
+        self.deadzone_active = False
 
     @overrides(AircraftBase)
     def ac_update_gforce_effect(self, telem_data, adv_spr=False):
@@ -430,11 +431,13 @@ class Aircraft(AircraftBase):
             if not self.deadzone_updated:
                 HapticEffect.device.set_deadzone(0)
                 self.deadzone_updated = True
+                self.deadzone_active = False
             return
 
         if ap_active and not self.deadzone_updated:
             HapticEffect.device.set_deadzone(round(utils.clamp(self.ap_active_deadzone * 4096, 0, 4096)))
             self.deadzone_updated = True
+            self.deadzone_active = True
 
 
 

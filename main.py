@@ -605,6 +605,7 @@ def _cleanup_on_exit(dev_serial):
             G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
         except:
             pass
+    HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
 
 def main():
     """
