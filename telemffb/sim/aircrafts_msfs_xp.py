@@ -1605,7 +1605,8 @@ class Helicopter(Aircraft):
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
-        self.subscribe_simvars()
+        if self._sim_is_msfs():
+            self.subscribe_simvars()
     
     @overrides(Aircraft)
     def on_timeout(self):
