@@ -30,6 +30,9 @@ class SimConnectSock(SimConnectManager):
         telem.set_simconnect(self)
         self._telem : TelemManager = telem
 
+    def quit(self):
+        self._telem.set_simconnect(None)
+        super().quit()
 
     def fmt(self, val):
         if isinstance(val, list):

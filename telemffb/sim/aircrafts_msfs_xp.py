@@ -154,13 +154,12 @@ class Aircraft(AircraftBase):
     turbulence_sensitivity: float = 0.0
     turbulence_intensity: float = 0.0
 
-    @classmethod
-    def set_simconnect(cls, sc):
-        cls._simconnect = sc
+    @property
+    def _simconnect(self):
+        return G.telem_manager.simconnect
 
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
-
 
         # clear any existing effects
         for e in effects.values(): e.destroy()
@@ -1377,8 +1376,6 @@ class Aircraft(AircraftBase):
             pause_spring.start()
 
 
-
-
 class PropellerAircraft(Aircraft):
     """Generic Class for Prop aircraft"""
     def __init__(self, name, **kwargs):
@@ -1637,7 +1634,7 @@ class Helicopter(Aircraft):
         pass
 
     def subscribe_simvars(self):
-        if not hasattr(self, "_simconnect"):
+        if not self._simconnect:
             return
 
         if 'ForceTrimSW' not in self._simconnect.sv_dict.keys():

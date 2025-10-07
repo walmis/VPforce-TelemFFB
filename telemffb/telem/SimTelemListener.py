@@ -234,7 +234,6 @@ class SimMSFS(SimTelemListener):
         self.telem = SimConnectSock(G.telem_manager)
 
         self.telem.start()
-        Aircraft.set_simconnect(self.telem)
         self.started = True
 
     @overrides(SimTelemListener)
@@ -243,7 +242,6 @@ class SimMSFS(SimTelemListener):
         if self.telem:
             self.telem.quit()
             self.telem = None
-            Aircraft.set_simconnect(None)
             self.started = False
     
     @overrides(SimTelemListener)
