@@ -173,7 +173,10 @@ class SimDCS(SimTelemListener):
 
         use_dll = G.system_settings.get('dbg_use_dll', False)
 
-        utils.install_export_lua(G.main_window, use_dll)
+        if use_dll:
+            utils.install_dcs_export_module_dll(G.main_window)
+        else:
+            utils.install_dcs_export_module_lua(G.main_window)
 
     @overrides(SimTelemListener)
     def stop(self):

@@ -1484,24 +1484,8 @@ def get_dcs_variant():
     return None
 
 
-def install_export_lua(window, dll=False):
-    """
-    Installs or updates the TelemFFB export integration into DCS installation directories.
-
-    Behavior:
-        - Dynamically finds 'DCS' and optionally 'DCS.<variant>' subfolders inside Saved Games.
-        - Modifies or creates 'Export.lua' with correct integration logic.
-        - Copies or removes 'TelemFFB.lua' and 'TelemFFB.dll' depending on the integration type.
-
-    Args:
-        window: Parent Qt window for QMessageBox prompts
-        dll (bool):
-            - If True: installs .DLL style integration, removes Lua style.
-            - If False: installs .Lua style integration, removes DLL style.
-    """
-    mode = "DLL" if dll else "Lua"
-    logging.info(f"DCS Export Installer: Starting DCS Export integration in {mode} mode")
-
+def _prepare_dcs_export_context():
+    """Resolve shared paths and targets for DCS export integration."""
     saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
     logging.info(f"DCS Export Installer: Saved Games directory detected: {saved_games}")
 
@@ -1511,27 +1495,33 @@ def install_export_lua(window, dll=False):
     else:
         logging.info("DCS Export Installer: No DCS variant detected; will check base 'DCS' only")
 
-    # Build target directories list
     dirlist = ['DCS']
     if dcs_variant:
         dirlist.append(f'DCS.{dcs_variant}')
 
     logging.debug(f"DCS Export Installer: Candidate DCS folders under Saved Games: {dirlist}")
 
-    # Integration strings
-    dll_script = (
-        'package.cpath = package.cpath .. ";"..require(\'lfs\').writedir().."\\\\Scripts\\\\?.dll"\n'
-        'require("telemffb")'
-    )
-    lua_line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
-
-    # Local resources
     local_telemffb = get_resource_path('export/TelemFFB.lua', prefer_root=True)
     source_dll_path = os.path.join(os.path.dirname(local_telemffb), "TelemFFB.dll")
     logging.debug(f"DCS Export Installer: Local Lua path: {local_telemffb}")
     logging.debug(f"DCS Export Installer: Local DLL path: {source_dll_path}")
 
-    any_changes = False  # Track across all variants for a final summary
+    return saved_games, dirlist, local_telemffb, source_dll_path
+
+
+def install_dcs_export_module_lua(window):
+    """Install/update the Lua-based TelemFFB export integration for DCS."""
+    logging.info("DCS Export Installer: Starting DCS Export integration in Lua mode")
+
+    saved_games, dirlist, local_telemffb, source_dll_path = _prepare_dcs_export_context()
+
+    lua_line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
+    dll_script = (
+        'package.cpath = package.cpath .. ";"..require(\'lfs\').writedir().."\\\\Scripts\\\\?.dll"\n'
+        'require("telemffb")'
+    )
+
+    any_changes = False
 
     for dirname in dirlist:
         p = os.path.join(saved_games, dirname)
@@ -1552,7 +1542,6 @@ def install_export_lua(window, dll=False):
         lua_script_path = os.path.join(scripts_dir, "TelemFFB.lua")
         target_dll_path = os.path.join(scripts_dir, "TelemFFB.dll")
 
-        # Read export.lua (if exists)
         try:
             with open(export_lua_path, "r", encoding="utf-8") as f:
                 export_data = f.read()
@@ -1561,194 +1550,95 @@ def install_export_lua(window, dll=False):
             export_data = ""
             logging.info(f"DCS Export Installer: No Export.lua found at {export_lua_path}; will create if needed")
 
-        updated = False  # Track per-folder
+        updated = False
 
-        # --- DLL MODE ---
-        if dll:
-            logging.debug("DCS Export Installer: Ensuring Lua-style integration is removed (if present)")
-            # Remove LUA integration
-            if lua_line in export_data:
-                before_len = len(export_data)
-                export_data = export_data.replace(lua_line + "\n", "").replace(lua_line, "")
-                after_len = len(export_data)
+        logging.debug("DCS Export Installer: Ensuring DLL-style integration is removed (if present)")
+        if 'require("telemffb")' in export_data or "package.cpath" in export_data:
+            before_lines = export_data.splitlines()
+            after_lines = [
+                line for line in before_lines
+                if 'require("telemffb")' not in line and "package.cpath" not in line
+            ]
+            removed = len(before_lines) - len(after_lines)
+            export_data = "\n".join(after_lines) + ("\n" if after_lines else "")
+            updated = True
+            logging.info(f"DCS Export Installer: Removed {removed} DLL-style line(s) from Export.lua")
+        else:
+            logging.debug("DCS Export Installer: DLL integration lines not present in Export.lua")
+
+        if os.path.exists(target_dll_path):
+            try:
+                os.remove(target_dll_path)
                 updated = True
-                logging.info("DCS Export Installer: Removed Lua integration line from Export.lua ")
-            else:
-                logging.debug("DCS Export Installer: Lua integration not found in Export.lua")
+                logging.info(f"DCS Export Installer: Removed DLL file: {target_dll_path}")
+            except Exception as e:
+                QMessageBox.critical(
+                    window, "DLL Removal Error",
+                    f"Failed to delete existing DLL:\n{e}\n\nPlease ensure DCS is not running."
+                )
+                logging.error(f"DCS Export Installer: Error removing DLL: {e}")
+                return
+        else:
+            logging.debug("DCS Export Installer: DLL file not present; nothing to remove")
 
+        if lua_line not in export_data:
+            logging.info("DCS Export Installer: Lua integration not present in Export.lua")
+            reply = QMessageBox.question(
+                window, "Confirm",
+                f"Install TelemFFB export entries into {export_lua_path}?"
+            )
+            logging.info(f"DCS Export Installer: User response for adding Lua line: {reply.name}")
+            if reply == QMessageBox.StandardButton.Yes:
+                if export_data and not export_data.endswith("\n"):
+                    export_data += "\n"
+                export_data += lua_line + "\n"
+                updated = True
+                logging.info("DCS Export Installer: Added Lua-style export line to Export.lua")
+                try:
+                    with open(local_telemffb, "rb") as src, open(lua_script_path, "wb") as dst:
+                        shutil.copyfileobj(src, dst)
+                    logging.info(f"DCS Export Installer: Wrote Lua script to {lua_script_path}")
+                except Exception as e:
+                    logging.error(f"DCS Export Installer: Failed writing Lua script {lua_script_path}: {e}")
+                    return
+        else:
+            logging.debug("DCS Export Installer: Lua integration already present in Export.lua")
             if os.path.exists(lua_script_path):
                 try:
-                    os.remove(lua_script_path)
-                    updated = True
-                    logging.info(f"DCS Export Installer: Removed Lua script file: {lua_script_path}")
-                except Exception as e:
-                    logging.error(f"DCS Export Installer: Failed to remove Lua script {lua_script_path}: {e}")
-
-            # Add DLL integration if missing
-            if 'require("telemffb")' not in export_data:
-                logging.info("DCS Export Installer: DLL integration not present in Export.lua")
-                reply = QMessageBox.question(
-                    window, "Confirm",
-                    f"Install TelemFFB DLL export entries into {export_lua_path}?"
-                )
-                logging.info(f"DCS Export Installer: User response for adding DLL lines: {reply.name}")
-                if reply == QMessageBox.StandardButton.Yes:
-                    # Ensure a trailing newline if file not empty
-                    if export_data and not export_data.endswith("\n"):
-                        export_data += "\n"
-                    export_data += dll_script + "\n"
-                    updated = True
-                    logging.info("DCS Export Installer: Added DLL-style lines to Export.lua")
-            else:
-                logging.debug("DCS Export Installer: DLL integration already present in Export.lua")
-
-            # Copy or update DLL
-            if os.path.exists(source_dll_path):
-                logging.debug("DCS Export Installer: Checking whether TelemFFB.dll update is needed")
-                try:
-                    needs_copy = False
-                    if not os.path.exists(target_dll_path):
-                        logging.info(f"DCS Export Installer: DLL not found at {target_dll_path}; will copy")
-                        needs_copy = True
-                    else:
-                        src_crc = calculate_checksum(source_dll_path)
-                        dst_crc = calculate_checksum(target_dll_path)
-                        logging.debug(f"DCS Export Installer: CRC source={src_crc} target={dst_crc}")
-                        if src_crc != dst_crc:
-                            logging.info("DCS Export Installer: DLL differs from local copy; update recommended")
-                            needs_copy = True
-                        else:
-                            logging.info("DCS Export Installer: DLL already up-to-date")
-
-                    if needs_copy:
+                    crc_existing = calculate_checksum(lua_script_path)
+                    crc_local = calculate_checksum(local_telemffb)
+                    logging.debug(f"DCS Export Installer: Lua CRC existing={crc_existing} local={crc_local}")
+                    if crc_existing != crc_local:
+                        logging.info("DCS Export Installer: Lua script differs from local copy; update recommended")
                         reply = QMessageBox.question(
-                            window, "DLL update",
-                            f"The TelemFFB DLL will be copied to {target_dll_path}. Proceed?"
+                            window, "Lua script update",
+                            f"The DCS Export script 'TelemFFB.lua' has changed. Update {lua_script_path}?"
                         )
-                        logging.info(f"DCS Export Installer: User response for DLL copy: {reply.name}")
+                        logging.info(f"DCS Export Installer: User response for Lua script update: {reply.name}")
                         if reply == QMessageBox.StandardButton.Yes:
-                            if os.path.exists(target_dll_path):
-                                try:
-                                    os.remove(target_dll_path)
-                                    logging.info(f"DCS Export Installer: Removed existing DLL at {target_dll_path}")
-                                except Exception as e:
-                                    QMessageBox.critical(
-                                        window, "DLL Update Error",
-                                        f"Failed to delete the existing DLL:\n{e}\n\nPlease ensure DCS is not running."
-                                    )
-                                    logging.error(f"DCS Export Installer: Error deleting DLL: {e}")
-                                    return
                             try:
-                                shutil.copy2(source_dll_path, target_dll_path)
+                                with open(local_telemffb, "rb") as src, open(lua_script_path, "wb") as dst:
+                                    shutil.copyfileobj(src, dst)
                                 updated = True
-                                logging.info(f"DCS Export Installer: Copied DLL to {target_dll_path}")
+                                logging.info(f"DCS Export Installer: Updated Lua script at {lua_script_path}")
                             except Exception as e:
-                                QMessageBox.critical(
-                                    window, "DLL Copy Error",
-                                    f"Failed to copy the new DLL:\n{e}\n\nPlease ensure DCS is not running."
-                                )
-                                logging.error(f"DCS Export Installer: Error copying DLL: {e}")
+                                logging.error(f"DCS Export Installer: Error updating Lua script: {e}")
                                 return
+                    else:
+                        logging.info("DCS Export Installer: Lua script already up-to-date")
                 except Exception as e:
-                    logging.error(f"DCS Export Installer: Unexpected error during DLL update: {e}")
+                    logging.error(f"DCS Export Installer: Error during Lua script CRC comparison: {e}")
             else:
-                logging.warning(f"DCS Export Installer: TelemFFB.dll not found at source: {source_dll_path}")
-
-        # --- LUA MODE ---
-        else:
-            logging.debug("DCS Export Installer: Ensuring DLL-style integration is removed (if present)")
-            # Remove DLL integration lines
-            if 'require("telemffb")' in export_data or "package.cpath" in export_data:
-                before_lines = export_data.splitlines()
-                after_lines = [
-                    line for line in before_lines
-                    if 'require("telemffb")' not in line and "package.cpath" not in line
-                ]
-                removed = len(before_lines) - len(after_lines)
-                export_data = "\n".join(after_lines) + ("\n" if after_lines else "")
-                updated = True
-                logging.info(f"DCS Export Installer: Removed {removed} DLL-style line(s) from Export.lua")
-            else:
-                logging.debug("DCS Export Installer: DLL integration lines not present in Export.lua")
-
-            # Remove DLL file (if present)
-            if os.path.exists(target_dll_path):
+                logging.info("DCS Export Installer: Lua integration present but script file missing; writing fresh copy")
                 try:
-                    os.remove(target_dll_path)
+                    with open(local_telemffb, "rb") as src, open(lua_script_path, "wb") as dst:
+                        shutil.copyfileobj(src, dst)
                     updated = True
-                    logging.info(f"DCS Export Installer: Removed DLL file: {target_dll_path}")
+                    logging.info(f"DCS Export Installer: Wrote missing Lua script to {lua_script_path}")
                 except Exception as e:
-                    QMessageBox.critical(
-                        window, "DLL Removal Error",
-                        f"Failed to delete existing DLL:\n{e}\n\nPlease ensure DCS is not running."
-                    )
-                    logging.error(f"DCS Export Installer: Error removing DLL: {e}")
+                    logging.error(f"DCS Export Installer: Failed writing Lua script {lua_script_path}: {e}")
                     return
-            else:
-                logging.debug("DCS Export Installer: DLL file not present; nothing to remove")
 
-            # Add or update Lua integration
-            if lua_line not in export_data:
-                logging.info("DCS Export Installer: Lua integration not present in Export.lua")
-                reply = QMessageBox.question(
-                    window, "Confirm",
-                    f"Install TelemFFB export entries into {export_lua_path}?"
-                )
-                logging.info(f"DCS Export Installer: User response for adding Lua line: {reply.name}")
-                if reply == QMessageBox.StandardButton.Yes:
-                    if export_data and not export_data.endswith("\n"):
-                        export_data += "\n"
-                    export_data += lua_line + "\n"
-                    updated = True
-                    logging.info("DCS Export Installer: Added Lua-style export line to Export.lua")
-                    # Ensure script is written
-                    try:
-                        with open(local_telemffb, "rb") as src, open(lua_script_path, "wb") as dst:
-                            shutil.copyfileobj(src, dst)
-                        logging.info(f"DCS Export Installer: Wrote Lua script to {lua_script_path}")
-                    except Exception as e:
-                        logging.error(f"DCS Export Installer: Failed writing Lua script {lua_script_path}: {e}")
-                        return
-            else:
-                logging.debug("DCS Export Installer: Lua integration already present in Export.lua")
-                # If script exists but differs, offer to update
-                if os.path.exists(lua_script_path):
-                    try:
-                        crc_existing = calculate_checksum(lua_script_path)
-                        crc_local = calculate_checksum(local_telemffb)
-                        logging.debug(f"DCS Export Installer: Lua CRC existing={crc_existing} local={crc_local}")
-                        if crc_existing != crc_local:
-                            logging.info("DCS Export Installer: Lua script differs from local copy; update recommended")
-                            reply = QMessageBox.question(
-                                window, "Lua script update",
-                                f"The DCS Export script 'TelemFFB.lua' has changed. Update {lua_script_path}?"
-                            )
-                            logging.info(f"DCS Export Installer: User response for Lua script update: {reply.name}")
-                            if reply == QMessageBox.StandardButton.Yes:
-                                try:
-                                    with open(local_telemffb, "rb") as src, open(lua_script_path, "wb") as dst:
-                                        shutil.copyfileobj(src, dst)
-                                    updated = True
-                                    logging.info(f"DCS Export Installer: Updated Lua script at {lua_script_path}")
-                                except Exception as e:
-                                    logging.error(f"DCS Export Installer: Error updating Lua script: {e}")
-                                    return
-                        else:
-                            logging.info("DCS Export Installer: Lua script already up-to-date")
-                    except Exception as e:
-                        logging.error(f"DCS Export Installer: Error during Lua script CRC comparison: {e}")
-                else:
-                    logging.info("DCS Export Installer: Lua integration present but script file missing; writing fresh copy")
-                    try:
-                        with open(local_telemffb, "rb") as src, open(lua_script_path, "wb") as dst:
-                            shutil.copyfileobj(src, dst)
-                        updated = True
-                        logging.info(f"DCS Export Installer: Wrote missing Lua script to {lua_script_path}")
-                    except Exception as e:
-                        logging.error(f"DCS Export Installer: Failed writing Lua script {lua_script_path}: {e}")
-                        return
-
-        # Persist Export.lua if modified
         if updated:
             try:
                 with open(export_lua_path, "w", encoding="utf-8") as f:
@@ -1761,11 +1651,183 @@ def install_export_lua(window, dll=False):
         else:
             logging.info(f"DCS Export Installer: No changes required for {export_lua_path}")
 
-    # Final summary for the whole run
     if any_changes:
-        logging.info(f"DCS Export Installer: Completed with changes applied (mode={mode})")
+        logging.info("DCS Export Installer: Completed with changes applied (mode=Lua)")
     else:
-        logging.info(f"DCS Export Installer: Completed; nothing to change (mode={mode})")
+        logging.info("DCS Export Installer: Completed; nothing to change (mode=Lua)")
+
+
+def install_dcs_export_module_dll(window):
+    """Install/update the DLL-based TelemFFB export integration for DCS."""
+    logging.info("DCS Export Installer: Starting DCS Export integration in DLL mode")
+
+    saved_games, dirlist, local_telemffb, source_dll_path = _prepare_dcs_export_context()
+
+    lua_line = "local telemffblfs=require('lfs');dofile(telemffblfs.writedir()..'Scripts/TelemFFB.lua')"
+    dll_lines = [
+        'package.cpath = package.cpath .. ";"..require(\'lfs\').writedir().."\\\\Scripts\\\\?.dll"',
+        'require("telemffb")'
+    ]
+
+    any_changes = False
+
+    for dirname in dirlist:
+        p = os.path.join(saved_games, dirname)
+        if not os.path.exists(p):
+            logging.info(f"DCS Export Installer: '{p}' does not exist; skipping this DCS folder")
+            continue
+
+        logging.info(f"DCS Export Installer: Processing DCS folder: {p}")
+
+        scripts_dir = os.path.join(p, 'Scripts')
+        if not os.path.exists(scripts_dir):
+            os.makedirs(scripts_dir, exist_ok=True)
+            logging.info(f"DCS Export Installer: Created Scripts directory: {scripts_dir}")
+        else:
+            logging.debug(f"DCS Export Installer: Scripts directory already exists: {scripts_dir}")
+
+        export_lua_path = os.path.join(scripts_dir, "Export.lua")
+        lua_script_path = os.path.join(scripts_dir, "TelemFFB.lua")
+        target_dll_path = os.path.join(scripts_dir, "TelemFFB.dll")
+
+        try:
+            with open(export_lua_path, "r", encoding="utf-8") as f:
+                export_data = f.read()
+            logging.info(f"DCS Export Installer: Found existing Export.lua at {export_lua_path}")
+        except FileNotFoundError:
+            export_data = ""
+            logging.info(f"DCS Export Installer: No Export.lua found at {export_lua_path}; will create if needed")
+
+        updated = False
+
+        if lua_line in export_data:
+            export_data = export_data.replace(lua_line + "\n", "").replace(lua_line, "")
+            updated = True
+            logging.info("DCS Export Installer: Removed Lua integration line from Export.lua ")
+
+        if os.path.exists(lua_script_path):
+            try:
+                os.remove(lua_script_path)
+                updated = True
+                logging.info(f"DCS Export Installer: Removed Lua script file: {lua_script_path}")
+            except Exception as e:
+                logging.error(f"DCS Export Installer: Failed to remove Lua script {lua_script_path}: {e}")
+
+        export_lines = export_data.splitlines()
+
+        def _is_active_line(line: str, target: str) -> bool:
+            stripped = line.strip()
+            if stripped.startswith("--"):
+                return False
+            return stripped == target
+
+        pkg_index = next((idx for idx, line in enumerate(export_lines) if _is_active_line(line, dll_lines[0])), None)
+        req_index = next((idx for idx, line in enumerate(export_lines) if _is_active_line(line, dll_lines[1])), None)
+        has_ordered_block = pkg_index is not None and req_index is not None and req_index == pkg_index + 1
+
+        if has_ordered_block:
+            logging.debug("DCS Export Installer: DLL integration already present in Export.lua")
+        else:
+            logging.info("DCS Export Installer: DLL integration missing or out of order in Export.lua")
+            reply = QMessageBox.question(
+                window, "Confirm",
+                f"Install TelemFFB DLL export entries into {export_lua_path}?"
+            )
+            logging.info(f"DCS Export Installer: User response for adding DLL lines: {reply.name}")
+            if reply == QMessageBox.StandardButton.Yes:
+                cleaned_lines = []
+                for line in export_lines:
+                    stripped = line.strip()
+                    stripped_no_comment = stripped[2:].lstrip() if stripped.startswith("--") else stripped
+                    if stripped_no_comment in dll_lines:
+                        continue
+                    cleaned_lines.append(line)
+
+                if cleaned_lines and cleaned_lines[-1].strip():
+                    cleaned_lines.append("")
+
+                cleaned_lines.extend(dll_lines)
+                export_data = "\n".join(cleaned_lines) + "\n"
+                updated = True
+                logging.info("DCS Export Installer: Enforced DLL export block in Export.lua")
+            else:
+                export_data = "\n".join(export_lines) + ("\n" if export_data.endswith("\n") else "")
+
+        if os.path.exists(source_dll_path):
+            logging.debug("DCS Export Installer: Checking whether TelemFFB.dll update is needed")
+            try:
+                needs_copy = False
+                if not os.path.exists(target_dll_path):
+                    logging.info(f"DCS Export Installer: DLL not found at {target_dll_path}; will copy")
+                    needs_copy = True
+                else:
+                    src_crc = calculate_checksum(source_dll_path)
+                    dst_crc = calculate_checksum(target_dll_path)
+                    logging.debug(f"DCS Export Installer: CRC source={src_crc} target={dst_crc}")
+                    if src_crc != dst_crc:
+                        logging.info("DCS Export Installer: DLL differs from local copy; update recommended")
+                        needs_copy = True
+                    else:
+                        logging.info("DCS Export Installer: DLL already up-to-date")
+
+                if needs_copy:
+                    reply = QMessageBox.question(
+                        window, "DLL update",
+                        f"The TelemFFB DLL will be copied to {target_dll_path}. Proceed?"
+                    )
+                    logging.info(f"DCS Export Installer: User response for DLL copy: {reply.name}")
+                    if reply == QMessageBox.StandardButton.Yes:
+                        if os.path.exists(target_dll_path):
+                            try:
+                                os.remove(target_dll_path)
+                                logging.info(f"DCS Export Installer: Removed existing DLL at {target_dll_path}")
+                            except Exception as e:
+                                QMessageBox.critical(
+                                    window, "DLL Update Error",
+                                    f"Failed to delete the existing DLL:\n{e}\n\nPlease ensure DCS is not running."
+                                )
+                                logging.error(f"DCS Export Installer: Error deleting DLL: {e}")
+                                return
+                        try:
+                            shutil.copy2(source_dll_path, target_dll_path)
+                            updated = True
+                            logging.info(f"DCS Export Installer: Copied DLL to {target_dll_path}")
+                        except Exception as e:
+                            QMessageBox.critical(
+                                window, "DLL Copy Error",
+                                f"Failed to copy the new DLL:\n{e}\n\nPlease ensure DCS is not running."
+                            )
+                            logging.error(f"DCS Export Installer: Error copying DLL: {e}")
+                            return
+            except Exception as e:
+                logging.error(f"DCS Export Installer: Unexpected error during DLL update: {e}")
+        else:
+            logging.warning(f"DCS Export Installer: TelemFFB.dll not found at source: {source_dll_path}")
+
+        if updated:
+            try:
+                with open(export_lua_path, "w", encoding="utf-8") as f:
+                    f.write(export_data)
+                any_changes = True
+                logging.info(f"DCS Export Installer: Export.lua written to {export_lua_path} ")
+            except Exception as e:
+                logging.error(f"DCS Export Installer: Failed writing Export.lua at {export_lua_path}: {e}")
+                return
+        else:
+            logging.info(f"DCS Export Installer: No changes required for {export_lua_path}")
+
+    if any_changes:
+        logging.info("DCS Export Installer: Completed with changes applied (mode=DLL)")
+    else:
+        logging.info("DCS Export Installer: Completed; nothing to change (mode=DLL)")
+
+
+def install_dcs_export_module(window, dll=False):
+    """Backwards-compatible wrapper dispatching to DLL or Lua installers."""
+    if dll:
+        install_dcs_export_module_dll(window)
+    else:
+        install_dcs_export_module_lua(window)
 
 class AnsiColors:
     """ ANSI color codes """
