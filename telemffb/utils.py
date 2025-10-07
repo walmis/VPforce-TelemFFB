@@ -1493,11 +1493,12 @@ def _prepare_dcs_export_context():
     if dcs_variant:
         logging.info(f"DCS Export Installer: Active DCS variant resolved as: {dcs_variant!r}")
     else:
-        logging.info("DCS Export Installer: No DCS variant detected; will check base 'DCS' only")
+        logging.info("DCS Export Installer: No DCS variant detected; will check base 'DCS' and 'DCS.openbeta' only")
 
-    dirlist = ['DCS']
+    dirlist = ['DCS', 'DCS.openbeta']
     if dcs_variant:
-        dirlist.append(f'DCS.{dcs_variant}')
+        if f'DCS.{dcs_variant}' not in dirlist:
+            dirlist.append(f'DCS.{dcs_variant}')
 
     logging.debug(f"DCS Export Installer: Candidate DCS folders under Saved Games: {dirlist}")
 
