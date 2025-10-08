@@ -2159,6 +2159,10 @@ class HPGHelicopter(Helicopter):
     vrs_effect_enable: bool = True
     vrs_effect_intensity = 0
     afcs_followup_trim_rate = 100
+    handson_force_mode = False
+    hands_on_force_threshold = 0.03
+    handsoff_force_duration = 500  # ms
+    handson_force_debug = False
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
@@ -2173,6 +2177,7 @@ class HPGHelicopter(Helicopter):
         self.feet_on_active = 0
         self.followup_trim_accumulator = 0.0
         self.tracker_var = False
+        self._last_hands_on_time_ms = 0
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
@@ -2278,6 +2283,33 @@ class HPGHelicopter(Helicopter):
             else:
                 hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
             hands_on_either = hands_on_dict["master_result"]
+
+            if self.handson_force_mode:
+                force_x, force_y = HapticEffect.device.get_input().forceXY()
+                thresh = self.hands_on_force_threshold
+
+                is_hands_on_now = abs(force_x) > thresh or abs(force_y) > thresh
+
+                now_ms = int(time.perf_counter() * 1000)
+
+                if is_hands_on_now:
+                    self._last_hands_on_time_ms = now_ms
+                    hands_on_either = True
+                    if self.handson_force_debug:
+                        utils.dbprint('green', f"hands on: True     (fx: {force_x}, fy: {force_y})")
+                        logging.info(f"hands on: True     (fx: {force_x}, fy: {force_y})")
+
+                else:
+                    if now_ms - self._last_hands_on_time_ms > self.handsoff_force_duration:
+                        if self.handson_force_debug:
+                            utils.dbprint('blue', f"hands on: False     (fx: {force_x}, fy: {force_y})")
+                            logging.info(f"hands on: False     (fx: {force_x}, fy: {force_y})")
+                        hands_on_either = False
+                    else:
+                        if self.handson_force_debug:
+                            utils.dbprint('yellow', f"hands on: Waiting     (fx: {force_x}, fy: {force_y})")
+                            logging.info(f"hands on: Waiting     (fx: {force_x}, fy: {force_y})")
+
             hands_on_x = hands_on_dict["x_result"]
             dev_x = hands_on_dict["x_deviation"]
             dev_x_raw = hands_on_dict["x_deviation_raw"]
@@ -2341,8 +2373,6 @@ class HPGHelicopter(Helicopter):
                     elif dev_x_raw < 0:
                         self.cpO_x -= followup_trim_step_size
 
-
-
                 if not (self.hands_on_y_active or self.hands_on_active):
                     if sema_y_avg > 0:
                         self.cpO_y -= self.afcsy_step_size
@@ -2355,12 +2385,10 @@ class HPGHelicopter(Helicopter):
                     elif dev_y_raw < 0:
                         self.cpO_y -= followup_trim_step_size
 
-
             self.spring_x.cpOffset = round(self.cpO_x)
             self.spring_y.cpOffset = round(self.cpO_y)
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
-
 
             if self.send_individual_hands_on:
                 if hands_on_x:

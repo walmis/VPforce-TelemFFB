@@ -1634,6 +1634,58 @@
 		<validvalues>0,100</validvalues>
 	</defaults>
 	<defaults>
+		<datatype>bool</datatype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2100.64</order>
+		<name>handson_force_mode</name>
+		<displayname>Force Mode ( &lt;b&gt;Experimental&lt;/b&gt;)</displayname>
+		<prereq>telemffb_controls_axes</prereq>
+		<info>When enabled, uses force output from Rhino vs. deflection to determine hands-on detection&lt;br&gt;&lt;br&gt;Note: Regular hands on/off sliders are inactive when force mode enabled.&lt;br&gt;&lt;br&gt;Use Force Mode sub settings to control hands on/off detection.&lt;br&gt;&lt;br&gt;For best results, disable adaptive recentering in configurator</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+	</defaults>
+	<defaults><joystick>true</joystick>
+		<datatype>pct_float</datatype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2100.65</order>
+		<name>hands_on_force_threshold</name>
+		<displayname>Hands On Force Threshold</displayname>
+		<prereq>handson_force_mode</prereq>
+		<info>Force value to achieve hands-on detection</info>
+		<MSFS>true</MSFS>
+		<sliderfactor>0.1</sliderfactor>
+		<validvalues>0,150</validvalues>
+		<value>0.03</value>
+	</defaults>
+	<defaults>
+		<info>Time (ms) duration below hands-on threshold to consider "hands-off"</info>
+		<datatype>d_int</datatype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2100.66</order>
+		<name>handsoff_force_duration</name>
+		<displayname>Hands Off Hysteresis Time (ms)</displayname>
+		<prereq>handson_force_mode</prereq>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<validvalues>0,1500</validvalues>
+	</defaults>
+	<defaults>
+		<datatype>bool</datatype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2100.67</order>
+		<name>handson_force_debug</name>
+		<displayname>Debug Logging</displayname>
+		<prereq>handson_force_mode</prereq>
+		<info>Enable logging of hands on/off state (generates lots of logs.. only use if troubleshooting)</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value>false</value>
+	</defaults>
+	<defaults>
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
@@ -7295,6 +7347,20 @@
 			<name>hands_on_deadzone</name>
 			<type>SASHelicopter</type>
 			<value>0.1</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>handson_force_mode</name>
+			<type>HPGHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>handsoff_force_duration</name>
+			<type>HPGHelicopter</type>
+			<value>500</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
 		</classdefaults_MSFS>

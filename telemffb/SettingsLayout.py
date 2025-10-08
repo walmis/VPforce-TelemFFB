@@ -713,6 +713,36 @@ class SettingsLayout(QGridLayout):
             self.addWidget(sliderfactor, i, fct_col)
 
             slider.blockSignals(False)
+        if item['datatype'] == 'pct_float':
+            # stored value is decimal fraction (e.g., 0.043)
+            d_val = float(item['value'])
+            factor = float(item['sliderfactor'])  # e.g., 0.1  (so 1 step = 0.1%)
+            # slider position is the percent value divided by factor
+            # (0.043 * 100) / 0.1 = 43.0 → shows 43.0% on the slider
+            val = float(round((d_val * 100.0) / factor))
+
+            dfs = df_slider  # reuse your existing "direct float" slider instance for this row
+            dfs.blockSignals(True)
+            if validvalues and validvalues != '':
+                dfs.setRange(int(validvalues[0]), int(validvalues[1]))  # e.g., 0..15  (percent domain)
+            dfs.setValue(round(val))
+
+            # label shows percent with 3 decimals
+            value_label.setText(f"{d_val * 100.0:.2f}%")
+
+            dfs.valueChanged.connect(lambda _v: self.pct_df_slider_changed(write=False))
+            dfs.delayedValueChanged.connect(lambda _v: self.pct_df_slider_changed(write=True))
+
+            sl_layout = QHBoxLayout()
+            m_butt.clicked.connect(dfs.decrease_single_step)
+            p_butt.clicked.connect(dfs.increase_single_step)
+            sl_layout.addWidget(m_butt);
+            sl_layout.addWidget(dfs);
+            sl_layout.addWidget(p_butt)
+            self.addLayout(sl_layout, i, entry_col, 1, entry_colspan)
+            self.addWidget(value_label, i, val_col)
+            self.addWidget(sliderfactor, i, fct_col)
+            dfs.blockSignals(False)
 
         if item['datatype'] == 'n_float' :
 
@@ -1453,6 +1483,51 @@ class SettingsLayout(QGridLayout):
         if hasattr(self, 'configurator_button'):
             # button may not exist in child instance if master is setting on behalf of child instance
             self.configurator_button.setText("Edit Gain Overrides")
+
+    def pct_df_slider_changed(self, write=True):
+        self.trigger_form_reload = False
+        setting_name = self.sender().objectName().replace('dfsld_', '')
+        value_label_name = 'vl_' + self.sender().objectName().replace('dfsld_', '')
+        sliderfactor_name = 'sf_' + self.sender().objectName().replace('dfsld_', '')
+        unit_dropbox_name = 'ud_' + self.sender().objectName().replace('dfsld_', '')
+
+        unit_dropbox = self.mainwindow.findChild(NoWheelComboBox, unit_dropbox_name)
+        unit = unit_dropbox.currentText() if unit_dropbox is not None else ''
+
+        value_label = self.mainwindow.findChild(QLabel, value_label_name)
+        sliderfactor_label = self.mainwindow.findChild(QLabel, sliderfactor_name)
+
+        factor = 1.0
+        if sliderfactor_label is not None:
+            factor = float(sliderfactor_label.text())
+
+        # slider integer → percent float
+        slider_pos = self.sender().value()  # e.g., 43 when 43.0%
+        percent_value = slider_pos * factor  # with factor 0.1 → 4.3%
+        decimal_value = round(percent_value / 100.0, 4)  # → 0.043
+
+        if value_label is not None:
+            decimals = 3 if factor < 0.1 else 2 if factor < 1.0 else 1
+            value_label.setText(f"{percent_value:.{decimals}f}%")
+
+        if self.show_slider_debug:
+            logging.debug(
+                f"pct_df_Slider {self.sender().objectName()} changed. "
+                f"pos={slider_pos} factor={factor} percent={percent_value:.3f}% save={decimal_value}"
+            )
+
+        if write:
+            G.settings_mgr.write_to_xml(
+                G.settings_mgr.current_sim,
+                G.settings_mgr.current_class,
+                G.settings_mgr.current_pattern,
+                str(decimal_value),  # stored as decimal percent
+                setting_name,
+                unit
+            )
+            self.show_erase_button()
+        if G.settings_mgr.timed_out:
+            self.reload_caller()
 
     def slider_changed(self, write=True):
         self.trigger_form_reload = False
