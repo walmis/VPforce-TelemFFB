@@ -2257,6 +2257,10 @@ class HPGHelicopter(Helicopter):
             trim_reset = telem_data.get("hpgTrimRelease", 0)
         else:
             trim_reset = False
+        input_data = HapticEffect.device.get_input()
+        force_trim_pressed = input_data.isButtonPressed(self.force_trim_button) if self.cyclic_spring_init else False
+        if force_trim_pressed:
+            self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 1)
 
         if ffb_type == "joystick":
             if not self.telemffb_controls_axes and not self.local_disable_axis_control:
