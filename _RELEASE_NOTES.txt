@@ -1,6 +1,19 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  October 7, 2025
+############################################
+## DCS
+- Update export dll package
+  - Fix crash on slot changing
+  - Add FF Mig-29 Damage model support
+- Enhance DCS Export script logic
+## MSFS
+- Fix issue with erratic force trim behavior on HPG Helicopters
+- Added experimental force based hands on/off detection for HPG Helicopters.
+    - Uses force output data from Rhino rather than axis deflection to determine hands on/off state
+    - Recommend to **disable** Adaptive Recentering in configurator for best results (previous recommendation for deflection based detection was to enable Adaptive Recentering)
+############################################
 ##  October 5, 2025
 ############################################
 # Hot Fix Oct 6, 2025
