@@ -46,6 +46,8 @@ import random
 from .aircraft_base import AircraftBase, effects
 import json
 from telemffb.utils import overrides
+from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
+
 #unit conversions (to m/s)
 knots = 0.514444
 kmh = 1.0/3.6
@@ -136,7 +138,7 @@ class Aircraft(AircraftBase):
         for e in effects.values(): e.destroy()
         effects.clear()
 
-        self.sprin_mode = self.SpringModeEnum.NONE.name
+        self.sprin_mode = SpringModeEnum.NONE.name
 
         # self.spring = HapticEffect().spring()
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)

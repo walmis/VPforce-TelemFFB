@@ -94,3 +94,8 @@ sim_listeners : 'SimListenerManager'
 
 # Triggers and flags
 force_reload_aircraft_trigger: bool = False
+
+from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.utils import Dispenser
+
+effects : 'Dispenser' = Dispenser(HapticEffect)  # Haptic effects dispenser, used to manage and access haptic effects by name

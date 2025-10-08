@@ -46,6 +46,8 @@ from telemffb.utils import overrides
 from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
 from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects, perftracker
 from telemffb.telem.DcsIpcThread import DcsIpcThread
+from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
+
 #unit conversions (to m/s)
 knots = 0.514444
 kmh = 1.0/3.6
@@ -293,7 +295,7 @@ class Aircraft(AircraftBase):
                 return
         self.last_collective_y = phys_y
 
-        if self.spring_mode_is(self.SpringModeEnum.FORCETRIM):
+        if self.spring_mode_is(SpringModeEnum.FORCETRIM):
             self.spring.name = "collective_ft"
             self.ac_collective_force_trim_override(telem_data, self.spring)
         else:
@@ -489,7 +491,7 @@ class Aircraft(AircraftBase):
 
     def dcs_override_spring(self):
         if not self.is_joystick(): return
-        if not self.spring_mode_is(self.SpringModeEnum.CUSTOM):
+        if not self.spring_mode_is(SpringModeEnum.CUSTOM):
             # If feature disabled, ensure spring is stopped and abort
             effects['dcs_spr_override'].stop()
             return
@@ -668,7 +670,7 @@ class Helicopter(Aircraft):
 
     def dcs_update_trim_damper(self):
         if not self.is_joystick(): return
-        if not self.spring_mode_is(self.SpringModeEnum.NONE): return  # only supported when spring mode is NONE (game managed)
+        if not self.spring_mode_is(SpringModeEnum.NONE): return  # only supported when spring mode is NONE (game managed)
         if not self.dcs_tr_damper_enabled: return
         if not self.dcs_tr_button:
             self.flag_error('Please configure the trim-release button.  It must match that which is bound as trim release in the sim.')

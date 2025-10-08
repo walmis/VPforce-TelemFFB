@@ -2736,3 +2736,20 @@ def hexdump(src, length=16, sep='.'):
 
     return ("\n".join(lines))
 
+def expocurve(x, k):
+    # expo function for + k: y = (1-k)x + k( (1-e^(-ax)) / (1-e^-a))
+    #       for negative k: y = (1+k)x + -k(e^(a(x-1))-e^(-a)) / (1-e^(-a))
+    #   x = orig pct_max
+    #   y = new pct_max
+    #   k = expo value 0-1
+    #   a = alpha, controls how much to bend the curve.
+    #       a=5.5 gives approx 2x increase at 25% orig pct_max with k=0.5, 3x at 25% with k=1
+    #               and 1/2x decrease with k=-0.5, 1/3x with k=-1 at 75%
+    newvalue = 0
+    expo_a = 5.5  # alpha
+    if k >= 0:
+        newvalue = (1 - k) * x + k * (1 - math.exp(-expo_a * x)) / (1 - math.exp(-expo_a))
+    else:
+        newvalue = (1 + k) * x + (-k) * (math.exp(expo_a * (x - 1)) - math.exp(-expo_a)) / (1 - math.exp(-expo_a))
+    #print(f'expo input:{x} k:{k} output:{newvalue}')
+    return newvalue

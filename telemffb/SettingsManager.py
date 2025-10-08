@@ -9,7 +9,25 @@ from PyQt6.QtCore import QObject, pyqtSignal
 import telemffb.globals as G
 from . import xmlutils
 
+class SpringModeEnum(Enum):
+    NONE = auto()
+    BASIC = auto()
+    CENTER = auto()
+    CNTR_FT = auto()
+    ADVANCED = auto()
+    FBW = auto()
+    DEFAULT = auto()
+    NOSPRING = auto()
+    STATIC = auto()
+    DYNAMIC = auto()
+    CUSTOM = auto()
+    FORCETRIM = auto()
 
+class GEffectModeEnum(Enum):
+    DISABLED = auto()
+    LEGACY = auto()
+    NEW = auto()
+    ADVANCED = auto()
 class SettingsManager(QObject):
     activeProfileChanged = pyqtSignal(str)
     aircraftChanged = pyqtSignal(str)
@@ -122,19 +140,7 @@ class SettingsManager(QObject):
                     pass
 
 
-    class SpringModeEnum(Enum):
-        NONE = auto()
-        BASIC = auto()
-        CENTER = auto()
-        CNTR_FT = auto()
-        ADVANCED = auto()
-        FBW = auto()
-        DEFAULT = auto()
-        NOSPRING = auto()
-        STATIC = auto()
-        DYNAMIC = auto()
-        CUSTOM = auto()
-        FORCETRIM = auto()
+
 
     # used for both joystick and pedals
     MSFS_XP_JOYSTICK_SPRING_MODE = {
@@ -212,12 +218,6 @@ class SettingsManager(QObject):
         SpringModeEnum.NOSPRING: "No Spring",
         SpringModeEnum.FORCETRIM: "Hardware Force Trim",
     }
-
-    class GEffectModeEnum(Enum):
-        DISABLED = auto()
-        LEGACY = auto()
-        NEW = auto()
-        ADVANCED = auto()
 
     MSFS_XP_G_EFFECT_MODE = {
         GEffectModeEnum.DISABLED: "Disabled",
