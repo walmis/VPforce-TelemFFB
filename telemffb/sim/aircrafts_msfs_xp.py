@@ -259,6 +259,8 @@ class Aircraft(AircraftBase):
 
         self.spring_mode = SpringModeEnum.BASIC.name
 
+        self.last_pedal_x = 0
+
     def msfs_update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
         # freq = 8
@@ -1564,12 +1566,10 @@ class Helicopter(Aircraft):
     collective_spring_coeff_y = 0
     last_collective_y = None
 
-    pedals_init = 0
     pedal_spring_gain = 1
     hpg_pedal_spring_gain = 1
     pedal_dampening_gain = 1
     pedal_spring_coeff_x = 0
-    last_pedal_x = 0
 
     joystick_trim_follow_gain_physical_x = 0.3
     joystick_trim_follow_gain_virtual_x = 0.2
@@ -1586,6 +1586,7 @@ class Helicopter(Aircraft):
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
+        self.pedals_init = 0
         if self._sim_is_msfs():
             self.subscribe_simvars()
     
@@ -2162,6 +2163,7 @@ class HPGHelicopter(Helicopter):
         self.followup_trim_accumulator = 0.0
         self.tracker_var = False
         self._last_hands_on_time_ms = 0
+        self.pedals_init = 0
 
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
