@@ -62,6 +62,7 @@ kmh = 1.0 / 3.6
 deg = math.pi / 180
 fpss2gs = 1 / 32.17405
 
+
 class GForceEffectMixIn(AircraftEffectUtilsBase):
     # gforce_effect_master: bool = False
     # gforce_effect_enable: bool = False
@@ -84,12 +85,15 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
     new_gforce_max_gs_neg = -4
     new_gforce_effect_deflection_factor_neg = 1.0
 
-    gforce_effect_adv_curve: str = 'none'
+    gforce_effect_adv_curve: str = "none"
 
     def __init__(self):
         self.offset_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.offset_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
-        self.offset_adjuster = effects['offset_adjuster'].spring_adjuster()
+        self.offset_adjuster = effects["offset_adjuster"].spring_adjuster()
+
+        derivative_hz = 5  # derivative lpf filter -3db Hz
+        self._dGs = utils.Derivative(derivative_hz)
 
     def _ac_run_new_gforce_effect(self, telem_data):
         """Apply new G-force effects based on aircraft acceleration.
@@ -101,7 +105,11 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         Args:
             telem_data (dict): Telemetry data containing acceleration information
         """
-        if self._should_skip_joystick_effect() or not self.gforce_effect_mode_is(GEffectModeEnum.NEW) or self.gforce_effect_mode_is(GEffectModeEnum.DISABLED):
+        if (
+            self._should_skip_joystick_effect()
+            or not self.gforce_effect_mode_is(GEffectModeEnum.NEW)
+            or self.gforce_effect_mode_is(GEffectModeEnum.DISABLED)
+        ):
             effects.dispose("new_gforce")
             return
         if self._should_skip_airborne_effect(telem_data):
@@ -135,27 +143,25 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         _, spring_y_center = input_data.CP_XY()
         if spring_y_center is None:
             spring_y_center = 0
-        derivative_hz = 5  # derivative lpf filter -3db Hz
         derivative_k = 0.1  # derivative gain value, or damping ratio
 
-        dGs = getattr(self, "_dGs", None)
-        if not dGs: dGs = self._dGs = utils.Derivative(derivative_hz)
-        dGs.lpf.cutoff_freq_hz = derivative_hz
-
+        dGs = self._dGs
         if gs > 1 and y > (spring_y_center + self.new_gforce_effect_center_deadzone):
             direction = 180
-            g_factor = utils.scale_clamp(gs, (gmin, gmax), (0,1))
+            g_factor = utils.scale_clamp(gs, (gmin, gmax), (0, 1))
 
-            g_deriv = - dGs.update(g_factor) * derivative_k
+            g_deriv = -dGs.update(g_factor) * derivative_k
             g_factor += g_deriv
             y_maxpoint = spring_y_center + (1 - spring_y_center) * self.new_gforce_effect_deflection_factor
             # utils.dbprint("green", f"y: {y}, syc:{spring_y_center}, y_max: {y_maxpoint}")
             deflection_factor = abs(utils.scale(y, (spring_y_center, y_maxpoint), (0, 1)))
-        elif gs < 1 and y < (spring_y_center - self.new_gforce_effect_center_deadzone) and self.new_gforce_enable_neg_gs:
+        elif (
+            gs < 1 and y < (spring_y_center - self.new_gforce_effect_center_deadzone) and self.new_gforce_enable_neg_gs
+        ):
             direction = 0
-            g_factor = utils.scale_clamp(gs, (gmin_neg, gmax_neg), (0,1))
+            g_factor = utils.scale_clamp(gs, (gmin_neg, gmax_neg), (0, 1))
 
-            g_deriv = - dGs.update(g_factor) * derivative_k
+            g_deriv = -dGs.update(g_factor) * derivative_k
             g_factor += g_deriv
             y_maxpoint = abs(spring_y_center + (-1 - spring_y_center) * self.new_gforce_effect_deflection_factor_neg)
             # utils.dbprint("red", f"y_pos: {y}, spr_cent:{spring_y_center}, y_max: {y_maxpoint}")
@@ -164,20 +170,20 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
             effects["new_gforce"].stop()
             return
 
-        telem_data['g_factor_raw'] = g_factor
-        telem_data['g_deflection'] = deflection_factor
+        telem_data["g_factor_raw"] = g_factor
+        telem_data["g_deflection"] = deflection_factor
         # utils.dbprint("blue", f"g_deflection_factor: {deflection_factor}", "joystick")
-        telem_data['g_y'] = y
+        telem_data["g_y"] = y
 
         g_factor = g_factor * deflection_factor
 
-        telem_data['g_factor'] = g_factor
+        telem_data["g_factor"] = g_factor
         effects["new_gforce"].constant(g_factor, direction).start()
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def ac_update_gforce_effect(self, telem_data, adv_spr=False):
         if self.gforce_effect_mode_is(GEffectModeEnum.DISABLED):
-            effects.dispose('gforce', 'new_gforce')
+            effects.dispose("gforce", "new_gforce")
             return
         if self.gforce_effect_mode_is(GEffectModeEnum.NEW):
             # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
@@ -196,9 +202,11 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
             # Flag error and abort if not met
             supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
             if not supported:
-                self.flag_error('The Advanced/Custom Curve G-Force effect requires firmware v1.0.18 or higher.\n'
-                                f'The device is currently running version {G.device_firmware_version}\n'
-                                f'Please update your device firmware!')
+                self.flag_error(
+                    "The Advanced/Custom Curve G-Force effect requires firmware v1.0.18 or higher.\n"
+                    f"The device is currently running version {G.device_firmware_version}\n"
+                    f"Please update your device firmware!"
+                )
                 return
 
         if self._should_skip_airborne_effect(telem_data):
@@ -230,13 +238,10 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
             derivative_hz = 5  # derivative lpf filter -3db Hz
             derivative_k = 0.1  # derivative gain value, or damping ratio
 
-            dGs = getattr(self, "_dGs", None)
-            if not dGs: 
-                dGs = self._dGs = utils.Derivative(derivative_hz)
-
+            dGs = self._dGs
             dGs.lpf.cutoff_freq_hz = derivative_hz
 
-            g_deriv = - dGs.update(g_factor) * derivative_k
+            g_deriv = -dGs.update(g_factor) * derivative_k
 
             g_factor += g_deriv
 
@@ -247,43 +252,42 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
             logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
         elif self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED):
-            if self.gforce_effect_adv_curve == 'none':
-                self.flag_error('Please Configure the Advanced G-Force Effect Settings')
-                effects.dispose('adv_gforce_constant')
+            if self.gforce_effect_adv_curve == "none":
+                self.flag_error("Please Configure the Advanced G-Force Effect Settings")
+                effects.dispose("adv_gforce_constant")
                 return
             if self.adv_g_settings_dict == {}:
                 self.adv_g_settings_dict = utils.json.loads(self.gforce_effect_adv_curve)
 
             gains = utils.get_gain_from_gs(self.gforce_effect_adv_curve, abs(gs))
-
-            mode = self.adv_g_settings_dict.get('mode', 'constant')
+            mode = self.adv_g_settings_dict.get("mode", "constant")
 
             if gs >= 0:
-                g_factor = gains.get('pos')
+                g_factor = gains.get("pos")
                 direction = 180
             else:
-                if self.adv_g_settings_dict.get('enable_neg'):
-                    g_factor = -gains.get('neg')
+                if self.adv_g_settings_dict.get("enable_neg"):
+                    g_factor = -gains.get("neg")
                     direction = 0
                 else:
-                    effects.dispose('gforce', 'gforce_spr')
+                    effects.dispose("gforce", "gforce_spr")
                     return
 
             if not g_factor:
-                effects.dispose('gforce', 'gforce_spr')
+                effects.dispose("gforce", "gforce_spr")
                 return
-            if mode == 'constant':
+            if mode == "constant":
                 g_factor = utils.clamp(g_factor, 0.0, 1.0)
                 effects["gforce"].constant(g_factor, direction).start()
 
-            elif mode == 'offset':
-                adjuster_cpOy = int(-g_factor*4096)
+            elif mode == "offset":
+                adjuster_cpOy = int(-g_factor * 4096)
 
                 if adv_spr:
                     # If being called by advanced spring effect, don't apply adjuster offset here, return offset value and let the advanced spring adjuster effect do it
                     return adjuster_cpOy
 
-                self.offset_adjuster.name = 'gforce_spr'
+                self.offset_adjuster.name = "gforce_spr"
                 self.offset_adjuster_y.set_offset(adjuster_cpOy)
                 self.offset_adjuster_y.set_saturation(4096)
                 self.offset_adjuster_x.set_saturation(4096)
@@ -294,9 +298,12 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         else:
             effects.dispose("gforce")
             return
-        
+
+
 class DynamicSpringMixin:
+    """Provides dynamic spring condition holders for devices that need them."""
     def __init__(self):
+        # these are set to real FFB report condition objects during instance initialization
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
@@ -330,7 +337,6 @@ class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
         force_trim_pressed = self.check_button_press(self.pedal_ft_release_button, self.pedal_ft_use_master_buttons)
         trim_reset_pressed = self.check_button_press(self.pedal_ft_reset_button, self.pedal_ft_use_master_buttons)
 
-
         if force_trim_pressed or not ft_active:
             if self.pedal_ft_damper_enabled:
                 self.spring_x.set_coefficient(self.pedal_ft_damper_force)
@@ -353,7 +359,7 @@ class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
                 self.pedal_trim_reset_complete = False
             return True
         return False
-    
+
     def ac_override_pedal_spring(self, telem_data):
         if not self.is_pedals(): return
 
@@ -404,6 +410,264 @@ class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
 
         spring.setCondition(self.spring_x)
         spring.start(override=True)
+
+
+class HelicopterEffectsMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
+    """Mixin for helicopter-specific configuration and effects."""
+
+    rotor_blade_count: int = 2
+
+    # Engine/rotor rumble
+    engine_rotor_rumble_enabled: bool = False
+    heli_engine_rumble_intensity: float = 0.12
+
+    # ETL / Overspeed
+    etl_effect_enable: bool = True
+    etl_start_speed: float = 6.0
+    etl_stop_speed: float = 22.0
+    etl_effect_intensity: float = 0.2
+    etl_shake_frequency: float = 14.0
+
+    overspeed_effect_enable: bool = True
+    overspeed_shake_start: float = 70.0
+    overspeed_shake_intensity: float = 0.2
+    overspeed_shake_frequency: float = 0.0
+
+    # Vortex Ring State (VRS)
+    vrs_effect_enable: bool = False
+    vrs_effect_intensity: float = 0.0
+    vrs_threshold_speed: float = 0.0
+    vrs_vs_onset: float = 0
+    vrs_vs_max: float = 0
+
+    # Collective force trim override settings
+    collective_ft_ovd_enabled: bool = False
+    collective_ft_ovd_release: int = 0
+    collective_ft_ovd_spring_gain: float = 0.5
+    collective_ft_ovd_tr_damper: float = 0.05
+    collective_ft_ovd_reset: int = 0
+    collective_ft_ovd_trim_rate: int = 200
+    collective_ft_init: bool = False
+    collective_ft_ovd_trim_down = 0
+    collective_ft_ovd_trim_up = 0
+    collective_ft_ovd_cp0_y = 4096
+    collective_ft_use_master_buttons: bool = False
+
+    ########################################
+    ######                            ######
+    ######     Helicopter Effects     ######
+    ######                            ######
+    ########################################
+
+    def ac_calc_etl_effect(self, telem_data, blade_ct=None):
+        #  rotor = 245
+        mod = telem_data.get("N")
+        tas = telem_data.get("TAS", 0)
+        WoW = sum(telem_data.get("WeightOnWheels"))
+        if mod == "UH-60L":
+            # UH60 always shows positive value for tailwheel
+            WoW = telem_data.get("WeightOnWheels")[0] + telem_data.get("WeightOnWheels")[2]
+
+        if self._sim_is_xplane():
+            rotor = telem_data.get("PropRPM", 0)
+            if isinstance(rotor, list):
+                rotor = rotor[0]
+        else:
+            rotor = telem_data.get("RotorRPM", 0)
+            if isinstance(rotor, list):
+                rotor = max(rotor)
+        if WoW > 0:
+            # logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
+            effects.dispose("etlX", "etlY", "overspeedX", "overspeedY")
+            return
+        if blade_ct is None:
+            blade_ct = 2
+            rotor = 250
+
+        self.etl_shake_frequency = (rotor / 75) * blade_ct
+        self.overspeed_shake_frequency = self.etl_shake_frequency * 0.75
+
+        etl_mid = (self.etl_start_speed + self.etl_stop_speed) / 2.0
+
+        if (
+            (tas >= self.etl_start_speed and tas <= self.etl_stop_speed)
+            and self.etl_effect_intensity
+            and self.etl_effect_enable
+        ):
+            shake = self.etl_effect_intensity * utils.gaussian_scaling(
+                tas, self.etl_start_speed, self.etl_stop_speed, peak_percentage=0.5, curve_width=0.7
+            )
+            shake = utils.clamp(shake, 0.0, 1.0)
+            effects["etlY"].periodic(self.etl_shake_frequency, shake, 0).start()
+            effects["etlX"].periodic(self.etl_shake_frequency + 4, shake, 90).start()
+            logging.debug(f"Playing ETL shake (freq = {self.etl_shake_frequency}, intens= {shake})")
+        else:
+            effects.dispose("etlX", "etlY")
+
+        if tas >= self.overspeed_shake_start and self.overspeed_effect_enable:
+            shake = self.overspeed_shake_intensity * utils.non_linear_scaling(
+                tas, self.overspeed_shake_start, self.overspeed_shake_start + 15, curvature=0.7
+            )
+            shake = utils.clamp(shake, 0.0, 1.0)
+            effects["overspeedY"].periodic(self.overspeed_shake_frequency, shake, 0).start()
+            effects["overspeedX"].periodic(self.overspeed_shake_frequency + 4, shake, 90).start()
+            logging.debug(f"Overspeed shake (freq = {self.etl_shake_frequency}, intens= {shake}) ")
+        else:
+            effects.dispose("overspeedX", "overspeedY")
+
+    def ac_update_vrs_effect(self, telem_data):
+        vs = telem_data.get("VerticalSpeed", 0)
+        if self._sim_is_dcs():
+            # spd = abs(telem_data.get("VlctVectors")[0])
+            tas = telem_data.get("TAS")
+            adj_tas = tas - abs(vs)
+            spd = adj_tas
+            telem_data["_adj_TAS"] = adj_tas
+        else:
+            spd = abs(telem_data.get("TAS", 0))
+        wow = max(telem_data.get("WeightOnWheels", 1))
+        # print(f"tas:{tas}, vs:{vs}, wow:{wow}")
+        if not self.vrs_effect_enable or wow or spd > self.vrs_threshold_speed or vs > 0:
+            # print("I'm out")
+            effects.dispose("vrs_buffet", "vrs_buffet2")
+            return
+
+        if abs(vs) >= self.vrs_vs_onset:
+            vs_factor = utils.scale(abs(vs), (self.vrs_vs_onset, self.vrs_vs_max), (0.0, self.vrs_effect_intensity))
+            if spd == 0:
+                spd_factor = 1
+            else:
+                spd_factor = utils.scale(spd, (spd * 1.2, spd), (0, 1))
+
+            intensity = utils.clamp(vs_factor * spd_factor, 0, 1)
+
+            effects["vrs_buffet"].periodic(10, intensity, utils.RandomDirectionModulator).start()
+            effects["vrs_buffet2"].periodic(12, intensity, utils.RandomDirectionModulator).start()
+        else:
+            effects.dispose("vrs_buffet", "vrs_buffet2")
+
+    def ac_update_heli_engine_rumble(self, telem_data, blade_ct=None):
+        if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:
+            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
+            return
+        if self._sim_is_xplane():
+            rrpm = telem_data.get("PropRPM", 0)
+            if isinstance(rrpm, list):
+                rrpm = rrpm[0]
+        else:
+            rrpm = telem_data.get("RotorRPM", 0)
+            if isinstance(rrpm, list):
+                rrpm = max(rrpm)
+        mod = telem_data.get("N")
+        tas = telem_data.get("TAS", 0)
+        eng_rpm = telem_data.get("EngRPM", 0)
+        if isinstance(eng_rpm, list):
+            eng_rpm = max(eng_rpm)
+
+        # rotor = telem_data.get("RotorRPM")
+
+        if blade_ct is None:
+            blade_ct = 2
+            rrpm = 250
+
+        if rrpm < 5:
+            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
+            return
+
+        logging.debug(f"Engine Rumble: Blade_Ct={blade_ct}, RPM={rrpm}")
+        frequency = float(rrpm) / 45 * blade_ct
+
+        median_modulation = 2
+        frequency2 = frequency + median_modulation
+        if frequency > 0 and eng_rpm > 0:
+            logging.debug(f"Current Heli Engine Rumble Intensity = {self.heli_engine_rumble_intensity}")
+            effects["rotor_rpm0-1"].periodic(
+                frequency, self.heli_engine_rumble_intensity * 0.5, 0
+            ).start()  # vib on X axis
+            effects["rotor_rpm1-1"].periodic(
+                frequency2, self.heli_engine_rumble_intensity * 0.5, 90
+            ).start()  # vib on Y axis
+        else:
+            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
+
+    def ac_collective_force_trim_override(self, telem_data, spring):
+        """
+        Generic effect enabling spring force and hardware trim for collective axis.
+        """
+
+        if not self.is_collective():
+            return
+        if not self.spring_mode_is(SpringModeEnum.FORCETRIM):
+            # If feature disabled, ensure spring is stopped and abort
+            effects["collective_ft"].stop()
+            return
+
+        dt = perftracker.get_time_delta("collective_ft_perf")
+        self.telem_data["_coll_ft_dt"] = dt
+
+        wow = sum(telem_data.get("WeightOnWheels", [1]))
+
+        input_data = HapticEffect.device.get_input()
+        _, y = input_data.axisXY()
+        current_buttons = input_data.getPressedButtons()
+
+        force_trim_active = telem_data.get("ForceTrimSW", True)
+
+        if not force_trim_active:
+            # Force trim is enabled, but the 'ForceTrimSW' flag is false, just move
+            self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
+            self.collective_ft_ovd_cp0_y = round(y * 4096)
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
+            spring.setCondition(self.spring_y)
+            return
+
+        # decide what to do depending on which button is pressed
+        if self.check_button_press(self.collective_ft_ovd_release, self.collective_ft_use_master_buttons):
+            # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
+            # as it is moved while spring force is enabled.
+            # return from method so default spring gains do not get applied at the end of the method
+            self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
+
+            self.collective_ft_ovd_cp0_y = round(y * 4096)
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
+            spring.setCondition(self.spring_y)
+            spring.start(override=True)
+            return
+
+        elif self.check_button_press(self.collective_ft_ovd_reset, self.collective_ft_use_master_buttons):
+            # if trim reset button pressed, set offsets back to 0
+            # print("TRIM RESET")
+            self.collective_ft_ovd_cp0_y = 4096
+            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
+            spring.setCondition(self.spring_y)
+
+        # calculate step size based on configured rate and delta time
+        trim_step_size = self.collective_ft_ovd_trim_rate * dt
+
+        self.telem_data["_coll_ft_step"] = trim_step_size
+
+        if self.check_button_press(self.collective_ft_ovd_trim_down, self.collective_ft_use_master_buttons):
+            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+            # print("TRIM DOWN")
+            self.collective_ft_ovd_cp0_y += trim_step_size
+            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
+            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
+        elif self.check_button_press(self.collective_ft_ovd_trim_up, self.collective_ft_use_master_buttons):
+            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
+            # print("TRIM UP")
+            self.collective_ft_ovd_cp0_y -= trim_step_size
+            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
+            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
+
+        self.telem_data["_coll_ft_trim_pos"] = round(self.collective_ft_ovd_cp0_y)
+
+        # If trim release is not pressed, set spring gain based on user setting and start spring override
+        self.spring_y.set_coefficient(self.collective_ft_ovd_spring_gain)
+
+        spring.setCondition(self.spring_y)
+        # ensure spring is started with override = true
+        spring.start(override=True)
+
 
 class BuffetingEffectMixIn(AircraftEffectUtilsBase):
     aoa_buffet_freq = 13
@@ -506,16 +770,528 @@ class BuffetingEffectMixIn(AircraftEffectUtilsBase):
         if tas < drag_buffet_threshold:
             return 0
 
-class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectMixIn):
+# Weapons / Countermeasure effects mixin
+class WeaponsEffectMixIn(AircraftEffectUtilsBase):
+    """Mixin for weapon, gunfire and countermeasure effects."""
+    # weapon / CM related config
+    gun_vibration_intensity: float = 0.12  # peak gunfire vibration intensity, 0 to disable
+    cm_vibration_intensity: float = 0.12  # peak countermeasure release vibration intensity, 0 to disable
+    weapon_release_intensity: float = 0.12  # peak weapon release vibration intensity, 0 to disable
+    weapon_effect_direction: int = 45  # Affects direction of weapon effects (-1 for random)
+
+    gunfire_effect_enabled: bool = False
+    countermeasure_effect_enabled: bool = False
+    weapon_release_effect_enabled: bool = False
+
+    def ac_update_cm_weapons(self, telem):
+        payload = telem.get("PayloadInfo")
+        gun = telem.get("Gun")
+        flares = telem.get("Flares")
+        chaff = telem.get("Chaff")
+
+        # Use helper method for weapon effects
+        self._create_weapon_effect("payload_rel", "PayloadInfo", payload,
+                                 self.weapon_release_effect_enabled, self.weapon_release_intensity, shape=EFFECT_SQUARE)
+
+        self._create_weapon_effect("gunfire", "Gun", gun,
+                                 self.gunfire_effect_enabled, self.gun_vibration_intensity, shape=EFFECT_SAWTOOTHUP)
+
+        # Countermeasures effect (combined flares and chaff)
+        cm_changed = (self.anything_has_changed("Flares", flares) or
+                     self.anything_has_changed("Chaff", chaff))
+        if cm_changed and self.countermeasure_effect_enabled:
+            direction = self._get_effect_direction(self.weapon_effect_direction)
+            if self.weapon_effect_direction == -1:
+                logging.info(f"CM Effect Direction is randomized: {direction} deg")
+            effects["cm"].periodic(50, self.cm_vibration_intensity, direction, duration=80).start(force=True)
+        elif not (self.anything_has_changed("Flares", flares, delta_ms=160) or
+                 self.anything_has_changed("Chaff", chaff, delta_ms=160)) or not self.countermeasure_effect_enabled:
+            effects["cm"].stop()
+
+    def _create_weapon_effect(self, effect_name: str, telem_key: str, telem_value,
+                             enabled_flag: bool, intensity: float, frequency: int = 10,
+                             duration: int = 80, delta_ms: int = 160, shape: int = EFFECT_SINE):
+        """Generic method for weapon-related effects (gun, payload, countermeasures)."""
+        if not enabled_flag:
+            effects[effect_name].stop()
+            return
+
+        if self.anything_has_changed(telem_key, telem_value):
+            direction = self._get_effect_direction(self.weapon_effect_direction)
+            if self.weapon_effect_direction == -1:
+                logging.info(f"{effect_name.title()} Effect Direction is randomized: {direction} deg")
+            effects[effect_name].periodic(frequency, intensity, direction, effect_type=shape, duration=duration).start(force=True)
+        elif not self.anything_has_changed(telem_key, telem_value, delta_ms=delta_ms):
+            effects[effect_name].stop()
+
+
+class DeadzoneMixIn(AircraftEffectUtilsBase):
+    """Mixin for device deadzone configuration and runtime application."""
+    enable_deadzone: bool = False
+    deadzone_base_pct: float = 0.0
+
+    def __init__(self):
+        super().__init__()
+        # instance state for deadzone handling
+        self.active_deadzone_pct: float = 0.0
+        self.deadzone_active: bool = False
+
+    def ac_set_deadzone(self):
+        if not self.enable_deadzone and self.deadzone_active:
+            if self.active_deadzone_pct != 0.0:
+                HapticEffect.device.set_deadzone(0)
+                self.active_deadzone_pct = 0.0
+                logging.info('Disabling deadzone')
+                self.deadzone_active = False
+            return
+        if self.active_deadzone_pct != self.deadzone_base_pct:
+            dz = utils.clamp(round((self.deadzone_base_pct / 100) * 4096), 0, 4096)
+            HapticEffect.device.set_deadzone(dz)
+            self.active_deadzone_pct = self.deadzone_base_pct
+            logging.info(f"Setting Deadzone to %{self.deadzone_base_pct}")
+            self.deadzone_active = True
+
+
+class MotionEffectsMixIn(AircraftEffectUtilsBase):
+    """Contains motion/rumble/haptic related configuration, state and handlers.
+
+    This mixin centralises motion-related attributes and methods such as flaps,
+    canopy, landing gear, speedbrakes, spoilers, tailhook, fuelboom, wingfold,
+    runway rumble and touchdown effects. Instance state used by these
+    handlers is initialised in __init__ so AircraftBase can remain a thin
+    delegator.
+    """
+
+    # Motion / haptic configuration (defaults moved from AircraftBase)
+    speedbrake_motion_intensity : float = 0.12
+    speedbrake_buffet_intensity : float = 0.15
+    speedbrake_speed_thresh :   float = 80 * kt2ms
+
+    speedbrake_motion_effect_enabled: bool = False
+    speedbrake_buffet_effect_enabled: bool = False
+
+    spoiler_motion_intensity: float = 0.0
+    spoiler_buffet_intensity: float = 0.15
+    spoiler_spd_thresh_low: float = 80 * kt2ms
+    spoiler_spd_thresh_hi: float = 140 * kt2ms
+    spoiler_motion_effect_enabled: bool = False
+    spoiler_buffet_effect_enabled: bool = False
+
+    flaps_motion_intensity : float = 0.12
+    flaps_buffet_intensity : float = 0.0
+    flaps_motion_effect_enabled: bool = False
+
+    canopy_motion_intensity : float = 0.12
+    canopy_buffet_intensity : float = 0.0
+    canopy_motion_effect_enabled: bool = False
+
+    gear_motion_effect_enabled: bool = True
+    gear_motion_intensity: float = 0.12
+    gear_buffet_effect_enabled: bool = True
+    gear_buffet_intensity: float = 0.15
+    gear_buffet_freq = 10
+    gear_buffet_speed_low = 100
+    gear_buffet_speed_high = 150
+
+    tailhook_motion_effect_enabled: bool = False
+    tailhook_motion_intensity: float = 0.12
+
+    fuelboom_motion_effect_enabled: bool = False
+    fuelboom_motion_intensity: float = 0.12
+
+    wingfold_motion_effect_enabled: bool = False
+    wingfold_motion_intensity: float = 0.10
+
+    runway_rumble_intensity: float = 1.0
+    runway_rumble_enabled: bool = False
+
+    touchdown_effect_enabled: bool = False
+    touchdown_effect_max_force: float = 0.5
+    touchdown_effect_max_gs: float = 3.0
+
+    def __init__(self, *args, **kwargs):
+        # Ensure cooperative multiple-inheritance init ordering
+        super().__init__(*args, **kwargs)
+
+        # Instance state used by motion/haptic handlers
+        self.last_device_x = None
+        self.last_device_y = None
+        # smoother used by some motion effects — per-instance to avoid shared state
+        self.smoother = utils.Smoother()
+
+    def bms_taxi_bumps(self, telem_data):
+        """Generates a bump effect in response to bumpIntensity telemetry for Falcon BMS simulator"""
+        if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
+            effects.dispose("runway_bump0", "runway_bump1")
+            return
+        bump = telem_data.get("BumpIntensity")
+        if bump and self.anything_has_changed("BumpIntensity", bump):
+            intensity = utils.clamp(bump * self.runway_rumble_intensity, 0, 1)
+            effects['runway_bump0'].periodic(15, intensity * .75, direction=0, effect_type=EFFECT_SQUARE, duration=80).start()
+            effects['runway_bump1'].periodic(15, intensity, direction=0, effect_type=EFFECT_SQUARE, phase=180, duration=160).start()
+
+    def ac_update_runway_rumble(self, telem_data):
+        """Add wheel based rumble effects for immersion
+        Generates bumps/etc on touchdown, rolling, field landing etc
+        """
+        if self._sim_is_bms():
+            # Fake it since BMS does not have weight on wheels - only has 'bumps' telemetry
+            self.bms_taxi_bumps(telem_data)
+            return
+
+        if self.is_collective(): return
+        if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
+            effects.dispose("runway0", "runway1")
+            return
+
+        WoW = telem_data.get("WeightOnWheels", (0, 0, 0))
+        hp_f_cutoff_hz = 3
+        v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[0])) * self.runway_rumble_intensity
+        v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[1] - WoW[2]) * self.runway_rumble_intensity
+
+        v1 = utils.clamp_minmax(v1, 0.5)
+        v2 = utils.clamp_minmax(v2, 0.5)
+
+        tot_weight = sum(WoW)
+
+        if tot_weight:
+            logging.debug(f"Runway Rumble : v1 = {v1}. v2 = {v2}")
+            effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
+            effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
+        else:
+            effects.dispose("runway0", "runway1")
+
+
+    def ac_update_touchdown_effect(self, telem_data):
+        """Generates a g-based force upon landing or as a result of large bumps"""
+
+        max_force = self.touchdown_effect_max_force
+        max_g = self.touchdown_effect_max_gs
+        if self.is_collective() or self.is_pedals():
+            return
+        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
+            gs = round(telem_data.get("ACCs")[1] - 1, 2)
+        elif self._sim_is("MSFS") or self._sim_is("XPLANE"):
+            gs = round(telem_data.get("AccBody")[1], 2)
+        else:
+            return
+
+        if not self.touchdown_effect_enabled:
+            effects.dispose("touchdown")
+            return
+        on_ground = telem_data.get("SimOnGround", 0)
+        if not on_ground:
+            effects.dispose("touchdown")
+            return
+        force = round(utils.scale_clamp(gs, (0, self.touchdown_effect_max_gs), (0,self.touchdown_effect_max_force)), 2)
+
+        logging.debug(f"Touchdown Effect: Realtime Gs: {gs}, Force:{force}")
+        effects['touchdown'].constant(force, 180).start()
+
+
+    def ac_update_flaps(self, telem_data):
+        """Delegates to MotionEffectsMixIn.ac_update_flaps"""
+        return super().ac_update_flaps(telem_data)
+
+
+    def ac_update_canopy(self, telem_data):
+        canopypos = telem_data.get("Canopy")
+        if canopypos is None:
+            canopypos = telem_data.get("canopy_value")
+        if canopypos is None:
+            return
+        if self.anything_has_changed("Canopy", canopypos, delta_ms=100) and self.canopy_motion_intensity > 0 and self.canopy_motion_effect_enabled:
+            logging.debug(f"Canopy Pos: {canopypos}")
+            direction = 90 if self.is_pedals() else 0
+            effects["canopymovement"].periodic(120, self.canopy_motion_intensity, direction, 3).start()
+        else:
+            if canopypos == 0 and effects['canopymovement'].started:
+                effects['canopyclunk'].periodic(10, utils.clamp((self.canopy_motion_intensity * 2), 0, 1), 180, effect_type=EFFECT_SQUARE,duration=40).start()
+            effects["canopymovement"].stop(destroy_after=5000)
+
+
+    def ac_update_landing_gear(self, telem_data):
+        gearpos = telem_data.get("gear_value", telem_data.get("GearPos", None))
+        if isinstance(gearpos, list):
+            gearpos = max(gearpos)
+
+        if self._sim_is_msfs() or self._sim_is_xplane():
+            retracts = telem_data.get("RetractableGear", 0)
+            if isinstance(retracts, list):
+                retracts = max(retracts)
+            if (self.gear_motion_intensity > 0) and (retracts):
+                gearpos = max(telem_data.get("Gear", 0))
+        
+        if gearpos is None:
+            return
+        
+        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
+        if airspd is None:
+            return
+        
+        if self._sim_is_xplane():
+            self.gear_buffet_speed_low = 0.9 * self.telem_data.get("Vle", 10000)
+            self.gear_buffet_speed_high = self.gear_buffet_speed_low * 1.3
+
+        rumble_freq = self.gear_buffet_freq
+
+        if self.anything_has_changed("gear_value", gearpos, 50) and self.gear_motion_intensity > 0 and self.gear_motion_effect_enabled:
+            logging.debug(f"Landing Gear Pos: {gearpos}")
+            effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
+            effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 90, 3, phase=120).start()
+            if (gearpos == 0 or gearpos == 1) and self.is_joystick():
+                dir = 0 if gearpos == 0 else 180
+                effects['gearclunk'].periodic(10, utils.clamp((self.gear_motion_intensity * 3), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
+        else:
+            effects.dispose("gearmovement", "gearmovement2")
+
+        if (airspd > self.gear_buffet_speed_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
+            realtime_intensity = utils.scale_clamp(airspd, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),(0, self.gear_buffet_intensity)) * gearpos
+            effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, 4).start()
+            effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, 4).start()
+            logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
+        else:
+            effects.dispose("gearbuffet", "gearbuffet2")
+
+
+    def ac_update_speed_brakes(self, telem_data):
+        if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
+            return
+
+        spd_thresh = self.speedbrake_speed_thresh
+        spdbrk = telem_data.get("SpeedbrakePos")
+        if spdbrk is None:
+            spdbrk = telem_data.get("speedbrakes_value", None)
+
+        if spdbrk is None:
+            return
+
+        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
+        if airspd is None:
+            return
+        if self.anything_has_changed("speedbrakes_value", spdbrk, 50) and self.speedbrake_motion_intensity > 0 and self.speedbrake_motion_effect_enabled:
+            logging.debug(f"Speedbrake Pos: {spdbrk}")
+            direction = 90 if self.is_pedals() else 0
+            effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, direction, 3).start()
+        else:
+            effects.dispose("speedbrakemovement")
+
+        config = {
+            'enabled_attr': 'speedbrake_buffet_effect_enabled',
+            'intensity_attr': 'speedbrake_buffet_intensity',
+            'effect_names': ['speedbrakebuffet'],
+            'effect_name': 'speedbrake',
+            'threshold_speed': spd_thresh,
+            'threshold_value': 0.1,
+            'deployment_key': 'speedbrakes_value',
+            'directions': [utils.RandomDirectionModulator],
+            'require_airborne': False
+        }
+        temp_telem = dict(self._telem_data)
+        temp_telem['speedbrakes_value'] = spdbrk
+        temp_telem['TAS'] = airspd
+        self._create_buffeting_effect(temp_telem, config)
+
+
+    def ac_update_spoilers(self, telem_data):
+        if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
+            return
+
+        spd_thresh_low = self.spoiler_spd_thresh_low
+        spd_thresh_hi  = self.spoiler_spd_thresh_hi
+
+        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
+        if airspd is None:
+            return
+
+        tas_intensity = utils.clamp_minmax(utils.scale(airspd, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
+        spoiler = telem_data.get("Spoilers")
+
+        if spoiler == 0 or spoiler == None:
+            effects.dispose("spoilermovement", "spoilermovement2")
+            return
+        if isinstance(spoiler, list):
+            spoiler = sum(spoiler) / len(spoiler)
+
+        if self.spoiler_motion_intensity > 0 and self.spoiler_motion_intensity > 0 and self.spoiler_motion_effect_enabled:
+            if self.anything_has_changed("Spoilers", spoiler, delta_ms=50):
+                logging.debug(f"Spoilers Pos: {spoiler}")
+                effects["spoilermovement"].periodic(118, self.spoiler_motion_intensity, 0, 4).start()
+                effects["spoilermovement2"].periodic(118, self.spoiler_motion_intensity, 90, 4).start()
+            else:
+                logging.debug("Destroying Spoiler Effects")
+                for effect in ["spoilermovement", "spoilermovement2"]:
+                    effects[effect].stop(1000)
+
+        if airspd > spd_thresh_low and spoiler > .1 and self.spoiler_buffet_intensity > 0 and self.spoiler_buffet_effect_enabled:
+            realtime_intensity = self.spoiler_buffet_intensity * spoiler * tas_intensity
+            logging.debug(f"PLAYING SPOILER RUMBLE | intensity: {realtime_intensity}, d-factor: {spoiler}, s-factor: {tas_intensity}")
+            effects["spoilerbuffet1-1"].periodic(15, realtime_intensity, 0, 4).start()
+            effects["spoilerbuffet1-2"].periodic(16, realtime_intensity, 0, 4).start()
+            effects["spoilerbuffet2-1"].periodic(14, realtime_intensity, 90, 4).start()
+            effects["spoilerbuffet2-2"].periodic(18, realtime_intensity, 90, 4).start()
+        else:
+            for effect in ["spoilerbuffet1-1", "spoilerbuffet1-2", "spoilerbuffet2-1", "spoilerbuffet2-2"]:
+                effects[effect].stop(1000)
+
+
+    def ac_update_tailhook_effect(self, telem_data):
+        hook = telem_data.get('TailHook', None)
+        if hook is None: return
+        if not self.is_joystick(): return
+
+        if not self.tailhook_motion_effect_enabled or not self.tailhook_motion_intensity:
+            effects.dispose('hookmovement')
+            return
+
+        if self.anything_has_changed("tailhook_value", hook, delta_ms=200):
+            logging.debug(f"Hook Pos: {hook}")
+            direction = 90 if self.is_pedals() else 0
+            effects["hookmovement"].periodic(160, self.tailhook_motion_intensity, direction, EFFECT_SAWTOOTHUP).start()
+        else:
+            if (hook == 0 or hook ==1) and effects['hookmovement'].started:
+                dir = (1-hook) * 180
+                effects['clunk'].periodic(10, utils.clamp((self.tailhook_motion_intensity * 2), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
+            effects.dispose("hookmovement")
+
+
+    def ac_update_fuelboom_effect(self, telem_data):
+        config = {
+            'telem_key': 'FuelBoom',
+            'change_key': 'fuelboom_value',
+            'effect_names': ['boommovement'],
+            'clunk_effects': ['clunk'],
+            'enabled_attr': 'fuelboom_motion_effect_enabled',
+            'intensity_attr': 'fuelboom_motion_intensity',
+            'frequency': 150,
+            'directions': [90 if self.is_pedals() else 0],
+            'effect_type': EFFECT_SAWTOOTHDOWN,
+            'delta_ms': 200,
+            'clunk_duration': 40
+        }
+        self._create_motion_effect(telem_data, config)
+
+
+    def ac_update_wingfold_effect(self, telem_data):
+        config = {
+            'telem_key': 'WingFold',
+            'change_key': 'wingfold_value',
+            'effect_names': ['wingfoldmovement_1', 'wingfoldmovement_2'],
+            'clunk_effects': ['wingfoldclunk1', 'wingfoldclunk2'],
+            'enabled_attr': 'wingfold_motion_effect_enabled',
+            'intensity_attr': 'wingfold_motion_intensity',
+            'frequency': 100,
+            'directions': [45, 225],
+            'effect_type': EFFECT_SAWTOOTHDOWN,
+            'delta_ms': 200,
+            'phase_offset': 90,
+            'require_ground': True,
+            'clunk_directions': [90, 270],
+            'clunk_duration': 100
+        }
+        self._create_motion_effect(telem_data, config)
+
+
+    def _create_motion_effect(self, telem_data: dict, config: dict):
+        """Generic method for motion effects (tailhook, fuelboom, wingfold, etc.)."""
+        value = telem_data.get(config['telem_key'])
+        if value is None:
+            return
+
+        if self._should_skip_joystick_effect():
+            return
+
+        if config.get('require_ground', False):
+            on_ground = telem_data.get('SimOnGround', 0)
+            if not on_ground:
+                effects.dispose(*config['effect_names'])
+                return
+
+        enabled = getattr(self, config['enabled_attr'])
+        intensity = getattr(self, config['intensity_attr'])
+
+        if not enabled or not intensity:
+            effects.dispose(*config['effect_names'])
+            return
+
+        delta_ms = config.get('delta_ms', 200)
+        if self.anything_has_changed(config['change_key'], value, delta_ms=delta_ms):
+            logging.debug(f"{config['telem_key']} Pos: {value}")
+
+            for i, effect_name in enumerate(config['effect_names']):
+                direction = config['directions'][i] if i < len(config['directions']) else config['directions'][0]
+                effect_type = config.get('effect_type', 0)
+                phase = config.get('phase_offset', 0) if i > 0 else 0
+
+                effects[effect_name].periodic(
+                    config['frequency'],
+                    intensity,
+                    direction,
+                    effect_type,
+                    phase=phase
+                ).start()
+        else:
+            clunk_effects = config.get('clunk_effects', [])
+            if clunk_effects and (value == 0 or value == 1):
+                if any(effects[name].started for name in config['effect_names']):
+                    clunk_intensity = utils.clamp(intensity * 2, 0, 1)
+
+                    for i, clunk_name in enumerate(clunk_effects):
+                        direction = config.get('clunk_directions', [180, 0])[i % 2]
+
+            effects.dispose(*config['effect_names'])
+
+
+    def _create_buffeting_effect(self, telem_data: dict, config: dict):
+        enabled = getattr(self, config['enabled_attr'])
+        intensity = getattr(self, config['intensity_attr'])
+
+        if not enabled or not intensity:
+            effects.dispose(*config['effect_names'])
+            return
+
+        tas = telem_data.get("TAS", 0)
+        if tas < config.get('threshold_speed', 0):
+            effects.dispose(*config['effect_names'])
+            return
+
+        deployment = telem_data.get(config['deployment_key'], 0)
+        if deployment <= config.get('threshold_value', 0.1):
+            effects.dispose(*config['effect_names'])
+            return
+
+        if config.get('require_airborne', True) and self._should_skip_airborne_effect(telem_data):
+            effects.dispose(*config['effect_names'])
+            return
+
+        speed_low, speed_high = config.get('speed_range', (0, 100))
+        tas_intensity = utils.scale_clamp(tas, (speed_low, speed_high), (0.0, 1.0))
+
+        if isinstance(deployment, list):
+            if config.get('special_calc') and "F-14" in str(telem_data.get("N", "")):
+                inner = (deployment[1], deployment[2])
+                outer = (deployment[0], deployment[3])
+                deployment = (0.85 * sum(inner) + 0.15 * sum(outer)) / 2
+            else:
+                deployment = sum(deployment) / len(deployment)
+
+        realtime_intensity = intensity * deployment * tas_intensity
+        frequency = getattr(self, config.get('frequency_attr', 'frequency'), 13)
+
+        for i, effect_name in enumerate(config['effect_names']):
+            direction = config['directions'][i] if i < len(config['directions']) else config['directions'][0]
+            effects[effect_name].periodic(frequency, realtime_intensity, direction, 4).start()
+
+        logging.debug(f"PLAYING {config['effect_name'].upper()} RUMBLE | intensity: {realtime_intensity}")
+
+
+class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffectsMixIn, WeaponsEffectMixIn, DeadzoneMixIn, MotionEffectsMixIn, BuffetingEffectMixIn):
     rotor_blade_count = 2
 
     cpO_x = 0
     cpO_y = 0
 
     aoa_effect_enabled: bool = False
-
-    runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
-    runway_rumble_enabled: bool = True
 
     keep_forces_on_pause: bool = True
     enable_damper_ovd: bool = False
@@ -524,16 +1300,6 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
     inertia_force: float = 0
     enable_friction_ovd: bool = False
     friction_force: float = 0
-
-    speedbrake_motion_intensity : float = 0.12      # peak vibration intensity when speed brake is moving, 0 to disable
-    speedbrake_buffet_intensity : float = 0.15      # peak buffeting intensity when speed brake deployed,  0 to disable
-    speedbrake_speed_thresh :   float = 80 * kt2ms  # speed threshold for speedbrake to start buffeting
-
-    spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
-    spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
-    spoiler_spd_thresh_low: float = 80 * kt2ms  # speed threshold for spoilers to start buffeting
-    spoiler_spd_thresh_hi: float = 140 * kt2ms  # speed threshold for spoilers to stop buffeting
-
 
     wind_effect_enabled : int = 0
     wind_effect_scaling: int = 0
@@ -555,10 +1321,7 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
 
 
 
-    gear_motion_effect_enabled: bool = True
-    gear_motion_intensity: float = 0.12
-    gear_buffet_effect_enabled: bool = True
-    gear_buffet_intensity: float = 0.15     # peak buffeting intensity when gear down during flight,  0 to disable
+    # gear motion attributes moved to MotionEffectsMixIn
 
     ####
     #### Beta effects - set to 1 to enable
@@ -580,13 +1343,7 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
     inertia_coeff: int = 0
     friction_coeff: int = 0
 
-    runway_rumble_intensity: float = 1.0  # peak runway intensity, 0 to disable
-    runway_rumble_enabled: bool = True
-    gun_vibration_intensity: float = 0.12  # peak gunfire vibration intensity, 0 to disable
-    cm_vibration_intensity: float = 0.12  # peak countermeasure release vibration intensity, 0 to disable
-    weapon_release_intensity: float = 0.12  # peak weapon release vibration intensity, 0 to disable
-    weapon_effect_direction: int = 45  # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
-
+    # runway_rumble attributes moved to MotionEffectsMixIn
     engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
     engine_prop_rumble_enabled: bool = True  # Engine Rumble - Piston specific - based on Prop RPM
     engine_rotor_rumble_enabled: bool = False  # Engine Rumble - Helicopter specific - based on Rotor RPM
@@ -599,63 +1356,20 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
 
     # gforce_effect_enable : bool = False
 
-    flaps_motion_intensity : float = 0.12      # peak vibration intensity when flaps are moving, 0 to disable
-    flaps_buffet_intensity : float = 0.0      # peak buffeting intensity when flaps are deployed,  0 to disable
 
-    canopy_motion_intensity : float = 0.12      # peak vibration intensity when canopy is moving, 0 to disable
-    canopy_buffet_intensity : float = 0.0      # peak buffeting intensity when canopy is open during flight,  0 to disable
+
+    # canopy motion attributes moved to MotionEffectsMixIn
 
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
     elevator_droop_enabled: bool = False
     elevator_droop_force: float = 0.0
     aircraft_is_fbw: bool = False           #deprecated
 
-    gear_motion_effect_enabled: bool = False
-    gear_buffet_effect_enabled: bool = False
-    gear_buffet_freq = 10
-    gear_buffet_speed_low = 100
-    gear_buffet_speed_high = 150
-    speedbrake_motion_effect_enabled: bool = False
-    speedbrake_buffet_effect_enabled: bool = False
-    flaps_motion_effect_enabled: bool = False
-    canopy_motion_effect_enabled: bool = False
-    spoiler_motion_effect_enabled: bool = False
-    spoiler_buffet_effect_enabled: bool = False
+    # motion effect flags and weapon/weapon-release attributes moved to MixIns
 
-    tailhook_motion_effect_enabled: bool = False
-    tailhook_motion_intensity: float = 0.12
-
-    fuelboom_motion_effect_enabled: bool = False
-    fuelboom_motion_intensity: float = 0.12
-
-    wingfold_motion_effect_enabled: bool = False
-    wingfold_motion_intensity: float = 0.10
-
-    weapon_release_effect_enabled: bool = False
-    weapon_release_intensity : float = 0.12         # peak weapon release vibration intensity, 0 to disable
-    weapon_effect_direction: int = 45               # Affects the direction of force applied for gun/cm/weapon release effect, Set to -1 for random direction
-
-    runway_rumble_intensity : float = 1.0           # peak runway intensity, 0 to disable
-    runway_rumble_enabled: bool = False
-
-    touchdown_effect_enabled: bool = False
-    touchdown_effect_max_force: float = 0.5
-    touchdown_effect_max_gs: float = 3.0
-
-    gunfire_effect_enabled: bool = False
-    gun_vibration_intensity : float = 0.12          # peak gunfire vibration intensity, 0 to disable
-    countermeasure_effect_enabled: bool = False
-    cm_vibration_intensity : float = 0.12           # peak countermeasure release vibration intensity, 0 to disable
+    # gun/countermeasure attributes moved to WeaponsEffectMixIn
 
     afterburner_effect_enabled: bool = True
-
-    etl_effect_enable: bool = True
-    overspeed_effect_enable: bool = True
-    vrs_effect_enable: bool = False
-    vrs_effect_intensity: float = 0.0
-    vrs_threshold_speed: float = 0.0
-    vrs_vs_onset: float = 0
-    vrs_vs_max: float = 0
 
     #spring_mode = G.JoystickSpringMode.BASIC
 
@@ -668,26 +1382,6 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
     aircraft_vne_gain = 1.0
 
     pedal_spring_coeff_x = 0
-
-    etl_start_speed = 6.0 # m/s
-    etl_stop_speed = 22.0 # m/s
-    etl_effect_intensity = 0.2 # [ 0.0 .. 1.0]
-    etl_shake_frequency = 14.0 # value has been deprecated in favor of rotor RPM calculation
-    overspeed_shake_start = 70.0 # m/s
-    overspeed_shake_intensity = 0.2
-    heli_engine_rumble_intensity = 0.12
-
-    collective_ft_ovd_enabled: bool = False
-    collective_ft_ovd_release: int = 0
-    collective_ft_ovd_spring_gain: float = 0.5
-    collective_ft_ovd_tr_damper: float = 0.05
-    collective_ft_ovd_reset: int = 0
-    collective_ft_ovd_trim_rate: int = 200
-    collective_ft_init: bool = False
-    collective_ft_ovd_trim_down = 0
-    collective_ft_ovd_trim_up = 0
-    collective_ft_ovd_cp0_y = 4096
-    collective_ft_use_master_buttons: bool = False
 
     adv_spr_override_enabled: bool = False   #deprecated
     adv_spr_gains: str = 'none'
@@ -704,18 +1398,36 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
     override_spring_trim_up: int = 0
     override_spring_trim_right: int = 0
     override_spring_trim_rate: int = 200
-    override_spring_cp0_x: int = 0
-    override_spring_cp0_y: int = 0
+    override_spring_cp0_x: float = 0.0
+    override_spring_cp0_y: float = 0.0
 
-    enable_deadzone: bool = False
-    deadzone_base_pct: float = 0.0
+    # enable_deadzone and deadzone_base_pct moved into DeadzoneMixIn
 
     g_y_offset: int = 0
 
-    last_device_x = None
-    last_device_y = None
+    # per-instance motion state (last_device_x/last_device_y/smoother) moved to MotionEffectsMixIn.__init__
 
-    smoother = utils.Smoother()
+    # Stubs for MixIn methods — keep these on AircraftBase so callers can resolve them directly.
+    # They delegate to the MixIn implementations via super().
+    def ac_calc_etl_effect(self, telem_data, blade_ct=None):
+        """Calculate ETL/overspeed shake effects (delegates to HelicopterEffectsMixIn)."""
+        return super().ac_calc_etl_effect(telem_data, blade_ct=blade_ct)
+
+    def ac_update_vrs_effect(self, telem_data):
+        """Update Vortex Ring State (VRS) effect (delegates to HelicopterEffectsMixIn)."""
+        return super().ac_update_vrs_effect(telem_data)
+
+    def ac_update_heli_engine_rumble(self, telem_data, blade_ct=None):
+        """Update helicopter engine/rotor rumble (delegates to HelicopterEffectsMixIn)."""
+        return super().ac_update_heli_engine_rumble(telem_data, blade_ct=blade_ct)
+
+    def ac_collective_force_trim_override(self, telem_data, spring):
+        """Collective force-trim override handler (delegates to HelicopterEffectsMixIn)."""
+        return super().ac_collective_force_trim_override(telem_data, spring)
+
+    def ac_update_gforce_effect(self, telem_data, adv_spr: bool = False):
+        """Delegates to GForceEffectMixIn.ac_update_gforce_effect (stub on AircraftBase)."""
+        return super().ac_update_gforce_effect(telem_data, adv_spr=adv_spr)
 
 
     def __init__(self, name: str, **kwargs):
@@ -865,6 +1577,9 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
             # When off ground, dispose effect and return
             effects.dispose('decel')
             return
+        
+        y_gs = 0
+        last_y_gs = 0
 
         if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is("BMS"):
             if self.decel_airborne_disable:
@@ -942,30 +1657,7 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
 
 
 
-    def ac_update_cm_weapons(self, telem):
-        payload = telem.get("PayloadInfo")
-        gun = telem.get("Gun")
-        flares = telem.get("Flares")
-        chaff = telem.get("Chaff")
-
-        # Use helper method for weapon effects
-        self._create_weapon_effect("payload_rel", "PayloadInfo", payload,
-                                 self.weapon_release_effect_enabled, self.weapon_release_intensity, shape=EFFECT_SQUARE)
-
-        self._create_weapon_effect("gunfire", "Gun", gun,
-                                 self.gunfire_effect_enabled, self.gun_vibration_intensity, shape=EFFECT_SAWTOOTHUP)
-
-        # Countermeasures effect (combined flares and chaff)
-        cm_changed = (self.anything_has_changed("Flares", flares) or
-                     self.anything_has_changed("Chaff", chaff))
-        if cm_changed and self.countermeasure_effect_enabled:
-            direction = self._get_effect_direction(self.weapon_effect_direction)
-            if self.weapon_effect_direction == -1:
-                logging.info(f"CM Effect Direction is randomized: {direction} deg")
-            effects["cm"].periodic(50, self.cm_vibration_intensity, direction, duration=80).start(force=True)
-        elif not (self.anything_has_changed("Flares", flares, delta_ms=160) or
-                 self.anything_has_changed("Chaff", chaff, delta_ms=160)) or not self.countermeasure_effect_enabled:
-            effects["cm"].stop()
+    # weapon/CM behavior moved into WeaponsEffectMixIn
 
     def ac_update_flaps(self, telem_data):
         flapspos = telem_data.get("Flaps")
@@ -984,220 +1676,32 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
             effects["flapsmovement"].stop(destroy_after=5000)
 
     def ac_update_canopy(self, telem_data):
-        canopypos = telem_data.get("Canopy")
-        if canopypos is None:
-            canopypos = telem_data.get("canopy_value")
-        if canopypos is None:
-            return
-        # canopypos = self._telem_data.get("canopy_value", 0)
-        if self.anything_has_changed("Canopy", canopypos, delta_ms=100) and self.canopy_motion_intensity > 0 and self.canopy_motion_effect_enabled:
-            logging.debug(f"Canopy Pos: {canopypos}")
-            direction = 90 if self.is_pedals() else 0
-            effects["canopymovement"].periodic(120, self.canopy_motion_intensity, direction, 3).start()
-        else:
-            # play short bump when canopy fully closes, play only once before movement effect is stopped
-            if canopypos == 0 and effects['canopymovement'].started:
-                effects['canopyclunk'].periodic(10, utils.clamp((self.canopy_motion_intensity * 2), 0, 1), 180, effect_type=EFFECT_SQUARE,duration=40).start()
-            # stop movement effect
-            effects["canopymovement"].stop(destroy_after=5000)
+        """Delegates to MotionEffectsMixIn.ac_update_canopy"""
+        return super().ac_update_canopy(telem_data)
 
     def ac_update_landing_gear(self, telem_data):
-        gearpos = telem_data.get("gear_value", telem_data.get("GearPos", None))
-        if isinstance(gearpos, list):
-            gearpos = max(gearpos)
-
-        if self._sim_is_msfs() or self._sim_is_xplane():
-            retracts = telem_data.get("RetractableGear", 0)
-            if isinstance(retracts, list):
-                retracts = max(retracts)
-            if (self.gear_motion_intensity > 0) and (retracts):
-                gearpos = max(telem_data.get("Gear", 0))
-        
-        if gearpos is None:
-            return
-        
-        airspd = telem_data.get("IAS", telem_data.get("TAS", None)) # IAS or TAS ?
-        if airspd is None:
-            return
-        
-        if self._sim_is_xplane():
-            self.gear_buffet_speed_low = 0.9 * self.telem_data.get("Vle", 10000) #set stupid high in case of telemetry failure
-            self.gear_buffet_speed_high = self.gear_buffet_speed_low * 1.3
-
-        rumble_freq = self.gear_buffet_freq
-
-        # Gear Motion Effect
-        if self.anything_has_changed("gear_value", gearpos, 50) and self.gear_motion_intensity > 0 and self.gear_motion_effect_enabled:
-            logging.debug(f"Landing Gear Pos: {gearpos}")
-            effects["gearmovement"].periodic(150, self.gear_motion_intensity, 0, 3).start()
-            effects["gearmovement2"].periodic(150, self.gear_motion_intensity, 90, 3, phase=120).start()
-            if (gearpos == 0 or gearpos == 1) and self.is_joystick():
-                # Play short, sharp bump when gear fully extended/retracted
-                dir = 0 if gearpos == 0 else 180  # change direction of effect depending on if gear are closed or extended
-                effects['gearclunk'].periodic(10, utils.clamp((self.gear_motion_intensity * 3), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
-        else:
-            effects.dispose("gearmovement", "gearmovement2")
-
-        # Gear Buffeting Effect
-        if (airspd > self.gear_buffet_speed_low and gearpos > .1) and self.gear_buffet_intensity > 0 and self.gear_buffet_effect_enabled:
-            # calculate insensity based on deployment percentage
-            # intensity will go from 0 to %100 configured between spd_thresh_low and spd_thresh_high
-            realtime_intensity = utils.scale_clamp(airspd, (self.gear_buffet_speed_low, self.gear_buffet_speed_high),(0, self.gear_buffet_intensity)) * gearpos
-            effects["gearbuffet"].periodic(rumble_freq, realtime_intensity, 0, 4).start()
-            effects["gearbuffet2"].periodic(rumble_freq, realtime_intensity, 90, 4).start()
-            logging.debug(f"PLAYING GEAR RUMBLE intensity:{realtime_intensity}")
-        else:
-            effects.dispose("gearbuffet", "gearbuffet2")
+        """Delegates to MotionEffectsMixIn.ac_update_landing_gear"""
+        return super().ac_update_landing_gear(telem_data)
 
     def ac_update_speed_brakes(self, telem_data):
-        if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
-            return
-
-        spd_thresh = self.speedbrake_speed_thresh
-        spdbrk = telem_data.get("SpeedbrakePos")
-        if spdbrk is None:
-            spdbrk = telem_data.get("speedbrakes_value", None)
-
-        if spdbrk is None:
-            return
-
-        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
-        if airspd is None:
-            return
-        # Speed brake motion effect
-        if self.anything_has_changed("speedbrakes_value", spdbrk, 50) and self.speedbrake_motion_intensity > 0 and self.speedbrake_motion_effect_enabled:
-            logging.debug(f"Speedbrake Pos: {spdbrk}")
-            direction = 90 if self.is_pedals() else 0
-            effects["speedbrakemovement"].periodic(180, self.speedbrake_motion_intensity, direction, 3).start()
-        else:
-            effects.dispose("speedbrakemovement")
-
-        # Speed brake buffeting effect using helper
-        config = {
-            'enabled_attr': 'speedbrake_buffet_effect_enabled',
-            'intensity_attr': 'speedbrake_buffet_intensity',
-            'effect_names': ['speedbrakebuffet'],
-            'effect_name': 'speedbrake',
-            'threshold_speed': spd_thresh,
-            'threshold_value': 0.1,
-            'deployment_key': 'speedbrakes_value',
-            'directions': [utils.RandomDirectionModulator],
-            'require_airborne': False
-        }
-        # Create a temporary telem_data with speedbrake value
-        temp_telem = dict(self._telem_data)
-        temp_telem['speedbrakes_value'] = spdbrk
-        temp_telem['TAS'] = airspd
-        self._create_buffeting_effect(temp_telem, config)
+        """Delegates to MotionEffectsMixIn.ac_update_speed_brakes"""
+        return super().ac_update_speed_brakes(telem_data)
 
     def ac_update_spoilers(self, telem_data):
-        if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
-            return
-
-        spd_thresh_low = self.spoiler_spd_thresh_low
-        spd_thresh_hi  = self.spoiler_spd_thresh_hi
-
-        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
-        if airspd is None:
-            return
-
-        tas_intensity = utils.clamp_minmax(utils.scale(airspd, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
-        spoiler = telem_data.get("Spoilers")
-
-        if spoiler == 0 or spoiler == None:
-            effects.dispose("spoilermovement", "spoilermovement2")
-            return
-        # average all spoiler values together
-        if isinstance(spoiler, list):
-            spoiler = sum(spoiler) / len(spoiler)
-
-        if self.spoiler_motion_intensity > 0 and self.spoiler_motion_intensity > 0 and self.spoiler_motion_effect_enabled:
-            if self.anything_has_changed("Spoilers", spoiler, delta_ms=50):
-                logging.debug(f"Spoilers Pos: {spoiler}")
-                effects["spoilermovement"].periodic(118, self.spoiler_motion_intensity, 0, 4).start()
-                effects["spoilermovement2"].periodic(118, self.spoiler_motion_intensity, 90, 4).start()
-            else:
-                logging.debug("Destroying Spoiler Effects")
-                for effect in ["spoilermovement", "spoilermovement2"]:
-                    effects[effect].stop(1000)
-
-        if airspd > spd_thresh_low and spoiler > .1 and self.spoiler_buffet_intensity > 0 and self.spoiler_buffet_effect_enabled:
-            # calculate insensity based on deployment percentage
-            realtime_intensity = self.spoiler_buffet_intensity * spoiler * tas_intensity
-            logging.debug(f"PLAYING SPOILER RUMBLE | intensity: {realtime_intensity}, d-factor: {spoiler}, s-factor: {tas_intensity}")
-            effects["spoilerbuffet1-1"].periodic(15, realtime_intensity, 0, 4).start()
-            effects["spoilerbuffet1-2"].periodic(16, realtime_intensity, 0, 4).start()
-            effects["spoilerbuffet2-1"].periodic(14, realtime_intensity, 90, 4).start()
-            effects["spoilerbuffet2-2"].periodic(18, realtime_intensity, 90, 4).start()
-        else:
-            for effect in ["spoilerbuffet1-1", "spoilerbuffet1-2", "spoilerbuffet2-1", "spoilerbuffet2-2"]:
-                effects[effect].stop(1000)
+        """Delegates to MotionEffectsMixIn.ac_update_spoilers"""
+        return super().ac_update_spoilers(telem_data)
 
     def ac_update_tailhook_effect(self, telem_data):
-        """
-        Tailhook motion effect:
-            Checks for presense of Tailhook telemetery and type of device.  If effect disabled or intensty set to 0,
-            ensure effect is stopped and abort.
-            Check for change in telemetry over the past 'delta_ms' miliseconds.  Delta insures effect doesn't flap on
-            some aircraft with slow telemetry updates.
-            When telemetry stops, check if hook is fully deployed or stored and play a short bump. Then stop the effect
-        """
-        hook = telem_data.get('TailHook', None)
-        if hook is None: return
-        if not self.is_joystick(): return
-
-        if not self.tailhook_motion_effect_enabled or not self.tailhook_motion_intensity:
-            effects.dispose('hookmovement')
-            return
-
-        if self.anything_has_changed("tailhook_value", hook, delta_ms=200):
-            logging.debug(f"Hook Pos: {hook}")
-            direction = 90 if self.is_pedals() else 0
-            effects["hookmovement"].periodic(160, self.tailhook_motion_intensity, direction, EFFECT_SAWTOOTHUP).start()
-        else:
-            # play short bump when hook stowed or deployed, change direction based on state.  Only play if movement effect still playing
-            if (hook == 0 or hook ==1) and effects['hookmovement'].started:
-                dir = (1-hook) * 180
-                effects['clunk'].periodic(10, utils.clamp((self.tailhook_motion_intensity * 2), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
-            # stop the effect
-            effects.dispose("hookmovement")
+        """Delegates to MotionEffectsMixIn.ac_update_tailhook_effect"""
+        return super().ac_update_tailhook_effect(telem_data)
 
     def ac_update_fuelboom_effect(self, telem_data):
-        """Fuel Boom motion effect using generic motion effect handler."""
-        config = {
-            'telem_key': 'FuelBoom',
-            'change_key': 'fuelboom_value',
-            'effect_names': ['boommovement'],
-            'clunk_effects': ['clunk'],
-            'enabled_attr': 'fuelboom_motion_effect_enabled',
-            'intensity_attr': 'fuelboom_motion_intensity',
-            'frequency': 150,
-            'directions': [90 if self.is_pedals() else 0],
-            'effect_type': EFFECT_SAWTOOTHDOWN,
-            'delta_ms': 200,
-            'clunk_duration': 40
-        }
-        self._create_motion_effect(telem_data, config)
+        """Delegates to MotionEffectsMixIn.ac_update_fuelboom_effect"""
+        return super().ac_update_fuelboom_effect(telem_data)
 
     def ac_update_wingfold_effect(self, telem_data):
-        """Wing Fold motion effect using generic motion effect handler."""
-        config = {
-            'telem_key': 'WingFold',
-            'change_key': 'wingfold_value',
-            'effect_names': ['wingfoldmovement_1', 'wingfoldmovement_2'],
-            'clunk_effects': ['wingfoldclunk1', 'wingfoldclunk2'],
-            'enabled_attr': 'wingfold_motion_effect_enabled',
-            'intensity_attr': 'wingfold_motion_intensity',
-            'frequency': 100,
-            'directions': [45, 225],
-            'effect_type': EFFECT_SAWTOOTHDOWN,
-            'delta_ms': 200,
-            'phase_offset': 90,
-            'require_ground': True,
-            'clunk_directions': [90, 270],
-            'clunk_duration': 100
-        }
-        self._create_motion_effect(telem_data, config)
+        """Delegates to MotionEffectsMixIn.ac_update_wingfold_effect"""
+        return super().ac_update_wingfold_effect(telem_data)
 
     def ac_update_wind_effect(self, telem_data):
         if not self.is_joystick(): return
@@ -1503,217 +2007,7 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
         logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
 
 
-    ########################################
-    ######                            ######
-    ######     Helicopter Effects     ######
-    ######                            ######
-    ########################################
 
-    def ac_calc_etl_effect(self, telem_data, blade_ct=None):
-        #  rotor = 245
-        mod = telem_data.get("N")
-        tas = telem_data.get("TAS", 0)
-        WoW = sum(telem_data.get("WeightOnWheels"))
-        if mod == "UH-60L":
-            # UH60 always shows positive value for tailwheel
-            WoW = telem_data.get("WeightOnWheels")[0] + telem_data.get("WeightOnWheels")[2]
-
-        if self._sim_is_xplane():
-            rotor = telem_data.get("PropRPM", 0)
-            if isinstance(rotor, list):
-                rotor = rotor[0]
-        else:
-            rotor = telem_data.get("RotorRPM", 0)
-            if isinstance(rotor, list):
-                rotor = max(rotor)
-        if WoW > 0:
-            # logging.debug("On the Ground, moving forward. Probably on a Ship! - Dont play effect!")
-            effects.dispose("etlX", "etlY", "overspeedX", "overspeedY")
-            return
-        if blade_ct is None:
-            blade_ct = 2
-            rotor = 250
-
-        self.etl_shake_frequency = (rotor / 75) * blade_ct
-        self.overspeed_shake_frequency = self.etl_shake_frequency * 0.75
-
-        etl_mid = (self.etl_start_speed + self.etl_stop_speed) / 2.0
-
-        if (tas >= self.etl_start_speed and tas <= self.etl_stop_speed) and self.etl_effect_intensity and self.etl_effect_enable:
-            shake = self.etl_effect_intensity * utils.gaussian_scaling(tas, self.etl_start_speed, self.etl_stop_speed, peak_percentage=0.5, curve_width=.7)
-            shake = utils.clamp(shake, 0.0, 1.0)
-            effects["etlY"].periodic(self.etl_shake_frequency, shake, 0).start()
-            effects["etlX"].periodic(self.etl_shake_frequency + 4, shake, 90).start()
-            logging.debug(f"Playing ETL shake (freq = {self.etl_shake_frequency}, intens= {shake})")
-        else:
-            effects.dispose("etlX", "etlY")
-
-        if tas >= self.overspeed_shake_start and self.overspeed_effect_enable:
-            shake = self.overspeed_shake_intensity * utils.non_linear_scaling(tas, self.overspeed_shake_start, self.overspeed_shake_start + 15, curvature=.7)
-            shake = utils.clamp(shake, 0.0, 1.0)
-            effects["overspeedY"].periodic(self.overspeed_shake_frequency, shake, 0).start()
-            effects["overspeedX"].periodic(self.overspeed_shake_frequency + 4, shake, 90).start()
-            logging.debug(f"Overspeed shake (freq = {self.etl_shake_frequency}, intens= {shake}) ")
-        else:
-            effects.dispose("overspeedX", "overspeedY")
-
-    def ac_update_vrs_effect(self, telem_data):
-        vs = telem_data.get("VerticalSpeed", 0)
-        if self._sim_is_dcs():
-            # spd = abs(telem_data.get("VlctVectors")[0])
-            tas = telem_data.get("TAS")
-            adj_tas = tas - abs(vs)
-            spd = adj_tas
-            telem_data['_adj_TAS'] = adj_tas
-        else:
-            spd = abs(telem_data.get('TAS', 0))
-        wow = max(telem_data.get("WeightOnWheels", 1))
-        # print(f"tas:{tas}, vs:{vs}, wow:{wow}")
-        if not self.vrs_effect_enable or wow or spd > self.vrs_threshold_speed or vs > 0:
-            # print("I'm out")
-            effects.dispose("vrs_buffet", "vrs_buffet2")
-            return
-
-        if abs(vs) >= self.vrs_vs_onset:
-            vs_factor = utils.scale(abs(vs), (self.vrs_vs_onset, self.vrs_vs_max), (0.0, self.vrs_effect_intensity))
-            if spd == 0:
-                spd_factor = 1
-            else:
-                spd_factor = utils.scale(spd, (spd*1.2, spd), (0,1))
-
-            intensity = utils.clamp(vs_factor * spd_factor, 0, 1)
-
-            effects["vrs_buffet"].periodic(10, intensity, utils.RandomDirectionModulator).start()
-            effects['vrs_buffet2'].periodic(12, intensity, utils.RandomDirectionModulator).start()
-        else:
-            effects.dispose("vrs_buffet", "vrs_buffet2")
-
-    def ac_update_heli_engine_rumble(self, telem_data, blade_ct=None):
-        if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:
-            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
-            return
-        if self._sim_is_xplane():
-            rrpm = telem_data.get("PropRPM", 0)
-            if isinstance(rrpm, list):
-                rrpm = rrpm[0]
-        else:
-            rrpm = telem_data.get("RotorRPM", 0)
-            if isinstance(rrpm, list):
-                rrpm = max(rrpm)
-        mod = telem_data.get("N")
-        tas = telem_data.get("TAS", 0)
-        eng_rpm = telem_data.get("EngRPM", 0)
-        if isinstance(eng_rpm, list):
-            eng_rpm = max(eng_rpm)
-
-        # rotor = telem_data.get("RotorRPM")
-
-        if blade_ct is None:
-            blade_ct = 2
-            rrpm = 250
-
-
-        if rrpm < 5:
-            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
-            return
-
-        logging.debug(f"Engine Rumble: Blade_Ct={blade_ct}, RPM={rrpm}")
-        frequency = float(rrpm) / 45 * blade_ct
-
-        median_modulation = 2
-        frequency2 = frequency + median_modulation
-        if frequency > 0 and eng_rpm > 0:
-            logging.debug(f"Current Heli Engine Rumble Intensity = {self.heli_engine_rumble_intensity}")
-            effects["rotor_rpm0-1"].periodic(frequency, self.heli_engine_rumble_intensity * .5, 0).start()  # vib on X axis
-            effects["rotor_rpm1-1"].periodic(frequency2, self.heli_engine_rumble_intensity * .5, 90).start()  # vib on Y axis
-        else:
-            effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
-
-
-
-
-
-
-
-    def ac_collective_force_trim_override(self, telem_data, spring):
-        '''
-        Generic effect enabling spring force and hardware trim for collective axis.
-        '''
-
-        if not self.is_collective(): return
-        if not self.spring_mode_is(SpringModeEnum.FORCETRIM):
-            # If feature disabled, ensure spring is stopped and abort
-            effects['collective_ft'].stop()
-            return
-
-
-        dt = perftracker.get_time_delta('collective_ft_perf')
-        self.telem_data['_coll_ft_dt'] = dt
-
-        wow = sum(telem_data.get("WeightOnWheels", [1]))
-
-        input_data = HapticEffect.device.get_input()
-        _, y = input_data.axisXY()
-        current_buttons = input_data.getPressedButtons()
-
-        force_trim_active = telem_data.get('ForceTrimSW', True)
-
-        if not force_trim_active:
-            # Force trim is enabled, but the 'ForceTrimSW' flag is false, just move
-            self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
-            self.collective_ft_ovd_cp0_y = round(y * 4096)
-            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
-            spring.setCondition(self.spring_y)
-            return
-
-        # decide what to do depending on which button is pressed
-        if self.check_button_press(self.collective_ft_ovd_release, self.collective_ft_use_master_buttons):
-            # use spring force as dampening.  Configured damper value applied as spring gain.  cpO will follow stick
-            # as it is moved while spring force is enabled.
-            # return from method so default spring gains do not get applied at the end of the method
-            self.spring_y.set_coefficient(self.collective_ft_ovd_tr_damper)
-
-            self.collective_ft_ovd_cp0_y = round(y * 4096)
-            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
-            spring.setCondition(self.spring_y)
-            spring.start(override=True)
-            return
-
-        elif self.check_button_press(self.collective_ft_ovd_reset, self.collective_ft_use_master_buttons):
-            # if trim reset button pressed, set offsets back to 0
-            # print("TRIM RESET")
-            self.collective_ft_ovd_cp0_y = 4096
-            self.spring_y.set_offset(self.collective_ft_ovd_cp0_y)
-            spring.setCondition(self.spring_y)
-
-        # calculate step size based on configured rate and delta time
-        trim_step_size = self.collective_ft_ovd_trim_rate * dt
-
-        self.telem_data['_coll_ft_step'] = trim_step_size
-
-
-        if self.check_button_press(self.collective_ft_ovd_trim_down, self.collective_ft_use_master_buttons):
-            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
-            # print("TRIM DOWN")
-            self.collective_ft_ovd_cp0_y += trim_step_size
-            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
-            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
-        elif self.check_button_press(self.collective_ft_ovd_trim_up, self.collective_ft_use_master_buttons):
-            # shift offset based on previously calculated step size.  Ensure value does not exceed limits
-            # print("TRIM UP")
-            self.collective_ft_ovd_cp0_y -= trim_step_size
-            self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
-            self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
-
-
-        self.telem_data['_coll_ft_trim_pos'] = round(self.collective_ft_ovd_cp0_y)
-
-        # If trim release is not pressed, set spring gain based on user setting and start spring override
-        self.spring_y.set_coefficient(self.collective_ft_ovd_spring_gain)
-
-        spring.setCondition(self.spring_y)
-        # ensure spring is started with override = true
-        spring.start(override=True)
 
     def ac_modify_game_spring(self):
         if not self.spring_mode_is(SpringModeEnum.ADVANCED):
@@ -1774,20 +2068,7 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, BuffetingEffectM
         self.spring_adjuster.setCondition(self.spring_adjuster_x)
         self.spring_adjuster.start()
 
-    def ac_set_deadzone(self):
-        if not self.enable_deadzone and self.deadzone_active:
-            if self.active_deadzone_pct != 0.0:
-                HapticEffect.device.set_deadzone(0)
-                self.active_deadzone_pct = 0.0
-                logging.info('Disabling deadzone')
-                self.deadzone_active = False
-            return
-        if self.active_deadzone_pct != self.deadzone_base_pct:
-            dz = utils.clamp(round((self.deadzone_base_pct / 100) * 4096), 0, 4096)
-            HapticEffect.device.set_deadzone(dz)
-            self.active_deadzone_pct = self.deadzone_base_pct
-            logging.info(f"Setting Deadzone to %{self.deadzone_base_pct}")
-            self.deadzone_active = True
+    # deadzone behavior moved into DeadzoneMixIn
 
     def on_event(self, event, *args):
         pass
