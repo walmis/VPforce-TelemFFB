@@ -7,10 +7,10 @@ import logging
 import math
 import telemffb.utils as utils
 from telemffb.util.conversions import kmh2ms
+from telemffb.sim.base.AircraftParamsMixIn import AircraftParamsMixIn
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
-
-class AoAEffectsMixIn(AircraftEffectUtilsBase):
+class AoAEffectsMixIn(AircraftEffectUtilsBase, AircraftParamsMixIn):
     """Local mixin for AoA effects (both basic CF and AoA-reduction).
 
     This mixin keeps AoA-related state and methods together inside

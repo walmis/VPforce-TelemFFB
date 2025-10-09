@@ -143,11 +143,9 @@ class Aircraft(AircraftBase):
 
     ######## TRIMWHEEL SPECIFIC
 
-    trimwheel_init = 0.0
     trimwheel_ap_spring_gain = 1.0
     trimwheel_dampening_gain = 0.0
     trimwheel_spring_coeff_y = 0.0  # not used
-    last_trimwheel_y = None
     trim_active = False
 
     turbulence_effect_enable: bool = False
@@ -158,6 +156,12 @@ class Aircraft(AircraftBase):
 
     uncoordinated_turn_effect_enabled: int = 1
 
+    # trimwheel settings
+    trimwheel_elev_up_button: int = 0
+    trimwheel_elev_dn_button: int = 0
+    trimwheel_use_master_buttons: bool = False
+    trimwheel_axis_invert: bool = False
+    trimwheel_use_axis: bool = False
 
     @property
     def _simconnect(self):
@@ -264,6 +268,8 @@ class Aircraft(AircraftBase):
         self.spring_mode = SpringModeEnum.BASIC.name
 
         self.last_pedal_x = 0
+        self.last_trimwheel_y = None
+
 
     def msfs_update_nosewheel_shimmy(self, telem_data):
         curve = 2.5
@@ -1551,8 +1557,7 @@ class Helicopter(Aircraft):
     overspeed_shake_start = 70.0  # m/s
     overspeed_shake_intensity = 0.2
     heli_engine_rumble_intensity = 0.12
-    cpO_x = 0
-    cpO_y = 0
+
     virtual_cyclic_x_offs = 0
     virtual_cyclic_y_offs = 0
     phys_cyclic_x_offs = 0
@@ -1593,7 +1598,10 @@ class Helicopter(Aircraft):
         self.pedals_init = 0
         if self._sim_is_msfs():
             self.subscribe_simvars()
-    
+            
+        self.cpO_x = 0
+        self.cpO_y = 0
+
     @overrides(Aircraft)
     def on_timeout(self):
         super().on_timeout()

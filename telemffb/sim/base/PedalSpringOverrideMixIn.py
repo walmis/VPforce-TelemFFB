@@ -3,9 +3,10 @@ from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
+from telemffb.sim.base.AircraftParamsMixIn import AircraftParamsMixIn
 
 
-class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
+class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin, AircraftParamsMixIn):
     '''Pedal spring override and trimming mixin.'''
 
     pedal_spring_gain: float = 1.0
@@ -22,7 +23,8 @@ class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     def __init__(self):
         super().__init__()
         self.pedal_trim_reset_complete: bool = False
-
+        self.cpO_x = 0
+        self.cpO_y = 0
 
     def ac_update_pedal_trim(self, telem_data):
         """Update the pedal trim effect based on telemetry data and user input.

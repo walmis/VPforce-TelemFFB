@@ -28,12 +28,14 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
 
         # per-instance state used by advanced spring override
         self.adv_spr_settings_dict: dict = {}
-
         # condition objects and adjuster used by the advanced spring override
         self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
         # the spring_adjuster effect object (wrapper) from the global effects dispenser
         self.spring_adjuster = self.effects['spring_adjuster'].spring_adjuster()
+
+        self.g_y_offset = 0
+
 
     def ac_modify_game_spring(self):
         if not self.spring_mode_is(SpringModeEnum.ADVANCED):

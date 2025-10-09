@@ -15,6 +15,9 @@ class HydraulicLossMixIn(FFBForcesMixIn):
         super().__init__(*args, **kwargs)
         # per-instance runtime state
         self.hydraulic_factor = 0.0
+        self.damper_coeff: int = 0
+        self.inertia_coeff: int = 0
+        self.friction_coeff: int = 0
 
     def ac_update_hydraulic_loss_effect(self, telem_data):
 
