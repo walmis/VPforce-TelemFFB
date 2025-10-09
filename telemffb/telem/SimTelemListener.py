@@ -24,7 +24,6 @@ from PyQt6 import QtCore
 
 import telemffb.globals as G
 import telemffb.utils as utils
-from telemffb.sim.aircrafts_msfs_xp import Aircraft
 from telemffb.telem.IL2Manager import IL2TelemParser
 from telemffb.telem.NetworkThread import NetworkThread
 from telemffb.telem.SharedMemThread import SharedMemThread

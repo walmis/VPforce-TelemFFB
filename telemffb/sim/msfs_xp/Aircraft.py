@@ -1,0 +1,1341 @@
+#
+# This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
+# Copyright (c) 2023 Valmantas Palikša.
+# Copyright (c) 2023 Micah Frisby
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
+import telemffb.globals as G
+import telemffb.utils as utils
+from telemffb.SettingsManager import SpringModeEnum
+from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect, EFFECT_SQUARE
+from telemffb.sim.aircraft_base import AircraftBase
+from telemffb.util.Vector import Vector, Vector2D
+from telemffb.util.conversions import P0, deg, math, ms2kt, rad, std_air_pressure, vsound
+from telemffb.util.TurbulenceModulator import TurbulenceModulator
+from telemffb.utils import clamp, overrides
+
+
+import json
+import logging
+import math
+import socket
+from math import atan2, sin, sqrt
+
+
+class Aircraft(AircraftBase):
+    """Base class for Aircraft based FFB"""
+
+    speedbrake_motion_intensity: float = 0.12  # peak vibration intensity when speed brake is moving, 0 to disable
+    speedbrake_buffet_intensity: float = 0.15  # peak buffeting intensity when speed brake deployed,  0 to disable
+
+    spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
+    spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
+
+
+    flaps_motion_intensity: float = 0.12  # peak vibration intensity when flaps are moving, 0 to disable
+    flaps_buffet_intensity: float = 0.0  # peak buffeting intensity when flaps are deployed,  0 to disable
+
+    canopy_motion_intensity: float = 0.12  # peak vibration intensity when canopy is moving, 0 to disable
+    canopy_buffet_intensity: float = 0.0  # peak buffeting intensity when canopy is open during flight,  0 to disable
+
+    afterburner_effect_intensity = 0.2  # peak intensity for afterburner rumble effect
+    jet_engine_rumble_intensity = 0.12  # peak intensity for jet engine rumble effect
+    jet_engine_rumble_freq = 45  # base frequency for jet engine rumble effect (Hz)
+
+    rotor_blade_count = 2
+    heli_engine_rumble_intensity=0.15
+
+    aircraft_is_spring_centered = 0   #deprecated
+    spring_centered_elev_gain = 0.5
+    spring_centered_ailer_gain = 0.5
+    aileron_spring_gain = 0.25
+    elevator_spring_gain = 0.25
+    rudder_spring_gain = 0.25
+
+    aircraft_is_fbw = 0    #deprecated
+    fbw_elevator_gain = 0.8
+    fbw_aileron_gain = 0.8
+    fbw_rudder_gain = 0.8
+
+    force_trim_enabled = 0
+    cyclic_spring_gain = 1.0
+    force_trim_button = 0
+    force_trim_reset_button = 0
+    include_dynamic_stick_forces = True
+    trim_release_spring_gain = 0
+
+    elevator_force_trim = 0
+    aileron_force_trim = 0
+
+    smoother = utils.Smoother()
+    dampener = utils.Derivative()
+    center_spring_on_pause = False
+
+    use_legacy_bindings = False
+    enable_custom_x_axis = False
+    enable_custom_y_axis = False
+    custom_x_axis: str = ''
+    custom_y_axis: str = ''
+    raw_x_axis_scale: int = 16384
+    raw_y_axis_scale: int = 16384
+
+    aileron_expo: int = 0
+    elevator_expo: int = 0
+    rudder_expo: int = 0
+
+    vne_override: int = 0
+
+    ######## PEDAL SPECIFIC
+
+    nosewheel_shimmy = 0
+    nosewheel_shimmy_intensity = 0.15
+    nosewheel_shimmy_min_speed = 7
+    nosewheel_shimmy_min_brakes = 0.6
+
+    steering_friction = 0
+    steering_friction_intensity = 0.8
+    steering_friction_spring = 0.5
+    steering_friction_expo = -0.4
+
+    ######## TRIMWHEEL SPECIFIC
+
+    trimwheel_ap_spring_gain = 1.0
+    trimwheel_dampening_gain = 0.0
+    trimwheel_spring_coeff_y = 0.0  # not used
+    trim_active = False
+
+    turbulence_effect_enable: bool = False
+    turbulence_hpf_alpha: float = 0.0
+    turbulence_smoothing_alpha: float = 0.0
+    turbulence_sensitivity: float = 0.0
+    turbulence_intensity: float = 0.0
+
+    uncoordinated_turn_effect_enabled: int = 1
+
+    # trimwheel settings
+    trimwheel_elev_up_button: int = 0
+    trimwheel_elev_dn_button: int = 0
+    trimwheel_use_master_buttons: bool = False
+    trimwheel_axis_invert: bool = False
+    trimwheel_use_axis: bool = False
+
+    @property
+    def _simconnect(self):
+        return G.telem_manager.simconnect
+
+    def __init__(self, name, **kwargs) -> None:
+        super().__init__(name)
+        self.turbulence_modulator = TurbulenceModulator()
+
+        # clear any existing effects
+        for e in self.effects.values(): e.destroy()
+        self.effects.clear()
+        # self.spring = HapticEffect().spring()
+        self._spring_handle =  self.effects["spring"].spring()
+        self._spring_handle.name = "spring"
+        self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
+        self.const_force = HapticEffect().constant(0, 0)
+
+        # aileron_max_deflection = 20.0*0.01745329
+        self.elevator_max_deflection = 12.0 * 0.01745329
+        # rudder_max_deflection = 20.0*0.01745329
+        self.aileron_gain = 0.1
+        self.elevator_gain = 0.1
+        self.rudder_gain = 0.1
+        self.slip_gain = 1.0
+        self.stall_AoA = 18.0 * 0.01745329
+        self.pusher_start_AoA = 900.0 * 0.01745329
+        self.pusher_working_angle = 900.0 * 0.01745329
+        self.wing_shadow_AoA = 900.0 * 0.01745329
+        self.wing_shadow_angle = 900.0 * 0.01745329
+        self.stick_shaker_AoA = 16.0 * 0.01745329
+
+        # FFB force value per lateral G
+        self.lateral_force_gain = 0.2
+
+        self.aoa_gain = 0.3
+        self.g_force_gain = 0.1
+        self.prop_diameter = 1.5
+
+        self.elevator_droop_moment = 0.1  # in FFB force units
+
+        # how much air flow the elevator receives from the propeller
+        self.elevator_prop_flow_ratio = 1.0
+        self.rudder_prop_flow_ratio = 1.0
+
+        # scale the dynamic pressure to ffb friendly values
+        self.dyn_pressure_scale = 0.005
+        self.max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
+
+        self.cyclic_trim_release_active = 0
+        self.cyclic_spring_init = 0
+        self.cyclic_center = [0.0, 0.0]  # x, y
+        self.collective_spring_init = 0
+        self.force_disable_collective_gain = True
+        self.trim_release_spring_gain = 0
+
+        self.force_trim_release_active = 0
+        self.force_trim_spring_init = 0
+        self.stick_center = [0, 0]  # x, y
+
+        self.force_trim_x_offset = 0
+        self.force_trim_y_offset = 0
+
+        self.telemffb_controls_axes = False
+        self.local_disable_axis_control = False
+
+        self.trim_following = False
+        self.joystick_x_axis_scale = 1.0
+        self.joystick_y_axis_scale = 1.0
+        self.rudder_x_axis_scale = 1.0
+
+        self.joystick_trim_follow_gain_physical_x = 1.0
+        self.joystick_trim_follow_gain_physical_y = 0.2
+        self.joystick_trim_follow_gain_virtual_x = 1.0
+        self.joystick_trim_follow_gain_virtual_y = 0.2
+        self.rudder_trim_follow_gain_physical_x = 1.0
+        self.rudder_trim_follow_gain_virtual_x = 0.2
+        self.joystick_ap_y_follow_axis = False
+        self.joystick_ap_follow_gain_physical_x = 1.0
+        self.joystick_ap_follow_gain_physical_y = 0.5
+        self.joystick_ap_follow_gain_virtual_x = 1.0
+        self.joystick_ap_follow_gain_virtual_y = 0.5
+        self.joystick_ap_x_follow_deadzone = 0.05
+        self.joystick_ap_y_follow_deadzone = 0.05
+
+        self.enable_stick_shaker = 0
+        self.stick_shaker_intensity = 0
+
+        self.ap_following = True
+
+        self.use_fbw_for_ap_follow = True
+
+        self.invert_ap_x_axis = False
+        self.max_elevator_coeff = 0.5
+        self.max_aileron_coeff = 0.5
+        self.max_rudder_coeff = 0.5
+
+        self.xplane_axis_override_active = False
+
+        self.trimwheel_init = False
+
+        self.vne_override = 0
+
+        self.spring_mode = SpringModeEnum.BASIC.name
+
+        self.last_pedal_x = 0
+        self.last_trimwheel_y = None
+
+
+    def msfs_update_nosewheel_shimmy(self, telem_data):
+        curve = 2.5
+        # freq = 8
+        freq_lo = 8
+        freq_hi = 16
+        brakes = telem_data.get("Brakes", (0, 0))
+        on_ground = telem_data.get("SimOnGround", 0)
+        wow = sum(telem_data.get("WeightOnWheels", 0))
+        if not wow or not on_ground:
+            self.effects.dispose("nw_shimmy")
+            return
+        gs = telem_data.get("GroundSpeed", 0)
+
+        freq = int(utils.scale(gs, (self.nosewheel_shimmy_min_speed, self.nosewheel_shimmy_min_speed*3), (freq_lo, freq_hi)))
+        logging.debug(f"brakes = {brakes}")
+        avg_brakes = sum(brakes) / len(brakes)
+        if avg_brakes >= self.nosewheel_shimmy_min_brakes and gs > self.nosewheel_shimmy_min_speed:
+            shimmy = utils.non_linear_scaling(avg_brakes, self.nosewheel_shimmy_min_brakes, 1.0, curvature=curve) * self.nosewheel_shimmy_intensity
+            logging.debug(f"Nosewheel Shimmy intensity calculation: (BrakesPct:{avg_brakes} | GS:{gs} | RT Intensity: {shimmy}")
+            self.effects["nw_shimmy"].periodic(freq, shimmy, 90).start()
+        else:
+            self.effects.dispose("nw_shimmy")
+
+    def msfs_update_steering_friction_effect(self, telem_data):
+        if not self.steering_friction:
+            if self.friction_effect_overridden and self.effects['friction'].name == 'steering_friction':
+                # If effect is disabled but was previously active, clean up and pass override control back to base friction effect
+                utils.dbprint("purple", self.friction_effect_overridden, instance='pedals')
+                self.friction_effect_overridden = False
+                self.effects['friction'].name = 'none'
+                self.effects["friction"].destroy()
+                return
+            return  # Hit this return if effect is simply disabled
+
+        if not self.enable_friction_ovd:
+            self.flag_error(
+                "Steering Friction effect enabled but friction override not enabled")
+            return
+
+        on_ground = telem_data.get("SimOnGround", 0)
+        wos = telem_data.get("WeightOnWheels", [0])[0]  # center steering wheel only
+        gs = telem_data.get("GroundSpeed", 0)
+        #csa = telem_data.get("CenterSteerAngle", 0)
+        wr = telem_data.get("WaterRudderExt", 0) # percent of rudder extension
+        surface = telem_data.get("SurfaceType", 0)
+
+        if on_ground and (wos or surface == "Water"):
+            # scale gs 0-40kt to 1-0
+            scalespeed = utils.scale(gs, (0, 20), (1, 0))
+            efriction = utils.expocurve(scalespeed * self.steering_friction_intensity, self.steering_friction_expo)
+            # logging.info(f"wos {wos}  gs {gs}  efriction {efriction}")
+
+            base_friction_coeff = int(self.friction_force * 4096)  # calculate coefficient of base effect setting as baseline
+            usable_friction_range = 4096 - base_friction_coeff  # usable coefficient for this effect
+            friction_coeff_add = int(usable_friction_range * efriction)  # ammount to add based on efriction calculation
+
+            friction_force = clamp((base_friction_coeff + friction_coeff_add), 0, 4096)
+
+            # self.friction_coeff = utils.clamp(int(efriction * 4096), int(self.friction_force * 4096), 4096)
+
+            if surface == "Water":
+                friction_force *= wr
+
+            telem_data["_pct_steer_f"] = friction_coeff_add / usable_friction_range
+            self._ipc_telem["_pct_steer_f"] = friction_coeff_add / usable_friction_range
+
+            self.friction_effect_overridden = True
+
+            self.effects["friction"].name = "steering_friction"
+            self.effects["friction"].friction(friction_force, friction_force).start()
+        else:
+            # clean up and pass control back to base effect when wheel no longer on ground
+            if self.friction_effect_overridden and self.effects['friction'].name == 'steering_friction':
+                self.friction_effect_overridden = False
+                self.effects["friction"].destroy()
+
+
+    def update_turbulence(self):
+        if self.turbulence_effect_enable:
+            force, dir = self.turbulence_modulator.update(self.telem_data, self.turbulence_hpf_alpha, self.turbulence_smoothing_alpha, self.turbulence_sensitivity, self.turbulence_intensity)
+            force = round(force, 4)
+            self.effects['turbulence'].constant(force, dir).start()
+
+            #print(f"force:{force} dir:{dir}")
+        else:
+            self.effects['turbulence'].destroy()
+
+    def _update_fbw_flight_controls(self, telem_data, ap=False):
+        ap_send_flag_x = True
+        ap_send_flag_y = True
+        ffb_type = telem_data.get("FFBType", "joystick")
+        if self._sim_is_msfs():
+            ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_xplane():
+            ap_active = telem_data.get("APServos", 0)
+
+        spr_name = "ap_spring" if ap else "fbw_spring"
+        self._spring_handle.name = spr_name
+
+        if ffb_type == "joystick":
+
+            if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
+
+                elev_trim = telem_data.get("ElevTrimPct", 0)
+
+                elev_trim = self.dampener.dampen_value(elev_trim, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+
+                # print(f"raw:{raw_elev_trim}, smooth:{elev_trim}")
+                aileron_trim = telem_data.get("AileronTrimPct", 0)
+
+                aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
+                virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
+
+                elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
+                virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+
+                phys_stick_y_offs = int(elev_trim*4096)
+
+                if self.ap_following and ap_active:
+                    input_data = HapticEffect.device.get_input()
+                    phys_x, phys_y = input_data.axisXY()
+                    if self._sim_is_msfs():
+                        aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+                        telem_data['phys_x_aileron'] = aileron_pos[0]
+                        if self.joystick_ap_y_follow_axis:
+                            elevator_pos = telem_data.get("ElevDeflPct", 0)
+                        else:
+                            elevator_pos = telem_data.get("ElevTrimPct", 0)
+
+                        elevator_pos = telem_data.get("ElevTrimPct", 0)
+                        elevator_pos = self.dampener.dampen_value(elevator_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+                        elevator_pos = clamp(elevator_pos * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                        virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_trim_follow_gain_virtual_y)
+                        phys_stick_y_offs = int(elevator_pos * 4096)
+
+
+                        aileron_pos = clamp(aileron_pos[0] * self.joystick_ap_follow_gain_physical_x, -1, 1)
+                        # aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+                        virtual_stick_x_offs = aileron_pos - (aileron_pos * self.joystick_ap_follow_gain_virtual_x)
+
+                        # if self.joystick_ap_y_follow_axis:
+                        #     elevator_pos = clamp(elevator_pos * self.joystick_ap_follow_gain_physical_y, -1, 1)
+                        #     virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_ap_follow_gain_virtual_y)
+                        #     phys_stick_y_offs = round(elevator_pos * 4096)
+
+                        ap_send_flag_x = True if abs(phys_x - aileron_pos) > self.joystick_ap_x_follow_deadzone else False
+                        ap_send_flag_y = True if abs(phys_y - elevator_pos) > self.joystick_ap_y_follow_deadzone else False
+
+
+                        telem_data["phys_x_send_flag"] = ap_send_flag_x
+                        telem_data["phys_y_send_flag"] = ap_send_flag_y
+
+                    if self._sim_is_xplane():
+                        aileron_pos = telem_data.get("APRollServo", 0)
+                        aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+                        elevator_pos = telem_data.get("APPitchServo", 0)
+                        phys_stick_y_offs = int(elevator_pos*4096)
+
+
+                    phys_stick_x_offs = int(aileron_pos * 4096)
+                    if self.invert_ap_x_axis:
+                        phys_stick_x_offs = -phys_stick_x_offs
+                else:
+                    phys_stick_x_offs = int(aileron_trim * 4096)
+
+            else:
+                phys_stick_x_offs = 0
+                virtual_stick_x_offs = 0
+                phys_stick_y_offs = 0
+                virtual_stick_y_offs = 0
+
+            if self.telemffb_controls_axes and not self.local_disable_axis_control:
+                input_data = HapticEffect.device.get_input()
+                phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+                telem_data['phys_y'] = phys_y
+                x_pos = phys_x - virtual_stick_x_offs
+                y_pos = phys_y - virtual_stick_y_offs
+                telem_data['phys_x_pos'] = x_pos
+                telem_data['phys_y_pos'] = y_pos
+                x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
+                y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+                if self._sim_is_xplane():
+                    pos_x_pos = x_pos * x_scale
+                    pos_y_pos = y_pos * y_scale
+                    self.send_xp_command(f'AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}')
+
+                if self._sim_is_msfs():
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
+                    else:
+                        x_var = 'AXIS_AILERONS_SET'
+                        x_range = 16384
+                    if self.enable_custom_y_axis:
+                        y_var = self.custom_y_axis
+                        y_range = self.raw_y_axis_scale
+                    else:
+                        y_var = 'AXIS_ELEVATOR_SET'
+                        y_range = 16384
+
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                    pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+                    if y_range != 1:
+                        pos_y_pos = -int(pos_y_pos)
+                    else:
+                        pos_y_pos = round(pos_y_pos, 5)
+
+                    # Only send axis position if "send flags" are true
+                    # "send_flags" will be false if autopilot is engaged and physical control is within deadzone
+                    # once deadzone is breached for an axis, position will be sent
+                    # if AP is not active, flags are always True
+                    if ap_send_flag_x:
+                        self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                    else:
+                        self._simconnect.send_event_to_msfs(x_var, 0)
+                    if ap_send_flag_y:
+                        self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    else:
+                        self._simconnect.send_event_to_msfs(y_var, 0)
+
+            # update spring data
+            if self.ap_following and ap_active:
+                y_coeff = 1.0
+                x_coeff = 1.0
+            else:
+                y_coeff = clamp(self.fbw_elevator_gain, 0, 1.0)
+                x_coeff = clamp(self.fbw_aileron_gain, 0, 1.0)
+
+            self.spring_y.set_coefficient(y_coeff)
+            # logging.debug(f"Elev Coeef: {elevator_coeff}")
+            self.spring_y.cpOffset = phys_stick_y_offs
+
+            self.spring_x.set_coefficient(x_coeff)
+            self.spring_x.cpOffset = phys_stick_x_offs
+
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_x)
+
+        elif ffb_type == "pedals":
+            if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
+
+                rudder_trim = telem_data.get("RudderTrimPct", 0)
+
+                rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
+                virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
+
+                phys_rudder_x_offs = int(rudder_trim * 4096)
+
+                if self.ap_following and ap_active:
+                    input_data = HapticEffect.device.get_input()
+                    # print("I am here")
+                    phys_x, phys_y = input_data.axisXY()
+                    if self._sim_is_msfs():
+                        rudder_pos = telem_data.get("RudderDeflPct", 0)
+                    if self._sim_is_xplane():
+                        rudder_pos = telem_data.get("APYawServo", 0)
+
+                    rudder_pos = self.dampener.dampen_value(rudder_pos, '_rudder_pos', derivative_hz=5, derivative_k=0.15)
+                    # derivative_hz = 5  # derivative lpf filter -3db Hz
+                    # derivative_k = 0.1  # derivative gain value, or damping ratio
+                    #
+                    # d_rudder_pos = getattr(self, "_d_rudder_pos", None)
+                    # if not d_rudder_pos: d_rudder_pos = self._d_rudder_pos = utils.Derivative(derivative_hz)
+                    # d_rudder_pos.lpf.cutoff_freq_hz = derivative_hz
+                    #
+                    # rudder_pos_deriv = - d_rudder_pos.update(rudder_pos) * derivative_k
+                    #
+                    # rudder_pos += rudder_pos_deriv
+
+
+                    phys_rudder_x_offs = int(rudder_pos * 4096)
+
+                else:
+                    phys_rudder_x_offs = int(rudder_trim * 4096)
+
+            else:
+                phys_rudder_x_offs = 0
+                virtual_rudder_x_offs = 0
+
+            if self.telemffb_controls_axes and not self.local_disable_axis_control:
+                input_data = HapticEffect.device.get_input()
+                phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+
+                x_pos = phys_x - virtual_rudder_x_offs
+                x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+
+                if self._sim_is_xplane():
+                    pos_x_pos = x_pos * x_scale
+                    self.send_xp_command(f'AXIS:px={round(pos_x_pos, 5)} ')
+
+                if self._sim_is_msfs():
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
+                    else:
+                        x_var = 'AXIS_RUDDER_SET'
+                        x_range = 16384
+
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+
+                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+
+                # update spring data
+
+            if self.ap_following and ap_active:
+                x_coeff = 4096
+            else:
+                x_coeff = clamp(int(4096 * self.fbw_rudder_gain), 0, 4096)
+
+            self.spring_x.set_coefficient(x_coeff)
+            # print(f"{phys_rudder_x_offs}")
+            self.spring_x.cpOffset = phys_rudder_x_offs
+            logging.debug(f"Elev Coeef: {x_coeff}")
+
+            self._spring_handle.setCondition(self.spring_x)
+        self._spring_handle.start()
+
+    def msfs_update_flight_controls(self, telem_data):
+        # calculations loosely based on FLightGear FFB page:
+        # https://wiki.flightgear.org/Force_feedback
+        # https://github.com/viktorradnai/fg-haptic/blob/master/force-feedback.nas
+        self._spring_handle.name = "dynamic_spring"
+        if self._sim_is_msfs():
+            ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_xplane():
+            ap_active = telem_data.get("APServos", 0)
+
+
+        elev_base_gain = 0
+        ailer_base_gain = 0
+        rudder_base_gain = 0
+        ffb_type = telem_data.get("FFBType", "joystick")
+        if ffb_type == "collective":
+            return
+
+        if self.spring_mode_is(SpringModeEnum.FBW) or telem_data.get("ACisFBW", 0):
+            logging.debug ("FBW Setting enabled, running fbw_flight_controls")
+            self._update_fbw_flight_controls(telem_data)
+            return
+
+        if telem_data.get("AircraftClass") == "Helicopter":
+            logging.debug("Aircraft is Helicopter, aborting update_flight_controls")
+            return
+
+        if self.telemffb_controls_axes and self.ap_following and ap_active and self.use_fbw_for_ap_follow:
+            logging.debug("FBW Setting enabled, running fbw_flight_controls")
+            self._update_fbw_flight_controls(telem_data, ap=True)
+            self.effects["dynamic_spring"].stop()
+            return
+        else:
+            self.effects["fbw_spring"].stop()
+
+        if self.spring_mode_is(SpringModeEnum.CENTER):
+            elev_base_gain = self.elevator_spring_gain
+            ailer_base_gain = self.aileron_spring_gain
+            rudder_base_gain = self.rudder_spring_gain
+            logging.debug(f"Aircraft controls are center sprung, setting x:y base gain to{ailer_base_gain}:{elev_base_gain}, rudder base gain to {rudder_base_gain}")
+
+        incidence_vec = Vector(telem_data["Incidence"])
+
+        force_trim_x_offset = self.force_trim_x_offset
+        force_trim_y_offset = self.force_trim_y_offset
+
+        _airspeed = incidence_vec.z
+        _airspeed = telem_data['IAS']
+        telem_data["TAS"] = _airspeed   # why not use simvar AIRSPEED TRUE?
+        IAS = telem_data['IAS']
+        telem_data['TAS_kt'] = _airspeed * ms2kt
+        telem_data['IAS_kt'] = IAS * ms2kt
+        # show acc in m/s
+        telem_data['AccBody_ms'] = [x * 9.80665 for x in telem_data['AccBody']]
+
+
+        base_elev_coeff = round(clamp((elev_base_gain * 4096), 0, 4096))
+        base_ailer_coeff = round(clamp((ailer_base_gain * 4096), 0, 4096))
+        base_rudder_coeff = round(clamp((rudder_base_gain * 4096), 0, 4096))
+
+        #logging.info(f"Base Elev/Ailer coeff = {base_elev_coeff}/{base_ailer_coeff}")
+
+        rudder_angle = telem_data["RudderDefl"] * rad  # + trim?
+        if self._sim_is_xplane():
+            rudder_angle = -rudder_angle
+
+        # print(data["ElevDefl"] / data["ElevDeflPct"] * 100)
+
+        slip_angle = atan2(incidence_vec.x, incidence_vec.z)
+        telem_data["SideSlip"] = slip_angle*deg # overwrite sideslip with our calculated version (including wind)
+
+        g_force = telem_data["G"] # this includes earths gravity
+
+        _aoa = -atan2(incidence_vec.y, incidence_vec.z)*deg
+        telem_data["AoA"] = _aoa
+
+        # calculate air flow velocity exiting the prop
+        # based on https://www.grc.nasa.gov/www/k-12/airplane/propth.html
+        _prop_thrust = telem_data.get('PropThrust', 0)
+        if isinstance(_prop_thrust, list):
+            _prop_thrust = max(_prop_thrust)
+
+        if _prop_thrust < 0:
+            _prop_thrust = 0
+
+        _prop_air_vel = sqrt(2 * _prop_thrust / (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed ** 2)
+
+        telem_data['_prop_thrust'] = _prop_thrust
+
+        if abs(incidence_vec.y) > 0.5 or _prop_air_vel > 1: # avoid edge cases
+            _elevator_aoa = atan2(-incidence_vec.y, _prop_air_vel) * deg
+        else:
+            _elevator_aoa = 0
+        telem_data["_elevator_aoa"] = _elevator_aoa
+
+
+        # calculate dynamic pressure based on air flow from propeller
+        # elevator_prop_flow_ratio defines how much prop wash the elevator receives
+        _elev_dyn_pressure = utils.mix(telem_data["DynPressure"],
+                                       0.5 * telem_data["AirDensity"] * _prop_air_vel ** 2,
+                                       self.elevator_prop_flow_ratio) * self.dyn_pressure_scale
+
+        # scale dynamic pressure to FFB friendly values
+        _dyn_pressure = telem_data["DynPressure"] * self.dyn_pressure_scale
+
+        # determine standard Q with Vne to get proper gain
+
+
+        if telem_data['src'] == 'XPLANE':
+            vne = telem_data.get('Vne')
+            vs0 = telem_data.get('Vso')
+        else:
+            vc, vs0, vs1 = telem_data.get("DesignSpeed")  # m/s   Vc is TAS!!
+            telem_data['Vc_kt'] = vc * ms2kt
+            Tvne = vc * 1.4  # rough estimate that Vne is 1.4x Vc
+            # correction from TAS to IAS
+            # https://aviation.stackexchange.com/questions/25801/how-do-you-convert-true-airspeed-to-indicated-airspeed
+            qv= (0.5 * std_air_pressure * (Tvne ** 2))
+            kmNs = ((( qv / P0) + 1) ** (2/7))
+            vne = vsound * sqrt(5 * ( kmNs - 1))
+        telem_data['Vne_ms_calc'] = vne
+
+        if self.vne_override:
+            vne = self.vne_override
+
+        telem_data['Vne_kt'] = vne * ms2kt
+
+        Qvne = 0.5 * std_air_pressure * vne ** 2
+        #Qvc = 0.5 * std_air_pressure * (vne/1.4) ** 2
+        telem_data['Qvne'] = Qvne * self.dyn_pressure_scale
+
+        Q_gain = 1/(Qvne * self.dyn_pressure_scale)
+        telem_data['Qvc_gain'] = Q_gain
+
+        self.elevator_gain = Q_gain
+        self.aileron_gain = Q_gain
+        self.rudder_gain = Q_gain
+
+
+        _slip_gain = 1.0 - self.slip_gain * abs(sin(slip_angle))
+        telem_data["_slip_gain"] = _slip_gain
+
+        # increasing G force causes increase in elevator droop effect
+        _elevator_droop_term = self.elevator_droop_moment * g_force / (1 + _elev_dyn_pressure)
+        telem_data["_elevator_droop_term"] = _elevator_droop_term
+        #logging.debug(f"ailer gain = {self.aileron_gain}")
+        aileron_coeff = _dyn_pressure * self.aileron_gain * _slip_gain
+
+        # add data to telemetry packet so they become visible in the GUI output
+        telem_data["_prop_air_vel"] = _prop_air_vel
+        telem_data["_elev_dyn_pressure"] = _elev_dyn_pressure
+        #logging.debug(f"elev gain = {self.elevator_gain}")
+        elevator_coeff = (_elev_dyn_pressure) * self.elevator_gain * _slip_gain
+        # a, b, c = 0.5, 0.3, 0.1
+        # elevator_coeff = a * (_elev_dyn_pressure ** 2) + b * _elev_dyn_pressure * self.elevator_gain + c * slip_gain
+
+        # apply expo curve
+        if self.spring_mode_is(SpringModeEnum.ADVANCED):
+            # calculate spd based on current elevator_coeff assuming linear from 0 to VNE
+            adv_spr_stgs = json.loads(self.adv_spr_gains)
+            scale = adv_spr_stgs.get('scale')
+            spd_y = scale * elevator_coeff
+            spd_x = scale * aileron_coeff
+            y_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_y)
+            x_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_x)
+            elevator_coeff = y_gains.get('y')
+            aileron_coeff = x_gains.get('x')
+        else:
+            elevator_coeff = utils.expocurve(elevator_coeff, self.elevator_expo)
+            aileron_coeff = utils.expocurve(aileron_coeff, self.aileron_expo)
+
+        telem_data["_elev_coeff"] = elevator_coeff
+        telem_data["_aile_coeff"] = aileron_coeff
+
+        # force is proportional to elevator deflection vs incoming airflow, this creates a dynamic elevator effect on top of spring
+        # update: reworking this based on spring center point offset and this below is not physically correct anyways
+        #_aoa_term = sin(( _aoa - telem_data["ElevDefl"]) * rad) * self.aoa_gain * _elev_dyn_pressure * _slip_gain
+        #telem_data["_aoa_term"] = _aoa_term
+        input_data = HapticEffect.device.get_input()
+        dx,dy = input_data.CP_scaled_axisXY()
+        _G_term = (self.g_force_gain * telem_data["AccBody"][1])
+        _G_term = _G_term * abs(dy)  # scale g forces based on stick deflection from spring center
+        telem_data["_G_term"] = _G_term
+
+        #       hpf_pitch_acc = hpf.get("xacc", 3).update(data["RelWndY"]) # test stuff
+        #       data["_hpf_pitch_acc"] = hpf_pitch_acc # test stuff
+        _rud_dyn_pressure = utils.mix(telem_data["DynPressure"], 0.5 * telem_data["AirDensity"] * _prop_air_vel ** 2,
+                                      self.rudder_prop_flow_ratio) * self.dyn_pressure_scale
+        rudder_coeff = _rud_dyn_pressure * self.rudder_gain * _slip_gain
+
+        # apply expo curve
+        if self.spring_mode_is(SpringModeEnum.ADVANCED):
+            # calculate spd based on current elevator_coeff assuming linear from 0 to VNE
+            adv_spr_stgs = json.loads(self.adv_spr_gains)
+            scale = adv_spr_stgs.get('scale')
+            spd_x = scale * rudder_coeff
+            x_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_x)
+            rudder_coeff = x_gains.get('x')
+        else:
+            rudder_coeff = utils.expocurve(rudder_coeff, self.rudder_expo)
+
+        telem_data["_rud_coeff"] = rudder_coeff
+        rud = (slip_angle - rudder_angle) * _dyn_pressure * _slip_gain
+        rud_force = clamp((rud * self.rudder_gain), -1, 1)
+        rud_force = self.dampener.dampen_value(rud_force, '_rud_force', derivative_hz=5, derivative_k=.015)
+
+        if ffb_type == 'joystick':
+
+            if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
+
+                elev_trim = telem_data.get("ElevTrimPct", 0)
+                aileron_trim = telem_data.get("AileronTrimPct", 0)
+
+                aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
+                virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
+
+                elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
+
+                elev_trim = self.dampener.dampen_value(elev_trim, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+
+                virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
+                phys_stick_y_offs = int(elev_trim * 4096)
+
+
+                if self.ap_following and ap_active:
+                    if self._sim_is_msfs():
+                        aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+                        aileron_pos = aileron_pos[0]
+                        aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
+                    if self._sim_is_xplane():
+                        aileron_pos = telem_data.get("APRollServo", 0)
+
+
+                    phys_stick_x_offs = int(aileron_pos * 4096)
+                else:
+                    phys_stick_x_offs = int(aileron_trim * 4096)
+            else:
+                phys_stick_x_offs = 0
+                virtual_stick_x_offs = 0
+                phys_stick_y_offs = 0
+                virtual_stick_y_offs = 0
+
+            if self.telemffb_controls_axes and not self.local_disable_axis_control:
+                input_data = HapticEffect.device.get_input()
+                phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+                telem_data['phys_y'] = phys_y
+
+                x_pos = phys_x - virtual_stick_x_offs
+                y_pos = phys_y - virtual_stick_y_offs
+
+                x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
+                y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+                if self._sim_is_xplane():
+                    pos_x_pos = x_pos * x_scale
+                    pos_y_pos = y_pos * y_scale
+                    self.send_xp_command(f'AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}')
+
+                if self._sim_is_msfs():
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
+                    else:
+                        x_var = 'AXIS_AILERONS_SET'
+                        x_range = 16384
+                    if self.enable_custom_y_axis:
+                        y_var = self.custom_y_axis
+                        y_range = self.raw_y_axis_scale
+                    else:
+                        y_var = 'AXIS_ELEVATOR_SET'
+                        y_range = 16384
+
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+                    pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
+
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+                    if y_range != 1:
+                        pos_y_pos = -int(pos_y_pos)
+                    else:
+                        pos_y_pos = round(pos_y_pos, 5)
+
+                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                    self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+
+                #give option to disable if desired by user
+            if self.aoa_effect_enabled and telem_data.get("ElevDeflPct", 0) != 0 and not max(telem_data.get("WeightOnWheels")):
+                # calculate maximum angle based on current angle and percentage
+                tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
+
+                speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
+                y_offs = _aoa / tot
+                y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
+                y_offs = clamp(y_offs, -1, 1)
+                # Take speed in relation to aircraft v speeds into account when moving offset based on aoa
+                y_offs = int(y_offs * 4096 * speed_factor * self.aoa_effect_gain)
+            else:
+                y_offs = force_trim_y_offset + (phys_stick_y_offs / 4096)
+                y_offs = clamp(y_offs, -1, 1)
+                y_offs = int(y_offs * 4096)
+
+            self.spring_y.cpOffset = y_offs
+            x_offs = phys_stick_x_offs
+            self.spring_x.cpOffset = x_offs
+
+
+                    # logging.debug(f"fto={force_trim_y_offset} | Offset={offs}")
+            # if self.adv_spr_override_enabled:
+            #     if self.adv_spr_gains == 'none':
+            #         self.flag_error('Please open and configure the advanced spring gain settings')
+            #     else:
+            #         gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.get('IAS', 0))
+            #         self.spring_y.positiveCoefficient = self.spring_y.negativeCoefficient = round(4096 * gains.get('y', 0))
+            #         self.spring_x.positiveCoefficient = self.spring_x.negativeCoefficient = round(4096 * gains.get('x', 0))
+            # else:
+            max_coeff_y = int(4096 * self.max_elevator_coeff)
+            realtime_coeff_y = int(4096 * elevator_coeff)
+            ec = int(utils.scale_clamp(realtime_coeff_y, (base_elev_coeff, 4096), (base_elev_coeff, max_coeff_y)))
+
+            pct_max_e = ec/max_coeff_y
+
+            telem_data["_pct_max_e"] = pct_max_e
+            self._ipc_telem["_pct_max_e"] = pct_max_e
+            logging.debug(f"Elev Coef: {ec}")
+            telem_data['_ec'] = ec
+
+            self.spring_y.set_coefficient(ec)
+
+            max_coeff_x = int(4096 * self.max_aileron_coeff)
+            realtime_coeff_x = int(4096 * aileron_coeff)
+            ac = int(utils.scale_clamp(realtime_coeff_x, (base_ailer_coeff, 4096), (base_ailer_coeff, max_coeff_x)))
+
+            pct_max_a = ac/max_coeff_x
+
+            telem_data["_pct_max_a"] = pct_max_a
+            self._ipc_telem["_pct_max_a"] = pct_max_a
+            telem_data['_ac'] = ac
+            logging.debug(f"Ailer Coef: {ac}")
+
+            self.spring_x.set_coefficient(ac)
+
+            # update spring data
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_x)
+
+            # update constant forces
+            cf_pitch = -_elevator_droop_term - _G_term # + _aoa_term
+            cf_pitch = clamp(cf_pitch, -1.0, 1.0)
+
+            # add force on lateral axis (sideways)
+            if self.uncoordinated_turn_effect_enabled:
+                _side_accel = -telem_data["AccBody"][0] * self.lateral_force_gain
+            else:
+                _side_accel = 0
+
+            cf_roll = _side_accel
+
+            cf = Vector2D(cf_pitch, cf_roll)
+            if cf.magnitude() > 1.0:
+                cf = cf.normalize()
+
+            mag, theta = cf.to_polar()
+
+            self.effects['control_weight'].constant(mag, theta*deg).start()
+                # print(mag, theta*deg)
+                # self.const_force.constant(mag, theta*deg).start()
+
+            self._spring_handle.start() # ensure spring is started
+
+        elif ffb_type == 'pedals':
+            if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
+
+                rudder_trim = telem_data.get("RudderTrimPct", 0)
+
+                rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
+                virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
+
+                phys_rudder_x_offs = int(rudder_trim * 4096)
+            else:
+                phys_rudder_x_offs = 0
+                virtual_rudder_x_offs = 0
+
+
+            if self.spring_mode_is(SpringModeEnum.ADVANCED):
+                if self.adv_spr_gains == 'none':
+                    self.flag_error('Please open and configure the advanced spring gain settings')
+                else:
+                    gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.get('IAS', 0))
+                    # print(f"gains: {gains}")
+                    self.spring_x.set_coefficient(gains.get('x', 0))
+                    rc = gains.get('x', 0)
+            else:
+                max_coeff_x = int(4096*self.max_rudder_coeff)
+                realtime_coeff_x = int(4096 * rudder_coeff)
+                rc = int(utils.scale_clamp(realtime_coeff_x, (base_rudder_coeff, 4096), (base_rudder_coeff, max_coeff_x)))
+
+                pct_max_r = rc/max_coeff_x
+
+                telem_data["_pct_max_r"] = pct_max_r
+                self._ipc_telem["_pct_max_r"] = pct_max_r
+                telem_data['_rc'] = rc
+                self.spring_x.set_coefficient(rc)
+
+            self.spring_x.cpOffset = phys_rudder_x_offs
+
+
+            # add spring force from steering wheel on ground
+            # should this be dependent on friction?  doesn't need to be.
+
+            if self.steering_friction:
+                on_ground = telem_data.get("SimOnGround", 0)
+                wos = telem_data.get("WeightOnWheels", [0])[0]  # center steering wheel only
+                gs = telem_data.get("GroundSpeed", 0)
+                csa = telem_data.get("CenterSteerAnglePct", 0)
+                wr = telem_data.get("WaterRudderExt", 0)  # percent of rudder extension
+                surface = telem_data.get("SurfaceType", 0)
+
+                if on_ground and (wos or surface == "Water"):
+                    rudder_angle = 30  #assumed rudder travel
+                    dynamic_angle = phys_rudder_x_offs*rudder_angle/4096
+                    dynamic_force = rc/4096
+                    steer_angle = csa*rudder_angle
+                    steer_force = self.steering_friction_spring/40  # dont need a strong spring
+                    if surface == "Water":
+                        steer_force *= wr
+                    result_angle_percent, result_mag = utils.add_vectors_deg(dynamic_angle, dynamic_force, steer_angle, steer_force)
+
+                    #logging.info(f"angle {result_angle_percent:.3f} mag {result_mag:.1f}  ofs {phys_rudder_x_offs/136:.1f}  rc {rc}  st angle {steer_angle:.1f} ")
+                    self.spring_x.set_coefficient(result_mag, True)
+                    self.spring_x.set_offset(result_angle_percent/rudder_angle)
+
+
+            self._spring_handle.setCondition(self.spring_x)
+
+            speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
+            rud_force = rud_force * speed_factor
+            # telem_data["RudForce"] = rud_force * speed_factor
+
+            if self.telemffb_controls_axes and not self.local_disable_axis_control:
+                input_data = HapticEffect.device.get_input()
+                phys_x, phys_y = input_data.axisXY()
+                telem_data['phys_x'] = phys_x
+                x_pos = phys_x - virtual_rudder_x_offs
+                x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+
+                if self._sim_is_xplane():
+                    pos_x_pos = x_pos * x_scale
+                    self.send_xp_command(f'AXIS:px={round(pos_x_pos, 5)}')
+
+                if self._sim_is_msfs():
+                    if self.enable_custom_x_axis:
+                        x_var = self.custom_x_axis
+                        x_range = self.raw_x_axis_scale
+                    else:
+                        x_var = 'AXIS_RUDDER_SET'
+                        x_range = 16384
+
+                    pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
+
+                    if x_range != 1:
+                        pos_x_pos = -int(pos_x_pos)
+                    else:
+                        pos_x_pos = round(pos_x_pos, 5)
+
+                    self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+
+            self.const_force.constant(rud_force, 270).start()
+            self._spring_handle.start()
+
+    def msfs_update_trimwheel(self, telem_data):
+        if not self.is_trimwheel():
+            return
+        if not self.telemffb_controls_axes and not self.local_disable_axis_control:
+            return
+        ap_active = 0
+        if self._sim_is_msfs():
+            ap_active = telem_data.get("APMaster", 0)
+        if self._sim_is_xplane():
+            ap_active = telem_data.get("APServos", 0)
+
+        input_data = HapticEffect.device.get_input()
+        phys_x, phys_y = input_data.axisXY()
+        self._spring_handle.name = "trimwheel_ap_spring"
+        if not self.trimwheel_use_axis:
+            trim_pos = telem_data.get('ElevTrim')
+
+            trim_limit_max = telem_data.get('ElevTrimMax')
+            if trim_limit_max == None:
+                trim_limit_max = telem_data.get('ElevTrimUpLmt')
+
+            trim_limit_min = telem_data.get('ElevTrimMin')
+            if trim_limit_min == None:
+                trim_limit_min = telem_data.get('ElevTrimDnLmt')
+                #trim_limit_min = -trim_limit_max
+            trim_limit_neutral = telem_data.get('ElevTrimNeutral')
+            # linear scale
+            trimwheel_pos = utils.scale(trim_pos, (trim_limit_min, trim_limit_max), (-1, 1))
+
+       #     if phys_y > 0:
+       #         trimwheel_pos = utils.scale(trim_pos, (trim_limit_neutral, trim_limit_up), (0, 1))
+       #     else:
+       #         trimwheel_pos = utils.scale(trim_pos, (-trim_limit_down, trim_limit_neutral), (-1, 0))
+
+            telem_data['trimwheel_pos_calc'] = trimwheel_pos
+
+        # print(f"Linear:{round(phys_y, 4)}, Curved:{round(trimwheel_pos, 4)}")
+
+        telem_data['phys_y'] = phys_y
+        if not self.trimwheel_init:
+            self.spring_y.set_coefficient(1.0)
+
+            if self.last_trimwheel_y is None:
+                # Air start or new aircraft.  Use sim defined trim setpoint as init point
+                trimwheel_pos = telem_data["ElevTrimPct"]
+                self.cpO_y = round(4096 * trimwheel_pos)
+            else:
+                # In air, previously paused.  Use stored position to init point
+                self.cpO_y = round(4096 * self.last_trimwheel_y)
+
+            self.spring_y.set_coefficient(1.0)
+
+            self.spring_y.cpOffset = self.cpO_y
+
+            self._spring_handle.setCondition(self.spring_y)
+            # self.damper.damper(coef_y=int(4096*self.trimwheel_dampening_gain)).start()
+            self._spring_handle.start(override=True)
+            # print(f"self.cpO_y:{self.cpO_y}, phys_y:{phys_y}")
+            if self.cpO_y / 4096 - 0.1 < phys_y < self.cpO_y / 4096 + 0.1:
+                # dont start sending position until physical stick has centered
+                self.trimwheel_init = 1
+                logging.info("Trim Wheel Initialized")
+            else:
+                # if self._sim_is_msfs():
+                #     self._simconnect.send_event_to_msfs(y_var, self.last_trimwheel_y)
+                return
+        self.last_trimwheel_y = phys_y
+
+        if self.trimwheel_use_axis:
+           trimwheel_pos = telem_data.get("ElevTrimPct", 0)
+
+
+        if ap_active == 0:
+
+            # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+            self.cpO_y = round(utils.scale(trimwheel_pos, (-1, 1), (-4096, 4096)))
+            telem_data['_tw_cpO_y'] = trimwheel_pos
+            self.spring_y.set_offset(trimwheel_pos)
+
+            # self.damper.damper(coef_y=0).start()
+            self.spring_y.set_coefficient(self.trimwheel_ap_spring_gain, True)
+
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.start(override=True)
+
+            if self._sim_is_xplane():  # unknown if this works
+                pos_y_pos = utils.scale(phys_y, (-1, 1), (1, 0))
+                if self.trimwheel_init:
+                    self.send_xp_command(f'AXIS:cy={round(pos_y_pos, 5)}')
+
+            if self._sim_is_msfs():
+                if self.enable_custom_y_axis:
+                    y_var = self.custom_y_axis
+                    y_range = self.raw_y_axis_scale
+                else:
+                    y_var = 'AXIS_ELEV_TRIM_SET'
+                    y_range = 16384
+
+                input_data = HapticEffect.device.get_input()
+                # phys_x, phys_y = input_data.axisXY()
+
+                pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
+                telem_data['_tw_phys_y_pos'] = phys_y
+                telem_data['_tw_phys_y_pos_neg'] = -phys_y
+                telem_data['_tw_pos_y_pos'] = pos_y_pos
+                if y_range != 1:
+                    pos_y_pos = -int(pos_y_pos)
+                else:
+                    pos_y_pos = round(pos_y_pos, 5)
+
+                if self.check_button_press(self.trimwheel_elev_up_button, self.trimwheel_use_master_buttons) or self.check_button_press(self.trimwheel_elev_dn_button, self.trimwheel_use_master_buttons):
+                    self.trim_active = True
+                    return
+
+                delta = round(phys_y - trimwheel_pos, 5)
+                # utils.dbprint('yellow', f"delta: {delta}")
+                telem_data["TRIM_DELTA"] = delta
+                if self.trim_active:
+                    if abs(delta) <= 0.003:
+                        self.trim_active = False
+
+                if not self.trim_active:
+                    if self.trimwheel_use_axis:
+                        if self.trimwheel_axis_invert:
+                            pos_y_pos = -pos_y_pos
+                            phys_y = -phys_y
+                        self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                    else:
+
+                        pos_y_pos = utils.scale(phys_y, (-1, 1), (trim_limit_min, trim_limit_max))
+                    #    if phys_y > 0:
+                    #        pos_y_pos = utils.scale(phys_y,(0, 1), (trim_limit_neutral, trim_limit_up))
+                    #    else:
+                    #        pos_y_pos = utils.scale(phys_y,(-1, 0), (-trim_limit_down, trim_limit_neutral))
+
+                        pos_y_pos = pos_y_pos * .01745
+                        self._simconnect.set_simdatum_to_msfs('ELEVATOR TRIM POSITION', pos_y_pos, units='radians')
+                self.last_pos_y_pos = pos_y_pos
+                telem_data['_tw_last'] = self.last_pos_y_pos
+
+        else:
+            # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
+            self.spring_y.set_offset(trimwheel_pos)
+            # self.damper.damper(coef_y=0).start()
+            self.spring_y.set_coefficient(self.trimwheel_ap_spring_gain, True)
+
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.start(override=True)
+
+    def msfs_update_stick_shaker(self, telem_data):
+        if not self._sim_is_msfs():
+            return
+
+        if not self.enable_stick_shaker:
+            self.effects['stick_shaker'].destroy()
+            return
+
+        stall = telem_data.get('StallWarning', 0)
+        if stall:
+            self.effects['stick_shaker'].periodic(14, self.stick_shaker_intensity, 0, EFFECT_SQUARE).start()
+        else:
+            self.effects['stick_shaker'].destroy()
+
+
+    def send_xp_command(self, cmd):
+        if not getattr(self, "_socket", None):
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+        self.toggle_xp_control()
+        self._socket.sendto(bytes(cmd, "utf-8"), ("127.0.0.1", 34391))
+
+    def toggle_xp_control(self):
+        if self.telem_data.get('FFBType', '') == 'collective':
+            # issues with axis override for collectve
+            return
+
+        if self.telem_data.get('FFBType', '') == 'trimwheel':
+            # not implemented
+            return
+
+        if not getattr(self, "_socket", None):
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+
+        if self.telem_data.get('FFBType', '') == 'collective' and self.telem_data.get("AircraftClass", '') != "Helicopter":
+            # we don't want to send the "prop pitch" override (collective) to XPLANE if we are not in a helo
+            if self.telem_data.get("cOvrd", 1):
+                sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=false"
+                self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+                logging.info(f"Sending to XPLANE: >>{sendstr}<<")
+                self.xplane_axis_override_active = False
+            return
+
+        if self.telemffb_controls_axes and not self.local_disable_axis_control and not self.xplane_axis_override_active:
+            sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=true"
+            self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+            logging.info(f"Sending to XPLANE: >>{sendstr}<<")
+            self.xplane_axis_override_active = True
+        elif self.xplane_axis_override_active and not self.telemffb_controls_axes:
+            sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=false"
+            self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+            logging.info(f"Sending to XPLANE: >>{sendstr}<<")
+            self.xplane_axis_override_active = False
+
+    def msfs_override_collective_spring(self):
+        """
+        Method specifically intended to start a spring with force=0 for use in fixed wing aircraft so it may be stowed
+        and kept out of the way
+        .
+        Option to leave spring active also exists
+        """
+        if not self.is_collective(): return
+
+        self.spring = self.effects["collective_ap_spring"].spring()
+
+        if not self.force_disable_collective_gain:
+            self.spring_y.set_coefficient(0.0)
+            self.spring_y.set_offset(0.0)
+            self.spring.setCondition(self.spring_y)
+            self.spring.start(override=True)
+        else:
+            self.spring_y.set_coefficient(0.0)
+            self.spring.setCondition(self.spring_y)
+            self.spring.start(override=True)
+
+    def find_xp_gear_orientation(self, x, y, z):
+        pass
+
+    @overrides(AircraftBase)
+    def on_event(self, event, *args):
+        logging.info(f"on_event {event} {args}")
+
+        if event == "STOP":
+            self.on_timeout()
+
+    @overrides(AircraftBase)
+    def on_telemetry(self, telem_data):
+        self.effects["pause_spring"].destroy()
+
+        if telem_data.get('Parked', 0): # MSFS in Hangar
+            return
+
+        if self._sim_is_xplane():
+            self.toggle_xp_control()
+
+        if self._sim_is_xplane():
+            incidence_vec = Vector(telem_data["VelAcf"])
+        else:
+            incidence_vec = Vector(telem_data["VelWorld"])
+            wind_vec = Vector(telem_data["AmbWind"])
+            incidence_vec = incidence_vec - wind_vec
+            # Rotate the vector from world frame into body frame
+            incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
+            incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
+            incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
+
+        telem_data["Incidence"] = list(incidence_vec)
+
+        #
+        ### Generic Aircraft Class Telemetry Handler
+        if not "AircraftClass" in telem_data:
+            telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
+
+        super().on_telemetry(telem_data)
+
+        if self.is_joystick():
+            self.update_turbulence()
+
+        if self.is_trimwheel():
+            self.msfs_update_trimwheel(telem_data)
+            return
+
+        self.msfs_update_stick_shaker(telem_data)
+        self.msfs_update_flight_controls(telem_data)
+
+        if self._sim_is_msfs() and self.is_pedals():
+            if self.nosewheel_shimmy and not telem_data.get("IsTaildragger", 0):
+                self.msfs_update_nosewheel_shimmy(telem_data)
+            self.msfs_update_steering_friction_effect(telem_data)
+
+    @overrides(AircraftBase)
+    def on_timeout(self):
+        if not self.effects["pause_spring"].started:
+            super().on_timeout()
+
+        self.cyclic_spring_init = 0
+        self.trimwheel_init = 0
+
+
+        self.const_force.stop()
+        self._spring_handle.stop()
+        if self.center_spring_on_pause:
+            self.spring_x.set_coefficient(1.0)
+            self.spring_y.set_coefficient(1.0)
+            self.spring_x.set_offset(0.0)
+            self.spring_y.set_offset(0.0)
+
+            pause_spring = self.effects["pause_spring"].spring()
+            pause_spring.setCondition(self.spring_x)
+            pause_spring.setCondition(self.spring_y)
+            pause_spring.start()
