@@ -263,3 +263,11 @@ class HelicopterEffectsMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
         spring.setCondition(self.spring_y)
         # ensure spring is started with override = true
         spring.start(override=True)
+
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)
+        if self.is_helicopter():
+            self.ac_calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
+            self.ac_update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
+            self.ac_update_vrs_effect(telem_data)
+    

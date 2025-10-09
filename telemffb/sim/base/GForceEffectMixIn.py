@@ -33,13 +33,17 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
     gforce_effect_adv_curve: str = "none"
 
     def __init__(self):
-        self.firmware_supported = None
+        self.__firmware_supported = None
         self.offset_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.offset_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.offset_adjuster = self.effects["offset_adjuster"].spring_adjuster()
 
         derivative_hz = 5  # derivative lpf filter -3db Hz
-        self._dGs = utils.Derivative(derivative_hz)
+        self.__dGs = utils.Derivative(derivative_hz)
+
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)
+        self.ac_update_gforce_effect(telem_data)
 
     def _ac_run_new_gforce_effect(self, telem_data):
         """Apply new G-force effects based on aircraft acceleration.
@@ -91,7 +95,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
             spring_y_center = 0
         derivative_k = 0.1  # derivative gain value, or damping ratio
 
-        dGs = self._dGs
+        dGs = self.__dGs
         if gs > 1 and y > (spring_y_center + self.new_gforce_effect_center_deadzone):
             direction = 180
             g_factor = utils.scale_clamp(gs, (gmin, gmax), (0, 1))
@@ -146,9 +150,9 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         if self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED):
             # Verify the device firmware meets the minimum version required to execute this portion of the effect
             # Flag error and abort if not met
-            if self.firmware_supported is None:
-                self.firmware_supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
-            if not self.firmware_supported:
+            if self.__firmware_supported is None:
+                self.__firmware_supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+            if not self.__firmware_supported:
                 self.flag_error(
                     "The Advanced/Custom Curve G-Force effect requires firmware v1.0.18 or higher.\n"
                     f"The device is currently running version {G.device_firmware_version}\n"
@@ -185,7 +189,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
             derivative_hz = 5  # derivative lpf filter -3db Hz
             derivative_k = 0.1  # derivative gain value, or damping ratio
 
-            dGs = self._dGs
+            dGs = self.__dGs
             dGs.lpf.cutoff_freq_hz = derivative_hz
 
             g_deriv = -dGs.update(g_factor) * derivative_k

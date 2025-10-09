@@ -19,13 +19,13 @@
 
 import logging
 import math
+from telemffb.sim.base.WindEffectMixIn import WindEffectMixIn
 import telemffb.utils as utils
-from typing import List, Dict
+from typing import List
 
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.base.DecelerationEffectMixIn import DecelerationEffectMixIn
 from telemffb.sim.base.EngineRumbleMixIn import EngineRumbleMixIn
-from telemffb.sim.base.AoAReductionMixIn import AoAReductionMixIn
 from telemffb.sim.base.MotionEffectsMixIn import MotionEffectsMixIn
 from telemffb.sim.base.WeaponsEffectMixIn import WeaponsEffectMixIn
 from telemffb.sim.base.BuffetingEffectMixIn import BuffetingEffectMixIn
@@ -34,6 +34,7 @@ from telemffb.sim.base.DeadzoneMixIn import DeadzoneMixIn
 from telemffb.sim.base.HydraulicLossMixIn import HydraulicLossMixIn
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
 from telemffb.sim.base.PedalSpringOverrideMixIn import PedalSpringOverrideMixIn
+from telemffb.sim.base.AoAEffectsMixIn import AoAEffectsMixIn
 
 from telemffb.util.conversions import kt2ms, kmh2ms
 
@@ -47,8 +48,7 @@ from telemffb.hw.ffb_rhino import (
     EFFECT_SQUARE,
     EFFECT_SINE,
 )
-from telemffb.globals import master_buttons
-
+import telemffb.globals as G
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 
 # Highpass filter dispenser
@@ -57,10 +57,8 @@ HPFs: utils.Dispenser = utils.Dispenser(utils.HighPassFilter)
 # Lowpass filter dispenser
 LPFs: utils.Dispenser = utils.Dispenser(utils.LowPassFilter)
 
+G.effects = utils.Dispenser(HapticEffect)
 
-
-
-            # effects.dispose("ab_rumble_2_2")
 
 class AircraftBase(
     GForceEffectMixIn,
@@ -71,7 +69,8 @@ class AircraftBase(
     HydraulicLossMixIn,
     DecelerationEffectMixIn,
     EngineRumbleMixIn,
-    AoAReductionMixIn,
+    AoAEffectsMixIn,
+    WindEffectMixIn,
     AdvancedSpringMixIn,
     MotionEffectsMixIn,
     BuffetingEffectMixIn,
@@ -80,8 +79,7 @@ class AircraftBase(
 
     cpO_x = 0
     cpO_y = 0
-
-    aoa_effect_enabled: bool = False
+    
 
     keep_forces_on_pause: bool = True
     enable_damper_ovd: bool = False
@@ -91,11 +89,8 @@ class AircraftBase(
     enable_friction_ovd: bool = False
     friction_force: float = 0
 
-    wind_effect_enabled : int = 0
-    wind_effect_scaling: int = 0
-    wind_effect_max_intensity: int = 0
-    aoa_effect_gain: float = 1.0
-    uncoordinated_turn_effect_enabled: int = 1
+    
+    
 
 
 
@@ -117,7 +112,7 @@ class AircraftBase(
 
     # canopy motion attributes moved to MotionEffectsMixIn
 
-    max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
+    
     elevator_droop_enabled: bool = False
     elevator_droop_force: float = 0.0
     aircraft_is_fbw: bool = False           #deprecated
@@ -348,28 +343,6 @@ class AircraftBase(
         else:
             self.effects.dispose('elev_droop')
 
-    def ac_update_aoa_effect(self, telem_data, minspeed=50*kmh2ms, maxspeed=140*kmh2ms):
-        if not self.aoa_effect_enabled: return
-        if not self.is_joystick(): return
-        if self.spring_mode_is(SpringModeEnum.FBW) or telem_data.get("ACisFBW"): return
-
-        aoa = telem_data.get("AoA", 0)
-        tas = telem_data.get("TAS", 0)
-        local_stall_aoa = self.stall_aoa
-
-        if aoa:
-            aoa = float(aoa)
-            speed_factor = utils.scale_clamp(tas, (minspeed, maxspeed), (0, 1.0))
-            mag = utils.scale_clamp(abs(aoa), (0, local_stall_aoa), (0, self.max_aoa_cf_force))
-            mag *= speed_factor
-            if (aoa > 0):
-                dir = 0
-            else:
-                dir = 180
-
-            telem_data["aoa_pull"] = mag
-            logging.debug(f"AOA EFFECT:{mag}")
-            self.effects["aoa"].constant(mag, dir).start()
 
     def ac_update_piston_engine_rumble(self, telem_data):
         """Delegates to EngineRumbleMixIn.ac_update_piston_engine_rumble"""
@@ -406,33 +379,22 @@ class AircraftBase(
             self.deadzone_active = False
 
     def on_telemetry(self, telem_data): 
-        aircraft_type = telem_data.get("AircraftClass", "Unknown")
+        super().on_telemetry(telem_data)
+
         fx,fy = HapticEffect.device.get_input().forceXY()
         self.telem_data['ForceXY'] = [fx,fy]
         jx, jy = HapticEffect.device.get_input().axisXY()
         self.telem_data['JoyXY'] = [jx, jy]
         # the methods should decide if they want to run based on the telemetry data
-        if aircraft_type == "JetAircraft":
+        if self.is_jet_aircraft():
             self.ac_update_ab_effect(telem_data)
 
-        elif aircraft_type == "PropellerAircraft":
+        elif self.is_propeller_aircraft():
             self.ac_update_piston_engine_rumble(telem_data)
 
-        self.ac_update_aoa_reduction_force_effect(telem_data)
-        self.ac_update_gforce_effect(telem_data)
         self.ac_update_wind_effect(telem_data)
         self.ac_update_jet_engine_rumble(telem_data)
 
-        if aircraft_type == "Helicopter":
-            self.ac_calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)
-            self.ac_update_heli_engine_rumble(telem_data, blade_ct=self.rotor_blade_count)
-            self.ac_update_vrs_effect(telem_data)
-        else:
-            # not helicopter
-            vs0 = self.aircraft_vs_speed
-            vne = self.aircraft_vne_speed
-            # print(f"Got Vs0={vs0}, Vne={vne}")
-            self.ac_update_aoa_effect(telem_data, minspeed=vs0, maxspeed=vne)
 
         if self.is_joystick():
             self.ac_override_elevator_droop(telem_data)

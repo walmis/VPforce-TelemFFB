@@ -3,7 +3,6 @@ import telemffb.utils as utils
 from telemffb.globals import master_instance
 from telemffb.hw.ffb_rhino import HapticEffect
 
-
 import logging
 import random
 import time
@@ -359,3 +358,38 @@ class AircraftEffectUtilsBase(object):
     def _is_telemetry_spike(self, y_gs: float, last_y_gs: float, threshold: float = 3.0) -> bool:
         """Check if telemetry shows a spike indicating crash or invalid data."""
         return abs(y_gs - last_y_gs) > threshold
+    
+
+    def is_jet_aircraft(self):
+        """Check if the current aircraft is a jet.
+
+        Returns:
+            bool: True if jet, False otherwise
+        """
+        return self._telem_data.get("AircraftClass", "") == "JetAircraft"
+    
+    def is_propeller_aircraft(self):
+        """Check if the current aircraft is a propeller aircraft.
+
+        Returns:
+            bool: True if propeller aircraft, False otherwise
+        """
+        return self._telem_data.get("AircraftClass", "") == "PropellerAircraft"
+
+    def is_helicopter(self):
+        """Check if the current aircraft is a helicopter.
+
+        Returns:
+            bool: True if helicopter, False otherwise
+        """
+        return self._telem_data.get("AircraftClass", "") == "Helicopter"
+    
+    
+
+    def on_timeout(self):
+        """Each mixin can implement this to handle telemetry timeout events. important: super().on_timeout() must be called in subclasses."""
+        pass
+
+    def on_telemetry(self, telem_data: dict):
+        """Each mixin can implement this to handle telemetry events. important: super().on_telemetry() must be called in subclasses."""
+        pass

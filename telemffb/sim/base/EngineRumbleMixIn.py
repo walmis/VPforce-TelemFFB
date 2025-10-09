@@ -173,3 +173,6 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
             self.effects.dispose("ab_rumble_1_1")
             # effects.dispose("ab_rumble_1_2")
             self.effects.dispose("ab_rumble_2_1")
+
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)

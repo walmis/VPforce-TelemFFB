@@ -156,6 +156,9 @@ class Aircraft(AircraftBase):
     turbulence_sensitivity: float = 0.0
     turbulence_intensity: float = 0.0
 
+    uncoordinated_turn_effect_enabled: int = 1
+
+
     @property
     def _simconnect(self):
         return G.telem_manager.simconnect
