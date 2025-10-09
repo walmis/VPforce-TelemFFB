@@ -70,18 +70,11 @@ class AircraftBase(
 
     def __init__(self, name: str, **kwargs):
         super().__init__()
-
         self._name = name
-
-        self.adv_g_settings_dict: dict = {}
-        self.adv_spr_settings_dict: dict = {}
 
         # clear any existing effects
         self.effects.clear()
-
-        self.spring_mode = SpringModeEnum.NONE.name
-        self.gforce_effect_mode = GEffectModeEnum.DISABLED.name
-
+        
     def on_event(self, event, *args):
         super().on_event(event, *args)
 

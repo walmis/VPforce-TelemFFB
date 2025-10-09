@@ -34,14 +34,21 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
 
     def __init__(self):
         super().__init__()
+        self.gforce_effect_mode = GEffectModeEnum.DISABLED.name
+
         self.__firmware_supported = None
         self.offset_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.offset_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.offset_adjuster = self.effects["offset_adjuster"].spring_adjuster()
 
+        self.adv_g_settings_dict: dict = {}
+
         derivative_hz = 5  # derivative lpf filter -3db Hz
         self.__dGs = utils.Derivative(derivative_hz)
-
+        
+    def gforce_effect_mode_is(self, mode):
+        return mode.name == self.gforce_effect_mode
+    
     def on_telemetry(self, telem_data: dict):
         super().on_telemetry(telem_data)
         self.ac_update_gforce_effect(telem_data)

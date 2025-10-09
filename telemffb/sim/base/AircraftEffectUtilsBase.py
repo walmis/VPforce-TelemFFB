@@ -52,12 +52,6 @@ class AircraftEffectUtilsBase(object):
             input_data = HapticEffect.device.get_input()
             return input_data.isButtonPressed(button)
 
-    def spring_mode_is(self, mode):
-        return mode.name == self.spring_mode
-
-    def gforce_effect_mode_is(self, mode):
-        return mode.name == self.gforce_effect_mode
-
     def step_value_over_time(self, key, value, timeframe_ms, dst_val, floatpoint=False):
         '''
         This function creates an entry in the  stepper dictionary which can be used to track the progress of driving a

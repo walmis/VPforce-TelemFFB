@@ -25,6 +25,7 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     def __init__(self, *args, **kwargs):
         # Ensure cooperative init ordering
         super().__init__(*args, **kwargs)
+        self.spring_mode = SpringModeEnum.NONE.name
 
         # per-instance state used by advanced spring override
         self.adv_spr_settings_dict: dict = {}
@@ -36,7 +37,9 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
 
         self.g_y_offset = 0
 
-
+    def spring_mode_is(self, mode):
+        return mode.name == self.spring_mode
+    
     def ac_modify_game_spring(self):
         if not self.spring_mode_is(SpringModeEnum.ADVANCED):
             self.spring_adjuster.stop()
