@@ -55,6 +55,7 @@ class DeadzoneMixIn(AircraftEffectUtilsBase):
 
     def on_timeout(self):  # override me
         super().on_timeout()
+        self.ac_set_deadzone_override(0.0)
         if self.deadzone_active:
             HapticEffect.device.set_deadzone(0)
             self.deadzone_updated = False
