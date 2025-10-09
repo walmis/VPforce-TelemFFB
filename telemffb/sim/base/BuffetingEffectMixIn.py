@@ -102,3 +102,7 @@ class BuffetingEffectMixIn(AircraftEffectUtilsBase):
         tas = telem_data.get("TAS", 0)
         if tas < drag_buffet_threshold:
             return 0
+        
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)
+        self.ac_update_buffeting(telem_data)

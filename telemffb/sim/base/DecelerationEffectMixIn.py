@@ -109,3 +109,7 @@ class DecelerationEffectMixIn(AircraftEffectUtilsBase):
             self.effects["decel"].constant(abs(avg_y_gs), direction=dir).start()
         else:
             self.effects.dispose("decel")
+
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)
+        self.ac_update_decel_effect(telem_data)

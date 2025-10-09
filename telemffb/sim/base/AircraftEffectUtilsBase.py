@@ -393,3 +393,7 @@ class AircraftEffectUtilsBase(object):
     def on_telemetry(self, telem_data: dict):
         """Each mixin can implement this to handle telemetry events. important: super().on_telemetry() must be called in subclasses."""
         pass
+
+    def on_event(self, event, *args):
+        """Each mixin can implement this to handle input events. important: super().on_event() must be called in subclasses."""
+        pass

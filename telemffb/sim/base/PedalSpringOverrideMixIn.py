@@ -18,7 +18,11 @@ class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     pedal_ft_reset_button: int = 0
     pedal_ft_damper_enabled: bool = False
     pedal_ft_damper_force: float = 0.0
-    pedal_trim_reset_complete: bool = False
+
+    def __init__(self):
+        super().__init__()
+        self.pedal_trim_reset_complete: bool = False
+
 
     def ac_update_pedal_trim(self, telem_data):
         """Update the pedal trim effect based on telemetry data and user input.
@@ -27,6 +31,64 @@ class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
         pass
 
     def ac_update_pedal_force_trim(self, telem_data, ft_active=True):
+        """
+        Update the pedal force-trim state and apply changes to the pedal spring.
+        This method inspects the current input state and configured trim buttons, then
+        either applies an immediate force-trim (setting the spring coefficient and
+        center-point offset) or performs a timed trim reset that steps the center-point
+        offset back to zero. It returns True when it handled a trim or reset action,
+        and False when no action was taken.
+        Parameters
+        ----------
+        telem_data : Any
+            Telemetry information (kept for API compatibility). Not used by this
+            implementation.
+        ft_active : bool, optional
+            If False, treat force-trim as active (forces the force-trim branch to run).
+            Default True.
+        Returns
+        -------
+        bool
+            True if a force-trim or trim-reset action was performed (state changed);
+            False if no action was required.
+        Side effects
+        ------------
+        - Reads device input via HapticEffect.device.get_input() and input_data.axisXY().
+        - May modify:
+          - self.spring_x.set_coefficient(...) (spring stiffness/force coefficient).
+          - self.spring_x.cpOffset (center-point offset for the spring).
+          - self.cpO_x (cached center-point offset, integer scaled).
+          - self.pedal_trim_reset_complete (boolean indicating reset completion).
+        - Calls self.check_button_press(...) to detect button events.
+        - Calls self.step_value_over_time("center_x", self.cpO_x, 1000, 0) to smoothly
+          step cpO_x toward zero during a reset.
+        Behavior details
+        ----------------
+        - If self.is_pedals() is False, the method returns immediately (no-op).
+        - Reads (phys_x, phys_y) from the device; phys_y is not used.
+        - If the force-trim button is pressed (or ft_active is False):
+          - If self.pedal_ft_damper_enabled, set spring coefficient to
+            self.pedal_ft_damper_force; otherwise set coefficient to 0.
+          - Compute self.cpO_x = round(phys_x * 4096) and write it to
+            self.spring_x.cpOffset.
+          - Return True.
+        - Else if the trim-reset button is pressed or a previous reset is still in
+          progress (not self.pedal_trim_reset_complete):
+          - Set spring coefficient to 4096 (maximum/default).
+          - Call self.step_value_over_time("center_x", self.cpO_x, 1000, 0) to update
+            self.cpO_x toward 0, assign the result to self.cpO_x and
+            self.spring_x.cpOffset.
+          - Set self.pedal_trim_reset_complete to True when cpO_x reaches 0; otherwise
+            set it to False.
+          - Return True.
+        - Otherwise return False.
+        Notes
+        -----
+        - The code uses a 4096 scaling for cpOffset; phys_x is expected to be in the
+          device's normalized range (consult device conventions for sign and range).
+        - This method directly mutates hardware-related objects and internal flags;
+          call sites should be prepared for those side effects.
+        """
         if not self.is_pedals(): return
 
         input_data = HapticEffect.device.get_input()
@@ -99,7 +161,7 @@ class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
             spr_coeff = utils.clamp(spr_coeff, 0, 4096)
             # print(f"coeff={spr_coeff}")
             self.spring_x.set_coefficient(spr_coeff)
-            if self.pedal_trimming_enabled and self._sim_is_dcs():
+            if self.pedal_trimming_enabled: # no-op by default don't check for DCS, and self._sim_is_dcs():
                 self.ac_update_pedal_trim(telem_data)
             # return
         spring = self.effects["pedal_spring"].spring()
@@ -108,3 +170,9 @@ class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
 
         spring.setCondition(self.spring_x)
         spring.start(override=True)
+
+    def on_telemetry(self, telem_data: dict):
+        if not self.is_pedals(): return
+
+        if not (self._sim_is_msfs() or self._sim_is_xplane()):
+            self.ac_override_pedal_spring(telem_data)

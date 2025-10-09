@@ -413,33 +413,10 @@ class Aircraft(AircraftBase):
 
         ap_active = telem_data.get("APEnabled", 0)
 
-        #  We can't call set_deadzone repeatedly
-        #  Only flag for update if one of the following conditions have changed
-        if not hasattr(self, 'deadzone_updated'):
-            self.deadzone_updated = False
-
-        if self.anything_has_changed('ap_active', ap_active):
-            self.deadzone_updated = False
-
-        if self.anything_has_changed('ap_active_deadzone_enabled', self.ap_active_deadzone_enabled):
-            self.deadzone_updated = False
-
-        if self.anything_has_changed('ap_active_deadzone', self.ap_active_deadzone):
-            self.deadzone_updated = False
-
-
-        if not self.ap_active_deadzone_enabled or not ap_active:
-            if not self.deadzone_updated:
-                HapticEffect.device.set_deadzone(0)
-                self.deadzone_updated = True
-                self.deadzone_active = False
-            return
-
-        if ap_active and not self.deadzone_updated:
-            HapticEffect.device.set_deadzone(round(utils.clamp(self.ap_active_deadzone * 4096, 0, 4096)))
-            self.deadzone_updated = True
-            self.deadzone_active = True
-
+        if ap_active:
+            self.ac_set_deadzone_override(self.ap_active_deadzone)
+        else:
+            self.ac_set_deadzone_override(0)
 
 
     def dcs_override_copilot_spring(self, telem_data):

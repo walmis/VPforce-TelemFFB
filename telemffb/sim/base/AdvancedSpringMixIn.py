@@ -94,3 +94,7 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
         self.spring_adjuster.setCondition(self.spring_adjuster_y)
         self.spring_adjuster.setCondition(self.spring_adjuster_x)
         self.spring_adjuster.start()
+
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)
+        self.ac_modify_game_spring()

@@ -176,3 +176,10 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
 
     def on_telemetry(self, telem_data: dict):
         super().on_telemetry(telem_data)
+        self.ac_update_jet_engine_rumble(telem_data)
+        
+        if self.is_jet_aircraft():
+            self.ac_update_ab_effect(telem_data)
+
+        elif self.is_propeller_aircraft():
+            self.ac_update_piston_engine_rumble(telem_data)

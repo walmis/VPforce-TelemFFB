@@ -81,3 +81,7 @@ class WeaponsEffectMixIn(AircraftEffectUtilsBase):
             ).start(force=True)
         elif not self.anything_has_changed(telem_key, telem_value, delta_ms=delta_ms):
             self.effects[effect_name].stop()
+
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)
+        self.ac_update_cm_weapons(telem_data)
