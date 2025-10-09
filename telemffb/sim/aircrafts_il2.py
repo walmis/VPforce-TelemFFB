@@ -43,7 +43,7 @@ import telemffb.utils as utils
 import telemffb.globals as G
 import logging
 import random
-from .aircraft_base import AircraftBase, effects
+from .aircraft_base import AircraftBase
 import json
 from telemffb.utils import overrides
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
@@ -131,12 +131,12 @@ class Aircraft(AircraftBase):
         self.gun_is_firing = 0
         self.gun_is_firing_dict = {}
         #clear any existing effects
-        self.spring = effects["spring"].spring()
+        self.spring = self.effects["spring"].spring()
         # self.damper = effects["damper"].damper()
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
-        for e in effects.values(): e.destroy()
-        effects.clear()
+        for e in self.effects.values(): e.destroy()
+        self.effects.clear()
 
         self.sprin_mode = SpringModeEnum.NONE.name
 
@@ -157,9 +157,9 @@ class Aircraft(AircraftBase):
         rockets = telem.get("Rockets")
         direction = 90 if self.is_pedals() else 0
         if self.anything_has_changed("Bombs", bombs):
-            effects["il2_bombs"].periodic(10, self.il2_bomb_release_intensity, direction,effect_type=EFFECT_SAWTOOTHUP, duration=80).start(force=True)
+            self.effects["il2_bombs"].periodic(10, self.il2_bomb_release_intensity, direction,effect_type=EFFECT_SAWTOOTHUP, duration=80).start(force=True)
         elif not self.anything_has_changed("Bombs", bombs, delta_ms=160):
-            effects["il2_bombs"].stop()
+            self.effects["il2_bombs"].stop()
 
         if self.il2_dynamic_gunfire_mode:
             gunfire_dict = json.loads(telem.get('GunFireData', '{}'))
@@ -170,26 +170,26 @@ class Aircraft(AircraftBase):
                 if self.anything_has_changed(weapon, rounds, delta_ms=100) and not is_firing:
                     rate, factor = self.gun_effect_from_mv(weapon_l[0], weapon_l[1])
                     print(f"rate:{int(rate)}, rpm:{int(rate)*60}, factor:{round(factor, 3)}")
-                    effects[f"il2_gunfire_{weapon}"].periodic(int(rate), utils.clamp(self.il2_weapon_release_intensity * factor, 0, 1), direction, effect_type=EFFECT_SAWTOOTHUP).start()
+                    self.effects[f"il2_gunfire_{weapon}"].periodic(int(rate), utils.clamp(self.il2_weapon_release_intensity * factor, 0, 1), direction, effect_type=EFFECT_SAWTOOTHUP).start()
                     self.gun_is_firing_dict[weapon] = True
                 elif not self.anything_has_changed(weapon, rounds, delta_ms=100):
-                    effects.dispose(f"il2_gunfire_{weapon}")
+                    self.effects.dispose(f"il2_gunfire_{weapon}")
                     self.gun_is_firing_dict[weapon] = False
 
         else:
             if self.anything_has_changed("Gun", gun) and not self.gun_is_firing:
-                effects["il2_gunfire"].periodic(canon_hz, self.il2_weapon_release_intensity, direction, effect_type=EFFECT_SQUARE).start(force=True)
+                self.effects["il2_gunfire"].periodic(canon_hz, self.il2_weapon_release_intensity, direction, effect_type=EFFECT_SQUARE).start(force=True)
                 self.gun_is_firing = 1
                 logging.debug(f"Gunfire={self.il2_weapon_release_intensity}")
             elif not self.anything_has_changed("Gun", gun, delta_ms=100):
                 # effects["gunfire"].stop()
-                effects.dispose("il2_gunfire")
+                self.effects.dispose("il2_gunfire")
                 self.gun_is_firing = 0
 
         if self.anything_has_changed("Rockets", rockets):
-            effects["il2_rockets"].periodic(50, self.il2_rocket_release_intensity, direction, effect_type=EFFECT_SQUARE, duration=80).start(force=True)
+            self.effects["il2_rockets"].periodic(50, self.il2_rocket_release_intensity, direction, effect_type=EFFECT_SQUARE, duration=80).start(force=True)
         if not self.anything_has_changed("Rockets", rockets, delta_ms=160):
-            effects["il2_rockets"].stop()
+            self.effects["il2_rockets"].stop()
 
     @overrides(AircraftBase)
     def ac_update_runway_rumble(self, telem_data):
@@ -201,7 +201,7 @@ class Aircraft(AircraftBase):
             super().ac_update_runway_rumble(telem_data)
         else:
             self.runway_rumble_intensity = 0
-            effects.dispose("runway0", "runway1")
+            self.effects.dispose("runway0", "runway1")
 
     @overrides(AircraftBase)
     def ac_update_buffeting(self, telem_data: dict):
@@ -213,15 +213,15 @@ class Aircraft(AircraftBase):
         amp = utils.clamp(telem_data.get("BuffetAmplitude", 0) * self.il2_buffeting_factor, 0.0, 1.0)
         amp2 = utils.clamp(amp * 1.4, 0, 1)
         if amp:
-            effects["il2_buffet"].periodic(freq, amp, direction, effect_type=EFFECT_SINE).start()
-            effects["il2_buffet2"].periodic(freq * 1.5, amp2, direction + 180, effect_type=EFFECT_SINE, phase=90).start()
+            self.effects["il2_buffet"].periodic(freq, amp, direction, effect_type=EFFECT_SINE).start()
+            self.effects["il2_buffet2"].periodic(freq * 1.5, amp2, direction + 180, effect_type=EFFECT_SINE, phase=90).start()
 
         else:
-            effects.dispose("il2_buffet", "il2_buffet2")
+            self.effects.dispose("il2_buffet", "il2_buffet2")
 
     def il2_update_damage(self, telem_data):
         if not self.damage_effect_enabled or not self.damage_effect_intensity:
-            effects.dispose("hit", "damage")
+            self.effects.dispose("hit", "damage")
             return
 
         hit = telem_data.get("Hits")
@@ -232,13 +232,13 @@ class Aircraft(AircraftBase):
         damage_amp = utils.clamp(self.damage_effect_intensity, 0.0, 1.0)
 
         if self.anything_has_changed("hit", hit):
-            effects["hit"].periodic(hit_freq, hit_amp, utils.RandomDirectionModulator,effect_type=EFFECT_SQUARE, duration=30).start()
+            self.effects["hit"].periodic(hit_freq, hit_amp, utils.RandomDirectionModulator,effect_type=EFFECT_SQUARE, duration=30).start()
         elif not self.anything_has_changed("hit", hit, delta_ms=120):
-            effects.dispose("hit")
+            self.effects.dispose("hit")
         if self.anything_has_changed("damage", damage):
-            effects["damage"].periodic(damage_freq, damage_amp, utils.RandomDirectionModulator, effect_type=EFFECT_SQUARE, duration=30).start()
+            self.effects["damage"].periodic(damage_freq, damage_amp, utils.RandomDirectionModulator, effect_type=EFFECT_SQUARE, duration=30).start()
         elif not self.anything_has_changed("damage", damage, delta_ms=120):
-            effects.dispose("damage")
+            self.effects.dispose("damage")
 
     @overrides(AircraftBase)
     def on_telemetry(self, telem_data : dict):
@@ -276,7 +276,7 @@ class Aircraft(AircraftBase):
     def on_event(self, event, *args):
         logging.info(f"on_event: {event}")
         if event == "Stop":
-            effects.clear()
+            self.effects.clear()
 
     def gun_effect_from_mv(self, m_kg: float, v_mps: float):
         """

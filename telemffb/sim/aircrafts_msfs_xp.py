@@ -52,7 +52,7 @@ import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import (FFBReport_Input, FFBReport_SetCondition,
                                    HapticEffect)
-from telemffb.sim.aircraft_base import AircraftBase, HPFs, LPFs, effects, perftracker
+from telemffb.sim.aircraft_base import AircraftBase, HPFs, LPFs, perftracker
 from telemffb.utils import Derivative, Dispenser, HighPassFilter, clamp, overrides
 from telemffb.util.conversions import *
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
@@ -163,10 +163,10 @@ class Aircraft(AircraftBase):
         super().__init__(name)
 
         # clear any existing effects
-        for e in effects.values(): e.destroy()
-        effects.clear()
+        for e in self.effects.values(): e.destroy()
+        self.effects.clear()
         # self.spring = HapticEffect().spring()
-        self._spring_handle =  effects["spring"].spring()
+        self._spring_handle =  self.effects["spring"].spring()
         self._spring_handle.name = "spring"
         self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
@@ -270,7 +270,7 @@ class Aircraft(AircraftBase):
         on_ground = telem_data.get("SimOnGround", 0)
         wow = sum(telem_data.get("WeightOnWheels", 0))
         if not wow or not on_ground:
-            effects.dispose("nw_shimmy")
+            self.effects.dispose("nw_shimmy")
             return
         gs = telem_data.get("GroundSpeed", 0)
 
@@ -280,18 +280,18 @@ class Aircraft(AircraftBase):
         if avg_brakes >= self.nosewheel_shimmy_min_brakes and gs > self.nosewheel_shimmy_min_speed:
             shimmy = utils.non_linear_scaling(avg_brakes, self.nosewheel_shimmy_min_brakes, 1.0, curvature=curve) * self.nosewheel_shimmy_intensity
             logging.debug(f"Nosewheel Shimmy intensity calculation: (BrakesPct:{avg_brakes} | GS:{gs} | RT Intensity: {shimmy}")
-            effects["nw_shimmy"].periodic(freq, shimmy, 90).start()
+            self.effects["nw_shimmy"].periodic(freq, shimmy, 90).start()
         else:
-            effects.dispose("nw_shimmy")
+            self.effects.dispose("nw_shimmy")
 
     def msfs_update_steering_friction_effect(self, telem_data):
         if not self.steering_friction:
-            if self.friction_effect_overridden and effects['friction'].name == 'steering_friction':
+            if self.friction_effect_overridden and self.effects['friction'].name == 'steering_friction':
                 # If effect is disabled but was previously active, clean up and pass override control back to base friction effect
                 utils.dbprint("purple", self.friction_effect_overridden, instance='pedals')
                 self.friction_effect_overridden = False
-                effects['friction'].name = 'none'
-                effects["friction"].destroy()
+                self.effects['friction'].name = 'none'
+                self.effects["friction"].destroy()
                 return
             return  # Hit this return if effect is simply disabled
 
@@ -329,24 +329,24 @@ class Aircraft(AircraftBase):
 
             self.friction_effect_overridden = True
 
-            effects["friction"].name = "steering_friction"
-            effects["friction"].friction(friction_force, friction_force).start()
+            self.effects["friction"].name = "steering_friction"
+            self.effects["friction"].friction(friction_force, friction_force).start()
         else:
             # clean up and pass control back to base effect when wheel no longer on ground
-            if self.friction_effect_overridden and effects['friction'].name == 'steering_friction':
+            if self.friction_effect_overridden and self.effects['friction'].name == 'steering_friction':
                 self.friction_effect_overridden = False
-                effects["friction"].destroy()
+                self.effects["friction"].destroy()
 
 
     def update_turbulence(self):
         if self.turbulence_effect_enable:
             force, dir = turbulence_modulator.update(self.telem_data, self.turbulence_hpf_alpha, self.turbulence_smoothing_alpha, self.turbulence_sensitivity, self.turbulence_intensity)
             force = round(force, 4)
-            effects['turbulence'].constant(force, dir).start()
+            self.effects['turbulence'].constant(force, dir).start()
 
             #print(f"force:{force} dir:{dir}")
         else:
-            effects['turbulence'].destroy()
+            self.effects['turbulence'].destroy()
 
     def _update_fbw_flight_controls(self, telem_data, ap=False):
         ap_send_flag_x = True
@@ -620,10 +620,10 @@ class Aircraft(AircraftBase):
         if self.telemffb_controls_axes and self.ap_following and ap_active and self.use_fbw_for_ap_follow:
             logging.debug("FBW Setting enabled, running fbw_flight_controls")
             self._update_fbw_flight_controls(telem_data, ap=True)
-            effects["dynamic_spring"].stop()
+            self.effects["dynamic_spring"].stop()
             return
         else:
-            effects["fbw_spring"].stop()
+            self.effects["fbw_spring"].stop()
 
         if self.spring_mode_is(SpringModeEnum.CENTER):
             elev_base_gain = self.elevator_spring_gain
@@ -955,7 +955,7 @@ class Aircraft(AircraftBase):
 
             mag, theta = cf.to_polar()
             
-            effects['control_weight'].constant(mag, theta*deg).start()
+            self.effects['control_weight'].constant(mag, theta*deg).start()
                 # print(mag, theta*deg)
                 # self.const_force.constant(mag, theta*deg).start()
 
@@ -1215,14 +1215,14 @@ class Aircraft(AircraftBase):
             return
 
         if not self.enable_stick_shaker:
-            effects['stick_shaker'].destroy()
+            self.effects['stick_shaker'].destroy()
             return
 
         stall = telem_data.get('StallWarning', 0)
         if stall:
-            effects['stick_shaker'].periodic(14, self.stick_shaker_intensity, 0, EFFECT_SQUARE).start()
+            self.effects['stick_shaker'].periodic(14, self.stick_shaker_intensity, 0, EFFECT_SQUARE).start()
         else:
-            effects['stick_shaker'].destroy()
+            self.effects['stick_shaker'].destroy()
 
 
     def send_xp_command(self, cmd):
@@ -1272,7 +1272,7 @@ class Aircraft(AircraftBase):
         """
         if not self.is_collective(): return
 
-        self.spring = effects["collective_ap_spring"].spring()
+        self.spring = self.effects["collective_ap_spring"].spring()
 
         if not self.force_disable_collective_gain:
             self.spring_y.set_coefficient(0.0)
@@ -1296,7 +1296,7 @@ class Aircraft(AircraftBase):
 
     @overrides(AircraftBase)
     def on_telemetry(self, telem_data):
-        effects["pause_spring"].destroy()
+        self.effects["pause_spring"].destroy()
 
         if telem_data.get('Parked', 0): # MSFS in Hangar
             return
@@ -1341,7 +1341,7 @@ class Aircraft(AircraftBase):
 
     @overrides(AircraftBase)
     def on_timeout(self):
-        if not effects["pause_spring"].started:
+        if not self.effects["pause_spring"].started:
             super().on_timeout()
 
         self.cyclic_spring_init = 0
@@ -1356,7 +1356,7 @@ class Aircraft(AircraftBase):
             self.spring_x.set_offset(0.0)
             self.spring_y.set_offset(0.0)
 
-            pause_spring = effects["pause_spring"].spring()
+            pause_spring = self.effects["pause_spring"].spring()
             pause_spring.setCondition(self.spring_x)
             pause_spring.setCondition(self.spring_y)
             pause_spring.start()
@@ -2655,9 +2655,9 @@ class HPGHelicopter(Helicopter):
 
 
         if vrs_intensity and self.vrs_effect_intensity and self.vrs_effect_enable:
-            effects["vrs_buffet"].periodic(10, self.vrs_effect_intensity * vrs_intensity, utils.RandomDirectionModulator).start()
+            self.effects["vrs_buffet"].periodic(10, self.vrs_effect_intensity * vrs_intensity, utils.RandomDirectionModulator).start()
         else:
-            effects.dispose("vrs_buffet")
+            self.effects.dispose("vrs_buffet")
 
 
 class SASHelicopter(Helicopter):
@@ -2874,7 +2874,7 @@ class FlyInsideHelicopter(Helicopter):
 
     def _update_vibration(self):
         if not self.FI_vibration_enable:
-            effects['FI_vibration'].destroy()
+            self.effects['FI_vibration'].destroy()
             return
         rrpm = self.telem_data.get("RotorRPM", 0)
         if self.is_joystick():
@@ -2905,7 +2905,7 @@ class FlyInsideHelicopter(Helicopter):
 
         force = round(force, 4)
 
-        effects['FI_vibration'].constant(force, direction).start()
+        self.effects['FI_vibration'].constant(force, direction).start()
 
         # print(f"FI_vibration_force:{force} dir:{dir}")
 

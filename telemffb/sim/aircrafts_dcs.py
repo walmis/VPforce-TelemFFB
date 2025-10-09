@@ -44,7 +44,7 @@ import time
 from telemffb import utils
 from telemffb.utils import overrides
 from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
-from telemffb.sim.aircraft_base import AircraftBase, LPFs, effects, perftracker
+from telemffb.sim.aircraft_base import AircraftBase, LPFs, perftracker
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 
@@ -127,7 +127,7 @@ class Aircraft(AircraftBase):
     ####
     def __init__(self, name : str, **kwargs):
         super().__init__(name, **kwargs)
-        self.spring = effects["spring"].spring()
+        self.spring = self.effects["spring"].spring()
         # self.damper = effects["damper"].damper()
 
         self.damage_enable_cmd_sent = 0
@@ -215,7 +215,7 @@ class Aircraft(AircraftBase):
     def on_event(self, event, *args):
         logging.info(f"on_event: {event}")
         if event == "Stop":
-            effects.clear()
+            self.effects.clear()
 
     @overrides(AircraftBase)
     def on_timeout(self):
@@ -246,10 +246,10 @@ class Aircraft(AircraftBase):
             random_dir = random.randint(0, 359)
             random_amp = utils.clamp(random.uniform(damage_amp*0.5, damage_amp*1.5), 0.0, 1.0)
             random_type = random.choice([EFFECT_SQUARE, EFFECT_SINE, EFFECT_TRIANGLE])
-            effects["damage"].periodic(damage_freq, random_amp, random_dir, effect_type=random_type, duration=30).start()
+            self.effects["damage"].periodic(damage_freq, random_amp, random_dir, effect_type=random_type, duration=30).start()
             logging.debug(f"Damage effect: dir={random_dir}, amp={random_amp}")
         elif not self.anything_has_changed("damage", damage, delta_ms=50):
-            effects.dispose("damage")
+            self.effects.dispose("damage")
 
     def dcs_override_collective_spring(self, telem_data):
         """
@@ -270,7 +270,7 @@ class Aircraft(AircraftBase):
         phys_x, phys_y = input_data.axisXY()
 
         if not self.collective_init:
-            self.spring = effects["collective_ap_spring"].spring()
+            self.spring = self.effects["collective_ap_spring"].spring()
 
             self.spring_y.set_coefficient(1.0)
             if max(telem_data.get("WeightOnWheels")):
@@ -327,7 +327,7 @@ class Aircraft(AircraftBase):
         # estimate trim from real stick position and virtual stick position
         offs_x = lp_x.update(pedal_pos - x - lp_x.value)
         self.spring_x.cpOffset = utils.clamp_minmax(round(offs_x * 4096), 4096)
-        self.spring = effects["pedal_spring"].spring()
+        self.spring = self.effects["pedal_spring"].spring()
         self.spring.setCondition(self.spring_x)
         self.spring.start(override=True)
 
@@ -359,7 +359,7 @@ class Aircraft(AircraftBase):
         self.spring_x.set_offset(offs_x)
         self.spring_y.set_offset(offs_y)
 
-        spring = effects["trim_spring"].spring()
+        spring = self.effects["trim_spring"].spring()
         # upload effect parameters to stick
         spring.setCondition(self.spring_x)
         spring.setCondition(self.spring_y)
@@ -372,8 +372,8 @@ class Aircraft(AircraftBase):
 
     def dcs_update_stick_shaker(self, telem_data):
         if not self.enable_stick_shaker:
-            effects['stick_shaker1'].destroy()
-            effects['stick_shaker2'].destroy()
+            self.effects['stick_shaker1'].destroy()
+            self.effects['stick_shaker2'].destroy()
             return
 
         aoa = telem_data.get('AoA', 0)
@@ -394,11 +394,11 @@ class Aircraft(AircraftBase):
 
         if shake:
             freq = self.stick_shaker_frequency
-            effects['stick_shaker1'].periodic(freq, self.stick_shaker_intensity, dir1, EFFECT_SAWTOOTHUP).start()
-            effects['stick_shaker2'].periodic(freq, self.stick_shaker_intensity, dir2, EFFECT_SAWTOOTHDOWN).start()
+            self.effects['stick_shaker1'].periodic(freq, self.stick_shaker_intensity, dir1, EFFECT_SAWTOOTHUP).start()
+            self.effects['stick_shaker2'].periodic(freq, self.stick_shaker_intensity, dir2, EFFECT_SAWTOOTHDOWN).start()
         else:
-            effects['stick_shaker1'].destroy()
-            effects['stick_shaker2'].destroy()
+            self.effects['stick_shaker1'].destroy()
+            self.effects['stick_shaker2'].destroy()
 
     def dcs_update_ap_deadzone(self, telem_data):
         """
@@ -449,7 +449,7 @@ class Aircraft(AircraftBase):
 
         seat = telem_data.get("Seat", 0)
         if seat == self.cp_spr_override_pilot_seat_id or not self.cp_spr_override_enabled:
-            effects['cp_ovd_spring'].stop()
+            self.effects['cp_ovd_spring'].stop()
             self.cp_spr_override_active = False
             # self.spring.stop()
             return
@@ -458,20 +458,20 @@ class Aircraft(AircraftBase):
             self.flag_error(
                 'Co-Pilot/RIO Spring Override is not compatible with the Trim Release Damper feature.  Please disable one or the other.')
             self.cp_spr_override_active = False
-            effects['cp_ovd_spring'].stop()
+            self.effects['cp_ovd_spring'].stop()
             return
         if self.trim_workaround:
             self.flag_error(
                 'Co-Pilot/RIO Spring Override is not compatible with the Trim Workaround feature.  Please disable one or the other.')
             self.cp_spr_override_active = False
-            effects['cp_ovd_spring'].stop()
+            self.effects['cp_ovd_spring'].stop()
             return
 
         if self.cp_spr_override_button_enabled:
 
             if self.cp_spr_override_button == 0:
                 self.flag_error("Please bind a button to the Co-Pilot/RIO spring override setting or disable the button control option")
-                effects['cp_ovd_spring'].stop()
+                self.effects['cp_ovd_spring'].stop()
                 self.cp_spr_override_active = False
                 return
 
@@ -479,21 +479,21 @@ class Aircraft(AircraftBase):
             override_pressed = input_data.isButtonPressed(self.cp_spr_override_button)
 
             if not override_pressed:
-                effects['cp_ovd_spring'].stop()
+                self.effects['cp_ovd_spring'].stop()
                 self.cp_spr_override_active = False
                 return
 
         coeff = int(self.cp_spr_override_spring_gain * 4096)
         self.spring_x.set_coefficient(coeff)
         self.spring_y.set_coefficient(coeff)
-        effects['cp_ovd_spring'].spring(coeff, coeff).start(override=True)
+        self.effects['cp_ovd_spring'].spring(coeff, coeff).start(override=True)
         self.cp_spr_override_active = True
 
     def dcs_override_spring(self):
         if not self.is_joystick(): return
         if not self.spring_mode_is(SpringModeEnum.CUSTOM):
             # If feature disabled, ensure spring is stopped and abort
-            effects['dcs_spr_override'].stop()
+            self.effects['dcs_spr_override'].stop()
             return
 
         if self.trim_workaround:
@@ -501,7 +501,7 @@ class Aircraft(AircraftBase):
             return
 
 
-        spring = effects['dcs_spr_override'].spring()
+        spring = self.effects['dcs_spr_override'].spring()
 
         dt = perftracker.get_time_delta('override_spring_perf')
         self.telem_data['_ovrd_spr_dt'] = dt

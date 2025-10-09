@@ -55,7 +55,6 @@ from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
 # from telemffb.UserModelDialog import UserModelDialog
 from telemffb.NewAircraftWizard import NewAircraftWizard
-from telemffb.sim.aircraft_base import effects
 from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
@@ -159,6 +158,7 @@ class MainWindow(QMainWindow):
 
         menubar = self.menuBar()
         self.menu = menubar
+        assert self.menu is not None
         # Set the background color of the menu bar
         # "#ab37c8" is VPForce purple
 
@@ -2131,7 +2131,7 @@ class MainWindow(QMainWindow):
                 active_settings = G.ipc_instance._ipc_telem_effects.get(f'{dev}_active_settings', [])
             else:
                 effect : HapticEffect
-                for key, effect in effects.dict.items():
+                for key, effect in G.effects.dict.items():
                     if effect.started:
                         descr, settingname = utils.EffectTranslator.get_translation(effect.name)
                         
@@ -2142,7 +2142,7 @@ class MainWindow(QMainWindow):
                             active_settings.append(settingname)
 
             if G.child_instance:
-                child_effects = str(effects.dict.keys())
+                child_effects = str(G.effects.dict.keys())
                 if child_effects:
                     G.ipc_instance.send_ipc_effects(active_effects, active_settings)
 
