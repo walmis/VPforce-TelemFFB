@@ -11,6 +11,7 @@ import time
 class AircraftEffectUtilsBase(object):
     """Base class for aircraft effects and utilities."""
     def __init__(self):
+        super().__init__()
         self._changes = {}
         self._change_counter = {}
         self._ipc_telem = {}

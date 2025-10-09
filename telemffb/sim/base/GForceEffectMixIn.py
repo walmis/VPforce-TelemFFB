@@ -33,6 +33,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
     gforce_effect_adv_curve: str = "none"
 
     def __init__(self):
+        super().__init__()
         self.__firmware_supported = None
         self.offset_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.offset_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)

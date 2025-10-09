@@ -6,7 +6,7 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 def pct2dz(pct: float) -> int:
     """Convert percentage (0-100) to deadzone value (0-4096)."""
-    return utils.clamp(round((pct / 100) * 4096), 0, 4096)
+    return utils.clamp(round(pct * 4096), 0, 4096)
 
 class DeadzoneMixIn(AircraftEffectUtilsBase):
     """Mixin for device deadzone configuration and runtime application."""
@@ -21,16 +21,15 @@ class DeadzoneMixIn(AircraftEffectUtilsBase):
         self.active_deadzone_pct_override: float = 0.0
 
     def ac_set_deadzone_override(self, value: float):
-        """Set deadzone override value (0 to disable override)."""
+        """Set deadzone override value (0 to disable override). Range: 0.0 to 1.0 (0% to 100%)."""
         if(value != self.active_deadzone_pct_override):
-            self.active_deadzone_pct_override = utils.clamp(value, 0.0, 100.0)
+            self.active_deadzone_pct_override = utils.clamp(value, 0.0, 1.0)
             HapticEffect.device.set_deadzone(pct2dz(self.active_deadzone_pct_override))
-            logging.info(f"Setting Deadzone override to %{self.active_deadzone_pct_override}")
+            logging.info(f"Setting Deadzone override to %{self.active_deadzone_pct_override*100}")
         if(value == 0.0 and self.active_deadzone_pct_override != 0.0):
             HapticEffect.device.set_deadzone(0)
             self.active_deadzone_pct_override = value
             logging.info("Resetting Deadzone override")
-
 
     def ac_update_deadzone(self):
         if self.active_deadzone_pct_override:
