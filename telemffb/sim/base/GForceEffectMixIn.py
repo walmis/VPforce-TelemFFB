@@ -33,6 +33,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
     gforce_effect_adv_curve: str = "none"
 
     def __init__(self):
+        self.firmware_supported = None
         self.offset_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.offset_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
         self.offset_adjuster = self.effects["offset_adjuster"].spring_adjuster()
@@ -145,8 +146,9 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         if self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED):
             # Verify the device firmware meets the minimum version required to execute this portion of the effect
             # Flag error and abort if not met
-            supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
-            if not supported:
+            if self.firmware_supported is None:
+                self.firmware_supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+            if not self.firmware_supported:
                 self.flag_error(
                     "The Advanced/Custom Curve G-Force effect requires firmware v1.0.18 or higher.\n"
                     f"The device is currently running version {G.device_firmware_version}\n"

@@ -1,10 +1,8 @@
+import logging
+
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
-
-
-import logging
-
 
 class DeadzoneMixIn(AircraftEffectUtilsBase):
     """Mixin for device deadzone configuration and runtime application."""

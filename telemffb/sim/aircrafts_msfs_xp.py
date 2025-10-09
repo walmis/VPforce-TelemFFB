@@ -52,7 +52,8 @@ import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import (FFBReport_Input, FFBReport_SetCondition,
                                    HapticEffect)
-from telemffb.sim.aircraft_base import AircraftBase, HPFs, LPFs, perftracker
+
+from telemffb.sim.aircraft_base import AircraftBase
 from telemffb.utils import Derivative, Dispenser, HighPassFilter, clamp, overrides
 from telemffb.util.conversions import *
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
@@ -63,7 +64,7 @@ EFFECT_TRIANGLE = 5
 EFFECT_SAWTOOTHUP = 6
 EFFECT_SAWTOOTHDOWN = 7
 turbulence_modulator = TurbulenceModulator()
-
+perftracker = utils.PerformanceTracker()
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""

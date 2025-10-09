@@ -1,13 +1,12 @@
+import logging
+
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.sim.aircraft_base import perftracker
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 
-
-import logging
-
+perftracker = utils.PerformanceTracker()
 
 class HelicopterEffectsMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     """Mixin for helicopter-specific configuration and effects."""

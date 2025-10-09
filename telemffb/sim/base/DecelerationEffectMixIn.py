@@ -1,10 +1,9 @@
-import telemffb.utils as utils
-from telemffb.sim.aircraft_base import perftracker
-from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
-
-
 import logging
 
+import telemffb.utils as utils
+from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+
+perftracker = utils.PerformanceTracker()
 
 class DecelerationEffectMixIn(AircraftEffectUtilsBase):
     """Mixin for deceleration/decel related configuration, runtime state and handler.

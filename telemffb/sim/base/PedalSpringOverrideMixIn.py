@@ -1,7 +1,8 @@
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.sim.base import AircraftEffectUtilsBase, DynamicSpringMixin
+from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 
 
 class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):

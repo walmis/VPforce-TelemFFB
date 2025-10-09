@@ -3,9 +3,9 @@ from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
-from telemffb.sim.aircraft_base import perftracker
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
+perftracker = utils.PerformanceTracker()
 
 class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
@@ -84,6 +84,7 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
         else:
             self.override_spring_cp0_x = 0
             self.override_spring_cp0_y = 0
+            
         offset = self.ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
         self.g_y_offset = offset if offset is not None else 0
         self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]

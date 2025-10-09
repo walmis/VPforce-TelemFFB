@@ -44,15 +44,14 @@ import time
 from telemffb import utils
 from telemffb.utils import overrides
 from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
-from telemffb.sim.aircraft_base import AircraftBase, LPFs, perftracker
+from telemffb.sim.aircraft_base import AircraftBase
 from telemffb.telem.DcsIpcThread import DcsIpcThread
-from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
+from telemffb.SettingsManager import SpringModeEnum
 
-#unit conversions (to m/s)
-knots = 0.514444
-kmh = 1.0/3.6
-deg = math.pi/180
+from telemffb.util.conversions import kt2ms, kmh2ms, ms2kmh, deg
 
+LPFs = utils.Dispenser(utils.LowPassFilter)
+perftracker = utils.PerformanceTracker()
 
 class Aircraft(AircraftBase):
     """Base class for Aircraft based FFB"""
@@ -505,8 +504,6 @@ class Aircraft(AircraftBase):
 
         dt = perftracker.get_time_delta('override_spring_perf')
         self.telem_data['_ovrd_spr_dt'] = dt
-
-
 
         if self.override_spring_ft_enabled:
             input_data = HapticEffect.device.get_input()

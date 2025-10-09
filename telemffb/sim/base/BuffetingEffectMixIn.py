@@ -1,7 +1,6 @@
 import telemffb.utils as utils
-from telemffb.sim.aircraft_base import knots
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
-
+from telemffb.util.conversions import kt2ms
 
 class BuffetingEffectMixIn(AircraftEffectUtilsBase):
     aoa_buffet_freq = 13
@@ -35,7 +34,7 @@ class BuffetingEffectMixIn(AircraftEffectUtilsBase):
 
         if not self.buffeting_intensity:
             return (0, 0)
-        max_airflow_speed = 75*knots  # speed at which airflow_factor is 1.0
+        max_airflow_speed = 75*kt2ms  # speed at which airflow_factor is 1.0
         airflow_factor = utils.scale_clamp(speed, (0, max_airflow_speed), (0, 1.0))
         buffeting_factor = utils.scale_clamp(aoa, (local_buffet_aoa, local_stall_aoa), (0.0, 1.0))
         # todo calc frequency
@@ -48,7 +47,7 @@ class BuffetingEffectMixIn(AircraftEffectUtilsBase):
         aoa = telem_data.get("AoA", 0)
         tas = telem_data.get("TAS", 0)
 
-        max_airflow_speed = 75*knots  # speed at which airflow_factor is 1.0
+        max_airflow_speed = 75*kt2ms  # speed at which airflow_factor is 1.0
 
         ds = telem_data.get("DesignSpeed", None)
         if ds:

@@ -1,9 +1,7 @@
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHDOWN, EFFECT_SAWTOOTHUP, EFFECT_SQUARE
-from telemffb.sim.aircraft_base import HPFs
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.util.conversions import kt2ms
-
 
 import logging
 
@@ -75,6 +73,9 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         # smoother used by some motion effects — per-instance to avoid shared state
         self.smoother = utils.Smoother()
 
+        self.center_wheel_hpf = utils.HighPassFilter(cutoff_freq_hz=3)
+        self.side_wheels_hpf = utils.HighPassFilter(cutoff_freq_hz=3)
+
     def bms_taxi_bumps(self, telem_data):
         """Generates a bump effect in response to bumpIntensity telemetry for Falcon BMS simulator"""
         if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
@@ -117,9 +118,9 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             return
 
         WoW = telem_data.get("WeightOnWheels", (0, 0, 0))
-        hp_f_cutoff_hz = 3
-        v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[0])) * self.runway_rumble_intensity
-        v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[1] - WoW[2]) * self.runway_rumble_intensity
+
+        v1 = self.center_wheel_hpf.update((WoW[0])) * self.runway_rumble_intensity
+        v2 = self.side_wheels_hpf.update(WoW[1] - WoW[2]) * self.runway_rumble_intensity
 
         v1 = utils.clamp_minmax(v1, 0.5)
         v2 = utils.clamp_minmax(v2, 0.5)

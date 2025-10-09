@@ -79,6 +79,11 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
             self.effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
 
     def ac_calc_engine_intensity(self, rpm) -> float:
+        """
+        Calculate the intensity to use based on the configurable high and low intensity settings and high and low RPM settings
+        intensity will decrease from max to min settings as the RPM increases from min to max settings
+        lower RPM = more rumble effect
+        """
         min_rpm = self.engine_rumble_lowrpm
         max_rpm = self.engine_rumble_highrpm
         max_intensity = self.engine_rumble_lowrpm_intensity
@@ -87,10 +92,15 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         rpm_percentage = 1 - ((rpm - min_rpm) / (max_rpm - min_rpm))
 
         if rpm < min_rpm:
-            interpolated_intensity = utils.scale(rpm, (0, min_rpm), (max_intensity*2, max_intensity))
+            # give some extra juice if RPM is very low (i.e. on engine start)
+            interpolated_intensity = utils.scale(rpm, (0, min_rpm), (max_intensity * 2, max_intensity))
         else:
+            # update to use scaling function
             interpolated_intensity = utils.scale(rpm, (min_rpm, max_rpm), (max_intensity, min_intensity))
-        logging.debug(f"rpm = {rpm} | rpm percent of range: {rpm_percentage} | interpolated intensity: {interpolated_intensity}")
+
+        logging.debug(
+            f"rpm = {rpm} | rpm percent of range: {rpm_percentage} | interpolated intensity: {interpolated_intensity}"
+        )
 
         return interpolated_intensity
 

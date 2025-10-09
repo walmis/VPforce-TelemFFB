@@ -10,3 +10,5 @@ ms2kt = 1.943844  # m/s to knot
 vsound = 290.07 # m/s, speed of sound at sea level in ISA condition
 P0 = 101325 # Pa, ISA static pressure at sealevel
 std_air_pressure = 1.225  # kg/m^3
+kmh2ms = 1.0/3.6  # km/h to m/s
+ms2kmh = 3.6  # m/s to km/h

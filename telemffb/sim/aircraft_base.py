@@ -19,10 +19,13 @@
 
 import logging
 import math
-from telemffb import telem
+import telemffb.utils as utils
+from typing import List, Dict
 
+from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.base.DecelerationEffectMixIn import DecelerationEffectMixIn
 from telemffb.sim.base.EngineRumbleMixIn import EngineRumbleMixIn
+from telemffb.sim.base.AoAReductionMixIn import AoAReductionMixIn
 from telemffb.sim.base.MotionEffectsMixIn import MotionEffectsMixIn
 from telemffb.sim.base.WeaponsEffectMixIn import WeaponsEffectMixIn
 from telemffb.sim.base.BuffetingEffectMixIn import BuffetingEffectMixIn
@@ -32,8 +35,7 @@ from telemffb.sim.base.HydraulicLossMixIn import HydraulicLossMixIn
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
 from telemffb.sim.base.PedalSpringOverrideMixIn import PedalSpringOverrideMixIn
 
-import telemffb.utils as utils
-from typing import List, Dict
+from telemffb.util.conversions import kt2ms, kmh2ms
 
 from telemffb.hw.ffb_rhino import (
     HapticEffect,
@@ -55,13 +57,7 @@ HPFs: utils.Dispenser = utils.Dispenser(utils.HighPassFilter)
 # Lowpass filter dispenser
 LPFs: utils.Dispenser = utils.Dispenser(utils.LowPassFilter)
 
-perftracker = utils.PerformanceTracker()
 
-# unit conversions (to m/s)
-knots = 0.514444
-kmh = 1.0 / 3.6
-deg = math.pi / 180
-fpss2gs = 1 / 32.17405
 
 
             # effects.dispose("ab_rumble_2_2")
@@ -75,11 +71,12 @@ class AircraftBase(
     HydraulicLossMixIn,
     DecelerationEffectMixIn,
     EngineRumbleMixIn,
+    AoAReductionMixIn,
     AdvancedSpringMixIn,
     MotionEffectsMixIn,
     BuffetingEffectMixIn,
 ):
-    rotor_blade_count = 2
+    """Base class for all aircraft types, providing common functionality and state management."""
 
     cpO_x = 0
     cpO_y = 0
@@ -102,13 +99,7 @@ class AircraftBase(
 
 
 
-    ###
-    ### AoA reduction force effect
-    ###
-    aoa_reduction_effect_enabled = 0
-    aoa_reduction_max_force = 0.0
-    critical_aoa_start = 22
-    critical_aoa_max = 25
+    # AoA reduction effect moved into AoAReductionMixIn
 
     # gear motion attributes moved to MotionEffectsMixIn
 
@@ -199,8 +190,7 @@ class AircraftBase(
 
         self.adv_g_settings_dict: dict = {}
         self.adv_spr_settings_dict: dict = {}
-        self.active_deadzone_pct: float = 0.0
-        self.deadzone_active = False
+
 
         # hydraulic_factor is initialised in HydraulicLossMixIn.__init__
         # clear any existing effects
@@ -253,31 +243,7 @@ class AircraftBase(
     def ac_update_runway_rumble(self, telem_data):
         super().ac_update_runway_rumble(telem_data)
 
-    def ac_update_aoa_reduction_force_effect(self, telem_data):
-        if not self.aoa_reduction_effect_enabled:
-            return
-        if self._should_skip_joystick_effect():
-            return
-        if self._should_skip_airborne_effect(telem_data):
-            self.effects.dispose("crit_aoa")
-            return
-        if self._should_skip_no_airspeed_effect(telem_data):
-            self.effects.dispose("crit_aoa")
-            return
-        start_aoa = self.critical_aoa_start
-        end_aoa = self.critical_aoa_max
-        aoa = telem_data.get("AoA", 0)
-        tas = telem_data.get("TAS", 0)
-        avg_aoa = self.smoother.get_average("crit_aoa", aoa, sample_size=8)
-        if avg_aoa >= start_aoa and tas > 10:
-            force_factor = round(utils.non_linear_scaling(avg_aoa, start_aoa, end_aoa, curvature=1.5), 4)
-            force_factor = self.aoa_reduction_max_force * force_factor
-            force_factor = utils.clamp(force_factor, 0.0, 1.0)
-            logging.debug(f"AoA Reduction Effect:  AoA= {aoa} avg_AoA={avg_aoa}, force={force_factor}, max allowed force={self.aoa_reduction_max_force}")
-            self.effects["crit_aoa"].constant(force_factor, 180).start()
-        else:
-            self.effects.dispose("crit_aoa")
-        return
+    # AoA reduction implementation lives in AoAReductionMixIn
 
     def ac_update_decel_effect(self, telem_data):
         """Delegates to DecelerationEffectMixIn.ac_update_decel_effect"""
@@ -375,14 +341,14 @@ class AircraftBase(
             self.effects.dispose('elev_droop')
             return
 
-        if telem_data['TAS'] < 20 * knots:
-            force = utils.scale_clamp(telem_data['TAS'], (20 * knots, 0), (0, self.elevator_droop_force))
+        if telem_data['TAS'] < 20 * kt2ms:
+            force = utils.scale_clamp(telem_data['TAS'], (20 * kt2ms, 0), (0, self.elevator_droop_force))
             self.effects['elev_droop'].constant(force, 180).start()
             logging.debug(f"override elevator:{force}")
         else:
             self.effects.dispose('elev_droop')
 
-    def ac_update_aoa_effect(self, telem_data, minspeed=50*kmh, maxspeed=140*kmh):
+    def ac_update_aoa_effect(self, telem_data, minspeed=50*kmh2ms, maxspeed=140*kmh2ms):
         if not self.aoa_effect_enabled: return
         if not self.is_joystick(): return
         if self.spring_mode_is(SpringModeEnum.FBW) or telem_data.get("ACisFBW"): return
@@ -409,28 +375,7 @@ class AircraftBase(
         """Delegates to EngineRumbleMixIn.ac_update_piston_engine_rumble"""
         return super().ac_update_piston_engine_rumble(telem_data)
 
-    def ac_calc_engine_intensity(self, rpm) -> float:
-        """
-        Calculate the intensity to use based on the configurable high and low intensity settings and high and low RPM settings
-        intensity will decrease from max to min settings as the RPM increases from min to max settings
-        lower RPM = more rumble effect
-        """
-        min_rpm = self.engine_rumble_lowrpm
-        max_rpm = self.engine_rumble_highrpm
-        max_intensity = self.engine_rumble_lowrpm_intensity
-        min_intensity = self.engine_rumble_highrpm_intensity
 
-        rpm_percentage = 1 - ((rpm - min_rpm) / (max_rpm - min_rpm))
-
-        if rpm < min_rpm:
-            # give some extra juice if RPM is very low (i.e. on engine start)
-            interpolated_intensity = utils.scale(rpm, (0, min_rpm), (max_intensity*2, max_intensity))
-        else:
-            # update to use scaling function
-            interpolated_intensity = utils.scale(rpm, (min_rpm, max_rpm), (max_intensity, min_intensity))
-        logging.debug(f"rpm = {rpm} | rpm percent of range: {rpm_percentage} | interpolated intensity: {interpolated_intensity}")
-
-        return interpolated_intensity
 
     ########################################
     ######                            ######
@@ -519,162 +464,3 @@ class AircraftBase(
         self.ac_update_canopy(telem_data)
         self.ac_update_spoilers(telem_data)
 
-    def _create_weapon_effect(self, effect_name: str, telem_key: str, telem_value,
-                             enabled_flag: bool, intensity: float, frequency: int = 10,
-                             duration: int = 80, delta_ms: int = 160, shape: int = EFFECT_SINE):
-        """Generic method for weapon-related effects (gun, payload, countermeasures)."""
-        if not enabled_flag:
-            self.effects[effect_name].stop()
-            return
-
-        if self.anything_has_changed(telem_key, telem_value):
-            direction = self._get_effect_direction(self.weapon_effect_direction)
-            if self.weapon_effect_direction == -1:
-                logging.info(f"{effect_name.title()} Effect Direction is randomized: {direction} deg")
-            self.effects[effect_name].periodic(frequency, intensity, direction, effect_type=shape, duration=duration).start(force=True)
-        elif not self.anything_has_changed(telem_key, telem_value, delta_ms=delta_ms):
-            self.effects[effect_name].stop()
-
-    def _create_motion_effect(self, telem_data: dict, config: dict):
-        """
-        Generic method for motion effects (tailhook, fuelboom, wingfold, etc.).
-
-        Args:
-            telem_data: Telemetry data dictionary
-            config: Configuration dictionary with keys:
-                - telem_key: Key in telemetry data
-                - change_key: Key for tracking changes
-                - effect_names: List of effect names
-                - clunk_effects: List of clunk effect names (optional)
-                - enabled_attr: Attribute name for enabled flag
-                - intensity_attr: Attribute name for intensity
-                - frequency: Effect frequency
-                - directions: List of directions for effects
-                - effect_type: Effect type (optional)
-                - delta_ms: Delta time for change detection
-                - require_ground: Whether effect requires being on ground
-                - phase_offset: Phase offset for secondary effects (optional)
-        """
-        value = telem_data.get(config['telem_key'])
-        if value is None:
-            return
-
-        if self._should_skip_joystick_effect():
-            return
-
-        # Check ground requirement
-        if config.get('require_ground', False):
-            on_ground = telem_data.get('SimOnGround', 0)
-            if not on_ground:
-                self.effects.dispose(*config['effect_names'])
-                return
-
-        enabled = getattr(self, config['enabled_attr'])
-        intensity = getattr(self, config['intensity_attr'])
-
-        if not enabled or not intensity:
-            self.effects.dispose(*config['effect_names'])
-            return
-
-        delta_ms = config.get('delta_ms', 200)
-        if self.anything_has_changed(config['change_key'], value, delta_ms=delta_ms):
-            logging.debug(f"{config['telem_key']} Pos: {value}")
-
-            # Create main effects
-            for i, effect_name in enumerate(config['effect_names']):
-                direction = config['directions'][i] if i < len(config['directions']) else config['directions'][0]
-                effect_type = config.get('effect_type', 0)
-                phase = config.get('phase_offset', 0) if i > 0 else 0
-
-                self.effects[effect_name].periodic(
-                    config['frequency'],
-                    intensity,
-                    direction,
-                    effect_type,
-                    phase=phase
-                ).start()
-        else:
-            # Handle clunk effects when motion stops
-            clunk_effects = config.get('clunk_effects', [])
-            if clunk_effects and (value == 0 or value == 1):
-                if any(self.effects[name].started for name in config['effect_names']):
-                    clunk_intensity = utils.clamp(intensity * 2, 0, 1)
-
-                    for i, clunk_name in enumerate(clunk_effects):
-                        direction = config.get('clunk_directions', [180, 0])[i % 2]
-                        if config['telem_key'] in ['TailHook', 'FuelBoom']:
-                            direction = (1 - value) * 180
-                        duration = config.get('clunk_duration', 40)
-
-                        self.effects[clunk_name].periodic(
-                            10,
-                            clunk_intensity,
-                            direction,
-                            effect_type=EFFECT_SQUARE,
-                            duration=duration
-                        ).start()
-
-            # Stop main effects
-            self.effects.dispose(*config['effect_names'])
-
-    def _create_buffeting_effect(self, telem_data: dict, config: dict):
-        """
-        Generic method for buffeting effects.
-
-        Args:
-            telem_data: Telemetry data dictionary
-            config: Configuration dictionary with keys:
-                - enabled_attr: Attribute name for enabled flag
-                - intensity_attr: Attribute name for intensity
-                - frequency_attr: Attribute name for frequency (optional)
-                - effect_name: Name of the effect
-                - threshold_speed: Minimum speed for effect
-                - threshold_value: Minimum deployment value
-                - deployment_key: Key for deployment value in telemetry
-                - speed_range: Tuple of (low_speed, high_speed) for intensity calculation
-                - require_airborne: Whether effect requires being airborne
-                - directions: List of directions for multi-axis effects
-        """
-        enabled = getattr(self, config['enabled_attr'])
-        intensity = getattr(self, config['intensity_attr'])
-
-        if not enabled or not intensity:
-            self.effects.dispose(*config['effect_names'])
-            return
-
-        tas = telem_data.get("TAS", 0)
-        if tas < config.get('threshold_speed', 0):
-            self.effects.dispose(*config['effect_names'])
-            return
-
-        deployment = telem_data.get(config['deployment_key'], 0)
-        if deployment <= config.get('threshold_value', 0.1):
-            self.effects.dispose(*config['effect_names'])
-            return
-
-        if config.get('require_airborne', True) and self._should_skip_airborne_effect(telem_data):
-            self.effects.dispose(*config['effect_names'])
-            return
-
-        # Calculate intensity based on speed and deployment
-        speed_low, speed_high = config.get('speed_range', (0, 100))
-        tas_intensity = utils.scale_clamp(tas, (speed_low, speed_high), (0.0, 1.0))
-
-        if isinstance(deployment, list):
-            # Handle special cases like F-14 spoilers
-            if config.get('special_calc') and "F-14" in str(telem_data.get("N", "")):
-                inner = (deployment[1], deployment[2])
-                outer = (deployment[0], deployment[3])
-                deployment = (0.85 * sum(inner) + 0.15 * sum(outer)) / 2
-            else:
-                deployment = sum(deployment) / len(deployment)
-
-        realtime_intensity = intensity * deployment * tas_intensity
-        frequency = getattr(self, config.get('frequency_attr', 'frequency'), 13)
-
-        # Create effects
-        for i, effect_name in enumerate(config['effect_names']):
-            direction = config['directions'][i] if i < len(config['directions']) else config['directions'][0]
-            self.effects[effect_name].periodic(frequency, realtime_intensity, direction, 4).start()
-
-        logging.debug(f"PLAYING {config['effect_name'].upper()} RUMBLE | intensity: {realtime_intensity}")
