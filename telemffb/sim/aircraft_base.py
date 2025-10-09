@@ -1486,6 +1486,165 @@ class DecelerationEffectMixIn(AircraftEffectUtilsBase):
             effects.dispose("decel")
 
 
+class EngineRumbleMixIn(AircraftEffectUtilsBase):
+    """Mixin to contain engine rumble related configuration, state and handlers.
+
+    Moves piston/prop and rotor/jet engine rumble attrs and methods out of
+    AircraftBase so per-instance state and behavior live with the mixin.
+    """
+    engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
+    engine_prop_rumble_enabled: bool = True  # Engine Rumble - Piston specific - based on Prop RPM
+    engine_rotor_rumble_enabled: bool = False  # Engine Rumble - Helicopter specific - based on Rotor RPM
+
+    engine_rumble_intensity: float = 0.02
+    engine_rumble_lowrpm: int = 450
+    engine_rumble_lowrpm_intensity: float = 0.12
+    engine_rumble_highrpm: int  = 2800
+    engine_rumble_highrpm_intensity: float = 0.06
+
+    afterburner_effect_intensity = 0.0      # peak intensity for afterburner rumble effect
+    jet_engine_rumble_intensity = 0      # peak intensity for jet engine rumble effect
+    jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
+    
+    afterburner_effect_enabled: bool = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # No per-instance runtime state currently required for engine rumble;
+        # placeholder in case future smoothing/filters are needed.
+        self._engine_rumble_last = None
+
+    def ac_update_piston_engine_rumble(self, telem_data):
+        if not self.engine_prop_rumble_enabled:
+            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+            return
+
+        if self._sim_is('DCS'):
+            rpm = telem_data.get("ActualRPM", 0.0)
+        elif self._sim_is('MSFS') or self._sim_is_xplane():
+            rpm = telem_data.get("PropRPM", 0.0)
+        elif self._sim_is('IL2'):
+            rpm = telem_data.get("RPM", 0.0)
+        else:
+            logging.warning("Unknown sim trying to play Engine Rumble effect")
+            rpm = 0.0
+
+        if type(rpm) == list:
+            rpm = max(rpm)
+
+        if rpm < 5:
+            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+            return
+
+        frequency = float(rpm) / 60
+
+        median_modulation = 2
+        modulation_pos = 2
+        modulation_neg = 1
+        frequency2 = frequency + median_modulation
+
+        r1_modulation = utils.sine_point_in_time(3, 10000)
+        r2_modulation = utils.sine_point_in_time(3, 17500, phase_offset_deg=45)
+
+        if frequency > 0:
+            force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
+            dynamic_rumble_intensity = utils.clamp(self.ac_calc_engine_intensity(rpm), 0, force_limit)
+            logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
+
+            effects["prop_rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()
+            effects["prop_rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()
+            effects["prop_rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()
+            effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()
+        else:
+            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+
+    def ac_calc_engine_intensity(self, rpm) -> float:
+        min_rpm = self.engine_rumble_lowrpm
+        max_rpm = self.engine_rumble_highrpm
+        max_intensity = self.engine_rumble_lowrpm_intensity
+        min_intensity = self.engine_rumble_highrpm_intensity
+
+        rpm_percentage = 1 - ((rpm - min_rpm) / (max_rpm - min_rpm))
+
+        if rpm < min_rpm:
+            interpolated_intensity = utils.scale(rpm, (0, min_rpm), (max_intensity*2, max_intensity))
+        else:
+            interpolated_intensity = utils.scale(rpm, (min_rpm, max_rpm), (max_intensity, min_intensity))
+        logging.debug(f"rpm = {rpm} | rpm percent of range: {rpm_percentage} | interpolated intensity: {interpolated_intensity}")
+
+        return interpolated_intensity
+
+    def ac_update_jet_engine_rumble(self, telem_data):
+        if not self.engine_jet_rumble_enabled or not self.jet_engine_rumble_intensity > 0:
+            effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
+            return
+
+        frequency = self.jet_engine_rumble_freq
+        median_modulation = 10
+        modulation_pos = 3
+        modulation_neg = 3
+        frequency2 = frequency + median_modulation
+        precision = 2
+        effect_index = 4
+        phase_offset = 120
+        if self._sim_is_xplane():
+            jet_eng_rpm = telem_data.get("EngPCT", 0)
+        else:
+            jet_eng_rpm = telem_data.get("EngRPM", 0)
+        if type(jet_eng_rpm) == list:
+            jet_eng_rpm = max(jet_eng_rpm)
+
+        if jet_eng_rpm == 0:
+            # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
+            effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
+            return
+
+        r1_modulation = utils.sine_point_in_time(3, 60000)
+        r2_modulation = utils.sine_point_in_time(2, 42500, phase_offset_deg=0)
+        intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
+        intensity = utils.clamp(intensity, 0, 1)
+        rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
+        rt_freq2 = round(rt_freq + median_modulation, 4)
+        effects["je_rumble_1_1"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
+        # effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
+        effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
+        # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset+30).start()
+        logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
+    
+    def ac_update_ab_effect(self, telem_data):
+        if not self.afterburner_effect_intensity or not self.afterburner_effect_enabled:
+            effects.dispose("ab_rumble_1_1", "ab_rumble_2_1")
+            return
+
+        frequency = 20
+        median_modulation = 2
+        modulation_pos = 2
+        modulation_neg = 1
+        frequency2 = frequency + median_modulation
+        precision = 2
+        afterburner_pos = telem_data.get("Afterburner", 0)
+        if isinstance(afterburner_pos, list):
+            afterburner_pos = max(afterburner_pos)
+
+        r1_modulation = utils.sine_point_in_time(modulation_pos, 15000)
+        r2_modulation = utils.sine_point_in_time(modulation_neg, 15000)
+
+        if afterburner_pos and (self.anything_has_changed("Afterburner", afterburner_pos) or self.anything_has_changed("Modulation", r1_modulation)):
+            # logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
+            intensity = self.afterburner_effect_intensity * afterburner_pos
+            effects["ab_rumble_1_1"].periodic(frequency + r1_modulation, intensity, 0,effect_type=EFFECT_TRIANGLE ).start()
+            # effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
+            effects["ab_rumble_2_1"].periodic(frequency + r1_modulation, intensity, 45,effect_type=EFFECT_TRIANGLE ).start()
+            # effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120,
+            #                                   offset=60).start()
+            # logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
+        elif afterburner_pos == 0:
+            # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
+            effects.dispose("ab_rumble_1_1")
+            # effects.dispose("ab_rumble_1_2")
+            effects.dispose("ab_rumble_2_1")
+            # effects.dispose("ab_rumble_2_2")
+
 class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
     adv_spr_override_enabled: bool = False   # deprecated
@@ -1583,6 +1742,7 @@ class AircraftBase(
     DeadzoneMixIn,
     HydraulicLossMixIn,
     DecelerationEffectMixIn,
+    EngineRumbleMixIn,
     AdvancedSpringMixIn,
     MotionEffectsMixIn,
     BuffetingEffectMixIn,
@@ -1608,9 +1768,7 @@ class AircraftBase(
     aoa_effect_gain: float = 1.0
     uncoordinated_turn_effect_enabled: int = 1
 
-    afterburner_effect_intensity = 0.0      # peak intensity for afterburner rumble effect
-    jet_engine_rumble_intensity = 0      # peak intensity for jet engine rumble effect
-    jet_engine_rumble_freq = 45             # base frequency for jet engine rumble effect (Hz)
+
 
     ###
     ### AoA reduction force effect
@@ -1630,15 +1788,7 @@ class AircraftBase(
     friction_coeff: int = 0
 
     # runway_rumble attributes moved to MotionEffectsMixIn
-    engine_jet_rumble_enabled: bool = False  # Engine Rumble - Jet specific
-    engine_prop_rumble_enabled: bool = True  # Engine Rumble - Piston specific - based on Prop RPM
-    engine_rotor_rumble_enabled: bool = False  # Engine Rumble - Helicopter specific - based on Rotor RPM
-
-    engine_rumble_intensity: float = 0.02
-    engine_rumble_lowrpm: int = 450
-    engine_rumble_lowrpm_intensity: float = 0.12
-    engine_rumble_highrpm: int  = 2800
-    engine_rumble_highrpm_intensity: float = 0.06
+    # Engine rumble attributes moved to EngineRumbleMixIn
 
     # gforce_effect_enable : bool = False
 
@@ -1653,7 +1803,6 @@ class AircraftBase(
 
     # gun/countermeasure attributes moved to WeaponsEffectMixIn
 
-    afterburner_effect_enabled: bool = True
 
     # spring_mode = G.JoystickSpringMode.BASIC
 
@@ -1925,50 +2074,8 @@ class AircraftBase(
             effects["aoa"].constant(mag, dir).start()
 
     def ac_update_piston_engine_rumble(self, telem_data):
-        if not self.engine_prop_rumble_enabled:
-            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
-            return
-
-        if self._sim_is('DCS'):
-            rpm = telem_data.get("ActualRPM", 0.0)
-        elif self._sim_is('MSFS') or self._sim_is_xplane():
-            rpm = telem_data.get("PropRPM", 0.0)
-        elif self._sim_is('IL2'):
-            rpm = telem_data.get("RPM", 0.0)
-        else:
-            logging.warning("Unknown sim trying to play Engine Rumble effect")
-            rpm = 0.0
-
-        if type(rpm) == list:
-            rpm = max(rpm)
-
-        if rpm < 5:
-            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
-            return
-
-        frequency = float(rpm) / 60
-
-        # frequency = 20
-        median_modulation = 2
-        modulation_pos = 2
-        modulation_neg = 1
-        frequency2 = frequency + median_modulation
-        precision = 2
-
-        r1_modulation = utils.sine_point_in_time(3, 10000)
-        r2_modulation = utils.sine_point_in_time(3, 17500, phase_offset_deg=45)
-
-        if frequency > 0:
-            force_limit = max(self.engine_rumble_highrpm_intensity, self.engine_rumble_lowrpm_intensity)
-            dynamic_rumble_intensity = utils.clamp(self.ac_calc_engine_intensity(rpm), 0, force_limit)
-            logging.debug(f"Current Engine Rumble Intensity = {dynamic_rumble_intensity}")
-
-            effects["prop_rpm0-1"].periodic(frequency, dynamic_rumble_intensity, 0).start()  # vib on X axis
-            effects["prop_rpm0-2"].periodic(frequency + r1_modulation, dynamic_rumble_intensity, 0).start()  # vib on X
-            effects["prop_rpm1-1"].periodic(frequency2, dynamic_rumble_intensity, 90).start()  # vib on Y axis
-            effects["prop_rpm1-2"].periodic(frequency2 + r2_modulation, dynamic_rumble_intensity, 90).start()  # vib on Y
-        else:
-            effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
+        """Delegates to EngineRumbleMixIn.ac_update_piston_engine_rumble"""
+        return super().ac_update_piston_engine_rumble(telem_data)
 
     def ac_calc_engine_intensity(self, rpm) -> float:
         """
@@ -1999,77 +2106,10 @@ class AircraftBase(
     ######                            ######
     ########################################
     def ac_update_ab_effect(self, telem_data):
-        if not self.afterburner_effect_intensity or not self.afterburner_effect_enabled:
-            effects.dispose("ab_rumble_1_1", "ab_rumble_2_1")
-            return
-
-        frequency = 20
-        median_modulation = 2
-        modulation_pos = 2
-        modulation_neg = 1
-        frequency2 = frequency + median_modulation
-        precision = 2
-        afterburner_pos = telem_data.get("Afterburner", 0)
-        if isinstance(afterburner_pos, list):
-            afterburner_pos = max(afterburner_pos)
-
-        r1_modulation = utils.sine_point_in_time(modulation_pos, 15000)
-        r2_modulation = utils.sine_point_in_time(modulation_neg, 15000)
-
-        if afterburner_pos and (self.anything_has_changed("Afterburner", afterburner_pos) or self.anything_has_changed("Modulation", r1_modulation)):
-            # logging.debug(f"AB Effect Updated: LT={Left_Throttle}, RT={Right_Throttle}")
-            intensity = self.afterburner_effect_intensity * afterburner_pos
-            effects["ab_rumble_1_1"].periodic(frequency + r1_modulation, intensity, 0,effect_type=EFFECT_TRIANGLE ).start()
-            # effects["ab_rumble_1_2"].periodic(frequency + r1_modulation, intensity, 0).start()
-            effects["ab_rumble_2_1"].periodic(frequency + r1_modulation, intensity, 45,effect_type=EFFECT_TRIANGLE ).start()
-            # effects["ab_rumble_2_2"].periodic(frequency2 + r2_modulation, intensity, 45, 4, phase=120,
-            #                                   offset=60).start()
-            # logging.debug(f"AB-Modul1= {r1_modulation} | AB-Modul2 = {r2_modulation}")
-        elif afterburner_pos == 0:
-            # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
-            effects.dispose("ab_rumble_1_1")
-            # effects.dispose("ab_rumble_1_2")
-            effects.dispose("ab_rumble_2_1")
-            # effects.dispose("ab_rumble_2_2")
+        super().ac_update_ab_effect(telem_data)
 
     def ac_update_jet_engine_rumble(self, telem_data):
-        if not self.engine_jet_rumble_enabled or not self.jet_engine_rumble_intensity > 0:
-            effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
-            return
-
-        frequency = self.jet_engine_rumble_freq
-        median_modulation = 10
-        modulation_pos = 3
-        modulation_neg = 3
-        frequency2 = frequency + median_modulation
-        precision = 2
-        effect_index = 4
-        phase_offset = 120
-        if self._sim_is_xplane():
-            jet_eng_rpm = telem_data.get("EngPCT", 0)
-        else:
-            jet_eng_rpm = telem_data.get("EngRPM", 0)
-        if type(jet_eng_rpm) == list:
-            jet_eng_rpm = max(jet_eng_rpm)
-
-        if jet_eng_rpm == 0:
-            # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
-            effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
-            return
-
-        r1_modulation = utils.sine_point_in_time(3, 60000)
-        r2_modulation = utils.sine_point_in_time(2, 42500, phase_offset_deg=0)
-        intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
-        intensity = utils.clamp(intensity, 0, 1)
-        rt_freq = round(frequency + (10 * (jet_eng_rpm / 100)), 4)
-        rt_freq2 = round(rt_freq + median_modulation, 4)
-        effects["je_rumble_1_1"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
-        # effects["je_rumble_1_2"].periodic(rt_freq + r1_modulation, intensity, 0, effect_index).start()
-        effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
-        # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset+30).start()
-        logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
-
-    # deadzone behavior moved into DeadzoneMixIn
+        super().ac_update_jet_engine_rumble(telem_data)
 
     def on_event(self, event, *args):
         pass
