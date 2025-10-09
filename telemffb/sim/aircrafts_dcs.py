@@ -122,6 +122,9 @@ class Aircraft(AircraftBase):
     stick_shaker_aoa = 22.3
     stick_shaker_frequency = 40
 
+    ap_active_deadzone_enabled : bool = False
+    ap_active_deadzone : float = 0.0
+
     ####
     ####
     def __init__(self, name : str, **kwargs):
@@ -135,11 +138,6 @@ class Aircraft(AircraftBase):
         self.last_device_x, self.last_device_y = input_data.axisXY()
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = None
-
-        self.ap_active_deadzone_enabled = False
-        self.ap_active_deadzone = 0.0
-        self.deadzone_updated = False
-        self.deadzone_active = False
 
     @overrides(AircraftBase)
     def ac_update_gforce_effect(self, telem_data, adv_spr=False):
@@ -412,6 +410,10 @@ class Aircraft(AircraftBase):
         if not self.is_joystick(): return
 
         ap_active = telem_data.get("APEnabled", 0)
+
+        if not self.ap_active_deadzone_enabled:
+            self.ac_set_deadzone_override(0)
+            return
 
         if ap_active:
             self.ac_set_deadzone_override(self.ap_active_deadzone)
