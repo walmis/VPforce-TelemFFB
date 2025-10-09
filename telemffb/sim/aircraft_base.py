@@ -930,6 +930,22 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             effects['runway_bump0'].periodic(15, intensity * .75, direction=0, effect_type=EFFECT_SQUARE, duration=80).start()
             effects['runway_bump1'].periodic(15, intensity, direction=0, effect_type=EFFECT_SQUARE, phase=180, duration=160).start()
 
+    def ac_update_flaps(self, telem_data):
+        flapspos = telem_data.get("Flaps")
+        if flapspos is None:
+            flapspos = telem_data.get("flaps_value")
+        if flapspos is None:
+            return
+        
+        if isinstance(flapspos, list):
+            flapspos = max(flapspos)
+        if self.anything_has_changed("Flaps", flapspos, delta_ms=100) and self.flaps_motion_intensity > 0 and self.flaps_motion_effect_enabled:
+            logging.debug(f"Flaps Pos: {flapspos}")
+            direction = 90 if self.is_pedals() else 0
+            effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, direction, 3).start()
+        else:
+            effects["flapsmovement"].stop(destroy_after=5000)
+
     def ac_update_runway_rumble(self, telem_data):
         """Add wheel based rumble effects for immersion
         Generates bumps/etc on touchdown, rolling, field landing etc
@@ -987,11 +1003,6 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
 
         logging.debug(f"Touchdown Effect: Realtime Gs: {gs}, Force:{force}")
         effects['touchdown'].constant(force, 180).start()
-
-
-    def ac_update_flaps(self, telem_data):
-        """Delegates to MotionEffectsMixIn.ac_update_flaps"""
-        return super().ac_update_flaps(telem_data)
 
 
     def ac_update_canopy(self, telem_data):
@@ -1285,7 +1296,190 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         logging.debug(f"PLAYING {config['effect_name'].upper()} RUMBLE | intensity: {realtime_intensity}")
 
 
-class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffectsMixIn, WeaponsEffectMixIn, DeadzoneMixIn, MotionEffectsMixIn, BuffetingEffectMixIn):
+class HydraulicLossMixIn(AircraftEffectUtilsBase):
+    """Mixin to handle hydraulic-loss related configuration, runtime state and effects."""
+    enable_hydraulic_loss_effect: bool = False
+    hydraulic_loss_threshold: float = 0.95
+    hydraulic_loss_damper: float = 1
+    hydraulic_loss_inertia: float = 1
+    hydraulic_loss_friction: float = 1
+
+    def __init__(self, *args, **kwargs):
+        # cooperative init for mixin ordering
+        super().__init__(*args, **kwargs)
+        # per-instance runtime state
+        self.hydraulic_factor = 0.0
+
+    def ac_update_hydraulic_loss_effect(self, telem_data):
+
+        telem_data['_hyd_factor'] = self.hydraulic_factor
+
+        if not self.enable_hydraulic_loss_effect:
+            return False
+        hydraulic_sys = telem_data.get('HydSys', "n/a")
+        hydraulic_pressure = telem_data.get('HydPress', 1)
+
+        if not self.enable_damper_ovd or not self.enable_inertia_ovd or not self.enable_friction_ovd:
+            self.flag_error("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
+            return False
+
+        if hydraulic_sys == 'n/a':
+            return False
+
+        if isinstance(hydraulic_pressure, list):
+            hydraulic_pressure = max(hydraulic_pressure)
+
+        if isinstance(hydraulic_sys, int) and (hydraulic_sys == 1 or hydraulic_sys == 0):
+            hydraulic_sys = bool(hydraulic_sys)
+
+        if isinstance(hydraulic_sys, list):
+            self.hydraulic_factor = max(hydraulic_sys)
+
+        elif isinstance(hydraulic_sys, bool):
+            if self._sim_is_dcs() and hydraulic_sys == True and hydraulic_pressure == 0:
+                hydraulic_sys = False
+
+            if hydraulic_sys == True:
+                self.hydraulic_factor = self.step_value_over_time('hyd_factor', self.hydraulic_factor, 2500, 1, floatpoint=True)
+            elif hydraulic_sys == False:
+                self.hydraulic_factor = self.step_value_over_time('hyd_factor', self.hydraulic_factor, 2500, 0, floatpoint=True)
+
+            # hydraulic_factor = int(hydraulic_sys)
+            telem_data['_hydraulic_factor_test'] = self.hydraulic_factor
+        else:
+            self.hydraulic_factor = hydraulic_sys
+
+        if self.hydraulic_factor >= self.hydraulic_loss_threshold:
+            effects["hyd_loss_damper"].destroy()
+            effects["hyd_loss_inertia"].destroy()
+            effects["hyd_loss_friction"].destroy()
+            self.damper_coeff = int(self.damper_force * 4096)
+            self.inertia_coeff = int(self.inertia_force * 4096)
+            self.friction_coeff = int(self.friction_force * 4096)
+            return False
+
+        damper = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_damper, self.damper_force))
+        inertia = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_inertia, self.inertia_force))
+        friction = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_friction, self.friction_force))
+
+        self.damper_coeff = utils.clamp(int(damper * 4096), 0, 4096)
+        self.inertia_coeff = utils.clamp(int(inertia * 4096), 0, 4096)
+        self.friction_coeff = utils.clamp(int(friction * 4096), 0, 4096)
+
+        effects["damper"].destroy()
+        effects["inertia"].destroy()
+        effects["friction"].destroy()
+
+        if not effects["hyd_loss_damper"].started or self.anything_has_changed('_hyd_loss_damper', self.damper_coeff):
+            effects["hyd_loss_damper"].damper(self.damper_coeff, self.damper_coeff).start()
+        if not effects["hyd_loss_inertia"].started or self.anything_has_changed('_hyd_loss_inertia', self.inertia_coeff):
+            effects["hyd_loss_inertia"].inertia(self.inertia_coeff, self.inertia_coeff).start()
+        if not effects["hyd_loss_friction"].started or self.anything_has_changed('_hyd_loss_friction', self.friction_coeff):
+            effects["hyd_loss_friction"].friction(self.friction_coeff, self.friction_coeff).start()
+
+        return True
+
+
+class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
+    """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
+    adv_spr_override_enabled: bool = False   # deprecated
+    adv_spr_gains: str = 'none'
+    adv_spr_use_hardware_trim: bool = False
+
+    # override spring trim button bindings and settings
+    override_spring_trim_down: int = 0
+    override_spring_trim_left: int = 0
+    override_spring_trim_up: int = 0
+    override_spring_trim_right: int = 0
+    override_spring_trim_rate: int = 200
+    override_spring_cp0_x: float = 0.0
+    override_spring_cp0_y: float = 0.0
+
+    def __init__(self, *args, **kwargs):
+        # Ensure cooperative init ordering
+        super().__init__(*args, **kwargs)
+
+        # per-instance state used by advanced spring override
+        self.adv_spr_settings_dict: dict = {}
+
+        # condition objects and adjuster used by the advanced spring override
+        self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
+        self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
+        # the spring_adjuster effect object (wrapper) from the global effects dispenser
+        self.spring_adjuster = effects['spring_adjuster'].spring_adjuster()
+
+    def ac_modify_game_spring(self):
+        if not self.spring_mode_is(SpringModeEnum.ADVANCED):
+            self.spring_adjuster.stop()
+            return
+        # Verify the device firmware meets the minimum version required to execute this effect
+        # Flag error and abort if not met
+        supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+        if not supported:
+            self.flag_error('The Advanced/Custom Spring Override requires firmware v1.0.18 or higher.\n'
+                            f'The device is currently running version {G.device_firmware_version}\n'
+                            f'Please update your device firmware!')
+            return
+        if self.adv_spr_gains == 'none':
+            self.flag_error('Please open and configure the advanced spring gain settings')
+            return
+
+        gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.get('IAS', 0))
+
+        self.spring_adjuster.name = 'adv_spr'
+        self.spring_adjuster_y.set_coefficient(gains.get('y', 0))
+        self.spring_adjuster_x.set_coefficient(gains.get('x', 0))
+
+        if self.adv_spr_use_hardware_trim:
+            dt = perftracker.get_time_delta('override_spring_perf')
+            trim_step_size = self.override_spring_trim_rate * dt
+            # trim_step_size = 200 * dt
+            self.telem_data['_ovrd_spr_step'] = trim_step_size
+            self.telem_data['_ovrd_spr_dt'] = dt
+            # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
+            # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
+            input_data = HapticEffect.device.get_input()
+            x, y = input_data.axisXY()
+            current_buttons = input_data.getPressedButtons()
+
+            if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
+                self.override_spring_cp0_y -= trim_step_size
+            elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
+                self.override_spring_cp0_y += trim_step_size
+
+            if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
+                self.override_spring_cp0_x -= trim_step_size
+            elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
+                self.override_spring_cp0_x += trim_step_size
+
+            self.override_spring_cp0_x = round(utils.clamp(self.override_spring_cp0_x, -4096, 4096))
+            self.override_spring_cp0_y = round(utils.clamp(self.override_spring_cp0_y, -4096, 4096))
+        else:
+            self.override_spring_cp0_x = 0
+            self.override_spring_cp0_y = 0
+        offset = self.ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
+        self.g_y_offset = offset if offset is not None else 0
+        self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]
+        self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + self.g_y_offset))
+        self.spring_adjuster_x.set_offset(round(self.override_spring_cp0_x))
+
+        self.spring_adjuster.setCondition(self.spring_adjuster_y)
+        self.spring_adjuster.setCondition(self.spring_adjuster_x)
+        self.spring_adjuster.start()
+
+
+
+class AircraftBase(
+    GForceEffectMixIn,
+    PedalSpringOverrideMixIn,
+    HelicopterEffectsMixIn,
+    WeaponsEffectMixIn,
+    DeadzoneMixIn,
+    HydraulicLossMixIn,
+    AdvancedSpringMixIn,
+    MotionEffectsMixIn,
+    BuffetingEffectMixIn,
+):
     rotor_blade_count = 2
 
     cpO_x = 0
@@ -1319,8 +1513,6 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
     critical_aoa_start = 22
     critical_aoa_max = 25
 
-
-
     # gear motion attributes moved to MotionEffectsMixIn
 
     ####
@@ -1332,12 +1524,6 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
     decel_invert_force = False
     decel_airborne_disable: bool = True
     ###
-
-    enable_hydraulic_loss_effect: bool = False
-    hydraulic_loss_threshold: float = 0.95
-    hydraulic_loss_damper: float = 1
-    hydraulic_loss_inertia: float = 1
-    hydraulic_loss_friction: float = 1
 
     damper_coeff: int = 0
     inertia_coeff: int = 0
@@ -1356,8 +1542,6 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
 
     # gforce_effect_enable : bool = False
 
-
-
     # canopy motion attributes moved to MotionEffectsMixIn
 
     max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
@@ -1371,10 +1555,10 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
 
     afterburner_effect_enabled: bool = True
 
-    #spring_mode = G.JoystickSpringMode.BASIC
+    # spring_mode = G.JoystickSpringMode.BASIC
 
     ## 0=DCS Default | 1=spring disabled (Heli)), 2=spring enabled at %100 (FW)
-    #pedal_spring_mode = G.PedalSpringMode.STATIC
+    # pedal_spring_mode = G.PedalSpringMode.STATIC
 
     aircraft_vs_speed = 87
     aircraft_vs_gain = 0.25
@@ -1383,23 +1567,12 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
 
     pedal_spring_coeff_x = 0
 
-    adv_spr_override_enabled: bool = False   #deprecated
-    adv_spr_gains: str = 'none'
-    adv_spr_use_hardware_trim: bool = False
-    # adv_spr_use_game_trim: bool = True
+    # Advanced spring override and trim attributes moved into AdvancedSpringMixIn
     trimwheel_elev_up_button: int = 0
     trimwheel_elev_dn_button: int = 0
     trimwheel_use_master_buttons: bool = False
     trimwheel_axis_invert: bool = False
     trimwheel_use_axis: bool = False
-
-    override_spring_trim_down: int = 0
-    override_spring_trim_left: int = 0
-    override_spring_trim_up: int = 0
-    override_spring_trim_right: int = 0
-    override_spring_trim_rate: int = 200
-    override_spring_cp0_x: float = 0.0
-    override_spring_cp0_y: float = 0.0
 
     # enable_deadzone and deadzone_base_pct moved into DeadzoneMixIn
 
@@ -1429,6 +1602,14 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
         """Delegates to GForceEffectMixIn.ac_update_gforce_effect (stub on AircraftBase)."""
         return super().ac_update_gforce_effect(telem_data, adv_spr=adv_spr)
 
+    def ac_update_hydraulic_loss_effect(self, telem_data):
+        """Delegates to HydraulicLossMixIn.ac_update_hydraulic_loss_effect"""
+        return super().ac_update_hydraulic_loss_effect(telem_data)
+
+    def ac_modify_game_spring(self):
+        """Delegates to AdvancedSpringMixIn.ac_modify_game_spring.
+        """
+        super().ac_modify_game_spring()
 
     def __init__(self, name: str, **kwargs):
         super().__init__()
@@ -1440,22 +1621,16 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
         self.active_deadzone_pct: float = 0.0
         self.deadzone_active = False
 
-        self.hydraulic_factor = 0.000
-        #clear any existing effects
+        # hydraulic_factor is initialised in HydraulicLossMixIn.__init__
+        # clear any existing effects
         effects.clear()
 
-
-        self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
-        self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
-        self.spring_adjuster = effects['spring_adjuster'].spring_adjuster()
-
+    # spring_adjuster_x/y and spring_adjuster are initialised in AdvancedSpringMixIn.__init__
 
         self.friction_effect_overridden: bool = False
 
         self.spring_mode = SpringModeEnum.NONE.name
         self.gforce_effect_mode = GEffectModeEnum.DISABLED.name
-
-
 
     ########################################
     ######                            ######
@@ -1502,7 +1677,6 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
             effects['runway_bump0'].periodic(15, intensity * .75, direction=0, effect_type=EFFECT_SQUARE, duration=80).start()
             effects['runway_bump1'].periodic(15, intensity, direction=0, effect_type=EFFECT_SQUARE, phase=180, duration=160).start()
 
-
     def ac_update_runway_rumble(self, telem_data):
         """Add wheel based rumble effects for immersion
         Generates bumps/etc on touchdown, rolling, field landing etc
@@ -1530,16 +1704,13 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
         # connect Y axis to nosewheel, X axis to the side wheels
         tot_weight = sum(WoW)
 
-        #if telem_data.get("T", 0) > 2:  # wait a bit for data to settle
+        # if telem_data.get("T", 0) > 2:  # wait a bit for data to settle
         if tot_weight:
             logging.debug(f"Runway Rumble : v1 = {v1}. v2 = {v2}")
             effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
             effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
         else:
             effects.dispose("runway0", "runway1")
-
-
-
 
     def ac_update_aoa_reduction_force_effect(self, telem_data):
         if not self.aoa_reduction_effect_enabled:
@@ -1577,7 +1748,7 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
             # When off ground, dispose effect and return
             effects.dispose('decel')
             return
-        
+
         y_gs = 0
         last_y_gs = 0
 
@@ -1655,25 +1826,10 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
         else:
             effects.dispose("decel")
 
-
-
     # weapon/CM behavior moved into WeaponsEffectMixIn
 
     def ac_update_flaps(self, telem_data):
-        flapspos = telem_data.get("Flaps")
-        if flapspos is None:
-            flapspos = telem_data.get("flaps_value")
-        if flapspos is None:
-            return
-        
-        if isinstance(flapspos, list):
-            flapspos = max(flapspos)
-        if self.anything_has_changed("Flaps", flapspos, delta_ms=100) and self.flaps_motion_intensity > 0 and self.flaps_motion_effect_enabled:
-            logging.debug(f"Flaps Pos: {flapspos}")
-            direction = 90 if self.is_pedals() else 0
-            effects["flapsmovement"].periodic(180, self.flaps_motion_intensity, direction, 3).start()
-        else:
-            effects["flapsmovement"].stop(destroy_after=5000)
+        super().ac_update_flaps(telem_data)
 
     def ac_update_canopy(self, telem_data):
         """Delegates to MotionEffectsMixIn.ac_update_canopy"""
@@ -1721,75 +1877,6 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
             return
         logging.debug(f"Adding wind effect intensity:{v}")
         effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
-
-    def ac_update_hydraulic_loss_effect(self, telem_data):
-
-        telem_data['_hyd_factor'] = self.hydraulic_factor
-
-        if not self.enable_hydraulic_loss_effect:
-            return False
-        hydraulic_sys = telem_data.get('HydSys', "n/a")
-        hydraulic_pressure = telem_data.get('HydPress', 1)
-
-        if not self.enable_damper_ovd or not self.enable_inertia_ovd or not self.enable_friction_ovd:
-            self.flag_error("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
-            return False
-
-        if hydraulic_sys == 'n/a':
-            return False
-
-        if isinstance(hydraulic_pressure, list):
-            hydraulic_pressure = max(hydraulic_pressure)
-
-        if isinstance(hydraulic_sys, int) and (hydraulic_sys == 1 or hydraulic_sys == 0):
-            hydraulic_sys = bool(hydraulic_sys)
-
-        if isinstance(hydraulic_sys, list):
-            self.hydraulic_factor = max(hydraulic_sys)
-
-        elif isinstance(hydraulic_sys, bool):
-            if self._sim_is_dcs() and hydraulic_sys == True and hydraulic_pressure == 0:
-                hydraulic_sys = False
-
-            if hydraulic_sys == True:
-                self.hydraulic_factor = self.step_value_over_time('hyd_factor', self.hydraulic_factor, 2500, 1, floatpoint=True)
-            elif hydraulic_sys == False:
-                self.hydraulic_factor = self.step_value_over_time('hyd_factor', self.hydraulic_factor, 2500, 0, floatpoint=True)
-
-            # hydraulic_factor = int(hydraulic_sys)
-            telem_data['_hydraulic_factor_test'] = self.hydraulic_factor
-        else:
-            self.hydraulic_factor = hydraulic_sys
-
-        if self.hydraulic_factor >= self.hydraulic_loss_threshold:
-            effects["hyd_loss_damper"].destroy()
-            effects["hyd_loss_inertia"].destroy()
-            effects["hyd_loss_friction"].destroy()
-            self.damper_coeff = int(self.damper_force * 4096)
-            self.inertia_coeff = int(self.inertia_force * 4096)
-            self.friction_coeff = int(self.friction_force * 4096)
-            return False
-
-        damper = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_damper, self.damper_force))
-        inertia = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_inertia, self.inertia_force))
-        friction = utils.scale(self.hydraulic_factor, (0, self.hydraulic_loss_threshold), (self.hydraulic_loss_friction, self.friction_force))
-
-        self.damper_coeff = utils.clamp(int(damper * 4096), 0, 4096)
-        self.inertia_coeff = utils.clamp(int(inertia * 4096), 0, 4096)
-        self.friction_coeff = utils.clamp(int(friction * 4096), 0, 4096)
-
-        effects["damper"].destroy()
-        effects["inertia"].destroy()
-        effects["friction"].destroy()
-
-        if not effects["hyd_loss_damper"].started or self.anything_has_changed('_hyd_loss_damper', self.damper_coeff):
-            effects["hyd_loss_damper"].damper(self.damper_coeff, self.damper_coeff).start()
-        if not effects["hyd_loss_inertia"].started or self.anything_has_changed('_hyd_loss_inertia', self.inertia_coeff):
-            effects["hyd_loss_inertia"].inertia(self.inertia_coeff, self.inertia_coeff).start()
-        if not effects["hyd_loss_friction"].started or self.anything_has_changed('_hyd_loss_friction', self.friction_coeff):
-            effects["hyd_loss_friction"].friction(self.friction_coeff, self.friction_coeff).start()
-
-        return True
 
     def ac_update_ffb_forces(self, telem_data):
 
@@ -1875,7 +1962,7 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
         else:
             logging.warning("Unknown sim trying to play Engine Rumble effect")
             rpm = 0.0
-        
+
         if type(rpm) == list:
             rpm = max(rpm)
 
@@ -1921,10 +2008,10 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
         rpm_percentage = 1 - ((rpm - min_rpm) / (max_rpm - min_rpm))
 
         if rpm < min_rpm:
-            #give some extra juice if RPM is very low (i.e. on engine start)
+            # give some extra juice if RPM is very low (i.e. on engine start)
             interpolated_intensity = utils.scale(rpm, (0, min_rpm), (max_intensity*2, max_intensity))
         else:
-            #update to use scaling function
+            # update to use scaling function
             interpolated_intensity = utils.scale(rpm, (min_rpm, max_rpm), (max_intensity, min_intensity))
         logging.debug(f"rpm = {rpm} | rpm percent of range: {rpm_percentage} | interpolated intensity: {interpolated_intensity}")
 
@@ -1973,7 +2060,7 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
         if not self.engine_jet_rumble_enabled or not self.jet_engine_rumble_intensity > 0:
             effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
             return
-        
+
         frequency = self.jet_engine_rumble_freq
         median_modulation = 10
         modulation_pos = 3
@@ -1988,12 +2075,12 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
             jet_eng_rpm = telem_data.get("EngRPM", 0)
         if type(jet_eng_rpm) == list:
             jet_eng_rpm = max(jet_eng_rpm)
-       
+
         if jet_eng_rpm == 0:
             # logging.debug(f"Both Less: Eng1: {eng1} Eng2: {eng2}, effect= {Aircraft.effect_index_set}")
             effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
             return
-        
+
         r1_modulation = utils.sine_point_in_time(3, 60000)
         r2_modulation = utils.sine_point_in_time(2, 42500, phase_offset_deg=0)
         intensity = self.jet_engine_rumble_intensity * (jet_eng_rpm / 100)
@@ -2005,68 +2092,6 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
         effects["je_rumble_2_1"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset).start()
         # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset+30).start()
         logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
-
-
-
-
-    def ac_modify_game_spring(self):
-        if not self.spring_mode_is(SpringModeEnum.ADVANCED):
-            self.spring_adjuster.stop()
-            return
-        # Verify the device firmware meets the minimum version required to execute this effect
-        # Flag error and abort if not met
-        supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
-        if not supported:
-            self.flag_error('The Advanced/Custom Spring Override requires firmware v1.0.18 or higher.\n'
-                            f'The device is currently running version {G.device_firmware_version}\n'
-                            f'Please update your device firmware!')
-            return
-        if self.adv_spr_gains == 'none':
-            self.flag_error('Please open and configure the advanced spring gain settings')
-            return
-
-        gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.get('IAS', 0))
-
-        self.spring_adjuster.name = 'adv_spr'
-        self.spring_adjuster_y.set_coefficient(gains.get('y', 0))
-        self.spring_adjuster_x.set_coefficient(gains.get('x', 0))
-
-        if self.adv_spr_use_hardware_trim:
-            dt = perftracker.get_time_delta('override_spring_perf')
-            trim_step_size = self.override_spring_trim_rate * dt
-            # trim_step_size = 200 * dt
-            self.telem_data['_ovrd_spr_step'] = trim_step_size
-            self.telem_data['_ovrd_spr_dt'] = dt
-            # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
-            # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
-            input_data = HapticEffect.device.get_input()
-            x, y = input_data.axisXY()
-            current_buttons = input_data.getPressedButtons()
-
-            if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:
-                self.override_spring_cp0_y -= trim_step_size
-            elif self.override_spring_trim_up and self.override_spring_trim_up in current_buttons:
-                self.override_spring_cp0_y += trim_step_size
-
-            if self.override_spring_trim_left and self.override_spring_trim_left in current_buttons:
-                self.override_spring_cp0_x -= trim_step_size
-            elif self.override_spring_trim_right and self.override_spring_trim_right in current_buttons:
-                self.override_spring_cp0_x += trim_step_size
-
-            self.override_spring_cp0_x = round(utils.clamp(self.override_spring_cp0_x, -4096, 4096))
-            self.override_spring_cp0_y = round(utils.clamp(self.override_spring_cp0_y, -4096, 4096))
-        else:
-            self.override_spring_cp0_x = 0
-            self.override_spring_cp0_y = 0
-        offset = self.ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
-        self.g_y_offset = offset if offset is not None else 0
-        self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]
-        self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + self.g_y_offset))
-        self.spring_adjuster_x.set_offset(round(self.override_spring_cp0_x))
-
-        self.spring_adjuster.setCondition(self.spring_adjuster_y)
-        self.spring_adjuster.setCondition(self.spring_adjuster_x)
-        self.spring_adjuster.start()
 
     # deadzone behavior moved into DeadzoneMixIn
 
@@ -2087,8 +2112,6 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
             self.deadzone_updated = False
             self.deadzone_active = False
 
-
-
     def on_telemetry(self, telem_data): 
         aircraft_type = telem_data.get("AircraftClass", "Unknown")
         fx,fy = HapticEffect.device.get_input().forceXY()
@@ -2097,10 +2120,10 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
         self.telem_data['JoyXY'] = [jx, jy]
         # the methods should decide if they want to run based on the telemetry data
         if aircraft_type == "JetAircraft":
-           self.ac_update_ab_effect(telem_data)
+            self.ac_update_ab_effect(telem_data)
 
         elif aircraft_type == "PropellerAircraft":
-           self.ac_update_piston_engine_rumble(telem_data)
+            self.ac_update_piston_engine_rumble(telem_data)
 
         self.ac_update_aoa_reduction_force_effect(telem_data)
         self.ac_update_gforce_effect(telem_data)
@@ -2125,14 +2148,13 @@ class AircraftBase(GForceEffectMixIn, PedalSpringOverrideMixIn, HelicopterEffect
             if not self._sim_is_msfs() and not self._sim_is_xplane():
                 self.ac_override_pedal_spring(telem_data)
 
-
         self.ac_update_buffeting(telem_data)
         self.ac_update_cm_weapons(telem_data)
 
         hyd_loss = self.ac_update_hydraulic_loss_effect(telem_data)
         if not hyd_loss: 
             self.ac_update_ffb_forces(telem_data)
-        
+
         self.ac_modify_game_spring()
         self.ac_set_deadzone()
 
