@@ -1380,6 +1380,112 @@ class HydraulicLossMixIn(AircraftEffectUtilsBase):
         return True
 
 
+class DecelerationEffectMixIn(AircraftEffectUtilsBase):
+    """Mixin for deceleration/decel related configuration, runtime state and handler.
+
+    Moves the deceleration effect behavior out of AircraftBase so per-instance
+    state (last speed etc.) is initialised here and the AircraftBase remains a
+    thin delegator.
+    """
+    # Beta effects - set to 1 to enable
+    deceleration_effect_enable = 0
+    deceleration_effect_enable_areyoureallysure = 0
+    deceleration_max_force = 0.5
+    decel_scale_factor = 1
+    decel_invert_force = False
+    decel_airborne_disable: bool = True
+
+    def __init__(self, *args, **kwargs):
+        # cooperative init for mixin ordering
+        super().__init__(*args, **kwargs)
+        # per-instance runtime state used by decel effect
+        self.last_speed = None
+        self.last_y_gs = 0
+
+    def ac_update_decel_effect(self, telem_data):
+        if not self.deceleration_effect_enable or not self.is_joystick():
+            effects.dispose("decel")
+            return
+
+        wow = sum(telem_data.get("WeightOnWheels"), 0)
+        if not wow and self.decel_airborne_disable:
+            # When off ground, dispose effect and return
+            effects.dispose('decel')
+            return
+
+        y_gs = 0
+        last_y_gs = 0
+
+        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is("BMS"):
+            if self.decel_airborne_disable:
+                # We are on the ground, calculate using G vectors
+                y_gs = telem_data.get("ACCs", 0)[0]
+                last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
+            else:
+                # we are in the air, calculate G vector from rate of change of velocity since DCS Y g vector is world orientation
+
+                dt = perftracker.get_time_delta('decel')
+                speed = telem_data.get('TAS')
+
+                if not hasattr(self, 'last_speed'):
+                    self.last_speed = speed
+                if not hasattr(self, 'last_y_gs'):
+                    self.last_y_gs = 0
+                last_speed = self.last_speed
+                self.last_speed = speed
+
+                accel_g = 0
+                if last_speed is not None and dt > 0:
+                    delta_v = speed - last_speed
+                    acceleration = delta_v / dt  # m/s²
+                    accel_g = acceleration / 9.81  # convert to Gs
+
+                self.telem_data['decel_g'] = accel_g
+
+                y_gs = accel_g
+                last_y_gs = self.last_y_gs
+                self.last_y_gs = y_gs
+
+        elif self._sim_is("MSFS"):
+            y_gs = telem_data.get("AccBody")[2]
+            last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
+
+        elif self._sim_is_xplane():
+            y_gs = -telem_data.get("Gaxil")
+            last_y_gs = self._last_telem_data.get("Gaxil", 0)
+        delta_y = abs(y_gs) - abs(last_y_gs)
+
+        if not self.anything_has_changed("decel", y_gs):
+            return
+
+        if abs(delta_y) > 3:  # If the per-frame rate of change is greater than 3 Gs, we have likely crashed and telemetry is violently spiking.. do not play effect:
+            return
+
+        if not telem_data.get("TAS", 0):
+            effects.dispose("decel")
+            return
+        avg_y_gs = self.smoother.get_average("y_gs", y_gs, sample_size=8)
+
+        self.telem_data['decel_g_smooth'] = avg_y_gs
+
+        max_gs = self.deceleration_max_force
+
+        dir = 180 if not self.decel_invert_force else 0
+
+        if (avg_y_gs < -0.03 < 500):  # Don't play effect for very small, or very large (crash) force values, or no weight on wheels
+            if abs(avg_y_gs) > max_gs:
+                avg_y_gs = -max_gs
+
+            avg_y_gs = utils.clamp(abs(avg_y_gs) * self.decel_scale_factor, 0, 1)
+            if self._sim_is_dcs() and not wow:
+                sb = telem_data.get('speedbrakes_value')
+                avg_y_gs = avg_y_gs * sb
+            logging.debug(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
+            effects["decel"].constant(abs(avg_y_gs), direction=dir).start()
+        else:
+            effects.dispose("decel")
+
+
 class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
     adv_spr_override_enabled: bool = False   # deprecated
@@ -1476,6 +1582,7 @@ class AircraftBase(
     WeaponsEffectMixIn,
     DeadzoneMixIn,
     HydraulicLossMixIn,
+    DecelerationEffectMixIn,
     AdvancedSpringMixIn,
     MotionEffectsMixIn,
     BuffetingEffectMixIn,
@@ -1516,14 +1623,7 @@ class AircraftBase(
     # gear motion attributes moved to MotionEffectsMixIn
 
     ####
-    #### Beta effects - set to 1 to enable
-    deceleration_effect_enable = 0
-    deceleration_effect_enable_areyoureallysure = 0
-    deceleration_max_force = 0.5
-    decel_scale_factor = 1
-    decel_invert_force = False
-    decel_airborne_disable: bool = True
-    ###
+    #### Beta effects - set to 1 to enable (moved to DecelerationEffectMixIn)
 
     damper_coeff: int = 0
     inertia_coeff: int = 0
@@ -1667,50 +1767,10 @@ class AircraftBase(
         effects['touchdown'].constant(force, 180).start()
 
     def bms_taxi_bumps(self, telem_data):
-        """Generates a bump effect in response to bumpIntensity telemetry for Falcon BMS simulator"""
-        if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
-            effects.dispose("runway_bump0", "runway_bump1")
-            return
-        bump = telem_data.get("BumpIntensity")
-        if bump and self.anything_has_changed("BumpIntensity", bump):
-            intensity = utils.clamp(bump * self.runway_rumble_intensity, 0, 1)
-            effects['runway_bump0'].periodic(15, intensity * .75, direction=0, effect_type=EFFECT_SQUARE, duration=80).start()
-            effects['runway_bump1'].periodic(15, intensity, direction=0, effect_type=EFFECT_SQUARE, phase=180, duration=160).start()
+        super().bms_taxi_bumps(telem_data)
 
     def ac_update_runway_rumble(self, telem_data):
-        """Add wheel based rumble effects for immersion
-        Generates bumps/etc on touchdown, rolling, field landing etc
-        """
-        if self._sim_is_bms():
-            # Fake it since BMS does not have weight on wheels - only has 'bumps' telemetry
-            self.bms_taxi_bumps(telem_data)
-            return
-
-        if self.is_collective(): return
-        if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
-            effects.dispose("runway0", "runway1")
-            return
-
-        WoW = telem_data.get("WeightOnWheels", (0, 0, 0))  # nose, left, right - wheels
-        # get high pass filters for wheel shock displacement data and update with latest data
-        hp_f_cutoff_hz = 3
-        v1 = HPFs.get("center_wheel", hp_f_cutoff_hz).update((WoW[0])) * self.runway_rumble_intensity
-        v2 = HPFs.get("side_wheels", hp_f_cutoff_hz).update(WoW[1] - WoW[2]) * self.runway_rumble_intensity
-
-        v1 = utils.clamp_minmax(v1, 0.5)
-        v2 = utils.clamp_minmax(v2, 0.5)
-
-        # modulate constant effects for X and Y axis
-        # connect Y axis to nosewheel, X axis to the side wheels
-        tot_weight = sum(WoW)
-
-        # if telem_data.get("T", 0) > 2:  # wait a bit for data to settle
-        if tot_weight:
-            logging.debug(f"Runway Rumble : v1 = {v1}. v2 = {v2}")
-            effects["runway0"].constant(v1, utils.RandomDirectionModulator).start()
-            effects["runway1"].constant(v2, utils.RandomDirectionModulator).start()
-        else:
-            effects.dispose("runway0", "runway1")
+        super().ac_update_runway_rumble(telem_data)
 
     def ac_update_aoa_reduction_force_effect(self, telem_data):
         if not self.aoa_reduction_effect_enabled:
@@ -1739,92 +1799,8 @@ class AircraftBase(
         return
 
     def ac_update_decel_effect(self, telem_data):
-        if not self.deceleration_effect_enable or not self.is_joystick():
-            effects.dispose("decel")
-            return
-
-        wow = sum(telem_data.get("WeightOnWheels"), 0)
-        if not wow and self.decel_airborne_disable:
-            # When off ground, dispose effect and return
-            effects.dispose('decel')
-            return
-
-        y_gs = 0
-        last_y_gs = 0
-
-        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is("BMS"):
-            if self.decel_airborne_disable:
-                # We are on the ground, calculate using G vectors
-                y_gs = telem_data.get("ACCs", 0)[0]
-                last_y_gs = self._last_telem_data.get("ACCs", [0, 0, 0])[0]
-            else:
-                # we are in the air, calculate G vector from rate of change of velocity since DCS Y g vector is world orientation
-
-                # if telem_data.get('speedbrakes_value', 0) <= 0.1:
-                #     # don't play decel effect while in the air unless the airbrake is deployed
-                #     effects.dispose("decel")
-                #     return
-
-                dt = perftracker.get_time_delta('decel')
-                speed = telem_data.get('TAS')
-
-                if not hasattr(self, 'last_speed'):
-                    self.last_speed = speed
-                if not hasattr(self, 'last_y_gs'):
-                    self.last_y_gs = 0
-                last_speed = self.last_speed
-                self.last_speed = speed
-
-                accel_g = 0
-                if last_speed is not None and dt > 0:
-                    delta_v = speed - last_speed
-                    acceleration = delta_v / dt  # m/s²
-                    accel_g = acceleration / 9.81  # convert to Gs
-
-                self.telem_data['decel_g'] = accel_g
-
-                y_gs = accel_g
-                last_y_gs = self.last_y_gs
-                self.last_y_gs = y_gs
-
-        elif self._sim_is("MSFS"):
-            y_gs = telem_data.get("AccBody")[2]
-            last_y_gs = self._last_telem_data.get("AccBody", [0, 0, 0])[2]
-
-        elif self._sim_is_xplane():
-            y_gs = -telem_data.get("Gaxil")
-            last_y_gs = self._last_telem_data.get("Gaxil", 0)
-        delta_y = abs(y_gs) - abs(last_y_gs)
-
-        if not self.anything_has_changed("decel", y_gs):
-            return
-
-        if abs(delta_y) > 3:  # If the per-frame rate of change is greater than 3 Gs, we have likely crashed and telemetry is violently spiking.. do not play effect:
-            return
-
-        if not telem_data.get("TAS", 0):
-            effects.dispose("decel")
-            return
-        avg_y_gs = self.smoother.get_average("y_gs", y_gs, sample_size=8)
-
-        self.telem_data['decel_g_smooth'] = avg_y_gs
-
-        max_gs = self.deceleration_max_force
-
-        dir = 180 if not self.decel_invert_force else 0
-
-        if (avg_y_gs < -0.03 < 500):  # Don't play effect for very small, or very large (crash) force values, or no weight on wheels
-            if abs(avg_y_gs) > max_gs:
-                avg_y_gs = -max_gs
-
-            avg_y_gs = utils.clamp(abs(avg_y_gs) * self.decel_scale_factor, 0, 1)
-            if self._sim_is_dcs() and not wow:
-                sb = telem_data.get('speedbrakes_value')
-                avg_y_gs = avg_y_gs * sb
-            logging.debug(f"y_gs = {y_gs} avg_y_gs = {avg_y_gs}")
-            effects["decel"].constant(abs(avg_y_gs), direction=dir).start()
-        else:
-            effects.dispose("decel")
+        """Delegates to DecelerationEffectMixIn.ac_update_decel_effect"""
+        return super().ac_update_decel_effect(telem_data)
 
     # weapon/CM behavior moved into WeaponsEffectMixIn
 
