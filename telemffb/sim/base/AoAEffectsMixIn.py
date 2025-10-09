@@ -16,19 +16,20 @@ class AoAEffectsMixIn(AircraftEffectUtilsBase, AircraftParamsMixIn):
     This mixin keeps AoA-related state and methods together inside
     `aircraft_base.py` to simplify refactoring and avoid import cycles.
     """
+
+    aoa_effect_enabled: bool = False
+    aoa_effect_gain: float = 1.0
+    max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
+
+    # AoA reduction (stall-protection) effect state
+    aoa_reduction_effect_enabled = 0
+    aoa_reduction_max_force = 0.0
+    critical_aoa_start = 22
+    critical_aoa_max = 25
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Basic AoA effect state
-        self.aoa_effect_enabled: bool = False
-        self.aoa_effect_gain: float = 1.0
-        self.max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
-
-        # AoA reduction (stall-protection) effect state
-        self.aoa_reduction_effect_enabled = 0
-        self.aoa_reduction_max_force = 0.0
-        self.critical_aoa_start = 22
-        self.critical_aoa_max = 25
         self.smoother = utils.Smoother()
 
     def ac_update_aoa_reduction_force_effect(self, telem_data):
