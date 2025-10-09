@@ -71,7 +71,6 @@ class AircraftBase(
     HydraulicLossMixIn,
     DecelerationEffectMixIn,
     EngineRumbleMixIn,
-    FFBForcesMixIn,
     AoAEffectsMixIn,
     WindEffectMixIn,
     AdvancedSpringMixIn,
@@ -159,14 +158,6 @@ class AircraftBase(
 
 
 
-
-
-    ########################################
-    ######                            ######
-    ######    Prop Aircraft Effects   ######
-    ######                            ######
-    ########################################
-
     def ac_override_elevator_droop(self, telem_data):
         if not self.is_joystick():
             return
@@ -209,9 +200,7 @@ class AircraftBase(
             self.ac_override_elevator_droop(telem_data)
 
 
-        hyd_loss = self.ac_update_hydraulic_loss_effect(telem_data)
-        if not hyd_loss: 
-            self.ac_update_ffb_forces(telem_data)
+
 
 
 

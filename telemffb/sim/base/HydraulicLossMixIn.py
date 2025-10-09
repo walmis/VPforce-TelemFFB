@@ -1,8 +1,8 @@
 import telemffb.utils as utils
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+from telemffb.sim.base.FFBForcesMixIn import FFBForcesMixIn
 
-
-class HydraulicLossMixIn(AircraftEffectUtilsBase):
+class HydraulicLossMixIn(FFBForcesMixIn):
     """Mixin to handle hydraulic-loss related configuration, runtime state and effects."""
     enable_hydraulic_loss_effect: bool = False
     hydraulic_loss_threshold: float = 0.95
@@ -84,3 +84,9 @@ class HydraulicLossMixIn(AircraftEffectUtilsBase):
             self.effects["hyd_loss_friction"].friction(self.friction_coeff, self.friction_coeff).start()
 
         return True
+    
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)
+        hyd_loss = self.ac_update_hydraulic_loss_effect(telem_data)
+        if not hyd_loss: 
+            self.ac_update_ffb_forces(telem_data)
