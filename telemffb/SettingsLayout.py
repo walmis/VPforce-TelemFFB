@@ -1134,12 +1134,16 @@ class SettingsLayout(QGridLayout):
             labeltext = item["name"] if self.show_settings_names else item["displayname"]
             if '.0' not in item['order']:
                 # label.text_label.setText(f'<a href="#" style="color: {color};">{labeltext}</a>')
-                clickaction = "Expand" if item['name'] not in self.expanded_items else "Collapse"
+                can_expand = item['name'] not in self.expanded_items
+                clickaction = "Expand" if can_expand else "Collapse"
                 label.text_label.setToolTip(f'Click to {clickaction}')
                 label.setClickable(True)
                 label.clicked.connect(expand_button.click)
                 if item['datatype'] == 'group':
                     label.text_label.setStyleSheet(styles.GROUP_LABEL_STYLESHEET)
+                    symbol = "►" if can_expand else "▼"
+                    label.text_label.setText(f"{symbol} {labeltext}")
+
                 else:
                     label.text_label.setStyleSheet(styles.EXPAND_LABEL_STYLESHEET)
 

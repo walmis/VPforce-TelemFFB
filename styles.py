@@ -443,12 +443,12 @@ QLabel {
 
 QLabel:hover {
     color: #c473d9;
-    text-decoration: underline; 
+    /*text-decoration: underline; */
 }
 
 QLabel:!hover {
     color: #ab37c8;
-    text-decoration: underline; 
+    /*text-decoration: underline; */
 }
 """
 
