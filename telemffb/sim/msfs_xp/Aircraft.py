@@ -17,6 +17,7 @@
 #
 
 from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
+from telemffb.sim.msfs_xp.MsfsXpNosewheelShimmyMixIn import MsfsXpNosewheelShimmyMixIn
 from telemffb.sim.msfs_xp.MsfsXpTrimwheelMixIn import MsfsXpTrimwheelMixIn
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
@@ -31,13 +32,14 @@ from telemffb.utils import overrides
 from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.base.AoAEffectsMixIn import AoAEffectsMixIn
-from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 import logging
 
+
 class Aircraft(
     MsfsXpTrimwheelMixIn, 
-    MfsfXpSteeringFrictionEffectMixIn
+    MfsfXpSteeringFrictionEffectMixIn,
+    MsfsXpNosewheelShimmyMixIn
 ):
     """Base class for Aircraft based FFB"""
 
@@ -86,10 +88,7 @@ class Aircraft(
 
     ######## PEDAL SPECIFIC
 
-    nosewheel_shimmy = 0
-    nosewheel_shimmy_intensity = 0.15
-    nosewheel_shimmy_min_speed = 7
-    nosewheel_shimmy_min_brakes = 0.6
+
 
 
 
@@ -175,28 +174,7 @@ class Aircraft(
         self.last_trimwheel_y = None
 
 
-    def msfs_update_nosewheel_shimmy(self, telem_data):
-        curve = 2.5
-        # freq = 8
-        freq_lo = 8
-        freq_hi = 16
-        brakes = telem_data.get("Brakes", (0, 0))
-        on_ground = telem_data.get("SimOnGround", 0)
-        wow = sum(telem_data.get("WeightOnWheels", 0))
-        if not wow or not on_ground:
-            self.effects.dispose("nw_shimmy")
-            return
-        gs = telem_data.get("GroundSpeed", 0)
 
-        freq = int(utils.scale(gs, (self.nosewheel_shimmy_min_speed, self.nosewheel_shimmy_min_speed*3), (freq_lo, freq_hi)))
-        logging.debug(f"brakes = {brakes}")
-        avg_brakes = sum(brakes) / len(brakes)
-        if avg_brakes >= self.nosewheel_shimmy_min_brakes and gs > self.nosewheel_shimmy_min_speed:
-            shimmy = utils.non_linear_scaling(avg_brakes, self.nosewheel_shimmy_min_brakes, 1.0, curvature=curve) * self.nosewheel_shimmy_intensity
-            logging.debug(f"Nosewheel Shimmy intensity calculation: (BrakesPct:{avg_brakes} | GS:{gs} | RT Intensity: {shimmy}")
-            self.effects["nw_shimmy"].periodic(freq, shimmy, 90).start()
-        else:
-            self.effects.dispose("nw_shimmy")
 
 
 
@@ -308,10 +286,9 @@ class Aircraft(
         self.msfs_update_stick_shaker(telem_data)
         self.msfs_update_flight_controls(telem_data)
 
-        if self._sim_is_msfs() and self.is_pedals():
-            if self.nosewheel_shimmy and not telem_data.get("IsTaildragger", 0):
-                self.msfs_update_nosewheel_shimmy(telem_data)
-            self.msfs_update_steering_friction_effect(telem_data)
+
+        self.msfs_update_nosewheel_shimmy(telem_data)
+        self.msfs_update_steering_friction_effect(telem_data)
 
     @overrides(AircraftBase)
     def on_timeout(self):

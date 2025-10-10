@@ -14,6 +14,9 @@ class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
     # end of user parameters
 
     def msfs_update_steering_friction_effect(self, telem_data):
+        if not self._sim_is_msfs(): return
+        if not self.is_pedals(): return
+
         if not self.steering_friction:
             if self.friction_effect_overridden and self.effects['friction'].name == 'steering_friction':
                 # If effect is disabled but was previously active, clean up and pass override control back to base friction effect
@@ -65,3 +68,7 @@ class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
             if self.friction_effect_overridden and self.effects['friction'].name == 'steering_friction':
                 self.friction_effect_overridden = False
                 self.effects["friction"].destroy()
+
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)
+        self.msfs_update_steering_friction_effect(telem_data)
