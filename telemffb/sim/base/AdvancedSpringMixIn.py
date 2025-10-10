@@ -25,6 +25,7 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     def __init__(self, *args, **kwargs):
         # Ensure cooperative init ordering
         super().__init__(*args, **kwargs)
+        self.__firmware_supported = None
         self.spring_mode = SpringModeEnum.NONE.name
 
         # per-instance state used by advanced spring override
@@ -46,8 +47,9 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
             return
         # Verify the device firmware meets the minimum version required to execute this effect
         # Flag error and abort if not met
-        supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
-        if not supported:
+        if self.__firmware_supported is None:
+            self.__firmware_supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+        if not self.__firmware_supported:
             self.flag_error('The Advanced/Custom Spring Override requires firmware v1.0.18 or higher.\n'
                             f'The device is currently running version {G.device_firmware_version}\n'
                             f'Please update your device firmware!')
