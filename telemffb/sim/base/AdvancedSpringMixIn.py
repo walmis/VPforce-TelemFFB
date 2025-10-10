@@ -9,6 +9,7 @@ perftracker = utils.PerformanceTracker()
 
 class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
+    # user parameters
     adv_spr_override_enabled: bool = False   # deprecated
     adv_spr_gains: str = 'none'
     adv_spr_use_hardware_trim: bool = False
@@ -21,6 +22,7 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
     override_spring_trim_rate: int = 200
     override_spring_cp0_x: float = 0.0
     override_spring_cp0_y: float = 0.0
+    # end of user parameters
 
     def __init__(self, *args, **kwargs):
         # Ensure cooperative init ordering
@@ -35,8 +37,6 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
         self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
         # the spring_adjuster effect object (wrapper) from the global effects dispenser
         self.spring_adjuster = self.effects['spring_adjuster'].spring_adjuster()
-
-        self.g_y_offset = 0
 
     def spring_mode_is(self, mode):
         return mode.name == self.spring_mode
@@ -93,9 +93,9 @@ class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
             self.override_spring_cp0_y = 0
             
         offset = self.ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
-        self.g_y_offset = offset if offset is not None else 0
-        self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), self.g_y_offset]
-        self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + self.g_y_offset))
+        g_y_offset = offset if offset is not None else 0
+        self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), g_y_offset]
+        self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + g_y_offset))
         self.spring_adjuster_x.set_offset(round(self.override_spring_cp0_x))
 
         self.spring_adjuster.setCondition(self.spring_adjuster_y)
