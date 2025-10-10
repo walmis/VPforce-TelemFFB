@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import override
 
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
@@ -111,7 +112,7 @@ class GliderAircraft(Aircraft):
         self.force_trim_x_offset = self.stick_center[0]
         self.force_trim_y_offset = self.stick_center[1]
 
-    @overrides(Aircraft)
+    @override
     def on_telemetry(self, telem_data):
         pass
         if telem_data.get("N") == None:
@@ -123,9 +124,8 @@ class GliderAircraft(Aircraft):
         if self.is_trimwheel():
             return
 
-        if self.spring_mode_is(SpringModeEnum.CNTR_FT):
-            self.msfs_update_force_trim(telem_data, x_axis=self.aileron_force_trim,
-                                                    y_axis=self.elevator_force_trim)
+        self.msfs_update_force_trim(telem_data, x_axis=self.aileron_force_trim,
+                                                y_axis=self.elevator_force_trim)
 
         if self.is_collective():
             self.msfs_override_collective_spring()

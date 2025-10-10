@@ -16,6 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import override
 from telemffb.sim.msfs_xp.MsfsXpHeliControlsMixIn import MsfsXpHeliControlsMixIn
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
@@ -84,14 +85,14 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         self.cpO_x = 0
         self.cpO_y = 0
 
-    @overrides(Aircraft)
+    @override
     def on_timeout(self):
         super().on_timeout()
         self.cyclic_spring_init = 0
         self.collective_init = 0
         self.pedals_init = 0
 
-    @overrides(Aircraft)
+    @override
     def on_telemetry(self, telem_data):
         self.speedbrake_motion_intensity = 0.0
         if telem_data.get("N") == None:
@@ -103,12 +104,11 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         if self.is_trimwheel():
             return
 
-        self.msfs_update_heli_controls(telem_data)
         self.msfs_update_collective(telem_data)
         # # self._update_cyclic_trim(telem_data)
         self.msfs_update_pedals(telem_data)
 
-    @overrides(Aircraft)
+    @override
     def msfs_update_trimwheel(self, *args, **kwargs):
         pass
 

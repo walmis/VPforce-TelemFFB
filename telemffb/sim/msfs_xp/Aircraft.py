@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import override
 
 from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
 from telemffb.sim.msfs_xp.MsfsXpNosewheelShimmyMixIn import MsfsXpNosewheelShimmyMixIn
@@ -196,14 +197,14 @@ class Aircraft(
     def find_xp_gear_orientation(self, x, y, z):
         pass
 
-    @overrides(AircraftBase)
+    @override
     def on_event(self, event, *args):
         logging.info(f"on_event {event} {args}")
 
         if event == "STOP":
             self.on_timeout()
 
-    @overrides(AircraftBase)
+    @override
     def on_telemetry(self, telem_data):
         self.effects["pause_spring"].destroy()
 
@@ -244,7 +245,7 @@ class Aircraft(
         self.msfs_update_flight_controls(telem_data)
 
 
-    @overrides(AircraftBase)
+    @override
     def on_timeout(self):
         if not self.effects["pause_spring"].started:
             super().on_timeout()

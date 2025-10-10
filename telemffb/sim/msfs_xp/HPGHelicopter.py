@@ -16,6 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import override
 from .Helicopter import Helicopter
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
@@ -315,6 +316,7 @@ class HPGHelicopter(Helicopter):
         # Trimming is handled by the AFCS integration - override parent class function
         pass
 
+    @override
     def msfs_update_pedals(self, telem_data):
 
         if telem_data.get("FFBType") != 'pedals':

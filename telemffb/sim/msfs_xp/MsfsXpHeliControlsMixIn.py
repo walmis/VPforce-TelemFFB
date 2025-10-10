@@ -3,7 +3,7 @@ from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
 from telemffb.utils import clamp
-
+from typing import override
 import logging
 
 
@@ -23,7 +23,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
     def msfs_update_heli_controls(self, telem_data):
         if self.is_trimwheel(): return
-        
+
         ffb_type = telem_data.get("FFBType", "joystick")
         if self._sim_is_msfs():
             ap_active = telem_data.get("APMaster", 0)
@@ -345,3 +345,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         self.cyclic_physical_trim_y_offs = round(cyclic_y_trim * 4096)
         self.cyclic_virtual_trim_x_offs = cyclic_x_trim - (cyclic_x_trim * self.joystick_trim_follow_gain_virtual_x)
         self.cyclic_virtual_trim_y_offs = cyclic_y_trim - (cyclic_y_trim * self.joystick_trim_follow_gain_virtual_y)
+
+    @override
+    def on_telemetry(self, telem_data: dict):
+        super().on_telemetry(telem_data)
+        self.msfs_update_heli_controls(telem_data)
