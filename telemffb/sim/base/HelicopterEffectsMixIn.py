@@ -8,7 +8,7 @@ from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 
 perftracker = utils.PerformanceTracker()
 
-class HelicopterEffectsMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
+class HelicopterEffectsMixIn(DynamicSpringMixin):
     """Mixin for helicopter-specific configuration and effects."""
 
     rotor_blade_count: int = 2

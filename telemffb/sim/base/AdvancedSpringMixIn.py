@@ -7,7 +7,7 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 perftracker = utils.PerformanceTracker()
 
-class AdvancedSpringMixIn(AircraftEffectUtilsBase, DynamicSpringMixin):
+class AdvancedSpringMixIn(DynamicSpringMixin):
     """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
     # user parameters
     adv_spr_override_enabled: bool = False   # deprecated

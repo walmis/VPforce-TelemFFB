@@ -6,7 +6,7 @@ from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 from telemffb.sim.base.AircraftParamsMixIn import AircraftParamsMixIn
 
 
-class PedalSpringOverrideMixIn(AircraftEffectUtilsBase, DynamicSpringMixin, AircraftParamsMixIn):
+class PedalSpringOverrideMixIn(DynamicSpringMixin, AircraftParamsMixIn):
     '''Pedal spring override and trimming mixin.'''
 
     pedal_spring_gain: float = 1.0
