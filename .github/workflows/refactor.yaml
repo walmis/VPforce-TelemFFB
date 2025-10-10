@@ -1,9 +1,7 @@
 name: Package Application with Pyinstaller
 
-on: 
-  push:
-    branches:
-      - 'refactor'
+on:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,7 +14,7 @@ jobs:
         echo VERSION = \"`git describe --always --abbrev=8 --dirty`\" > version.py
 
     - name: Package Application
-      uses: walmis/pyinstaller-action-windows@py311
+      uses: walmis/pyinstaller-action-windows@py312
       with:
         path: .
             
