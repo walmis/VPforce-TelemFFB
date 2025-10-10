@@ -19,6 +19,8 @@
 from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
 from telemffb.sim.msfs_xp.MsfsXpNosewheelShimmyMixIn import MsfsXpNosewheelShimmyMixIn
 from telemffb.sim.msfs_xp.MsfsXpTrimwheelMixIn import MsfsXpTrimwheelMixIn
+from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
+
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect, EFFECT_SQUARE
@@ -37,9 +39,11 @@ import logging
 
 
 class Aircraft(
+    AircraftBase,
     MsfsXpTrimwheelMixIn, 
     MfsfXpSteeringFrictionEffectMixIn,
-    MsfsXpNosewheelShimmyMixIn
+    MsfsXpNosewheelShimmyMixIn,
+    MsfsXpFlightControlsMixIn
 ):
     """Base class for Aircraft based FFB"""
 
@@ -84,29 +88,11 @@ class Aircraft(
 
 
 
-
-
-    ######## PEDAL SPECIFIC
-
-
-
-
-
-    ######## TRIMWHEEL SPECIFIC
-
-
-    trim_active = False
-
     turbulence_effect_enable: bool = False
     turbulence_hpf_alpha: float = 0.0
     turbulence_smoothing_alpha: float = 0.0
     turbulence_sensitivity: float = 0.0
     turbulence_intensity: float = 0.0
-
-
-    # trimwheel settings
-
-
 
 
     def __init__(self, name, **kwargs) -> None:
@@ -121,27 +107,7 @@ class Aircraft(
 
         self.const_force = HapticEffect().constant(0, 0)
 
-        # aileron_max_deflection = 20.0*0.01745329
-        self.elevator_max_deflection = 12.0 * 0.01745329
-        # rudder_max_deflection = 20.0*0.01745329
 
-        self.stall_AoA = 18.0 * 0.01745329
-        self.pusher_start_AoA = 900.0 * 0.01745329
-        self.pusher_working_angle = 900.0 * 0.01745329
-        self.wing_shadow_AoA = 900.0 * 0.01745329
-        self.wing_shadow_angle = 900.0 * 0.01745329
-        self.stick_shaker_AoA = 16.0 * 0.01745329
-
-        # FFB force value per lateral G
-
-        self.aoa_gain = 0.3
-
-
-
-
-        # scale the dynamic pressure to ffb friendly values
-        self.dyn_pressure_scale = 0.005
-        self.max_aoa_cf_force: float = 0.2  # CF force sent to device at %stall_aoa
 
         self.cyclic_trim_release_active = 0
         self.cyclic_spring_init = 0
@@ -157,21 +123,12 @@ class Aircraft(
         self.force_trim_x_offset = 0
         self.force_trim_y_offset = 0
 
-
-
         self.enable_stick_shaker = 0
         self.stick_shaker_intensity = 0
-
-
-
-
-
-        self.trimwheel_init = False
 
         self.spring_mode = SpringModeEnum.BASIC.name
 
         self.last_pedal_x = 0
-        self.last_trimwheel_y = None
 
 
 
@@ -286,9 +243,6 @@ class Aircraft(
         self.msfs_update_stick_shaker(telem_data)
         self.msfs_update_flight_controls(telem_data)
 
-
-        self.msfs_update_nosewheel_shimmy(telem_data)
-        self.msfs_update_steering_friction_effect(telem_data)
 
     @overrides(AircraftBase)
     def on_timeout(self):

@@ -1,14 +1,18 @@
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.aircraft_base import AircraftBase
+from telemffb.sim.base.AircraftEffectUtilsBase  import AircraftEffectUtilsBase
+
 from telemffb.sim.msfs_xp.MsfsXpSimConnectMixIn import MsfsXpSimConnectMixIn
+from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
+
 from telemffb.utils import clamp
 
 
 import logging
 
 
-class MsfsXpFBWFlightControlsMixIn(AircraftBase, MsfsXpSimConnectMixIn):
+class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
     """Mixin for MSFS FBW flight control handling."""
 
     # user parameters

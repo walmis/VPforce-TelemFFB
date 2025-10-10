@@ -52,7 +52,6 @@ G.effects = utils.Dispenser(HapticEffect)
 
 
 class AircraftBase(
-    GForceEffectMixIn,
     PedalSpringOverrideMixIn,
     HelicopterEffectsMixIn,
     WeaponsEffectMixIn,

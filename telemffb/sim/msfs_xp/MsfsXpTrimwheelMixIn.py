@@ -20,6 +20,13 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
     # trimwheel_spring_coeff_y = 0.0  # not used
     # end of user parameters
 
+    def __init__(self):
+        super().__init__()
+        self.trimwheel_init = 0
+        self.last_trimwheel_y = None
+        self.last_pos_y_pos = 0.0
+        self.trim_active = False
+
     def msfs_update_trimwheel(self, telem_data):
         if not self.is_trimwheel():
             return

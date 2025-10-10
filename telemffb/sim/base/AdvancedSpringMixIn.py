@@ -4,10 +4,11 @@ import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
 
 perftracker = utils.PerformanceTracker()
 
-class AdvancedSpringMixIn(DynamicSpringMixin):
+class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
     # user parameters
     adv_spr_override_enabled: bool = False   # deprecated
