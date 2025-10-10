@@ -23,6 +23,7 @@ with additional FFB effects.
 """
 
 import ctypes
+import functools
 import inspect
 import logging
 import os
@@ -1003,6 +1004,9 @@ class HapticEffect(Destroyable):
         self.modulator = None
         self.effect_type = None
         self._conds = {}
+        # Lazy initialization state
+        self._pending_create = None  # function for creating the effect (lazy initialization)
+        self._pending_conditions = {} # functions for setting condition (lazy initialization)
 
     def __repr__(self):
         return f"HapticEffect({self._h_effect})"
@@ -1022,6 +1026,18 @@ class HapticEffect(Destroyable):
 
         return cls.device
 
+    def _ensure_effect_created(self):
+        """Create the effect if it hasn't been created yet"""
+        if not self._h_effect and self._pending_create:
+            # Execute the pending create function
+            if self._pending_create():
+                # Clear the pending create function
+                self._pending_create = None
+                # If there are pending conditions to set, do it now
+                for val in self._pending_conditions.values():
+                    val()
+                self._pending_conditions.clear()
+
     def setCondition(self, cond : FFBReport_SetCondition) -> Self:
         assert self.effect_type in [
             EFFECT_SPRING,
@@ -1031,32 +1047,51 @@ class HapticEffect(Destroyable):
             EFFECT_SPRING_ADJUSTER,
         ]
 
-        if not self._h_effect:
-            self._conditional_effect(self.effect_type)
-
-        self._h_effect.setCondition(cond)
+        if self._h_effect:
+            self._h_effect.setCondition(cond)
+        else:
+            self._pending_conditions[cond.effectBlockIndex] = lambda: self._h_effect.setCondition(cond)
 
         return self
 
     def _conditional_effect(self, effect_type, coef_x = None, coef_y= None) -> Self:
+        self.effect_type = effect_type
+
         if not self._h_effect:
-            self._h_effect = self.device.create_effect(effect_type)
-            self.effect_type = effect_type
-            if not self._h_effect:
-                return self
-            self._h_effect.setEffect() # initialize defaults
+            # Store the creation function
+            def create_and_setup():
+                self._h_effect = self.device.create_effect(effect_type)
+                if not self._h_effect:
+                    return False
+                self._h_effect.setEffect() # initialize defaults
 
-        if coef_x is not None:
-            cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
-                                            positiveCoefficient=int(coef_x),
-                                            negativeCoefficient=int(coef_x))
-            self._h_effect.setCondition(cond_x)
+                if coef_x is not None:
+                    cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
+                                                    positiveCoefficient=int(coef_x),
+                                                    negativeCoefficient=int(coef_x))
+                    self._h_effect.setCondition(cond_x)
 
-        if coef_y is not None:
-            cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
-                                            positiveCoefficient=int(coef_y),
-                                            negativeCoefficient=int(coef_y))
-            self._h_effect.setCondition(cond_y)
+                if coef_y is not None:
+                    cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
+                                                    positiveCoefficient=int(coef_y),
+                                                    negativeCoefficient=int(coef_y))
+                    self._h_effect.setCondition(cond_y)
+                return True
+
+            self._pending_create = create_and_setup
+        else:
+            # Effect already exists, update coefficients directly
+            if coef_x is not None:
+                cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
+                                                positiveCoefficient=int(coef_x),
+                                                negativeCoefficient=int(coef_x))
+                self._h_effect.setCondition(cond_x)
+
+            if coef_y is not None:
+                cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
+                                                positiveCoefficient=int(coef_y),
+                                                negativeCoefficient=int(coef_y))
+                self._h_effect.setCondition(cond_y)
 
         return self
 
@@ -1076,18 +1111,27 @@ class HapticEffect(Destroyable):
         return self._conditional_effect(EFFECT_SPRING_ADJUSTER, coef_x, coef_y) 
 
     def periodic(self, frequency, magnitude:float, direction:float, *args, effect_type=EFFECT_SINE, duration=0, **kwargs):
-        if not self._h_effect:
-            self._h_effect = self.device.create_effect(effect_type)
-            self.effect_type = effect_type
-            if not self._h_effect: 
-                return self
-
+        # Handle direction modulator
         if isinstance(direction, type) and issubclass(direction, DirectionModulator):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
 
-        self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+        if not self._h_effect:
+            # Store the creation and setup function
+            def create_and_setup():
+                self._h_effect = self.device.create_effect(effect_type)
+                self.effect_type = effect_type
+                if not self._h_effect: 
+                    return False
+                self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+                return True
+            
+            self._pending_create = create_and_setup
+        else:
+            # Effect exists, update it directly
+            self._h_effect.setPeriodic(frequency, magnitude, direction, duration=duration, **kwargs)
+
         return self
 
     def constant(self, magnitude:float, direction:float, *args, **kwargs):
@@ -1098,17 +1142,27 @@ class HapticEffect(Destroyable):
         :param direction_deg: Angle in degrees
         :type direction_deg: float
         """
-        if not self._h_effect:
-            self._h_effect = self.device.create_effect(EFFECT_CONSTANT)
-            self.effect_type = EFFECT_CONSTANT
-            if not self._h_effect: return self
-
+        # Handle direction modulator
         if isinstance(direction, type) and issubclass(direction, DirectionModulator):
             if not self.modulator:
                 self.modulator = direction(*args, **kwargs)
             direction = self.modulator.update()
 
-        self._h_effect.setConstantForce(magnitude, direction, **kwargs)
+        if not self._h_effect:
+            # Store the creation and setup function
+            def create_and_setup():
+                self._h_effect = self.device.create_effect(EFFECT_CONSTANT)
+                self.effect_type = EFFECT_CONSTANT
+                if not self._h_effect: 
+                    return False
+                self._h_effect.setConstantForce(magnitude, direction, **kwargs)
+                return True
+            
+            self._pending_create = create_and_setup
+        else:
+            # Effect exists, update it directly
+            self._h_effect.setConstantForce(magnitude, direction, **kwargs)
+
         return self
 
     @property
@@ -1116,11 +1170,14 @@ class HapticEffect(Destroyable):
         return self._h_effect and self._h_effect.started
 
     def start(self, force=False, **kw):
+        # Ensure effect is created before starting
+        self._ensure_effect_created()
 
         if self._h_effect and (not self.started or force):
-            caller_frame = inspect.currentframe().f_back
-            caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is starting effect {self._h_effect.effect_id}")
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                caller_frame = inspect.currentframe().f_back
+                caller_name = caller_frame.f_code.co_name
+                logging.debug(f"The function {caller_name} is starting effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""
             logging.info(f"Start effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.start(**kw)
@@ -1135,9 +1192,10 @@ class HapticEffect(Destroyable):
         :type destroy_after: int, optional
         """
         if self._h_effect and self._h_effect.started:
-            caller_frame = inspect.currentframe().f_back
-            caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                caller_frame = inspect.currentframe().f_back
+                caller_name = caller_frame.f_code.co_name
+                logging.debug(f"The function {caller_name} is stopping effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
             logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.stop()
@@ -1153,13 +1211,17 @@ class HapticEffect(Destroyable):
 
     def destroy(self):
         if self._h_effect:
-            caller_frame = inspect.currentframe().f_back
-            caller_name = caller_frame.f_code.co_name
-            logging.debug(f"The function {caller_name} is destroying effect {self._h_effect.effect_id}")
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                caller_frame = inspect.currentframe().f_back
+                caller_name = caller_frame.f_code.co_name
+                logging.debug(f"The function {caller_name} is destroying effect {self._h_effect.effect_id}")
             name = f" (\"{self.name}\")" if self.name else ""  
             logging.info(f"Destroying effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.destroy()
             self._h_effect = None
+        
+        # Clear pending operation
+        self._pending_create = None
 
     def __del__(self):
         self.destroy()
