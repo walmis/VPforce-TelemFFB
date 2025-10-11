@@ -24,11 +24,8 @@ class JetAircraft(Aircraft):
     """Generic Class for Jets"""
     # flaps_motion_intensity = 0.0
 
-    _ab_is_playing = 0
-
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
-    # run on every telemetry frame
 
     @override
     def on_telemetry(self, telem_data):

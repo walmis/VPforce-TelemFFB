@@ -11,6 +11,7 @@ perftracker = utils.PerformanceTracker()
 class HelicopterEffectsMixIn(DynamicSpringMixin):
     """Mixin for helicopter-specific configuration and effects."""
 
+    # user parameters
     rotor_blade_count: int = 2
 
     # Engine/rotor rumble
@@ -48,6 +49,8 @@ class HelicopterEffectsMixIn(DynamicSpringMixin):
     collective_ft_ovd_trim_up = 0
     collective_ft_ovd_cp0_y = 4096
     collective_ft_use_master_buttons: bool = False
+    # end of user parameters
+    
 
     ########################################
     ######                            ######

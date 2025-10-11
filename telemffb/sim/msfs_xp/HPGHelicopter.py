@@ -31,6 +31,7 @@ import time
 perftracker = PerformanceTracker()
 
 class HPGHelicopter(Helicopter):
+    # user parameters 
     sema_yaw_max = 5
     afcs_step_size = 2
     collective_init = 0
@@ -53,6 +54,7 @@ class HPGHelicopter(Helicopter):
     hands_on_force_threshold = 0.03
     handsoff_force_duration = 500  # ms
     handson_force_debug = False
+    # end of user parameters
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)

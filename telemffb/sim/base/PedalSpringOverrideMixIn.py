@@ -9,6 +9,7 @@ from telemffb.sim.base.AircraftParamsMixIn import AircraftParamsMixIn
 class PedalSpringOverrideMixIn(DynamicSpringMixin, AircraftParamsMixIn):
     '''Pedal spring override and trimming mixin.'''
 
+    # user parameters
     pedal_spring_gain: float = 1.0
     pedal_trimming_enabled: bool = False
     pedal_dampening_gain = 0
@@ -19,6 +20,7 @@ class PedalSpringOverrideMixIn(DynamicSpringMixin, AircraftParamsMixIn):
     pedal_ft_reset_button: int = 0
     pedal_ft_damper_enabled: bool = False
     pedal_ft_damper_force: float = 0.0
+    # end of user parameters
 
     def __init__(self):
         super().__init__()

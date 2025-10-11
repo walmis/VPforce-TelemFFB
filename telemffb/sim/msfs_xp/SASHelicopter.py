@@ -22,6 +22,7 @@ from telemffb.hw.ffb_rhino import HapticEffect
 from .Helicopter import Helicopter
 
 class SASHelicopter(Helicopter):
+    # user parameters
     afcs_step_size = 2
     collective_init = 0
     collective_ap_spring_gain = 1
@@ -38,6 +39,7 @@ class SASHelicopter(Helicopter):
     send_individual_hands_on = 0
     vrs_effect_enable: bool = True
     vrs_effect_intensity = 0
+    # end of user parameters
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)

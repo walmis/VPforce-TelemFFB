@@ -11,9 +11,11 @@ from typing import Dict
 class WindEffectMixIn(AircraftEffectUtilsBase):
     """Local mixin to encapsulate wind effect state and logic."""
 
+    # user parameters
     wind_effect_enabled: int = 0
     wind_effect_scaling: int = 0
     wind_effect_max_intensity: int = 0
+    # end of user parameters
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -72,9 +72,6 @@ class Aircraft(
     spring_centered_elev_gain = 0.5
     spring_centered_ailer_gain = 0.5
 
-
-
-
     force_trim_enabled = 0
     include_dynamic_stick_forces = True
 
@@ -86,8 +83,6 @@ class Aircraft(
     center_spring_on_pause = False
 
     use_legacy_bindings = False
-
-
 
     turbulence_effect_enable: bool = False
     turbulence_hpf_alpha: float = 0.0

@@ -24,9 +24,11 @@ from telemffb.util.conversions import math
 import math
 
 class FlyInsideHelicopter(Helicopter):
+    # user parameters
     FI_vibration_enable = True
     FI_vibration_intensity = 0
     FI_vibration_expo = 0
+    # end of user parameters
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)

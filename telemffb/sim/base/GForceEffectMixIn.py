@@ -9,6 +9,7 @@ import logging
 
 
 class GForceEffectMixIn(AircraftEffectUtilsBase):
+    # user parameters
     # gforce_effect_master: bool = False
     # gforce_effect_enable: bool = False
     gforce_effect_invert_force = 0  # case where "180" degrees does not equal "away from pilot"
@@ -31,6 +32,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
     new_gforce_effect_deflection_factor_neg = 1.0
 
     gforce_effect_adv_curve: str = "none"
+    # end of user parameters
 
     def __init__(self):
         super().__init__()

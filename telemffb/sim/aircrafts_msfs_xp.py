@@ -16,7 +16,7 @@
 #
 
 
-#import submodules here to register them
+#import submodules here to register them at module level
 from .msfs_xp.Aircraft import Aircraft
 from .msfs_xp.JetAircraft import JetAircraft
 from .msfs_xp.PropellerAircraft import PropellerAircraft

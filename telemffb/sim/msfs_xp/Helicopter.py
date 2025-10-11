@@ -33,6 +33,8 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
     """Generic Class for Helicopters"""
+
+    # user parameters
     buffeting_intensity = 0.0
 
     etl_start_speed = 6.0  # m/s
@@ -73,8 +75,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
     cyclic_physical_trim_y_offs = 0
     cyclic_virtual_trim_x_offs = 0
     cyclic_virtual_trim_y_offs = 0
-
-
+    # end user parameters
 
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)

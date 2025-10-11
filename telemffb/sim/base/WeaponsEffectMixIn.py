@@ -11,6 +11,7 @@ class WeaponsEffectMixIn(AircraftEffectUtilsBase):
     """Mixin for weapon, gunfire and countermeasure effects."""
 
     # weapon / CM related config
+    # user parameters
     gun_vibration_intensity: float = 0.12  # peak gunfire vibration intensity, 0 to disable
     cm_vibration_intensity: float = 0.12  # peak countermeasure release vibration intensity, 0 to disable
     weapon_release_intensity: float = 0.12  # peak weapon release vibration intensity, 0 to disable
@@ -19,6 +20,7 @@ class WeaponsEffectMixIn(AircraftEffectUtilsBase):
     gunfire_effect_enabled: bool = False
     countermeasure_effect_enabled: bool = False
     weapon_release_effect_enabled: bool = False
+    # end of user parameters
 
     def ac_update_cm_weapons(self, telem):
         payload = telem.get("PayloadInfo")

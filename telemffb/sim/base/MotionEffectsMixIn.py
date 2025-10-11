@@ -17,6 +17,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
     """
 
     # Motion / haptic configuration (defaults moved from AircraftBase)
+    # user parameters
     speedbrake_motion_intensity : float = 0.12
     speedbrake_buffet_intensity : float = 0.15
     speedbrake_speed_thresh :   float = 80 * kt2ms
@@ -62,6 +63,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
     touchdown_effect_enabled: bool = False
     touchdown_effect_max_force: float = 0.5
     touchdown_effect_max_gs: float = 3.0
+    # end of user parameters
 
     def __init__(self, *args, **kwargs):
         # Ensure cooperative multiple-inheritance init ordering

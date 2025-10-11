@@ -4,6 +4,8 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 class FFBForcesMixIn(AircraftEffectUtilsBase):
     # FFB override state
+
+    # user parameters
     keep_forces_on_pause: bool = True
     enable_damper_ovd: bool = False
     damper_force: float = 0.0
@@ -11,6 +13,7 @@ class FFBForcesMixIn(AircraftEffectUtilsBase):
     inertia_force: float = 0.0
     enable_friction_ovd: bool = False
     friction_force: float = 0.0
+    # end of user parameters
 
     """Mixin to encapsulate FFB override forces (damper/inertia/friction) state and logic.
 
