@@ -142,14 +142,6 @@ def debug_caller_args(color):
 
     dbprint(color, f'"{callee}" called by "{caller}" Args: {arg_list}')
 
-def overrides(interface_class):
-    """Decorator to ensure that a method in a subclass overrides a method in its superclass or interface."""
-
-    def overrider(method):
-        assert method.__name__ in dir(interface_class)
-        return method
-    return overrider
-
 def millis() -> int:
     """return millisecond timer
 
