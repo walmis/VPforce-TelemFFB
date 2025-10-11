@@ -18,7 +18,7 @@
 
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, override
 
 from PyQt6 import QtCore
 
@@ -30,7 +30,6 @@ from telemffb.telem.SharedMemThread import SharedMemThread
 from telemffb.telem.SimConnectSock import SimConnectSock
 from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.telem.BMSTelemManager import BMSManager
-from telemffb.utils import overrides
 
 
 class SimTelemListener(QtCore.QObject):
@@ -87,7 +86,7 @@ class SimIL2(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("IL2")
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
@@ -102,13 +101,13 @@ class SimIL2(SimTelemListener):
         self.telem.start()
         self.started = True
 
-    @overrides(SimTelemListener)
+    @override
     def validate(self):
         il2_path = G.system_settings.get('pathIL2')
         logging.info("Validating IL2 Config")
         utils.analyze_il2_config(il2_path, port=self.port_udp, window=G.main_window)
 
-    @overrides(SimTelemListener)
+    @override
     def stop(self):
         logging.info("Stopping IL2 Telemetry Listener")
         if self.telem:
@@ -121,7 +120,7 @@ class SimBMS(SimTelemListener):
     def __init__(self) -> None:
         super().__init__("BMS")
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
@@ -130,11 +129,11 @@ class SimBMS(SimTelemListener):
         self.telem.start()
         self.started = True
 
-    @overrides(SimTelemListener)
+    @override
     def validate(self):
         return
 
-    @overrides(SimTelemListener)
+    @override
     def stop(self):
         logging.info("Stopping BMS Telemetry Listener")
         if self.telem:
@@ -149,7 +148,7 @@ class SimDCS(SimTelemListener):
         self.telem_ipc : Optional[DcsIpcThread] = None
         self.telem_udp : Optional[NetworkThread] = None # deprecated
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
@@ -163,7 +162,7 @@ class SimDCS(SimTelemListener):
         self.telem_udp.start()
         self.started = True
 
-    @overrides(SimTelemListener)
+    @override
     def validate(self):
         # check and install/update export lua script
         logging.info("Checking DCS export script")
@@ -177,7 +176,7 @@ class SimDCS(SimTelemListener):
         else:
             utils.install_dcs_export_module_lua(G.main_window)
 
-    @overrides(SimTelemListener)
+    @override
     def stop(self):
         logging.info("Stopping DCS Telemetry Listener")
         if self.telem_udp:
@@ -193,7 +192,7 @@ class SimXPLANE(SimTelemListener):
         super().__init__("XPLANE")
         self.telem : Optional[NetworkThread] = None
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
@@ -206,13 +205,13 @@ class SimXPLANE(SimTelemListener):
         self.telem.start()
         self.started = True
 
-    @overrides(SimTelemListener)
+    @override
     def validate(self):
         logging.info("Checking XPlane Plugin")
         xplane_path = G.system_settings.get('pathXPLANE', '')
         utils.install_xplane_plugin(xplane_path, G.main_window)
 
-    @overrides(SimTelemListener)
+    @override
     def stop(self):
         logging.info("Stopping XPlane Telemetry Listener")
         if self.telem:
@@ -225,7 +224,7 @@ class SimMSFS(SimTelemListener):
         super().__init__("MSFS")
         self.telem : Optional[SimConnectSock] = None
 
-    @overrides(SimTelemListener)
+    @override
     def start(self):
         if not self.is_enabled:
             return
@@ -235,7 +234,7 @@ class SimMSFS(SimTelemListener):
         self.telem.start()
         self.started = True
 
-    @overrides(SimTelemListener)
+    @override
     def stop(self):
         logging.info("Stopping MSFS Telemetry Listener")
         if self.telem:
@@ -243,7 +242,7 @@ class SimMSFS(SimTelemListener):
             self.telem = None
             self.started = False
     
-    @overrides(SimTelemListener)
+    @override
     def validate(self):
         return
 

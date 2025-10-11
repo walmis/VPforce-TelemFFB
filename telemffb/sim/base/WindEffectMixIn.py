@@ -1,3 +1,4 @@
+from typing import override
 import telemffb.utils as utils
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
@@ -40,6 +41,7 @@ class WindEffectMixIn(AircraftEffectUtilsBase):
         logging.debug(f"Adding wind effect intensity:{v}")
         self.effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
+    @override
     def on_telemetry(self, telem_data: Dict):
         super().on_telemetry(telem_data)
         self.ac_update_wind_effect(telem_data)

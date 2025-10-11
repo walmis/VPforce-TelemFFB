@@ -40,9 +40,9 @@ import math
 import random
 import socket
 import time
+from typing import override
 
 from telemffb import utils
-from telemffb.utils import overrides
 from telemffb.hw.ffb_rhino import (EFFECT_SINE, EFFECT_SQUARE, EFFECT_TRIANGLE, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN, HapticEffect)
 from telemffb.sim.aircraft_base import AircraftBase
 from telemffb.telem.DcsIpcThread import DcsIpcThread
@@ -139,24 +139,24 @@ class Aircraft(AircraftBase):
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = None
 
-    @overrides(AircraftBase)
+    @override
     def ac_update_gforce_effect(self, telem_data, adv_spr=False):
         # don't run if override is active
         if self.cp_spr_override_active: return
         return super().ac_update_gforce_effect(telem_data, adv_spr)
     
-    @overrides(AircraftBase)
+    @override
     def ac_update_runway_rumble(self, telem_data):
         if self.cp_spr_override_active: return
         return super().ac_update_runway_rumble(telem_data)
 
-    @overrides(AircraftBase)
+    @override
     def ac_update_decel_effect(self, telem_data):
         if self.cp_spr_override_active: return
         return super().ac_update_decel_effect(telem_data)
 
 
-    @overrides(AircraftBase)
+    @override
     def on_telemetry(self, telem_data : dict):
         ## Generic Aircraft Telemetry Handler
         """when telemetry frame is received, aircraft class receives data in dict format
@@ -208,13 +208,13 @@ class Aircraft(AircraftBase):
         self.dcs_override_copilot_spring(telem_data)
         self.dcs_update_ap_deadzone(telem_data)
 
-    @overrides(AircraftBase)
+    @override
     def on_event(self, event, *args):
         logging.info(f"on_event: {event}")
         if event == "Stop":
             self.effects.clear()
 
-    @overrides(AircraftBase)
+    @override
     def on_timeout(self):
         super().on_timeout()
         input_data = HapticEffect.device.get_input()
@@ -307,7 +307,7 @@ class Aircraft(AircraftBase):
             self.spring.start(override=True)
 
 
-    @overrides(AircraftBase)
+    @override
     def ac_update_pedal_trim(self, telem_data):
         return self.dcs_update_pedal_trim(telem_data)
 
@@ -585,7 +585,7 @@ class PropellerAircraft(Aircraft):
             telem_data["ActualRPM"] = rpm # inject ActualRPM into telemetry
 
     # run on every telemetry frame
-    @overrides(AircraftBase)
+    @override
     def on_telemetry(self, telem_data):
         ## Propeller Aircraft Telemetry Handler
         if telem_data.get("N") == None:
@@ -607,7 +607,7 @@ class JetAircraft(Aircraft):
     afterburner_effect_intensity = 0.2
 
     # run on every telemetry frame
-    @overrides(AircraftBase)
+    @override
     def on_telemetry(self, telem_data):
         ## Jet Aircraft Telemetry Handler
         if telem_data.get("N")== None:
@@ -619,7 +619,7 @@ class TurbopropAircraft(PropellerAircraft):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
-    @overrides(PropellerAircraft)
+    @override
     def on_telemetry(self, telem_data):
         if telem_data.get("N") == None:
             return
@@ -633,7 +633,7 @@ class Helicopter(Aircraft):
 
     pedal_spring_mode = 'No Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
-    @overrides(AircraftBase)
+    @override
     def on_telemetry(self, telem_data):
         self.speedbrake_motion_intensity = 0.0
         ## Helicopter Aircraft Telemetry Handler

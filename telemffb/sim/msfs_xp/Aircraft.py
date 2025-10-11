@@ -29,7 +29,7 @@ from telemffb.sim.aircraft_base import AircraftBase
 from telemffb.util.Vector import Vector
 from telemffb.util.conversions import rad
 from telemffb.util.TurbulenceModulator import TurbulenceModulator
-from telemffb.utils import overrides
+# removed local 'overrides' helper in favor of typing.override
 
 
 from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin

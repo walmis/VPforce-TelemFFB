@@ -16,8 +16,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import override
+
 from .Aircraft import Aircraft
-from telemffb.utils import overrides
+# removed local 'overrides' helper in favor of typing.override
 
 
 class PropellerAircraft(Aircraft):
@@ -26,7 +28,7 @@ class PropellerAircraft(Aircraft):
         super().__init__(name, **kwargs)
 
     # run on every telemetry frame
-    @overrides(Aircraft)
+    @override
     def on_telemetry(self, telem_data):
         ### Propeller Aircraft Class Telemetry Handler
         if telem_data.get("N") == None:

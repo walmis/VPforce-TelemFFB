@@ -16,13 +16,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import override
 import telemffb.utils as utils
 from .Helicopter import Helicopter
 from telemffb.util.conversions import math
 
-
 import math
-
 
 class FlyInsideHelicopter(Helicopter):
     FI_vibration_enable = True
@@ -36,14 +35,17 @@ class FlyInsideHelicopter(Helicopter):
         # self.phys_x, self.phys_y = input_data.axisXY()
         # self.cpO_y = round(self.phys_y * 4096)
 
+    @override
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
         self._update_vibration()
 
+    @override
     def ac_calc_etl_effect(self, *args, **kwargs):
         ## effect not used for FI Heli
         pass
 
+    @override
     def ac_update_vrs_effect(self, *args, **kwargs):
         ## effect not used for FI Heli
         pass

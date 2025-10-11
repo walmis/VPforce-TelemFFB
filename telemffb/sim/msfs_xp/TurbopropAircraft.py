@@ -16,10 +16,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import override
+
 from telemffb.sim.msfs_xp.PropellerAircraft import PropellerAircraft
 from telemffb.util.conversions import kt2ms
-from telemffb.utils import overrides
-
 
 class TurbopropAircraft(PropellerAircraft):
     def __init__(self, name, **kwargs):
@@ -29,7 +29,7 @@ class TurbopropAircraft(PropellerAircraft):
         self.spoiler_spd_thresh_hi = 260 * kt2ms
         self.speedbrake_speed_thresh = 120 * kt2ms
 
-    @overrides(PropellerAircraft)
+    @override
     def on_telemetry(self, telem_data):
         if telem_data.get("N") == None:
             return

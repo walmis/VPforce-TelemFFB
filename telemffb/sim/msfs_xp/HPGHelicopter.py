@@ -70,11 +70,12 @@ class HPGHelicopter(Helicopter):
         self._last_hands_on_time_ms = 0
         self.pedals_init = 0
 
+    @override
     def on_telemetry(self, telem_data):
         super().on_telemetry(telem_data)
 
         # self._update_vrs_effect(telem_data)
-
+    @override
     def on_timeout(self):
         super().on_timeout()
         self.cyclic_spring_init = 0
@@ -145,6 +146,7 @@ class HPGHelicopter(Helicopter):
         }
         return result
 
+    @override
     def msfs_update_heli_controls(self, telem_data):
         super().msfs_update_heli_controls(telem_data)
         ffb_type = telem_data.get("FFBType", "joystick")
@@ -312,6 +314,7 @@ class HPGHelicopter(Helicopter):
 
             self._spring_handle.start()
 
+    @override
     def _update_cyclic_trim(self, telem_data):
         # Trimming is handled by the AFCS integration - override parent class function
         pass
@@ -414,6 +417,7 @@ class HPGHelicopter(Helicopter):
 
             self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
+    @override
     def msfs_update_collective(self, telem_data):
         if telem_data.get("FFBType") != 'collective':
             return
@@ -545,10 +549,10 @@ class HPGHelicopter(Helicopter):
                 self._spring_handle.setCondition(self.spring_y)
                 self._spring_handle.start(override=True)
 
+    @override
     def ac_update_vrs_effect(self, telem_data):
         vrs_onset = telem_data.get("hpgVRSDatum", 0)
         vrs_certain = telem_data.get("hpgVRSIsInVRS", 0)
-
 
         if vrs_certain:
             vrs_intensity = 1.0
@@ -558,7 +562,6 @@ class HPGHelicopter(Helicopter):
             vrs_intensity = .66
         else:
             vrs_intensity = 0
-
 
         if vrs_intensity and self.vrs_effect_intensity and self.vrs_effect_enable:
             self.effects["vrs_buffet"].periodic(10, self.vrs_effect_intensity * vrs_intensity, utils.RandomDirectionModulator).start()

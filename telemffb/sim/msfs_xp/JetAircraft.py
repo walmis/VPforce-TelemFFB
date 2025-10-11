@@ -17,7 +17,7 @@
 #
 
 from .Aircraft import Aircraft
-from telemffb.utils import overrides
+from typing import override
 
 
 class JetAircraft(Aircraft):
@@ -30,7 +30,7 @@ class JetAircraft(Aircraft):
         super().__init__(name, **kwargs)
     # run on every telemetry frame
 
-    @overrides(Aircraft)
+    @override
     def on_telemetry(self, telem_data):
         ## Jet Aircraft Telemetry Manager
         if telem_data.get("N") == None:

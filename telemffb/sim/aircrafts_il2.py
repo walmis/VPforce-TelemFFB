@@ -37,7 +37,7 @@
 import math
 from random import randint
 import time
-from typing import List, Dict
+from typing import List, Dict, override
 from telemffb.hw.ffb_rhino import HapticEffect, FFBReport_SetCondition
 import telemffb.utils as utils
 import telemffb.globals as G
@@ -45,7 +45,6 @@ import logging
 import random
 from .aircraft_base import AircraftBase
 import json
-from telemffb.utils import overrides
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 
 #unit conversions (to m/s)
@@ -144,7 +143,7 @@ class Aircraft(AircraftBase):
         # self.spring_x = FFBReport_SetCondition(parameterBlockOffset=0)
         # self.spring_y = FFBReport_SetCondition(parameterBlockOffset=1)
 
-    @overrides(AircraftBase)
+    @override
     def ac_update_cm_weapons(self, telem):
         if not self.il2_shake_master: return
         if not self.il2_enable_weapons: return
@@ -191,7 +190,7 @@ class Aircraft(AircraftBase):
         if not self.anything_has_changed("Rockets", rockets, delta_ms=160):
             self.effects["il2_rockets"].stop()
 
-    @overrides(AircraftBase)
+    @override
     def ac_update_runway_rumble(self, telem_data):
         if not self.il2_shake_master: return
         if not self.il2_enable_runway_rumble: return
@@ -203,7 +202,7 @@ class Aircraft(AircraftBase):
             self.runway_rumble_intensity = 0
             self.effects.dispose("runway0", "runway1")
 
-    @overrides(AircraftBase)
+    @override
     def ac_update_buffeting(self, telem_data: dict):
         if not self.il2_shake_master: return
         if not self.il2_enable_buffet: return
@@ -240,7 +239,7 @@ class Aircraft(AircraftBase):
         elif not self.anything_has_changed("damage", damage, delta_ms=120):
             self.effects.dispose("damage")
 
-    @overrides(AircraftBase)
+    @override
     def on_telemetry(self, telem_data : dict):
         ## Generic Aircraft Telemetry Handler
         """when telemetry frame is received, aircraft class receives data in dict format
@@ -272,7 +271,7 @@ class Aircraft(AircraftBase):
             self.il2_update_damage(telem_data)
 
 
-    @overrides(AircraftBase)
+    @override
     def on_event(self, event, *args):
         logging.info(f"on_event: {event}")
         if event == "Stop":
@@ -338,7 +337,7 @@ class PropellerAircraft(Aircraft):
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
 
     # run on every telemetry frame
-    @overrides(AircraftBase)
+    @override
     def on_telemetry(self, telem_data):
         telem_data["AircraftClass"] = "PropellerAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
@@ -350,7 +349,7 @@ class JetAircraft(Aircraft):
     _ab_is_playing = 0
 
       # run on every telemetry frame
-    @overrides(AircraftBase)
+    @override
     def on_telemetry(self, telem_data):
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)

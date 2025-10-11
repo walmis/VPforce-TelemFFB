@@ -19,7 +19,7 @@
 
 from telemffb.telem.SimConnectManager import SimConnectManager
 from telemffb.hw.ffb_rhino import HapticEffect
-from telemffb.utils import overrides
+from typing import override
 import telemffb.globals as G
 
 from telemffb.telem.TelemManager import TelemManager
@@ -39,13 +39,13 @@ class SimConnectSock(SimConnectManager):
             return "~".join([str(x) for x in val])
         return val
     
-    @overrides(SimConnectManager)
+    @override
     def emit_packet(self, data):
         data["src"] = "MSFS"
         packet = bytes(";".join([f"{k}={self.fmt(v)}" for k, v in data.items()]), "utf-8")
         self._telem.submit_frame(packet)
     
-    @overrides(SimConnectManager)
+    @override
     def emit_event(self, event, *args):
         # special handling of Open event
         if event == "Open":

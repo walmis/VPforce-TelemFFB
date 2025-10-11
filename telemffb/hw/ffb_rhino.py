@@ -30,12 +30,12 @@ import os
 import time
 import weakref
 from dataclasses import dataclass
-from typing import List, Self
+from typing import List, Self, override
 
 import usb1
 from PyQt6.QtCore import QObject, QTimer, QTimerEvent, pyqtSignal
 
-from telemffb.utils import Destroyable, DirectionModulator, clamp, overrides, millis
+from telemffb.utils import Destroyable, DirectionModulator, clamp, millis
 
 paths = ["hidapi.dll", "dll/hidapi.dll", os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dll', 'hidapi.dll')]
 for p in paths:
@@ -836,7 +836,7 @@ class FFBRhino(QObject):
         self._dev.write(bytes(data))
 
     # runs on mainThread
-    @overrides(QObject)
+    @override
     def timerEvent(self, a0: QTimerEvent) -> None:
         try:
             self.read_reports()

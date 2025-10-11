@@ -30,6 +30,7 @@ import traceback
 import winreg
 from collections import OrderedDict
 from datetime import datetime
+from typing import override
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import QCoreApplication, Qt, QTimer, QUrl, pyqtSlot
@@ -59,7 +60,7 @@ from telemffb.telem.SimTelemListener import SimTelemListener
 from telemffb.SystemSettingsDialog import SystemSettingsDialog
 from telemffb.TeleplotSetupDialog import TeleplotSetupDialog
 from telemffb.ProfileManager import ProfileManagerDialog, NewProfileDialog
-from telemffb.utils import exit_application, overrides, HiDpiPixmap
+from telemffb.utils import exit_application, HiDpiPixmap
 
 class MainWindow(QMainWindow):
     
@@ -1714,7 +1715,7 @@ class MainWindow(QMainWindow):
             except TypeError:
                 pass  # No handler connected yet
 
-    @overrides(QWidget)
+    @override
     def closeEvent(self, event):
         # Perform cleanup before closing the application
         if G.child_instance:

@@ -20,7 +20,7 @@ from typing import override
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.Aircraft import Aircraft
-from telemffb.utils import overrides
+# removed local 'overrides' helper in favor of typing.override
 
 
 import logging

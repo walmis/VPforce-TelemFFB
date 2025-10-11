@@ -42,6 +42,7 @@ import random
 import re
 import shutil
 import typing
+from typing import override
 import zipfile
 from collections import defaultdict, deque
 import threading
@@ -602,7 +603,7 @@ class SystemSettings(QSettings):
         #self.def_inst_sys_dict, self.def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
         pass
 
-    @overrides(QSettings)
+    @override
     def setValue(self, key: str, value, instance=None) -> None:
         if instance:
             super().setValue(f"{instance}/{key}", value)

@@ -22,7 +22,7 @@ import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.Aircraft import Aircraft
-from telemffb.utils import clamp, overrides
+from telemffb.utils import clamp
 
 import logging
 

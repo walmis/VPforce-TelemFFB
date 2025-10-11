@@ -16,9 +16,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import override
+
 from telemffb.hw.ffb_rhino import HapticEffect
 from .Helicopter import Helicopter
-
 
 class SASHelicopter(Helicopter):
     afcs_step_size = 2
@@ -87,6 +88,7 @@ class SASHelicopter(Helicopter):
 
         return result
 
+    @override
     def msfs_update_heli_controls(self, telem_data):
         super().msfs_update_heli_controls(telem_data)
         ffb_type = telem_data.get("FFBType", "joystick")
@@ -198,6 +200,7 @@ class SASHelicopter(Helicopter):
 
             self._spring_handle.start()
 
+    @override
     def _update_cyclic_trim(self, telem_data):
         # Trimming is handled by the AFCS integration - override parent class function
         pass

@@ -1,4 +1,5 @@
 # Weapons / Countermeasure effects mixin
+from typing import override
 from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHUP, EFFECT_SINE, EFFECT_SQUARE
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
@@ -82,6 +83,7 @@ class WeaponsEffectMixIn(AircraftEffectUtilsBase):
         elif not self.anything_has_changed(telem_key, telem_value, delta_ms=delta_ms):
             self.effects[effect_name].stop()
 
+    @override
     def on_telemetry(self, telem_data: dict):
         super().on_telemetry(telem_data)
         self.ac_update_cm_weapons(telem_data)
