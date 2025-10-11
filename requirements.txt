@@ -8,3 +8,7 @@ pygetwindow
 requests
 numpy==2.3.0
 akima
+
+# Testing dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0

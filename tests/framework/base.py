@@ -1,0 +1,338 @@
+"""
+Base classes and mocks for telemetry effect testing.
+"""
+from typing import Dict, List, Optional, Any
+from unittest.mock import MagicMock, Mock
+import telemffb.globals as G
+
+
+class MockInputData:
+    """Mock for FFB device input data."""
+    
+    def __init__(self):
+        self._x_axis = 0.0
+        self._y_axis = 0.0
+        self._buttons = set()
+    
+    def axisXY(self):
+        """Return current X and Y axis values."""
+        return (self._x_axis, self._y_axis)
+    
+    def set_axis(self, x: float = None, y: float = None):
+        """Set axis values for testing."""
+        if x is not None:
+            self._x_axis = x
+        if y is not None:
+            self._y_axis = y
+    
+    def isButtonPressed(self, button: int) -> bool:
+        """Check if button is pressed."""
+        return button in self._buttons
+    
+    def press_button(self, button: int):
+        """Simulate button press."""
+        self._buttons.add(button)
+    
+    def release_button(self, button: int):
+        """Simulate button release."""
+        self._buttons.discard(button)
+
+
+class MockFFBDevice:
+    """Mock FFB device for testing."""
+    
+    def __init__(self):
+        self._input_data = MockInputData()
+    
+    def get_input(self) -> MockInputData:
+        """Return mock input data."""
+        return self._input_data
+
+
+class MockConditionEffect:
+    """Mock for condition effect (spring, damper, friction, inertia)."""
+    
+    def __init__(self, name: str = ""):
+        self.name = name
+        self.started = False
+        self._x_coefficient = 0
+        self._y_coefficient = 0
+        self._x_offset = 0
+        self._y_offset = 0
+        self._x_saturation = 0
+        self._y_saturation = 0
+        self.start_count = 0
+        self.stop_count = 0
+        self.destroy_count = 0
+    
+    def start(self):
+        """Start the effect."""
+        self.started = True
+        self.start_count += 1
+        return self
+    
+    def stop(self):
+        """Stop the effect."""
+        self.started = False
+        self.stop_count += 1
+        return self
+    
+    def destroy(self):
+        """Destroy the effect."""
+        self.started = False
+        self.destroy_count += 1
+        return self
+    
+    def spring(self, x_coeff: int = 0, y_coeff: int = 0):
+        """Set spring parameters."""
+        self._x_coefficient = x_coeff
+        self._y_coefficient = y_coeff
+        return self
+    
+    def damper(self, x_coeff: int = 0, y_coeff: int = 0):
+        """Set damper parameters."""
+        self._x_coefficient = x_coeff
+        self._y_coefficient = y_coeff
+        return self
+    
+    def friction(self, x_coeff: int = 0, y_coeff: int = 0):
+        """Set friction parameters."""
+        self._x_coefficient = x_coeff
+        self._y_coefficient = y_coeff
+        self.name = "friction"
+        return self
+    
+    def inertia(self, x_coeff: int = 0, y_coeff: int = 0):
+        """Set inertia parameters."""
+        self._x_coefficient = x_coeff
+        self._y_coefficient = y_coeff
+        return self
+    
+    def setCondition(self, condition):
+        """Set condition from condition object."""
+        if hasattr(condition, 'cpOffset'):
+            if condition.parameterBlockOffset == 0:  # X axis
+                self._x_offset = condition.cpOffset
+                self._x_coefficient = condition.positiveCoefficient or condition.negativeCoefficient
+                self._x_saturation = condition.positiveSaturation or condition.negativeSaturation
+            elif condition.parameterBlockOffset == 1:  # Y axis
+                self._y_offset = condition.cpOffset
+                self._y_coefficient = condition.positiveCoefficient or condition.negativeCoefficient
+                self._y_saturation = condition.positiveSaturation or condition.negativeSaturation
+        return self
+    
+    def get_coefficients(self):
+        """Get current coefficients."""
+        return (self._x_coefficient, self._y_coefficient)
+    
+    def get_offsets(self):
+        """Get current offsets."""
+        return (self._x_offset, self._y_offset)
+    
+    def spring_adjuster(self):
+        """Return self for spring adjuster chain."""
+        return self
+    
+    def reset_counters(self):
+        """Reset call counters for testing."""
+        self.start_count = 0
+        self.stop_count = 0
+        self.destroy_count = 0
+
+
+class MockHapticEffect:
+    """Mock haptic effect container."""
+    
+    device = None  # Class variable for device
+    
+    def __init__(self, device: MockFFBDevice = None):
+        if device is None:
+            device = MockFFBDevice()
+        MockHapticEffect.device = device
+        self.effects = {}
+    
+    def get_effect(self, name: str) -> MockConditionEffect:
+        """Get or create an effect by name."""
+        if name not in self.effects:
+            self.effects[name] = MockConditionEffect(name)
+        return self.effects[name]
+
+
+class MockEffectDispenser:
+    """Mock for the global effects dispenser."""
+    
+    def __init__(self):
+        self._effects = {}
+    
+    def __getitem__(self, key: str) -> MockConditionEffect:
+        """Get effect by name."""
+        if key not in self._effects:
+            self._effects[key] = MockConditionEffect(key)
+        return self._effects[key]
+    
+    def reset_all(self):
+        """Reset all effects."""
+        for effect in self._effects.values():
+            effect.stop()
+            effect.reset_counters()
+
+
+class MockSimConnect:
+    """Mock SimConnect for MSFS integration testing."""
+    
+    def __init__(self):
+        self.sent_events = []
+        self.variables = {}
+    
+    def send_event_to_msfs(self, event_name: str, value: Any):
+        """Record sent events."""
+        self.sent_events.append((event_name, value))
+    
+    def set_variable(self, var_name: str, value: Any):
+        """Set a variable."""
+        self.variables[var_name] = value
+    
+    def get_variable(self, var_name: str) -> Any:
+        """Get a variable."""
+        return self.variables.get(var_name)
+    
+    def clear_events(self):
+        """Clear recorded events."""
+        self.sent_events.clear()
+    
+    def get_last_event(self) -> Optional[tuple]:
+        """Get the last sent event."""
+        return self.sent_events[-1] if self.sent_events else None
+
+
+class MockDampener:
+    """Mock for the dampener utility."""
+    
+    def __init__(self):
+        self._values = {}
+    
+    def dampen_value(self, value, key, derivative_hz=5, derivative_k=0.15):
+        """Simple pass-through dampening for tests."""
+        self._values[key] = value
+        return value
+
+
+class BaseTelemetryEffectTestCase:
+    """Base test case class for telemetry effects.
+    
+    Provides common setup and utilities for testing effect mixins.
+    """
+    
+    def setup_method(self):
+        """Setup before each test method."""
+        # Create mocks
+        self.mock_device = MockFFBDevice()
+        self.mock_haptic = MockHapticEffect(self.mock_device)
+        self.mock_simconnect = MockSimConnect()
+        self.mock_effects = MockEffectDispenser()
+        
+        # Setup globals
+        G.effects = self.mock_effects
+        G.master_buttons = []
+        
+        # Store original HapticEffect.device
+        from telemffb.hw.ffb_rhino import HapticEffect
+        self._original_haptic_device = HapticEffect.device
+        HapticEffect.device = self.mock_device
+    
+    def teardown_method(self):
+        """Cleanup after each test method."""
+        # Restore original device
+        from telemffb.hw.ffb_rhino import HapticEffect
+        HapticEffect.device = self._original_haptic_device
+        
+        # Clear globals
+        G.effects = None
+        G.master_buttons = []
+    
+    def create_test_instance(self, mixin_class, **kwargs):
+        """Create a test instance of a mixin with proper base class chain.
+        
+        Args:
+            mixin_class: The mixin class to test
+            **kwargs: Additional initialization parameters
+        
+        Returns:
+            Instance of the mixin configured for testing
+        """
+        # Create a concrete test class that includes all required base classes
+        class TestClass(mixin_class):
+            def __init__(self, **init_kwargs):
+                # Initialize state that would normally come from base classes
+                self._changes = {}
+                self._change_counter = {}
+                self._ipc_telem = {}
+                self.stepper_dict = {}
+                self.spring_mode = None
+                self.gforce_effect_mode = None
+                self._telem_data = {}
+                self._last_telem_data = {}
+                self.friction_effect_overridden = False
+                self.telemffb_controls_axes = False
+                self.local_disable_axis_control = False
+                self.dampener = MockDampener()
+                
+                # Initialize with parent
+                super().__init__()
+                
+                # Apply any custom kwargs
+                for key, value in init_kwargs.items():
+                    setattr(self, key, value)
+            
+            def _sim_is_msfs(self):
+                """Mock sim check."""
+                return getattr(self, '_test_sim_is_msfs', False)
+            
+            def _sim_is_xplane(self):
+                """Mock sim check."""
+                return getattr(self, '_test_sim_is_xplane', False)
+            
+            def is_pedals(self):
+                """Mock pedals check."""
+                return self._telem_data.get("FFBType", "") == "pedals"
+            
+            def is_joystick(self):
+                """Mock joystick check."""
+                return self._telem_data.get("FFBType", "") == "joystick"
+            
+            def flag_error(self, message):
+                """Mock error flagging."""
+                self._flagged_errors = getattr(self, '_flagged_errors', [])
+                self._flagged_errors.append(message)
+            
+            def anything_has_changed(self, key, value):
+                """Mock change detection."""
+                changed = self._changes.get(key) != value
+                self._changes[key] = value
+                return changed
+            
+            def send_xp_command(self, command):
+                """Mock XP command."""
+                self._xp_commands = getattr(self, '_xp_commands', [])
+                self._xp_commands.append(command)
+        
+        return TestClass(**kwargs)
+    
+    def set_telemetry(self, instance, telem_data: dict):
+        """Set telemetry data on an instance."""
+        instance._telem_data = telem_data.copy()
+    
+    def assert_effect_started(self, effect_name: str, msg: str = ""):
+        """Assert that an effect was started."""
+        effect = self.mock_effects[effect_name]
+        assert effect.started, f"Effect '{effect_name}' was not started. {msg}"
+    
+    def assert_effect_stopped(self, effect_name: str, msg: str = ""):
+        """Assert that an effect was stopped."""
+        effect = self.mock_effects[effect_name]
+        assert not effect.started, f"Effect '{effect_name}' is still started. {msg}"
+    
+    def assert_effect_not_modified(self, effect_name: str, msg: str = ""):
+        """Assert that an effect was not modified."""
+        effect = self.mock_effects[effect_name]
+        assert effect.start_count == 0, f"Effect '{effect_name}' was modified. {msg}"
