@@ -63,6 +63,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
         
         telem = TelemetryDataBuilder().ffb_type("pedals").on_ground().build()
         
+        self.set_telemetry(instance, telem)
         # Act
         instance.on_telemetry(telem)
         
@@ -79,10 +80,11 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
         instance.enable_friction_ovd = False  # Not enabled
         
         telem = TelemetryDataBuilder().ffb_type("pedals").on_ground().build()
-        
+        self.set_telemetry(instance, telem)
+
         # Act
         instance.on_telemetry(telem)
-        
+        print(instance._flagged_errors)
         # Assert
         assert hasattr(instance, '_flagged_errors')
         assert len(instance._flagged_errors) > 0
@@ -105,7 +107,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(10.0)
             .build()
         )
-        
+        self.set_telemetry(instance, telem)
         # Act
         instance.on_telemetry(telem)
         
@@ -135,7 +137,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(0.0)  # Stationary
             .build()
         )
-        
+        self.set_telemetry(instance, telem_low_speed)
         instance.on_telemetry(telem_low_speed)
         effect = self.mock_effects['friction']
         low_speed_coeff = effect.get_coefficients()[0]
@@ -149,7 +151,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(10.0)
             .build()
         )
-        
+        self.set_telemetry(instance, telem_med_speed)
         instance.on_telemetry(telem_med_speed)
         med_speed_coeff = effect.get_coefficients()[0]
         
@@ -162,7 +164,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(20.0)
             .build()
         )
-        
+        self.set_telemetry(instance, telem_high_speed)
         instance.on_telemetry(telem_high_speed)
         high_speed_coeff = effect.get_coefficients()[0]
         
@@ -195,12 +197,14 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
         
         # Test with low intensity
         instance.steering_friction_intensity = 0.2
+        self.set_telemetry(instance, telem)
         instance.on_telemetry(telem)
         effect = self.mock_effects['friction']
         low_intensity_coeff = effect.get_coefficients()[0]
         
         # Test with high intensity
         instance.steering_friction_intensity = 1.0
+        self.set_telemetry(instance, telem)
         instance.on_telemetry(telem)
         high_intensity_coeff = effect.get_coefficients()[0]
         
@@ -230,7 +234,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(5.0)
             .build()
         )
-        
+        self.set_telemetry(instance, telem_full_rudder)
         instance.on_telemetry(telem_full_rudder)
         effect = self.mock_effects['friction']
         full_rudder_coeff = effect.get_coefficients()[0]
@@ -246,7 +250,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(5.0)
             .build()
         )
-        
+        self.set_telemetry(instance, telem_half_rudder)
         instance.on_telemetry(telem_half_rudder)
         half_rudder_coeff = effect.get_coefficients()[0]
         
@@ -261,7 +265,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(5.0)
             .build()
         )
-        
+        self.set_telemetry(instance, telem_no_rudder)
         instance.on_telemetry(telem_no_rudder)
         no_rudder_coeff = effect.get_coefficients()[0]
         
@@ -293,7 +297,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(10.0)
             .build()
         )
-        
+        self.set_telemetry(instance, telem_ground)
         instance.on_telemetry(telem_ground)
         effect = self.mock_effects['friction']
         assert effect.started, "Effect should be active on ground"
@@ -308,7 +312,7 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(60.0)
             .build()
         )
-        
+        self.set_telemetry(instance, telem_airborne)
         # Act
         instance.on_telemetry(telem_airborne)
         
@@ -335,7 +339,8 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(10.0)
             .build()
         )
-        
+
+        self.set_telemetry(instance, telem)
         instance.on_telemetry(telem)
         effect = self.mock_effects['friction']
         initial_destroy_count = effect.destroy_count
@@ -343,7 +348,8 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
         
         # Then disable the effect
         instance.steering_friction = 0
-        
+
+        self.set_telemetry(instance, telem)
         # Act
         instance.on_telemetry(telem)
         
@@ -371,7 +377,8 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(0.0)
             .build()
         )
-        
+
+        self.set_telemetry(instance, telem)
         # Act
         instance.on_telemetry(telem)
         
@@ -401,7 +408,8 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(0.0)
             .build()
         )
-        
+
+        self.set_telemetry(instance, telem)
         # Act
         instance.on_telemetry(telem)
         
@@ -428,7 +436,8 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
             .ground_speed(10.0)
             .build()
         )
-        
+
+        self.set_telemetry(instance, telem)
         # Act
         instance.on_telemetry(telem)
         
@@ -459,12 +468,16 @@ class TestMfsfXpSteeringFrictionEffect(BaseTelemetryEffectTestCase):
         
         # Test with negative expo (more responsive at low speeds)
         instance.steering_friction_expo = -0.4
+
+        self.set_telemetry(instance, telem)
         instance.on_telemetry(telem)
         effect = self.mock_effects['friction']
         negative_expo_coeff = effect.get_coefficients()[0]
         
         # Test with positive expo (less responsive at low speeds)
         instance.steering_friction_expo = 0.4
+        
+        self.set_telemetry(instance, telem)
         instance.on_telemetry(telem)
         positive_expo_coeff = effect.get_coefficients()[0]
         

@@ -99,7 +99,6 @@ class MockConditionEffect:
         """Set friction parameters."""
         self._x_coefficient = x_coeff
         self._y_coefficient = y_coeff
-        self.name = "friction"
         return self
     
     def inertia(self, x_coeff: int = 0, y_coeff: int = 0):
