@@ -13,6 +13,10 @@ class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
     steering_friction_expo = -0.4
     # end of user parameters
 
+    def __init__(self):
+        super().__init__()
+        self.friction_effect_overridden = False
+
     def msfs_update_steering_friction_effect(self, telem_data):
         if not self._sim_is_msfs(): return
         if not self.is_pedals(): return
@@ -55,6 +59,9 @@ class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
 
             if surface == "Water":
                 friction_force *= wr
+
+            if not usable_friction_range:
+                return
 
             telem_data["_pct_steer_f"] = friction_coeff_add / usable_friction_range
             self._ipc_telem["_pct_steer_f"] = friction_coeff_add / usable_friction_range
