@@ -239,6 +239,7 @@ class TestDirectMethodCalls(BaseTelemetryEffectTestCase):
             .ground_speed(10.0)
             .build()
         )
+        self.set_telemetry(instance, telem)
         
         # Call the effect method directly
         instance.msfs_update_steering_friction_effect(telem)
@@ -268,7 +269,8 @@ class TestDirectMethodCalls(BaseTelemetryEffectTestCase):
             .ground_speed(0.0)
             .build()
         )
-        
+
+        self.set_telemetry(instance, telem_low)
         instance.msfs_update_steering_friction_effect(telem_low)
         effect = self.mock_effects['friction']
         low_coeff = effect.get_coefficients()[0]

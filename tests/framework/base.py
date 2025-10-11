@@ -275,13 +275,22 @@ class BaseTelemetryEffectTestCase:
                 self.telemffb_controls_axes = False
                 self.local_disable_axis_control = False
                 self.dampener = MockDampener()
-                
+                self.mock_simconnect = None
                 # Initialize with parent
                 super().__init__()
                 
                 # Apply any custom kwargs
                 for key, value in init_kwargs.items():
                     setattr(self, key, value)
+
+            @property
+            def _simconnect(self):
+                """Mock SimConnect property."""
+                return self.mock_simconnect
+            @_simconnect.setter
+            def _simconnect(self, value):
+                """Mock SimConnect setter."""
+                self.mock_simconnect = value
             
             def _sim_is_msfs(self):
                 """Mock sim check."""

@@ -36,6 +36,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
             .aileron_trim(0.3)
             .build()
         )
+        self.set_telemetry(instance, telem)
         
         # Act
         instance._update_fbw_flight_controls(telem)
@@ -65,6 +66,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
             .aileron_trim(0.3)   # 30% trim
             .build()
         )
+        self.set_telemetry(instance, telem)
         
         # Act
         instance._update_fbw_flight_controls(telem)
@@ -94,6 +96,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
             .elevator_trim(0.5)
             .build()
         )
+        self.set_telemetry(instance, telem)
         
         # Test with low physical gain
         instance.joystick_trim_follow_gain_physical_y = 0.2
@@ -126,7 +129,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=0.5, y=-0.3)
         
         telem = TelemetryDataBuilder().ffb_type("joystick").build()
-        
+        self.set_telemetry(instance, telem)
         # Act
         instance._update_fbw_flight_controls(telem)
         
@@ -154,6 +157,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=1.0, y=1.0)
         
         telem = TelemetryDataBuilder().ffb_type("joystick").build()
+        self.set_telemetry(instance, telem)
         
         # Test with reduced scale
         instance.joystick_x_axis_scale = 0.5
@@ -201,6 +205,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
             .elevator_trim(0.2)
             .build()
         )
+        self.set_telemetry(instance, telem)
         
         # Physical stick at neutral
         self.mock_device._input_data.set_axis(x=0.0, y=0.0)
@@ -235,6 +240,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
             .aileron_deflection(0.02, -0.02)  # Small deflection
             .build()
         )
+        self.set_telemetry(instance, telem)
         
         # Physical stick very close to AP position
         self.mock_device._input_data.set_axis(x=0.02, y=0.0)
@@ -263,6 +269,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         instance._simconnect = self.mock_simconnect
         
         telem = TelemetryDataBuilder().ffb_type("joystick").build()
+        self.set_telemetry(instance, telem)
         
         # Test with low FBW gains
         instance.fbw_elevator_gain = 0.3
@@ -305,7 +312,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
             .autopilot(False)
             .build()
         )
-        
+        self.set_telemetry(instance, telem_ap_off)
         instance._update_fbw_flight_controls(telem_ap_off)
         spring = self.mock_effects['fbw_spring']
         x_coeff_ap_off, y_coeff_ap_off = spring.get_coefficients()
@@ -317,6 +324,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
             .autopilot(True)
             .build()
         )
+        self.set_telemetry(instance, telem_ap_on)
         
         self.mock_device._input_data.set_axis(x=0.0, y=0.0)
         instance._update_fbw_flight_controls(telem_ap_on)
@@ -347,6 +355,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
             .rudder_trim(0.5)
             .build()
         )
+        self.set_telemetry(instance, telem)
         
         # Act
         instance._update_fbw_flight_controls(telem)
@@ -372,7 +381,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
             .rudder_trim(0.6)  # 60% trim
             .build()
         )
-        
+        self.set_telemetry(instance, telem)
         # Act
         instance._update_fbw_flight_controls(telem)
         

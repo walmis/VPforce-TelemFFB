@@ -4,7 +4,13 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
+        {
+            "name": "Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tests/run_tests.py",
+            "console": "integratedTerminal"
+        },
         {
             "name": "TelemFFB debug",
             "type": "debugpy",
