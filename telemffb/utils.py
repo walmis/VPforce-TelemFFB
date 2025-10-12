@@ -1046,6 +1046,23 @@ class Derivative:
         var += derivative
 
         return var
+    
+class Dampener(Derivative):
+    def __init__(self, filter_hz=5, k=0.1):
+        super().__init__(filter_hz)
+        self.k = k
+
+    def update(self, value, derivative_hz=5, derivative_k=0.1):
+        # update filters if needed
+        if self.lpf:
+            if self.lpf.cutoff_freq_hz != derivative_hz:
+                self.lpf.cutoff_freq_hz = derivative_hz
+        if derivative_k != self.k:
+            self.k = derivative_k
+
+        derivative = -super().update(value) * self.k
+        value += derivative
+        return value
 
 
 class DirectionModulator:
