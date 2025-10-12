@@ -57,6 +57,17 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
     fbw_rudder_gain = 0.8
     # end of user parameters
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.elev_trim_dampener = utils.Dampener()
+        self.aileron_pos_dampener = utils.Dampener()
+        self.rudder_pos_dampener = utils.Dampener()
+
+    def on_timeout(self):
+        super().on_timeout()
+        self._spring_handle.stop()    
+
+
     def _update_fbw_flight_controls(self, telem_data, ap=False):
         ap_send_flag_x = True
         ap_send_flag_y = True
@@ -77,7 +88,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
                 elev_trim = telem_data.get("ElevTrimPct", 0)
 
-                elev_trim = self.dampener.dampen_value(elev_trim, "_elev_trim", derivative_hz=5, derivative_k=0.15)
+                elev_trim = self.elev_trim_dampener.update(elev_trim, derivative_hz=5, derivative_k=0.15)
 
                 # print(f"raw:{raw_elev_trim}, smooth:{elev_trim}")
                 aileron_trim = telem_data.get("AileronTrimPct", 0)
@@ -102,8 +113,8 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                             elevator_pos = telem_data.get("ElevTrimPct", 0)
 
                         elevator_pos = telem_data.get("ElevTrimPct", 0)
-                        elevator_pos = self.dampener.dampen_value(
-                            elevator_pos, "_elev_trim", derivative_hz=5, derivative_k=0.15
+                        elevator_pos = self.elev_trim_dampener.update(
+                            elevator_pos, derivative_hz=5, derivative_k=0.15
                         )
                         elevator_pos = clamp(elevator_pos * self.joystick_ap_follow_gain_physical_y, -1, 1)
                         virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_trim_follow_gain_virtual_y)
@@ -130,8 +141,8 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
                     if self._sim_is_xplane():
                         aileron_pos = telem_data.get("APRollServo", 0)
-                        aileron_pos = self.dampener.dampen_value(
-                            aileron_pos, "_aileron_pos", derivative_hz=5, derivative_k=0.15
+                        aileron_pos = self.aileron_pos_dampener.update(
+                            aileron_pos, derivative_hz=5, derivative_k=0.15
                         )
                         elevator_pos = telem_data.get("APPitchServo", 0)
                         phys_stick_y_offs = int(elevator_pos * 4096)
@@ -241,8 +252,8 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     if self._sim_is_xplane():
                         rudder_pos = telem_data.get("APYawServo", 0)
 
-                    rudder_pos = self.dampener.dampen_value(
-                        rudder_pos, "_rudder_pos", derivative_hz=5, derivative_k=0.15
+                    rudder_pos = self.rudder_pos_dampener.update(
+                        rudder_pos, derivative_hz=5, derivative_k=0.15
                     )
                     # derivative_hz = 5  # derivative lpf filter -3db Hz
                     # derivative_k = 0.1  # derivative gain value, or damping ratio
