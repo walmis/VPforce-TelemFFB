@@ -72,7 +72,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         instance._update_fbw_flight_controls(telem)
         
         # Assert
-        spring = self.mock_effects['fbw_spring']
+        spring = instance._spring_handle
         x_offset, y_offset = spring.get_offsets()
         
         # Offsets should be scaled from -1..1 to -4096..4096
@@ -101,7 +101,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         # Test with low physical gain
         instance.joystick_trim_follow_gain_physical_y = 0.2
         instance._update_fbw_flight_controls(telem)
-        spring = self.mock_effects['fbw_spring']
+        spring = instance._spring_handle
         _, low_gain_offset = spring.get_offsets()
         
         # Test with high physical gain
@@ -214,7 +214,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         instance._update_fbw_flight_controls(telem)
         
         # Assert
-        spring = self.mock_effects['ap_spring']
+        spring = instance._spring_handle
         x_offset, _ = spring.get_offsets()
         
         # Should command stick to move toward AP position
@@ -276,7 +276,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         instance.fbw_aileron_gain = 0.4
         instance._update_fbw_flight_controls(telem)
         
-        spring = self.mock_effects['fbw_spring']
+        spring = instance._spring_handle
         x_coeff_low, y_coeff_low = spring.get_coefficients()
         
         # Test with high FBW gains
@@ -328,7 +328,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         
         self.mock_device._input_data.set_axis(x=0.0, y=0.0)
         instance._update_fbw_flight_controls(telem_ap_on)
-        spring = self.mock_effects['ap_spring']
+        spring = instance._spring_handle
         x_coeff_ap_on, y_coeff_ap_on = spring.get_coefficients()
         
         # Assert - AP should use full coefficient (1.0 instead of 0.5)
@@ -386,7 +386,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         instance._update_fbw_flight_controls(telem)
         
         # Assert
-        spring = self.mock_effects['fbw_spring']
+        spring = instance._spring_handle
         x_offset, _ = spring.get_offsets()
         
         assert x_offset != 0, "X offset should be non-zero with rudder trim"
@@ -473,7 +473,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         instance._update_fbw_flight_controls(telem)
         
         # Assert
-        spring = self.mock_effects['ap_spring']
+        spring = instance._spring_handle
         x_offset, _ = spring.get_offsets()
         
         assert x_offset != 0, "Pedals should be commanded to AP position"
@@ -492,7 +492,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         instance.fbw_rudder_gain = 0.3
         instance._update_fbw_flight_controls(telem)
         
-        spring = self.mock_effects['fbw_spring']
+        spring = instance._spring_handle
         x_coeff_low, _ = spring.get_coefficients()
         
         # Test with high gain
@@ -526,7 +526,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         
         self.mock_device._input_data.set_axis(x=0.0, y=0.0)
         instance._update_fbw_flight_controls(telem_ap_on)
-        spring = self.mock_effects['ap_spring']
+        spring = instance._spring_handle
         x_coeff_ap_on, _ = spring.get_coefficients()
         
         # Assert - should be full stiffness (4096)
@@ -610,7 +610,7 @@ class TestMsfsXpFBWFlightControlsXPlane(BaseTelemetryEffectTestCase):
         instance._update_fbw_flight_controls(telem)
         
         # Assert
-        spring = self.mock_effects['ap_spring']
+        spring = instance._spring_handle
         x_offset, y_offset = spring.get_offsets()
         
         # Should use AP servo values
