@@ -17,6 +17,7 @@ class TelemetryDataBuilder:
             "WeightOnWheels": [0, 0, 0],
             "GroundSpeed": 0.0,
             "CenterSteerAngle": 0.0,
+            "CenterSteerAnglePct": 0.0,
             "WaterRudderExt": 0.0,
             "SurfaceType": "Asphalt",
             "FFBType": "joystick",
@@ -32,6 +33,17 @@ class TelemetryDataBuilder:
             "APRollServo": 0.0,
             "APPitchServo": 0.0,
             "APYawServo": 0.0,
+            "Incidence": [0.0, 0.0, 1.0],
+            "RudderDefl": 0.0,
+            "ElevDefl": 0.0,
+            "AileronDefl": 0.0,
+            "AirDensity": 1.225,
+            "PropThrust": 0,
+            "DynPressure": 500.0,
+            "G": 1.0,
+            "src": "MSFS",
+            "DesignSpeed": (100.0, 50.0, 60.0),
+            "AccBody": [0, 1, 0],
         }
     
     def on_ground(self, on_ground: bool = True):

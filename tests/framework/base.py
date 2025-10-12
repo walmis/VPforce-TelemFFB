@@ -1,10 +1,11 @@
 """
 Base classes and mocks for telemetry effect testing.
 """
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TypeVar, Type
 from unittest.mock import MagicMock, Mock
 import telemffb.globals as G
 
+T = TypeVar('T')
 
 class MockInputData:
     """Mock for FFB device input data."""
@@ -16,6 +17,10 @@ class MockInputData:
     
     def axisXY(self):
         """Return current X and Y axis values."""
+        return (self._x_axis, self._y_axis)
+    
+    def CP_scaled_axisXY(self):
+        """Return current X and Y axis values scaled for center position."""
         return (self._x_axis, self._y_axis)
     
     def forceXY(self):
@@ -51,11 +56,15 @@ class MockFFBDevice:
     def get_input(self) -> MockInputData:
         """Return mock input data."""
         return self._input_data
+    
+    def create_effect(self, effect_type):
+        """Create a mock effect."""
+        return MockConditionEffect()
 
 
 class MockConditionEffect:
     """Mock for condition effect (spring, damper, friction, inertia)."""
-    
+    effect_id = 0
     def __init__(self, name: str = ""):
         self.name = name
         self.started = False
@@ -69,6 +78,8 @@ class MockConditionEffect:
         self.start_count = 0
         self.stop_count = 0
         self.destroy_count = 0
+        self.effect_id += 1
+
     
     def start(self):
         """Start the effect."""
@@ -112,6 +123,13 @@ class MockConditionEffect:
         self._y_coefficient = y_coeff
         return self
     
+    def constant(self, magnitude: float, direction: float = 0):
+        """Set constant force parameters."""
+        # Store as magnitude/direction (polar form)
+        self._magnitude = magnitude
+        self._direction = direction
+        return self
+    
     def setCondition(self, condition):
         """Set condition from condition object."""
         if hasattr(condition, 'cpOffset'):
@@ -123,6 +141,12 @@ class MockConditionEffect:
                 self._y_offset = condition.cpOffset
                 self._y_coefficient = condition.positiveCoefficient or condition.negativeCoefficient
                 self._y_saturation = condition.positiveSaturation or condition.negativeSaturation
+        return self
+    
+    def setConstantForce(self, magnitude: float, direction: float = 0):
+        """Set constant force parameters."""
+        self._magnitude = magnitude
+        self._direction = direction
         return self
     
     def get_coefficients(self):
@@ -148,13 +172,15 @@ class MockHapticEffect:
     """Mock haptic effect container."""
     
     device = None  # Class variable for device
+    effect_id = 0
     
     def __init__(self, device: MockFFBDevice = None):
         if device is None:
             device = MockFFBDevice()
         MockHapticEffect.device = device
         self.effects = {}
-    
+        self.effect_id += 1
+
     def get_effect(self, name: str) -> MockConditionEffect:
         """Get or create an effect by name."""
         if name not in self.effects:
@@ -178,6 +204,12 @@ class MockEffectDispenser:
         if key not in self._effects:
             self._effects[key] = MockConditionEffect(key)
         return self._effects[key]
+    
+    def get(self, key: str, default=None):
+        """Get effect by name with optional default."""
+        if key in self._effects:
+            return self._effects[key]
+        return default
     
     def clear(self):
         """Clear all effects."""
@@ -237,6 +269,31 @@ class MockDampener:
         """Simple pass-through dampening for tests."""
         self._values[key] = value
         return value
+    
+    def update(self, value, derivative_hz=5, derivative_k=0.15):
+        """Simple pass-through update for tests."""
+        return value
+
+
+class MockSpringCondition:
+    """Mock for FFBReport_SetCondition used for spring configuration."""
+    
+    def __init__(self, parameterBlockOffset=0):
+        self.parameterBlockOffset = parameterBlockOffset
+        self.cpOffset = 0
+        self.positiveCoefficient = 0
+        self.negativeCoefficient = 0
+        self.positiveSaturation = 0
+        self.negativeSaturation = 0
+    
+    def set_coefficient(self, coefficient, override=False):
+        """Set spring coefficient."""
+        self.positiveCoefficient = coefficient
+        self.negativeCoefficient = coefficient
+    
+    def set_offset(self, offset):
+        """Set spring offset."""
+        self.cpOffset = int(offset * 4096) if abs(offset) <= 1 else int(offset)
 
 
 class BaseTelemetryEffectTestCase:
@@ -272,7 +329,7 @@ class BaseTelemetryEffectTestCase:
         G.effects = None
         G.master_buttons = []
     
-    def create_test_instance(self, mixin_class, **kwargs):
+    def create_test_instance(self, mixin_class: Type[T], **kwargs) -> T:
         """Create a test instance of a mixin with proper base class chain.
         
         Args:
@@ -298,7 +355,38 @@ class BaseTelemetryEffectTestCase:
                 self.telemffb_controls_axes = False
                 self.local_disable_axis_control = False
                 self.dampener = MockDampener()
+                self.elev_trim_dampener = MockDampener()
+                self.aileron_pos_dampener = MockDampener()
                 self.mock_simconnect = None
+                # Initialize spring conditions
+                self.spring_x = MockSpringCondition(parameterBlockOffset=0)
+                self.spring_y = MockSpringCondition(parameterBlockOffset=1)
+                self.__spring_handle_instance = None
+                # Initialize force trim
+                self.force_trim_x_offset = 0
+                self.force_trim_y_offset = 0
+                # Initialize other required attributes
+                self.ap_following = False
+                self.aoa_effect_enabled = 0
+                self.aoa_effect_gain = 0.5
+                # self.steering_friction = 0
+                # self.steering_friction_spring = 0
+                self.joystick_trim_follow_gain_physical_x = 0
+                self.joystick_trim_follow_gain_physical_y = 0
+                self.joystick_trim_follow_gain_virtual_x = 0
+                self.joystick_trim_follow_gain_virtual_y = 0
+                self.rudder_trim_follow_gain_physical_x = 0
+                self.rudder_trim_follow_gain_virtual_x = 0
+                self.joystick_x_axis_scale = 1.0
+                self.joystick_y_axis_scale = 1.0
+                self.rudder_x_axis_scale = 1.0
+                self.enable_custom_x_axis = False
+                self.enable_custom_y_axis = False
+                self.custom_x_axis = ""
+                self.custom_y_axis = ""
+                self.raw_x_axis_scale = 16384
+                self.raw_y_axis_scale = 16384
+                self.adv_spr_gains = "none"
                 # Initialize with parent
                 super().__init__()
                 
@@ -306,10 +394,19 @@ class BaseTelemetryEffectTestCase:
                 for key, value in init_kwargs.items():
                     setattr(self, key, value)
 
+            def on_telemetry(self, telem_data):
+                """Mock on_telemetry method."""
+                self._telem_data = telem_data.copy()
+                self._last_telem_data = telem_data.copy()
+                super().on_telemetry(telem_data)
+
             @property
             def _simconnect(self):
                 """Mock SimConnect property."""
+                if not self.mock_simconnect:
+                    self.mock_simconnect = MockSimConnect()
                 return self.mock_simconnect
+            
             @_simconnect.setter
             def _simconnect(self, value):
                 """Mock SimConnect setter."""
@@ -346,6 +443,23 @@ class BaseTelemetryEffectTestCase:
                 """Mock XP command."""
                 self._xp_commands = getattr(self, '_xp_commands', [])
                 self._xp_commands.append(command)
+            
+            def spring_mode_is(self, mode):
+                """Check if spring mode matches."""
+                return self.spring_mode == mode
+            
+            @property
+            def effects(self):
+                """Return mock effects dispenser."""
+                return G.effects
+            
+            @property
+            def _spring_handle(self):
+                """Return mock spring handle."""
+                if self.__spring_handle_instance is None:
+                    self.__spring_handle_instance = G.effects['dynamic_spring']
+                    self.__spring_handle_instance.name = 'dynamic_spring'
+                return self.__spring_handle_instance
         
         return TestClass(**kwargs)
     

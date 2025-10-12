@@ -11,7 +11,7 @@ perftracker = utils.PerformanceTracker()
 class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
     # user parameters
-    spring_mode = SpringModeEnum.NONE.name
+    _spring_mode : SpringModeEnum = SpringModeEnum.NONE
     
     adv_spr_override_enabled: bool = False   # deprecated
     adv_spr_gains: str = 'none'
@@ -27,6 +27,33 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     override_spring_cp0_y: float = 0.0
     # end of user parameters
 
+    @property
+    def spring_mode(self) -> SpringModeEnum:
+        return self._spring_mode
+    
+    @spring_mode.setter
+    def spring_mode(self, value):
+        # Accept None, enum instances, and valid enum member names (strings).
+        if value is None:
+            self._spring_mode = SpringModeEnum.NONE
+            return
+
+        # Enum instance -> accept
+        if isinstance(value, SpringModeEnum):
+            self._spring_mode = value
+            return
+
+        # String -> map to enum if valid name
+        if isinstance(value, str):
+            if value in SpringModeEnum.__members__:
+                self._spring_mode = SpringModeEnum[value]
+                return
+            else:
+                raise ValueError(f"Invalid spring mode string: {value}")
+
+        # Any other type is invalid
+        raise ValueError("Invalid type for spring_mode")
+
     def __init__(self, *args, **kwargs):
         # Ensure cooperative init ordering
         super().__init__(*args, **kwargs)
@@ -41,8 +68,8 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         self.spring_adjuster = self.effects['spring_adjuster'].spring_adjuster()
 
 
-    def spring_mode_is(self, mode):
-        return mode.name == self.spring_mode
+    def spring_mode_is(self, mode : SpringModeEnum):
+        return mode == self.spring_mode
     
     def ac_modify_game_spring(self):
         if not self.spring_mode_is(SpringModeEnum.ADVANCED):

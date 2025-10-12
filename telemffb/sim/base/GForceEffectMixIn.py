@@ -36,7 +36,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
 
     def __init__(self):
         super().__init__()
-        self.gforce_effect_mode = GEffectModeEnum.DISABLED.name
+        self._gforce_effect_mode = GEffectModeEnum.DISABLED
 
         self.__firmware_supported = None
         self.offset_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
@@ -47,6 +47,33 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
 
         derivative_hz = 5  # derivative lpf filter -3db Hz
         self.__dGs = utils.Derivative(derivative_hz)
+
+    @property
+    def gforce_effect_mode(self) -> GEffectModeEnum:
+        return self._gforce_effect_mode
+    
+    @gforce_effect_mode.setter
+    def gforce_effect_mode(self, value):
+        # Accept None, enum instances, and valid enum member names (strings).
+        if value is None:
+            self._gforce_effect_mode = GEffectModeEnum.DISABLED
+            return
+
+        # Enum instance -> accept
+        if isinstance(value, GEffectModeEnum):
+            self._gforce_effect_mode = value
+            return
+
+        # String -> map to enum if valid name
+        if isinstance(value, str):
+            if value in GEffectModeEnum.__members__:
+                self._gforce_effect_mode = GEffectModeEnum[value]
+                return
+            else:
+                raise ValueError(f"Invalid GEffectModeEnum mode string: {value}")
+        
+        # Any other type is invalid
+        raise ValueError("Invalid type for gforce_effect_mode")
         
     def gforce_effect_mode_is(self, mode):
         return mode.name == self.gforce_effect_mode
