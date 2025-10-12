@@ -434,7 +434,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
 
         elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
-        elev_trim = self.elev_trim_dampener.dampen_value(elev_trim, "_elev_trim", derivative_hz=5, derivative_k=0.15)
+        elev_trim = self.elev_trim_dampener.update(elev_trim, derivative_hz=5, derivative_k=0.15)
 
         virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
         phys_stick_y_offs = int(elev_trim * 4096)
