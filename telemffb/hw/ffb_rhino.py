@@ -30,7 +30,7 @@ import os
 import time
 import weakref
 from dataclasses import dataclass
-from typing import List, Self, override
+from typing import List, Optional, Self, override
 
 import usb1
 from PyQt6.QtCore import QObject, QTimer, QTimerEvent, pyqtSignal
@@ -995,15 +995,14 @@ class FFBRhino(QObject):
 
 # Higher level effect interface
 class HapticEffect(Destroyable):
-    device : FFBRhino = None
+    device : Optional[FFBRhino] = None
 
     def __init__(self):
-        self.name = None
+        self.name : Optional[str] = None
         self._stopped_time : int = 0
-        self._h_effect : FFBEffectHandle = None
-        self.modulator = None
-        self.effect_type = None
-        self._conds = {}
+        self._h_effect : Optional[FFBEffectHandle] = None
+        self.modulator : Optional[FFBReport_SetCondition] = None
+        self.effect_type : Optional[int] = None
         # Lazy initialization state
         self._pending_create = None  # function for creating the effect (lazy initialization)
         self._pending_conditions = {} # functions for setting condition (lazy initialization)
