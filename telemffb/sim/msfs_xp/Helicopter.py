@@ -105,8 +105,6 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
         super().on_telemetry(telem_data)
 
-        if self.is_trimwheel():
-            return
 
         self.msfs_update_collective(telem_data)
         # # self._update_cyclic_trim(telem_data)
@@ -217,7 +215,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
                 self.last_pos_x_pos = pos_x_pos
 
     def msfs_update_collective(self, telem_data):
-        if not self.is_collective() or self.is_trimwheel():
+        if not self.is_collective():
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
             return

@@ -126,6 +126,3 @@ class GliderAircraft(Aircraft):
 
         self.msfs_update_force_trim(telem_data, x_axis=self.aileron_force_trim,
                                                 y_axis=self.elevator_force_trim)
-
-        if self.is_collective():
-            self.msfs_override_collective_spring()

@@ -40,6 +40,8 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
             return
         
+        assert HapticEffect.device is not None, "Haptic device not initialized"
+        
         ap_active = 0
         if self._sim_is_msfs():
             ap_active = telem_data.get("APMaster", 0)

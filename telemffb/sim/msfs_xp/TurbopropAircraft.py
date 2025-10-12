@@ -36,8 +36,3 @@ class TurbopropAircraft(PropellerAircraft):
         telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
-        if self.is_trimwheel():
-            return
-
-        if self.is_collective():
-            self.msfs_override_collective_spring()
