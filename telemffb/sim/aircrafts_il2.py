@@ -60,12 +60,6 @@ EFFECT_SAWTOOTHDOWN = 7
 # example: effects["myUniqueName"]
 # effects : Dict[str, HapticEffect] = utils.Dispenser(HapticEffect)
 
-# Highpass filter dispenser
-HPFs : Dict[str, utils.HighPassFilter]  = utils.Dispenser(utils.HighPassFilter)
-
-# Lowpass filter dispenser
-LPFs : Dict[str, utils.LowPassFilter] = utils.Dispenser(utils.LowPassFilter)
-
 dbg_en = 0
 dbg_lvl = 2
 def dbg(level, *args, **kwargs):
@@ -344,11 +338,8 @@ class PropellerAircraft(Aircraft):
 
 class JetAircraft(Aircraft):
     """Generic Class for Jets"""
-    #flaps_motion_intensity = 0.0
 
-    _ab_is_playing = 0
-
-      # run on every telemetry frame
+    # run on every telemetry frame
     @override
     def on_telemetry(self, telem_data):
         telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry

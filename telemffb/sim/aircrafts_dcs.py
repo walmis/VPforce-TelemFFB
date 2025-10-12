@@ -573,7 +573,6 @@ class PropellerAircraft(Aircraft):
 
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
-    # pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
     def dcs_update_actual_rpm(self, telem_data):
         if not "ActualRPM" in telem_data:
@@ -599,9 +598,6 @@ class PropellerAircraft(Aircraft):
 class JetAircraft(Aircraft):
     """Generic Class for Jets"""
     #flaps_motion_intensity = 0.0
-
-    _ab_is_playing = 0
-    pedal_spring_mode = 'Static Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
     jet_engine_rumble_intensity = 0.05
     afterburner_effect_intensity = 0.2
@@ -630,8 +626,6 @@ class TurbopropAircraft(PropellerAircraft):
 class Helicopter(Aircraft):
     """Generic Class for Helicopters"""
     buffeting_intensity = 0.0
-
-    pedal_spring_mode = 'No Spring'    ## 0=DCS Default | 1=spring disabled + damper enabled, 2=spring enabled at %100 (overriding DCS) + damper
 
     @override
     def on_telemetry(self, telem_data):
