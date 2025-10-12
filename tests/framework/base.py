@@ -169,6 +169,14 @@ class MockEffectDispenser:
             self._effects[key] = MockConditionEffect(key)
         return self._effects[key]
     
+    def clear(self):
+        """Clear all effects."""
+        self._effects.clear()
+
+    def values(self):
+        """Return all effect values."""
+        return self._effects.values()
+
     def reset_all(self):
         """Reset all effects."""
         for effect in self._effects.values():
