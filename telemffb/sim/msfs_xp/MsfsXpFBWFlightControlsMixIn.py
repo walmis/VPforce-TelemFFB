@@ -68,7 +68,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         self._spring_handle.stop()    
 
 
-    def _update_fbw_flight_controls(self, telem_data, ap=False):
+    def update_fbw_flight_controls(self, telem_data, ap=False):
         ap_send_flag_x = True
         ap_send_flag_y = True
         ffb_type = telem_data.get("FFBType", "joystick")

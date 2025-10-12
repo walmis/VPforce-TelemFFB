@@ -42,7 +42,6 @@ import logging
 class Aircraft(
     AircraftBase,
     MsfsXpTrimwheelMixIn, 
-    MfsfXpSteeringFrictionEffectMixIn,
     MsfsXpNosewheelShimmyMixIn,
     MsfsXpFlightControlsMixIn
 ):

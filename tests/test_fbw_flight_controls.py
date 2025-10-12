@@ -39,7 +39,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         self.set_telemetry(instance, telem)
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         # When disabled, spring offset should be 0
@@ -69,7 +69,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         self.set_telemetry(instance, telem)
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         spring = instance._spring_handle
@@ -100,13 +100,13 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         
         # Test with low physical gain
         instance.joystick_trim_follow_gain_physical_y = 0.2
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         spring = instance._spring_handle
         _, low_gain_offset = spring.get_offsets()
         
         # Test with high physical gain
         instance.joystick_trim_follow_gain_physical_y = 1.0
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         _, high_gain_offset = spring.get_offsets()
         
         # Assert
@@ -131,7 +131,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         telem = TelemetryDataBuilder().ffb_type("joystick").build()
         self.set_telemetry(instance, telem)
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         assert_simconnect_event_sent(
@@ -162,7 +162,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         # Test with reduced scale
         instance.joystick_x_axis_scale = 0.5
         instance.joystick_y_axis_scale = 0.5
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Get sent values
         aileron_events = [
@@ -211,7 +211,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=0.0, y=0.0)
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         spring = instance._spring_handle
@@ -246,7 +246,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=0.02, y=0.0)
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert - within deadzone, so axis should be zeroed
         aileron_events = [
@@ -274,7 +274,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         # Test with low FBW gains
         instance.fbw_elevator_gain = 0.3
         instance.fbw_aileron_gain = 0.4
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         spring = instance._spring_handle
         x_coeff_low, y_coeff_low = spring.get_coefficients()
@@ -282,7 +282,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         # Test with high FBW gains
         instance.fbw_elevator_gain = 0.9
         instance.fbw_aileron_gain = 0.8
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         x_coeff_high, y_coeff_high = spring.get_coefficients()
         
@@ -313,7 +313,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
             .build()
         )
         self.set_telemetry(instance, telem_ap_off)
-        instance._update_fbw_flight_controls(telem_ap_off)
+        instance.update_fbw_flight_controls(telem_ap_off)
         spring = self.mock_effects['fbw_spring']
         x_coeff_ap_off, y_coeff_ap_off = spring.get_coefficients()
         
@@ -327,7 +327,7 @@ class TestMsfsXpFBWFlightControlsJoystick(BaseTelemetryEffectTestCase):
         self.set_telemetry(instance, telem_ap_on)
         
         self.mock_device._input_data.set_axis(x=0.0, y=0.0)
-        instance._update_fbw_flight_controls(telem_ap_on)
+        instance.update_fbw_flight_controls(telem_ap_on)
         spring = instance._spring_handle
         x_coeff_ap_on, y_coeff_ap_on = spring.get_coefficients()
         
@@ -358,7 +358,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         self.set_telemetry(instance, telem)
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         spring = self.mock_effects['fbw_spring']
@@ -383,7 +383,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         )
         self.set_telemetry(instance, telem)
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         spring = instance._spring_handle
@@ -408,7 +408,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         telem = TelemetryDataBuilder().ffb_type("pedals").build()
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         assert_simconnect_event_sent(
@@ -432,7 +432,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         
         # Test with reduced scale
         instance.rudder_x_axis_scale = 0.5
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Get sent values
         rudder_events = [
@@ -470,7 +470,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=0.0, y=0.0)
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         spring = instance._spring_handle
@@ -490,14 +490,14 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         
         # Test with low gain
         instance.fbw_rudder_gain = 0.3
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         spring = instance._spring_handle
         x_coeff_low, _ = spring.get_coefficients()
         
         # Test with high gain
         instance.fbw_rudder_gain = 0.9
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         x_coeff_high, _ = spring.get_coefficients()
         
@@ -525,7 +525,7 @@ class TestMsfsXpFBWFlightControlsPedals(BaseTelemetryEffectTestCase):
         )
         
         self.mock_device._input_data.set_axis(x=0.0, y=0.0)
-        instance._update_fbw_flight_controls(telem_ap_on)
+        instance.update_fbw_flight_controls(telem_ap_on)
         spring = instance._spring_handle
         x_coeff_ap_on, _ = spring.get_coefficients()
         
@@ -553,7 +553,7 @@ class TestMsfsXpFBWFlightControlsXPlane(BaseTelemetryEffectTestCase):
         telem = TelemetryDataBuilder().ffb_type("joystick").build()
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         assert hasattr(instance, '_xp_commands'), "Should send XP commands"
@@ -578,7 +578,7 @@ class TestMsfsXpFBWFlightControlsXPlane(BaseTelemetryEffectTestCase):
         telem = TelemetryDataBuilder().ffb_type("pedals").build()
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         assert hasattr(instance, '_xp_commands')
@@ -607,7 +607,7 @@ class TestMsfsXpFBWFlightControlsXPlane(BaseTelemetryEffectTestCase):
         self.mock_device._input_data.set_axis(x=0.0, y=0.0)
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         spring = instance._spring_handle
@@ -638,7 +638,7 @@ class TestMsfsXpFBWFlightControlsCustomAxes(BaseTelemetryEffectTestCase):
         telem = TelemetryDataBuilder().ffb_type("joystick").build()
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         assert_simconnect_event_sent(
@@ -665,7 +665,7 @@ class TestMsfsXpFBWFlightControlsCustomAxes(BaseTelemetryEffectTestCase):
         telem = TelemetryDataBuilder().ffb_type("joystick").build()
         
         # Act
-        instance._update_fbw_flight_controls(telem)
+        instance.update_fbw_flight_controls(telem)
         
         # Assert
         custom_events = [
