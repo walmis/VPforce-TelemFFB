@@ -127,6 +127,8 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
 
     def ac_override_pedal_spring(self, telem_data):
         if not self.is_pedals(): return
+        if self._sim_is_msfs() or self._sim_is_xplane(): # TODO: override ac_override_pedal_spring with a stub in the child class
+            return
 
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
@@ -177,7 +179,5 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         spring.start(override=True)
 
     def on_telemetry(self, telem_data: dict):
-        if not self.is_pedals(): return
-
-        if not (self._sim_is_msfs() or self._sim_is_xplane()):
-            self.ac_override_pedal_spring(telem_data)
+        super().on_telemetry(telem_data)
+        self.ac_override_pedal_spring(telem_data)

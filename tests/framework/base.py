@@ -18,6 +18,10 @@ class MockInputData:
         """Return current X and Y axis values."""
         return (self._x_axis, self._y_axis)
     
+    def forceXY(self):
+        """Return current force values (mock returns zeros)."""
+        return (0.0, 0.0)
+    
     def set_axis(self, x: float = None, y: float = None):
         """Set axis values for testing."""
         if x is not None:
@@ -55,6 +59,7 @@ class MockConditionEffect:
     def __init__(self, name: str = ""):
         self.name = name
         self.started = False
+        self.effect_type = 0  # Default effect type
         self._x_coefficient = 0
         self._y_coefficient = 0
         self._x_offset = 0
@@ -163,6 +168,11 @@ class MockEffectDispenser:
     def __init__(self):
         self._effects = {}
     
+    @property
+    def dict(self):
+        """Return the internal effects dictionary."""
+        return self._effects
+    
     def __getitem__(self, key: str) -> MockConditionEffect:
         """Get effect by name."""
         if key not in self._effects:
@@ -182,6 +192,11 @@ class MockEffectDispenser:
         for effect in self._effects.values():
             effect.stop()
             effect.reset_counters()
+
+    def dispose(self, *args):
+        for name in args:
+            if name in self._effects:
+                del self._effects[name]
 
 
 class MockSimConnect:
