@@ -11,6 +11,8 @@ perftracker = utils.PerformanceTracker()
 class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
     # user parameters
+    spring_mode = SpringModeEnum.NONE.name
+    
     adv_spr_override_enabled: bool = False   # deprecated
     adv_spr_gains: str = 'none'
     adv_spr_use_hardware_trim: bool = False
@@ -29,7 +31,6 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         # Ensure cooperative init ordering
         super().__init__(*args, **kwargs)
         self.__firmware_supported = None
-        self.spring_mode = SpringModeEnum.NONE.name
 
         # per-instance state used by advanced spring override
         self.adv_spr_settings_dict: dict = {}
@@ -38,6 +39,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
         # the spring_adjuster effect object (wrapper) from the global effects dispenser
         self.spring_adjuster = self.effects['spring_adjuster'].spring_adjuster()
+
 
     def spring_mode_is(self, mode):
         return mode.name == self.spring_mode

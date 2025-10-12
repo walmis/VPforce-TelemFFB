@@ -21,6 +21,10 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
     # end of user parameters
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
     def msfs_update_heli_controls(self, telem_data):
         if self.is_trimwheel(): return
 
@@ -42,6 +46,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             telem_data.get("ForceTrimSW", True) if self.custom_ft_sw_var_enabled else True
         )  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
         if ffb_type == "joystick":
+            assert HapticEffect.device is not None, "HapticEffect.device is None"
             input_data = HapticEffect.device.get_input()
             x, y = input_data.axisXY()
             telem_data["phys_x"] = x

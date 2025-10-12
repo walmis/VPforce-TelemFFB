@@ -83,6 +83,9 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         if self._sim_is_msfs():
             self.subscribe_simvars()
 
+        self.cyclic_spring_init = 0
+        self.collective_init = 0
+        self.pedals_init = 0
         self.cpO_x = 0
         self.cpO_y = 0
 
@@ -120,8 +123,6 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         if 'ForceTrimSW' not in self._simconnect.sv_dict.keys():
             self._simconnect.add_simvar(name='ForceTrimSW', var="L:TelemFFBHeliFT", sc_unit="enum")
             self._simconnect._resubscribe()
-
-
 
 
     def msfs_update_pedals(self, telem_data):

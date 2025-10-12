@@ -18,7 +18,7 @@
 
 
 import logging
-import math
+from typing import override
 
 import telemffb.utils as utils
 
@@ -32,9 +32,7 @@ from telemffb.sim.base.BuffetingEffectMixIn import BuffetingEffectMixIn
 from telemffb.sim.base.HelicopterEffectsMixIn import HelicopterEffectsMixIn
 from telemffb.sim.base.DeadzoneMixIn import DeadzoneMixIn
 from telemffb.sim.base.HydraulicLossMixIn import HydraulicLossMixIn
-from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
 from telemffb.sim.base.PedalSpringOverrideMixIn import PedalSpringOverrideMixIn
-from telemffb.sim.base.AoAEffectsMixIn import AoAEffectsMixIn
 
 from telemffb.hw.ffb_rhino import (
     HapticEffect,
@@ -45,7 +43,6 @@ from telemffb.hw.ffb_rhino import (
     EFFECT_SPRING_ADJUSTER,
 )
 import telemffb.globals as G
-from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 
 # initialize the global effects dispenser
 G.effects = utils.Dispenser(HapticEffect)
@@ -59,7 +56,6 @@ class AircraftBase(
     HydraulicLossMixIn,
     DecelerationEffectMixIn,
     EngineRumbleMixIn,
-    AoAEffectsMixIn,
     WindEffectMixIn,
     AdvancedSpringMixIn,
     MotionEffectsMixIn,
@@ -73,10 +69,12 @@ class AircraftBase(
 
         # clear any existing effects
         self.effects.clear()
-        
+    
+    @override
     def on_event(self, event, *args):
         super().on_event(event, *args)
 
+    @override
     def on_timeout(self):  # override me
         logging.info("Telemetry Timeout, stopping effects")
         # effects.foreach(lambda e: e.stop())
@@ -95,6 +93,7 @@ class AircraftBase(
 
         super().on_timeout()
 
+    @override
     def on_telemetry(self, telem_data):
         fx, fy = HapticEffect.device.get_input().forceXY()
         self.telem_data["ForceXY"] = [fx, fy]

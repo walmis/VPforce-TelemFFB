@@ -54,7 +54,6 @@ class Aircraft(
     spoiler_motion_intensity: float = 0.0  # peak vibration intensity when spoilers is moving, 0 to disable
     spoiler_buffet_intensity: float = 0.15  # peak buffeting intensity when spoilers deployed,  0 to disable
 
-
     flaps_motion_intensity: float = 0.12  # peak vibration intensity when flaps are moving, 0 to disable
     flaps_buffet_intensity: float = 0.0  # peak buffeting intensity when flaps are deployed,  0 to disable
 
@@ -90,23 +89,15 @@ class Aircraft(
     turbulence_sensitivity: float = 0.0
     turbulence_intensity: float = 0.0
 
-
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
         self.turbulence_modulator = TurbulenceModulator()
 
         # clear any existing effects
-        for e in self.effects.values(): e.destroy()
         self.effects.clear()
         # self.spring = HapticEffect().spring()
 
-
-        self.const_force = HapticEffect().constant(0, 0)
-
-
-
         self.cyclic_trim_release_active = 0
-        self.cyclic_spring_init = 0
         self.cyclic_center = [0.0, 0.0]  # x, y
         self.collective_spring_init = 0
         self.force_disable_collective_gain = True
@@ -126,46 +117,37 @@ class Aircraft(
 
         self.last_pedal_x = 0
 
-
-
-
-
-
-
     def update_turbulence(self):
         if self.turbulence_effect_enable:
-            force, dir = self.turbulence_modulator.update(self.telem_data, self.turbulence_hpf_alpha, self.turbulence_smoothing_alpha, self.turbulence_sensitivity, self.turbulence_intensity)
+            force, dir = self.turbulence_modulator.update(
+                self.telem_data,
+                self.turbulence_hpf_alpha,
+                self.turbulence_smoothing_alpha,
+                self.turbulence_sensitivity,
+                self.turbulence_intensity,
+            )
             force = round(force, 4)
-            self.effects['turbulence'].constant(force, dir).start()
+            self.effects["turbulence"].constant(force, dir).start()
 
-            #print(f"force:{force} dir:{dir}")
+            # print(f"force:{force} dir:{dir}")
         else:
-            self.effects['turbulence'].destroy()
-
-
-
-
-
-
+            self.effects["turbulence"].destroy()
 
     def msfs_update_stick_shaker(self, telem_data):
+        if not self.is_joystick():
+            return
         if not self._sim_is_msfs():
             return
 
         if not self.enable_stick_shaker:
-            self.effects['stick_shaker'].destroy()
+            self.effects["stick_shaker"].destroy()
             return
 
-        stall = telem_data.get('StallWarning', 0)
+        stall = telem_data.get("StallWarning", 0)
         if stall:
-            self.effects['stick_shaker'].periodic(14, self.stick_shaker_intensity, 0, EFFECT_SQUARE).start()
+            self.effects["stick_shaker"].periodic(14, self.stick_shaker_intensity, 0, EFFECT_SQUARE).start()
         else:
-            self.effects['stick_shaker'].destroy()
-
-
-
-
-
+            self.effects["stick_shaker"].destroy()
 
     def msfs_override_collective_spring(self):
         """
@@ -175,7 +157,7 @@ class Aircraft(
         Option to leave spring active also exists
         """
         if not self.is_collective(): return
-        if not self.is_helicopter(): return
+        if self.is_helicopter(): return # if helicopter, do nothing, we are only doing this for fixed wing aircraft with collective
 
         self.spring = self.effects["collective_ap_spring"].spring()
 
@@ -194,6 +176,7 @@ class Aircraft(
 
     @override
     def on_event(self, event, *args):
+        super().on_event(event, *args)
         logging.info(f"on_event {event} {args}")
 
         if event == "STOP":
@@ -232,13 +215,7 @@ class Aircraft(
         if self.is_joystick():
             self.update_turbulence()
 
-        if self.is_trimwheel():
-            self.msfs_update_trimwheel(telem_data)
-            return
-
         self.msfs_update_stick_shaker(telem_data)
-        self.msfs_update_flight_controls(telem_data)
-
 
     @override
     def on_timeout(self):
@@ -246,11 +223,7 @@ class Aircraft(
             super().on_timeout()
 
         self.cyclic_spring_init = 0
-        self.trimwheel_init = 0
 
-
-        self.const_force.stop()
-        self._spring_handle.stop()
         if self.center_spring_on_pause:
             self.spring_x.set_coefficient(1.0)
             self.spring_y.set_coefficient(1.0)

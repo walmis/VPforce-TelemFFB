@@ -1,3 +1,4 @@
+from typing import override
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsMixIn
@@ -27,11 +28,18 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         self.last_pos_y_pos = 0.0
         self.trim_active = False
 
+    @override
+    def on_telemetry(self, telem_data):
+        super().on_telemetry(telem_data)
+        self.msfs_update_trimwheel(telem_data)    
+    
+
     def msfs_update_trimwheel(self, telem_data):
         if not self.is_trimwheel():
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
             return
+        
         ap_active = 0
         if self._sim_is_msfs():
             ap_active = telem_data.get("APMaster", 0)
