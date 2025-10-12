@@ -1,4 +1,4 @@
-from telemffb.hw.ffb_rhino import FFBReport_SetCondition
+from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 class DynamicSpringMixin(AircraftEffectUtilsBase):
@@ -11,7 +11,7 @@ class DynamicSpringMixin(AircraftEffectUtilsBase):
         self.__spring_handle = None 
 
     @property
-    def _spring_handle(self):
+    def _spring_handle(self) -> HapticEffect:
         if self.__spring_handle is None:
             self.__spring_handle = self.effects['spring'].spring()
             self.__spring_handle.name = 'spring'
