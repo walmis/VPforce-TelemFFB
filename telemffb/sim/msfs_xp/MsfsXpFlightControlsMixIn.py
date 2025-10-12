@@ -1,3 +1,10 @@
+from typing import override
+import json
+import logging
+import math
+from math import atan2, sin, sqrt
+
+from telemffb.sim.base.AoAEffectsMixIn import AoAEffectsMixIn
 import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
@@ -6,14 +13,7 @@ from telemffb.util.Vector import Vector, Vector2D
 from telemffb.util.conversions import P0, deg, math, ms2kt, rad, std_air_pressure, vsound
 from telemffb.utils import clamp
 
-
-import json
-import logging
-import math
-from math import atan2, sin, sqrt
-
-
-class MsfsXpFlightControlsMixIn(MsfsXpFBWFlightControlsMixIn):
+class MsfsXpFlightControlsMixIn(MsfsXpFBWFlightControlsMixIn, AoAEffectsMixIn):
     """Mixin for MSFS and X-Plane specific flight control handling."""
 
     # user parameters
@@ -53,6 +53,20 @@ class MsfsXpFlightControlsMixIn(MsfsXpFBWFlightControlsMixIn):
         self.aileron_gain = 0.1
         self.elevator_gain = 0.1
         self.rudder_gain = 0.1
+
+        self.rudder_force_dampener = utils.Dampener()
+        self.const_force = HapticEffect().constant(0, 0)
+
+    @override
+    def on_timeout(self):
+        super().on_timeout()
+        self.const_force.stop()
+
+    @override
+    def on_telemetry(self, telem_data):
+        super().on_telemetry(telem_data)
+        self.msfs_update_flight_controls(telem_data)
+    
 
     def msfs_update_flight_controls(self, telem_data):
         # calculations loosely based on FLightGear FFB page:
@@ -270,7 +284,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpFBWFlightControlsMixIn):
         telem_data["_rud_coeff"] = rudder_coeff
         rud = (slip_angle - rudder_angle) * _dyn_pressure * _slip_gain
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
-        rud_force = self.dampener.dampen_value(rud_force, "_rud_force", derivative_hz=5, derivative_k=0.015)
+        rud_force = self.rudder_force_dampener.update(rud_force, derivative_hz=5, derivative_k=0.015)
 
         if ffb_type == "joystick":
 
@@ -284,7 +298,7 @@ class MsfsXpFlightControlsMixIn(MsfsXpFBWFlightControlsMixIn):
 
                 elev_trim = clamp(elev_trim * self.joystick_trim_follow_gain_physical_y, -1, 1)
 
-                elev_trim = self.dampener.dampen_value(elev_trim, "_elev_trim", derivative_hz=5, derivative_k=0.15)
+                elev_trim = self.elev_trim_dampener.dampen_value(elev_trim, "_elev_trim", derivative_hz=5, derivative_k=0.15)
 
                 virtual_stick_y_offs = elev_trim - (elev_trim * self.joystick_trim_follow_gain_virtual_y)
                 phys_stick_y_offs = int(elev_trim * 4096)
@@ -293,8 +307,8 @@ class MsfsXpFlightControlsMixIn(MsfsXpFBWFlightControlsMixIn):
                     if self._sim_is_msfs():
                         aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
                         aileron_pos = aileron_pos[0]
-                        aileron_pos = self.dampener.dampen_value(
-                            aileron_pos, "_aileron_pos", derivative_hz=5, derivative_k=0.15
+                        aileron_pos = self.aileron_pos_dampener.update(
+                            aileron_pos, derivative_hz=5, derivative_k=0.15
                         )
                     elif self._sim_is_xplane():
                         aileron_pos = telem_data.get("APRollServo", 0)
