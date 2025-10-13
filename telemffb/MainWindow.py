@@ -49,8 +49,9 @@ import telemffb.xmlutils as xmlutils
 # from telemffb.config_utils import autoconvert_config
 from telemffb.ConfiguratorDialog import ConfiguratorDialog
 from telemffb.custom_widgets import ClickLogo, InstanceStatusRow, NoKeyScrollArea, NoWheelSlider, NoWheelNumberSlider, \
-    SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow
+    SimStatusLabel, vpf_purple, AppStatusWidget, DetachedTabWindow, ExceptionStatusWidget
 from telemffb.DevicePanel import DeviceIconPanel
+from telemffb.ExceptionTracker import ExceptionViewerDialog
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.SCOverridesEditor import SCOverridesEditor
 from telemffb.SettingsLayout import SettingsLayout
@@ -816,16 +817,25 @@ class MainWindow(QMainWindow):
         self.version_label.setOpenExternalLinks(True)
         self.setStatusBar(self.status_bar)
         self.firmware_label = QLabel()
-        try:
-            f_vers = HapticEffect.device.get_firmware_version()
-        except:
-            f_vers = 'error fetching'
-        self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
+        if not HapticEffect.device:
+            f_vers = 'Device Disconnected'
+            self.firmware_label.setText("Device Disconnected")
+        else:
+            try:
+                f_vers = HapticEffect.device.get_firmware_version()
+            except:
+                f_vers = 'error fetching'
+            self.firmware_label.setText(f'Rhino Firmware: {f_vers}')
 
         self.version_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.firmware_label.setAlignment(Qt.AlignmentFlag.AlignRight)
 
+        # Add exception status widget to status bar
+        self.exception_status_widget = ExceptionStatusWidget(self)
+        self.exception_status_widget.clicked.connect(self.show_exception_viewer)
+        
         self.status_bar.addWidget(self.firmware_label)
+        self.status_bar.addPermanentWidget(self.exception_status_widget)
         self.status_bar.addPermanentWidget(self.version_label)
 
 
@@ -834,6 +844,11 @@ class MainWindow(QMainWindow):
         G.telem_manager.telemetryReceived.connect(self.on_update_telemetry)
         G.telem_manager.telemetryTimeout.connect(self.on_telemetry_timeout)
         G.telem_manager.aircraftUpdated.connect(self.update_settings)
+        
+        """ Connect exception tracker signals """
+        
+        G.exception_tracker.exception_added.connect(self.update_exception_count)
+        G.exception_tracker.exceptions_cleared.connect(self.update_exception_count)
 
 
         """  Load the stored window geometry from users registry keys """
@@ -1138,6 +1153,15 @@ class MainWindow(QMainWindow):
         if G.master_instance:
             G.ipc_instance.send_broadcast_message("RELOAD AIRCRAFT")
 
+    def show_exception_viewer(self):
+        """Show the exception viewer dialog."""
+        dialog = ExceptionViewerDialog(G.exception_tracker, self)
+        dialog.exec()
+        
+    def update_exception_count(self):
+        """Update the exception count in the status bar."""
+        count = G.exception_tracker.get_count()
+        self.exception_status_widget.set_count(count)
 
     def add_debug_menu(self):
         # debug mode

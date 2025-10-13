@@ -2460,6 +2460,55 @@ class GForceCurveWidget(CurveWidget):
         self.update()
 
 
+class ExceptionStatusWidget(QWidget):
+    """Status bar widget showing logged exception count with clickable link."""
+    
+    clicked = pyqtSignal()  # Emitted when the widget is clicked
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.exception_count = 0
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Setup the widget UI."""
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Error icon/emoji
+        self.icon_label = QLabel("❌")
+        #self.icon_label.setStyleSheet("font-size: 14pt;")
+        
+        # Text label
+        self.text_label = QLabel("Errors: 0")
+        self.text_label.setStyleSheet("color: #ff6b6b; font-weight: bold;")
+        
+        layout.addWidget(self.icon_label)
+        layout.addWidget(self.text_label)
+        
+        # Make it look clickable
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Click to view logged exceptions")
+        
+        # Initially hidden
+        self.hide()
+        
+    def set_count(self, count: int):
+        """Update the exception count."""
+        self.exception_count = count
+        self.text_label.setText(f"Errors: {count}")
+        
+        if count > 0:
+            self.show()
+        else:
+            self.hide()
+            
+    def mousePressEvent(self, event):
+        """Handle mouse click."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 

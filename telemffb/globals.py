@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from telemffb.ConfiguratorDialog import ConfiguratorDialog
     from telemffb.hw.ffb_rhino import DeviceInfo, HapticEffect
     from telemffb.utils import Dispenser
+    from telemffb.ExceptionTracker import ExceptionTracker
 # Application state
 is_exe: bool = False
 args : 'CmdLineArgs'
@@ -95,6 +96,7 @@ sim_listeners : 'SimListenerManager'
 # Triggers and flags
 force_reload_aircraft_trigger: bool = False
 
-
+# Exception tracking
+exception_tracker : 'ExceptionTracker'  # Tracks logged exceptions for user notification and reporting
 
 effects : 'Dispenser'  # Haptic effects dispenser, used to manage and access haptic effects by name
