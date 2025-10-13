@@ -6057,13 +6057,6 @@
 			<device>any</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
-			<name>new_gforce_effect_enable</name>
-			<type>JetAircraft</type>
-			<value>false</value>
-			<sim>DCS</sim>
-			<device>joystick</device>
-		</classdefaults_DCS>
-		<classdefaults_DCS>
 			<name>new_gforce_enable_neg_gs</name>
 			<type>JetAircraft</type>
 			<value>false</value>
@@ -6246,13 +6239,6 @@
 			<device>any</device>
 		</classdefaults_DCS>
 		<classdefaults_DCS>
-			<name>new_gforce_effect_enable</name>
-			<type>TurbopropAircraft</type>
-			<value>false</value>
-			<sim>DCS</sim>
-			<device>joystick</device>
-		</classdefaults_DCS>
-		<classdefaults_DCS>
 			<name>new_gforce_enable_neg_gs</name>
 			<type>TurbopropAircraft</type>
 			<value>false</value>
@@ -6396,13 +6382,6 @@
 			<name>gforce_min_gs</name>
 			<type>PropellerAircraft</type>
 			<value>1.4</value>
-			<sim>DCS</sim>
-			<device>joystick</device>
-		</classdefaults_DCS>
-		<classdefaults_DCS>
-			<name>new_gforce_effect_enable</name>
-			<type>PropellerAircraft</type>
-			<value>false</value>
 			<sim>DCS</sim>
 			<device>joystick</device>
 		</classdefaults_DCS>
@@ -7762,34 +7741,6 @@
 			<value>1.0</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>new_gforce_effect_enable</name>
-			<type>GliderAircraft</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>new_gforce_effect_enable</name>
-			<type>JetAircraft</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>new_gforce_effect_enable</name>
-			<type>PropellerAircraft</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
-		</classdefaults_MSFS>
-		<classdefaults_MSFS>
-			<name>new_gforce_effect_enable</name>
-			<type>TurbopropAircraft</type>
-			<value>false</value>
-			<sim>MSFS</sim>
-			<device>joystick</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>new_gforce_enable_neg_gs</name>
@@ -9450,34 +9401,6 @@
 			<device>pedals</device>
 		</classdefaults_XPLANE>
 		<classdefaults_XPLANE>
-			<name>new_gforce_effect_enable</name>
-			<type>GliderAircraft</type>
-			<value>false</value>
-			<sim>XPLANE</sim>
-			<device>joystick</device>
-		</classdefaults_XPLANE>
-		<classdefaults_XPLANE>
-			<name>new_gforce_effect_enable</name>
-			<type>JetAircraft</type>
-			<value>false</value>
-			<sim>XPLANE</sim>
-			<device>joystick</device>
-		</classdefaults_XPLANE>
-		<classdefaults_XPLANE>
-			<name>new_gforce_effect_enable</name>
-			<type>PropellerAircraft</type>
-			<value>false</value>
-			<sim>XPLANE</sim>
-			<device>joystick</device>
-		</classdefaults_XPLANE>
-		<classdefaults_XPLANE>
-			<name>new_gforce_effect_enable</name>
-			<type>TurbopropAircraft</type>
-			<value>false</value>
-			<sim>XPLANE</sim>
-			<device>joystick</device>
-		</classdefaults_XPLANE>
-		<classdefaults_XPLANE>
 			<name>new_gforce_enable_neg_gs</name>
 			<type>GliderAircraft</type>
 			<value>false</value>
@@ -10101,16 +10024,16 @@
 			<device>joystick</device>
 		</classdefaults_IL2>
 		<classdefaults_IL2>
-			<name>gforce_effect_enable</name>
+			<name>gforce_effect_mode</name>
 			<type>JetAircraft</type>
-			<value>true</value>
+			<value>LEGACY</value>
 			<sim>IL2</sim>
 			<device>joystick</device>
 		</classdefaults_IL2>
 		<classdefaults_IL2>
-			<name>gforce_effect_enable</name>
-			<type>PropellerAircraft</type>
-			<value>true</value>
+			<name>gforce_effect_mode</name>
+			<type>JetAircraft</type>
+			<value>LEGACY</value>
 			<sim>IL2</sim>
 			<device>joystick</device>
 		</classdefaults_IL2>
@@ -10162,20 +10085,6 @@
 			<value>0.05</value>
 			<sim>IL2</sim>
 			<device>any</device>
-		</classdefaults_IL2>
-		<classdefaults_IL2>
-			<name>new_gforce_effect_enable</name>
-			<type>JetAircraft</type>
-			<value>false</value>
-			<sim>IL2</sim>
-			<device>joystick</device>
-		</classdefaults_IL2>
-		<classdefaults_IL2>
-			<name>new_gforce_effect_enable</name>
-			<type>PropellerAircraft</type>
-			<value>false</value>
-			<sim>IL2</sim>
-			<device>joystick</device>
 		</classdefaults_IL2>
 		<classdefaults_IL2>
 			<name>new_gforce_enable_neg_gs</name>
@@ -10387,13 +10296,6 @@
 			<value>0.05</value>
 			<sim>BMS</sim>
 			<device>any</device>
-		</classdefaults_BMS>
-		<classdefaults_BMS>
-			<name>new_gforce_effect_enable</name>
-			<type>JetAircraft</type>
-			<value>false</value>
-			<sim>BMS</sim>
-			<device>joystick</device>
 		</classdefaults_BMS>
 		<classdefaults_BMS>
 			<name>new_gforce_enable_neg_gs</name>
@@ -10994,13 +10896,6 @@
 		<device>any</device>
 		</classdefaults_any>
 	<classdefaults_any>
-		<name>gforce_effect_enable</name>
-		<type>AllSettings</type>
-		<value>true</value>
-		<sim>any</sim>
-		<device>any</device>
-		</classdefaults_any>
-	<classdefaults_any>
 		<name>gforce_effect_max_intensity</name>
 		<type>AllSettings</type>
 		<value>1.0</value>
@@ -11175,13 +11070,6 @@
 		<sim>any</sim>
 		<device>any</device>
 		</classdefaults_any>
-	<classdefaults_any>
-		<name>new_gforce_effect_enable</name>
-		<type>AllSettings</type>
-		<value>false</value>
-		<sim>any</sim>
-		<device>joystick</device>
-	</classdefaults_any>
 	<classdefaults_any>
 		<name>nosewheel_shimmy</name>
 		<type>AllSettings</type>
@@ -12262,13 +12150,6 @@
 	</models>
 	<models>
 		<name>gear_buffet_effect_enabled</name>
-		<model>F-4E-45MC</model>
-		<value>false</value>
-		<sim>DCS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>gforce_effect_enable</name>
 		<model>F-4E-45MC</model>
 		<value>false</value>
 		<sim>DCS</sim>
