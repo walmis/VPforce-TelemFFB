@@ -114,7 +114,10 @@ class ConfiguratorDialog(QDialog, Ui_ConfiguratorDialog):
 
         self.at_show_state = self.construct_setting_table()
 
-        self._dev_gains_at_show = HapticEffect.device.get_gains()
+        if HapticEffect.device is not None:
+            self._dev_gains_at_show = HapticEffect.device.get_gains()
+        else:
+            self._dev_gains_at_show = None
 
         # self.read_gains()
 
