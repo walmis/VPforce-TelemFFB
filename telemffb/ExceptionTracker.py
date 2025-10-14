@@ -23,10 +23,10 @@ from datetime import datetime
 from typing import List, Optional
 import stransi
 
-from PyQt6.QtCore import QObject, pyqtSignal, Qt
+from PyQt6.QtCore import QObject, pyqtSignal, Qt, QThread
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QTextEdit, QWidget, QListWidget,
-                             QListWidgetItem, QSplitter, QMessageBox, QSizePolicy)
+                             QListWidgetItem, QSplitter, QMessageBox, QProgressDialog, QSizePolicy)
 from PyQt6.QtGui import QFont, QTextCursor
 
 
@@ -306,23 +306,37 @@ class ExceptionViewerDialog(QDialog):
             self.count_label.setText("Total Exceptions: 0")
             
     def report_exceptions(self):
-        """Report exceptions (stub implementation)."""
-        count = self.tracker.get_count()
+        """Report exceptions by uploading support bundle to API.
         
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Report Exceptions")
-        msg.setText(
-            f"Exception reporting feature (stub implementation)\n\n"
-            f"This would send {count} exception(s) to the development team.\n\n"
-            f"In a full implementation, this would:\n"
-            f"  • Package exception details\n"
-            f"  • Include system information\n"
-            f"  • Upload to issue tracker or support system\n"
-            f"  • Provide a tracking reference"
+        This method now delegates to the standalone report_exceptions function in utils.py.
+        """
+        from telemffb.utils import report_exceptions
+        
+        # Disable report button while running
+        try:
+            self.report_button.setEnabled(False)
+        except Exception:
+            pass
+        
+        # Callback to re-enable button when upload completes
+        def on_complete(success, payload):
+            try:
+                self.report_button.setEnabled(True)
+            except Exception:
+                pass
+        
+        # Call the standalone function
+        started = report_exceptions(
+            parent_widget=self,
+            on_complete_callback=on_complete
         )
-        msg.setIcon(QMessageBox.Icon.Information)
-        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg.exec()
+        
+        # Re-enable button if user cancelled before starting
+        if not started:
+            try:
+                self.report_button.setEnabled(True)
+            except Exception:
+                pass
         
     def copy_selected(self):
         """Copy selected exception to clipboard."""

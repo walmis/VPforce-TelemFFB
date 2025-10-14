@@ -68,7 +68,7 @@ from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, 
 from PyQt6.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
 
 from PyQt6 import QtCore, QtGui
-from PyQt6.QtWidgets import QFileDialog, QMessageBox
+from PyQt6.QtWidgets import QFileDialog, QMessageBox, QProgressDialog
 import stransi
 
 from enum import Enum, auto
@@ -453,6 +453,241 @@ def prune_log_files(path, number, unit):
 
 #     except WindowsError:
 #         return None
+
+def create_support_bundle_data(userconfig_rootpath, exceptions=None):
+    """Create support bundle as bytes (in memory) for API upload.
+    
+    Args:
+        userconfig_rootpath: Path to user config directory
+        exceptions: Optional list of ExceptionRecord objects to include
+        
+    Returns:
+        bytes: Support bundle as zip file data
+    """
+    import io
+    from datetime import datetime
+    
+    # Get the system settings
+    sys_dict = read_all_system_settings()
+    
+    # Create zip file in memory
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as support_zip:
+        # Add userconfig_v2.xml
+        userconfig_path = os.path.join(userconfig_rootpath, "userconfig_v2.xml")
+        if os.path.exists(userconfig_path):
+            support_zip.write(userconfig_path, "userconfig_v2.xml")
+        
+        # Add log files
+        log_folder = os.path.join(userconfig_rootpath, "log")
+        if os.path.exists(log_folder):
+            for folder_name, subfolders, filenames in os.walk(log_folder):
+                for filename in filenames:
+                    file_path = os.path.join(folder_name, filename)
+                    arcname = os.path.relpath(file_path, userconfig_rootpath)
+                    support_zip.write(file_path, arcname)
+        
+        # Add system settings
+        cfg_content = "\n".join(f"{key}={value}" for key, value in sys_dict.items())
+        support_zip.writestr("system_settings.cfg", cfg_content)
+        
+        # Add exception details if provided
+        if exceptions:
+            exc_content = []
+            exc_content.append(f"Exception Report - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            exc_content.append(f"Total Exceptions: {len(exceptions)}\n")
+            exc_content.append("=" * 80 + "\n\n")
+            
+            for i, exc in enumerate(exceptions, 1):
+                exc_content.append(f"Exception {i}/{len(exceptions)}\n")
+                exc_content.append("-" * 80 + "\n")
+                exc_content.append(exc.format_full())
+                exc_content.append("\n" + "=" * 80 + "\n\n")
+            
+            support_zip.writestr("exceptions.txt", "".join(exc_content))
+    
+    # Get the bytes
+    zip_buffer.seek(0)
+    return zip_buffer.read()
+
+
+def report_exceptions(parent_widget=None, on_complete_callback=None):
+    """Report exceptions by uploading support bundle to API.
+    
+    This function runs bundle creation and HTTP POST in a background QThread
+    so the Qt event loop (UI) remains responsive. It includes user prompts
+    and confirmation dialogs.
+    
+    Args:
+        parent_widget: Parent QWidget for dialog boxes (can be None)
+        on_complete_callback: Optional callback function to call when upload completes (success or failure)
+    
+    Returns:
+        bool: True if upload process started, False if user cancelled or no exceptions
+    """
+    
+    exceptions_list = G.exception_tracker.get_exceptions()
+
+    # Confirm upload
+    reply = QMessageBox.question(
+        parent_widget,
+        "Report Exceptions",
+        (
+            f"Upload Support Bundle to VPforce support?\n\n"
+            f"This will include:\n"
+            f"  • Exception details and tracebacks\n"
+            f"  • System configuration\n"
+            f"  • Application logs\n\n"
+            f"You will need to complete a verification challenge."
+        ),
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.Yes,
+    )
+
+    if reply != QMessageBox.StandardButton.Yes:
+        return False
+
+    # Progress dialog (indeterminate)
+    progress = QProgressDialog("Creating support bundle and uploading to server...", None, 0, 0, parent_widget)
+    progress.setWindowTitle("Uploading...")
+    progress.setWindowModality(Qt.WindowModality.ApplicationModal)
+    progress.setCancelButton(None)
+    progress.setMinimumDuration(0)
+    progress.show()
+
+    # Worker that runs in background thread
+    class UploadWorker(QObject):
+        finished = pyqtSignal(bool, dict)
+
+        def __init__(self, api_url: str, userconfig_rootpath: str, exceptions_list):
+            super().__init__()
+            self.api_url = api_url
+            self.userconfig_rootpath = userconfig_rootpath
+            self.exceptions_list = exceptions_list
+
+        def run(self):
+            # Do imports here to avoid importing requests in main thread unnecessarily
+            try:
+                import requests
+
+                # Create bundle in memory
+                bundle = create_support_bundle_data(self.userconfig_rootpath, self.exceptions_list)
+
+                resp = requests.post(
+                    self.api_url,
+                    files={'bundle': ('support_bundle.zip', bundle, 'application/zip')},
+                    timeout=30,
+                )
+
+                if resp.status_code == 200:
+                    try:
+                        payload = resp.json()
+                    except Exception:
+                        payload = {'challenge_url': None}
+                    self.finished.emit(True, payload)
+                else:
+                    self.finished.emit(False, {'status_code': resp.status_code, 'text': resp.text})
+
+            except Exception as e:
+                # Classify common requests errors if requests is available
+                try:
+                    import traceback as _tb
+                    import requests as _requests
+                    if isinstance(e, _requests.exceptions.ConnectionError):
+                        self.finished.emit(False, {'error': 'connection'})
+                        return
+                    if isinstance(e, _requests.exceptions.Timeout):
+                        self.finished.emit(False, {'error': 'timeout'})
+                        return
+                    # Other requests-related exception
+                    self.finished.emit(False, {'error': str(e), 'traceback': _tb.format_exc()})
+                except Exception:
+                    import traceback as _tb
+                    self.finished.emit(False, {'error': str(e), 'traceback': _tb.format_exc()})
+
+    # Build API URL and capture userconfig path now
+    userconfig_rootpath = G.userconfig_rootpath
+    api_url = 'https://vpforce.eu/telemffb/api/upload'
+
+    # Prepare thread and worker
+    thread = QThread(parent_widget)
+    worker = UploadWorker(api_url, userconfig_rootpath, exceptions_list)
+    worker.moveToThread(thread)
+
+    # Connect signals
+    thread.started.connect(worker.run)
+
+    def on_finished(success: bool, payload: dict):
+        try:
+            progress.close()
+        except Exception:
+            pass
+
+        if success:
+            challenge_url = payload.get('challenge_url') if isinstance(payload, dict) else None
+            if challenge_url:
+                # Open challenge URL in browser from main thread
+                import webbrowser
+                webbrowser.open(challenge_url)
+                QMessageBox.information(
+                    parent_widget,
+                    "Verification Required",
+                    "A verification page has been opened in your browser.\n\nPlease complete the challenge to submit your report.",
+                )
+            else:
+                QMessageBox.warning(parent_widget, "Upload Error", "Server did not return a challenge URL.")
+        else:
+            # Handle common errors
+            if payload.get('error') == 'connection':
+                QMessageBox.critical(
+                    parent_widget,
+                    "Connection Error",
+                    "Could not connect to the support server.\n\nPlease check your internet connection and try again.",
+                )
+            elif payload.get('error') == 'timeout':
+                QMessageBox.critical(parent_widget, "Timeout Error", "Upload timed out.\n\nPlease try again later.")
+            else:
+                # Show server response if available
+                status = payload.get('status_code')
+                text = payload.get('text') or payload.get('error') or ''
+                if status:
+                    QMessageBox.critical(
+                        parent_widget,
+                        "Upload Failed",
+                        f"Failed to upload support bundle.\n\nStatus: {status}\nMessage: {text[:200]}",
+                    )
+                else:
+                    QMessageBox.critical(
+                        parent_widget,
+                        "Upload Error",
+                        f"An error occurred while uploading:\n\n{text}",
+                    )
+
+        # Clean up thread and worker
+        try:
+            thread.quit()
+            thread.wait(2000)
+        except Exception:
+            pass
+
+        worker.deleteLater()
+        thread.deleteLater()
+        
+        # Call completion callback if provided
+        if on_complete_callback:
+            try:
+                on_complete_callback(success, payload)
+            except Exception:
+                pass
+
+    worker.finished.connect(on_finished)
+    # Ensure we stop the thread if it finishes
+    worker.finished.connect(thread.quit)
+    thread.start()
+    
+    return True
+
 
 def create_support_bundle(userconfig_rootpath):
     # Get the  system settings

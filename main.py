@@ -605,7 +605,9 @@ def _cleanup_on_exit(dev_serial):
             G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
         except:
             pass
-    HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
+        
+    if HapticEffect.device:
+        HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
 
 def main():
     """
@@ -723,6 +725,19 @@ def main():
     G.log_window = LogWindow()
     _init_logging(G.log_window.widget)
     G.log_window.pause_button.clicked.connect(sys.stdout.toggle_pause)
+
+    # ============================================================================
+    # PHASE 6.5: Exception Tracking Setup
+    # ============================================================================
+    # Initialize exception tracker for logging and user notification
+    from telemffb.ExceptionTracker import ExceptionTracker
+    G.exception_tracker = ExceptionTracker()
+    
+    # Add exception tracking handler to the logger
+    exception_handler = G.exception_tracker.get_handler()
+    logging.getLogger().addHandler(exception_handler)
+    
+    logging.info("Exception tracking initialized")
 
     # ============================================================================
     # PHASE 7: Convert Legacy userconfig to new format
