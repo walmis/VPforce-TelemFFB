@@ -246,8 +246,14 @@ class MainWindow(QMainWindow):
         self.reset_user_config_action.triggered.connect(self.reset_user_config)
         utilities_menu.addAction(self.reset_user_config_action)
 
+        def launch_vpconf():
+            try:
+                utils.launch_vpconf()
+            except Exception as e:
+                logging.error(f"Error launching VPforce Configurator: {e}")
+                QMessageBox.critical(self, "Error", f"Error launching VPforce Configurator: {e}")
         self.vpconf_action = QAction("Launch VPforce Configurator", self)
-        self.vpconf_action.triggered.connect(lambda: utils.launch_vpconf())
+        self.vpconf_action.triggered.connect(launch_vpconf)
         utilities_menu.addAction(self.vpconf_action)
 
         reload_action = QAction('Force Reload Aircraft (Ctrl+Shift+R)', self)

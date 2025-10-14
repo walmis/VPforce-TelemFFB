@@ -708,11 +708,14 @@ def main():
     def excepthook(exc_type, exc_value, exc_tb):
         if exc_type == KeyboardInterrupt:
             utils.exit_application()
-
+            return
+        # Log the unhandled exception including the full traceback via the logging module
+        logging.getLogger().error("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
+        # Also write the formatted traceback to stdout for the in-app log window
         tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
         sys.stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
-        #QtWidgets.QApplication.quit()
-        # or QtWidgets.QApplication.exit(0)
+        # Optionally exit the Qt application:
+        # QtWidgets.QApplication.quit()
     sys.excepthook = excepthook
 
     # ============================================================================
