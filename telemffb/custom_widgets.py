@@ -16,6 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import os.path
+from typing import Optional
 
 from PyQt6.QtGui import QAction, QWheelEvent, QPalette
 
@@ -527,6 +528,11 @@ class DelayTimerSlider(QSlider):
     delayedValueChanged = pyqtSignal(int)
     def __init__(self, *args, **kwargs):
         super(DelayTimerSlider, self).__init__(*args, **kwargs)
+        self.checkbox : Optional[QCheckBox] = None # bound checkbox
+        self.label : Optional[QLabel] = None # bound label
+        self.setting_key : Optional[str] = None # bound setting key
+        self.gain_id : Optional[int] = None # bound gain id
+
         self._delay = 150  # Delay in milliseconds
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
