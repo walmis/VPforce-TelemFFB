@@ -30,7 +30,7 @@ from . import globals as G
 from . import utils
 from .ui.Ui_SystemDialog import Ui_SystemDialog
 from .utils import validate_vpconf_profile, HiDpiPixmap
-from telemffb.hw.ffb_rhino import FFBRhino
+from telemffb.hw.ffb_rhino import DeviceInfo, FFBRhino
 from .custom_widgets import FFBDeviceListModel
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
@@ -263,13 +263,14 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.select_enabled_sim()
 
+        # pending device path changes (only written on Save)
+        self._pending_devpaths = {}
+
         self.populateUSBSelectors()
 
     def populateUSBSelectors(self):
         # Populate the USB device selectors with currently connected devices
         devices = FFBRhino.enumerate()
-
-
 
         combo_boxes = [self.cb_select_j, self.cb_select_p, self.cb_select_c, self.cb_select_t]
 
@@ -287,8 +288,91 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         for cb in combo_boxes:
             cb._prev_index = cb.currentIndex()
 
+        # Try to select initial devices based on saved system settings devpath_{role}
+        # mapping of combobox to device role name in settings
+        dev_map = {
+            self.cb_select_j: 'joystick',
+            self.cb_select_p: 'pedals',
+            self.cb_select_c: 'collective',
+            self.cb_select_t: 'trimwheel',
+        }
+
+        for cb, short in dev_map.items():
+            try:
+                saved_key = f"devpath_{short}"
+                saved_path = G.system_settings.get(saved_key, '')
+            except Exception:
+                saved_path = ''
+
+            if not saved_path:
+                continue
+
+            model = cb.model()
+            found_index = -1
+            # iterate through model rows to find a matching device.path
+            row_count = model.rowCount()
+            for row in range(row_count):
+                item_index = model.index(row, 0)
+                dev : DeviceInfo = model.data(item_index, Qt.ItemDataRole.UserRole)
+                if dev is None:
+                    continue
+                # some DeviceInfo objects may expose different path attributes
+                dev_path = dev.path
+                if dev_path and saved_path and dev_path.decode() == str(saved_path):
+                    found_index = row
+                    break
+
+            if found_index >= 0:
+                # block signals to avoid triggering change handlers
+                cb.blockSignals(True)
+                cb.setCurrentIndex(found_index)
+                cb._prev_index = found_index
+                cb.blockSignals(False)
+
+        # Helper: persist a combobox selection into G.system_settings
+        def persist_combobox_selection(cb, role_name):
+            model = cb.model()
+            sel_index = cb.currentIndex()
+            if sel_index < 0:
+                # clear saved setting
+                try:
+                    self._pending_devpaths[f'devpath_{role_name}'] = ''
+                except Exception:
+                    logging.exception('Failed to clear devpath setting')
+                return
+
+            dev = model.data(model.index(sel_index, 0), Qt.ItemDataRole.UserRole)
+            if dev is None:
+                try:
+                    self._pending_devpaths[f'devpath_{role_name}'] = ''
+                except Exception:
+                    logging.exception('Failed to clear devpath setting')
+                return
+
+            # prefer device.path (bytes) decode
+            dev_path = getattr(dev, 'path', None)
+            if isinstance(dev_path, (bytes, bytearray)):
+                try:
+                    dev_path = dev_path.decode()
+                except Exception:
+                    dev_path = str(dev_path)
+
+            try:
+                self._pending_devpaths[f'devpath_{role_name}'] = dev_path
+            except Exception:
+                logging.exception('Failed to persist devpath setting')
+
+
+
         # Handler to enforce uniqueness across combo boxes
         def on_device_changed(index, changed_cb= None):
+            # map combobox to role name for persistence
+            cb_role_map = {
+                self.cb_select_j: 'joystick',
+                self.cb_select_p: 'pedals',
+                self.cb_select_c: 'collective',
+                self.cb_select_t: 'trimwheel',
+            }
             # when model includes dummy at 0, index 0 means None
             if changed_cb is None:
                 return
@@ -299,9 +383,12 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             if index >= 0:
                 dev = model.data(model.index(index, 0), Qt.ItemDataRole.UserRole)
 
-            # if no device selected, just accept
+            # if no device selected, persist cleared selection and accept
             if dev is None:
                 changed_cb._prev_index = index
+                role = cb_role_map.get(changed_cb, None)
+                if role:
+                    persist_combobox_selection(changed_cb, role)
                 return
 
             # check if any other combobox already has this device
@@ -340,10 +427,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             # no conflicts, commit
             changed_cb._prev_index = index
 
+            # After successful change, persist the selection for this combobox's role
+            # map combobox to role name
+            cb_role_map = {
+                self.cb_select_j: 'joystick',
+                self.cb_select_p: 'pedals',
+                self.cb_select_c: 'collective',
+                self.cb_select_t: 'trimwheel',
+            }
+
+            role = cb_role_map.get(changed_cb, None)
+            if role:
+                persist_combobox_selection(changed_cb, role)
+
         # connect signals
         for cb in combo_boxes:
             # use lambda binding to capture cb in the handler
             cb.currentIndexChanged.connect(lambda idx, _cb=cb: on_device_changed(idx, changed_cb=_cb))
+
+        # Additionally, ensure that when selection is cleared (index 0 / None) the setting is persisted.
+        # The on_device_changed handler will call persist after committing the change, but if a selection
+        # was reverted by conflict resolution it will also update the persisted value when appropriate.
 
 
 
@@ -740,6 +844,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         if not self.validate_settings():
             return
+
+        # Persist any pending devpath selections that were changed while the dialog was open
+        try:
+            for k, v in getattr(self, '_pending_devpaths', {}).items():
+                G.system_settings.setValue(k, v)
+        except Exception:
+            logging.exception('Failed to write pending devpath settings')
 
         G.sim_listeners.restart_all()
 

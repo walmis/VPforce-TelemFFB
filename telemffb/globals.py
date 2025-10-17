@@ -85,7 +85,7 @@ device_type : DeviceTypeLiteral = "joystick"
 device_info : Optional['DeviceInfo'] = None
 """DeviceInfo object representing the connected device. This attribute is redundant, since HapticEffect.device provides the same information."""
 
-device_devpath : str
+device_devpath : Optional[str] = None
 """System path to device, e.g. /dev/hidraw0 or \\?\\hid#vid_ffff&pid_2055&mi_00#7&2b3b4c3f&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}"""
 
 device_usbpid : str # deprecated

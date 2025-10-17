@@ -1,3 +1,21 @@
+#
+# This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
+# Copyright (c) 2023 Valmantas Palikša.
+# Copyright (c) 2023 Micah Frisby
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
 """
 TelemFFB Main Application Entry Point
 
@@ -19,24 +37,6 @@ Application Flow:
 12. Application event loop
 13. Cleanup on exit
 """
-
-#
-# This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
-# Copyright (c) 2023 Valmantas Palikša.
-# Copyright (c) 2023 Micah Frisby
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, version 3.
-#
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
 
 import sys
 # import faulthandler
@@ -61,7 +61,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from PyQt6 import QtCore, QtWidgets, QtGui
-from PyQt6.QtCore import QCoreApplication, Qt
+from PyQt6.QtCore import QCoreApplication, Qt, QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox, QPlainTextEdit
 
 
@@ -171,6 +171,8 @@ def _setup_device_configuration():
         else:
             G.device_type = str.lower(G.args.type)
 
+        devpath = G.system_settings.get(f'devpath_{G.device_type}', None)
+        G.device_devpath = devpath
         G.device_usbpid = G.args.device.split(":")[1]
         
     assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
@@ -347,8 +349,19 @@ def _initialize_device_connection():
 
     devs = _enumerate_and_log_devices()
 
+    # Attempt to auto-assign unconfigured devpath_* settings based on discovered devices
+    _auto_assign_devices(devs)
+
     try:
         dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
+
+        def connect_signals():
+            dev.deviceConnected.connect(G.main_window.update_device_status)
+            dev.buttonPressed.connect(G.main_window.get_active_buttons)
+            dev.buttonReleased.connect(G.main_window.get_active_buttons)
+        # Use QTimer.singleShot to connect signals after event loop starts
+        QTimer.singleShot(0, connect_signals)
+
         G.device_info = dev.info
 
         if G.args.reset:
@@ -368,7 +381,7 @@ def _initialize_device_connection():
         G.device_connection_status = False
         logging.exception("Exception")
         QMessageBox.warning(None, "Cannot connect to Rhino",
-                          f"Unable to open HID at FFFF:{G.device_usbpid} for device: {G.device_type}\nError: {e}\n\n"
+                          f"Unable to open device: {G.device_type}\nError: {e}\n\n"
                           "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
 
     return dev, dev_serial, dev_firmware_version
@@ -388,6 +401,96 @@ def _enumerate_and_log_devices() -> List[DeviceInfo]:
 
     logging.info("-------")
     return devs
+
+
+def _auto_assign_devices(devs: List[DeviceInfo]):
+    """Auto-assign system_settings devpath_* entries for unassigned device slots.
+
+    This inspects the enumerated devices and, for each device whose
+    `ident` or `product_string` indicates a known role (Joystick, Pedals,
+    Collective, Trimwheel), it will assign the system setting key
+    `devpath_<role>` to the device path if that key is not already set.
+
+    Only runs assignments when this process is the master instance to avoid
+    races between multiple instances. Assignments are written via
+    `G.system_settings.setValue` so they persist in the system settings.
+    """
+    try:
+        if not G.master_instance:
+            return
+
+        # Map normalized role keywords to devpath keys
+        role_keywords = {
+            'joystick': ['joystick'],
+            'pedals': ['pedal', 'pedals'],
+            'collective': ['collective'],
+            'trimwheel': ['trimwheel', 'trim']
+        }
+
+        # VID:PID fallback mapping (product_id hex -> role)
+        vidpid_role_map = {
+            0x2055: 'joystick',
+            0x2054: 'pedals',
+            0x2053: 'collective',
+            0x2052: 'trimwheel',
+        }
+
+        # Build reverse lookup from product_string/ident to role
+        for devinfo in devs:
+            try:
+                # DeviceInfo.ident property exists and returns cleaned product string
+                ident = devinfo.ident
+                # prefer ident (configurator name) if present
+                label = ident.lower()
+                devpath = devinfo.path.decode()
+
+                assigned = False
+                for role, keywords in role_keywords.items():
+                    key = f'devpath_{role}'
+                    # Only assign if not already configured
+                    existing = G.system_settings.get(key, None) is not None
+                    if existing:
+                        continue
+
+                    for kw in keywords:
+                        if kw in label:
+                            logging.info(f"Auto-assigning {key} -> {devpath} (matched '{kw}' in '{label}')")
+                            try:
+                                G.system_settings.setValue(key, devpath)
+                                if role == G.device_type:
+                                    G.device_devpath = devpath
+                            except Exception:
+                                logging.exception(f"Failed to set system setting {key}")
+                            # once assigned for this device, don't try other roles
+                            assigned = True
+                            break
+                    if assigned:
+                        # move to next device if already assigned by name match
+                        break
+
+                # If not matched by product string/name, try VID:PID mapping
+                if not assigned:
+                    try:
+                        pid = int(devinfo.product_id)
+                        role = vidpid_role_map.get(pid, None)
+                        if role:
+                            key = f'devpath_{role}'
+                            existing = G.system_settings.get(key, None) is not None
+                            if not existing:
+                                logging.info(f"Auto-assigning {key} -> {devpath} (matched pid 0x{pid:04X})")
+                                try:
+                                    G.system_settings.setValue(key, devpath)
+                                    if role == G.device_type:
+                                        G.device_devpath = devpath
+                                except Exception:
+                                    logging.exception(f"Failed to set system setting {key}")
+                    except Exception:
+                        logging.exception("Error matching device by pid for auto-assign")
+            except Exception:
+                logging.exception("Error while attempting to auto-assign device")
+
+    except Exception:
+        logging.exception("_auto_assign_devices failure")
 
 def _check_firmware_version(dev_firmware_version, min_firmware_version):
     """Check if device firmware version meets minimum requirements."""
@@ -513,20 +616,7 @@ def _setup_ipc_and_connections():
     G.ipc_instance.show_offline_model_signal.connect(G.main_window.load_single_offline_model)
     G.ipc_instance.start()
 
-def _setup_device_button_connections():
-    """Setup device button event connections."""
-    try:
-        HapticEffect.device.buttonPressed.connect(G.main_window.get_active_buttons)
-        HapticEffect.device.buttonReleased.connect(G.main_window.get_active_buttons)
-    except:
-        pass
 
-def _setup_device_connect_status():
-    """Setup device disconnect/reconnect status signals"""
-    try:
-        HapticEffect.device.deviceConnected.connect(G.main_window.update_device_status)
-    except:
-        pass
 def _sim_connected_events():
     G.sim_listeners.allStarted.connect(G.telem_manager.reset_sim_connected)
     G.telem_manager.first_frame_received.connect(G.sim_listeners.stop_inactive)
@@ -550,11 +640,18 @@ def _check_version_update():
 
 def _check_system_settings_required():
     """Check if system settings dialog should be opened."""
-    if (not G.system_settings.get("pidJoystick", None) and
-        not G.system_settings.get("pidPedals", None) and
-        not G.system_settings.get("pidCollective", None) and
-        not G.system_settings.get("pidTrimWheel", None)):
-        G.main_window.open_system_settings_dialog()
+
+    #for key in ["devpath_joystick", "devpath_pedals", "devpath_collective", "devpath_trimwheel"]:
+    #    if G.system_settings.get(key, None):
+
+    #        return
+    if G.device_devpath is None:
+        QMessageBox.information(None, "System Settings Required",
+                                f"VPforce Device for {G.device_type} is not assigned.  Please assign a device in System Settings.")
+        if G.child_instance:
+            G.ipc_instance.send_message("SHOW SETTINGS")
+        else:
+            G.main_window.open_system_settings_dialog()
 
 def _setup_async_initialization(dev : FFBRhino, dev_serial):
     """Setup background initialization that doesn't block main window appearance."""
@@ -566,7 +663,7 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
             logging.exception("Unable to get configurator slider values from device")
 
         if G.system_settings.get('enableVPConfStartup', False):
-            logging.info(f'Starting aysnc "startup vpconf" config push: {G.system_settings.get('pathVPConfStartup', '')}')
+            logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.get("pathVPConfStartup", "")}')
             try:
                 upload_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
             except Exception:
@@ -759,14 +856,15 @@ def main():
 
     logging.info(f"TelemFFB (version {version}) Starting")
 
+    # Set logging level based on system settings
+    _setup_logging_level()
+
     # ============================================================================
     # PHASE 9: Device Connection and Firmware Validation
     # ============================================================================
     # Connect to Rhino FFB device and validate firmware version
     dev, dev_serial, dev_firmware_version = _initialize_device_connection()
 
-    # Set logging level based on system settings
-    _setup_logging_level()
 
     # ============================================================================
     # PHASE 10: Core Component Initialization
@@ -787,11 +885,7 @@ def main():
     # Setup IPC for master-child instance communication and connect all signals
     _setup_ipc_and_connections()
 
-    # Connect device button events to main window handlers
-    _setup_device_button_connections()
 
-    # Connect device status events to main window handler:
-    _setup_device_connect_status()
 
     # Connect sim start/stop signals
     _sim_connected_events()
