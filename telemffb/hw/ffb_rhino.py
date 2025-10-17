@@ -727,7 +727,7 @@ class FFBEffectHandle:
 class DeviceInfo:
     interface_number: int
     manufacturer_string: str
-    path: str
+    path: bytes
     product_id: int
     product_string: str
     release_number: int
@@ -746,24 +746,26 @@ class FFBRhino(QObject):
     buttonReleased = pyqtSignal(int)
     deviceConnected = pyqtSignal(bool)
 
-    def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> None:
+    def __init__(self, vid = 0xFFFF, pid=0x2055, serial=None, path : Optional[str] = None) -> None:
 
         self.vid = vid
         self.pid = pid
-        self.info : DeviceInfo = None
-        self.firmware_version : str = None
+        self.info : Optional[DeviceInfo] = None
+        self.firmware_version : Optional[str] = None
         self._button_state : int = 0
         self._prev_hats = 0xFFFF
 
         if not path:
             devs = FFBRhino.enumerate(pid)
-            if serial:
-                devs = list(filter(lambda x: x.serial_number == serial, devs))
-            if path:
-                devs = list(filter(lambda x: x.path == path, devs))
-            if not devs:
-                raise hid.HIDException('unable to open device')
-            self.info = devs[0]
+        else:
+            devs = FFBRhino.enumerate()
+        if serial:
+            devs = list(filter(lambda x: x.serial_number == serial, devs))
+        if path:
+            devs = list(filter(lambda x: x.path == bytes(path, 'utf-8'), devs))
+        if not devs:
+            raise hid.HIDException('unable to open device')
+        self.info = devs[0]
 
         self._in_reports = {}
         self._effect_handles : List[FFBEffectHandle] = []
@@ -778,18 +780,25 @@ class FFBRhino(QObject):
         if self._dev:
             self._dev.close()
             self._dev = None
-        
+        if not self.info:
+            raise hid.HIDException('unable to reconnect device, no device info')
         self._dev = hid.Device(path=self.info.path)
         self._dev.nonblocking = True
 
     @property
     def serial(self):
+        if not self._dev:
+            return None
         return self._dev.serial
     @property
     def product(self):
+        if not self._dev:
+            return None
         return self._dev.product
     @property
     def manufacturer(self):
+        if not self._dev:
+            return None
         return self._dev.manufacturer
     
     @staticmethod
@@ -812,13 +821,14 @@ class FFBRhino(QObject):
 
     # Get global effect slider values as seen in VPConfigurator
     def get_gains(self) -> FFBReport_Get_Gains_Feature_Data:
+        assert(self._dev)
         d = self._dev.get_feature_report(HID_REPORT_FEATURE_ID_GET_GAINS, ctypes.sizeof(FFBReport_Get_Gains_Feature_Data))
         data = FFBReport_Get_Gains_Feature_Data.from_buffer_copy(d)
         return data
     
     # Set global effect class gain, same as in VPConfigurator sliders
     def set_gain(self, slider_id, value):
-        assert(value >= 0 and value <= 100)
+        assert(self._dev and value >= 0 and value <= 100)
         data = FFBReport_Set_Gain_Feature_Data_t()
         data.reportId = HID_REPORT_FEATURE_ID_SET_GAIN
         data.gain_id = slider_id
@@ -831,7 +841,7 @@ class FFBRhino(QObject):
 
         :param deadzone: Deadzone value in the range 0-4096.
         """
-        assert(0 <= deadzone <= 4096)
+        assert(self._dev and 0 <= deadzone <= 4096)
         data = FFBReport_SetDeadzone(deadzone=deadzone)
         self._dev.write(bytes(data))
 
@@ -938,11 +948,13 @@ class FFBRhino(QObject):
         return None
 
     def reset_effects(self):
+        assert(self._dev)
         logging.info("FFB: Reset device effects")
         self._dev.write(bytes([HID_REPORT_ID_DEVICE_CONTROL, CONTROL_RESET]))
         time.sleep(0.01)
 
     def create_effect(self, type) -> FFBEffectHandle:
+        assert(self._dev)
         self._dev.send_feature_report(bytes([HID_REPORT_ID_CREATE_EFFECT, type, 0, 0]))
         r = bytearray(self._dev.get_feature_report(HID_REPORT_ID_PID_BLOCK_LOAD, 5))
 
@@ -959,6 +971,7 @@ class FFBRhino(QObject):
         return handle
     
     def write(self, data):
+        assert(self._dev)
         if self._dev.write(data) < 0:
             raise IOError("HID Write")
         
