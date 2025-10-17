@@ -30,7 +30,8 @@ from . import globals as G
 from . import utils
 from .ui.Ui_SystemDialog import Ui_SystemDialog
 from .utils import validate_vpconf_profile, HiDpiPixmap
-
+from telemffb.hw.ffb_rhino import FFBRhino
+from .custom_widgets import FFBDeviceListModel
 
 class SystemSettingsDialog(QDialog, Ui_SystemDialog):
     def __init__(self, parent=None,):
@@ -146,6 +147,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.tabWidget.setCurrentIndex(0)
         self.simTabWidget.setCurrentIndex(0)
+        
 
         # Connect signals to slots
         self.cb_logPrune.stateChanged.connect(self.toggle_log_prune_widgets)
@@ -260,6 +262,90 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.tabBar().setDocumentMode(True)
 
         self.select_enabled_sim()
+
+        self.populateUSBSelectors()
+
+    def populateUSBSelectors(self):
+        # Populate the USB device selectors with currently connected devices
+        devices = FFBRhino.enumerate()
+
+
+
+        combo_boxes = [self.cb_select_j, self.cb_select_p, self.cb_select_c, self.cb_select_t]
+
+        model = FFBDeviceListModel(devices)
+        for cb in combo_boxes:
+            cb.setModel(model)
+            # Ensure the combobox shows the display role text but we can fetch the DeviceInfo from the model via UserRole
+            cb.setModelColumn(0)
+            # clear any existing items so the view updates cleanly
+            # (when using setModel, clear isn't necessary but keep for safety)
+            # store a reference so the model isn't garbage-collected
+            cb._ffb_device_model = model
+
+        # Track previous index so we can revert on cancel
+        for cb in combo_boxes:
+            cb._prev_index = cb.currentIndex()
+
+        # Handler to enforce uniqueness across combo boxes
+        def on_device_changed(index, changed_cb= None):
+            # when model includes dummy at 0, index 0 means None
+            if changed_cb is None:
+                return
+
+            # get selected device object
+            model = changed_cb.model()
+            dev = None
+            if index >= 0:
+                dev = model.data(model.index(index, 0), Qt.ItemDataRole.UserRole)
+
+            # if no device selected, just accept
+            if dev is None:
+                changed_cb._prev_index = index
+                return
+
+            # check if any other combobox already has this device
+            for other in combo_boxes:
+                if other is changed_cb:
+                    continue
+                other_idx = other.currentIndex()
+                if other_idx < 0:
+                    continue
+                other_dev = other.model().data(other.model().index(other_idx, 0), Qt.ItemDataRole.UserRole)
+                if other_dev is not None and getattr(other_dev, 'serial_number', None) == getattr(dev, 'serial_number', None) and getattr(other_dev, 'path', None) == getattr(dev, 'path', None):
+                    # conflict detected
+                    msg = QMessageBox(self)
+                    msg.setWindowTitle('Device Conflict')
+                    msg.setText('The selected device is already assigned to another instance.')
+                    msg.setInformativeText('Do you want to override the other assignment (clear it) or cancel this selection?')
+                    override_btn = msg.addButton('Override', QMessageBox.ButtonRole.AcceptRole)
+                    cancel_btn = msg.addButton('Cancel', QMessageBox.ButtonRole.RejectRole)
+                    msg.setDefaultButton(cancel_btn)
+                    msg.exec()
+
+                    if msg.clickedButton() == override_btn:
+                        # clear other combobox selection (set to index 0 = None)
+                        other.setCurrentIndex(0)
+                        # accept new selection
+                        changed_cb._prev_index = index
+                        return
+                    else:
+                        # revert selection on changed_cb
+                        # block signals to avoid recursion
+                        changed_cb.blockSignals(True)
+                        changed_cb.setCurrentIndex(changed_cb._prev_index)
+                        changed_cb.blockSignals(False)
+                        return
+
+            # no conflicts, commit
+            changed_cb._prev_index = index
+
+        # connect signals
+        for cb in combo_boxes:
+            # use lambda binding to capture cb in the handler
+            cb.currentIndexChanged.connect(lambda idx, _cb=cb: on_device_changed(idx, changed_cb=_cb))
+
+
 
     def select_enabled_sim(self):
         for sim in ('DCS', 'MSFS', 'XPLANE', 'IL2', 'BMS'):
