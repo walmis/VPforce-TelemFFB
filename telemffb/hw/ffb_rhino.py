@@ -736,6 +736,10 @@ class DeviceInfo:
     usage_page: int
     vendor_id: int
 
+    def vidpid(self) -> str:
+        """Returns the device VID:PID string"""
+        return f"{self.vendor_id:04X}:{self.product_id:04X}"
+
     @property
     def ident(self) -> str:
         """Returns the device name set in the VPforce Configurator"""
@@ -750,7 +754,7 @@ class FFBRhino(QObject):
 
         self.vid = vid
         self.pid = pid
-        self.info : Optional[DeviceInfo] = None
+        self.info : DeviceInfo 
         self.firmware_version : Optional[str] = None
         self._button_state : int = 0
         self._prev_hats = 0xFFFF
@@ -780,8 +784,7 @@ class FFBRhino(QObject):
         if self._dev:
             self._dev.close()
             self._dev = None
-        if not self.info:
-            raise hid.HIDException('unable to reconnect device, no device info')
+
         self._dev = hid.Device(path=self.info.path)
         self._dev.nonblocking = True
 
