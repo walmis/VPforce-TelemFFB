@@ -32,6 +32,8 @@ from PyQt6.QtWidgets import QStyle, QStyleOptionSlider
 
 from PyQt6.QtCore import Qt
 
+from PyQt6.QtCore import QAbstractListModel, QModelIndex
+
 import numpy as np
 
 import telemffb.globals as G
@@ -40,6 +42,78 @@ import styles
 
 vpf_purple = "#ab37c8"   # rgb(171, 55, 200)
 t_purple = QColor(f"#44{vpf_purple[-6:]}")
+
+
+class FFBDeviceListModel(QAbstractListModel):
+    """A simple list model exposing `telemffb.hw.ffb_rhino.DeviceInfo` entries.
+
+    - DisplayRole returns a human-readable string for the device
+    - UserRole (Qt.UserRole) returns the DeviceInfo instance
+    """
+
+    def __init__(self, devices=None, parent=None, include_none: bool = True):
+        super().__init__(parent)
+        self._devices = list(devices) if devices else []
+        # include a dummy 'Not Selected' entry at index 0 when True
+        self._include_none = bool(include_none)
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self._devices) + (1 if self._include_none else 0)
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid():
+            return None
+        row = index.row()
+
+        # If include_none is enabled, row 0 is the dummy placeholder
+        if self._include_none:
+            if row == 0:
+                if role == Qt.ItemDataRole.DisplayRole:
+                    return "(None) - Not Selected"
+                if role == Qt.ItemDataRole.UserRole:
+                    return None
+                return None
+            # offset into actual devices
+            row -= 1
+
+        try:
+            dev = self._devices[row]
+        except IndexError:
+            return None
+
+        if role == Qt.ItemDataRole.DisplayRole:
+            # Friendly name: Config ident, vendor:product, serial
+            try:
+                vid = getattr(dev, 'vendor_id', 0)
+                pid = getattr(dev, 'product_id', 0)
+                ident = getattr(dev, 'ident', getattr(dev, 'product_string', 'Unknown'))
+                serial = getattr(dev, 'serial_number', '')
+                return f"{ident} ({vid:04X}:{pid:04X}) {serial}"
+            except Exception:
+                return str(getattr(dev, 'product_string', dev))
+
+        if role == Qt.ItemDataRole.UserRole:
+            return dev
+
+        return None
+
+    def update(self, devices):
+        """Replace the device list and notify views."""
+        self.beginResetModel()
+        self._devices = list(devices) if devices else []
+        self.endResetModel()
+
+    def device_at(self, idx: int):
+        """Return the DeviceInfo at the given model index, or None for the dummy entry or out of range."""
+        if self._include_none:
+            if idx == 0:
+                return None
+            idx -= 1
+
+        if 0 <= idx < len(self._devices):
+            return self._devices[idx]
+        return None
+
 
 class DetachedTabWindow(QtWidgets.QMainWindow):
     reattachRequested = pyqtSignal(str)  # emit the tab title
