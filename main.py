@@ -58,6 +58,7 @@ import shutil
 import subprocess
 import traceback
 from datetime import datetime
+from typing import List, Optional
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import QCoreApplication, Qt
@@ -144,21 +145,24 @@ def _setup_device_configuration():
     3. Set global device variables for use throughout application
     """
     if G.args.device is None:
-        mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
+        dev_mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
         master_rb = G.system_settings.get('masterInstance', 1)
+        devname = dev_mapping.get(master_rb, "joystick")
+            
+        G.device_usbpid = '2055'
+        G.device_type = 'joystick'
+        
+        devpath = G.system_settings.get(f'devpath_{devname}', None)
+        if devpath:
+            G.device_devpath = devpath
 
-        try:
-            d = mapping[master_rb]
-            G.device_usbpid = str(G.system_settings.get(f'pid{d.capitalize()}', "2055"))
-            G.device_type = d
-        except KeyError:
-            G.device_usbpid = '2055'
-            G.device_type = 'joystick'
+        G.device_usbpid = str(G.system_settings.get(f'pid{devname.capitalize()}', "2055"))
+        G.device_type = devname
+
 
         if not G.device_usbpid: # check empty string
             G.device_usbpid = '2055'
 
-        G.device_usbvidpid = f"FFFF:{G.device_usbpid}"
         G.args.type = G.device_type
     else:
         if G.args.type is None:
@@ -168,7 +172,6 @@ def _setup_device_configuration():
             G.device_type = str.lower(G.args.type)
 
         G.device_usbpid = G.args.device.split(":")[1]
-        G.device_usbvidpid = G.args.device
         
     assert isinstance(G.device_usbpid, str), "Device USB PID must be a string"
 
@@ -337,15 +340,17 @@ def _initialize_device_connection():
     dev_firmware_version = 'ERROR'
     dev = None
 
-    try:
-        vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
-    except Exception:
-        return dev, dev_serial, dev_firmware_version
+    # try:
+    #     vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
+    # except Exception:
+    #     return dev, dev_serial, dev_firmware_version
 
-    _enumerate_and_log_devices()
+    devs = _enumerate_and_log_devices()
 
     try:
-        dev = HapticEffect.open(vid_pid[0], vid_pid[1])
+        dev = HapticEffect.open(pid=int(G.device_usbpid, 16))
+        G.device_info = dev.info
+
         if G.args.reset:
             dev.reset_effects()
         dev_firmware_version = dev.get_firmware_version()
@@ -363,12 +368,12 @@ def _initialize_device_connection():
         G.device_connection_status = False
         logging.exception("Exception")
         QMessageBox.warning(None, "Cannot connect to Rhino",
-                          f"Unable to open HID at {G.device_usbvidpid} for device: {G.device_type}\nError: {e}\n\n"
+                          f"Unable to open HID at FFFF:{G.device_usbpid} for device: {G.device_type}\nError: {e}\n\n"
                           "Please open the System Settings and verify the Master\ndevice PID is configured correctly")
 
     return dev, dev_serial, dev_firmware_version
 
-def _enumerate_and_log_devices():
+def _enumerate_and_log_devices() -> List[DeviceInfo]:
     """Enumerate and log available Rhino devices."""
     devs = FFBRhino.enumerate()
     logging.info("Available Rhino Devices:")
@@ -382,6 +387,7 @@ def _enumerate_and_log_devices():
             G.instance_dev_dict[devinfo.product_id] = devinfo
 
     logging.info("-------")
+    return devs
 
 def _check_firmware_version(dev_firmware_version, min_firmware_version):
     """Check if device firmware version meets minimum requirements."""
@@ -550,7 +556,7 @@ def _check_system_settings_required():
         not G.system_settings.get("pidTrimWheel", None)):
         G.main_window.open_system_settings_dialog()
 
-def _setup_async_initialization(dev, dev_serial):
+def _setup_async_initialization(dev : FFBRhino, dev_serial):
     """Setup background initialization that doesn't block main window appearance."""
     @utils.threaded()
     def init_async():
@@ -561,11 +567,9 @@ def _setup_async_initialization(dev, dev_serial):
 
         if G.system_settings.get('enableVPConfStartup', False):
             logging.info(f'Starting aysnc "startup vpconf" config push: {G.system_settings.get('pathVPConfStartup', '')}')
-            G.vpconf_init_pending = True # True flag delays telemetry process until async process completed by upload_vpconf_profile
             try:
                 upload_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
             except Exception:
-                G.vpconf_init_pending = False # allow telem processing if config push fails
                 logging.exception("Unable to set VPConfigurator startup profile")
 
         try:
@@ -846,7 +850,7 @@ def _init_logging(log_widget : QPlainTextEdit):
 
     date_str = datetime.now().strftime("%Y%m%d")
 
-    logname = "".join(["TelemFFB", "_", G.device_usbvidpid.replace(":", "-"), '_', G.device_type, "_", date_str, ".log"])
+    logname = "".join(["TelemFFB", "_", G.device_type, "_", date_str, ".log"])
     log_file = os.path.join(log_folder, logname)
 
     # Create a logger instance
