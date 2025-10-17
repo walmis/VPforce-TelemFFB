@@ -73,7 +73,7 @@ def test_open_with_path(monkeypatch):
     # Create FFBRhino by specifying path
     # Note: FFBRhino.__init__ will call enumerate when path is falsy; to test explicit path handling
     # we call FFBRhino with a dummy vid/pid and let the class pick the first device.
-    r = ffb_rhino.FFBRhino(path="\\\\?\\HID#VID_FFFF&PID_2055&MI_00#FAKEPATH")
+    r = ffb_rhino.FFBRhino(path=str(fake_path, 'utf-8'))
 
     # After initialization, the device's info.path should match our fake path
     assert r.info.path == fake_path
