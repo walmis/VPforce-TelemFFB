@@ -2741,8 +2741,9 @@ def upload_vpconf_profile(config_filepath, serial):
         if not os.path.isfile(config_filepath):
             logging.error(f"Error loading VPforce Configurator Profile: ({config_filepath}) - The file does not exist! ")
             return
-
-        if not validate_vpconf_profile(config_filepath, G.device_usbpid, G.device_type, silent=True):
+        
+        assert G.device_info is not None, "Device info must be set before uploading profile"
+        if not validate_vpconf_profile(config_filepath, G.device_info.product_id, G.device_type, silent=True):
             logging.error(f"VPForce Config Error: ({config_filepath}) - The file failed validation!  Check the PID is correct for the device")
             return
 
@@ -2753,11 +2754,13 @@ def upload_vpconf_profile(config_filepath, serial):
         def exec():
             # Use NamedMutex to ensure only one instance of the configurator is executed at a time
             # This might help prevent issues with libusb race conditions when configurator tries to enumerate devices
-            with NamedMutex("vpconf_mutex", acquired=True):
-                ret = subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
-                logging.info(f"VPForce Configurator exited with code {ret}")
+            try:
+                with NamedMutex("vpconf_mutex", acquired=True):
+                    G.vpconf_init_pending = True
+                    ret = subprocess.call([vpconf_path, "-config", config_filepath, "-serial", serial], cwd=workdir, env=env, shell=True)
+                    logging.info(f"VPForce Configurator exited with code {ret}")
+            finally:
                 G.vpconf_init_pending = False
-
 
         thread = threading.Thread(target=exec)
         thread.start()
