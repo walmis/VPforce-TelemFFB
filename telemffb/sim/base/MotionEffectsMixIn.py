@@ -70,8 +70,8 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         super().__init__(*args, **kwargs)
 
         # Instance state used by motion/haptic handlers
-        self.last_device_x = None
-        self.last_device_y = None
+        self.last_device_x = 0
+        self.last_device_y = 0
         # smoother used by some motion effects — per-instance to avoid shared state
         self.smoother = utils.Smoother()
 
