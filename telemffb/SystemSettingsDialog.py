@@ -219,6 +219,13 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_t.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
 
+        # add PID textboxes as attribute to device selection combos
+        self.cb_select_j._tb_box = self.tb_pid_j
+        self.cb_select_p._tb_box = self.tb_pid_p
+        self.cb_select_c._tb_box = self.tb_pid_c
+        self.cb_select_t._tb_box = self.tb_pid_t
+
+
 
 
 
@@ -413,8 +420,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                     if msg.clickedButton() == override_btn:
                         # clear other combobox selection (set to index 0 = None)
                         other.setCurrentIndex(0)
+                        other._tb_box.setText('') # clear overidden PID textbox
                         # accept new selection
                         changed_cb._prev_index = index
+                        changed_cb._tb_box.setText(format(dev.product_id, "x")) # update PID textbox
                         return
                     else:
                         # revert selection on changed_cb
@@ -426,6 +435,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
             # no conflicts, commit
             changed_cb._prev_index = index
+            changed_cb._tb_box.setText(format(dev.product_id, "x"))   # update PID textbox
+
 
             # After successful change, persist the selection for this combobox's role
             # map combobox to role name
