@@ -2151,19 +2151,26 @@ def parseAnsiText(ansi_text):
     output = []
     for i in parsed.instructions():
         if isinstance(i, stransi.SetColor):
-            rgb = i.color.hex
-            if i.role == stransi.color.ColorRole.BACKGROUND:
-                current_format.setBackground(QColor(rgb.hex_code))
-            elif i.role ==  stransi.color.ColorRole.FOREGROUND:
-                current_format.setForeground(QColor(rgb.hex_code))
+            if not i.color:
+                current_format = QTextCharFormat()
+            else:
+                rgb = i.color.hex
+                if i.role == stransi.color.ColorRole.BACKGROUND:
+                    current_format.setBackground(QColor(rgb.hex_code))
+                elif i.role ==  stransi.color.ColorRole.FOREGROUND:
+                    current_format.setForeground(QColor(rgb.hex_code))
         elif isinstance(i, stransi.SetAttribute):
             match i.attribute:
                 case stransi.attribute.Attribute.BOLD:
                     current_format.setFontWeight(100)
                 case stransi.attribute.Attribute.ITALIC:
-                    current_format.setFontItalic(i.is_on())
+                    current_format.setFontItalic(True)
+                case stransi.attribute.Attribute.NOT_ITALIC:
+                    current_format.setFontItalic(False)
                 case stransi.attribute.Attribute.UNDERLINE:
-                    current_format.setFontUnderline(i.is_on())
+                    current_format.setFontUnderline(True)
+                case stransi.attribute.Attribute.NOT_UNDERLINE:
+                    current_format.setFontUnderline(False)
                 case stransi.attribute.Attribute.NORMAL:
                     current_format = QTextCharFormat()
         else:
