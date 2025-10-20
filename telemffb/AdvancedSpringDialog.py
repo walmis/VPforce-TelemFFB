@@ -342,7 +342,7 @@ class AdvancedSpringDialog(QDialog, Ui_AdvancedSpringDialog):
     def draw_live_view(self, data):
         ias = data.get('IAS', 0)
         current_gains = G.telem_manager.currentAircraft.adv_spr_gains
-        if current_gains != "none":
+        if current_gains is not None:
             gains = get_gain_from_speed(current_gains, ias)
         else:
             gains = None

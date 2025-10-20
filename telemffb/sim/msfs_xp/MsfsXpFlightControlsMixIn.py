@@ -318,7 +318,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         # Apply expo curve or advanced spring gains
         if self.spring_mode_is(SpringModeEnum.ADVANCED):
-            adv_spr_stgs = json.loads(self.adv_spr_gains)
+            adv_spr_stgs = self.adv_spr_gains
             scale = adv_spr_stgs.get("scale")
             spd_y = scale * elevator_coeff
             spd_x = scale * aileron_coeff
@@ -623,7 +623,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
     def _calculate_rudder_spring_coefficient(self, telem_data, rudder_coeff, base_rudder_coeff):
         """Calculate spring coefficient for rudder pedals."""
         if self.spring_mode_is(SpringModeEnum.ADVANCED):
-            if self.adv_spr_gains == "none":
+            if not self.adv_spr_gains:
                 self.flag_error("Please open and configure the advanced spring gain settings")
                 rudder_coeff = 0
             else:

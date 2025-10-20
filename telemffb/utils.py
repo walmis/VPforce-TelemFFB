@@ -1111,7 +1111,7 @@ def get_gain_from_gs(json_string, input_gs):
     return {"pos": interpolated_pos, "neg": interpolated_neg}
 
 
-def get_gain_from_speed(json_string, input_airspeed_ms):
+def get_gain_from_speed(curve_settings : str | dict, input_airspeed_ms):
     """
     Interpolates the % force input airspeed and the advanced spring curve settings passed.
 
@@ -1130,8 +1130,12 @@ def get_gain_from_speed(json_string, input_airspeed_ms):
         "m/s": 1.0,
     }
 
-    # Parse JSON string
-    settings = json.loads(json_string)
+    if isinstance(curve_settings, dict):
+        settings = curve_settings
+    else:
+        # Parse JSON string
+        settings = json.loads(curve_settings)
+    assert settings is not None, "Invalid settings for speed curve."
 
     # Extract curves and units
     curve_x = settings.get("curve_x", {})

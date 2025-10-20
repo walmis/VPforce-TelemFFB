@@ -1,3 +1,4 @@
+from typing import Optional
 import telemffb.globals as G
 from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 import telemffb.utils as utils
@@ -5,7 +6,7 @@ from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
-
+import json
 perftracker = utils.PerformanceTracker()
 
 class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
@@ -14,7 +15,6 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     _spring_mode : SpringModeEnum = SpringModeEnum.NONE
     
     adv_spr_override_enabled: bool = False   # deprecated
-    adv_spr_gains: str = 'none'
     adv_spr_use_hardware_trim: bool = False
 
     # override spring trim button bindings and settings
@@ -26,6 +26,18 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     override_spring_cp0_x: float = 0.0
     override_spring_cp0_y: float = 0.0
     # end of user parameters
+
+    @property
+    def adv_spr_gains(self) -> Optional[dict]:
+        return self._adv_spr_gains
+    
+    @adv_spr_gains.setter
+    def adv_spr_gains(self, value: str):
+        """adv_spr_gains gets assigned with json encoded string or 'none' via settings subsystem, save it as a dict internally"""
+        if value == 'none':
+            self._adv_spr_gains = None
+            return
+        self._adv_spr_gains = json.loads(value)
 
     @property
     def spring_mode(self) -> SpringModeEnum:
@@ -58,6 +70,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         # Ensure cooperative init ordering
         super().__init__(*args, **kwargs)
         self.__firmware_supported = None
+        self._adv_spr_gains: Optional[dict] = None
 
         # per-instance state used by advanced spring override
         self.adv_spr_settings_dict: dict = {}
@@ -84,7 +97,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
                             f'The device is currently running version {G.device_firmware_version}\n'
                             f'Please update your device firmware!')
             return
-        if self.adv_spr_gains == 'none':
+        if not self.adv_spr_gains:
             self.flag_error('Please open and configure the advanced spring gain settings')
             return
 
