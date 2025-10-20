@@ -916,7 +916,7 @@ class FFBRhino(QObject):
             report = self.get_report(HID_REPORT_ID_PID_STATE_REPORT)
             #print(report)
             if report.deviceResetEvent:
-                logging.info("Device FFB reset event: Invalidating all effects")
+                logging.info("Device FFB state was reset, telemFFB will recreate all effects")
                 for ref in self._effect_handles:
                     effect : FFBEffectHandle = ref()
                     effect.invalidate()

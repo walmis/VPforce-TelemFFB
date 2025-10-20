@@ -361,7 +361,7 @@ class TelemManager(QObject, threading.Thread):
         self._handle_command_runner(params)
         self._handle_configurator_overrides(params)
 
-        logging.info(f"Creating handler for {aircraft_name}: {Aircraft_Class.__module__}.{Aircraft_Class.__name__}")
+        logging.info(f"Creating handler for [blue]{aircraft_name}[/blue]: [dim]{Aircraft_Class.__module__}.{Aircraft_Class.__name__}[/dim]")
 
         # Create and configure new aircraft instance
         self.currentAircraft : AircraftBase = Aircraft_Class(aircraft_name)
