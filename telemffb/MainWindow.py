@@ -1306,8 +1306,9 @@ class MainWindow(QMainWindow):
 
         #self.devicetype_label.hide()
         current_title = self.windowTitle()
-        new_title = f"** MASTER INSTANCE ** {current_title}"
-        self.setWindowTitle(new_title)
+        if len(G.launched_instances):
+            current_title = f"** MASTER INSTANCE ** {current_title}"
+        self.setWindowTitle(current_title)
         # self.instance_status_row.show()
         # if "joystick" in G.launched_instances:
         #     self.instance_status_row.joystick_status_icon.show()
