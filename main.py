@@ -935,9 +935,16 @@ def main():
 
 def _init_logging(log_widget : QPlainTextEdit):
     log_folder = os.path.join(os.environ['LOCALAPPDATA'], "VPForce-TelemFFB", 'log')
-    
-    sys.stdout = utils.OutLog(log_widget, sys.stdout)
-    sys.stderr = utils.OutLog(log_widget, sys.stderr)
+
+    # Capture original streams so logging StreamHandlers can write to the
+    # real console. We still route stdout/stderr to the UI via OutLog, but
+    # ensure the logging StreamHandler writes to the original streams to
+    # avoid duplicate writes through OutLog -> original_out.
+    orig_stdout = sys.stdout
+    orig_stderr = sys.stderr
+
+    sys.stdout = utils.OutLog(log_widget, orig_stdout)
+    sys.stderr = utils.OutLog(log_widget, orig_stderr)
 
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
@@ -968,7 +975,9 @@ def _init_logging(log_widget : QPlainTextEdit):
     formatter = logging.Formatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
     formatter_file = MyFormatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
 
-    # Create a StreamHandler to log messages to the console
+    # Create a StreamHandler to log messages to the real console (orig_stdout).
+    # Important: use the original stdout so the handler doesn't write into OutLog
+    # which would then forward back to original stdout and cause duplicate output.
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(formatter)
@@ -978,9 +987,13 @@ def _init_logging(log_widget : QPlainTextEdit):
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter_file)
 
-    # Add the handlers to the logger
-    #logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
+    # Wrap handlers with a DedupHandler so repeated identical messages are suppressed
+    # Clear any pre-existing root handlers to avoid duplicate outputs
+    logger.handlers.clear()
+    from telemffb.utils import DedupHandler
+    dedup = DedupHandler(handlers=[console_handler, file_handler])
+    # Attach the dedup handler to the root logger. Individual handlers are still owned by DedupHandler.
+    logger.addHandler(dedup)
 
     # Create a list of keywords to filter
     log_filter_strings = [
@@ -996,8 +1009,8 @@ def _init_logging(log_widget : QPlainTextEdit):
     console_handler.addFilter(log_filter)
     file_handler.addFilter(log_filter)
 
-    logging.getLogger().handlers[0].setStream(sys.stdout)
-    logging.getLogger().handlers[0].setFormatter(formatter)
+    # DedupHandler wraps the console and file handlers; no need to manipulate
+    # logging.getLogger().handlers[0] directly anymore.
 
     if not G.child_instance:
         try:    # in case other instance tries doing at the same time

@@ -2224,6 +2224,146 @@ class OutLog(QtCore.QObject):
     def flush(self):
         pass
 
+
+class DedupHandler(logging.Handler):
+    """Handler that suppresses immediate duplicate log records and emits
+    a summary when a different message arrives or periodically while the
+    same message keeps repeating.
+
+    It forwards records to one or more inner handlers passed during
+    construction. Thread-safe.
+    """
+
+    def __init__(self, handlers=None, period_seconds: float = 5.0):
+        super().__init__()
+        self.handlers = handlers or []
+        self._lock = threading.Lock()
+        self._last_key = None
+        self._count = 0
+        self._last_record = None
+        self._first_ts = 0.0
+        self._last_periodic_emit_ts = 0.0
+        self.period_seconds = float(period_seconds)
+
+    def _normalize_message(self, record: logging.LogRecord) -> str:
+        try:
+            txt = record.getMessage() or ""
+            parts = parseAnsiText(txt)
+            return "".join([t for t, _ in parts])
+        except Exception:
+            return record.getMessage() or ""
+
+    def _make_key(self, record: logging.LogRecord):
+        # Key by level, logger name and normalized message
+        return (record.levelno, record.name, self._normalize_message(record))
+
+    def _make_summary_record(self, base_record: logging.LogRecord, repeated_count: int, periodic: bool = False) -> logging.LogRecord:
+        if periodic:
+            msg = f"{self._normalize_message(base_record)} (message repeated {repeated_count} times so far)"
+        else:
+            msg = f"{self._normalize_message(base_record)} (message repeated {repeated_count} times)"
+        new_rec = logging.LogRecord(
+            name=base_record.name,
+            level=base_record.levelno,
+            pathname=base_record.pathname,
+            lineno=base_record.lineno,
+            msg=msg,
+            args=(),
+            exc_info=None,
+            func=base_record.funcName,
+        )
+        # preserve timestamp
+        new_rec.created = base_record.created
+        return new_rec
+
+    def emit(self, record: logging.LogRecord):
+        try:
+            key = self._make_key(record)
+            now = time.time()
+            with self._lock:
+                if key == self._last_key:
+                    # same as previous: increment and buffer
+                    self._count += 1
+                    self._last_record = record
+
+                    # On first repeat, set first timestamp if not set
+                    if not self._first_ts:
+                        self._first_ts = now
+
+                    # If enough time passed since last periodic emit, emit a periodic summary
+                    if self.period_seconds and (now - self._last_periodic_emit_ts) >= self.period_seconds and self._count > 1:
+                        summary = self._make_summary_record(self._last_record, self._count, periodic=True)
+                        for h in self.handlers:
+                            try:
+                                h.emit(summary)
+                            except Exception:
+                                pass
+                        self._last_periodic_emit_ts = now
+
+                    return
+
+                # Different message: if previous one was repeated, emit final summary
+                if self._count > 1 and self._last_record is not None:
+                    summary = self._make_summary_record(self._last_record, self._count, periodic=False)
+                    for h in self.handlers:
+                        try:
+                            h.emit(summary)
+                        except Exception:
+                            pass
+
+                # Forward current record to inner handlers
+                for h in self.handlers:
+                    try:
+                        h.emit(record)
+                    except Exception:
+                        pass
+
+                # update tracking state
+                self._last_key = key
+                self._count = 1
+                self._last_record = record
+                self._first_ts = now
+                self._last_periodic_emit_ts = now
+        except Exception:
+            # In case of any failure in dedup logic, fallback to best-effort forwarding
+            for h in self.handlers:
+                try:
+                    h.emit(record)
+                except Exception:
+                    pass
+
+    def flush(self):
+        # flush inner handlers if they support flush
+        for h in self.handlers:
+            try:
+                h.flush()
+            except Exception:
+                pass
+
+    def close(self):
+        # Emit pending summary if any
+        try:
+            with self._lock:
+                if self._count > 1 and self._last_record is not None:
+                    summary = self._make_summary_record(self._last_record, self._count)
+                    for h in self.handlers:
+                        try:
+                            h.emit(summary)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        # close inner handlers
+        for h in self.handlers:
+            try:
+                h.close()
+            except Exception:
+                pass
+
+        super().close()
+
+
 class FetchLatestVersion(QThread):
     workers = []
 
