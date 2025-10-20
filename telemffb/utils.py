@@ -2163,6 +2163,13 @@ def parseAnsiText(ansi_text):
             match i.attribute:
                 case stransi.attribute.Attribute.BOLD:
                     current_format.setFontWeight(100)
+                case stransi.attribute.Attribute.DIM:
+                    cl = current_format.foreground().color()
+                    cl.setAlpha(128)
+                    current_format.setForeground(cl)
+                case stransi.attribute.Attribute.NEITHER_BOLD_NOR_DIM:
+                    current_format.clearProperty(QTextCharFormat.Property.FontWeight)
+                    current_format.clearForeground()
                 case stransi.attribute.Attribute.ITALIC:
                     current_format.setFontItalic(True)
                 case stransi.attribute.Attribute.NOT_ITALIC:
