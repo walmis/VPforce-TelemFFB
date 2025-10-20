@@ -44,13 +44,14 @@ import pygetwindow as get_focus_window
 
 from telemffb.utils import hexdump
 import json
+from telemffb.util import conversions as conv
 
-
-knots = 0.514444
-kmh = 1.0 / 3.6
+# use centralized conversion constants
+knots = conv.kt2ms
+kmh = conv.kmh2ms
 deg = math.pi / 180
-fpss2gs = 1 / 32.17405
-mpss2gs = 1 / 9.81
+fpss2gs = conv.fpss2gs
+mpss2gs = conv.mpss2gs
 
 dbg_en = 0
 dbg_lvl = 0

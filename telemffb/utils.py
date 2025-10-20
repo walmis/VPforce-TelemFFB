@@ -77,6 +77,7 @@ import telemffb.globals as G
 import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
 from .namedmutex import NamedMutex
+from .util import conversions as conv
 
 def check_min_firmware_version(dev_firmware_version, min_firmware_version):
     """Check if device firmware version meets minimum requirements."""
@@ -869,29 +870,40 @@ class SystemSettings(QSettings):
 def mix(a, b, val):
     return a * (1 - val) + b * (val)
 
+_TRUE_SET = frozenset(["true", "yes", "on", "enable", "enabled"])
+_FALSE_SET = frozenset(["false", "no", "off", "disable", "disabled"])
+_UNIT_CONVERSIONS = {
+    "%": conv.percent,
+    "kt": conv.kt2ms,
+    "kph": conv.kmh2ms,
+    "fpm": 0.00508,
+    "m/s": 1,
+    "mph": conv.mph2ms,
+    "deg": 1,
+    "ms": 1,
+    "hz": 1,
+    "m": 1,
+    "ft": conv.ft2m,
+    "in": conv.in2m,
+}
 
 def to_number(v: str):
     """Try to convert string to number
     If unable, return the original string
     """
     orig_v = v
-    if isinstance(v, (bool, int)):
+    if isinstance(v, (bool, int, float)):
         return v
 
     v_lower = v.lower()
-    if v_lower in ["true", "yes", "on", "enable", "enabled"]:
+    if v_lower in _TRUE_SET:
         return True
-    if v_lower in ["false", "no", "off", "disable", "disabled"]:
+    if v_lower in _FALSE_SET:
         return False
 
     scale = 1
-    unit_conversions = {
-        "%": 0.01, "kt": 0.51444, "kph": 1 / 3.6, "fpm": 0.00508, "m/s": 1,
-        "mph": 0.44704, "deg": 1, "ms": 1, "hz": 1, "m": 1, "ft": 0.3048,
-        "in": 0.0254, "m^2": 1, "ft^2": 0.092903
-    }
 
-    for unit, factor in unit_conversions.items():
+    for unit, factor in _UNIT_CONVERSIONS.items():
         if v_lower.endswith(unit) or v_lower.startswith(unit):
             scale = factor
             v = v.strip(unit)
@@ -1110,11 +1122,11 @@ def get_gain_from_speed(json_string, input_airspeed_ms):
     Returns:
         dict: A dictionary containing the interpolated X and Y gain values as a factor (0...1).
     """
-    # Unit conversion factors
+    # Unit conversion factors (to m/s)
     UNIT_CONVERSIONS = {
-        "kt": 1.94384,
-        "mph": 2.23694,
-        "kph": 3.6,
+        "kt": conv.kt2ms,
+        "mph": conv.mph2ms,
+        "kph": conv.kmh2ms,
         "m/s": 1.0,
     }
 

@@ -46,10 +46,11 @@ import random
 from .aircraft_base import AircraftBase
 import json
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
+from telemffb.util import conversions as conv
 
-#unit conversions (to m/s)
-knots = 0.514444
-kmh = 1.0/3.6
+# unit conversions (to m/s)
+knots = conv.kt2ms
+kmh = conv.kmh2ms
 deg = math.pi/180
 EFFECT_SQUARE = 3
 EFFECT_SINE = 4

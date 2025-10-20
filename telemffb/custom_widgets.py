@@ -2381,10 +2381,11 @@ class CurveWidget(QWidget):
 
 
 class SpringCurveWidget(CurveWidget):
+    from telemffb.util import conversions as conv
     UNIT_CONVERSIONS = {
-        "kt": 1.94384,
-        "mph": 2.23694,
-        "kph": 3.6,
+        "kt": conv.ms2kt,
+        "mph": conv.ms2mph,
+        "kph": conv.ms2kmh,
         "m/s": 1.0,
     }
     def __init__(self, parent=None, unit='kt', base_unit='m/s'):
