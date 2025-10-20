@@ -107,6 +107,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         super().on_telemetry(telem_data)
         self.msfs_update_flight_controls(telem_data)
 
+    @override
+    def ac_modify_game_spring(self):
+        """This function is not used in MSFS/X-Plane mixin."""
+
     def _calculate_airspeeds(self, telem_data, incidence_vec):
         """Calculate and store airspeed values in telemetry data."""
         _airspeed = telem_data["IAS"]
@@ -318,6 +322,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         # Apply expo curve or advanced spring gains
         if self.spring_mode_is(SpringModeEnum.ADVANCED):
+            #print(self.adv_spr_gains)
             adv_spr_stgs = self.adv_spr_gains
             scale = adv_spr_stgs.get("scale")
             spd_y = scale * elevator_coeff
