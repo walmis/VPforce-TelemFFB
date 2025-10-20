@@ -133,13 +133,14 @@ class AircraftEffectUtilsBase(object):
 
         Logs warnings for unknown parameters and info for each applied setting.
         """
+        logging.info(f"Applying settings...")
         for k, v in settings_dict.items():
             if k in ["type"]: continue
             if k.endswith("_group"): continue
-            if getattr(self, k, None) is None and k != 'vpconf' and 'dummy' not in k and 'command_runner' not in k:
-                # logging.info(f"WARNING: Unknown parameter {k} in config")  # This log is no longer relevant since we moved away from ini files
+            if hasattr(self, k) is None and k != 'vpconf' and 'dummy' not in k and 'command_runner' not in k:
+                logging.warning(f"Trying to assign unknown parameter {k} ")
                 continue
-            logging.info(f"set {k} = {v}")
+            logging.info(f" [cyan]set[/cyan]: {k} = {v}")
             setattr(self, k, v)
 
     def has_changed(self, item: str, delta_ms=0, data=None) -> bool:

@@ -964,16 +964,119 @@ def _init_logging(log_widget : QPlainTextEdit):
     logging.addLevelName(logging.WARNING, f'{AnsiColors.YELLOW}WARNING{AnsiColors.END}')
 
     # remove ansi escape strings
-    class MyFormatter(logging.Formatter):
+    class AnsiRemoverFormatter(logging.Formatter):
         def format(self, record):
             s = super().format(record)
             p = utils.parseAnsiText(s)
             return "".join([txt[0] for txt in p])
-            
+
+
+    class _ValueColorFilter(logging.Filter):
+        """Logging filter that colorizes numeric and boolean literals in the log record's message.
+
+        This filter wraps matched tokens in ANSI color codes. It is safe to add to a logger
+        because it does not modify the record object except for the 'msg' and 'message' text.
+        The regex is conservative to avoid matching inside words.
+        """
+        import re
+        _re_float = re.compile(r"(?<![\w.-])(-?\d+\.\d+)(?![\w.])")
+        _re_int = re.compile(r"(?<![\w.-])(-?\d+)(?![\w.])")
+        _re_bool = re.compile(r"\b(True|False)\b")
+
+
+
+        def filter(self, record: logging.LogRecord) -> bool:
+            try:
+                msg = str(record.getMessage())
+            except Exception:
+                # If formatting fails, leave record untouched
+                return True
+            # ANSI color codes used for simple terminal highlighting of values in log messages
+            # These are intentionally lightweight and only applied when the terminal supports ANSI.
+            _ANSI_RESET = "\x1b[0m"
+            _ANSI_BLUE = "\x1b[34m"   # integers
+            _ANSI_CYAN = "\x1b[36m"   # floats
+            _ANSI_MAGENTA = "\x1b[35m" # booleans
+            # First colorize floats, then ints (so we don't double-color the float's integer part)
+            msg = self._re_float.sub(lambda m: f"{_ANSI_CYAN}{m.group(1)}{_ANSI_RESET}", msg)
+            msg = self._re_int.sub(lambda m: f"{_ANSI_BLUE}{m.group(1)}{_ANSI_RESET}", msg)
+            msg = self._re_bool.sub(lambda m: f"{_ANSI_MAGENTA}{m.group(1)}{_ANSI_RESET}", msg)
+
+            # Expand custom bracket tags like [b]...[/b], [i], [u], [dim], and colors [red]...[/red]
+            # into ANSI SGR sequences so terminals that support ANSI will render them.
+            def _expand_bracket_tags(s: str) -> str:
+                if not s:
+                    return s
+
+                open_map = {
+                    'b': '\x1b[1m',      # bold
+                    'i': '\x1b[3m',      # italic
+                    'u': '\x1b[4m',      # underline
+                    'dim': '\x1b[2m',    # faint/dim
+                    'reset': '\x1b[0m',
+                    'black': '\x1b[30m',
+                    'red': '\x1b[31m',
+                    'green': '\x1b[32m',
+                    'yellow': '\x1b[33m',
+                    'blue': '\x1b[34m',
+                    'magenta': '\x1b[35m',
+                    'cyan': '\x1b[36m',
+                    'white': '\x1b[97m',
+                    'gray': '\x1b[90m',
+                }
+
+                close_map = {
+                    'b': '\x1b[22m',
+                    'i': '\x1b[23m',
+                    'u': '\x1b[24m',
+                    'dim': '\x1b[22m',
+                    'reset': '\x1b[0m',
+                    'black': '\x1b[39m',
+                    'red': '\x1b[39m',
+                    'green': '\x1b[39m',
+                    'yellow': '\x1b[39m',
+                    'blue': '\x1b[39m',
+                    'magenta': '\x1b[39m',
+                    'cyan': '\x1b[39m',
+                    'white': '\x1b[39m',
+                    'gray': '\x1b[39m',
+                }
+
+                def repl(m: re.Match) -> str:
+                    slash = m.group(1)
+                    tag = (m.group(2) or '').lower()
+                    if not tag:
+                        return m.group(0)
+                    if slash:
+                        return close_map.get(tag) or m.group(0)
+                    else:
+                        return open_map.get(tag) or m.group(0)
+
+                return re.sub(r"\[(/?)([a-zA-Z]+)\]", repl, s)
+
+            try:
+                msg = _expand_bracket_tags(msg)
+            except Exception:
+                # keep original message on any failure
+                pass
+
+            # assign colored message back to the record. Some logging handlers use record.message
+            # or re-format using record.msg and record.args; update both when applicable.
+            try:
+                record.msg = msg
+                # if a formatted 'message' attr exists, update it too
+                if hasattr(record, 'message'):
+                    record.message = msg
+            except Exception:
+                # never fail logging
+                pass
+
+            return True
+        
     # Create a formatter for the log messages
     fmt_string = f'{utils.AnsiColors.DARK_GRAY}%(asctime)s.%(msecs)03d - {G.device_type}{utils.AnsiColors.END} - %(levelname)s - %(message)s'
     formatter = logging.Formatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
-    formatter_file = MyFormatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
+    formatter_file = AnsiRemoverFormatter(fmt_string, datefmt='%Y-%m-%d %H:%M:%S')
 
     # Create a StreamHandler to log messages to the real console (orig_stdout).
     # Important: use the original stdout so the handler doesn't write into OutLog
@@ -1008,6 +1111,11 @@ def _init_logging(log_widget : QPlainTextEdit):
 
     console_handler.addFilter(log_filter)
     file_handler.addFilter(log_filter)
+
+    #console_handler.addFilter(_ValueColorFilter())
+    #file_handler.addFilter(_ValueColorFilter())
+
+    logger.addFilter(_ValueColorFilter())
 
     # DedupHandler wraps the console and file handlers; no need to manipulate
     # logging.getLogger().handlers[0] directly anymore.
