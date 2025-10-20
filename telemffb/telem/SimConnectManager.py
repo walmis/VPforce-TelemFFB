@@ -658,7 +658,7 @@ class SimConnectManager(threading.Thread):
             recv = ReceiverInstance.cast_recv(pRecv)
             #print(f"got {recv.__class__.__name__}")
             if isinstance(recv, RECV_EXCEPTION):
-                logging.error(f"SimConnect exception {recv.dwException}, sendID {recv.dwSendID}, index {recv.dwIndex}")
+                logging.warning(f"SimConnect exception {recv.dwException}, sendID {recv.dwSendID}, index {recv.dwIndex}")
             elif isinstance(recv, RECV_QUIT):
                 logging.info("Quit received")
                 self.emit_event("Quit")
