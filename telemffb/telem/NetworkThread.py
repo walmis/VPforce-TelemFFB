@@ -38,7 +38,7 @@ class NetworkThread(threading.Thread):
         self._run = True
         s: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 65535)
 
         s.settimeout(0.1)
         s.bind((self._host, self._port))
@@ -48,7 +48,7 @@ class NetworkThread(threading.Thread):
             try:
                 data: bytes
                 sender: Tuple[str, int]
-                data, sender = s.recvfrom(4096)
+                data, sender = s.recvfrom(65535)
                 if self._telem_parser is not None:
                     data = self._telem_parser.process_packet(data)
 
