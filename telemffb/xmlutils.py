@@ -1576,7 +1576,7 @@ def read_single_model( the_sim, aircraft_name, input_modeltype = '', instance_de
                 - model_pattern (str): Regex or name pattern matched from the XML.
                 - sorted_data (list of dict): Fully resolved and sorted configuration items.
         """
-    logging.info (f"Reading from XML:  Sim: {the_sim}, Aircraft name: {aircraft_name}, Class: {input_modeltype}")
+    logging.info (f"Reading from XML:  Sim:'{the_sim}', Aircraft name:'{aircraft_name}', Class:'{input_modeltype}'")
     if active_profile is None:
         ptrn = get_pattern_by_sim_fullname(the_sim, aircraft_name)
         cls = get_class_for_sim_model(the_sim, ptrn)
