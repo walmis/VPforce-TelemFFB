@@ -40,6 +40,7 @@ import threading
 import logging
 import os
 import telemffb.globals as G
+from enum import IntEnum
 
 surface_types = {
     0: "Concrete",
@@ -68,6 +69,52 @@ surface_types = {
     23: "Tarmac",
     24: "Wright flyer track",
 }
+
+class SimConnectException(IntEnum):
+    NONE = 0
+    ERROR = 1
+    SIZE_MISMATCH = 2
+    UNRECOGNIZED_ID = 3
+    UNOPENED = 4
+    VERSION_MISMATCH = 5
+    TOO_MANY_GROUPS = 6
+    NAME_UNRECOGNIZED = 7
+    TOO_MANY_EVENT_NAMES = 8
+    EVENT_ID_DUPLICATE = 9
+    TOO_MANY_MAPS = 10
+    TOO_MANY_OBJECTS = 11
+    TOO_MANY_REQUESTS = 12
+    WEATHER_INVALID_PORT = 13
+    WEATHER_INVALID_METAR = 14
+    WEATHER_UNABLE_TO_GET_OBSERVATION = 15
+    WEATHER_UNABLE_TO_CREATE_STATION = 16
+    WEATHER_UNABLE_TO_REMOVE_STATION = 17
+    INVALID_DATA_TYPE = 18
+    INVALID_DATA_SIZE = 19
+    DATA_ERROR = 20
+    INVALID_ARRAY = 21
+    CREATE_OBJECT_FAILED = 22
+    LOAD_FLIGHTPLAN_FAILED = 23
+    OPERATION_INVALID_FOR_OBJECT_TYPE = 24
+    ILLEGAL_OPERATION = 25
+    ALREADY_SUBSCRIBED = 26
+    INVALID_ENUM = 27
+    DEFINITION_ERROR = 28
+    DUPLICATE_ID = 29
+    DATUM_ID = 30
+    OUT_OF_BOUNDS = 31
+    ALREADY_CREATED = 32
+    OBJECT_OUTSIDE_REALITY_BUBBLE = 33
+    OBJECT_CONTAINER = 34
+    OBJECT_AI = 35
+    OBJECT_ATC = 36
+    OBJECT_SCHEDULE = 37
+    JETWAY_DATA = 38
+    ACTION_NOT_FOUND = 39
+    NOT_AN_ACTION = 40
+    INCORRECT_ACTION_PARAMS = 41
+    GET_INPUT_EVENT_FAILED = 42
+    SET_INPUT_EVENT_FAILED = 43
 
 class SimVar:
     """
@@ -240,6 +287,8 @@ EV_PAUSED = 65499 # id for paused event
 EV_STARTED = 65498 # id for started event
 EV_STOPPED = 65497  # id for stopped event
 EV_SIMSTATE = 65496
+
+
 class SimConnectManager(threading.Thread):
     """
     Manages SimConnect communication with Microsoft Flight Simulator.
@@ -658,7 +707,7 @@ class SimConnectManager(threading.Thread):
             recv = ReceiverInstance.cast_recv(pRecv)
             #print(f"got {recv.__class__.__name__}")
             if isinstance(recv, RECV_EXCEPTION):
-                logging.warning(f"SimConnect exception {recv.dwException}, sendID {recv.dwSendID}, index {recv.dwIndex}")
+                logging.warning(f"SimConnect exception [blue]{SimConnectException(recv.dwException).name}[/blue], sendID {recv.dwSendID}, index {recv.dwIndex}")
             elif isinstance(recv, RECV_QUIT):
                 logging.info("Quit received")
                 self.emit_event("Quit")
