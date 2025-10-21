@@ -145,7 +145,6 @@ effect.stop()  # Frees device resource
 ## Dependencies & External Integrations
 - **PyQt6**: UI framework (migration from PyQt5 in progress - see `makeresources.bat` uses `pyrcc5`)
 - **libusb1/hidapi**: USB device communication (DLLs in `dll/` directory)
-- **pyzmq**: IPC networking between instances
 - **SimConnect**: MSFS integration (custom fork at github.com/walmis/pysimconnect)
 - **numpy/akima**: Math operations for curves and interpolation
 
