@@ -773,6 +773,48 @@ def read_all_system_settings():
 
 
 class SystemSettings(QSettings):
+    # Type hints for common settings to improve IDE autocompletion and discovery
+    # These are intentionally class-level annotations (no runtime effect) so editors can
+    # surface available settings via dot-completion (e.g. settings.logLevel)
+    logLevel: str
+    telemTimeout: int
+    saveWindow: bool
+    saveLastTab: bool
+    enableVPConfStartup: bool
+    pathVPConfStartup: str
+    enableVPConfExit: bool
+    enableVPConfGlobalDefault: bool
+    pathVPConfExit: str
+    enableResetGainsExit: bool
+
+    pruneLogs: bool
+    pruneLogsNum: int
+    pruneLogsUnit: str
+    ignoreUpdate: bool
+    startToTray: bool
+    closeToTray: bool
+    enableDCS: bool
+    enableMSFS: bool
+    enableXPLANE: bool
+    validateXPLANE: bool
+    pathXPLANE: str
+    validateIL2: bool
+    pathIL2: str
+    portIL2: int
+    enableBMS: bool
+    masterInstance: int
+    autolaunchMaster: bool
+    autolaunchJoystick: bool
+    autolaunchPedals: bool
+    autolaunchCollective: bool
+    startMinJoystick: bool
+    startMinPedals: bool
+    startMinCollective: bool
+    startHeadlessJoystick: bool
+    startHeadlessPedals: bool
+    startHeadlessCollective: bool
+    debug: bool
+
     default_inst = {
         'logLevel': 'INFO',
         'telemTimeout': 200,
@@ -829,7 +871,8 @@ class SystemSettings(QSettings):
     def __init__(self, pid=None, tp=None):
         super().__init__('VPforce', 'TelemFFB')
         #self.def_inst_sys_dict, self.def_global_sys_dict = get_default_sys_settings(pid, tp, cmb=False)
-        pass
+        # No additional initialization required. Keep QSettings initialization intact.
+        return
 
     @override
     def setValue(self, key: str, value, instance=None) -> None:
@@ -837,6 +880,47 @@ class SystemSettings(QSettings):
             super().setValue(f"{instance}/{key}", value)
         else:
             super().setValue(key, value)
+
+    def __getattr__(self, name: str):
+        """Allow dot-access to settings, e.g. settings.someOption
+
+        If the setting does not exist in QSettings, the default from
+        SystemSettings.defaults (if any) or None is returned.
+        """
+        # Only handle attribute-style access for settings keys. Let Python
+        # raise AttributeError for truly missing attributes.
+        try:
+            return self.get(name)
+        except Exception:
+            raise AttributeError(name)
+
+    def __setattr__(self, name: str, value):
+        """Assigning to attributes will persist the value to QSettings unless
+        it's an internal attribute (starts with '_') or a real class attribute.
+        """
+        # Allow normal attribute behavior for internals and attributes that
+        # already exist on the instance/class (to avoid interfering with QSettings internals)
+        if name.startswith('_') or name in self.__dict__ or hasattr(type(self), name):
+            object.__setattr__(self, name, value)
+            return
+
+        # Otherwise persist via QSettings
+        try:
+            # store as instance/global agnostic key; setValue will handle saving
+            # under instance-specific key when appropriate elsewhere
+            self.setValue(name, value)
+        except Exception:
+            # Fallback: if persistence fails, store as a regular attribute
+            object.__setattr__(self, name, value)
+
+    def __dir__(self):
+        # Include known setting keys from defaults to improve autocompletion in REPLs and editors
+        extra = []
+        try:
+            extra = list(self.defaults.keys())
+        except Exception:
+            extra = []
+        return sorted(set(super().__dir__() + extra))
 
     def get(self, name, default=None):       
         # check instance params

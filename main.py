@@ -92,7 +92,7 @@ def send_test_message():
             G.ipc_instance.send_message("TEST MESSAGE")
 
 def _launch_children():
-    if not G.system_settings.get('autolaunchMaster'):
+    if not G.system_settings.autolaunchMaster:
         return
     if not G.master_instance:
         return
@@ -146,7 +146,7 @@ def _setup_device_configuration():
     """
     if G.args.device is None:
         dev_mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
-        master_rb = G.system_settings.get('masterInstance', 1)
+        master_rb = G.system_settings.masterInstance
         devname = dev_mapping.get(master_rb, "joystick")
             
         G.device_usbpid = '2055'
@@ -658,19 +658,21 @@ def _setup_async_initialization(dev : FFBRhino, dev_serial):
     @utils.threaded()
     def init_async():
         try:
-            G.startup_configurator_gains = dev.get_gains()
+            if dev:
+                G.startup_configurator_gains = dev.get_gains()
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
-        if G.system_settings.get('enableVPConfStartup', False):
-            logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.get("pathVPConfStartup", "")}')
+        if G.system_settings.enableVPConfStartup:
+            logging.info(f'Starting async "startup vpconf" config push: {G.system_settings.pathVPConfStartup}')
             try:
-                upload_vpconf_profile(G.system_settings.get('pathVPConfStartup', ''), dev_serial)
+                upload_vpconf_profile(G.system_settings.pathVPConfStartup, dev_serial)
             except Exception:
                 logging.exception("Unable to set VPConfigurator startup profile")
 
         try:
-            G.vpconf_configurator_gains = dev.get_gains()
+            if dev:
+                G.vpconf_configurator_gains = dev.get_gains()
         except Exception:
             logging.exception("Unable to get configurator slider values from device")
 
@@ -695,13 +697,13 @@ def _cleanup_on_exit(dev_serial):
     G.sim_listeners.stop_all()
     G.telem_manager.quit()
 
-    if G.system_settings.get('enableVPConfExit', False):
+    if G.system_settings.enableVPConfExit:
         try:
-            upload_vpconf_profile(G.system_settings.get('pathVPConfExit', ''), dev_serial)
+            upload_vpconf_profile(G.system_settings.pathVPConfExit, dev_serial)
         except Exception:
             logging.error("Unable to set VPConfigurator exit profile")
 
-    if G.system_settings.get('enableResetGainsExit', False):
+    if G.system_settings.enableResetGainsExit:
         try:
             G.gain_override_dialog.set_gains_from_object(G.startup_configurator_gains)
         except:
