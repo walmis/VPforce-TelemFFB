@@ -188,7 +188,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         derivative_k = 0.1  # derivative gain value, or damping ratio
 
         dGs = self.__dGs
-        if gs > 1 and y > (spring_y_center + self.new_gforce_effect_center_deadzone):
+        if gs > 1 and y >= (spring_y_center + self.new_gforce_effect_center_deadzone):
             direction = 180
             g_factor = utils.scale_clamp(gs, (gmin, gmax), (0, 1))
 
@@ -198,7 +198,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
             # utils.dbprint("green", f"y: {y}, syc:{spring_y_center}, y_max: {y_maxpoint}")
             deflection_factor = abs(utils.scale(y, (spring_y_center, y_maxpoint), (0, 1)))
         elif (
-            gs < 1 and y < (spring_y_center - self.new_gforce_effect_center_deadzone) and self.new_gforce_enable_neg_gs
+            gs < 1 and y <= (spring_y_center - self.new_gforce_effect_center_deadzone) and self.new_gforce_enable_neg_gs
         ):
             direction = 0
             g_factor = utils.scale_clamp(gs, (gmin_neg, gmax_neg), (0, 1))
