@@ -1043,15 +1043,15 @@ class HapticEffect(Destroyable):
 
     def _ensure_effect_created(self):
         """Create the effect if it hasn't been created yet"""
-        if not self._h_effect and self._pending_create:
+        if not self._h_effect:
+            assert self._pending_create is not None, "Attempt to start a destroyed effect?"
             # Execute the pending create function
-            if self._pending_create():
-                # Clear the pending create function
-                self._pending_create = None
-                # If there are pending conditions to set, do it now
-                for val in self._pending_conditions.values():
-                    val()
-                self._pending_conditions.clear()
+            self._pending_create()
+            self._pending_create = None
+            # If there are pending conditions to set, do it now
+            for val in self._pending_conditions.values():
+                val()
+            self._pending_conditions.clear()
 
     def setCondition(self, cond : FFBReport_SetCondition) -> Self:
         assert self.effect_type in [
@@ -1069,8 +1069,27 @@ class HapticEffect(Destroyable):
 
         return self
 
-    def _conditional_effect(self, effect_type, coef_x = None, coef_y= None) -> Self:
+    def _conditional_effect(self, effect_type, coef_x = None, coef_y= None, sat_x = None, sat_y = None) -> Self:
         self.effect_type = effect_type
+
+        def set_conditions():
+            assert self._h_effect is not None, "Effect must be created before setting condition"
+
+            if coef_x is not None or sat_x is not None:
+                cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
+                                                positiveCoefficient=int(coef_x or 0),
+                                                negativeCoefficient=int(coef_x or 0),
+                                                positiveSaturation=int(sat_x or 0),
+                                                negativeSaturation=int(sat_x or 0))
+                self._h_effect.setCondition(cond_x)
+
+            if coef_y is not None or sat_y is not None:
+                cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
+                                                positiveCoefficient=int(coef_y or 0),
+                                                negativeCoefficient=int(coef_y or 0),
+                                                positiveSaturation=int(sat_y or 0),
+                                                negativeSaturation=int(sat_y or 0))
+                self._h_effect.setCondition(cond_y)
 
         if not self._h_effect:
             # Store the creation function
@@ -1080,50 +1099,30 @@ class HapticEffect(Destroyable):
                     return False
                 self._h_effect.setEffect() # initialize defaults
 
-                if coef_x is not None:
-                    cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
-                                                    positiveCoefficient=int(coef_x),
-                                                    negativeCoefficient=int(coef_x))
-                    self._h_effect.setCondition(cond_x)
-
-                if coef_y is not None:
-                    cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
-                                                    positiveCoefficient=int(coef_y),
-                                                    negativeCoefficient=int(coef_y))
-                    self._h_effect.setCondition(cond_y)
+                set_conditions()
                 return True
 
             self._pending_create = create_and_setup
         else:
             # Effect already exists, update coefficients directly
-            if coef_x is not None:
-                cond_x = FFBReport_SetCondition(parameterBlockOffset=0, 
-                                                positiveCoefficient=int(coef_x),
-                                                negativeCoefficient=int(coef_x))
-                self._h_effect.setCondition(cond_x)
-
-            if coef_y is not None:
-                cond_y = FFBReport_SetCondition(parameterBlockOffset=1, 
-                                                positiveCoefficient=int(coef_y),
-                                                negativeCoefficient=int(coef_y))
-                self._h_effect.setCondition(cond_y)
+            set_conditions()
 
         return self
 
-    def inertia(self, coef_x = None, coef_y = None):
-        return self._conditional_effect(EFFECT_INERTIA, coef_x, coef_y)
+    def inertia(self, coef_x = None, coef_y = None, **kwargs):
+        return self._conditional_effect(EFFECT_INERTIA, coef_x, coef_y, **kwargs)
 
-    def damper(self, coef_x = None, coef_y = None):
-        return self._conditional_effect(EFFECT_DAMPER, coef_x, coef_y)
+    def damper(self, coef_x = None, coef_y = None, **kwargs):
+        return self._conditional_effect(EFFECT_DAMPER, coef_x, coef_y, **kwargs)
 
-    def friction(self, coef_x = None, coef_y = None):
-        return self._conditional_effect(EFFECT_FRICTION, coef_x, coef_y) 
+    def friction(self, coef_x = None, coef_y = None, **kwargs):
+        return self._conditional_effect(EFFECT_FRICTION, coef_x, coef_y, **kwargs)
 
-    def spring(self, coef_x = None, coef_y = None):
-        return self._conditional_effect(EFFECT_SPRING, coef_x, coef_y) 
-    
-    def spring_adjuster(self, coef_x = 4096, coef_y = 4096):
-        return self._conditional_effect(EFFECT_SPRING_ADJUSTER, coef_x, coef_y) 
+    def spring(self, coef_x = None, coef_y = None, **kwargs):
+        return self._conditional_effect(EFFECT_SPRING, coef_x, coef_y, **kwargs)
+
+    def spring_adjuster(self, coef_x = 4096, coef_y = 4096, **kwargs):
+        return self._conditional_effect(EFFECT_SPRING_ADJUSTER, coef_x, coef_y, **kwargs)
 
     def periodic(self, frequency, magnitude:float, direction:float, *args, effect_type=EFFECT_SINE, duration=0, **kwargs):
         # Handle direction modulator

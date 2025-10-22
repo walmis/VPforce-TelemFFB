@@ -78,7 +78,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         self.spring_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
         self.spring_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
         # the spring_adjuster effect object (wrapper) from the global effects dispenser
-        self.spring_adjuster = self.effects['spring_adjuster'].spring_adjuster()
+        self.spring_adjuster = HapticEffect().spring_adjuster()
 
 
     def spring_mode_is(self, mode : SpringModeEnum):

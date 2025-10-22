@@ -39,9 +39,6 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         self._gforce_effect_mode = GEffectModeEnum.DISABLED
 
         self.__firmware_supported = None
-        self.offset_adjuster_x = FFBReport_SetCondition(parameterBlockOffset=0)
-        self.offset_adjuster_y = FFBReport_SetCondition(parameterBlockOffset=1)
-        self.offset_adjuster = self.effects["offset_adjuster"].spring_adjuster()
 
         self.adv_g_settings_dict: dict = {}
 
@@ -55,7 +52,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
     @gforce_effect_mode.setter
     def gforce_effect_mode(self, value):
         # Accept None, enum instances, and valid enum member names (strings).
-        if value is None:
+        if value is None or value is False:
             self._gforce_effect_mode = GEffectModeEnum.DISABLED
             return
 
@@ -76,7 +73,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         raise ValueError("Invalid type for gforce_effect_mode")
         
     def gforce_effect_mode_is(self, mode):
-        return mode.name == self.gforce_effect_mode
+        return mode == self.gforce_effect_mode
     
     def on_telemetry(self, telem_data: dict):
         super().on_telemetry(telem_data)
@@ -168,10 +165,17 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         self.effects["new_gforce"].constant(g_factor, direction).start()
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
+    def __dispose_all(self):
+        self.effects.dispose("gforce", "new_gforce", "gforce_spr", "offset_adjuster")
+
     def ac_update_gforce_effect(self, telem_data, adv_spr=False):
-        if self.gforce_effect_mode_is(GEffectModeEnum.DISABLED):
-            self.effects.dispose("gforce", "new_gforce")
+        if not self.is_joystick():
             return
+        
+        if self.gforce_effect_mode_is(GEffectModeEnum.DISABLED):
+            self.__dispose_all()
+            return
+        
         if self.gforce_effect_mode_is(GEffectModeEnum.NEW):
             # if "New" Gforce effect is enabled, call it instead and ensure the effect is disposed
             self.effects.dispose("gforce")
@@ -180,9 +184,6 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         else:
             self.effects.dispose("new_gforce")
 
-        if self._should_skip_joystick_effect():
-            self.effects.dispose("gforce")
-            return
 
         if self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED):
             # Verify the device firmware meets the minimum version required to execute this portion of the effect
@@ -198,10 +199,10 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
                 return
 
         if self._should_skip_airborne_effect(telem_data):
-            self.effects.dispose("gforce")
+            self.__dispose_all()
             return
         if self._should_skip_no_airspeed_effect(telem_data):
-            self.effects.dispose("gforce")
+            self.__dispose_all()
             return
 
         gs, y_gs, last_y_gs = self._get_gs_data(telem_data)
@@ -209,7 +210,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
             return
 
         if self._is_telemetry_spike(y_gs, last_y_gs):
-            self.effects.dispose("gforce")
+            self.__dispose_all()
             return
 
         logging.debug(f"GS={gs}, AVG_Z_GS={gs}")
@@ -260,29 +261,39 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
                 else:
                     self.effects.dispose("gforce", "gforce_spr")
                     return
-
-            if not g_factor:
-                self.effects.dispose("gforce", "gforce_spr")
-                return
+           
             if mode == "constant":
+                if not g_factor:
+                    self.effects["gforce"].stop()
+                    return
+                
                 g_factor = utils.clamp(g_factor, 0.0, 1.0)
                 self.effects["gforce"].constant(g_factor, direction).start()
 
             elif mode == "offset":
+                if not g_factor:
+                    self.effects["gforce_spr"].stop()
+                    return
+                
                 adjuster_cpOy = int(-g_factor * 4096)
 
                 if adv_spr:
                     # If being called by advanced spring effect, don't apply adjuster offset here, return offset value and let the advanced spring adjuster effect do it
                     return adjuster_cpOy
+                
+                #_x = FFBReport_SetCondition(parameterBlockOffset=0)
+                _y = FFBReport_SetCondition(parameterBlockOffset=1)
+                _y.set_offset(adjuster_cpOy)
+                _y.set_saturation(1)  #set relative adjustment mode
+                _y.set_coefficient(4096)
 
-                self.offset_adjuster.name = "gforce_spr"
-                self.offset_adjuster_y.set_offset(adjuster_cpOy)
-                self.offset_adjuster_y.set_saturation(4096)
-                self.offset_adjuster_x.set_saturation(4096)
-                self.offset_adjuster.setCondition(self.offset_adjuster_y)
-                self.offset_adjuster.setCondition(self.offset_adjuster_x)
-                self.offset_adjuster.start()
+                offset_adjuster : HapticEffect = self.effects["gforce_spr"].spring_adjuster(sat_x=1, sat_y=1)
+
+                #_x.set_saturation(4096)
+                #offset_adjuster.setCondition(_x)
+                offset_adjuster.setCondition(_y)
+                offset_adjuster.start()
 
         else:
-            self.effects.dispose("gforce")
+            self.__dispose_all()
             return
