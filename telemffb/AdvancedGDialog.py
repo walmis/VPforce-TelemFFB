@@ -348,14 +348,12 @@ class AdvancedGDialog(QDialog, Ui_AdvancedGForceDialog):
 
 
         if gs >= 0:
-            gains = get_gain_from_gs(current_gains, gs)
-            gain_pos = gains.get('pos')
+            gain_pos, _ = get_gain_from_gs(current_gains, gs)
             if gain_pos > 0:
                 gain_pos = gain_pos * (100/self.sl_pos_mastergain.value())  # convert back to %100 reference gain so it follows curve line
             self.curve_pos.draw_crosshairs(gs, gain_pos*100)
         else:
-            gains = get_gain_from_gs(current_gains, abs(gs))
-            gain_neg = gains.get('neg')
+            _, gain_neg = get_gain_from_gs(current_gains, abs(gs))
             if gain_neg > 0:
                 gain_neg = gain_neg * (100/self.sl_pos_mastergain.value()) # convert back to %100 reference gain so it follows curve line
             self.curve_neg.draw_crosshairs(abs(gs), gain_neg*100)

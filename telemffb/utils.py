@@ -1198,7 +1198,7 @@ def get_gain_from_gs(curve_settings, input_gs):
     interpolated_pos = round(float(interpolate_curve_y_point(curve_pos, input_gs) / 100) * gain_pos, 3)
     interpolated_neg = round(float(interpolate_curve_y_point(curve_neg, input_gs) / 100) * gain_neg, 3)
 
-    return {"pos": interpolated_pos, "neg": interpolated_neg}
+    return interpolated_pos, interpolated_neg
 
 
 def get_gain_from_speed(curve_settings : str | dict, input_airspeed_ms):

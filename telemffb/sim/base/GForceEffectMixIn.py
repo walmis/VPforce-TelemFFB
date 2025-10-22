@@ -293,15 +293,15 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
                 self.effects.dispose("adv_gforce_constant")
                 return
 
-            gains = utils.get_gain_from_gs(self.gforce_effect_adv_curve, abs(gs))
+            gain_pos, gain_neg = utils.get_gain_from_gs(self.gforce_effect_adv_curve, abs(gs))
             mode = self.g_effect_adv_mode()
 
             if gs >= 0:
-                g_factor = gains.get("pos")
+                g_factor = gain_pos
                 direction = 180
             else:
                 if self.gforce_effect_adv_curve.get("enable_neg"):
-                    g_factor = -gains.get("neg")
+                    g_factor = -gain_neg
                     direction = 0
                 else:
                     self.effects.dispose("gforce", "gforce_spr")
