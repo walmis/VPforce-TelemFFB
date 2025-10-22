@@ -1011,9 +1011,28 @@ class FFBRhino(QObject):
 
 # Higher level effect interface
 class HapticEffect(Destroyable):
+    """High-level wrapper for a single haptic effect on a Rhino device.
+
+    This class provides a lazy, convenient API to create, configure and
+    control Force Feedback (FFB) effects on the `FFBRhino` device. Effects
+    may be created lazily and configured before they are actually allocated
+    on the hardware; pending creation and pending condition updates are
+    stored and applied when the effect is first used.
+
+    Attributes:
+        device: Class-level reference to the opened `FFBRhino` device.
+    """
+
     device : Optional[FFBRhino] = None
 
     def __init__(self):
+        """Create a new HapticEffect controller.
+
+        The effect is not allocated on the device immediately. Callers can
+        chain configuration methods (for example `.spring(...)` or
+        `.constant(...)`) and then call `.start()` to ensure allocation and
+        playback.
+        """
         self.name : Optional[str] = None
         self._stopped_time : int = 0
         self._h_effect : Optional[FFBEffectHandle] = None
@@ -1024,17 +1043,31 @@ class HapticEffect(Destroyable):
         self._pending_conditions = {} # functions for setting condition (lazy initialization)
 
     def __repr__(self):
-        return f"HapticEffect({self._h_effect})"
+        """Return a short representation including the underlying handle."""
+        return f"HapticEffect({self._h_effect}) at {hex(id(self))}"
     
     @property
     def id(self):
+        """Return the numeric device effect id if allocated, otherwise None."""
         return self._h_effect.effect_id if self._h_effect else None
 
-    # Open defaut Rhino device, specific devices can be specified using serial or path arguments
-    # path example: \\\\?\\HID#VID_FFFF&PID_2055&MI_00#9&3450694a&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
-    # path can be obtained using FFBRhino.enumerate function
     @classmethod
     def open(cls, vid = 0xFFFF, pid=0x2055, serial=None, path=None) -> FFBRhino:
+        """Open and attach a `FFBRhino` device for all HapticEffect instances.
+
+        This is a convenience to set the class-level `device` reference used
+        when effects are created. The arguments are forwarded to the
+        `FFBRhino` constructor/selector.
+
+        Args:
+            vid: USB vendor id (default 0xFFFF for VPforce devices).
+            pid: USB product id (default 0x2055 for Rhino).
+            serial: Optional device serial to select a specific unit.
+            path: Optional device path to select a specific unit.
+
+        Returns:
+            The opened `FFBRhino` instance.
+        """
         logging.info(f"Open Rhino HID {vid:04X}:{pid:04X}")
         cls.device = FFBRhino(vid, pid, serial, path)
         logging.info(f"Successfully opened HID '{cls.device.info.path.decode('utf-8')}'")
@@ -1042,18 +1075,35 @@ class HapticEffect(Destroyable):
         return cls.device
 
     def _ensure_effect_created(self):
-        """Create the effect if it hasn't been created yet"""
+        """Allocate the underlying effect on the device if it hasn't been yet.
+
+        If this object was configured before allocation, the pending create
+        function and any pending condition setters will be executed. Raises
+        an AssertionError if the effect was previously destroyed.
+        """
         if not self._h_effect:
-            assert self._pending_create is not None, "Attempt to start a destroyed effect?"
+            assert self._pending_create is not None
             # Execute the pending create function
             self._pending_create()
-            self._pending_create = None
             # If there are pending conditions to set, do it now
             for val in self._pending_conditions.values():
                 val()
             self._pending_conditions.clear()
 
     def setCondition(self, cond : FFBReport_SetCondition) -> Self:
+        """Set condition parameters for condition-style effects.
+
+        Condition effects include spring, damper, inertia, friction and the
+        spring adjuster. If the underlying device effect is not yet
+        allocated the condition will be queued and applied after allocation.
+
+        Args:
+            cond: An instance of `FFBReport_SetCondition` describing the
+                parameter block to apply.
+
+        Returns:
+            Self to allow method chaining.
+        """
         assert self.effect_type in [
             EFFECT_SPRING,
             EFFECT_DAMPER,
@@ -1065,11 +1115,28 @@ class HapticEffect(Destroyable):
         if self._h_effect:
             self._h_effect.setCondition(cond)
         else:
+            # Queue the condition for application once effect is created
             self._pending_conditions[cond.effectBlockIndex] = lambda: self._h_effect.setCondition(cond)
 
         return self
 
     def _conditional_effect(self, effect_type, coef_x = None, coef_y= None, sat_x = None, sat_y = None) -> Self:
+        """Common helper for condition-style effects.
+
+        Configures positive/negative coefficients and saturation for X and Y
+        parameter blocks. If the effect is not yet allocated the creation
+        function will be stored for lazy allocation.
+
+        Keyword Args:
+            coef_x (int|float|None): Positive/negative coefficient for the X axis.
+                If a float is provided it is scaled internally where appropriate.
+            coef_y (int|float|None): Positive/negative coefficient for the Y axis.
+            sat_x (int|float|None): Positive/negative saturation for the X axis.
+            sat_y (int|float|None): Positive/negative saturation for the Y axis.
+
+        Returns:
+            Self for chaining.
+        """
         self.effect_type = effect_type
 
         def set_conditions():
@@ -1109,22 +1176,88 @@ class HapticEffect(Destroyable):
 
         return self
 
-    def inertia(self, coef_x = None, coef_y = None, **kwargs):
-        return self._conditional_effect(EFFECT_INERTIA, coef_x, coef_y, **kwargs)
+    def inertia(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as an inertia effect.
 
-    def damper(self, coef_x = None, coef_y = None, **kwargs):
-        return self._conditional_effect(EFFECT_DAMPER, coef_x, coef_y, **kwargs)
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
 
-    def friction(self, coef_x = None, coef_y = None, **kwargs):
-        return self._conditional_effect(EFFECT_FRICTION, coef_x, coef_y, **kwargs)
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_INERTIA, coef_x=coef_x, coef_y=coef_y, **kwargs)
 
-    def spring(self, coef_x = None, coef_y = None, **kwargs):
-        return self._conditional_effect(EFFECT_SPRING, coef_x, coef_y, **kwargs)
+    def damper(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as a damper effect.
 
-    def spring_adjuster(self, coef_x = 4096, coef_y = 4096, **kwargs):
-        return self._conditional_effect(EFFECT_SPRING_ADJUSTER, coef_x, coef_y, **kwargs)
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
+
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_DAMPER, coef_x=coef_x, coef_y=coef_y, **kwargs)
+
+    def friction(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as a friction effect.
+
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
+
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_FRICTION, coef_x=coef_x, coef_y=coef_y, **kwargs)
+
+    def spring(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as a spring effect.
+
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
+
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_SPRING, coef_x=coef_x, coef_y=coef_y, **kwargs)
+
+    def spring_adjuster(self, coef_x = None, coef_y = None, **kwargs) -> Self:
+        """Configure this object as a spring adjuster effect.
+
+        Accepts keyword arguments passed through to `_conditional_effect`.
+        Typical keyword arguments:
+          - coef_x, coef_y: coefficients for X/Y parameter blocks
+          - sat_x, sat_y: saturation for X/Y parameter blocks
+
+        Returns:
+            Self for chaining.
+        """
+        return self._conditional_effect(EFFECT_SPRING_ADJUSTER, coef_x=coef_x, coef_y=coef_y, **kwargs)
 
     def periodic(self, frequency, magnitude:float, direction:float, *args, effect_type=EFFECT_SINE, duration=0, **kwargs):
+        """Create or update a periodic effect (sine/square/triangle/etc.).
+
+        Direction may be a numeric angle in degrees or a DirectionModulator
+        class; when a modulator class is given it will be instantiated and
+        queried for an updated direction value.
+
+        Args:
+            frequency: Frequency in Hz.
+            magnitude: Magnitude in range [0.0, 1.0].
+            direction: Direction in degrees or a DirectionModulator subclass.
+            effect_type: One of PERIODIC_EFFECTS (defaults to sine).
+            duration: Duration in milliseconds (0 for infinite/continuous).
+
+        Returns:
+            Self for chaining.
+        """
         # Handle direction modulator
         if isinstance(direction, type) and issubclass(direction, DirectionModulator):
             if not self.modulator:
@@ -1149,12 +1282,18 @@ class HapticEffect(Destroyable):
         return self
 
     def constant(self, magnitude:float, direction:float, *args, **kwargs):
-        """Create and manage CF FFB effect
+        """Create or update a constant (constant force) effect.
 
-        :param magnitude: Effect strength from 0.0 .. 1.0
-        :type magnitude: float
-        :param direction_deg: Angle in degrees
-        :type direction_deg: float
+        Direction may be a numeric angle in degrees or a DirectionModulator
+        class. If the underlying effect is not yet allocated the creation is
+        queued for lazy allocation.
+
+        Args:
+            magnitude: Float in range [0.0, 1.0] representing effect strength.
+            direction: Angle in degrees or a DirectionModulator subclass.
+
+        Returns:
+            Self for chaining.
         """
         # Handle direction modulator
         if isinstance(direction, type) and issubclass(direction, DirectionModulator):
@@ -1181,9 +1320,20 @@ class HapticEffect(Destroyable):
 
     @property
     def started(self) -> bool:
-        return self._h_effect and self._h_effect.started
+        """Return True when the underlying effect is currently playing."""
+        return bool(self._h_effect and self._h_effect.started)
 
     def start(self, force=False, **kw):
+        """Ensure effect is allocated and start playback.
+
+        Args:
+            force: If True, restart the effect even if it is already playing.
+            **kw: Forwarded to the underlying effect start call (for loopCount
+                or override behavior).
+
+        Returns:
+            Self for chaining.
+        """
         # Ensure effect is created before starting
         self._ensure_effect_created()
 
@@ -1200,10 +1350,14 @@ class HapticEffect(Destroyable):
         return self
 
     def stop(self, destroy_after : int = 10000):
-        """Stop active effect
+        """Stop playback of the effect and optionally destroy it after a timeout.
 
-        :param destroy_after: Cleanup (destroy) effect if unused for x milliseconds
-        :type destroy_after: int, optional
+        Args:
+            destroy_after: If non-zero, the effect will be destroyed after this
+                many milliseconds of being stopped. Default is 10000 (10s).
+
+        Returns:
+            Self for chaining.
         """
         if self._h_effect and self._h_effect.started:
             if logging.getLogger().isEnabledFor(logging.DEBUG):
@@ -1224,6 +1378,11 @@ class HapticEffect(Destroyable):
         return self
 
     def destroy(self):
+        """Deallocate the underlying effect from the device immediately.
+
+        After calling this the effect handle is cleared and subsequent calls
+        that require an allocated effect will recreate it lazily.
+        """
         if self._h_effect:
             if logging.getLogger().isEnabledFor(logging.DEBUG):
                 caller_frame = inspect.currentframe().f_back
@@ -1233,11 +1392,9 @@ class HapticEffect(Destroyable):
             logging.info(f"Destroying effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.destroy()
             self._h_effect = None
-        
-        # Clear pending operation
-        self._pending_create = None
 
     def __del__(self):
+        """Destructor helper to ensure resources are freed."""
         self.destroy()
 
 # unit test
