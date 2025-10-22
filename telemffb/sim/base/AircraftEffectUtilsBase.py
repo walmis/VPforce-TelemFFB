@@ -329,28 +329,6 @@ class AircraftEffectUtilsBase(object):
         """Common check for effects that require airspeed."""
         return not telem_data.get("TAS", 0)
 
-    def _get_gs_data(self, telem_data: dict) -> tuple:
-        """Get G-force data based on simulator type."""
-        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
-            accs = telem_data.get("ACCs")
-            if not accs:
-                return None, None, None
-            gs = accs[1]
-            y_gs = accs[0]
-            last_accs = self._last_telem_data.get("ACCs", [0, 0, 0])
-            last_y_gs = last_accs[0]
-        elif self._sim_is("MSFS") or self._sim_is('XPLANE'):
-            gs = telem_data.get("G")
-            acc_body = telem_data.get("AccBody")
-            if not acc_body:
-                return None, None, None
-            y_gs = acc_body[2]
-            last_acc_body = self._last_telem_data.get("AccBody", [0, 0, 0])
-            last_y_gs = last_acc_body[2]
-        else:
-            return None, None, None
-        return gs, y_gs, last_y_gs
-
     def _is_telemetry_spike(self, y_gs: float, last_y_gs: float, threshold: float = 3.0) -> bool:
         """Check if telemetry shows a spike indicating crash or invalid data."""
         return abs(y_gs - last_y_gs) > threshold

@@ -1,19 +1,20 @@
-from typing import Optional
+import json
+from typing import Optional, override
+
+import telemffb.utils as utils
 import telemffb.globals as G
 from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
-import telemffb.utils as utils
-from telemffb.SettingsManager import SpringModeEnum
+from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
-from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
-import json
+
 perftracker = utils.PerformanceTracker()
 
 class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     """Mixin for the Advanced/Custom spring override (advanced spring trimming and adjuster)."""
     # user parameters
     _spring_mode : SpringModeEnum = SpringModeEnum.NONE
-    
+
     adv_spr_override_enabled: bool = False   # deprecated
     adv_spr_use_hardware_trim: bool = False
 
@@ -30,7 +31,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     @property
     def adv_spr_gains(self) -> Optional[dict]:
         return self._adv_spr_gains
-    
+
     @adv_spr_gains.setter
     def adv_spr_gains(self, value: str):
         """adv_spr_gains gets assigned with json encoded string or 'none' via settings subsystem, save it as a dict internally"""
@@ -42,7 +43,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     @property
     def spring_mode(self) -> SpringModeEnum:
         return self._spring_mode
-    
+
     @spring_mode.setter
     def spring_mode(self, value):
         # Accept None, enum instances, and valid enum member names (strings).
@@ -80,10 +81,9 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         # the spring_adjuster effect object (wrapper) from the global effects dispenser
         self.spring_adjuster = HapticEffect().spring_adjuster()
 
-
     def spring_mode_is(self, mode : SpringModeEnum):
         return mode == self.spring_mode
-    
+
     def ac_modify_game_spring(self):
         if not self.spring_mode_is(SpringModeEnum.ADVANCED):
             self.spring_adjuster.stop()
@@ -134,8 +134,8 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         else:
             self.override_spring_cp0_x = 0
             self.override_spring_cp0_y = 0
-            
-        offset = self.ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
+
+        offset = super().ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
         g_y_offset = offset if offset is not None else 0
         self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), g_y_offset]
         self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + g_y_offset))
@@ -144,6 +144,13 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         self.spring_adjuster.setCondition(self.spring_adjuster_y)
         self.spring_adjuster.setCondition(self.spring_adjuster_x)
         self.spring_adjuster.start()
+
+    @override
+    def ac_update_gforce_effect(self, telem_data: dict, adv_spr: bool = False) -> Optional[int]:
+        """If advanced spring is enabled and in offset mode, handle gforce effect as part of advanced spring processing.
+        else defer to GForceEffectMixIn implementation."""
+        if not (self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED) and self.g_effect_adv_mode() == "offset"):
+            return super().ac_update_gforce_effect(telem_data, adv_spr=adv_spr)
 
     def on_telemetry(self, telem_data: dict):
         super().on_telemetry(telem_data)

@@ -1182,8 +1182,14 @@ def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
     return float(interpolation(input_x))
 
 
-def get_gain_from_gs(json_string, input_gs):
-    settings = json.loads(json_string)
+def get_gain_from_gs(curve_settings, input_gs):
+    if isinstance(curve_settings, str):
+        settings = json.loads(curve_settings)
+    elif isinstance(curve_settings, dict):
+        settings = curve_settings
+    else:
+        raise ValueError("Invalid input: must be a JSON string or a dictionary.")
+
     curve_pos = settings.get("curve_pos", {})
     curve_neg = settings.get("curve_neg", {})
     gain_pos = settings.get('gain_pos') / 100

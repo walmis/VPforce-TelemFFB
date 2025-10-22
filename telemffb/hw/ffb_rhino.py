@@ -252,7 +252,7 @@ class FFBReport_SetCondition(BaseStructure):
                ]
     _defaults_ = { "reportId": HID_REPORT_ID_SET_CONDITION }
 
-    def set_offset(self, offset: (int|float)) -> None:
+    def set_offset(self, offset: (int|float)) -> Self:
         """
         Set the center position offset for the FFB device.
         
@@ -274,11 +274,14 @@ class FFBReport_SetCondition(BaseStructure):
             - The processed offset is stored in the cpOffset attribute
         """
         if isinstance(offset, float):
-            offset = round(offset * 4096)
-        offset = clamp(offset, -4096, 4096)
-        self.cpOffset = offset
+            val = round(offset * 4096)
+        else:
+            val = int(offset)
+        val = clamp(val, -4096, 4096)
+        self.cpOffset = val
+        return self
 
-    def set_saturation(self, saturation: (int|float), do_clamp: bool = True) -> None:
+    def set_saturation(self, saturation: (int|float), do_clamp: bool = True) -> Self:
         """
         Sets the positive and negative saturation based on the input saturation value.
 
@@ -289,13 +292,16 @@ class FFBReport_SetCondition(BaseStructure):
             None
         """
         if isinstance(saturation, float):
-            saturation = round(saturation * 4096)
+            val = round(saturation * 4096)
+        else:
+            val = int(saturation)
         if do_clamp:
-            saturation = clamp(saturation, 0, 4096)
-        self.positiveSaturation = saturation
-        self.negativeSaturation = saturation
+            val = clamp(val, 0, 4096)
+        self.positiveSaturation = val
+        self.negativeSaturation = val
+        return self
 
-    def set_coefficient(self, coefficient: (int|float), do_clamp: bool = True) -> None:
+    def set_coefficient(self, coefficient: (int|float), do_clamp: bool = True) -> Self:
         """
         Sets the positive and negative coefficients based on the input coefficient value.
 
@@ -306,13 +312,17 @@ class FFBReport_SetCondition(BaseStructure):
             None
         """
         if isinstance(coefficient, float):
-            coefficient = round(coefficient * 4096)
-        if do_clamp:
-            coefficient = clamp(coefficient, 0, 4096)
-        self.positiveCoefficient = coefficient
-        self.negativeCoefficient = coefficient
+            val = round(coefficient * 4096)
+        else:
+            val = int(coefficient)
 
-    def set_coefficients(self, positive, negative):
+        if do_clamp:
+            val = clamp(val, 0, 4096)
+        self.positiveCoefficient = val
+        self.negativeCoefficient = val
+        return self
+
+    def set_coefficients(self, positive, negative) -> Self:
         """
         Sets the positive and negative coefficients of the object.
 
@@ -325,6 +335,7 @@ class FFBReport_SetCondition(BaseStructure):
         """
         self.positiveCoefficient = positive
         self.negativeCoefficient = negative
+        return self
 
 class FFBReport_SetEnvelope(BaseStructure):
     """

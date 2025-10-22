@@ -130,6 +130,10 @@ class MockConditionEffect:
         self._direction = direction
         return self
     
+    def setEffect(self):
+        """Mock setEffect method."""
+        return self
+    
     def setCondition(self, condition):
         """Set condition from condition object."""
         if hasattr(condition, 'cpOffset'):
@@ -157,8 +161,8 @@ class MockConditionEffect:
         """Get current offsets."""
         return (self._x_offset, self._y_offset)
     
-    def spring_adjuster(self):
-        """Return self for spring adjuster chain."""
+    def spring_adjuster(self, *args, **kwargs):
+        """Return self for spring adjuster chain. Accept args/kwargs to match production signature."""
         return self
     
     def reset_counters(self):

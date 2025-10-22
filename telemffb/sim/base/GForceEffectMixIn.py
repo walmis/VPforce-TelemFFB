@@ -1,3 +1,5 @@
+import json
+from typing import Literal, Optional, override
 import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.SettingsManager import GEffectModeEnum
@@ -31,7 +33,6 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
     new_gforce_max_gs_neg = -4
     new_gforce_effect_deflection_factor_neg = 1.0
 
-    gforce_effect_adv_curve: str = "none"
     # end of user parameters
 
     def __init__(self):
@@ -40,11 +41,30 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
 
         self.__firmware_supported = None
 
-        self.adv_g_settings_dict: dict = {}
+        self._gforce_effect_adv_curve: dict = {}
 
         derivative_hz = 5  # derivative lpf filter -3db Hz
         self.__dGs = utils.Derivative(derivative_hz)
 
+    def __dispose_all(self):
+        self.effects.dispose("gforce", "new_gforce", "gforce_spr", "offset_adjuster")
+
+    def __check_firmware_support(self):
+        if self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED):
+            # Verify the device firmware meets the minimum version required to execute this portion of the effect
+            # Flag error and abort if not met
+            if self.__firmware_supported is None:
+                self.__firmware_supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
+            if not self.__firmware_supported:
+                self.flag_error(
+                    "The Advanced/Custom Curve G-Force effect requires firmware v1.0.18 or higher.\n"
+                    f"The device is currently running version {G.device_firmware_version}\n"
+                    f"Please update your device firmware!"
+                )
+                return False
+        return True
+
+    # user parameters
     @property
     def gforce_effect_mode(self) -> GEffectModeEnum:
         return self._gforce_effect_mode
@@ -71,13 +91,51 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         
         # Any other type is invalid
         raise ValueError("Invalid type for gforce_effect_mode")
-        
+    
+    @property
+    def gforce_effect_adv_curve(self) -> dict:
+        return self._gforce_effect_adv_curve
+    
+    @gforce_effect_adv_curve.setter
+    def gforce_effect_adv_curve(self, value):
+        if isinstance(value, dict):
+            self._gforce_effect_adv_curve = value
+            return
+        if not value or value == "none":
+            self._gforce_effect_adv_curve = {}
+        else:
+            self._gforce_effect_adv_curve = json.loads(value)
+    # end of user parameters
+
     def gforce_effect_mode_is(self, mode):
         return mode == self.gforce_effect_mode
     
+    @override
     def on_telemetry(self, telem_data: dict):
         super().on_telemetry(telem_data)
         self.ac_update_gforce_effect(telem_data)
+
+    def _get_gs_data(self, telem_data: dict) -> tuple:
+        """Get G-force data based on simulator type."""
+        if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
+            accs = telem_data.get("ACCs")
+            if not accs:
+                return None, None, None
+            gs = accs[1]
+            y_gs = accs[0]
+            last_accs = self._last_telem_data.get("ACCs", [0, 0, 0])
+            last_y_gs = last_accs[0]
+        elif self._sim_is("MSFS") or self._sim_is('XPLANE'):
+            gs = telem_data.get("G")
+            acc_body = telem_data.get("AccBody")
+            if not acc_body:
+                return None, None, None
+            y_gs = acc_body[2]
+            last_acc_body = self._last_telem_data.get("AccBody", [0, 0, 0])
+            last_y_gs = last_acc_body[2]
+        else:
+            return None, None, None
+        return gs, y_gs, last_y_gs
 
     def _ac_run_new_gforce_effect(self, telem_data):
         """Apply new G-force effects based on aircraft acceleration.
@@ -165,9 +223,9 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         self.effects["new_gforce"].constant(g_factor, direction).start()
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
-    def __dispose_all(self):
-        self.effects.dispose("gforce", "new_gforce", "gforce_spr", "offset_adjuster")
-
+    def g_effect_adv_mode(self) -> Literal["constant", "offset"]:
+        return self.gforce_effect_adv_curve.get("mode", "constant") if self.gforce_effect_adv_curve else "constant"
+           
     def ac_update_gforce_effect(self, telem_data, adv_spr=False):
         if not self.is_joystick():
             return
@@ -184,19 +242,8 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         else:
             self.effects.dispose("new_gforce")
 
-
-        if self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED):
-            # Verify the device firmware meets the minimum version required to execute this portion of the effect
-            # Flag error and abort if not met
-            if self.__firmware_supported is None:
-                self.__firmware_supported = utils.check_min_firmware_version(G.device_firmware_version, "v1.0.18")
-            if not self.__firmware_supported:
-                self.flag_error(
-                    "The Advanced/Custom Curve G-Force effect requires firmware v1.0.18 or higher.\n"
-                    f"The device is currently running version {G.device_firmware_version}\n"
-                    f"Please update your device firmware!"
-                )
-                return
+        if not self.__check_firmware_support():
+            return
 
         if self._should_skip_airborne_effect(telem_data):
             self.__dispose_all()
@@ -245,17 +292,15 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
                 self.flag_error("Please Configure the Advanced G-Force Effect Settings")
                 self.effects.dispose("adv_gforce_constant")
                 return
-            if self.adv_g_settings_dict == {}:
-                self.adv_g_settings_dict = utils.json.loads(self.gforce_effect_adv_curve)
 
             gains = utils.get_gain_from_gs(self.gforce_effect_adv_curve, abs(gs))
-            mode = self.adv_g_settings_dict.get("mode", "constant")
+            mode = self.g_effect_adv_mode()
 
             if gs >= 0:
                 g_factor = gains.get("pos")
                 direction = 180
             else:
-                if self.adv_g_settings_dict.get("enable_neg"):
+                if self.gforce_effect_adv_curve.get("enable_neg"):
                     g_factor = -gains.get("neg")
                     direction = 0
                 else:
@@ -270,29 +315,24 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
                 g_factor = utils.clamp(g_factor, 0.0, 1.0)
                 self.effects["gforce"].constant(g_factor, direction).start()
 
-            elif mode == "offset":
-                if not g_factor:
-                    self.effects["gforce_spr"].stop()
-                    return
-                
+            elif mode == "offset":               
                 adjuster_cpOy = int(-g_factor * 4096)
 
                 if adv_spr:
                     # If being called by advanced spring effect, don't apply adjuster offset here, return offset value and let the advanced spring adjuster effect do it
                     return adjuster_cpOy
                 
-                #_x = FFBReport_SetCondition(parameterBlockOffset=0)
-                _y = FFBReport_SetCondition(parameterBlockOffset=1)
-                _y.set_offset(adjuster_cpOy)
-                _y.set_saturation(1)  #set relative adjustment mode
-                _y.set_coefficient(4096)
+                if not g_factor:
+                    self.effects["gforce_spr"].stop()
+                    return
+                
+                offset_adjuster : HapticEffect = self.effects["gforce_spr"].spring_adjuster(x_coef=4096, x_sat=1)
+                cond_y = FFBReport_SetCondition(parameterBlockOffset=1)
+                cond_y.set_offset(adjuster_cpOy)
+                cond_y.set_saturation(1)  #set relative adjustment mode
+                cond_y.set_coefficient(4096)
 
-                offset_adjuster : HapticEffect = self.effects["gforce_spr"].spring_adjuster(sat_x=1, sat_y=1)
-
-                #_x.set_saturation(4096)
-                #offset_adjuster.setCondition(_x)
-                offset_adjuster.setCondition(_y)
-                offset_adjuster.start()
+                offset_adjuster.setCondition(cond_y).start()
 
         else:
             self.__dispose_all()
