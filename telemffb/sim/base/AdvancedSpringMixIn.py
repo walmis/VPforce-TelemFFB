@@ -149,7 +149,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
     def ac_update_gforce_effect(self, telem_data: dict, adv_spr: bool = False) -> Optional[int]:
         """If advanced spring is enabled and in offset mode, handle gforce effect as part of advanced spring processing.
         else defer to GForceEffectMixIn implementation."""
-        if not (self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED) and self.g_effect_adv_mode() == "offset"):
+        if not (self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED) and self.g_effect_get_adv_mode() == "offset"):
             return super().ac_update_gforce_effect(telem_data, adv_spr=adv_spr)
 
     def on_telemetry(self, telem_data: dict):

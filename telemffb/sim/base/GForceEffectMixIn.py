@@ -151,13 +151,9 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
             self._should_skip_joystick_effect()
             or not self.gforce_effect_mode_is(GEffectModeEnum.NEW)
             or self.gforce_effect_mode_is(GEffectModeEnum.DISABLED)
+            or self._should_skip_airborne_effect(telem_data)
+            or self._should_skip_no_airspeed_effect(telem_data)
         ):
-            self.effects.dispose("new_gforce")
-            return
-        if self._should_skip_airborne_effect(telem_data):
-            self.effects.dispose("new_gforce")
-            return
-        if self._should_skip_no_airspeed_effect(telem_data):
             self.effects.dispose("new_gforce")
             return
 
@@ -223,7 +219,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
         self.effects["new_gforce"].constant(g_factor, direction).start()
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
-    def g_effect_adv_mode(self) -> Literal["constant", "offset"]:
+    def g_effect_get_adv_mode(self) -> Literal["constant", "offset"]:
         return self.gforce_effect_adv_curve.get("mode", "constant") if self.gforce_effect_adv_curve else "constant"
            
     def ac_update_gforce_effect(self, telem_data, adv_spr=False):
@@ -294,7 +290,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase):
                 return
 
             gain_pos, gain_neg = utils.get_gain_from_gs(self.gforce_effect_adv_curve, abs(gs))
-            mode = self.g_effect_adv_mode()
+            mode = self.g_effect_get_adv_mode()
 
             if gs >= 0:
                 g_factor = gain_pos
