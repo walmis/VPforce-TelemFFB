@@ -53,7 +53,45 @@ from telemffb.util.conversions import kt2ms, kmh2ms, ms2kmh, deg
 LPFs = utils.Dispenser(utils.LowPassFilter)
 perftracker = utils.PerformanceTracker()
 
-class Aircraft(AircraftBase):
+class DCSCommands:
+    def dcs_send_commands(self, cmds):
+        cmds = "\n".join(cmds)
+        DcsIpcThread.send_commands(cmds)
+
+    def dcs_cmd_set_rudder(self, value: float):
+        """Sets the rudder position in DCS.  Value is between -1.0 and 1.0
+
+        :param value: Rudder position
+        :type value: float
+        :return: DCS command string
+        :rtype: str
+        """
+        cmd = f"LoSetCommand(2003, {value})"
+        self.dcs_send_commands([cmd])
+
+    def dcs_cmd_set_stick_x(self, value: float):
+        """Sets the stick X position in DCS.  Value is between -1.0 and 1.0
+
+        :param value: Stick X position
+        :type value: float
+        :return: DCS command string
+        :rtype: str
+        """
+        cmd = f"LoSetCommand(2002, {value})"
+        self.dcs_send_commands([cmd])
+    
+    def dcs_cmd_set_stick_y(self, value: float):
+        """Sets the stick Y position in DCS.  Value is between -1.0 and 1.0
+
+        :param value: Stick Y position
+        :type value: float
+        :return: DCS command string
+        :rtype: str
+        """
+        cmd = f"LoSetCommand(2001, {value})"
+        self.dcs_send_commands([cmd])
+
+class Aircraft(AircraftBase, DCSCommands):
     """Base class for Aircraft based FFB"""
     ####
     #### Beta effects - set to 1 to enable
@@ -134,8 +172,7 @@ class Aircraft(AircraftBase):
 
         self.damage_enable_cmd_sent = 0
         self.pedals_init = 0
-        input_data = HapticEffect.device.get_input()
-        self.last_device_x, self.last_device_y = input_data.axisXY()
+        self.last_device_x, self.last_device_y = HapticEffect.device.get_input().axisXY()
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = None
 
@@ -179,7 +216,7 @@ class Aircraft(AircraftBase):
             pass
 
         if not self.damage_enable_cmd_sent and self.damage_effect_enabled:
-            self.send_commands([f"enableGetDamage({int(self.damage_effect_enabled)})"])
+            self.dcs_send_commands([f"enableGetDamage({int(self.damage_effect_enabled)})"])
             logging.info(f"Sending <enableGetDamage({int(self.damage_effect_enabled)}) to DCS")
             self.damage_enable_cmd_sent = 1
 
@@ -228,9 +265,7 @@ class Aircraft(AircraftBase):
         # self.damper.stop()
 
 
-    def send_commands(self, cmds):
-        cmds = "\n".join(cmds)
-        DcsIpcThread.send_commands(cmds)
+
 
     def dcs_update_damage(self, telem_data):
         if not self.damage_effect_enabled: return
@@ -328,7 +363,7 @@ class Aircraft(AircraftBase):
         self.spring.setCondition(self.spring_x)
         self.spring.start(override=True)
 
-        self.send_commands([f"LoSetCommand(2003, {x - offs_x})"])
+        self.dcs_send_commands([f"LoSetCommand(2003, {x - offs_x})"])
 
     def dcs_update_stick_position(self, telem_data):
         if not self.is_joystick(): return
@@ -364,7 +399,7 @@ class Aircraft(AircraftBase):
         spring.start(override=True)
 
         # override DCS input and set our own values
-        self.send_commands([f"LoSetCommand(2001, {y - offs_y})", 
+        self.dcs_send_commands([f"LoSetCommand(2001, {y - offs_y})", 
                             f"LoSetCommand(2002, {x - offs_x})"])
 
     def dcs_update_stick_shaker(self, telem_data):
