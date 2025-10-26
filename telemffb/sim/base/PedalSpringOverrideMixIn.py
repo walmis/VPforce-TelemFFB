@@ -178,6 +178,16 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         spring.setCondition(self.spring_x)
         spring.start(override=True)
 
+    def verify_pedal_axis(self):
+        if not self.is_pedals():
+            return False
+        
+        if HapticEffect.device:
+            x,y = HapticEffect.device.get_input().axisXY()
+            if y != 0 and x == 0:
+                self.flag_error("Pedal axis mismatch: Y axis used instead of X. Fix by swapping X/Y in VPConfigurator.")
+
     def on_telemetry(self, telem_data: dict):
         super().on_telemetry(telem_data)
+        self.verify_pedal_axis()
         self.ac_override_pedal_spring(telem_data)
