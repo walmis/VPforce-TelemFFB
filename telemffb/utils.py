@@ -22,6 +22,7 @@ import os
 import random
 import re
 import shutil
+import tempfile
 import typing
 from typing import override
 import zipfile
@@ -348,7 +349,7 @@ def archive_logs(directory):
                 logging.info(f"Archiving logs from {readable_date} into {zip_filename}")
                 zip_path = os.path.join(directory, zip_filename)
 
-                with zipfile.ZipFile(zip_path, 'a', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zip_file:
+                with zipfile.ZipFile(zip_path, 'a', compression=zipfile.ZIP_LZMA, compresslevel=9) as zip_file:
                     log_file_path = os.path.join(directory, filename)
                     zip_file.write(log_file_path, os.path.basename(log_file_path))
                     os.remove(log_file_path)  # Remove the original log file
@@ -436,26 +437,21 @@ def prune_log_files(path, number, unit):
 #     except WindowsError:
 #         return None
 
-def create_support_bundle_data(userconfig_rootpath, exceptions=None):
-    """Create support bundle as bytes (in memory) for API upload.
+def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=None):
+    """Internal helper to create a support bundle zip file.
     
     Args:
+        zip_file_path: Output path for the zip file
         userconfig_rootpath: Path to user config directory
         exceptions: Optional list of ExceptionRecord objects to include
-        
-    Returns:
-        bytes: Support bundle as zip file data
     """
-    import io
     from datetime import datetime
     
     # Get the system settings
     sys_dict = read_all_system_settings()
     
-    # Create zip file in memory
-    zip_buffer = io.BytesIO()
-    
-    with zipfile.ZipFile(zip_buffer, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as support_zip:
+    # Create the support zip file directly
+    with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_LZMA, compresslevel=9) as support_zip:
         # Add userconfig_v2.xml
         userconfig_path = os.path.join(userconfig_rootpath, "userconfig_v2.xml")
         if os.path.exists(userconfig_path):
@@ -488,10 +484,31 @@ def create_support_bundle_data(userconfig_rootpath, exceptions=None):
                 exc_content.append("\n" + "=" * 80 + "\n\n")
             
             support_zip.writestr("exceptions.txt", "".join(exc_content))
+
+
+def create_support_bundle_data(userconfig_rootpath, exceptions=None):
+    """Create support bundle as bytes (in memory) for API upload.
     
-    # Get the bytes
-    zip_buffer.seek(0)
-    return zip_buffer.read()
+    Args:
+        userconfig_rootpath: Path to user config directory
+        exceptions: Optional list of ExceptionRecord objects to include
+        
+    Returns:
+        bytes: Support bundle as zip file data
+    """
+    # Use a temporary file to create the zip, then read it into memory
+    with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp:
+        tmp_path = tmp.name
+    
+    try:
+        _create_support_bundle_zip(tmp_path, userconfig_rootpath, exceptions)
+        with open(tmp_path, 'rb') as f:
+            return f.read()
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
 
 def report_exceptions(parent_widget=None, on_complete_callback=None):
@@ -672,53 +689,102 @@ def report_exceptions(parent_widget=None, on_complete_callback=None):
 
 
 def create_support_bundle(userconfig_rootpath):
-    # Get the  system settings
-    sys_dict = read_all_system_settings()
-
+    """Create a support bundle with a file save dialog, showing progress during creation.
+    
+    This function runs bundle creation in a background QThread with an indeterminate
+    progress dialog, keeping the UI responsive during the zip operation.
+    
+    Args:
+        userconfig_rootpath: Path to user config directory
+    """
     # Prompt the user for the destination and filename for the zip file
     file_dialog = QFileDialog()
     file_dialog.setFileMode(QFileDialog.FileMode.AnyFile)
     file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
     file_dialog.setNameFilter("Zip Files (*.zip)")
 
-    if file_dialog.exec():
-        # Get the selected file path
-        zip_file_path = file_dialog.selectedFiles()[0]
+    if not file_dialog.exec():
+        return
 
-        # Create a temporary folder to store files
-        temp_folder = "temp_support_bundle"
-        os.makedirs(temp_folder, exist_ok=True)
+    # Get the selected file path
+    zip_file_path = file_dialog.selectedFiles()[0]
 
+    # Progress dialog (indeterminate)
+    progress = QProgressDialog("Creating support bundle...", None, 0, 0)
+    progress.setWindowTitle("Creating Support Bundle")
+    progress.setWindowModality(Qt.WindowModality.ApplicationModal)
+    progress.setCancelButton(None)
+    progress.setMinimumDuration(0)
+    progress.show()
+
+    # Worker to perform the zip creation in background
+    class BundleWorker(QObject):
+        finished = pyqtSignal(bool, dict)
+
+        def __init__(self, userconfig_rootpath, zip_file_path):
+            super().__init__()
+            self.userconfig_rootpath = userconfig_rootpath
+            self.zip_file_path = zip_file_path
+
+        def run(self):
+            try:
+                _create_support_bundle_zip(self.zip_file_path, self.userconfig_rootpath)
+                # Success
+                self.finished.emit(True, {"path": self.zip_file_path})
+            except Exception as e:
+                # Report error
+                try:
+                    self.finished.emit(False, {"error": str(e)})
+                except Exception:
+                    pass
+
+    # Prepare thread and worker
+    thread = QThread()
+    worker = BundleWorker(userconfig_rootpath, zip_file_path)
+    worker.moveToThread(thread)
+
+    # Connect signals
+    thread.started.connect(worker.run)
+
+    def _on_finished(success: bool, payload: dict):
         try:
-            # Save userconfig_v2.xml to the temporary folder
-            userconfig_path = os.path.join(temp_folder, "userconfig_v2.xml")
-            shutil.copy(os.path.join(userconfig_rootpath, "userconfig_v2.xml"), userconfig_path)
+            progress.close()
+        except Exception:
+            pass
 
-            # Save the contents of the 'log' folder to the temporary folder
-            log_folder_path = os.path.join(temp_folder, "log")
-            shutil.copytree(os.path.join(userconfig_rootpath, "log"), log_folder_path)
+        if success:
+            try:
+                QMessageBox.information(
+                    None, 
+                    "Support Bundle Created", 
+                    f"Support bundle saved to:\n{payload.get('path')}"
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                QMessageBox.critical(
+                    None, 
+                    "Error", 
+                    f"Failed to create support bundle:\n{payload.get('error')}"
+                )
+            except Exception:
+                pass
 
-            # Save system settings to a temporary .cfg file
-            cfg_file_path = os.path.join(temp_folder, "system_settings.cfg")
-            with open(cfg_file_path, "w") as cfg_file:
-                # Write each key-value pair as 'key=value' on a new line
-                for key, value in sys_dict.items():
-                    cfg_file.write(f"{key}={value}\n")
+        # Cleanup
+        try:
+            thread.quit()
+            thread.wait(2000)
+        except Exception:
+            pass
 
-            # Create the support zip file
-            with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as support_zip:
-                # Add userconfig_v2.xml, log folder, and system settings .cfg file to the zip
-                support_zip.write(userconfig_path, "userconfig_v2.xml")
-                for folder_name, subfolders, filenames in os.walk(log_folder_path):
-                    for filename in filenames:
-                        file_path = os.path.join(folder_name, filename)
-                        arcname = os.path.relpath(file_path, temp_folder)
-                        support_zip.write(file_path, os.path.join(arcname))
-                support_zip.write(cfg_file_path, "system_settings.cfg")
+        worker.deleteLater()
+        thread.deleteLater()
 
-        finally:
-            # Clean up the temporary folder
-            shutil.rmtree(temp_folder)
+    worker.finished.connect(_on_finished)
+    # Ensure thread stops when finished
+    worker.finished.connect(thread.quit)
+    thread.start()
 
 
 def read_all_system_settings():
