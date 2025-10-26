@@ -484,6 +484,31 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
                 exc_content.append("\n" + "=" * 80 + "\n\n")
             
             support_zip.writestr("exceptions.txt", "".join(exc_content))
+        
+        # Add DCS files if available
+        try:
+            saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
+            if saved_games:
+                dcs_variant = get_dcs_variant()
+                dcs_folders = ['DCS', 'DCS.openbeta']
+                if dcs_variant and f'DCS.{dcs_variant}' not in dcs_folders:
+                    dcs_folders.append(f'DCS.{dcs_variant}')
+                
+                for dcs_folder in dcs_folders:
+                    dcs_path = os.path.join(saved_games, dcs_folder)
+                    if os.path.exists(dcs_path):
+                        # Add DCS log file
+                        dcs_log = os.path.join(dcs_path, "Logs", "dcs.log")
+                        if os.path.exists(dcs_log):
+                            support_zip.write(dcs_log, f"{dcs_folder}/Logs/dcs.log")
+                        
+                        # Add Export.lua if present
+                        export_lua = os.path.join(dcs_path, "Scripts", "Export.lua")
+                        if os.path.exists(export_lua):
+                            support_zip.write(export_lua, f"{dcs_folder}/Scripts/Export.lua")
+        except Exception as e:
+            # If DCS detection fails, continue without DCS files
+            pass
 
 
 def create_support_bundle_data(userconfig_rootpath, exceptions=None):
