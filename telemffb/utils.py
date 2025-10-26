@@ -1,25 +1,6 @@
 #
 # This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
 # Copyright (c) 2023 Valmantas Palikša.
-# Copyright (c) 2023 Micah Frisby
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, version 3.
-#
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-
-
-#
-# This file is part of the TelemFFB distribution (https://github.com/walmis/TelemFFB).
-# Copyright (c) 2023 Valmantas Palikša.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -367,7 +348,7 @@ def archive_logs(directory):
                 logging.info(f"Archiving logs from {readable_date} into {zip_filename}")
                 zip_path = os.path.join(directory, zip_filename)
 
-                with zipfile.ZipFile(zip_path, 'a') as zip_file:
+                with zipfile.ZipFile(zip_path, 'a', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zip_file:
                     log_file_path = os.path.join(directory, filename)
                     zip_file.write(log_file_path, os.path.basename(log_file_path))
                     os.remove(log_file_path)  # Remove the original log file
@@ -474,7 +455,7 @@ def create_support_bundle_data(userconfig_rootpath, exceptions=None):
     # Create zip file in memory
     zip_buffer = io.BytesIO()
     
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as support_zip:
+    with zipfile.ZipFile(zip_buffer, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as support_zip:
         # Add userconfig_v2.xml
         userconfig_path = os.path.join(userconfig_rootpath, "userconfig_v2.xml")
         if os.path.exists(userconfig_path):
@@ -725,14 +706,14 @@ def create_support_bundle(userconfig_rootpath):
                     cfg_file.write(f"{key}={value}\n")
 
             # Create the support zip file
-            with zipfile.ZipFile(zip_file_path, 'w') as support_zip:
+            with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as support_zip:
                 # Add userconfig_v2.xml, log folder, and system settings .cfg file to the zip
                 support_zip.write(userconfig_path, "userconfig_v2.xml")
                 for folder_name, subfolders, filenames in os.walk(log_folder_path):
                     for filename in filenames:
                         file_path = os.path.join(folder_name, filename)
                         arcname = os.path.relpath(file_path, temp_folder)
-                        support_zip.write(file_path, os.path.join("log", arcname))
+                        support_zip.write(file_path, os.path.join(arcname))
                 support_zip.write(cfg_file_path, "system_settings.cfg")
 
         finally:
