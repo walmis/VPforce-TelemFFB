@@ -1,6 +1,17 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  October 29, 2025
+############################################
+## Platform
+- Fix hard crash when TelemFFB started with no device connected
+## DCS
+- Update export dll to get correct telemetry for pedal trimming feature
+## IL2
+- Fix g-force effect conversion and selection issue
+
+
+############################################
 ##  October 7, 2025
 ############################################
 ## DCS
