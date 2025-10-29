@@ -712,6 +712,47 @@ def _cleanup_on_exit(dev_serial):
     if HapticEffect.device:
         HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
 
+def _init_excepthooks():
+    orig_stdout = sys.stdout
+    # Configure global exception handler for better error reporting
+    def excepthook(exc_type, exc_value, exc_tb):
+        if exc_type == KeyboardInterrupt:
+            utils.exit_application()
+            return
+        # Log the unhandled exception including the full traceback via the logging module
+        logging.getLogger().error("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
+        # Also write the formatted traceback to stdout for the in-app log window
+        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        orig_stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
+        # Optionally exit the Qt application:
+        # QtWidgets.QApplication.quit()
+    sys.excepthook = excepthook
+
+    # Configure threading exception handler to catch exceptions in threads (Python 3.8+)
+    # This must be set up AFTER logging is initialized so the handler can log properly
+    def threading_excepthook(args):
+        """Handle uncaught exceptions in threads."""
+        exc_type = args.exc_type
+        exc_value = args.exc_value
+        exc_tb = args.exc_traceback
+        thread = args.thread
+        
+        # Log the exception - this will be captured by ExceptionTracker
+        logging.getLogger().error(
+            f"Uncaught exception in thread {thread.name}",
+            exc_info=(exc_type, exc_value, exc_tb)
+        )
+        # Also write to stdout for visibility in log window
+        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        orig_stdout.write(
+            f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}] Exception in thread {thread.name}{AnsiColors.WHITE}\n{tb}{AnsiColors.END}"
+        )
+    
+    # Set threading exception hook (available in Python 3.8+)
+    import threading
+    if hasattr(threading, 'excepthook'):
+        threading.excepthook = threading_excepthook
+
 def main():
     """
     Main application entry point and initialization flow.
@@ -792,6 +833,8 @@ def main():
     else:
         appmode = 'Source'
 
+    _init_excepthooks()
+
     # ============================================================================
     # PHASE 5: Logging and Debug Setup
     # ============================================================================
@@ -807,19 +850,7 @@ def main():
         logging.info(f"Using {G.args.teleplot} for plotting")
         utils.teleplot.configure(G.args.teleplot)
 
-    # Configure global exception handler for better error reporting
-    def excepthook(exc_type, exc_value, exc_tb):
-        if exc_type == KeyboardInterrupt:
-            utils.exit_application()
-            return
-        # Log the unhandled exception including the full traceback via the logging module
-        logging.getLogger().error("Uncaught exception", exc_info=(exc_type, exc_value, exc_tb))
-        # Also write the formatted traceback to stdout for the in-app log window
-        tb = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        sys.stdout.write(f"{AnsiColors.BRIGHT_REDBG}[{G.device_type}]{AnsiColors.WHITE}{tb}{AnsiColors.END}")
-        # Optionally exit the Qt application:
-        # QtWidgets.QApplication.quit()
-    sys.excepthook = excepthook
+
 
     # ============================================================================
     # PHASE 6: UI and Logging Window Setup

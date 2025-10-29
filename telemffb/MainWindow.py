@@ -844,6 +844,8 @@ class MainWindow(QMainWindow):
         self.status_bar.addPermanentWidget(self.exception_status_widget)
         self.status_bar.addPermanentWidget(self.version_label)
 
+        self.exception_status_widget.set_count(G.exception_tracker.get_count())
+
 
         """ Setup hooks to update the telemetry and settings widgets """
 
