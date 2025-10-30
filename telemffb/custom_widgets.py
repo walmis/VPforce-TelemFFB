@@ -324,6 +324,11 @@ class AppStatusWidget(QWidget):
         self.cb_selectProfileCombo.setDisabled(False)
         self.pulse_label(self.sim_status_label.status_label, pulses=20000, color=QColor(200,0,0))
 
+    def set_waiting(self, source):
+        if self.offline: return
+        self.sim_status_label.set_waiting()
+        self.cb_selectProfileCombo.setDisabled(False)
+
     def set_offline(self, source):
         self.offline = True
         self.sim_status_label.set_status(source, 'Offline')

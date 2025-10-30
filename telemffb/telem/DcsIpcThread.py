@@ -22,6 +22,8 @@ import socket
 import threading
 from typing import Optional, Tuple, TYPE_CHECKING
 from telemffb.util.SharedMemReader import SharedMemoryReader
+from telemffb.utils import schedule_on_main_thread
+import telemffb.globals as G
 
 if TYPE_CHECKING:
     from telemffb.telem.TelemManager import TelemManager
@@ -75,6 +77,16 @@ class DcsIpcThread(threading.Thread):
                 if not packet:
                     continue
                 message = packet.message
+
+                # If we get Ev=Start, indicate to GUI that DCS sim is active and telemFFB is loaded
+                if message == "Ev=Start":
+                    # Schedule GUI update on main thread
+                    schedule_on_main_thread(lambda: G.main_window.update_sim_indicators("DCS", paused=True))
+
+                if message == "Ev=Stop":
+                    # Schedule GUI update on main thread
+                    schedule_on_main_thread(lambda: G.main_window.status_container.set_waiting("DCS"))
+
                 self._telem.submit_frame(message)
             except Exception as e:
                 logging.error(f"Error reading from shared memory: {e}")

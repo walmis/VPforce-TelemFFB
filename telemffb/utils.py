@@ -46,7 +46,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import akima
 
-from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings, Qt
+from PyQt6.QtCore import QCoreApplication, QSize, QThread, pyqtSignal, QObject, QSettings, Qt, QMetaObject, pyqtSlot
 from PyQt6.QtGui import QGuiApplication, QPixmap, QTextCharFormat, QColor
 
 from PyQt6 import QtCore, QtGui
@@ -66,6 +66,63 @@ def check_min_firmware_version(dev_firmware_version, min_firmware_version):
     minver = re.sub(r'\D', '', min_firmware_version)
     devver = re.sub(r'\D', '', dev_firmware_version)
     return devver >= minver
+
+
+def schedule_on_main_thread(func):
+    """
+    Schedule a callable to execute in the main Qt thread.
+    
+    This is essential when calling GUI methods from worker threads (e.g., threading.Thread).
+    Qt GUI objects must only be accessed from the thread they were created in (main thread).
+    
+    Args:
+        func: A callable (lambda or function) to execute in the main thread
+    
+    Examples:
+        # Lambda (simple and clean):
+        schedule_on_main_thread(lambda: G.main_window.update_sim_indicators("dcs", True))
+        schedule_on_main_thread(lambda: some_widget.setText("Hello"))
+        
+        # Function reference:
+        def update_ui():
+            G.main_window.statusBar().showMessage("Updated")
+        schedule_on_main_thread(update_ui)
+    """
+    class CallableWrapper(QObject):
+        # Keep references to wrapper objects to prevent garbage collection
+        _scheduled_wrappers = []
+
+        def __init__(self, func):
+            super().__init__()
+            # Keep a reference to prevent garbage collection before execution
+            self._scheduled_wrappers.append(self)
+            # Clean up old wrappers if list gets too long (prevent memory leak)
+            if len(self._scheduled_wrappers) > 100:
+                self._scheduled_wrappers[:] = self._scheduled_wrappers[-50:]
+
+            self.func = func
+            # Move to main thread
+            if QCoreApplication.instance():
+                self.moveToThread(QCoreApplication.instance().thread())
+        
+        @pyqtSlot()
+        def execute(self):
+            try:
+                self.func()
+            finally:
+                # Remove from references list after execution
+                try:
+                    self._scheduled_wrappers.remove(self)
+                except (ValueError, AttributeError):
+                    pass
+    
+    wrapper = CallableWrapper(func)
+
+    QMetaObject.invokeMethod(
+        wrapper,
+        "execute",
+        Qt.ConnectionType.QueuedConnection
+    )
 
 
 def dbprint(color, msg, instance=None):
