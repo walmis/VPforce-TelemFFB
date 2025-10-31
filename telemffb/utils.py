@@ -511,9 +511,14 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
     with zipfile.ZipFile(zip_file_path, 'w', compression=zipfile.ZIP_LZMA, compresslevel=9) as support_zip:
         # Add userconfig_v2.xml
         userconfig_path = os.path.join(userconfig_rootpath, "userconfig_v2.xml")
+        legacy_userconfig_path = os.path.join(userconfig_rootpath, "userconfig.xml")
+
         if os.path.exists(userconfig_path):
             support_zip.write(userconfig_path, "userconfig_v2.xml")
-        
+
+        if os.path.exists(legacy_userconfig_path):
+            support_zip.write(userconfig_path, "userconfig.xml")
+
         # Add log files
         log_folder = os.path.join(userconfig_rootpath, "log")
         if os.path.exists(log_folder):
