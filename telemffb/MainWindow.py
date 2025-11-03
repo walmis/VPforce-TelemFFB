@@ -1181,6 +1181,7 @@ class MainWindow(QMainWindow):
         teleplot_action = QAction("Teleplot Setup", self)
         def do_open_teleplot_setup_dialog():
             dialog = TeleplotSetupDialog(self)
+            dialog.cb_send.setChecked(utils.teleplot.enabled)
             dialog.exec()
         teleplot_action.triggered.connect(do_open_teleplot_setup_dialog)
         debug_menu.addAction(teleplot_action)
