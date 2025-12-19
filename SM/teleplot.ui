@@ -124,8 +124,15 @@
      <item>
       <widget class="QLabel" name="label_5">
        <property name="text">
-        <string>To stop sending teleplot data,
-clear the boxes and select Save</string>
+        <string>To stop sending teleplot data, uncheck
+Transmit or clear the boxes and click Save</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="cb_send">
+       <property name="text">
+        <string>Transmit to teleplot.fr</string>
        </property>
       </widget>
      </item>
@@ -157,13 +164,23 @@ clear the boxes and select Save</string>
          </property>
         </spacer>
        </item>
-       <item alignment="Qt::AlignRight">
-        <widget class="QDialogButtonBox" name="buttonBox">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+       <item>
+        <widget class="QPushButton" name="pb_Save">
+         <property name="text">
+          <string>Save</string>
          </property>
-         <property name="standardButtons">
-          <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
+         <property name="default">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="pb_Cancel">
+         <property name="text">
+          <string>Close</string>
+         </property>
+         <property name="autoDefault">
+          <bool>true</bool>
          </property>
         </widget>
        </item>

@@ -960,6 +960,8 @@ class SystemSettings(QSettings):
         'enableVPConfGlobalDefault': False,
         'pathVPConfExit': '',
         'enableResetGainsExit': False,
+        'teleplotPort': '',
+        'teleplotVars': ''
     }
 
     globl_sys_dict = {
@@ -1637,6 +1639,7 @@ class Dispenser:
 class Teleplot:
     def __init__(self):
         self.sock = None
+        self.enabled = False
 
     def configure(self, address: str):
         try:
