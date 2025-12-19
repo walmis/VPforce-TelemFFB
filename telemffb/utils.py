@@ -2487,12 +2487,32 @@ class DedupHandler(logging.Handler):
         self.period_seconds = float(period_seconds)
 
     def _normalize_message(self, record: logging.LogRecord) -> str:
+        """
+        Return a normalized, *uncolored* message string for de-duplication.
+
+        - First attempt to collapse msg+args via record.getMessage().
+        - If that fails (e.g. bad % formatting), fall back to record.msg.
+        - In either case, clear record.args so future getMessage() calls are safe.
+        """
+        # First, try to safely collapse msg+args into a single string
         try:
             txt = record.getMessage() or ""
-            parts = parseAnsiText(txt)
-            return "".join([t for t, _ in parts])
-        except Exception:
-            return record.getMessage() or ""
+            # Now that we've successfully formatted, freeze it and drop args
+            record.msg = txt
+            record.args = ()
+        except Exception as e:
+            # getMessage() itself failed (e.g. "not all arguments converted")
+            # Fall back to the raw msg, but still clear args so it can't blow up later.
+            record.args = ()
+            try:
+                txt = str(record.msg) if record.msg is not None else ""
+            except Exception:
+                # Last-resort fallback
+                txt = f"<unformattable log message: {e}>"
+
+        # At this point txt is *some* string, args is empty, so no more % formatting.
+        parts = parseAnsiText(txt)
+        return "".join(t for t, _ in parts)
 
     def _make_key(self, record: logging.LogRecord):
         # Key by level, logger name and normalized message

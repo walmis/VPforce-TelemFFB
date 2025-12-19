@@ -247,7 +247,11 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                 self.cyclic_center = [x, y]
 
             else:
-                self._spring_handle.stop()
+                self.spring_x.set_coefficient(0)
+                self.spring_y.set_coefficient(0)
+                self._spring_handle.setCondition(self.spring_x)
+                self._spring_handle.setCondition(self.spring_y)
+                self._spring_handle.start()
 
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.get_input()
