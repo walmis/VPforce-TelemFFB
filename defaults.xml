@@ -7071,6 +7071,20 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>engine_rotor_rumble_enabled</name>
+			<type>FlyInsideHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>engine_rotor_rumble_enabled</name>
+			<type>CowanSimHelicopter</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>engine_rotor_rumble_enabled</name>
 			<type>HPGHelicopter</type>
 			<value>true</value>
 			<sim>MSFS</sim>
@@ -8320,6 +8334,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>telemffb_controls_axes</name>
+			<type>!CowanSimHelicopter</type>
+			<sim>MSFS</sim>
+			<device>trimwheel</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>telemffb_controls_axes</name>
 			<type>!HPGHelicopter</type>
 			<sim>MSFS</sim>
 			<device>trimwheel</device>
@@ -8365,6 +8385,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>trim_following</name>
+			<type>!CowanSimHelicopter</type>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>trim_following</name>
 			<type>!HPGHelicopter</type>
 			<sim>MSFS</sim>
 			<device>joystick</device>
@@ -8643,6 +8669,27 @@
 			<name>type</name>
 			<type>FlyInsideHelicopter</type>
 			<value>FlyInsideHelicopter</value>
+			<sim>MSFS</sim>
+			<device>collective</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>type</name>
+			<type>CowanSimHelicopter</type>
+			<value>CowanSimHelicopter</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>type</name>
+			<type>CowanSimHelicopter</type>
+			<value>CowanSimHelicopter</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>type</name>
+			<type>CowanSimHelicopter</type>
+			<value>CowanSimHelicopter</value>
 			<sim>MSFS</sim>
 			<device>collective</device>
 		</classdefaults_MSFS>
@@ -16836,41 +16883,129 @@
 	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
-		<model>FlyInside B206.*</model>
+		<model>FlyInside - B206</model>
 		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</models>
 	<models>
-		<name>etl_effect_intensity</name>
-		<model>FlyInside B206.*</model>
+		<name>rotor_blade_count</name>
+		<model>FlyInside - B206</model>
+		<value>2</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>runway_rumble_intensity</name>
+		<model>FlyInside - B206</model>
+		<value>0.5</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>FI_vibration_expo</name>
+		<model>FlyInside - B206</model>
 		<value>0.2</value>
 		<sim>MSFS</sim>
-		<device>any</device>
+		<device>joystick</device>
 	</models>
 	<models>
-		<name>etl_start_speed</name>
-		<model>FlyInside B206.*</model>
-		<value>7</value>
-		<unit>m/s</unit>
+		<name>hydraulic_loss_damper</name>
+		<model>FlyInside - B206</model>
+		<value>0.39</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_friction</name>
+		<model>FlyInside - B206</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_inertia</name>
+		<model>FlyInside - B206</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>FI_vibration_intensity</name>
+		<model>FlyInside - B206</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_damper_ovd</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_friction_ovd</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_hydraulic_loss_effect</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_inertia_ovd</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_damper_ovd</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_friction_ovd</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_hydraulic_loss_effect</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_inertia_ovd</name>
+		<model>FlyInside - B206</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>FlyInside - B206</model>
+		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
 	<models>
-		<name>etl_stop_speed</name>
+		<name>enable_custom_x_axis</name>
 		<model>FlyInside B206.*</model>
-		<value>15</value>
-		<unit>m/s</unit>
+		<value>true</value>
 		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>FlyInside B206.*</model>
-		<value>45</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
+		<device>pedals</device>
 	</models>
 	<models>
 		<name>rotor_blade_count</name>
@@ -16887,12 +17022,103 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>FI_vibration_expo</name>
+		<model>FlyInside B206.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_damper</name>
+		<model>FlyInside B206.*</model>
+		<value>0.39</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_friction</name>
+		<model>FlyInside B206.*</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>hydraulic_loss_inertia</name>
+		<model>FlyInside B206.*</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>FI_vibration_intensity</name>
+		<model>FlyInside B206.*</model>
+		<value>0.2</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_damper_ovd</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_friction_ovd</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_hydraulic_loss_effect</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_inertia_ovd</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>enable_damper_ovd</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_friction_ovd</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_hydraulic_loss_effect</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>enable_inertia_ovd</name>
+		<model>FlyInside B206.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>FlyInside B206.*</model>
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
-		</models>
+	</models>
 	<models>
 		<name>enable_custom_x_axis</name>
 		<model>FlyInside B47.*</model>
@@ -16901,49 +17127,11 @@
 		<device>pedals</device>
 	</models>
 	<models>
-		<name>etl_effect_intensity</name>
-		<model>FlyInside B47.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_start_speed</name>
-		<model>FlyInside B47.*</model>
-		<value>5</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>etl_stop_speed</name>
-		<model>FlyInside B47.*</model>
-		<value>10</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
 		<name>force_trim_enabled</name>
 		<model>FlyInside B47.*</model>
 		<value>false</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
-	</models>
-	<models>
-		<name>overspeed_shake_intensity</name>
-		<model>FlyInside B47.*</model>
-		<value>0.3</value>
-		<sim>MSFS</sim>
-		<device>any</device>
-	</models>
-	<models>
-		<name>overspeed_shake_start</name>
-		<model>FlyInside B47.*</model>
-		<value>45</value>
-		<unit>m/s</unit>
-		<sim>MSFS</sim>
-		<device>any</device>
 	</models>
 	<models>
 		<name>rotor_blade_count</name>
