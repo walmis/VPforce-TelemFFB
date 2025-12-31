@@ -3020,7 +3020,7 @@ def validate_vpconf_profile(file_path, pid=None, dev_type=None, silent=False, wi
         Returns:
             str: Device identifier
         """
-        return G.device_info.product_id if G.device_info else "UnknownDevice"
+        return G.device_info.ident if G.device_info else "UnknownDevice"
 
 
     def _show_error_message(title, message, silent, window):
