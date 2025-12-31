@@ -122,6 +122,9 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             self._simconnect.add_simvar(name='ForceTrimSW', var="L:TelemFFBHeliFT", sc_unit="enum")
             self._simconnect._resubscribe()
 
+    def msfs_send_heli_pedal_pos(self, xvar, xpos, telem_data):
+        self._simconnect.send_event_to_msfs(xvar, xpos)
+
 
     def msfs_update_pedals(self, telem_data):
         if not self.is_pedals(): 
@@ -177,7 +180,9 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
                         else:
                             x_var = 'ROTOR_AXIS_TAIL_ROTOR_SET'
 
-                        self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
+                        self.msfs_send_heli_pedal_pos(x_var, self.last_pos_x_pos, telem_data)
+                        # self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
+
                     return
 
             if self.spring_mode_is(SpringModeEnum.FORCETRIM):
@@ -211,8 +216,13 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
                 else:
                     pos_x_pos = round(pos_x_pos, 5)
 
-                self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                self.msfs_send_heli_pedal_pos(x_var, pos_x_pos, telem_data)
+                # self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+
                 self.last_pos_x_pos = pos_x_pos
+
+    def msfs_send_heli_collective_pos(self, yvar, ypos, telem_data):
+        self._simconnect.send_event_to_msfs(yvar, ypos)
 
     def msfs_update_collective(self, telem_data):
         if not self.is_collective():
@@ -263,7 +273,8 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
                 logging.info("Collective Initialized")
             else:
                 if self._sim_is_msfs():
-                    self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
+                    self.msfs_send_heli_collective_pos(y_var, self.last_pos_y_pos, telem_data)
+                    # self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
 
                 return
         self.last_collective_y = phys_y
@@ -305,5 +316,6 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
                 pos_y_pos = round(pos_y_pos, 5)
 
             if self.collective_init:
-                self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                self.msfs_send_heli_collective_pos(y_var, pos_y_pos, telem_data)
+                # self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
                 self.last_pos_y_pos = pos_y_pos

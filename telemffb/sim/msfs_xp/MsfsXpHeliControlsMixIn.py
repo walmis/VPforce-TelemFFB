@@ -24,6 +24,9 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def msfs_send_heli_cyclic_pos(self, xvar, xpos, yvar, ypos, telem_data):
+        self._simconnect.send_event_to_msfs(xvar, xpos)
+        self._simconnect.send_event_to_msfs(yvar, ypos)
 
     def msfs_update_heli_controls(self, telem_data):
         if self.is_trimwheel(): return
@@ -128,8 +131,10 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                             else:
                                 y_var = "AXIS_CYCLIC_LONGITUDINAL_SET"
 
-                            self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
-                            self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
+                            self.msfs_send_heli_cyclic_pos(x_var, self.last_pos_x_pos, y_var, self.last_pos_y_pos, telem_data)
+                            # self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
+                            # self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
+
                         return
                 elif force_trim_pressed:
                     """This clause executes when the force trim button is depressed
@@ -298,8 +303,10 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                         else:
                             pos_y_pos = round(pos_y_pos, 5)
 
-                        self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-                        self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+                        self.msfs_send_heli_cyclic_pos(x_var, pos_x_pos, y_var, pos_y_pos, telem_data)
+                        # self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+                        # self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+
                         self.last_pos_x_pos = pos_x_pos
                         self.last_pos_y_pos = pos_y_pos
 
