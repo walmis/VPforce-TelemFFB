@@ -81,7 +81,7 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<trimwheel>true</trimwheel>
-		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,GliderAircraft,Helicopter,HPGHelicopter,SASHelicopter,FlyInsideHelicopter,CowanSimHelicopter</validvalues>
+		<validvalues>PropellerAircraft,TurbopropAircraft,JetAircraft,GliderAircraft,Helicopter,HPGHelicopter,SASHelicopter,FlyInsideHelicopter,CowanSimHelicopter,TaogH500Helicopter</validvalues>
 	</defaults>
 	<defaults>
 		<datatype>list</datatype>
@@ -5652,6 +5652,54 @@
 			<var>L:CSR66_Hyd_Switch</var>
 			<sc_unit>bool</sc_unit>
 		</sc_overrides>
+		<sc_overrides>
+			<name>TaogH500CyclicFriction</name>
+			<model>H500C.*</model>
+			<var>L:cyclic_friction</var>
+			<sc_unit>bool</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>TaogH500CollectiveFriction</name>
+			<model>H500C.*</model>
+			<var>L:collective_friction</var>
+			<sc_unit>bool</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>TaogH500TRDamaged</name>
+			<model>H500C.*</model>
+			<var>L:TR_damaged</var>
+			<sc_unit>bool</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>TaogH500PedalLock</name>
+			<model>H500C.*</model>
+			<var>L:pedal_lock</var>
+			<sc_unit>bool</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>TaogH500CyclicFriction</name>
+			<model>OH6A.*</model>
+			<var>L:cyclic_friction</var>
+			<sc_unit>bool</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>TaogH500CollectiveFriction</name>
+			<model>OH6A.*</model>
+			<var>L:collective_friction</var>
+			<sc_unit>bool</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>TaogH500TRDamaged</name>
+			<model>OH6A.*</model>
+			<var>L:TR_damaged</var>
+			<sc_unit>bool</sc_unit>
+		</sc_overrides>
+		<sc_overrides>
+			<name>TaogH500PedalLock</name>
+			<model>OH6A.*</model>
+			<var>L:pedal_lock</var>
+			<sc_unit>bool</sc_unit>
+		</sc_overrides>
 		<validvalues_overrides>
 			<name>spring_mode</name>
 			<sim>MSFS</sim>
@@ -5733,6 +5781,27 @@
 			<name>spring_mode</name>
 			<sim>MSFS</sim>
 			<class>SASHelicopter</class>
+			<validvalues>MSFS_XP_HELI_COLLECTIVE_SPRING_MODE</validvalues>
+			<device>collective</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>TaogH500Helicopter</class>
+			<validvalues>MSFS_XP_HELI_JOYSTICK_SPRING_MODE</validvalues>
+			<device>joystick</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>TaogH500Helicopter</class>
+			<validvalues>MSFS_XP_HELI_PEDAL_SPRING_MODE</validvalues>
+			<device>pedals</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>TaogH500Helicopter</class>
 			<validvalues>MSFS_XP_HELI_COLLECTIVE_SPRING_MODE</validvalues>
 			<device>collective</device>
 		</validvalues_overrides>
@@ -6558,6 +6627,12 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>aoa_effect_enabled</name>
+			<type>!TaogH500Helicopter</type>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>aoa_effect_enabled</name>
 			<type>!CowanSimHelicopter</type>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -6634,6 +6709,13 @@
 		<classdefaults_MSFS>
 			<name>deceleration_effect_enable</name>
 			<type>FlyInsideHelicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>any</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>deceleration_effect_enable</name>
+			<type>TaogH500Helicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>any</device>
@@ -17218,6 +17300,20 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>type</name>
+		<model>H500C.*</model>
+		<value>TaogH500Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>spring_mode</name>
+		<model>H500C.*</model>
+		<value>FORCETRIM</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
 		<name>aileron_expo</name>
 		<model>Icon A5.*</model>
 		<value>0.1</value>
@@ -17521,6 +17617,20 @@
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>OH6A.*</model>
+		<value>TaogH500Helicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>spring_mode</name>
+		<model>OH6A.*</model>
+		<value>FORCETRIM</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -18644,6 +18754,10 @@
 	<classes>
 		<sim>MSFS</sim>
 		<class_name>FlyInsideHelicopter</class_name>
+	</classes>
+	<classes>
+		<sim>MSFS</sim>
+		<class_name>TaogH500Helicopter</class_name>
 	</classes>
 	<classes>
 		<sim>XPLANE</sim>
