@@ -954,6 +954,20 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<grouping>Basic</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>1232</order>
+		<name>force_trim_send_reset</name>
+		<displayname>Zero Trim with TR</displayname>
+		<prereq>spring_mode.FORCETRIM.CNTR_FT</prereq>
+		<info>When enabled (default), TelemFFB sends "ROTOR_TRIM_RESET" to zero trim when force trim is repositioned, </info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<value>true</value>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
 		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>

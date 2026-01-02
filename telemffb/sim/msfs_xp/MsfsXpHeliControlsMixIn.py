@@ -18,6 +18,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
     force_trim_reset_button = 0
     cyclic_spring_gain = 1.0
     trim_release_spring_gain = 0
+    force_trim_send_reset = True
 
     # end of user parameters
 
@@ -154,7 +155,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                         self.cyclic_virtual_trim_y_offs = 0.0
 
                         # tell MSFS to reset rotor trim ONCE on edge
-                        if self._sim_is_msfs():
+                        if self._sim_is_msfs() and self.force_trim_send_reset:
                             self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 1)
 
                         logging.info(f"Force Trim Disengaged total={self.cpO_x}:{self.cpO_y}")
@@ -188,7 +189,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
                     self.cyclic_center = [x, y]
 
-                    if self._sim_is_msfs():
+                    if self._sim_is_msfs() and self.force_trim_send_reset:
                         # turn off the reset flag ONCE on edge
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
@@ -223,7 +224,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                     self.spring_x.set_offset(round(self.cpO_x))
                     self.spring_y.set_offset(round(self.cpO_y))
 
-                    if self._sim_is_msfs():
+                    if self._sim_is_msfs() and self.force_trim_send_reset:
                         self._simconnect.send_event_to_msfs("ROTOR_TRIM_RESET", 0)
 
                 else:
