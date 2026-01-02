@@ -5766,6 +5766,27 @@
 		<validvalues_overrides>
 			<name>spring_mode</name>
 			<sim>MSFS</sim>
+			<class>CowanSimHelicopter</class>
+			<validvalues>MSFS_XP_HELI_JOYSTICK_SPRING_MODE</validvalues>
+			<device>joystick</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>CowanSimHelicopter</class>
+			<validvalues>MSFS_XP_HELI_PEDAL_SPRING_MODE</validvalues>
+			<device>pedals</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
+			<class>CowanSimHelicopter</class>
+			<validvalues>MSFS_XP_HELI_COLLECTIVE_SPRING_MODE</validvalues>
+			<device>collective</device>
+		</validvalues_overrides>
+		<validvalues_overrides>
+			<name>spring_mode</name>
+			<sim>MSFS</sim>
 			<class>HPGHelicopter</class>
 			<validvalues>MSFS_XP_FT_ONLY_JOYSTICK_SPRING_MODE</validvalues>
 			<device>joystick</device>
