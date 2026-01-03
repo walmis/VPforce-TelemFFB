@@ -123,6 +123,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             self._simconnect._resubscribe()
 
     def msfs_send_heli_pedal_pos(self, xvar, xpos, telem_data):
+        if not self._simconnect: return
         self._simconnect.send_event_to_msfs(xvar, xpos)
 
 
@@ -222,6 +223,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
                 self.last_pos_x_pos = pos_x_pos
 
     def msfs_send_heli_collective_pos(self, yvar, ypos, telem_data):
+        if not self._simconnect: return
         self._simconnect.send_event_to_msfs(yvar, ypos)
 
     def msfs_update_collective(self, telem_data):

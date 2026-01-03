@@ -26,6 +26,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         super().__init__(*args, **kwargs)
 
     def msfs_send_heli_cyclic_pos(self, xvar, xpos, yvar, ypos, telem_data):
+        if not self._simconnect: return
         self._simconnect.send_event_to_msfs(xvar, xpos)
         self._simconnect.send_event_to_msfs(yvar, ypos)
 
