@@ -1290,8 +1290,12 @@ class SettingsLayout(QGridLayout):
         sender = self.sender()
 
         if isinstance(sender, QtWidgets.QLineEdit):
-            # True when sender is a editable ComboBox (i.e. 'anylist')
-            combo = sender.parent()  # QComboBox is the parent of the QLineEdit
+            combo = sender.parent()  # QComboBox parent of QLineEdit
+
+            # If the popup is open, this "editingFinished" is just focus moving
+            # into the dropdown list — don't treat it as a commit.
+            if combo.view() is not None and combo.view().isVisible():
+                return
         else:
             combo = sender
 
