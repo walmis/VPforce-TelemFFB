@@ -18113,6 +18113,20 @@
 	</models>
 	<models>
 		<name>type</name>
+		<model>S-76C++.*</model>
+		<value>CowanSimHelicopter</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>force_trim_send_reset</name>
+		<model>S-76C++.*</model>
+		<value>false</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
 		<model>Savage Grravel.*</model>
 		<value>PropellerAircraft</value>
 		<sim>MSFS</sim>
