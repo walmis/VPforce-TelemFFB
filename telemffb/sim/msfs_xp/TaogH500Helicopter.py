@@ -36,7 +36,7 @@ class TaogH500Helicopter(Helicopter):
     def msfs_send_heli_pedal_pos(self, xvar, xpos, telem_data):
         if not self._simconnect: return
         if not telem_data.get("TaogH500PedalLock", 0):
-            self._simconnect.send_event_to_msfs("L:H500C_OH6A-AXIS_ANTI_TORQUE_PEDALS", xpos)
+            self._simconnect.send_event_to_msfs("L:HELICOPTER_Pedals_Position", xpos)
             if not telem_data.get("TaogH500TRDamaged", 0):
                 self._simconnect.send_event_to_msfs(xvar, xpos)
 
@@ -47,12 +47,9 @@ class TaogH500Helicopter(Helicopter):
             self._simconnect.send_event_to_msfs(xvar, xpos)
             self._simconnect.send_event_to_msfs(yvar, ypos)
 
-            self._simconnect.send_event_to_msfs("L:H500C_OH6A-AXIS_CYCLIC_LATERAL", xpos)
-            self._simconnect.send_event_to_msfs("L:H500C_OH6A-AXIS_CYCLIC_LONGITUDINAL", ypos)
 
     @override
     def msfs_send_heli_collective_pos(self, yvar, ypos, telem_data):
         if not self._simconnect: return
         if not telem_data.get("TaogH500CollectiveFriction", 0):
             self._simconnect.send_event_to_msfs(yvar, ypos)
-            self._simconnect.send_event_to_msfs("L:H500C_OH6A-AXIS_COLLECTIVE", ypos)
