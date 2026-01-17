@@ -6,6 +6,24 @@ import logging
 import socket
 
 
+class SimConnectProxy:
+    """Proxy object that handles None simconnect gracefully."""
+    
+    def __init__(self, simconnect_getter):
+        self._simconnect_getter = simconnect_getter
+    
+    def __getattr__(self, name):
+        simconnect = self._simconnect_getter()
+        if simconnect is None:
+            logging.warning(f"SimConnect is None, cannot access attribute/method: {name}")
+            # Return a callable that does nothing for method calls
+            return lambda *args, **kwargs: None
+        return getattr(simconnect, name)
+    
+    def __bool__(self):
+        return self._simconnect_getter() is not None
+
+
 class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     """Mixin for MSFS SimConnect integration."""
 
@@ -19,10 +37,11 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self._socket = None
         self.__xplane_axis_override_active = False
         self.__xplane_addr = ("127.0.0.1", 34391)
+        self._simconnect_proxy = SimConnectProxy(lambda: G.telem_manager.simconnect if G.telem_manager else None)
 
     @property
     def _simconnect(self):
-        return G.telem_manager.simconnect
+        return self._simconnect_proxy
 
     def send_xp_command(self, cmd):
         if self._socket is None:
