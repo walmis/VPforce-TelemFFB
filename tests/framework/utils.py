@@ -51,6 +51,22 @@ class TelemetryDataBuilder:
         self._data["SimOnGround"] = 1 if on_ground else 0
         return self
     
+    def with_sim_on_ground(self, value: int):
+        """Set SimOnGround directly with integer value."""
+        self._data["SimOnGround"] = value
+        return self
+    
+    def with_airspeed(self, speed: float):
+        """Set airspeed."""
+        self._data["TAS"] = speed
+        self._data["IAS"] = speed
+        return self
+    
+    def with_field(self, key: str, value: Any):
+        """Set arbitrary field."""
+        self._data[key] = value
+        return self
+    
     def weight_on_wheels(self, nose: float = 1.0, left: float = 1.0, right: float = 1.0):
         """Set weight on wheels for each gear."""
         self._data["WeightOnWheels"] = [nose, left, right]

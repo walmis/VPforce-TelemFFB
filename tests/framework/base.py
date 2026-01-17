@@ -38,6 +38,10 @@ class MockInputData:
         """Check if button is pressed."""
         return button in self._buttons
     
+    def getPressedButtons(self) -> list:
+        """Get list of pressed buttons."""
+        return list(self._buttons)
+    
     def press_button(self, button: int):
         """Simulate button press."""
         self._buttons.add(button)
@@ -81,8 +85,12 @@ class MockConditionEffect:
         self.effect_id += 1
 
     
-    def start(self):
-        """Start the effect."""
+    def start(self, override=False):
+        """Start the effect.
+        
+        Args:
+            override: Whether to override existing effects (ignored in mock)
+        """
         self.started = True
         self.start_count += 1
         return self
@@ -241,6 +249,10 @@ class MockSimConnect:
     def __init__(self):
         self.sent_events = []
         self.variables = {}
+        self.sv_dict = {}
+        self.simvar_calls = []
+        self.add_simvar_count = 0
+        self._resubscribe_count = 0
     
     def send_event_to_msfs(self, event_name: str, value: Any):
         """Record sent events."""
@@ -253,6 +265,16 @@ class MockSimConnect:
     def get_variable(self, var_name: str) -> Any:
         """Get a variable."""
         return self.variables.get(var_name)
+    
+    def add_simvar(self, name: str, var: str, sc_unit: str = ""):
+        """Mock adding a simvar."""
+        self.add_simvar_count += 1
+        self.simvar_calls.append(f"add_simvar: {name} = {var} ({sc_unit})")
+        self.sv_dict[name] = {"var": var, "unit": sc_unit}
+    
+    def _resubscribe(self):
+        """Mock resubscribe."""
+        self._resubscribe_count += 1
     
     def clear_events(self):
         """Clear recorded events."""
@@ -466,6 +488,67 @@ class BaseTelemetryEffectTestCase:
                 return self.__spring_handle_instance
         
         return TestClass(**kwargs)
+    
+    def create_aircraft_instance(self, aircraft_class: Type[T], name: str = "TestAircraft", **kwargs) -> T:
+        """Create an aircraft instance with proper setup for testing.
+        
+        Args:
+            aircraft_class: The aircraft class to instantiate
+            name: Aircraft name (positional arg for Aircraft classes)
+            **kwargs: Additional parameters for the aircraft
+            
+        Returns:
+            Configured aircraft instance ready for testing
+        """
+        # Extract test-specific kwargs
+        test_sim_is_msfs = kwargs.pop('_test_sim_is_msfs', False)
+        test_sim_is_xplane = kwargs.pop('_test_sim_is_xplane', False)
+        test_device_type = kwargs.pop('_test_device_type', 'joystick')
+        
+        # Setup G.telem_manager to avoid AttributeError
+        # Always update simconnect to match this test's mock
+        if not hasattr(G, 'telem_manager') or G.telem_manager is None:
+            # Create a simple mock telem_manager
+            telem_manager_mock = Mock()
+            G.telem_manager = telem_manager_mock
+        
+        # Always set simconnect to this test's mock_simconnect
+        G.telem_manager.simconnect = self.mock_simconnect
+        
+        # Create the instance with name as positional arg and pass remaining kwargs
+        instance = aircraft_class(name, **kwargs)
+        
+        # Set up mock SimConnect if needed
+        if not hasattr(instance, 'mock_simconnect') or instance.mock_simconnect is None:
+            instance.mock_simconnect = self.mock_simconnect
+        
+        # Initialize telemetry data dict if not present
+        if not hasattr(instance, '_telem_data'):
+            instance._telem_data = {}
+        
+        # Setup test helpers for sim detection
+        instance._test_sim_is_msfs = test_sim_is_msfs
+        instance._test_sim_is_xplane = test_sim_is_xplane
+        instance._test_device_type = test_device_type
+        
+        # Override sim detection methods
+        original_sim_is_msfs = instance._sim_is_msfs
+        original_sim_is_xplane = instance._sim_is_xplane
+        
+        def mock_sim_is_msfs():
+            if hasattr(instance, '_test_sim_is_msfs'):
+                return instance._test_sim_is_msfs
+            return original_sim_is_msfs()
+        
+        def mock_sim_is_xplane():
+            if hasattr(instance, '_test_sim_is_xplane'):
+                return instance._test_sim_is_xplane
+            return original_sim_is_xplane()
+        
+        instance._sim_is_msfs = mock_sim_is_msfs
+        instance._sim_is_xplane = mock_sim_is_xplane
+        
+        return instance
     
     def set_telemetry(self, instance, telem_data: dict):
         """Set telemetry data on an instance."""
