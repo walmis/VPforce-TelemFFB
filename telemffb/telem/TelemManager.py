@@ -124,7 +124,7 @@ class TelemManager(QObject, threading.Thread):
         self._simconnect = sc
 
     @property
-    def simconnect(self) -> SimConnectManager:
+    def simconnect(self) -> Optional[SimConnectManager]:
         return self._simconnect
 
     def get_aircraft_config(self, aircraft_name, data_source) -> Tuple[dict, str]:
