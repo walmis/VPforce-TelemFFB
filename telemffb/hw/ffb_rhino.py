@@ -168,12 +168,13 @@ class FFBReport_SetEffect(BaseStructure):
                 ("samplePeriod", ctypes.c_uint16),
                 ("gain", ctypes.c_uint16),
                 ("triggerButton", ctypes.c_uint8),
-                ("axesEnable", ctypes.c_uint8), # bit 0: x_axis_enble, bit 1: y_axis_enable, bit 2: direction_enable
+                ("axesEnable", ctypes.c_uint8, 3), # bit 0: x_axis_enble, bit 1: y_axis_enable, bit 2: direction_enable
+                ("effectSource", ctypes.c_uint8, 1), # bit 0: effect_source : 0 - game, 1 - telemFFB
                 ("directionX", ctypes.c_uint8),
                 ("directionY", ctypes.c_uint8),
                 ("startDelay", ctypes.c_uint16)
                ]
-    _defaults_ = {"reportId": HID_REPORT_ID_SET_EFFECT, "gain":4096}
+    _defaults_ = {"reportId": HID_REPORT_ID_SET_EFFECT, "gain":4096, "effectSource": 1}
 
 
 class FFBReport_SetDeadzone(BaseStructure):
@@ -344,27 +345,27 @@ class FFBReport_SetEnvelope(BaseStructure):
     Attributes:
         reportId (int): The report ID.
         effectBlockIndex (int): The effect block index.
-        attackLevel (int): The attack level, relative to the baseline, in the range from 0 through 4096.
-        fadeLevel (int): The fade level, relative to the baseline, in the range from 0 through 4096.
+        attackFromForce (int): The attack level (force to start from), relative to the baseline, in the range from 0 through 4096.
+        decayToForce (int): The decay level (force to decay to), relative to the baseline, in the range from 0 through 4096.
         attackTime (int): The time, in milliseconds, to reach the sustain level.
-        fadeTime (int): The time, in milliseconds, to reach the fade level.
+        decayTime (int): The time, in milliseconds, to reach the decay level.
     """
 
     reportId: int               # uint8_t reportId
     effectBlockIndex: int       # uint8_t effectBlockIndex
-    attackLevel: int            # uint16_t attackLevel
-    fadeLevel: int              # uint16_t fadeLevel
+    attackFromForce: int        # uint16_t attackLevel (firmware: attackFromForce)
+    decayToForce: int           # uint16_t fadeLevel (firmware: decayToForce)
     attackTime: int             # uint16_t attackTime
-    fadeTime: int               # uint16_t fadeTime
+    decayTime: int              # uint16_t fadeTime (firmware: decayTime)
 
     _pack_ = 1
     _fields_ = [
         ("reportId", ctypes.c_uint8),        # uint8_t reportId
         ("effectBlockIndex", ctypes.c_uint8),# uint8_t effectBlockIndex
-        ("attackLevel", ctypes.c_uint16),    # uint16_t attackLevel
-        ("fadeLevel", ctypes.c_uint16),      # uint16_t fadeLevel
+        ("attackFromForce", ctypes.c_uint16),# uint16_t attackLevel
+        ("decayToForce", ctypes.c_uint16),   # uint16_t fadeLevel
         ("attackTime", ctypes.c_uint16),     # uint16_t attackTime
-        ("fadeTime", ctypes.c_uint16)        # uint16_t fadeTime
+        ("decayTime", ctypes.c_uint16)       # uint16_t fadeTime
     ]
     _defaults_ = { "reportId": HID_REPORT_ID_SET_ENVELOPE }
 
@@ -713,6 +714,17 @@ class FFBEffectHandle:
         if self._data_changed(f"setCondition{cond.parameterBlockOffset}", data):
             self.ffb.write(data)
 
+    def setEnvelope(self, envelope: FFBReport_SetEnvelope):
+        """Set envelope parameters for the effect.
+        
+        Args:
+            envelope: An instance of FFBReport_SetEnvelope with envelope parameters.
+        """
+        envelope.effectBlockIndex = self.effect_id
+        data = bytes(envelope)
+        if self._data_changed("setEnvelope", data):
+            self.ffb.write(data)
+
     def setPeriodic(self, freq, magnitude, direction, duration=0, **kwargs):
         assert(self.type in PERIODIC_EFFECTS)
         assert(magnitude >= 0 and magnitude <= 1.0)
@@ -1052,6 +1064,9 @@ class HapticEffect(Destroyable):
         # Lazy initialization state
         self._pending_create = None  # function for creating the effect (lazy initialization)
         self._pending_conditions = {} # functions for setting condition (lazy initialization)
+        self._pending_envelope : Optional[FFBReport_SetEnvelope] = None  # envelope to apply once on creation
+        self._envelope_applied : bool = False  # track if envelope has been applied
+        self._envelope_once : bool = False  # track if envelope should be cleared after first use  # track if envelope was explicitly set via .envelope()  # track if envelope has been applied
 
     def __repr__(self):
         """Return a short representation including the underlying handle."""
@@ -1100,6 +1115,10 @@ class HapticEffect(Destroyable):
             for val in self._pending_conditions.values():
                 val()
             self._pending_conditions.clear()
+            # Apply envelope if pending and not yet applied
+            if self._h_effect and self._pending_envelope and not self._envelope_applied:
+                self._h_effect.setEnvelope(self._pending_envelope)
+                self._envelope_applied = True
 
     def setCondition(self, cond : FFBReport_SetCondition) -> Self:
         """Set condition parameters for condition-style effects.
@@ -1121,6 +1140,7 @@ class HapticEffect(Destroyable):
             EFFECT_INERTIA,
             EFFECT_FRICTION,
             EFFECT_SPRING_ADJUSTER,
+            EFFECT_DETENT,
         ]
 
         if self._h_effect:
@@ -1252,6 +1272,133 @@ class HapticEffect(Destroyable):
         """
         return self._conditional_effect(EFFECT_SPRING_ADJUSTER, coef_x=coef_x, coef_y=coef_y, **kwargs)
 
+    def detent(self, position_x=0, position_y=0, peak_x=None, peak_y=None, 
+               range_x=None, range_y=None, gate_pos_x=None, gate_neg_x=None,
+               gate_pos_y=None, gate_neg_y=None, deadband_x=None, deadband_y=None) -> Self:
+        """Configure this object as a detent effect.
+        
+        A detent effect creates a "notch" or "valley" at a specified position,
+        providing tactile feedback when the control passes through that position.
+        The effect automatically includes 400-unit edge smoothing and -1000 damping.
+        
+        Firmware Parameter Mapping:
+        ---------------------------
+        Python Parameter    | Firmware Code         | Description
+        --------------------|----------------------|----------------------------------
+        position_x, _y      | e->cp.x, e->cp.y     | Center position of detent
+        peak_x, peak_y      | e->coef.pos.x, .y    | Detent size/peak strength
+        range_x, range_y    | e->coef.neg.x, .y    | Detent range/width
+        gate_pos_x, _y      | e->saturation.pos.x/y| Upper gate/bound position
+        gate_neg_x, _y      | e->saturation.neg.x/y| Lower gate/bound position
+        deadband_x, _y      | e->deadband.x, .y    | Deadband size on X/Y axis
+        
+        Args:
+            position_x (int, optional): Center position of detent on X-axis (default: 0).
+                Firmware: e->cp.x
+            position_y (int, optional): Center position of detent on Y-axis (default: 0).
+                Firmware: e->cp.y
+            peak_x (int, optional): Detent size/peak strength on X-axis.
+                Firmware: e->coef.pos.x (e.g., groove_detent_size = 2500)
+            peak_y (int, optional): Detent size/peak strength on Y-axis.
+                Firmware: e->coef.pos.y (e.g., latch_detent_size = 1500)
+            range_x (int, optional): Detent range/width on X-axis.
+                Firmware: e->coef.neg.x (e.g., groove_detent_range = 3000)
+            range_y (int, optional): Detent range/width on Y-axis.
+                Firmware: e->coef.neg.y (e.g., latch_detent_range = 2000)
+            gate_pos_x (int, optional): Upper gate/bound position on X-axis.
+                Firmware: e->saturation.pos.x
+            gate_neg_x (int, optional): Lower gate/bound position on X-axis.
+                Firmware: e->saturation.neg.x
+            gate_pos_y (int, optional): Upper gate/bound position on Y-axis.
+                Firmware: e->saturation.pos.y (e.g., -400 for shifter groove)
+            gate_neg_y (int, optional): Lower gate/bound position on Y-axis.
+                Firmware: e->saturation.neg.y (e.g., -10000 for shifter groove)
+            deadband_x (int, optional): Deadband size on X-axis (default: None).
+                Firmware: e->deadband.x
+            deadband_y (int, optional): Deadband size on Y-axis (default: None).
+                Firmware: e->deadband.y
+        
+        Returns:
+            Self for chaining.
+            
+        Note:
+            The firmware implementation includes automatic features:
+            - 400-unit smoothing range at the edges of the saturation bounds
+            - -1000 damping coefficient applied when force is active
+            - Cross-axis gain modulation based on position within smoothing range
+            
+        Example - Vertical groove detent (from firmware init_hshifter):
+            >>> # Vertical groove at x=2000
+            >>> effect = HapticEffect().detent(
+            ...     position_x=2000,          # e->cp.x = 2000
+            ...     peak_x=2500,              # e->coef.pos.x = groove_detent_size
+            ...     range_x=3000,             # e->coef.neg.x = groove_detent_range
+            ...     gate_pos_y=-400,          # e->saturation.pos.y = -400
+            ...     gate_neg_y=-10000         # e->saturation.neg.y = -10000
+            ... )
+            >>> effect.start()
+            
+        Example - Latch detent (from firmware):
+            >>> effect = HapticEffect().detent(
+            ...     position_y=-3000,         # e->cp.y = -3000
+            ...     peak_y=1500,              # e->coef.pos.y = latch_detent_size
+            ...     range_y=2000,             # e->coef.neg.y = latch_detent_range
+            ...     position_x=2000,          # e->cp.x = 2000
+            ...     peak_x=2500,              # e->coef.pos.x = groove_detent_size
+            ...     range_x=3000,             # e->coef.neg.x = groove_detent_range
+            ...     gate_pos_y=-400,
+            ...     gate_neg_y=-10000
+            ... )
+            >>> effect.start()
+        """
+        self.effect_type = EFFECT_DETENT
+
+        def set_conditions():
+            assert self._h_effect is not None, "Effect must be created before setting condition"
+
+            # X-axis configuration
+            if peak_x is not None or range_x is not None or gate_pos_x is not None or gate_neg_x is not None or deadband_x is not None:
+                cond_x = FFBReport_SetCondition(
+                    parameterBlockOffset=0,
+                    cpOffset=int(position_x),               # e->cp.x
+                    positiveCoefficient=int(peak_x or 0),   # e->coef.pos.x (detent size/peak)
+                    negativeCoefficient=int(range_x or 0),  # e->coef.neg.x (detent range/width)
+                    positiveSaturation=int(gate_pos_x or 0),  # e->saturation.pos.x
+                    negativeSaturation=int(gate_neg_x or 0),   # e->saturation.neg.x
+                    deadBand=int(deadband_x or 0)           # e->deadband.x
+                )
+                self._h_effect.setCondition(cond_x)
+
+            # Y-axis configuration
+            if peak_y is not None or range_y is not None or gate_pos_y is not None or gate_neg_y is not None or deadband_y is not None:
+                cond_y = FFBReport_SetCondition(
+                    parameterBlockOffset=1,
+                    cpOffset=int(position_y),               # e->cp.y
+                    positiveCoefficient=int(peak_y or 0),   # e->coef.pos.y
+                    negativeCoefficient=int(range_y or 0),  # e->coef.neg.y
+                    positiveSaturation=int(gate_pos_y or 0),  # e->saturation.pos.y
+                    negativeSaturation=int(gate_neg_y or 0),   # e->saturation.neg.y
+                    deadBand=int(deadband_y or 0)           # e->deadband.y
+                )
+                self._h_effect.setCondition(cond_y)
+
+        if not self._h_effect:
+            # Store the creation function for lazy initialization
+            def create_and_setup():
+                self._h_effect = self.device.create_effect(EFFECT_DETENT)
+                if not self._h_effect:
+                    return False
+                self._h_effect.setEffect()  # Initialize defaults
+                set_conditions()
+                return True
+
+            self._pending_create = create_and_setup
+        else:
+            # Effect already exists, update parameters directly
+            set_conditions()
+
+        return self
+
     def periodic(self, frequency, magnitude:float, direction:float, *args, effect_type=EFFECT_SINE, duration=0, **kwargs):
         """Create or update a periodic effect (sine/square/triangle/etc.).
 
@@ -1329,6 +1476,73 @@ class HapticEffect(Destroyable):
 
         return self
 
+    def envelope(self, attackFromForce=None, decayToForce=None, attackTime=None, decayTime=None, once=False, **kwargs) -> Self:
+        """Set or update envelope parameters for the effect.
+        
+        The envelope can be specified either as individual parameters or as a dict/FFBReport_SetEnvelope.
+        By default, explicitly set envelopes persist across start/stop cycles. Set once=True for one-time use.
+        
+        Args:
+            attackFromForce (int, optional): Force to start from (0-4096). Firmware: attackFromForce
+            decayToForce (int, optional): Force to decay to (0-4096). Firmware: decayToForce
+            attackTime (int, optional): Time in milliseconds to reach sustain level
+            decayTime (int, optional): Time in milliseconds to reach decay level
+            once (bool, optional): If True, envelope is cleared after first use (on stop). Default False.
+            **kwargs: Can include a dict or FFBReport_SetEnvelope instance as 'envelope' key
+        
+        Returns:
+            Self for chaining.
+            
+        Example - Persistent envelope:
+            >>> effect = HapticEffect()
+            >>> effect.constant(magnitude=0.5, direction=90).envelope(
+            ...     attackFromForce=2048, 
+            ...     decayToForce=512,
+            ...     attackTime=500,
+            ...     decayTime=300
+            ... ).start()
+            
+        Example - One-time envelope:
+            >>> effect.constant(magnitude=0.5, direction=90).envelope(
+            ...     attackFromForce=2048,
+            ...     decayToForce=512,
+            ...     attackTime=500,
+            ...     decayTime=300,
+            ...     once=True
+            ... ).start()
+        """
+        # Handle if full envelope object passed via kwargs
+        if 'envelope' in kwargs:
+            env = kwargs['envelope']
+            if isinstance(env, dict):
+                self._pending_envelope = FFBReport_SetEnvelope(**env)
+            elif isinstance(env, FFBReport_SetEnvelope):
+                self._pending_envelope = env
+        else:
+            # Build from individual parameters
+            params = {}
+            if attackFromForce is not None:
+                params['attackFromForce'] = attackFromForce
+            if decayToForce is not None:
+                params['decayToForce'] = decayToForce
+            if attackTime is not None:
+                params['attackTime'] = attackTime
+            if decayTime is not None:
+                params['decayTime'] = decayTime
+            
+            if params:
+                self._pending_envelope = FFBReport_SetEnvelope(**params)
+        
+        # Track if envelope should be cleared after first use
+        self._envelope_once = once
+        
+        # If effect already exists and envelope is set, apply envelope immediately
+        if self._h_effect and self._pending_envelope:
+            self._h_effect.setEnvelope(self._pending_envelope)
+            self._envelope_applied = True
+        
+        return self
+
     @property
     def started(self) -> bool:
         """Return True when the underlying effect is currently playing."""
@@ -1378,6 +1592,20 @@ class HapticEffect(Destroyable):
             name = f" (\"{self.name}\")" if self.name else ""  
             logging.info(f"Stop effect {self._h_effect.effect_id} ({self._h_effect.name}){name}")
             self._h_effect.stop()
+            
+            # Clear envelope if it was marked as one-time use
+            if self._envelope_once and self._pending_envelope:
+                clear_envelope = FFBReport_SetEnvelope(
+                    attackFromForce=0,
+                    decayToForce=0,
+                    attackTime=0,
+                    decayTime=0
+                )
+                self._h_effect.setEnvelope(clear_envelope)
+                self._pending_envelope = None
+                self._envelope_applied = False
+                self._envelope_once = False
+            
             if destroy_after:
                 if not self._stopped_time:
                     self._stopped_time = millis()
