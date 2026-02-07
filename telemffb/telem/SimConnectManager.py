@@ -35,6 +35,7 @@ License: GPL-3.0
 from simconnect import *
 from ctypes import byref, cast, sizeof
 from telemffb.utils import dbprint
+from telemffb.util.TransformExpr import TransformExpr
 import time
 import threading
 import logging
@@ -160,6 +161,21 @@ class SimVar:
         self.index = None # index for multivariable simvars
         if self.sc_unit.lower() in ["bool", "enum"]:
             self.datatype = DATATYPE_INT32
+        self._scale_transform = None
+
+    def _build_scale_transform(self):
+        """
+        Convert the public 'scale' value into a Transform instance.
+        """
+        if isinstance(self.scale, TransformExpr):
+            return self.scale
+
+        if isinstance(self.scale, (int, float, str)):
+            return TransformExpr(self.scale)
+
+        raise TypeError(
+            f"Invalid scale type for SimVar '{self.name}': {type(self.scale)}"
+        )
 
     def _calculate(self, input):
         """
@@ -173,8 +189,12 @@ class SimVar:
         """
         if self.mutator:
             input = self.mutator(input)
-        if self.scale:
-            input = input*self.scale
+
+        if self.scale is not None:
+            if self._scale_transform is None:
+                self._scale_transform = self._build_scale_transform()
+            input = self._scale_transform.apply(input)
+
         return input
 
     def __repr__(self) -> str:

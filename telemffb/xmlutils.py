@@ -1475,7 +1475,15 @@ def read_models_sc_overrides(which_root, full_model_name, source):
                     sc_unit_elem = model_elem.find('sc_unit')
                     sc_unit = sc_unit_elem.text if sc_unit_elem is not None else ""
                     scale_elem = model_elem.find('scale')
-                    scale = float(scale_elem.text) if scale_elem is not None else None
+                    if scale_elem is None:
+                        scale = None
+                    elif isinstance(scale_elem.text, float):
+                        scale = float(scale_elem.text)
+                    elif isinstance(scale_elem.text, str):
+                        scale = scale_elem.text.strip()
+                    else:
+                        scale = None
+                    # scale = float(scale_elem.text) if scale_elem is not None else None
 
                     model_dict = {
                         'name': name,

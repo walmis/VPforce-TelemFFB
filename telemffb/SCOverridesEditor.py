@@ -18,13 +18,13 @@
 
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QAbstractItemView, QDialog, QTableWidgetItem
+from PyQt6.QtWidgets import QAbstractItemView, QDialog, QTableWidgetItem, QMessageBox
 
 from . import globals as G
 from . import xmlutils
 from .telem.SimConnectManager import SimConnectManager
 from .ui.Ui_SCOverridesDialog import Ui_SCOverridesDialog
-
+from .util.TransformExpr import TransformExpr
 
 class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
     overrides = []
@@ -35,22 +35,96 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         self.retranslateUi(self)
         self.defaults_path = defaults_path
         self.userconfig_path = userconfig_path
-        self.fill_fields()
         self.pb_add.clicked.connect(self.add_button_clicked)
         self.pb_delete.clicked.connect(self.delete_button_clicked)
+        self.pb_Refresh.clicked.connect(self.fill_fields)
+
+        self.msfs_types = ["bool", "enum", "number", "Percent Over 100", "degrees", "meters/second"]
+        self.xplane_types = ["int", "float"]
+
+        self.lb_transform.setToolTip(
+            """
+        <b>Transform Expression</b><br><br>
+
+        Use this field to convert raw telemetry values into the range expected by the application.<br><br>
+
+        You may enter <b>either</b>:<br>
+        &bull; <b>A number</b> &ndash; applies a simple multiplier<br>
+        <code>0.01</code> &nbsp;&rarr;&nbsp; multiplies the value by 0.01<br><br>
+
+        &bull; <b>A math expression</b> using <code>x</code> as the input value<br>
+        <code>(x - 50) * 0.02</code> &nbsp;&rarr;&nbsp; converts <code>0–100</code> to <code>-1–1</code><br><br>
+
+        <b>Rules</b><br>
+        &bull; <code>x</code> represents the incoming telemetry value<br>
+        &bull; Standard math operators are supported:<br>
+        &nbsp;&nbsp;<code>+ &nbsp; - &nbsp; * &nbsp; / &nbsp; // &nbsp; % &nbsp; **</code><br>
+        &bull; Parentheses are allowed<br><br>
+
+        <b>Not supported</b>: functions, variables other than <code>x</code>, or programming syntax<br><br>
+
+        <b>Examples</b><br>
+        <code>x * 0.01</code><br>
+        <code>(x - 50) * 0.02</code><br>
+        <code>-x</code><br>
+        <code>(x - 16384) / 16384</code><br>
+        <code>x ** 2</code><br><br>
+
+        <b>Tip</b><br>
+        Leave this field blank to use the raw value without modification.
+        """
+        )
+
+        self.fill_fields()
+
+
+    def _parse_scale(self, text: str):
+        """
+        Validate scale input.
+
+        Returns:
+            None            -> empty scale
+            float           -> numeric scale
+            str             -> valid expression scale
+        Raises:
+            ValueError      -> invalid expression
+        """
+        text = text.strip()
+        if not text:
+            return None
+
+        # First try numeric scale
+        try:
+            return float(text)
+        except ValueError:
+            pass
+
+        # Otherwise, treat as expression and validate
+        TransformExpr(text)  # will raise if invalid
+        return text
 
     def fill_fields(self):
-        is_msfs = G.settings_mgr.current_sim == 'MSFS'
-        self.pb_add.setEnabled(is_msfs)
+        self.tableWidget.clear()
+        self.fill_table()
+        sim = G.settings_mgr.current_sim
+        is_valid = sim == 'MSFS' or sim == 'XPLANE'
+        if sim == 'MSFS':
+            self.cb_sc_unit.clear()
+            self.cb_sc_unit.addItems(self.msfs_types)
+        if sim == 'XPLANE':
+            self.cb_sc_unit.clear()
+            self.cb_sc_unit.addItems(self.xplane_types)
+        self.pb_add.setEnabled(is_valid)
         self.pb_delete.setEnabled(False)
-        self.tb_var.setEnabled(is_msfs)
-        self.tableWidget.setEnabled(is_msfs)
-        self.tb_scale.setEnabled(is_msfs)
-        self.cb_name.setEnabled(is_msfs)
-        self.cb_sc_unit.setEnabled(is_msfs)
+        self.tb_var.setEnabled(is_valid)
+        self.tableWidget.setEnabled(is_valid)
+        self.tb_scale.setEnabled(is_valid)
+        self.cb_name.setEnabled(is_valid)
+        self.cb_sc_unit.setEnabled(is_valid)
         self.tb_pattern.setText(G.settings_mgr.current_pattern)
 
-        if is_msfs:
+        if is_valid:
+            self.lb_InfoLabel.setText('')
             self.fill_cb_name()
 
             self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern)
@@ -64,7 +138,8 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
                 self.fill_table()
 
         else:
-            self.bottomlabel.setText('SimConnect overrides are for MSFS only.')
+            self.lb_InfoLabel.setText('SimConnect/Dataref overrides are only available for MSFS and X-Plane.\nLoad into an aircraft, or select an aircraft in the offline editor mode to use this dialog')
+            self.bottomlabel.setText('SimConnect/Dataref overrides are for MSFS/X-Plane only. ')
         pass
 
     def fill_cb_name(self):
@@ -89,7 +164,7 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
         self.tableWidget.clear()
         list_length = len(self.overrides) - 1
         # Set headers
-        headers = ['Property', 'Variable', 'SC Unit', 'Scale', 's']
+        headers = ['Property', 'Variable', 'Unit', 'Scale', 's']
         self.tableWidget.setHorizontalHeaderLabels(headers)
         row_index = 0
         # Set width of the variable column
@@ -184,28 +259,44 @@ class SCOverridesEditor(QDialog, Ui_SCOverridesDialog):
             self.pb_delete.setEnabled(False)
 
     def add_button_clicked(self):
-
         name = self.cb_name.currentText()
         var = self.tb_var.text()
         sc_unit = self.cb_sc_unit.currentText()
         scale_text = self.tb_scale.text()
-        scale_valid = True
-        # Validate and convert scale to a number (integer or float)
-        if scale_text != '':
-            try:
-                scale = float(scale_text)
-            except ValueError:
-                scale_valid = False
-                self.tb_scale.setText('')
 
-        # Handle the case where scale is not a valid number
-        # enable delete button for user rows
-        if name != '' and var != '' and sc_unit != '' and scale_valid:
-            xmlutils.write_sc_override_to_xml(G.settings_mgr.current_pattern, var, name, sc_unit, scale_text)
+        try:
+            scale = self._parse_scale(scale_text)
+            self.tb_scale.setStyleSheet("")
+            self.tb_scale.setToolTip("")
+        except ValueError as e:
+            # Invalid expression → visual feedback
+            self.tb_scale.setStyleSheet("border: 1px solid red;")
+            txt = self.label_4.toolTip()
+            error_html = (
+                "<b>Invalid transform expression.</b><br><br>"
+                "Only numbers or math expressions using <code>x</code> are allowed.<br><br>"
+                "See the field tooltip for examples."
+            )
+            QMessageBox.critical(self, "Invalid expression", error_html)
+            self.tb_scale.setToolTip(str(e))
+            return
+
+        if name and var and sc_unit:
+            xmlutils.write_sc_override_to_xml(
+                G.settings_mgr.current_pattern,
+                var,
+                name,
+                sc_unit,
+                scale_text.strip() if scale is not None else None,
+            )
+
             self.cb_name.setCurrentText('')
             self.tb_var.setText('')
             self.cb_sc_unit.setCurrentText('')
             self.tb_scale.setText('')
+            self.tb_scale.setStyleSheet("")
+            self.tb_scale.setToolTip("")
+
             self.overrides = xmlutils.read_sc_overrides(G.settings_mgr.current_pattern)
             self.fill_table()
 

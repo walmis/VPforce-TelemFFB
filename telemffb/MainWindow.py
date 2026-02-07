@@ -1232,7 +1232,7 @@ class MainWindow(QMainWindow):
         configurator_settings_action.triggered.connect(do_open_configurator_dialog)
         debug_menu.addAction(configurator_settings_action)
 
-        sc_overrides_action = QAction('SimConnect Overrides Editor', self)
+        sc_overrides_action = QAction('SimConnect/Dataref Overrides Editor', self)
         def do_open_sc_override_dialog():
             dialog = SCOverridesEditor(self)
             dialog.raise_()

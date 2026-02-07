@@ -23,6 +23,8 @@ import os
 import subprocess
 import threading
 import time
+import socket
+
 from dataclasses import dataclass
 
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -369,6 +371,7 @@ class TelemManager(QObject, threading.Thread):
         self.currentAircraftConfig = params
 
         self._setup_simconnect_overrides(aircraft_name, data_source)
+        self._setup_xpplugin_overrides(aircraft_name, data_source)
         # self._update_settings_ui()
         self.aircraftUpdated.emit()
 
@@ -442,6 +445,17 @@ class TelemManager(QObject, threading.Thread):
                 self._simconnect.add_simvar(name=sv['name'], var=sv['var'], sc_unit=sv['sc_unit'], scale=sv['scale'])
             self._simconnect._resubscribe()
 
+    def _setup_xpplugin_overrides(self, aircraft_name, data_source):
+        """Setup Dataref variable overrides for XPLANE aircraft."""
+        if data_source == "XPLANE" and aircraft_name != '':
+            if not getattr(self, "_socket", None):
+                self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+            d1 = xmlutils.read_sc_overrides(aircraft_name)
+            for sv in d1:
+                sendstr = f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion={sv['scale']}"
+                # sendstr = f"SUBSCRIBE:dataref=sim/flightmodel/position/latitude,type=float,tag=LLLatitude,precision=6,conversion=0.51444"
+                self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
+
     # def _update_settings_ui(self):
     #     """Update settings UI if visible."""
     #     if G.settings_mgr.isVisible():
@@ -467,6 +481,7 @@ class TelemManager(QObject, threading.Thread):
                 self._recreate_aircraft_with_new_type(aircraft_info, params, cls_name)
 
             self._setup_simconnect_overrides(aircraft_name, data_source)
+            self._setup_xpplugin_overrides(aircraft_name, data_source)
             self.aircraftUpdated.emit()
 
     def _handle_configurator_overrides_update(self, params):
