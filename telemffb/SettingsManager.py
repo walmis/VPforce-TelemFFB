@@ -188,6 +188,10 @@ class SettingsManager(QObject):
         SpringModeEnum.FORCETRIM: "Force Trim",
     }
 
+    MSFS_XP_FT_ONLY_PEDAL_SPRING_MODE = {
+        SpringModeEnum.FORCETRIM: "Force Trim",
+    }
+
     DCS_IL2_PEDAL_SPRING_MODE = {
         SpringModeEnum.NONE: "None (Game Managed)",
         SpringModeEnum.NOSPRING: "No Spring (Free Floating)",

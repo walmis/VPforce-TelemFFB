@@ -85,7 +85,7 @@ class UserModelDialog(QDialog):
     <p><b style="font-family: Courier">(The )?Name.*</b> matches starting with '<b>Name</b>' or '<b>The Name</b>'</p>
 
     <p><b>**Note** if this is a new livery for an existing aircraft, is recommended to clone from the default profile</b></p>
-    <p><b>for that aircraft if one exists.  This is mandatory for aircraftad with special implementations like 'HPGHelicopter'</b></p>
+    <p><b>for that aircraft if one exists.  This is mandatory for aircraft with special implementations like HPGHelicopter, SASHelicopter, FlyInsideHelicopter, TaogH500Helicopter, XAW109Helicopter</b></p>
 
 """
         label1 = QLabel(lb1_txt)
@@ -112,7 +112,7 @@ class UserModelDialog(QDialog):
                 classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter',
                            'HPGHelicopter', 'SASHelicopter', 'FlyInsideHelicopter', 'TaogH500Helicopter']
             case 'XPLANE':
-                classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter']
+                classes = ['PropellerAircraft', 'TurbopropAircraft', 'JetAircraft', 'GliderAircraft', 'Helicopter', 'XAW109Helicopter']
 
         # FOR TESTING
         # classes.append('AllSettings')

@@ -28,5 +28,6 @@ from .msfs_xp.Helicopter import Helicopter
 from .msfs_xp.HPGHelicopter import HPGHelicopter
 from .msfs_xp.TaogH500Helicopter import TaogH500Helicopter
 from .msfs_xp.SASHelicopter import SASHelicopter
+from .msfs_xp.XAW109Helicopter import XAW109Helicopter
 
 
