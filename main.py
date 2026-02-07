@@ -710,7 +710,10 @@ def _cleanup_on_exit(dev_serial):
             pass
         
     if HapticEffect.device:
-        HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
+        try:
+            HapticEffect.device.set_deadzone(0) #ensure deadzone is set back to configurator value on exit
+        except Exception:
+            logging.error("Unable to reset device deadzone.. device likely disconnected")
 
 def _init_excepthooks():
     orig_stdout = sys.stdout
