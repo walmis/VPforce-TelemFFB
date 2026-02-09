@@ -6890,10 +6890,38 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ap_following</name>
+			<type>PropellerAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
 			<type>JetAircraft</type>
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
+			<type>GilderAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
+			<type>GilderAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>trimwheel</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ap_following</name>
@@ -6908,6 +6936,13 @@
 			<value>true</value>
 			<sim>MSFS</sim>
 			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
+			<type>TurbopropAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ap_following</name>
@@ -7556,6 +7591,7 @@
 		<classdefaults_MSFS>
 			<name>force_trim_button</name>
 			<type>!Helicopter</type>
+			<value></value>
 			<sim>MSFS</sim>
 			<device>collective</device>
 		</classdefaults_MSFS>
