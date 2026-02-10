@@ -55,6 +55,20 @@ class TransformExpr:
 
         # Expression scale
         if isinstance(value, str):
+            value = value.strip()
+
+            # Treat numeric strings as scale (backward compatibility)
+            try:
+                numeric = float(value)
+            except ValueError:
+                numeric = None
+
+            if numeric is not None:
+                self._mode = "scale"
+                self._scale = numeric
+                return
+
+            # Otherwise, treat as expression
             self._mode = "expr"
             self._expr = value
 
