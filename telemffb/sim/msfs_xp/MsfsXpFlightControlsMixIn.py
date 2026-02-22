@@ -42,7 +42,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
     lateral_force_gain = 0.2
 
     controls_lock_enable = False
-    controls_lock_simvar = 'L:ControlLock'
+    controls_lock_simvar = ''
+    controls_lock_simvar_invert = False
 
     ## end of user parameters
 
@@ -613,16 +614,19 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self.spring_y.set_coefficient(ec)
         self.spring_x.set_coefficient(ac)
 
+        if controls_locked:
+            telem_data["_controls_locked"] = controls_locked
+            self.spring_y.set_coefficient(4096)
+            self.spring_x.set_coefficient(4096)
+            self.spring_y.cpOffset = 0
+            self.spring_x.cpOffset = 0
+
         self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.setCondition(self.spring_x)
 
         self._apply_joystick_constant_forces(telem_data, _elevator_droop_term, _G_term)
 
-        if controls_locked:
-            self.spring_y.set_coefficient(4096)
-            self.spring_x.set_coefficient(4096)
-            self.spring_y.cpOffset = 0
-            self.spring_x.cpOffset = 0
+
 
         self._spring_handle.start()
 
@@ -738,15 +742,17 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         self._apply_steering_friction(telem_data, phys_rudder_x_offs, rc)
 
+        if controls_locked:
+            self.spring_x.set_coefficient(4096)
+            self.spring_x.cpOffset = 0
+
         self._spring_handle.setCondition(self.spring_x)
 
         self._send_rudder_axis_commands(telem_data, virtual_rudder_x_offs)
 
         self.const_force.constant(rud_force, 270).start()
 
-        if controls_locked:
-            self.spring_x.set_coefficient(4096)
-            self.spring_x.cpOffset = 0
+
 
         self._spring_handle.start()
     
@@ -772,15 +778,15 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
 
         if self._sim_is_msfs():
-            if (
-                self.controls_lock_enable and self.anything_has_changed("controls_lock_simvar", self.controls_lock_simvar)
-            ) or self.anything_has_changed("controls_lock_enable", self.controls_lock_enable):
+            if self.controls_lock_enable and self.controls_lock_simvar != '':
                 self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
                 self._simconnect._resubscribe()
 
         # get controls lock status
         controls_locked = telem_data.get("ControlsLock", 0) if self.controls_lock_enable else False
 
+        if self.controls_lock_simvar_invert:
+            controls_locked = not controls_locked
 
         if ffb_type == "collective":
             return

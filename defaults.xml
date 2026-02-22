@@ -3724,12 +3724,30 @@
 		<displayname>Controls Lock Simvar</displayname>
 		<prereq>controls_lock_enable</prereq>
 		<info>Sim Variable for control locks</info>
+		<any>any</any>
 		<MSFS>true</MSFS>
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
-		<validvalues>L:ControlLock</validvalues>
+		<value>L:ControlLock</value>
 		<datatype>anylist</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Mechanical</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40060.3</order>
+		<name>controls_lock_simvar_invert</name>
+		<displayname>Invert Controls Lock Simvar</displayname>
+		<prereq>controls_lock_enable</prereq>
+		<info>Enable if variable ON means Control Lock is OFF</info>
+		<any>any</any>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -15141,6 +15159,34 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>profile</name>
+		<model>340 .*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>340 .*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>340 .*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>340 .*</model>
+		<value>L:ASD_SAAB340B_lever_gust_lock</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>404 Titan.*</model>
 		<value>PropellerAircraft</value>
@@ -15309,7 +15355,7 @@
 		<model>A2A Piper PA-24.*</model>
 		<value>L:ControlLock2</value>
 		<sim>MSFS</sim>
-		<device>joystick</device>
+		<device>any</device>
 	</models>
 	<models>
 		<name>type</name>
@@ -18654,6 +18700,27 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>controls_lock_enable</name>
+		<model>Pilatus PC-6.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Pilatus PC-6.*</model>
+		<value>L:PC6_GUSTLOCK_UNLOCKED</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar_invert</name>
+		<model>Pilatus PC-6.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Pilatus PC-6.*</model>
 		<value>TurbopropAircraft</value>
@@ -19327,7 +19394,7 @@
 		<model>Wilga.*</model>
 		<value>L:GustLock</value>
 		<sim>MSFS</sim>
-		<device>joystick</device>
+		<device>any</device>
 	</models>
 	<models>
 		<name>controls_lock_enable</name>
@@ -19340,13 +19407,6 @@
 		<name>controls_lock_enable</name>
 		<model>Wilga.*</model>
 		<value>true</value>
-		<sim>MSFS</sim>
-		<device>pedals</device>
-	</models>
-	<models>
-		<name>controls_lock_simvar</name>
-		<model>Wilga.*</model>
-		<value>L:GustLock</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</models>
