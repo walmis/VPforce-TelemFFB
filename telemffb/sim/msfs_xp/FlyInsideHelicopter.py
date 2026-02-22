@@ -85,4 +85,7 @@ class FlyInsideHelicopter(Helicopter):
 
         force = round(force, 4)
 
-        self.effects['FI_vibration'].constant(force, direction).start()
+        self.effects['FI_vibration'].constant(force, direction).envelope(
+             attackFromForce=0,       # Start from zero for noticeable fade-in
+             attackTime=1000,          # 1000ms attack
+         ).start()

@@ -585,7 +585,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             cf = cf.normalize()
 
         mag, theta = cf.to_polar()
-        self.effects["control_weight"].constant(mag, theta * deg).start()
+        self.effects["control_weight"].constant(mag, theta * deg).envelope(
+             attackFromForce=0,       # Start from zero for noticeable fade-in
+             attackTime=1000,          # 1000ms attack
+         ).start()
 
     def _update_joystick_controls(self, telem_data, ap_active, elevator_coeff, aileron_coeff, 
                                    base_elev_coeff, base_ailer_coeff, _aoa, _elevator_droop_term, 
