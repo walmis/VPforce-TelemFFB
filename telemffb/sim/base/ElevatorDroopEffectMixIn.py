@@ -18,7 +18,10 @@ class ElevatorDroopEffectMixIn(AircraftEffectUtilsBase):
 
         if telem_data['TAS'] < 20 * kt2ms:
             force = utils.scale_clamp(telem_data['TAS'], (20 * kt2ms, 0), (0, self.elevator_droop_force))
-            self.effects['elev_droop'].constant(force, 180).start()
+            self.effects['elev_droop'].constant(force, 180).envelope(
+             attackFromForce=0,       # Start from zero for noticeable fade-in
+             attackTime=1000,          # 1000ms attack
+         ).start()
             logging.debug(f"override elevator:{force}")
         else:
             self.effects.dispose('elev_droop')
