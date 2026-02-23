@@ -3690,7 +3690,6 @@
 		<order>40050</order>
 		<name>rotor_blade_count</name>
 		<displayname>Rotor Blade Count</displayname>
-		<prereq>mechanical_group</prereq>
 		<any>true</any>
 		<DCS>true</DCS>
 		<BMS>true</BMS>
@@ -3700,6 +3699,55 @@
 		<pedals>true</pedals>
 		<collective>true</collective>
 		<validvalues>2,3,4,5,6,7,8</validvalues>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Mechanical</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40060</order>
+		<name>controls_lock_enable</name>
+		<displayname>Controls Lock</displayname>
+		<prereq>mechanical_group</prereq>
+		<info>Enable if this aircraft has a control lock</info>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<datatype>bool</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Mechanical</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40060.1</order>
+		<name>controls_lock_simvar</name>
+		<displayname>Controls Lock Simvar</displayname>
+		<prereq>controls_lock_enable</prereq>
+		<info>Sim Variable for control locks</info>
+		<any>any</any>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>L:ControlLock</value>
+		<datatype>anylist</datatype>
+	</defaults>
+	<defaults>
+		<effecttype>spring</effecttype>
+		<grouping>Mechanical</grouping>
+		<parentgroup>mechanical</parentgroup>
+		<order>40060.3</order>
+		<name>controls_lock_simvar_invert</name>
+		<displayname>Invert Controls Lock Simvar</displayname>
+		<prereq>controls_lock_enable</prereq>
+		<info>Enable if variable ON means Control Lock is OFF</info>
+		<any>any</any>
+		<MSFS>true</MSFS>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<value>false</value>
+		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
 		<effecttype>periodic</effecttype>
@@ -6904,6 +6952,20 @@
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>ap_following</name>
+			<type>TurbopropAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
+			<type>PropellerAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
 			<type>PropellerAircraft</type>
 			<value>true</value>
 			<sim>MSFS</sim>
@@ -6980,6 +7042,62 @@
 			<device>collective</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>PropellerAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>TurbopropAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>TurbopropAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>JetAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>GilderAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>GilderAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
 			<name>critical_aoa_max</name>
 			<type>JetAircraft</type>
 			<value>25</value>
@@ -7008,6 +7126,27 @@
 			<value>L:TelemFFBHeliFT</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
+			<type>JetAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
+			<type>GilderAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>ap_following</name>
+			<type>GilderAircraft</type>
+			<value>true</value>
+			<sim>MSFS</sim>
+			<device>trimwheel</device>
 		</classdefaults_MSFS>
 		<classdefaults_MSFS>
 			<name>custom_ft_sw_var</name>
@@ -15020,6 +15159,34 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>profile</name>
+		<model>340 .*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>340 .*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>340 .*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>340 .*</model>
+		<value>L:ASD_SAAB340B_lever_gust_lock</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>404 Titan.*</model>
 		<value>PropellerAircraft</value>
@@ -15173,6 +15340,20 @@
 		<model>A2A Piper PA-24.*</model>
 		<value>74</value>
 		<unit>in</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>A2A Piper PA-24.*</model>
+		<value>L:ControlLock2</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -15954,6 +16135,126 @@
 		<name>type</name>
 		<model>Blackbird Simulations DHC-2.*</model>
 		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Black Square A36.* Bonanza.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_ap_x_follow_deadzone</name>
+		<model>Black Square A36.* Bonanza.*</model>
+		<value>0.15</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_ap_y_follow_deadzone</name>
+		<model>Black Square A36.* Bonanza.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Black Square A36.* Bonanza.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Black Square A36.* Bonanza.*</model>
+		<value>L:bksq_controlLocks</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Black Square B36TP Bonanza.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>vne_override</name>
+		<model>Black Square B36TP Bonanza.*</model>
+		<value>170</value>
+		<unit>kt</unit>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>elevator_expo</name>
+		<model>Black Square B36TP Bonanza.*</model>
+		<value>0.0</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_ap_x_follow_deadzone</name>
+		<model>Black Square B36TP Bonanza.*</model>
+		<value>0.15</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_ap_y_follow_deadzone</name>
+		<model>Black Square B36TP Bonanza.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Black Square B36TP Bonanza.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Black Square B36TP Bonanza.*</model>
+		<value>L:bksq_controlLocks</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Black Square Baron 58.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>joystick_ap_x_follow_deadzone</name>
+		<model>Black Square Baron 58.*</model>
+		<value>0.15</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_ap_y_follow_deadzone</name>
+		<model>Black Square Baron 58.*</model>
+		<value>0.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Black Square Baron 58.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Black Square Baron 58.*</model>
+		<value>L:bksq_controlLocks</value>
 		<sim>MSFS</sim>
 		<device>any</device>
 	</models>
@@ -18399,6 +18700,27 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>controls_lock_enable</name>
+		<model>Pilatus PC-6.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Pilatus PC-6.*</model>
+		<value>L:PC6_GUSTLOCK_UNLOCKED</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar_invert</name>
+		<model>Pilatus PC-6.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Pilatus PC-6.*</model>
 		<value>TurbopropAircraft</value>
@@ -19064,6 +19386,27 @@
 		<name>max_rudder_coeff</name>
 		<model>Wilga.*</model>
 		<value>0.66</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Wilga.*</model>
+		<value>L:GustLock</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Wilga.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Wilga.*</model>
+		<value>true</value>
 		<sim>MSFS</sim>
 		<device>pedals</device>
 	</models>
