@@ -853,6 +853,7 @@
 	</defaults>
 	<defaults>
 		<effecttype>spring</effecttype>
+		<value>.5</value>
 		<datatype>float</datatype>
 		<grouping>Basic</grouping>
 		<parentgroup>basic</parentgroup>
