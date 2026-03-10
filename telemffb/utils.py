@@ -375,6 +375,8 @@ class EffectTranslator:
         "hyd_loss_damper": ["Low Hydraulic Damper", "hydraulic_loss_damper"],
         "hyd_loss_inertia": ["Low Hydraulic Inertia", "hydraulic_loss_inertia"],
         "hyd_loss_friction": ["Low Hydraulic Friction", "hydraulic_loss_friction"],
+        "lock_1": ["Controls Lock Lower Bound", ""],
+        "lock_2": ["Controls Lock Upper Bound", ""],
     }
     @classmethod
     def get_translation(cls, key):

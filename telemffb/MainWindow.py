@@ -2132,30 +2132,7 @@ class MainWindow(QMainWindow):
 
             telem_items = ""
             # Parse filter once per update
-            raw = (self.telem_filter.text() or "")
-            tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
-            for k, v in data.items():
-
-                # check for msfs and debug mode (alt-d pressed), change to simvar name
-                if self.show_simvars:
-                    if data["src"] == "MSFS":
-                        s = G.telem_manager.simconnect.get_var_name(k)
-                        # s = simvarnames.get_var_name(k)
-                        if s is not None:
-                            k = s
-
-                # Apply simple OR filtering against the key only
-                if tokens:
-                    k_cf = str(k).lower()
-                    if not any(tok in k_cf for tok in tokens):
-                        continue
-
-                if isinstance(v, float):
-                    telem_items += f"{k}: {v:.3f}\n"
-                else:
-                    if isinstance(v, list):
-                        v = "[" + ", ".join([f"{x:.3f}" if isinstance(x, float) else str(x) if x is not None else "None" for x in v]) + "]"
-                    telem_items += f"{k}: {v}\n"
+            telem_items = self.get_telem_items(data, telem_items)
 
             active_effects = ""
             active_settings = []
@@ -2314,6 +2291,34 @@ class MainWindow(QMainWindow):
 
         except Exception:
             logging.exception("Exception")
+
+    def get_telem_items(self, data, telem_items):
+        raw = (self.telem_filter.text() or "")
+        tokens = [t.strip().lower() for t in raw.split(",") if t.strip()]
+        for k, v in data.items():
+
+            # check for msfs and debug mode (alt-d pressed), change to simvar name
+            if self.show_simvars:
+                if data["src"] == "MSFS":
+                    s = G.telem_manager.simconnect.get_var_name(k)
+                    # s = simvarnames.get_var_name(k)
+                    if s is not None:
+                        k = s
+
+            # Apply simple OR filtering against the key only
+            if tokens:
+                k_cf = str(k).lower()
+                if not any(tok in k_cf for tok in tokens):
+                    continue
+
+            if isinstance(v, float):
+                telem_items += f"{k}: {v:.3f}\n"
+            else:
+                if isinstance(v, list):
+                    v = "[" + ", ".join(
+                        [f"{x:.3f}" if isinstance(x, float) else str(x) if x is not None else "None" for x in v]) + "]"
+                telem_items += f"{k}: {v}\n"
+        return telem_items
 
     def update_craft_text_block(self, craft=None, pattern=None, profile=None):
         if craft is None:
