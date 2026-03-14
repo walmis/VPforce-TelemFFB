@@ -615,11 +615,56 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self.spring_x.set_coefficient(ac)
 
         if controls_locked:
-            telem_data["_controls_locked"] = controls_locked
+            input_data = HapticEffect.device.get_input()
+            phys_x, phys_y = input_data.axisXY()
+            x = round(phys_x * 4096)
+            y = round(phys_y * 4096)
+
+            groove_detent_size: int = 4096
+            groove_detent_range = 4096
+            pos = 1500
+            if self.effects['lock_1'].started or self.effects['lock_2'].started:
+                return
+            self.effects['control_weight'].stop()
             self.spring_y.set_coefficient(4096)
             self.spring_x.set_coefficient(4096)
             self.spring_y.cpOffset = 0
             self.spring_x.cpOffset = 0
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.start()
+            if (-0.15 < phys_x < 0.15) and (-0.15 < phys_y < 0.15):
+                self.effects['lock_1'].detent(
+                    position_x=pos,
+                    peak_x=groove_detent_size,
+                    range_x=groove_detent_range,
+                    gate_pos_y=0,
+                    gate_neg_y=0,
+                    position_y=pos,
+                    peak_y=groove_detent_size,
+                    range_y=groove_detent_range,
+                    gate_pos_x=0,
+                    gate_neg_x=0
+                ).start()
+                self.effects['lock_2'].detent(
+                    position_x=-pos,
+                    peak_x=groove_detent_size,
+                    range_x=groove_detent_range,
+                    gate_pos_y=0,
+                    gate_neg_y=0,
+                    position_y=-pos,
+                    peak_y=groove_detent_size,
+                    range_y=groove_detent_range,
+                    gate_pos_x=0,
+                    gate_neg_x=0
+                ).start()
+                telem_data["_controls_locked"] = controls_locked
+                self._spring_handle.stop()
+
+            return
+        else:
+            self.effects['lock_1'].stop()
+            self.effects['lock_2'].stop()
 
         self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.setCondition(self.spring_x)
@@ -743,8 +788,48 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self._apply_steering_friction(telem_data, phys_rudder_x_offs, rc)
 
         if controls_locked:
+            input_data = HapticEffect.device.get_input()
+            phys_x, phys_y = input_data.axisXY()
+            x = round(phys_x * 4096)
+            y = round(phys_y * 4096)
+
+            groove_detent_size: int = 4096
+            groove_detent_range = 4096
+            pos = 1500
+            if self.effects['lock_1'].started or self.effects['lock_2'].started:
+                return
+            self.effects['control_weight'].stop()
+
             self.spring_x.set_coefficient(4096)
+
             self.spring_x.cpOffset = 0
+
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.start()
+            if (-0.15 < phys_x < 0.15) and (-0.15 < phys_y < 0.15):
+                self.effects['lock_1'].detent(
+                    position_x=pos,
+                    peak_x=groove_detent_size,
+                    range_x=groove_detent_range,
+                    gate_pos_y=0,
+                    gate_neg_y=0,
+
+                ).start()
+                self.effects['lock_2'].detent(
+                    position_x=-pos,
+                    peak_x=groove_detent_size,
+                    range_x=groove_detent_range,
+                    gate_pos_y=0,
+                    gate_neg_y=0,
+
+                ).start()
+                telem_data["_controls_locked"] = controls_locked
+                self._spring_handle.stop()
+
+            return
+        else:
+            self.effects['lock_1'].stop()
+            self.effects['lock_2'].stop()
 
         self._spring_handle.setCondition(self.spring_x)
 
