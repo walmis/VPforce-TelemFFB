@@ -452,7 +452,10 @@ class TelemManager(QObject, threading.Thread):
                 self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
             d1 = xmlutils.read_sc_overrides(aircraft_name)
             for sv in d1:
-                sendstr = f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion={sv['scale']}"
+                scale = sv['scale'] if sv['scale'] is not None or sv['scale'] == '' else 1.0
+                sendstr = f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion={scale}"
+                # if sv['scale'] is None or sv['scale'] == '':
+                #     print(f"SUBSCRIBE:dataref={sv['var']},type={sv['sc_unit']},tag={sv['name']},precision=3,conversion=>{scale}<")
                 # sendstr = f"SUBSCRIBE:dataref=sim/flightmodel/position/latitude,type=float,tag=LLLatitude,precision=6,conversion=0.51444"
                 self._socket.sendto(bytes(sendstr, "utf-8"), ("127.0.0.1", 34391))
 
