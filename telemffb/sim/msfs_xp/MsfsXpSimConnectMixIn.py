@@ -30,6 +30,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     # user parameters
     local_disable_axis_control: bool = False
     telemffb_controls_axes: bool = False
+    _xplane_event_states: dict = {}
     # end of user parameters
 
     def __init__(self, *args, **kwargs):
@@ -48,6 +49,34 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
         self.toggle_xp_control()
         self._socket.sendto(bytes(cmd, "utf-8"), self.__xplane_addr)
+
+    def write_xp_dataref(self, dataref, value, type="int"):
+        command = f"WRITE:dataref={dataref},value={value},type={type}"
+        print(f"WRITE:dataref={dataref},value={value},type={type}")
+        self.send_xp_command(command)
+
+    def trigger_xp_event(self, dataref, state: bool, type="track"):
+        if type == "once" or type == "begin" or type == "end":
+            command = f"COMMAND:cmd={dataref},phase={type}"
+            self.send_xp_command(command)
+        else:  # "track" mode
+            last_state = self._xplane_event_states.get(dataref)  # None if never seen
+
+            if state and last_state is not True:
+                # Transition to True → send "begin"
+                command = f"COMMAND:cmd={dataref},phase=begin"
+                print(f"COMMAND:cmd={dataref},phase=begin")
+                self.send_xp_command(command)
+                self._xplane_event_states[dataref] = True
+
+            elif not state and last_state is not False:
+                # Transition to False → send "end"
+                command = f"COMMAND:cmd={dataref},phase=end"
+                print(f"COMMAND:cmd={dataref},phase=end")
+                self.send_xp_command(command)
+                self._xplane_event_states[dataref] = False
+
+            # If state matches last_state, do nothing (no change)
 
     def toggle_xp_control(self):
         if self.is_collective():

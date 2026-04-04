@@ -274,9 +274,9 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             vne = vsound * sqrt(5 * (kmNs - 1))
 
         telem_data["Vne_ms_calc"] = vne
-
-        if self.vne_override:
-            vne = self.vne_override
+        if isinstance(self.vne_override, (float, int)):
+            if self.vne_override:
+                vne = self.vne_override
 
         telem_data["Vne_kt"] = vne * ms2kt
 

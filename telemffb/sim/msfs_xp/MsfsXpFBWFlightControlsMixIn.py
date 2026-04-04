@@ -120,14 +120,12 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                         virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_trim_follow_gain_virtual_y)
                         phys_stick_y_offs = int(elevator_pos * 4096)
 
-                        aileron_pos = clamp(aileron_pos[0] * self.joystick_ap_follow_gain_physical_x, -1, 1)
-                        # aileron_pos = self.dampener.dampen_value(aileron_pos, '_aileron_pos', derivative_hz=5, derivative_k=0.15)
-                        virtual_stick_x_offs = aileron_pos - (aileron_pos * self.joystick_ap_follow_gain_virtual_x)
+                        if isinstance(aileron_pos, list):
+                            aileron_pos = aileron_pos[0]
 
-                        # if self.joystick_ap_y_follow_axis:
-                        #     elevator_pos = clamp(elevator_pos * self.joystick_ap_follow_gain_physical_y, -1, 1)
-                        #     virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_ap_follow_gain_virtual_y)
-                        #     phys_stick_y_offs = round(elevator_pos * 4096)
+                        aileron_pos = clamp(aileron_pos * self.joystick_ap_follow_gain_physical_x, -1, 1)
+
+                        virtual_stick_x_offs = aileron_pos - (aileron_pos * self.joystick_ap_follow_gain_virtual_x)
 
                         ap_send_flag_x = (
                             True if abs(phys_x - aileron_pos) > self.joystick_ap_x_follow_deadzone else False
@@ -207,12 +205,9 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     # if AP is not active, flags are always True
                     if ap_send_flag_x:
                         self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-                    else:
-                        self._simconnect.send_event_to_msfs(x_var, 0)
+
                     if ap_send_flag_y:
                         self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
-                    else:
-                        self._simconnect.send_event_to_msfs(y_var, 0)
 
             # update spring data
             if self.ap_following and ap_active:
