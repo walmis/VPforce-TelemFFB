@@ -205,12 +205,9 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     # if AP is not active, flags are always True
                     if ap_send_flag_x:
                         self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-                    else:
-                        self._simconnect.send_event_to_msfs(x_var, 0)
+
                     if ap_send_flag_y:
                         self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
-                    else:
-                        self._simconnect.send_event_to_msfs(y_var, 0)
 
             # update spring data
             if self.ap_following and ap_active:
