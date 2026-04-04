@@ -1296,7 +1296,7 @@ def interpolate_curve_y_point(curve_dict, input_x, conversion_factor=1):
     smooth_curve_enabled = curve_dict.get("smooth_curve_enabled", False)
 
     # Extract x and y values from points
-    x_values = np.array([p["x"] for p in points]) / conversion_factor  # Convert on factor
+    x_values = np.array([p["x"] for p in points]) * conversion_factor  # Convert curve points from user units to m/s
     y_values = np.array([p["y"] for p in points])
 
     # Handle out-of-bounds x_values
