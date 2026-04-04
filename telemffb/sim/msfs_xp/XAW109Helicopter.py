@@ -280,6 +280,6 @@ class XAW109Helicopter(Helicopter):
 
             # self.damper.damper(coef_y=0).start()
             self.spring_y.negativeCoefficient = self.spring_y.positiveCoefficient = 4096
-
+            self.spring_y.set_coefficient(self.collective_ap_spring_gain, True)
             self._spring_handle.setCondition(self.spring_y)
             self._spring_handle.start()
