@@ -150,6 +150,63 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
             force_trim_active = telem_data.get('ForceTrimSW', True) if self.custom_ft_sw_var_enabled else True  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
 
+            if self._sim_is_msfs():
+                if self.controls_lock_enable and self.controls_lock_simvar != '':
+                    self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
+                    self._simconnect._resubscribe()
+
+
+            # get controls lock status
+            controls_locked = telem_data.get("ControlsLock", 0) if self.controls_lock_enable else False
+
+            if self.controls_lock_simvar_invert:
+                controls_locked = not controls_locked
+
+            if controls_locked:
+                input_data = HapticEffect.device.get_input()
+                phys_x, phys_y = input_data.axisXY()
+                x = round(phys_x * 4096)
+                y = round(phys_y * 4096)
+
+                groove_detent_size: int = 4096
+                groove_detent_range = 4096
+                pos = 1500
+                if self.effects['lock_1'].started or self.effects['lock_2'].started:
+                    return
+                self.effects['control_weight'].stop()
+
+                self.spring_x.set_coefficient(4096)
+
+                self.spring_x.cpOffset = 0
+
+                self._spring_handle.setCondition(self.spring_x)
+                self._spring_handle.start()
+                if -0.15 < phys_x < 0.15:
+                    self.effects['lock_1'].detent(
+                        position_x=pos,
+                        peak_x=groove_detent_size,
+                        range_x=groove_detent_range,
+                        gate_pos_y=0,
+                        gate_neg_y=0,
+
+                    ).start()
+                    self.effects['lock_2'].detent(
+                        position_x=-pos,
+                        peak_x=groove_detent_size,
+                        range_x=groove_detent_range,
+                        gate_pos_y=0,
+                        gate_neg_y=0,
+
+                    ).start()
+                    telem_data["_controls_locked"] = controls_locked
+                    self._spring_handle.stop()
+
+                return
+            else:
+                self.effects['lock_1'].stop()
+                self.effects['lock_2'].stop()
+
+
             if not self.pedals_init:
 
                 self.spring_x.set_coefficient(self.pedal_spring_coeff_x)
@@ -233,6 +290,57 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         phys_x, phys_y = input_data.axisXY()
 
         telem_data['phys_y'] = phys_y
+
+        if self._sim_is_msfs():
+            if self.controls_lock_enable and self.controls_lock_simvar != '':
+                self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
+                self._simconnect._resubscribe()
+
+        # get controls lock status
+        controls_locked = telem_data.get("ControlsLock", 0) if self.controls_lock_enable else False
+
+        if self.controls_lock_simvar_invert:
+            controls_locked = not controls_locked
+
+        if controls_locked:
+            telem_data["_controls_locked"] = controls_locked
+            input_data = HapticEffect.device.get_input()
+            phys_x, phys_y = input_data.axisXY()
+            x = round(phys_x * 4096)
+            y = round(phys_y * 4096)
+
+            groove_detent_size: int = 4096
+            groove_detent_range = 4096
+            pos = 4000
+            if self.effects['lock_1'].started or self.effects['lock_2'].started:
+                return
+            self.spring_y.set_coefficient(4096)
+            self.spring_y.cpOffset = 4096
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.start()
+            if 0.9 < phys_y < 1.0:
+                self.effects['lock_1'].detent(
+                    position_y=pos,
+                    peak_y=groove_detent_size,
+                    range_y=groove_detent_range,
+                    gate_pos_x=0,
+                    gate_neg_x=0
+                ).start()
+                self.effects['lock_2'].detent(
+                    position_y=pos-1500,
+                    peak_y=groove_detent_size,
+                    range_y=groove_detent_range,
+                    gate_pos_x=0,
+                    gate_neg_x=0
+                ).start()
+                telem_data["_controls_locked"] = controls_locked
+                self._spring_handle.stop()
+
+            return
+        else:
+            self.effects['lock_1'].stop()
+            self.effects['lock_2'].stop()
+
         if not self.collective_init:
             self._spring_handle.name = "collective_ap_spring"
             self.spring_y.set_coefficient(4096)
