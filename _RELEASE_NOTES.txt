@@ -1,6 +1,49 @@
 This is not an exhaustive change log (see github for that).  This file only outlines the new/improved/changed functionality for new commits
 
 ############################################
+##  April 2026
+############################################
+## Platform
+- Exception tracking and reporting system
+  - New runtime exception tracker with UI viewer showing recent error history
+  - Support bundle improvements: now includes DCS logs and Export.lua; switched to LZMA compression for smaller archives
+  - Automatic error deduplication prevents repeated alerts for the same issue
+- FFB Device Management enhancements
+  - Auto-assign device paths for unconfigured slots on startup; selections are persisted in system settings
+  - Improved USB device selector in System Settings — prevents duplicate device assignments across slots
+- UI: Fix cyclic spring gain not displaying in settings panel
+- Fix error condition on app exit and SimConnect session halt
+- Fix error handling when launching VPforce Configurator from the app
+
+## XPlane
+- X-Trident AW109 special implementation
+  - Full AFCS integration: cyclic trim rate control, force trim release, and autopilot cyclic following with per-axis deadzone tuning
+  - Pedal/rudder trim integration with fine and coarse trim controls
+  - Collective spring gain and force trim release
+  - Correctly honors collective spring gain setting
+- X-Plane plugin: Added dataref write and command write support for expanded aircraft control
+
+## MSFS
+- Control lock feature added for Fixed wing and Helicopter aircraft:
+  - Saab 340, PC-6 Porter, Wilga, Beechcraft A36 Bonanza, Beechcraft B58 Baron, A2A Comanche PA-24
+  - Taog H500
+- Taog H500/OH6 special implementation with optimized spring and trim configuration
+- CowanSim S76: Updated default profile; added option to disable ROTOR TRIM RESET command
+- FlyInsideHeli: Engine vibrations now mapped to pedals and collective axes
+
+
+## DCS
+- Export DLL updates
+  - Added C-130 Hercules
+  - Added AH-6 / MH-6 Little Bird
+  - Fixed rudder control surface telemetry
+- DCS start/stop event handling: TelemFFB UI now responds earlier when the DCS export module loads or unloads
+
+## Effects
+- New envelope and detent effect support in HapticEffect
+  - Attack envelope on constant force effects — reduces the risk of jarring axis slam on initial activation
+
+############################################
 ##  October 29, 2025
 ############################################
 ## Platform
