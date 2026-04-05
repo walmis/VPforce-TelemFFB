@@ -3728,6 +3728,7 @@
 		<joystick>true</joystick>
 		<pedals>true</pedals>
 		<collective>true</collective>
+		<value>false</value>
 		<datatype>bool</datatype>
 	</defaults>
 	<defaults>
@@ -7220,6 +7221,20 @@
 		<classdefaults_MSFS>
 			<name>controls_lock_enable</name>
 			<type>GilderAircraft</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>pedals</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>Helicopter</type>
+			<value>false</value>
+			<sim>MSFS</sim>
+			<device>joystick</device>
+		</classdefaults_MSFS>
+		<classdefaults_MSFS>
+			<name>controls_lock_enable</name>
+			<type>Helicopter</type>
 			<value>false</value>
 			<sim>MSFS</sim>
 			<device>pedals</device>
@@ -18344,6 +18359,48 @@
 		<device>joystick</device>
 	</models>
 	<models>
+		<name>controls_lock_enable</name>
+		<model>H500C.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>H500C.*</model>
+		<value>L:collective_friction</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>H500C.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>H500C.*</model>
+		<value>L:cyclic_friction</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>H500C.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>H500C.*</model>
+		<value>L:pedal_lock</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
 		<name>aileron_expo</name>
 		<model>Icon A5.*</model>
 		<value>0.1</value>
@@ -18661,6 +18718,48 @@
 		<value>FORCETRIM</value>
 		<sim>MSFS</sim>
 		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>OH6A.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>OH6A.*</model>
+		<value>L:collective_friction</value>
+		<sim>MSFS</sim>
+		<device>collective</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>OH6A.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>OH6A.*</model>
+		<value>L:cyclic_friction</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>OH6A.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>OH6A.*</model>
+		<value>L:pedal_lock</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
 	</models>
 	<models>
 		<name>type</name>

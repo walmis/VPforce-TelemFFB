@@ -799,7 +799,6 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             pos = 1500
             if self.effects['lock_1'].started or self.effects['lock_2'].started:
                 return
-            self.effects['control_weight'].stop()
 
             self.spring_x.set_coefficient(4096)
 
@@ -807,7 +806,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.start()
-            if (-0.15 < phys_x < 0.15) and (-0.15 < phys_y < 0.15):
+            if -0.15 < phys_x < 0.15:
                 self.effects['lock_1'].detent(
                     position_x=pos,
                     peak_x=groove_detent_size,
