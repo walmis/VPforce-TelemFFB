@@ -20,6 +20,7 @@ from typing import override
 
 from telemffb.hw.ffb_rhino import HapticEffect
 from .Helicopter import Helicopter
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class SASHelicopter(Helicopter):
     # user parameters
@@ -49,7 +50,7 @@ class SASHelicopter(Helicopter):
         self.cpO_y = round(self.phys_y * 4096)
 
 
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
 
 
@@ -91,20 +92,20 @@ class SASHelicopter(Helicopter):
         return result
 
     @override
-    def msfs_update_heli_controls(self, telem_data):
+    def msfs_update_heli_controls(self, telem_data: BaseTelemetryData):
         super().msfs_update_heli_controls(telem_data)
-        ffb_type = telem_data.get("FFBType", "joystick")
-        ap_active = telem_data.get("APMaster", 0)
+        ffb_type = telem_data.FFBType or "joystick"
+        ap_active = telem_data.APMaster or 0
         # trim_reset = max(telem_data.get("h145TrimRelease", 0), telem_data.get("h160TrimRelease", 0))
-        trim_reset = telem_data.get("hpgTrimRelease", 0)
+        trim_reset = telem_data.hpgTrimRelease or 0
 
         if ffb_type == "joystick":
             if not self.telemffb_controls_axes and not self.local_disable_axis_control:
                 self.flag_error(
                     "Aircraft is configured as class SASHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
                 return
-            sema_x = telem_data.get("SEMAx", 0)
-            sema_y = telem_data.get("SEMAy", 0)
+            sema_x = telem_data.SEMAx or 0
+            sema_y = telem_data.SEMAy or 0
 
             sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=100)
             sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=100)
@@ -162,7 +163,7 @@ class SASHelicopter(Helicopter):
             self._spring_handle.setCondition(self.spring_y)
 
             # hands_off_deadzone = 0.02
-            if telem_data.get("hpgHandsOnCyclic", 0):
+            if telem_data.hpgHandsOnCyclic:
                 hands_on_dict = self.check_hands_on(self.hands_off_deadzone)
             else:
                 hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
@@ -194,15 +195,15 @@ class SASHelicopter(Helicopter):
                     self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
                     self.hands_on_active = False
 
-            telem_data["hands_on"] = int(hands_on_either)
-            telem_data["hands_on_x"] = int(hands_on_x)
-            telem_data["hands_on_y"] = int(hands_on_y)
-            telem_data["deviation_x"] = dev_x
-            telem_data["deviation_y"] = dev_y
+            telem_data.hands_on = int(hands_on_either)
+            telem_data.hands_on_x = int(hands_on_x)
+            telem_data.hands_on_y = int(hands_on_y)
+            telem_data.deviation_x = dev_x
+            telem_data.deviation_y = dev_y
 
             self._spring_handle.start()
 
     @override
-    def _update_cyclic_trim(self, telem_data):
+    def _update_cyclic_trim(self, telem_data: BaseTelemetryData):
         # Trimming is handled by the AFCS integration - override parent class function
         pass

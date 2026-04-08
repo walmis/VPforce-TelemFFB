@@ -20,6 +20,7 @@ from typing import override
 
 from telemffb.sim.msfs_xp.PropellerAircraft import PropellerAircraft
 from telemffb.util.conversions import kt2ms
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class TurbopropAircraft(PropellerAircraft):
     def __init__(self, name, **kwargs):
@@ -30,9 +31,9 @@ class TurbopropAircraft(PropellerAircraft):
         self.speedbrake_speed_thresh = 120 * kt2ms
 
     @override
-    def on_telemetry(self, telem_data):
-        if telem_data.get("N") == None:
+    def on_telemetry(self, telem_data: BaseTelemetryData):
+        if telem_data.N is None:
             return
-        telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
+        telem_data.AircraftClass = "TurbopropAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)

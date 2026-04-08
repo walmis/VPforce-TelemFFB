@@ -4,6 +4,7 @@ Base classes and mocks for telemetry effect testing.
 from typing import Dict, List, Optional, Any, TypeVar, Type
 from unittest.mock import MagicMock, Mock
 import telemffb.globals as G
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 T = TypeVar('T')
 
@@ -73,6 +74,9 @@ class MockConditionEffect:
         self.name = name
         self.started = False
         self.effect_type = 0  # Default effect type
+        self.detent_config = None
+        self._envelope = None
+        self._envelope_once = False
         self._x_coefficient = 0
         self._y_coefficient = 0
         self._x_offset = 0
@@ -98,6 +102,9 @@ class MockConditionEffect:
     def stop(self):
         """Stop the effect."""
         self.started = False
+        if self._envelope_once:
+            self._envelope = None
+            self._envelope_once = False
         self.stop_count += 1
         return self
     
@@ -159,6 +166,35 @@ class MockConditionEffect:
         """Set constant force parameters."""
         self._magnitude = magnitude
         self._direction = direction
+        return self
+
+    def detent(self, **kwargs):
+        """Store detent configuration and return self for call chaining."""
+        self.effect_type = 11  # EFFECT_DETENT in production code
+        self.detent_config = kwargs.copy()
+        return self
+
+    def envelope(self, attackFromForce=None, decayToForce=None, attackTime=None, decayTime=None, once=False, **kwargs):
+        """Store envelope parameters and return self for call chaining."""
+        if 'envelope' in kwargs:
+            self._envelope = kwargs['envelope']
+        else:
+            params = {}
+            if attackFromForce is not None:
+                params['attackFromForce'] = attackFromForce
+            if decayToForce is not None:
+                params['decayToForce'] = decayToForce
+            if attackTime is not None:
+                params['attackTime'] = attackTime
+            if decayTime is not None:
+                params['decayTime'] = decayTime
+            self._envelope = params if params else None
+        self._envelope_once = once
+        return self
+
+    def setEnvelope(self, envelope):
+        """Set envelope object directly to mirror production effect API."""
+        self._envelope = envelope
         return self
     
     def get_coefficients(self):
@@ -375,8 +411,8 @@ class BaseTelemetryEffectTestCase:
                 self.stepper_dict = {}
                 self.spring_mode = None
                 self.gforce_effect_mode = None
-                self._telem_data = {}
-                self._last_telem_data = {}
+                self._telem_data = BaseTelemetryData()
+                self._last_telem_data = BaseTelemetryData()
                 self.friction_effect_overridden = False
                 self.telemffb_controls_axes = False
                 self.local_disable_axis_control = False
@@ -524,7 +560,7 @@ class BaseTelemetryEffectTestCase:
         
         # Initialize telemetry data dict if not present
         if not hasattr(instance, '_telem_data'):
-            instance._telem_data = {}
+            instance._telem_data = BaseTelemetryData()
         
         # Setup test helpers for sim detection
         instance._test_sim_is_msfs = test_sim_is_msfs
@@ -550,9 +586,12 @@ class BaseTelemetryEffectTestCase:
         
         return instance
     
-    def set_telemetry(self, instance, telem_data: dict):
+    def set_telemetry(self, instance, telem_data):
         """Set telemetry data on an instance."""
-        instance._telem_data = telem_data.copy()
+        if isinstance(telem_data, BaseTelemetryData):
+            instance._telem_data = telem_data.copy()
+        else:
+            instance._telem_data = BaseTelemetryData(telem_data)
     
     def assert_effect_started(self, effect_name: str, msg: str = ""):
         """Assert that an effect was started."""

@@ -7,6 +7,7 @@ from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
 from telemffb.sim.base.GForceEffectMixIn import GForceEffectMixIn
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 perftracker = utils.PerformanceTracker()
 
@@ -101,7 +102,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             self.flag_error('Please open and configure the advanced spring gain settings')
             return
 
-        gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.get('IAS', 0))
+        gains = utils.get_gain_from_speed(self.adv_spr_gains, self.telem_data.IAS or 0)
 
         self.spring_adjuster.name = 'adv_spr'
         self.spring_adjuster_y.set_coefficient(gains.get('y', 0))
@@ -111,8 +112,8 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             dt = perftracker.get_time_delta('override_spring_perf')
             trim_step_size = self.override_spring_trim_rate * dt
             # trim_step_size = 200 * dt
-            self.telem_data['_ovrd_spr_step'] = trim_step_size
-            self.telem_data['_ovrd_spr_dt'] = dt
+            self.telem_data._ovrd_spr_step = trim_step_size
+            self.telem_data._ovrd_spr_dt = dt
             # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
             # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
             input_data = HapticEffect.device.get_input()
@@ -137,7 +138,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
 
         offset = super().ac_update_gforce_effect(self.telem_data, adv_spr=True)  # Returns g force spring offset if effect enabled and in offset mode
         g_y_offset = offset if offset is not None else 0
-        self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), g_y_offset]
+        self.telem_data._ovrd_spr_trim_pos = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y), g_y_offset]
         self.spring_adjuster_y.set_offset(round(self.override_spring_cp0_y + g_y_offset))
         self.spring_adjuster_x.set_offset(round(self.override_spring_cp0_x))
 
@@ -146,12 +147,12 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
         self.spring_adjuster.start()
 
     @override
-    def ac_update_gforce_effect(self, telem_data: dict, adv_spr: bool = False) -> Optional[int]:
+    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr: bool = False) -> Optional[int]:
         """If advanced spring is enabled and in offset mode, handle gforce effect as part of advanced spring processing.
         else defer to GForceEffectMixIn implementation."""
         if not (self.gforce_effect_mode_is(GEffectModeEnum.ADVANCED) and self.g_effect_get_adv_mode() == "offset"):
             return super().ac_update_gforce_effect(telem_data, adv_spr=adv_spr)
 
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.ac_modify_game_spring()

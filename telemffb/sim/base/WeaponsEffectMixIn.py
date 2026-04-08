@@ -5,6 +5,7 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 
 import logging
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class WeaponsEffectMixIn(AircraftEffectUtilsBase):
@@ -23,10 +24,10 @@ class WeaponsEffectMixIn(AircraftEffectUtilsBase):
     # end of user parameters
 
     def ac_update_cm_weapons(self, telem):
-        payload = telem.get("PayloadInfo")
-        gun = telem.get("Gun")
-        flares = telem.get("Flares")
-        chaff = telem.get("Chaff")
+        payload = telem.PayloadInfo
+        gun = telem.Gun
+        flares = telem.Flares
+        chaff = telem.Chaff
 
         # Use helper method for weapon effects
         self._create_weapon_effect(
@@ -86,6 +87,6 @@ class WeaponsEffectMixIn(AircraftEffectUtilsBase):
             self.effects[effect_name].stop()
 
     @override
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.ac_update_cm_weapons(telem_data)

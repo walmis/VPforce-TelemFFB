@@ -3,6 +3,7 @@ import logging
 import telemffb.utils as utils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 def pct2dz(pct: float) -> int:
     """Convert percentage (0-100) to deadzone value (0-4096)."""
@@ -48,7 +49,7 @@ class DeadzoneMixIn(AircraftEffectUtilsBase):
             logging.info(f"Setting Deadzone to %{self.deadzone_base_pct}")
             self.deadzone_active = True
 
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.ac_update_deadzone()
 

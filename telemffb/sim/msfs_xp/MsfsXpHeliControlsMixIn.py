@@ -5,6 +5,7 @@ from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsM
 from telemffb.utils import clamp
 from typing import override
 import logging
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
@@ -25,18 +26,18 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def msfs_send_heli_cyclic_pos(self, xvar, xpos, yvar, ypos, telem_data):
+    def msfs_send_heli_cyclic_pos(self, xvar, xpos, yvar, ypos, telem_data: BaseTelemetryData):
         self._simconnect.send_event_to_msfs(xvar, xpos)
         self._simconnect.send_event_to_msfs(yvar, ypos)
 
-    def msfs_update_heli_controls(self, telem_data):
+    def msfs_update_heli_controls(self, telem_data: BaseTelemetryData):
         if self.is_trimwheel(): return
 
-        ffb_type = telem_data.get("FFBType", "joystick")
+        ffb_type = telem_data.FFBType or "joystick"
         if self._sim_is_msfs():
-            ap_active = telem_data.get("APMaster", 0)
+            ap_active = telem_data.APMaster or 0
         if self._sim_is_xplane():
-            ap_active = telem_data.get("APServos", 0)
+            ap_active = telem_data.APServos or 0
 
         if self._sim_is_msfs():
             if (
@@ -52,23 +53,23 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
         self._spring_handle.name = "cyclic_spring"
         force_trim_active = (
-            telem_data.get("ForceTrimSW", True) if self.custom_ft_sw_var_enabled else True
+            telem_data.get("ForceTrimSW", True) if self.custom_ft_sw_var_enabled else True  # non-zero default: keep .get()
         )  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
         if ffb_type == "joystick":
             assert HapticEffect.device is not None, "HapticEffect.device is None"
             input_data = HapticEffect.device.get_input()
             x, y = input_data.axisXY()
-            telem_data["phys_x"] = x
-            telem_data["phys_y"] = y
+            telem_data.phys_x = x
+            telem_data.phys_y = y
 
             # get controls lock status
-            controls_locked = telem_data.get("ControlsLock", 0) if self.controls_lock_enable else False
+            controls_locked = (telem_data.ControlsLock or 0) if self.controls_lock_enable else False
 
             if self.controls_lock_simvar_invert:
                 controls_locked = not controls_locked
 
             if controls_locked:
-                telem_data["_controls_locked"] = controls_locked
+                telem_data._controls_locked = controls_locked
                 input_data = HapticEffect.device.get_input()
                 phys_x, phys_y = input_data.axisXY()
                 x = round(phys_x * 4096)
@@ -112,7 +113,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                         gate_pos_x=0,
                         gate_neg_x=0
                     ).start()
-                    telem_data["_controls_locked"] = controls_locked
+                    telem_data._controls_locked = controls_locked
                     self._spring_handle.stop()
 
                 return
@@ -160,8 +161,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
                     # force_trim_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
                     phys_x, phys_y = input_data.axisXY()
-                    telem_data["phys_x"] = phys_x
-                    telem_data["phys_y"] = phys_y
+                    telem_data.phys_x = phys_x
+                    telem_data.phys_y = phys_y
                     self.spring_x.set_coefficient(self.cyclic_spring_gain, True)
                     self.spring_y.set_coefficient(self.cyclic_spring_gain, True)
 
@@ -298,8 +299,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                         self.spring_y.set_coefficient(self.cyclic_spring_gain, True)
                         self.ft_was_inactive = False
 
-                telem_data["StickXY"] = [x, y]
-                telem_data["StickXY_offset"] = self.cyclic_center
+                telem_data.StickXY = [x, y]
+                telem_data.StickXY_offset = self.cyclic_center
 
             elif self.spring_mode_is(SpringModeEnum.FORCETRIM) and not force_trim_active:
                 self.ft_was_inactive = True
@@ -327,8 +328,8 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.get_input()
                 phys_x, phys_y = input_data.axisXY()
-                telem_data["phys_x"] = phys_x
-                telem_data["phys_y"] = phys_y
+                telem_data.phys_x = phys_x
+                telem_data.phys_y = phys_y
                 self._update_cyclic_trim(telem_data)
 
                 x_pos = phys_x - self.cyclic_virtual_trim_x_offs
@@ -392,13 +393,13 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                 if not self._spring_handle.started:
                     self._spring_handle.start()
 
-    def _update_cyclic_trim(self, telem_data):
+    def _update_cyclic_trim(self, telem_data: BaseTelemetryData):
         if not self.is_joystick():
             return
         if not self.trim_following:
             return
 
-        if not telem_data.get('ForceTrimSW', True):
+        if not telem_data.get('ForceTrimSW', True):  # non-zero default: keep .get()
             self.cyclic_physical_trim_x_offs = 0
             self.cyclic_physical_trim_y_offs = 0
             self.cyclic_virtual_trim_x_offs = 0
@@ -409,11 +410,11 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         if getattr(self, "cyclic_trim_release_active", 0):
             return
         if self._sim_is_msfs():
-            cyclic_x_trim = telem_data.get("CyclicTrimX", 0)
-            cyclic_y_trim = telem_data.get("CyclicTrimY", 0)
+            cyclic_x_trim = telem_data.CyclicTrimX or 0
+            cyclic_y_trim = telem_data.CyclicTrimY or 0
         if self._sim_is_xplane():
-            cyclic_x_trim = telem_data.get("AileronTrimPct", 0)
-            cyclic_y_trim = telem_data.get("ElevTrimPct", 0)
+            cyclic_x_trim = telem_data.AileronTrimPct or 0
+            cyclic_y_trim = telem_data.ElevTrimPct or 0
         else:
             raise ValueError("Unknown simulator for cyclic trim")
 
@@ -429,6 +430,6 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         self.cyclic_virtual_trim_y_offs = cyclic_y_trim - (cyclic_y_trim * self.joystick_trim_follow_gain_virtual_y)
 
     @override
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.msfs_update_heli_controls(telem_data)

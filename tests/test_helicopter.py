@@ -15,6 +15,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from tests.framework.base import BaseTelemetryEffectTestCase, MockConditionEffect
 from tests.framework.utils import TelemetryDataBuilder
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.msfs_xp.Helicopter import Helicopter
 from telemffb.sim.msfs_xp.MsfsXpHeliControlsMixIn import MsfsXpHeliControlsMixIn
 from telemffb.SettingsManager import SpringModeEnum
@@ -277,6 +278,52 @@ class TestHelicopterCollective(BaseTelemetryEffectTestCase):
         if events:
             assert events[-1][0] == "CUSTOM_COLLECTIVE_AXIS"
 
+    def test_collective_controls_lock_invert_short_circuits_axis_updates(self):
+        """Test collective lock-state inversion triggers lock path and skips normal collective flow."""
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="collective")
+        instance.telemffb_controls_axes = True
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar_invert = True
+
+        telem = self._create_heli_telem()
+        telem["FFBType"] = "collective"
+        telem["ControlsLock"] = 0  # inverted -> treated as locked
+        self.set_telemetry(instance, telem)
+
+        # Detent creation window for collective lock path.
+        self.mock_device._input_data.set_axis(y=0.95)
+
+        instance.msfs_update_collective(telem)
+
+        assert telem.get("_controls_locked", False) is True
+        assert instance.collective_init == 0
+        assert len(self.mock_simconnect.sent_events) == 0
+        assert self.mock_effects["lock_1"].started
+        assert self.mock_effects["lock_1"].detent_config is not None
+        assert self.mock_effects["lock_1"].detent_config["position_y"] == 4000
+        assert self.mock_effects["lock_2"].detent_config["position_y"] == 2500
+
+    def test_collective_controls_lock_started_effect_short_circuits_axis_updates(self):
+        """Test collective lock path exits early when lock effects are already active."""
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="collective")
+        instance.telemffb_controls_axes = True
+        instance.controls_lock_enable = True
+        instance.collective_init = 1
+
+        telem = self._create_heli_telem()
+        telem["FFBType"] = "collective"
+        telem["ControlsLock"] = 1
+        self.set_telemetry(instance, telem)
+
+        self.mock_effects["lock_1"].started = True
+        self.mock_device._input_data.set_axis(y=0.4)
+
+        instance.msfs_update_collective(telem)
+
+        assert telem.get("_controls_locked", False) is True
+        assert len(self.mock_simconnect.sent_events) == 0
+        assert self.mock_effects["lock_1"].started
+
 
 @pytest.mark.unit
 @pytest.mark.msfs
@@ -463,6 +510,53 @@ class TestHelicopterPedals(BaseTelemetryEffectTestCase):
         events = self.mock_simconnect.sent_events
         if events:
             assert events[-1][0] == "CUSTOM_PEDAL_AXIS"
+
+    def test_pedals_controls_lock_invert_short_circuits_axis_updates(self):
+        """Test pedal lock-state inversion triggers lock path and skips normal pedal flow."""
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="pedals")
+        instance.telemffb_controls_axes = True
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar_invert = True
+
+        telem = self._create_heli_telem()
+        telem["FFBType"] = "pedals"
+        telem["ControlsLock"] = 0  # inverted -> treated as locked
+        self.set_telemetry(instance, telem)
+
+        # Detent creation window for pedal lock path.
+        self.mock_device._input_data.set_axis(x=0.0)
+
+        instance.msfs_update_pedals(telem)
+
+        assert telem.get("_controls_locked", False) is True
+        assert instance.pedals_init == 0
+        assert len(self.mock_simconnect.sent_events) == 0
+        assert self.mock_effects["lock_1"].started
+        assert self.mock_effects["lock_1"].detent_config is not None
+        assert self.mock_effects["lock_1"].detent_config["position_x"] == 1500
+        assert self.mock_effects["lock_2"].detent_config["position_x"] == -1500
+
+    def test_pedals_controls_lock_started_effect_short_circuits_axis_updates(self):
+        """Test pedal lock path exits early when lock effects are already active."""
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="pedals")
+        instance.telemffb_controls_axes = True
+        instance.controls_lock_enable = True
+        instance.pedals_init = 1
+
+        telem = self._create_heli_telem()
+        telem["FFBType"] = "pedals"
+        telem["ControlsLock"] = 1
+        self.set_telemetry(instance, telem)
+
+        self.mock_effects["lock_1"].started = True
+        self.mock_device._input_data.set_axis(x=0.2)
+
+        instance.msfs_update_pedals(telem)
+
+        # Pedal lock path only writes `_controls_locked` once the centered detent is engaged.
+        assert telem.get("_controls_locked", False) is False
+        assert len(self.mock_simconnect.sent_events) == 0
+        assert self.mock_effects["lock_1"].started
 
 
 @pytest.mark.unit
@@ -735,7 +829,7 @@ class TestHelicopterTelemetryProcessing(BaseTelemetryEffectTestCase):
         instance._test_sim_is_msfs = True
         instance._test_device_type = "joystick"
         
-        telem = {
+        telem = BaseTelemetryData({
             "SimOnGround": 0,
             "FFBType": "joystick",
             "N": 100.0,
@@ -744,31 +838,31 @@ class TestHelicopterTelemetryProcessing(BaseTelemetryEffectTestCase):
             "Heading": 0.0,
             "Pitch": 0.0,
             "Roll": 0.0
-        }
+        })
         self.set_telemetry(instance, telem)
         
         instance.on_telemetry(telem)
         
         # Should inject helicopter class
-        assert telem.get("AircraftClass") == "Helicopter"
+        assert telem.AircraftClass == "Helicopter"
     
     def test_on_telemetry_returns_early_if_no_rotor_rpm(self):
         """Test that on_telemetry returns early if no rotor RPM data."""
         instance = self.create_aircraft_instance(Helicopter, name="TestHeli")
         instance._test_sim_is_msfs = True
         
-        telem = {
+        telem = BaseTelemetryData({
             "SimOnGround": 0,
             "FFBType": "joystick"
             # Missing "N" (rotor RPM)
-        }
+        })
         self.set_telemetry(instance, telem)
         
         # Should return early without processing
         instance.on_telemetry(telem)
         
         # AircraftClass should not be injected
-        assert telem.get("AircraftClass") is None
+        assert telem.AircraftClass is None
     
     def test_on_telemetry_disables_speedbrake_motion(self):
         """Test that helicopter disables speedbrake motion effects."""
@@ -776,7 +870,7 @@ class TestHelicopterTelemetryProcessing(BaseTelemetryEffectTestCase):
         instance._test_sim_is_msfs = True
         instance.speedbrake_motion_intensity = 1.0  # Set non-zero
         
-        telem = {
+        telem = BaseTelemetryData({
             "SimOnGround": 0,
             "FFBType": "joystick",
             "N": 100.0,
@@ -785,7 +879,7 @@ class TestHelicopterTelemetryProcessing(BaseTelemetryEffectTestCase):
             "Heading": 0.0,
             "Pitch": 0.0,
             "Roll": 0.0
-        }
+        })
         self.set_telemetry(instance, telem)
         
         instance.on_telemetry(telem)

@@ -6,6 +6,7 @@ from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 from telemffb.sim.base.AircraftParamsMixIn import AircraftParamsMixIn
 
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
     '''Pedal spring override and trimming mixin.'''
@@ -29,13 +30,13 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         self.cpO_x = 0
         self.cpO_y = 0
 
-    def ac_update_pedal_trim(self, telem_data):
+    def ac_update_pedal_trim(self, telem_data: BaseTelemetryData):
         """Update the pedal trim effect based on telemetry data and user input.
         This method should be overridden in subclasses to implement specific pedal trim logic.
         """
         pass
 
-    def ac_update_pedal_force_trim(self, telem_data, ft_active=True):
+    def ac_update_pedal_force_trim(self, telem_data: BaseTelemetryData, ft_active=True):
         """
         Update the pedal force-trim state and apply changes to the pedal spring.
         This method inspects the current input state and configured trim buttons, then
@@ -125,7 +126,7 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             return True
         return False
 
-    def ac_override_pedal_spring(self, telem_data):
+    def ac_override_pedal_spring(self, telem_data: BaseTelemetryData):
         if not self.is_pedals(): return
         if self._sim_is_msfs() or self._sim_is_xplane(): # TODO: override ac_override_pedal_spring with a stub in the child class
             return
@@ -153,7 +154,7 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
                 self.spring_x.set_coefficient(spring_coeff)
 
         elif self.spring_mode_is(SpringModeEnum.DYNAMIC) or self.spring_mode_is(SpringModeEnum.CUSTOM):
-            tas = telem_data.get("TAS", 0)
+            tas = telem_data.TAS or 0
 
             vs = self.aircraft_vs_speed
             vne = self.aircraft_vne_speed
@@ -187,7 +188,7 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             if y != 0 and x == 0:
                 self.flag_error("Pedal axis mismatch: Y axis used instead of X. Fix by swapping X/Y in VPConfigurator.")
 
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.verify_pedal_axis()
         self.ac_override_pedal_spring(telem_data)

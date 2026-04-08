@@ -23,6 +23,7 @@ from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.util.conversions import kt2ms, ms2kt
 from telemffb.utils import clamp, PerformanceTracker
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 import logging
@@ -58,25 +59,25 @@ class XAW109Helicopter(Helicopter):
         self.cpO_y = round(self.phys_y * 4096)
 
 
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
 
 
     def on_timeout(self):
         super().on_timeout()
 
-    def msfs_update_heli_controls(self, telem_data):
+    def msfs_update_heli_controls(self, telem_data: BaseTelemetryData):
         super().msfs_update_heli_controls(telem_data)
-        ffb_type = telem_data.get("FFBType", "joystick")
-        ap_active = telem_data.get("APMaster", 0)
+        ffb_type = telem_data.FFBType or "joystick"
+        ap_active = telem_data.APMaster or 0
 
         if ffb_type == "joystick":
             input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
-            telem_data["act_target_roll"] = phys_x
-            telem_data["act_target_pitch"] = phys_y
-            x_rate = telem_data.get("AW109_aileron_trim_rate", 0)
-            y_rate = telem_data.get("AW109_elevator_trim_rate", 0)
+            telem_data.act_target_roll = phys_x
+            telem_data.act_target_pitch = phys_y
+            x_rate = telem_data.AW109_aileron_trim_rate or 0
+            y_rate = telem_data.AW109_elevator_trim_rate or 0
 
             # self.cpO_x += x_rate
             # self.cpO_y += y_rate
@@ -96,21 +97,21 @@ class XAW109Helicopter(Helicopter):
 
 
 
-    def _update_cyclic_trim(self, telem_data):
+    def _update_cyclic_trim(self, telem_data: BaseTelemetryData):
         # Trimming is handled by the AFCS integration - override parent class function
         pass
 
-    def msfs_update_pedals(self, telem_data):
+    def msfs_update_pedals(self, telem_data: BaseTelemetryData):
 
-        if telem_data.get("FFBType") != 'pedals':
+        if telem_data.FFBType != 'pedals':
             return
 
         # if self.telemffb_controls_axes and not self.local_disable_axis_control:
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
-        telem_data['phys_x'] = phys_x
-        telem_data['pedal_position'] = phys_x
-        telem_data['IAS_kt'] = telem_data.get("IAS", 0) * ms2kt
+        telem_data.phys_x = phys_x
+        telem_data.pedal_position = phys_x
+        telem_data.IAS_kt = telem_data.IAS or 0 * ms2kt
         # if self.pedal_ft_release_button:
         #     state = input_data.isButtonPressed(self.pedal_ft_release_button)
         #     self.trigger_xp_event("SPECIAL/buttons/cmd_ft_ped_rel", state=state, type="track")
@@ -144,24 +145,24 @@ class XAW109Helicopter(Helicopter):
             self.running_trim_total = 0
 
 
-        pedal_ft_released = telem_data.get("AW109_ped_force_trim_release_pressed", 0)
+        pedal_ft_released = telem_data.AW109_ped_force_trim_release_pressed or 0
 
 
-        trim_coarse = telem_data.get("AW109_rud_trim_coarse", 0)
-        trim_fine = telem_data.get("AW109_rud_trim_fine", 0)
-        trim_zero = telem_data.get("AW109_rud_trim_zero", 0)
+        trim_coarse = telem_data.AW109_rud_trim_coarse or 0
+        trim_fine = telem_data.AW109_rud_trim_fine or 0
+        trim_zero = telem_data.AW109_rud_trim_zero or 0
 
         trim_total = trim_coarse + trim_zero + trim_fine
         trim_total_abs = abs(trim_total)
-        telem_data['_AW109_rud_trim_total'] = trim_total
-        telem_data['_AW109_rud_trim_total_abs'] = trim_total_abs
+        telem_data._AW109_rud_trim_total = trim_total
+        telem_data._AW109_rud_trim_total_abs = trim_total_abs
 
-        # trim_threshold_high = telem_data.get("AW109_rud_trim_thresh_hi", 0)
+        # trim_threshold_high = telem_data.AW109_rud_trim_thresh_hi or 0
         trim_threshold = self.afcs_threshold_value
-        telem_data['_AW109_rud_trim_threshold'] = trim_threshold
+        telem_data._AW109_rud_trim_threshold = trim_threshold
 
         trim_required_calc = trim_total_abs > trim_threshold
-        telem_data['_AW109_rud_trim_required_calc'] = trim_required_calc
+        telem_data._AW109_rud_trim_required_calc = trim_required_calc
 
         trim_step_size = self.afcs_motion_rate
         trim_step_size = -trim_step_size if trim_total < 0 else trim_step_size
@@ -187,9 +188,9 @@ class XAW109Helicopter(Helicopter):
 
             if trim_required_calc:
                 self.cpO_x += trim_step_size
-                telem_data["_telemffb_moving_rud"] = True
+                telem_data._telemffb_moving_rud = True
             else:
-                telem_data["_telemffb_moving_rud"] = False
+                telem_data._telemffb_moving_rud = False
 
 
 
@@ -207,8 +208,8 @@ class XAW109Helicopter(Helicopter):
         self.last_pedal_x = phys_x
 
 
-    def msfs_update_collective(self, telem_data):
-        if telem_data.get("FFBType") != 'collective':
+    def msfs_update_collective(self, telem_data: BaseTelemetryData):
+        if telem_data.FFBType != 'collective':
             return
 
         self._spring_handle.name = "collective_ap_spring"
@@ -217,18 +218,18 @@ class XAW109Helicopter(Helicopter):
         input_data = HapticEffect.device.get_input()
         # force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
 
-        collective_ft_released = telem_data.get("AW109_col_force_trim_release_pressed", 0)
+        collective_ft_released = telem_data.AW109_col_force_trim_release_pressed or 0
 
-        collective_rate = telem_data.get("AW109_collective_trim_rate", 0)
+        collective_rate = telem_data.AW109_collective_trim_rate or 0
 
-        collective_v_mode = telem_data.get("AW109_collective_mode", 0)
+        collective_v_mode = telem_data.AW109_collective_mode or 0
 
-        collective_afcs_pos = telem_data.get("AW109_collective_ratio", 0)
+        collective_afcs_pos = telem_data.AW109_collective_ratio or 0
         axis_afcs_pos = utils.scale_clamp(collective_afcs_pos, (0,1), (4096, -4096), return_int=True)
 
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
-        telem_data['phys_y'] = phys_y
+        telem_data.phys_y = phys_y
 
         if not self.collective_init:
 

@@ -4,6 +4,7 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 
 import logging
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class EngineRumbleMixIn(AircraftEffectUtilsBase):
@@ -34,17 +35,17 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         # placeholder in case future smoothing/filters are needed.
         self._engine_rumble_last = None
 
-    def ac_update_piston_engine_rumble(self, telem_data):
+    def ac_update_piston_engine_rumble(self, telem_data: BaseTelemetryData):
         if not self.engine_prop_rumble_enabled:
             self.effects.dispose("prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2")
             return
 
         if self._sim_is('DCS'):
-            rpm = telem_data.get("ActualRPM", 0.0)
+            rpm = telem_data.ActualRPM or 0.0
         elif self._sim_is('MSFS') or self._sim_is_xplane():
-            rpm = telem_data.get("PropRPM", 0.0)
+            rpm = telem_data.PropRPM or 0.0
         elif self._sim_is('IL2'):
-            rpm = telem_data.get("RPM", 0.0)
+            rpm = telem_data.RPM or 0.0
         else:
             logging.warning("Unknown sim trying to play Engine Rumble effect")
             rpm = 0.0
@@ -104,7 +105,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
 
         return interpolated_intensity
 
-    def ac_update_jet_engine_rumble(self, telem_data):
+    def ac_update_jet_engine_rumble(self, telem_data: BaseTelemetryData):
         if not self.engine_jet_rumble_enabled or not self.jet_engine_rumble_intensity > 0:
             self.effects.dispose("je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2")
             return
@@ -118,9 +119,9 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         effect_index = 4
         phase_offset = 120
         if self._sim_is_xplane():
-            jet_eng_rpm = telem_data.get("EngPCT", 0)
+            jet_eng_rpm = telem_data.EngPCT or 0
         else:
-            jet_eng_rpm = telem_data.get("EngRPM", 0)
+            jet_eng_rpm = telem_data.EngRPM or 0
         if type(jet_eng_rpm) == list:
             jet_eng_rpm = max(jet_eng_rpm)
 
@@ -141,7 +142,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         # effects["je_rumble_2_2"].periodic(rt_freq2 + r2_modulation, intensity, 90, effect_index, phase=phase_offset+30).start()
         logging.debug(f"JE-M1={r1_modulation}, F1-1={rt_freq}, F1-2={round(rt_freq + r1_modulation,4)} | JE-M2 = {r2_modulation}, F2-1={rt_freq2}, F2-2={round(rt_freq2 + r2_modulation, 4)} ")
 
-    def ac_update_ab_effect(self, telem_data):
+    def ac_update_ab_effect(self, telem_data: BaseTelemetryData):
         if not self.afterburner_effect_intensity or not self.afterburner_effect_enabled:
             self.effects.dispose("ab_rumble_1_1", "ab_rumble_2_1")
             return
@@ -152,7 +153,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
         modulation_neg = 1
         frequency2 = frequency + median_modulation
         precision = 2
-        afterburner_pos = telem_data.get("Afterburner", 0)
+        afterburner_pos = telem_data.Afterburner or 0
         if isinstance(afterburner_pos, list):
             afterburner_pos = max(afterburner_pos)
 
@@ -174,7 +175,7 @@ class EngineRumbleMixIn(AircraftEffectUtilsBase):
             # effects.dispose("ab_rumble_1_2")
             self.effects.dispose("ab_rumble_2_1")
 
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.ac_update_jet_engine_rumble(telem_data)
         

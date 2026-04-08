@@ -24,17 +24,18 @@ from telemffb.sim.msfs_xp.Aircraft import Aircraft
 
 
 import logging
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class GliderAircraft(Aircraft):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
-    def msfs_update_force_trim(self, telem_data, x_axis=True, y_axis=True):
+    def msfs_update_force_trim(self, telem_data: BaseTelemetryData, x_axis=True, y_axis=True):
         if not self.spring_mode_is(SpringModeEnum.CNTR_FT):
             return
 
-        ffb_type = telem_data.get("FFBType", "joystick")
+        ffb_type = telem_data.FFBType or "joystick"
         offs_x = 0
         offs_y = 0
         if ffb_type != "joystick":
@@ -107,17 +108,17 @@ class GliderAircraft(Aircraft):
             logging.info("Trim Reset Pressed")
             return
 
-        telem_data["StickXY"] = [x, y]
-        telem_data["StickXY_offset"] = self.stick_center
+        telem_data.StickXY = [x, y]
+        telem_data.StickXY_offset = self.stick_center
         self.force_trim_x_offset = self.stick_center[0]
         self.force_trim_y_offset = self.stick_center[1]
 
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         pass
-        if telem_data.get("N") == None:
+        if telem_data.N is None:
             return
-        telem_data["AircraftClass"] = "GliderAircraft"  # inject aircraft class into telemetry
+        telem_data.AircraftClass = "GliderAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
 

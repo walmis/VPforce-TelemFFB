@@ -27,26 +27,27 @@ from telemffb.utils import clamp, PerformanceTracker
 
 import logging
 import time
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class TaogH500Helicopter(Helicopter):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
     @override
-    def msfs_send_heli_pedal_pos(self, xvar, xpos, telem_data):
-        if not telem_data.get("TaogH500PedalLock", 0):
+    def msfs_send_heli_pedal_pos(self, xvar, xpos, telem_data: BaseTelemetryData):
+        if not (telem_data.TaogH500PedalLock or 0):
             self._simconnect.send_event_to_msfs("L:HELICOPTER_Pedals_Position", xpos)
-            if not telem_data.get("TaogH500TRDamaged", 0):
+            if not (telem_data.TaogH500TRDamaged or 0):
                 self._simconnect.send_event_to_msfs(xvar, xpos)
 
     @override
-    def msfs_send_heli_cyclic_pos(self, xvar, xpos, yvar, ypos, telem_data):
-        if not telem_data.get("TaogH500CyclicFriction", 0):
+    def msfs_send_heli_cyclic_pos(self, xvar, xpos, yvar, ypos, telem_data: BaseTelemetryData):
+        if not (telem_data.TaogH500CyclicFriction or 0):
             self._simconnect.send_event_to_msfs(xvar, xpos)
             self._simconnect.send_event_to_msfs(yvar, ypos)
 
 
     @override
-    def msfs_send_heli_collective_pos(self, yvar, ypos, telem_data):
-        if not telem_data.get("TaogH500CollectiveFriction", 0):
+    def msfs_send_heli_collective_pos(self, yvar, ypos, telem_data: BaseTelemetryData):
+        if not (telem_data.TaogH500CollectiveFriction or 0):
             self._simconnect.send_event_to_msfs(yvar, ypos)

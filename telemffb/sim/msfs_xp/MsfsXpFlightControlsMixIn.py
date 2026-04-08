@@ -13,6 +13,7 @@ from telemffb.sim.msfs_xp.MsfsXpFBWFlightControlsMixIn import MsfsXpFBWFlightCon
 from telemffb.util.Vector import Vector, Vector2D
 from telemffb.util.conversions import P0, deg, math, ms2kt, rad, std_air_pressure, vsound
 from telemffb.utils import clamp
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlightControlsMixIn, AoAEffectsMixIn):
     """Mixin for MSFS and X-Plane specific flight control handling."""
@@ -88,7 +89,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self.const_force.stop()
 
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         """Process a new telemetry update.
 
         This method is invoked whenever new telemetry is available from the
@@ -116,17 +117,17 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
     def ac_modify_game_spring(self):
         """This function is not used in MSFS/X-Plane mixin."""
 
-    def _calculate_airspeeds(self, telem_data, incidence_vec):
+    def _calculate_airspeeds(self, telem_data: BaseTelemetryData, incidence_vec):
         """Calculate and store airspeed values in telemetry data."""
-        _airspeed = telem_data["IAS"]
-        telem_data["TAS"] = _airspeed
-        telem_data["TAS_kt"] = _airspeed * ms2kt
-        telem_data["IAS_kt"] = telem_data["IAS"] * ms2kt
-        telem_data["AccBody_ms"] = [x * 9.80665 for x in telem_data["AccBody"]]
+        _airspeed = telem_data.IAS
+        telem_data.TAS = _airspeed
+        telem_data.TAS_kt = _airspeed * ms2kt
+        telem_data.IAS_kt = telem_data.IAS * ms2kt
+        telem_data.AccBody_ms = [x * 9.80665 for x in telem_data.AccBody]
         return _airspeed
 
 
-    def _calculate_angles(self, telem_data, incidence_vec):
+    def _calculate_angles(self, telem_data: BaseTelemetryData, incidence_vec):
         """Calculate angle-of-attack (AoA), slip angle and rudder deflection.
 
         Parameters
@@ -149,19 +150,19 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             - aoa is the angle-of-attack in degrees (negative sign preserved
               to match existing code behaviour).
         """
-        rudder_angle = telem_data["RudderDefl"] * rad
+        rudder_angle = telem_data.RudderDefl * rad
         if self._sim_is_xplane():
             rudder_angle = -rudder_angle
 
         slip_angle = atan2(incidence_vec.x, incidence_vec.z)
-        telem_data["SideSlip"] = slip_angle * deg
+        telem_data.SideSlip = slip_angle * deg
 
         _aoa = -atan2(incidence_vec.y, incidence_vec.z) * deg
-        telem_data["AoA"] = _aoa
+        telem_data.AoA = _aoa
 
         return rudder_angle, slip_angle, _aoa
 
-    def _calculate_prop_airflow(self, telem_data, _airspeed, incidence_vec):
+    def _calculate_prop_airflow(self, telem_data: BaseTelemetryData, _airspeed, incidence_vec):
         """Calculate propeller-induced airflow velocity and elevator AoA.
 
         Parameters
@@ -181,28 +182,28 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         float
             The computed propeller-induced air velocity (m/s).
         """
-        _prop_thrust = telem_data.get("PropThrust", 0)
+        _prop_thrust = telem_data.PropThrust or 0
         if isinstance(_prop_thrust, list):
             _prop_thrust = max(_prop_thrust)
         if _prop_thrust < 0:
             _prop_thrust = 0
 
         _prop_air_vel = sqrt(
-            2 * _prop_thrust / (telem_data["AirDensity"] * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed**2
+            2 * _prop_thrust / (telem_data.AirDensity * (math.pi * (self.prop_diameter / 2) ** 2)) + _airspeed**2
         )
 
-        telem_data["_prop_thrust"] = _prop_thrust
+        telem_data._prop_thrust = _prop_thrust
 
         if abs(incidence_vec.y) > 0.5 or _prop_air_vel > 1:
             _elevator_aoa = atan2(-incidence_vec.y, _prop_air_vel) * deg
         else:
             _elevator_aoa = 0
-        telem_data["_elevator_aoa"] = _elevator_aoa
+        telem_data._elevator_aoa = _elevator_aoa
 
-        telem_data["_prop_air_vel"] = _prop_air_vel
+        telem_data._prop_air_vel = _prop_air_vel
         return _prop_air_vel
 
-    def _calculate_dynamic_pressures(self, telem_data, _prop_air_vel):
+    def _calculate_dynamic_pressures(self, telem_data: BaseTelemetryData, _prop_air_vel):
         """Calculate scaled dynamic pressures used to compute FFB gains.
 
         Parameters
@@ -221,20 +222,20 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         """
         _elev_dyn_pressure = (
             utils.mix(
-                telem_data["DynPressure"],
-                0.5 * telem_data["AirDensity"] * _prop_air_vel**2,
+                telem_data.DynPressure,
+                0.5 * telem_data.AirDensity * _prop_air_vel**2,
                 self.elevator_prop_flow_ratio,
             )
             * self.__dyn_pressure_scale
         )
-        telem_data["_elev_dyn_pressure"] = _elev_dyn_pressure
+        telem_data._elev_dyn_pressure = _elev_dyn_pressure
 
-        _dyn_pressure = telem_data["DynPressure"] * self.__dyn_pressure_scale
+        _dyn_pressure = telem_data.DynPressure * self.__dyn_pressure_scale
 
         _rud_dyn_pressure = (
             utils.mix(
-                telem_data["DynPressure"],
-                0.5 * telem_data["AirDensity"] * _prop_air_vel**2,
+                telem_data.DynPressure,
+                0.5 * telem_data.AirDensity * _prop_air_vel**2,
                 self.rudder_prop_flow_ratio,
             )
             * self.__dyn_pressure_scale
@@ -242,7 +243,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         return _elev_dyn_pressure, _dyn_pressure, _rud_dyn_pressure
 
-    def _calculate_vne_and_gains(self, telem_data):
+    def _calculate_vne_and_gains(self, telem_data: BaseTelemetryData):
         """Calculate Vne (never-exceed airspeed) and set aerodynamic gains.
 
         The method computes an estimated Vne based on simulator-supplied
@@ -262,29 +263,29 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             (vne, Q_gain) where vne is the computed Vne in m/s and Q_gain is a
             normalization factor applied to dynamic pressure values.
         """
-        if telem_data["src"] == "XPLANE":
-            vne = telem_data.get("Vne")
-            vs0 = telem_data.get("Vso")
+        if telem_data.src == "XPLANE":
+            vne = telem_data.Vne
+            vs0 = telem_data.Vso
         else:
-            vc, vs0, vs1 = telem_data.get("DesignSpeed")
-            telem_data["Vc_kt"] = vc * ms2kt
+            vc, vs0, vs1 = telem_data.DesignSpeed
+            telem_data.Vc_kt = vc * ms2kt
             Tvne = vc * 1.4
             qv = 0.5 * std_air_pressure * (Tvne**2)
             kmNs = ((qv / P0) + 1) ** (2 / 7)
             vne = vsound * sqrt(5 * (kmNs - 1))
 
-        telem_data["Vne_ms_calc"] = vne
+        telem_data.Vne_ms_calc = vne
         if isinstance(self.vne_override, (float, int)):
             if self.vne_override:
                 vne = self.vne_override
 
-        telem_data["Vne_kt"] = vne * ms2kt
+        telem_data.Vne_kt = vne * ms2kt
 
         Qvne = 0.5 * std_air_pressure * vne**2
-        telem_data["Qvne"] = Qvne * self.__dyn_pressure_scale
+        telem_data.Qvne = Qvne * self.__dyn_pressure_scale
 
         Q_gain = 1 / (Qvne * self.__dyn_pressure_scale)
-        telem_data["Qvc_gain"] = Q_gain
+        telem_data.Qvc_gain = Q_gain
 
         self.elevator_gain = Q_gain
         self.aileron_gain = Q_gain
@@ -292,7 +293,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         return vne, Q_gain
 
-    def _calculate_control_coefficients(self, telem_data, _elev_dyn_pressure, _dyn_pressure, _rud_dyn_pressure, _slip_gain, g_force):
+    def _calculate_control_coefficients(self, telem_data: BaseTelemetryData, _elev_dyn_pressure, _dyn_pressure, _rud_dyn_pressure, _slip_gain, g_force):
         """Calculate force coefficients for elevator, aileron and rudder.
 
         Parameters
@@ -318,7 +319,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         """
         # Elevator droop effect
         _elevator_droop_term = self.elevator_droop_moment * g_force / (1 + _elev_dyn_pressure)
-        telem_data["_elevator_droop_term"] = _elevator_droop_term
+        telem_data._elevator_droop_term = _elevator_droop_term
 
         # Calculate raw coefficients
         aileron_coeff = _dyn_pressure * self.aileron_gain * _slip_gain
@@ -346,13 +347,13 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             aileron_coeff = utils.expocurve(aileron_coeff, self.aileron_expo)
             rudder_coeff = utils.expocurve(rudder_coeff, self.rudder_expo)
 
-        telem_data["_elev_coeff"] = elevator_coeff
-        telem_data["_aile_coeff"] = aileron_coeff
-        telem_data["_rud_coeff"] = rudder_coeff
+        telem_data._elev_coeff = elevator_coeff
+        telem_data._aile_coeff = aileron_coeff
+        telem_data._rud_coeff = rudder_coeff
 
         return elevator_coeff, aileron_coeff, rudder_coeff, _elevator_droop_term
 
-    def _calculate_g_term(self, telem_data):
+    def _calculate_g_term(self, telem_data: BaseTelemetryData):
         """Calculate the term used to translate body-acceleration to a pitch bias.
 
         Reads input device axis scaling to weight the G effect by how much the
@@ -373,12 +374,12 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         input_data = HapticEffect.device.get_input()
         dx, dy = input_data.CP_scaled_axisXY()
-        _G_term = self.g_force_gain * telem_data["AccBody"][1]
+        _G_term = self.g_force_gain * telem_data.AccBody[1]
         _G_term = _G_term * abs(dy)
-        telem_data["_G_term"] = _G_term
+        telem_data._G_term = _G_term
         return _G_term
 
-    def _calculate_rudder_force(self, telem_data, slip_angle, rudder_angle, _dyn_pressure, _slip_gain, vne):
+    def _calculate_rudder_force(self, telem_data: BaseTelemetryData, slip_angle, rudder_angle, _dyn_pressure, _slip_gain, vne):
         """Calculate rudder feedback force based on side-slip and rudder deflection.
 
         Parameters
@@ -407,13 +408,13 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
         rud_force = self.rudder_force_dampener.update(rud_force, derivative_hz=5, derivative_k=0.015)
 
-        IAS = telem_data["IAS"]
+        IAS = telem_data.IAS
         speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
         rud_force = rud_force * speed_factor
 
         return rud_force
 
-    def _calculate_joystick_trim_offsets(self, telem_data, ap_active):
+    def _calculate_joystick_trim_offsets(self, telem_data: BaseTelemetryData, ap_active):
         """Calculate trim-following offsets for joystick axes.
 
         Parameters
@@ -437,8 +438,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         if not (self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control):
             return 0, 0, 0, 0
 
-        elev_trim = telem_data.get("ElevTrimPct", 0)
-        aileron_trim = telem_data.get("AileronTrimPct", 0)
+        elev_trim = telem_data.ElevTrimPct or 0
+        aileron_trim = telem_data.AileronTrimPct or 0
 
         aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
         virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
@@ -451,11 +452,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         if self.ap_following and ap_active:
             if self._sim_is_msfs():
-                aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
+                aileron_pos = telem_data.AileronDeflPctLR or (0, 0)
                 aileron_pos = aileron_pos[0]
                 aileron_pos = self.aileron_pos_dampener.update(aileron_pos, derivative_hz=5, derivative_k=0.15)
             elif self._sim_is_xplane():
-                aileron_pos = telem_data.get("APRollServo", 0)
+                aileron_pos = telem_data.APRollServo or 0
             else:
                 aileron_pos = 0
             phys_stick_x_offs = int(aileron_pos * 4096)
@@ -464,7 +465,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         return phys_stick_x_offs, virtual_stick_x_offs, phys_stick_y_offs, virtual_stick_y_offs
 
-    def _send_joystick_axis_commands(self, telem_data, virtual_stick_x_offs, virtual_stick_y_offs):
+    def _send_joystick_axis_commands(self, telem_data: BaseTelemetryData, virtual_stick_x_offs, virtual_stick_y_offs):
         """Send axis control commands to the simulator for a physical joystick.
 
         Parameters
@@ -486,8 +487,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
-        telem_data["phys_x"] = phys_x
-        telem_data["phys_y"] = phys_y
+        telem_data.phys_x = phys_x
+        telem_data.phys_y = phys_y
 
         x_pos = phys_x - virtual_stick_x_offs
         y_pos = phys_y - virtual_stick_y_offs
@@ -529,14 +530,14 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
             self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
 
-    def _calculate_aoa_offset(self, telem_data, _aoa, force_trim_y_offset, phys_stick_y_offs, IAS, vne):
+    def _calculate_aoa_offset(self, telem_data: BaseTelemetryData, _aoa, force_trim_y_offset, phys_stick_y_offs, IAS, vne):
         """Calculate Y offset for AoA effect."""
         if (
             self.aoa_effect_enabled
-            and telem_data.get("ElevDeflPct", 0) != 0
-            and not max(telem_data.get("WeightOnWheels"))
+            and (telem_data.ElevDeflPct or 0) != 0
+            and not max(telem_data.WeightOnWheels)
         ):
-            tot = telem_data["ElevDefl"] / telem_data["ElevDeflPct"]
+            tot = telem_data.ElevDefl / telem_data.ElevDeflPct
             speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
             y_offs = _aoa / tot
             y_offs = y_offs + force_trim_y_offset + (phys_stick_y_offs / 4096)
@@ -549,37 +550,37 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         return y_offs
 
-    def _calculate_joystick_spring_coefficients(self, telem_data, elevator_coeff, aileron_coeff, base_elev_coeff, base_ailer_coeff):
+    def _calculate_joystick_spring_coefficients(self, telem_data: BaseTelemetryData, elevator_coeff, aileron_coeff, base_elev_coeff, base_ailer_coeff):
         """Calculate spring coefficients for joystick axes."""
         max_coeff_y = int(4096 * self.max_elevator_coeff)
         realtime_coeff_y = int(4096 * elevator_coeff)
         ec = int(utils.scale_clamp(realtime_coeff_y, (base_elev_coeff, 4096), (base_elev_coeff, max_coeff_y)))
 
         pct_max_e = ec / max_coeff_y
-        telem_data["_pct_max_e"] = pct_max_e
+        telem_data._pct_max_e = pct_max_e
         self._ipc_telem["_pct_max_e"] = pct_max_e
         logging.debug(f"Elev Coef: {ec}")
-        telem_data["_ec"] = ec
+        telem_data._ec = ec
 
         max_coeff_x = int(4096 * self.max_aileron_coeff)
         realtime_coeff_x = int(4096 * aileron_coeff)
         ac = int(utils.scale_clamp(realtime_coeff_x, (base_ailer_coeff, 4096), (base_ailer_coeff, max_coeff_x)))
 
         pct_max_a = ac / max_coeff_x
-        telem_data["_pct_max_a"] = pct_max_a
+        telem_data._pct_max_a = pct_max_a
         self._ipc_telem["_pct_max_a"] = pct_max_a
-        telem_data["_ac"] = ac
+        telem_data._ac = ac
         logging.debug(f"Ailer Coef: {ac}")
 
         return ec, ac
 
-    def _apply_joystick_constant_forces(self, telem_data, _elevator_droop_term, _G_term):
+    def _apply_joystick_constant_forces(self, telem_data: BaseTelemetryData, _elevator_droop_term, _G_term):
         """Apply constant forces (droop, G-forces, lateral) to joystick."""
         cf_pitch = -_elevator_droop_term - _G_term
         cf_pitch = clamp(cf_pitch, -1.0, 1.0)
 
         if self.uncoordinated_turn_effect_enabled:
-            _side_accel = -telem_data["AccBody"][0] * self.lateral_force_gain
+            _side_accel = -telem_data.AccBody[0] * self.lateral_force_gain
         else:
             _side_accel = 0
 
@@ -595,7 +596,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
              attackTime=1000,          # 1000ms attack
          ).start()
 
-    def _update_joystick_controls(self, telem_data, ap_active, elevator_coeff, aileron_coeff, 
+    def _update_joystick_controls(self, telem_data: BaseTelemetryData, ap_active, elevator_coeff, aileron_coeff, 
                                    base_elev_coeff, base_ailer_coeff, _aoa, _elevator_droop_term, 
                                    _G_term, force_trim_y_offset, IAS, vne, controls_locked):
         """Handle all joystick-specific FFB updates."""
@@ -615,7 +616,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self.spring_x.set_coefficient(ac)
 
         if controls_locked:
-            telem_data["_controls_locked"] = controls_locked
+            telem_data._controls_locked = controls_locked
             input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
             x = round(phys_x * 4096)
@@ -676,26 +677,26 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         self._spring_handle.start()
 
-    def _calculate_rudder_trim_offsets(self, telem_data):
+    def _calculate_rudder_trim_offsets(self, telem_data: BaseTelemetryData):
         """Calculate trim following offsets for rudder pedals."""
         if not (self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control):
             return 0, 0
 
-        rudder_trim = telem_data.get("RudderTrimPct", 0)
+        rudder_trim = telem_data.RudderTrimPct or 0
         rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
         virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
         phys_rudder_x_offs = int(rudder_trim * 4096)
 
         return phys_rudder_x_offs, virtual_rudder_x_offs
 
-    def _calculate_rudder_spring_coefficient(self, telem_data, rudder_coeff, base_rudder_coeff):
+    def _calculate_rudder_spring_coefficient(self, telem_data: BaseTelemetryData, rudder_coeff, base_rudder_coeff):
         """Calculate spring coefficient for rudder pedals."""
         if self.spring_mode_is(SpringModeEnum.ADVANCED):
             if not self.adv_spr_gains:
                 self.flag_error("Please open and configure the advanced spring gain settings")
                 rudder_coeff = 0
             else:
-                gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.get("IAS", 0))
+                gains = utils.get_gain_from_speed(self.adv_spr_gains, telem_data.IAS or 0)
                 self.spring_x.set_coefficient(gains.get("x", 0))
                 rudder_coeff = gains.get("x", 0)
         else:
@@ -704,35 +705,35 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             rudder_coeff = int(utils.scale_clamp(realtime_coeff_x, (base_rudder_coeff, 4096), (base_rudder_coeff, max_coeff_x)))
 
             pct_max_r = rudder_coeff / max_coeff_x
-            telem_data["_pct_max_r"] = pct_max_r
+            telem_data._pct_max_r = pct_max_r
             self._ipc_telem["_pct_max_r"] = pct_max_r
-            telem_data["_rc"] = rudder_coeff
+            telem_data._rc = rudder_coeff
             self.spring_x.set_coefficient(rudder_coeff)
 
         return rudder_coeff
     
     @override
-    def msfs_update_steering_friction_effect(self, telem_data):
+    def msfs_update_steering_friction_effect(self, telem_data: BaseTelemetryData):
         pass
 
-    def _apply_steering_friction(self, telem_data, phys_rudder_x_offs, rudder_coeff):
+    def _apply_steering_friction(self, telem_data: BaseTelemetryData, phys_rudder_x_offs, rudder_coeff):
         """Apply steering friction effect when on ground."""
         if not self.steering_friction:
             return
 
-        on_ground = telem_data.get("SimOnGround", 0)
-        wos = telem_data.get("WeightOnWheels", [0])[0]
-        surface = telem_data.get("SurfaceType", 0)
+        on_ground = telem_data.SimOnGround or 0
+        wos = (telem_data.WeightOnWheels or [0])[0]
+        surface = telem_data.SurfaceType or 0
 
         if on_ground and (wos or surface == "Water"):
             rudder_angle = 30  # assumed rudder travel
             dynamic_angle = phys_rudder_x_offs * rudder_angle / 4096
             dynamic_force = rudder_coeff / 4096
-            csa = telem_data.get("CenterSteerAnglePct", 0)
+            csa = telem_data.CenterSteerAnglePct or 0
             steer_angle = csa * rudder_angle
             steer_force = self.steering_friction_spring / 40
 
-            wr = telem_data.get("WaterRudderExt", 0)
+            wr = telem_data.WaterRudderExt or 0
             if surface == "Water":
                 steer_force *= wr
 
@@ -743,7 +744,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             self.spring_x.set_coefficient(result_mag, True)
             self.spring_x.set_offset(result_angle_percent / rudder_angle)
 
-    def _send_rudder_axis_commands(self, telem_data, virtual_rudder_x_offs):
+    def _send_rudder_axis_commands(self, telem_data: BaseTelemetryData, virtual_rudder_x_offs):
         """Send axis control commands to the simulator for rudder pedals."""
         if not (self.telemffb_controls_axes and not self.local_disable_axis_control):
             return
@@ -752,7 +753,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
-        telem_data["phys_x"] = phys_x
+        telem_data.phys_x = phys_x
         x_pos = phys_x - virtual_rudder_x_offs
         x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
 
@@ -777,7 +778,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
             self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
-    def _update_pedals_controls(self, telem_data, rudder_coeff, base_rudder_coeff, rud_force, controls_locked):
+    def _update_pedals_controls(self, telem_data: BaseTelemetryData, rudder_coeff, base_rudder_coeff, rud_force, controls_locked):
         """Handle all pedals-specific FFB updates."""
 
         phys_rudder_x_offs, virtual_rudder_x_offs = self._calculate_rudder_trim_offsets(telem_data)
@@ -842,7 +843,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self._spring_handle.start()
     
 
-    def msfs_update_flight_controls(self, telem_data):
+    def msfs_update_flight_controls(self, telem_data: BaseTelemetryData):
         """
         Main method for updating flight controls. 
         Calculations loosely based on FlightGear FFB:
@@ -853,13 +854,13 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         
         # Determine autopilot state
         if self._sim_is_msfs():
-            ap_active = telem_data.get("APMaster", 0)
+            ap_active = telem_data.APMaster or 0
         elif self._sim_is_xplane():
-            ap_active = telem_data.get("APServos", 0)
+            ap_active = telem_data.APServos or 0
         else:
             return
 
-        ffb_type = telem_data.get("FFBType", "joystick")
+        ffb_type = telem_data.FFBType or "joystick"
 
 
         if self._sim_is_msfs():
@@ -868,7 +869,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
                 self._simconnect._resubscribe()
 
         # get controls lock status
-        controls_locked = telem_data.get("ControlsLock", 0) if self.controls_lock_enable else False
+        controls_locked = (telem_data.ControlsLock or 0) if self.controls_lock_enable else False
 
         if self.controls_lock_simvar_invert:
             controls_locked = not controls_locked
@@ -878,12 +879,12 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
 
         # Early exit conditions for FBW or helicopter mode
-        if self.spring_mode_is(SpringModeEnum.FBW) or telem_data.get("ACisFBW", 0):
+        if self.spring_mode_is(SpringModeEnum.FBW) or telem_data.ACisFBW:
             logging.debug("FBW Setting enabled, running fbw_flight_controls")
             self.update_fbw_flight_controls(telem_data)
             return
 
-        if telem_data.get("AircraftClass") == "Helicopter":
+        if telem_data.AircraftClass == "Helicopter":
             logging.debug("Aircraft is Helicopter, aborting update_flight_controls")
             return
 
@@ -909,12 +910,12 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             )
 
         # Calculate aerodynamic values
-        incidence_vec = Vector(telem_data["Incidence"])
+        incidence_vec = Vector(telem_data.Incidence)
         force_trim_x_offset = self.force_trim_x_offset
         force_trim_y_offset = self.force_trim_y_offset
         
         _airspeed = self._calculate_airspeeds(telem_data, incidence_vec)
-        IAS = telem_data["IAS"]
+        IAS = telem_data.IAS
         
         rudder_angle, slip_angle, _aoa = self._calculate_angles(telem_data, incidence_vec)
         _prop_air_vel = self._calculate_prop_airflow(telem_data, _airspeed, incidence_vec)
@@ -927,9 +928,9 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         
         # Calculate slip gain
         _slip_gain = 1.0 - self.slip_gain * abs(sin(slip_angle))
-        telem_data["_slip_gain"] = _slip_gain
+        telem_data._slip_gain = _slip_gain
         
-        g_force = telem_data["G"]
+        g_force = telem_data.G
         
         # Calculate control surface coefficients
         elevator_coeff, aileron_coeff, rudder_coeff, _elevator_droop_term = \

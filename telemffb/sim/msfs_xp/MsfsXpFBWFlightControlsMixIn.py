@@ -10,6 +10,7 @@ from telemffb.utils import clamp
 
 
 import logging
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
@@ -68,14 +69,14 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         self._spring_handle.stop()    
 
 
-    def update_fbw_flight_controls(self, telem_data, ap=False):
+    def update_fbw_flight_controls(self, telem_data: BaseTelemetryData, ap=False):
         ap_send_flag_x = True
         ap_send_flag_y = True
-        ffb_type = telem_data.get("FFBType", "joystick")
+        ffb_type = telem_data.FFBType or "joystick"
         if self._sim_is_msfs():
-            ap_active = telem_data.get("APMaster", 0)
+            ap_active = telem_data.APMaster or 0
         elif self._sim_is_xplane():
-            ap_active = telem_data.get("APServos", 0)
+            ap_active = telem_data.APServos or 0
         else:
             ap_active = 0
 
@@ -86,12 +87,12 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
 
             if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
 
-                elev_trim = telem_data.get("ElevTrimPct", 0)
+                elev_trim = telem_data.ElevTrimPct or 0
 
                 elev_trim = self.elev_trim_dampener.update(elev_trim, derivative_hz=5, derivative_k=0.15)
 
                 # print(f"raw:{raw_elev_trim}, smooth:{elev_trim}")
-                aileron_trim = telem_data.get("AileronTrimPct", 0)
+                aileron_trim = telem_data.AileronTrimPct or 0
 
                 aileron_trim = clamp(aileron_trim * self.joystick_trim_follow_gain_physical_x, -1, 1)
                 virtual_stick_x_offs = aileron_trim - (aileron_trim * self.joystick_trim_follow_gain_virtual_x)
@@ -105,14 +106,14 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     input_data = HapticEffect.device.get_input()
                     phys_x, phys_y = input_data.axisXY()
                     if self._sim_is_msfs():
-                        aileron_pos = telem_data.get("AileronDeflPctLR", (0, 0))
-                        telem_data["phys_x_aileron"] = aileron_pos[0]
+                        aileron_pos = telem_data.AileronDeflPctLR or (0, 0)
+                        telem_data.phys_x_aileron = aileron_pos[0]
                         if self.joystick_ap_y_follow_axis:
-                            elevator_pos = telem_data.get("ElevDeflPct", 0)
+                            elevator_pos = telem_data.ElevDeflPct or 0
                         else:
-                            elevator_pos = telem_data.get("ElevTrimPct", 0)
+                            elevator_pos = telem_data.ElevTrimPct or 0
 
-                        elevator_pos = telem_data.get("ElevTrimPct", 0)
+                        elevator_pos = telem_data.ElevTrimPct or 0
                         elevator_pos = self.elev_trim_dampener.update(
                             elevator_pos, derivative_hz=5, derivative_k=0.15
                         )
@@ -120,8 +121,8 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                         virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_trim_follow_gain_virtual_y)
                         phys_stick_y_offs = int(elevator_pos * 4096)
 
-                        if isinstance(aileron_pos, list):
-                            aileron_pos = aileron_pos[0]
+                        if isinstance(aileron_pos, (list, tuple)):
+                            aileron_pos = aileron_pos[0] if aileron_pos else 0
 
                         aileron_pos = clamp(aileron_pos * self.joystick_ap_follow_gain_physical_x, -1, 1)
 
@@ -134,15 +135,15 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                             True if abs(phys_y - elevator_pos) > self.joystick_ap_y_follow_deadzone else False
                         )
 
-                        telem_data["phys_x_send_flag"] = ap_send_flag_x
-                        telem_data["phys_y_send_flag"] = ap_send_flag_y
+                        telem_data.phys_x_send_flag = ap_send_flag_x
+                        telem_data.phys_y_send_flag = ap_send_flag_y
 
                     if self._sim_is_xplane():
-                        aileron_pos = telem_data.get("APRollServo", 0)
+                        aileron_pos = telem_data.APRollServo or 0
                         aileron_pos = self.aileron_pos_dampener.update(
                             aileron_pos, derivative_hz=5, derivative_k=0.15
                         )
-                        elevator_pos = telem_data.get("APPitchServo", 0)
+                        elevator_pos = telem_data.APPitchServo or 0
                         phys_stick_y_offs = int(elevator_pos * 4096)
 
                     phys_stick_x_offs = int(aileron_pos * 4096)
@@ -160,12 +161,12 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.get_input()
                 phys_x, phys_y = input_data.axisXY()
-                telem_data["phys_x"] = phys_x
-                telem_data["phys_y"] = phys_y
+                telem_data.phys_x = phys_x
+                telem_data.phys_y = phys_y
                 x_pos = phys_x - virtual_stick_x_offs
                 y_pos = phys_y - virtual_stick_y_offs
-                telem_data["phys_x_pos"] = x_pos
-                telem_data["phys_y_pos"] = y_pos
+                telem_data.phys_x_pos = x_pos
+                telem_data.phys_y_pos = y_pos
                 x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
                 y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
                 if self._sim_is_xplane():
@@ -230,7 +231,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
         elif ffb_type == "pedals":
             if self.trim_following and self.telemffb_controls_axes and not self.local_disable_axis_control:
 
-                rudder_trim = telem_data.get("RudderTrimPct", 0)
+                rudder_trim = telem_data.RudderTrimPct or 0
 
                 rudder_trim = clamp(rudder_trim * self.rudder_trim_follow_gain_physical_x, -1, 1)
                 virtual_rudder_x_offs = rudder_trim - (rudder_trim * self.rudder_trim_follow_gain_virtual_x)
@@ -243,9 +244,9 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                     phys_x, phys_y = input_data.axisXY()
                     rudder_pos = None
                     if self._sim_is_msfs():
-                        rudder_pos = telem_data.get("RudderDeflPct", 0)
+                        rudder_pos = telem_data.RudderDeflPct or 0
                     if self._sim_is_xplane():
-                        rudder_pos = telem_data.get("APYawServo", 0)
+                        rudder_pos = telem_data.APYawServo or 0
 
                     rudder_pos = self.rudder_pos_dampener.update(
                         rudder_pos, derivative_hz=5, derivative_k=0.15
@@ -273,7 +274,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
                 input_data = HapticEffect.device.get_input()
                 phys_x, phys_y = input_data.axisXY()
-                telem_data["phys_x"] = phys_x
+                telem_data.phys_x = phys_x
 
                 x_pos = phys_x - virtual_rudder_x_offs
                 x_scale = clamp(self.rudder_x_axis_scale, 0, 1)

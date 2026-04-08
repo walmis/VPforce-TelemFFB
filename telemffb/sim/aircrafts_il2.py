@@ -47,6 +47,7 @@ from .aircraft_base import AircraftBase
 import json
 from telemffb.SettingsManager import GEffectModeEnum, SpringModeEnum
 from telemffb.util import conversions as conv
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 # unit conversions (to m/s)
 knots = conv.kt2ms
@@ -186,11 +187,11 @@ class Aircraft(AircraftBase):
             self.effects["il2_rockets"].stop()
 
     @override
-    def ac_update_runway_rumble(self, telem_data):
+    def ac_update_runway_rumble(self, telem_data: BaseTelemetryData):
         if not self.il2_shake_master: return
         if not self.il2_enable_runway_rumble: return
 
-        if telem_data.get("TAS") > 1.0 and telem_data.get("AGL") < 10.0 and utils.average(telem_data.get("GearPos")) == 1:
+        if telem_data.TAS > 1.0 and telem_data.AGL < 10.0 and utils.average(telem_data.GearPos) == 1:
             self.runway_rumble_intensity = self.il2_runway_rumble_intensity
             super().ac_update_runway_rumble(telem_data)
         else:
@@ -203,8 +204,8 @@ class Aircraft(AircraftBase):
         if not self.il2_enable_buffet: return
 
         direction = 90 if self.is_pedals() else 0
-        freq = telem_data.get("BuffetFrequency", 0)
-        amp = utils.clamp(telem_data.get("BuffetAmplitude", 0) * self.il2_buffeting_factor, 0.0, 1.0)
+        freq = telem_data.BuffetFrequency or 0
+        amp = utils.clamp((telem_data.BuffetAmplitude or 0) * self.il2_buffeting_factor, 0.0, 1.0)
         amp2 = utils.clamp(amp * 1.4, 0, 1)
         if amp:
             self.effects["il2_buffet"].periodic(freq, amp, direction, effect_type=EFFECT_SINE).start()
@@ -213,13 +214,13 @@ class Aircraft(AircraftBase):
         else:
             self.effects.dispose("il2_buffet", "il2_buffet2")
 
-    def il2_update_damage(self, telem_data):
+    def il2_update_damage(self, telem_data: BaseTelemetryData):
         if not self.damage_effect_enabled or not self.damage_effect_intensity:
             self.effects.dispose("hit", "damage")
             return
 
-        hit = telem_data.get("Hits")
-        damage = telem_data.get("Damage")
+        hit = telem_data.Hits
+        damage = telem_data.Damage
         hit_freq = 5
         hit_amp = utils.clamp(self.damage_effect_intensity, 0.0, 1.0)
         damage_freq = 10
@@ -235,14 +236,14 @@ class Aircraft(AircraftBase):
             self.effects.dispose("damage")
 
     @override
-    def on_telemetry(self, telem_data : dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         ## Generic Aircraft Telemetry Handler
         """when telemetry frame is received, aircraft class receives data in dict format
 
         :param new_data: New telemetry data
         :type new_data: dict
         """
-        if telem_data.get('SimPaused', False) or telem_data.get('MPMenu') or not telem_data.get('Focus', False):
+        if telem_data.SimPaused or telem_data.MPMenu or not telem_data.Focus:
             if not self.stop_state:
                 self.on_timeout()
             self.stop_state = True
@@ -251,11 +252,11 @@ class Aircraft(AircraftBase):
         
         self.stop_state = False
 
-        if telem_data["AircraftClass"] == "unknown":
-            telem_data["AircraftClass"] = "GenericAircraft" #inject aircraft class into telemetry
+        if telem_data.AircraftClass == "unknown":
+            telem_data.AircraftClass = "GenericAircraft" #inject aircraft class into telemetry
         self._telem_data = telem_data
 
-        if telem_data.get("N") == None:
+        if telem_data.N is None:
             return
 
         # call Base class handler
@@ -333,8 +334,8 @@ class PropellerAircraft(Aircraft):
 
     # run on every telemetry frame
     @override
-    def on_telemetry(self, telem_data):
-        telem_data["AircraftClass"] = "PropellerAircraft"   #inject aircraft class into telemetry
+    def on_telemetry(self, telem_data: BaseTelemetryData):
+        telem_data.AircraftClass = "PropellerAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
 class JetAircraft(Aircraft):
@@ -342,6 +343,6 @@ class JetAircraft(Aircraft):
 
     # run on every telemetry frame
     @override
-    def on_telemetry(self, telem_data):
-        telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
+    def on_telemetry(self, telem_data: BaseTelemetryData):
+        telem_data.AircraftClass = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)

@@ -5,6 +5,7 @@ from telemffb.sim.msfs_xp.MsfsXpFlightControlsMixIn import MsfsXpFlightControlsM
 
 
 import logging
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
@@ -29,12 +30,12 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         self.trim_active = False
 
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.msfs_update_trimwheel(telem_data)    
     
 
-    def msfs_update_trimwheel(self, telem_data):
+    def msfs_update_trimwheel(self, telem_data: BaseTelemetryData):
         if not self.is_trimwheel():
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -44,25 +45,25 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         
         ap_active = 0
         if self._sim_is_msfs():
-            ap_active = telem_data.get("APMaster", 0)
+            ap_active = telem_data.APMaster or 0
         if self._sim_is_xplane():
-            ap_active = telem_data.get("APServos", 0)
+            ap_active = telem_data.APServos or 0
 
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
         self._spring_handle.name = "trimwheel_ap_spring"
         if not self.trimwheel_use_axis:
-            trim_pos = telem_data.get("ElevTrim")
+            trim_pos = telem_data.ElevTrim
 
-            trim_limit_max = telem_data.get("ElevTrimMax")
+            trim_limit_max = telem_data.ElevTrimMax
             if trim_limit_max == None:
-                trim_limit_max = telem_data.get("ElevTrimUpLmt")
+                trim_limit_max = telem_data.ElevTrimUpLmt
 
-            trim_limit_min = telem_data.get("ElevTrimMin")
+            trim_limit_min = telem_data.ElevTrimMin
             if trim_limit_min == None:
-                trim_limit_min = telem_data.get("ElevTrimDnLmt")
+                trim_limit_min = telem_data.ElevTrimDnLmt
                 # trim_limit_min = -trim_limit_max
-            trim_limit_neutral = telem_data.get("ElevTrimNeutral")
+            trim_limit_neutral = telem_data.ElevTrimNeutral
             # linear scale
             trimwheel_pos = utils.scale(trim_pos, (trim_limit_min, trim_limit_max), (-1, 1))
 
@@ -71,17 +72,17 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
             #     else:
             #         trimwheel_pos = utils.scale(trim_pos, (-trim_limit_down, trim_limit_neutral), (-1, 0))
 
-            telem_data["trimwheel_pos_calc"] = trimwheel_pos
+            telem_data.trimwheel_pos_calc = trimwheel_pos
 
         # print(f"Linear:{round(phys_y, 4)}, Curved:{round(trimwheel_pos, 4)}")
 
-        telem_data["phys_y"] = phys_y
+        telem_data.phys_y = phys_y
         if not self.trimwheel_init:
             self.spring_y.set_coefficient(1.0)
 
             if self.last_trimwheel_y is None:
                 # Air start or new aircraft.  Use sim defined trim setpoint as init point
-                trimwheel_pos = telem_data["ElevTrimPct"]
+                trimwheel_pos = telem_data.ElevTrimPct
                 self.cpO_y = round(4096 * trimwheel_pos)
             else:
                 # In air, previously paused.  Use stored position to init point
@@ -106,7 +107,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
         self.last_trimwheel_y = phys_y
 
         if self.trimwheel_use_axis:
-            trimwheel_pos = telem_data.get("ElevTrimPct", 0)
+            trimwheel_pos = telem_data.ElevTrimPct or 0
         else:
             raise ValueError("Trimwheel must use axis")
 
@@ -114,7 +115,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
 
             # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)
             self.cpO_y = round(utils.scale(trimwheel_pos, (-1, 1), (-4096, 4096)))
-            telem_data["_tw_cpO_y"] = trimwheel_pos
+            telem_data._tw_cpO_y = trimwheel_pos
             self.spring_y.set_offset(trimwheel_pos)
 
             # self.damper.damper(coef_y=0).start()
@@ -140,9 +141,9 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                 # phys_x, phys_y = input_data.axisXY()
 
                 pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
-                telem_data["_tw_phys_y_pos"] = phys_y
-                telem_data["_tw_phys_y_pos_neg"] = -phys_y
-                telem_data["_tw_pos_y_pos"] = pos_y_pos
+                telem_data._tw_phys_y_pos = phys_y
+                telem_data._tw_phys_y_pos_neg = -phys_y
+                telem_data._tw_pos_y_pos = pos_y_pos
                 if y_range != 1:
                     pos_y_pos = -int(pos_y_pos)
                 else:
@@ -156,7 +157,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
 
                 delta = round(phys_y - trimwheel_pos, 5)
                 # utils.dbprint('yellow', f"delta: {delta}")
-                telem_data["TRIM_DELTA"] = delta
+                telem_data.TRIM_DELTA = delta
                 if self.trim_active:
                     if abs(delta) <= 0.003:
                         self.trim_active = False
@@ -178,7 +179,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
                         pos_y_pos = pos_y_pos * 0.01745
                         self._simconnect.set_simdatum_to_msfs("ELEVATOR TRIM POSITION", pos_y_pos, units="radians")
                 self.last_pos_y_pos = pos_y_pos
-                telem_data["_tw_last"] = self.last_pos_y_pos
+                telem_data._tw_last = self.last_pos_y_pos
 
         else:
             # trimwheel_pos = self.dampener.dampen_value(trimwheel_pos, '_elev_trim', derivative_hz=5, derivative_k=0.15)

@@ -2,6 +2,7 @@ import telemffb.globals as G
 import telemffb.utils as utils
 from telemffb.globals import master_instance
 from telemffb.hw.ffb_rhino import HapticEffect
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 import logging
 import random
@@ -18,8 +19,8 @@ class AircraftEffectUtilsBase(object):
         self.stepper_dict = {}
         self.spring_mode = None
         self.gforce_effect_mode = None
-        self._telem_data = {}
-        self._last_telem_data = {}
+        self._telem_data: BaseTelemetryData = BaseTelemetryData()
+        self._last_telem_data: BaseTelemetryData = BaseTelemetryData()
         self._ipc_telem = {}
 
     @property
@@ -28,14 +29,14 @@ class AircraftEffectUtilsBase(object):
         return G.effects
 
     @property
-    def telem_data(self) -> dict:
+    def telem_data(self) -> BaseTelemetryData:
         return self._telem_data
 
     @property
     def aircraft_type(self):
         """Return the type of aircraft based on telemetry data."""
         if self._telem_data:
-            return self._telem_data.get("AircraftType", "Unknown")
+            return self._telem_data.AircraftType or "Unknown"
         return "Unknown"
 
     def check_master_button_press(self, button):
@@ -182,8 +183,8 @@ class AircraftEffectUtilsBase(object):
         Args:
             message (str): Error message to display
         """
-        dev = self.telem_data.get('FFBType', 'joystick').capitalize()
-        self.telem_data['error'] = message
+        dev = (self.telem_data.FFBType or 'joystick').capitalize()
+        self.telem_data.error = message
         if not master_instance:
             self._ipc_telem['error'] = f"{dev}: {message}"
 
@@ -193,7 +194,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if device is a joystick, False otherwise
         """
-        return self._telem_data.get("FFBType", "joystick") == "joystick"
+        return (self._telem_data.FFBType or "joystick") == "joystick"
 
     def is_pedals(self):
         """Check if the current FFB device is pedals.
@@ -201,7 +202,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if device is pedals, False otherwise
         """
-        return self._telem_data.get("FFBType") == "pedals"
+        return self._telem_data.FFBType == "pedals"
 
     def is_collective(self):
         """Check if the current FFB device is a collective.
@@ -209,7 +210,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if device is a collective, False otherwise
         """
-        return self._telem_data.get("FFBType") == "collective"
+        return self._telem_data.FFBType == "collective"
 
     def is_trimwheel(self):
         """Check if the current FFB device is a trim wheel.
@@ -217,7 +218,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if device is a trim wheel, False otherwise
         """
-        return self._telem_data.get("FFBType") == "trimwheel"
+        return self._telem_data.FFBType == "trimwheel"
 
 
     def anything_has_changed(self, item: str, value, delta_ms=0):
@@ -256,7 +257,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if MSFS, False otherwise
         """
-        return self._telem_data.get("src") == "MSFS"
+        return self._telem_data.src == "MSFS"
 
     def _sim_is_xplane(self):
         """Check if the current simulator is X-Plane.
@@ -264,7 +265,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if X-Plane, False otherwise
         """
-        return self._telem_data.get('src') == "XPLANE"
+        return self._telem_data.src == "XPLANE"
 
     def _sim_is_dcs(self, *unused):
         """Check if the current simulator is DCS World.
@@ -272,7 +273,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if DCS, False otherwise
         """
-        return self._telem_data.get("src") == "DCS"
+        return self._telem_data.src == "DCS"
 
     def _sim_is_bms(self, *unused):
         """
@@ -281,7 +282,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if DCS, False otherwise
         """
-        return self._telem_data.get("src") == "BMS"
+        return self._telem_data.src == "BMS"
 
     def _sim_is_il2(self, *unused):
         """Check if the current simulator is IL2 Sturmovik..
@@ -289,7 +290,7 @@ class AircraftEffectUtilsBase(object):
                 Returns:
                     bool: True if IL2, False otherwise
                 """
-        return self._telem_data.get("src") == "IL2"
+        return self._telem_data.src == "IL2"
 
     def _sim_is(self, sim, *unused):
         """Check if the current simulator matches the specified name.
@@ -300,9 +301,16 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if matches, False otherwise
         """
-        return self._telem_data.get('src') == sim
+        return self._telem_data.src == sim
 
     # Helper methods for code reuse
+    @staticmethod
+    def _get_device_axes() -> tuple[float, float]:
+        device = HapticEffect.device
+        if device is None:
+            return 0.0, 0.0
+        return device.get_input().axisXY()
+    
     def _get_random_direction(self):
         """Get a random direction for weapon effects based on device type."""
         import random
@@ -321,13 +329,13 @@ class AircraftEffectUtilsBase(object):
         """Common check for joystick-only effects."""
         return not self.is_joystick()
 
-    def _should_skip_airborne_effect(self, telem_data: dict) -> bool:
+    def _should_skip_airborne_effect(self, telem_data: BaseTelemetryData) -> bool:
         """Common check for effects that should be disabled when on ground."""
-        return bool(sum(telem_data.get("WeightOnWheels", [0])))
+        return bool(sum(telem_data.WeightOnWheels or [0]))
 
-    def _should_skip_no_airspeed_effect(self, telem_data: dict) -> bool:
+    def _should_skip_no_airspeed_effect(self, telem_data: BaseTelemetryData) -> bool:
         """Common check for effects that require airspeed."""
-        return not telem_data.get("TAS", 0)
+        return not (telem_data.TAS or 0)
 
     def _is_telemetry_spike(self, y_gs: float, last_y_gs: float, threshold: float = 3.0) -> bool:
         """Check if telemetry shows a spike indicating crash or invalid data."""
@@ -340,7 +348,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if jet, False otherwise
         """
-        return self._telem_data.get("AircraftClass", "") == "JetAircraft"
+        return (self._telem_data.AircraftClass or "") == "JetAircraft"
     
     def is_propeller_aircraft(self):
         """Check if the current aircraft is a propeller aircraft.
@@ -348,7 +356,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if propeller aircraft, False otherwise
         """
-        return self._telem_data.get("AircraftClass", "") == "PropellerAircraft"
+        return (self._telem_data.AircraftClass or "") == "PropellerAircraft"
 
     def is_helicopter(self):
         """Check if the current aircraft is a helicopter.
@@ -356,7 +364,7 @@ class AircraftEffectUtilsBase(object):
         Returns:
             bool: True if helicopter, False otherwise
         """
-        return self._telem_data.get("AircraftClass", "") == "Helicopter"
+        return (self._telem_data.AircraftClass or "") == "Helicopter"
     
     
 
@@ -364,7 +372,7 @@ class AircraftEffectUtilsBase(object):
         """Each mixin can implement this to handle telemetry timeout events. important: super().on_timeout() must be called in subclasses."""
         pass
 
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         """Each mixin can implement this to handle telemetry events. important: super().on_telemetry() must be called in subclasses."""
         pass
 

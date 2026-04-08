@@ -11,6 +11,7 @@ from tests.framework.utils import (
     assert_effect_started,
     assert_friction_coefficient_in_range,
 )
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
 
 
@@ -100,11 +101,11 @@ class TestFrameworkBasics(BaseTelemetryEffectTestCase):
 class TestTelemetryDataBuilder(BaseTelemetryEffectTestCase):
     """Tests for the TelemetryDataBuilder."""
     
-    def test_builder_creates_dict(self):
-        """Test that builder creates a dictionary."""
+    def test_builder_creates_base_telemetry_data(self):
+        """Test that builder creates BaseTelemetryData."""
         telem = TelemetryDataBuilder().build()
         
-        assert isinstance(telem, dict)
+        assert isinstance(telem, BaseTelemetryData)
         assert len(telem) > 0
     
     def test_builder_fluent_interface(self):
@@ -209,12 +210,12 @@ class TestSimulatorMocking(BaseTelemetryEffectTestCase):
         instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
         
         # Set as pedals
-        instance._telem_data = {"FFBType": "pedals"}
+        instance._telem_data = BaseTelemetryData({"FFBType": "pedals"})
         assert instance.is_pedals()
         assert not instance.is_joystick()
         
         # Set as joystick
-        instance._telem_data = {"FFBType": "joystick"}
+        instance._telem_data = BaseTelemetryData({"FFBType": "joystick"})
         assert instance.is_joystick()
         assert not instance.is_pedals()
 

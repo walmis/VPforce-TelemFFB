@@ -1,5 +1,6 @@
 import telemffb.utils as utils
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class FFBForcesMixIn(AircraftEffectUtilsBase):
@@ -25,7 +26,7 @@ class FFBForcesMixIn(AircraftEffectUtilsBase):
         # flag moved here
         self.friction_effect_overridden: bool = False
 
-    def ac_update_ffb_forces(self, telem_data):
+    def ac_update_ffb_forces(self, telem_data: BaseTelemetryData):
         """Update explicit override FFB effects (damper, inertia, friction)."""
         # Damper
         if self.enable_damper_ovd:

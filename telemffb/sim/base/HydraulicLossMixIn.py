@@ -1,6 +1,7 @@
 import telemffb.utils as utils
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.base.FFBForcesMixIn import FFBForcesMixIn
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class HydraulicLossMixIn(FFBForcesMixIn):
     """Mixin to handle hydraulic-loss related configuration, runtime state and effects."""
@@ -19,14 +20,14 @@ class HydraulicLossMixIn(FFBForcesMixIn):
         self.inertia_coeff: int = 0
         self.friction_coeff: int = 0
 
-    def ac_update_hydraulic_loss_effect(self, telem_data):
+    def ac_update_hydraulic_loss_effect(self, telem_data: BaseTelemetryData):
 
-        telem_data['_hyd_factor'] = self.hydraulic_factor
+        telem_data._hyd_factor = self.hydraulic_factor
 
         if not self.enable_hydraulic_loss_effect:
             return False
         hydraulic_sys = telem_data.get('HydSys', "n/a")
-        hydraulic_pressure = telem_data.get('HydPress', 1)
+        hydraulic_pressure = telem_data.get('HydPress', 1)  # non-zero defaults: keep .get()
 
         if not self.enable_damper_ovd or not self.enable_inertia_ovd or not self.enable_friction_ovd:
             self.flag_error("Hydraulic Loss effect enabled but damper/inertia/friction overrides not enabled - effect requires all three enabled with base values set")
@@ -54,7 +55,7 @@ class HydraulicLossMixIn(FFBForcesMixIn):
                 self.hydraulic_factor = self.step_value_over_time('hyd_factor', self.hydraulic_factor, 2500, 0, floatpoint=True)
 
             # hydraulic_factor = int(hydraulic_sys)
-            telem_data['_hydraulic_factor_test'] = self.hydraulic_factor
+            telem_data._hydraulic_factor_test = self.hydraulic_factor
         else:
             self.hydraulic_factor = hydraulic_sys
 
@@ -88,7 +89,7 @@ class HydraulicLossMixIn(FFBForcesMixIn):
 
         return True
     
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         hyd_loss = self.ac_update_hydraulic_loss_effect(telem_data)
         if not hyd_loss: 

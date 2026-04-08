@@ -22,6 +22,7 @@ from .Helicopter import Helicopter
 from telemffb.util.conversions import math
 
 import math
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class FlyInsideHelicopter(Helicopter):
     # user parameters
@@ -38,7 +39,7 @@ class FlyInsideHelicopter(Helicopter):
         # self.cpO_y = round(self.phys_y * 4096)
 
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self._update_vibration()
 
@@ -56,7 +57,7 @@ class FlyInsideHelicopter(Helicopter):
         if not self.FI_vibration_enable:
             self.effects['FI_vibration'].destroy()
             return
-        rrpm = self.telem_data.get("RotorRPM", 0)
+        rrpm = self.telem_data.RotorRPM or 0
         if self.is_joystick():
             vx, vy = "FI_VibY", "FI_VibX"
         elif self.is_pedals():
