@@ -74,6 +74,7 @@ class MockConditionEffect:
         self.name = name
         self.started = False
         self.effect_type = 0  # Default effect type
+        self.detent_config = None
         self._envelope = None
         self._envelope_once = False
         self._x_coefficient = 0
@@ -165,6 +166,12 @@ class MockConditionEffect:
         """Set constant force parameters."""
         self._magnitude = magnitude
         self._direction = direction
+        return self
+
+    def detent(self, **kwargs):
+        """Store detent configuration and return self for call chaining."""
+        self.effect_type = 11  # EFFECT_DETENT in production code
+        self.detent_config = kwargs.copy()
         return self
 
     def envelope(self, attackFromForce=None, decayToForce=None, attackTime=None, decayTime=None, once=False, **kwargs):

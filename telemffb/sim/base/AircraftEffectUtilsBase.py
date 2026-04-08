@@ -304,6 +304,13 @@ class AircraftEffectUtilsBase(object):
         return self._telem_data.src == sim
 
     # Helper methods for code reuse
+    @staticmethod
+    def _get_device_axes() -> tuple[float, float]:
+        device = HapticEffect.device
+        if device is None:
+            return 0.0, 0.0
+        return device.get_input().axisXY()
+    
     def _get_random_direction(self):
         """Get a random direction for weapon effects based on device type."""
         import random
