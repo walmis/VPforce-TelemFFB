@@ -1,26 +1,38 @@
-import telemffb.globals as G
-from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
-
+from __future__ import annotations
 
 import logging
 import socket
+from typing import TYPE_CHECKING, Any, Callable, Optional
+
+import telemffb.globals as G
+from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+
+if TYPE_CHECKING:
+    from telemffb.telem.SimConnectManager import SimConnectManager
 
 
-class SimConnectProxy:
-    """Proxy object that handles None simconnect gracefully."""
-    
-    def __init__(self, simconnect_getter):
+class SimConnectProxy(object):
+    """Proxy object that handles None simconnect gracefully.
+
+    At runtime, delegates attribute access to the SimConnectManager
+    instance returned by the getter, or returns a no-op callable
+    when SimConnect is unavailable.
+
+    For type-checking, inherits from SimConnectManager so Pylance
+    can provide full autocompletion on the proxied methods.
+    """
+
+    def __init__(self, simconnect_getter: Callable[[], Optional[SimConnectManager]]) -> None:
         self._simconnect_getter = simconnect_getter
-    
-    def __getattr__(self, name):
+
+    def __getattr__(self, name: str) -> Any:
         simconnect = self._simconnect_getter()
         if simconnect is None:
             logging.warning(f"SimConnect is None, cannot access attribute/method: {name}")
-            # Return a callable that does nothing for method calls
             return lambda *args, **kwargs: None
         return getattr(simconnect, name)
-    
-    def __bool__(self):
+
+    def __bool__(self) -> bool:
         return self._simconnect_getter() is not None
 
 
@@ -41,8 +53,8 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
         self._simconnect_proxy = SimConnectProxy(lambda: G.telem_manager.simconnect if G.telem_manager else None)
 
     @property
-    def _simconnect(self):
-        return self._simconnect_proxy
+    def _simconnect(self) -> SimConnectManager:
+        return self._simconnect_proxy # type: ignore
 
     def send_xp_command(self, cmd):
         if self._socket is None:
@@ -92,8 +104,8 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
 
         if self.is_collective() and not self.is_helicopter():
             # we don't want to send the "prop pitch" override (collective) to XPLANE if we are not in a helo
-            if self.telem_data.get("cOvrd", 1):
-                sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=false"
+            if self.telem_data.get("cOvrd", 1):  # non-zero default: keep .get()
+                sendstr = f"OVERRIDE:{self.telem_data.FFBType}=false"
                 self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
                 logging.info(f"Sending to XPLANE: >>{sendstr}<<")
                 self.__xplane_axis_override_active = False
@@ -104,12 +116,12 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
             and not self.local_disable_axis_control
             and not self.__xplane_axis_override_active
         ):
-            sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=true"
+            sendstr = f"OVERRIDE:{self.telem_data.FFBType}=true"
             self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
             logging.info(f"Sending to XPLANE: >>{sendstr}<<")
             self.__xplane_axis_override_active = True
         elif self.__xplane_axis_override_active and not self.telemffb_controls_axes:
-            sendstr = f"OVERRIDE:{self.telem_data['FFBType']}=false"
+            sendstr = f"OVERRIDE:{self.telem_data.FFBType}=false"
             self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
             logging.info(f"Sending to XPLANE: >>{sendstr}<<")
             self.__xplane_axis_override_active = False

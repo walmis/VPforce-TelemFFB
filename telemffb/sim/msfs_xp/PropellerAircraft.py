@@ -19,6 +19,7 @@
 from typing import override
 
 from .Aircraft import Aircraft
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 # removed local 'overrides' helper in favor of typing.override
 
 
@@ -29,10 +30,10 @@ class PropellerAircraft(Aircraft):
 
     # run on every telemetry frame
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         ### Propeller Aircraft Class Telemetry Handler
-        if telem_data.get("N") == None:
+        if telem_data.N is None:
             return
-        telem_data["AircraftClass"] = "PropellerAircraft"  # inject aircraft class into telemetry
+        telem_data.AircraftClass = "PropellerAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)

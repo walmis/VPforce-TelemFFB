@@ -37,6 +37,7 @@ from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.base.AoAEffectsMixIn import AoAEffectsMixIn
 
 import logging
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class Aircraft(
@@ -132,7 +133,7 @@ class Aircraft(
         else:
             self.effects["turbulence"].destroy()
 
-    def msfs_update_stick_shaker(self, telem_data):
+    def msfs_update_stick_shaker(self, telem_data: BaseTelemetryData):
         if not self.is_joystick():
             return
         if not self._sim_is_msfs():
@@ -142,7 +143,7 @@ class Aircraft(
             self.effects["stick_shaker"].destroy()
             return
 
-        stall = telem_data.get("StallWarning", 0)
+        stall = telem_data.StallWarning or 0
         if stall:
             self.effects["stick_shaker"].periodic(14, self.stick_shaker_intensity, 0, EFFECT_SQUARE).start()
         else:
@@ -182,32 +183,31 @@ class Aircraft(
             self.on_timeout()
 
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         self.effects["pause_spring"].destroy()
 
-        if telem_data.get('Parked', 0): # MSFS in Hangar
+        if telem_data.Parked: # MSFS in Hangar
             return
 
         if self._sim_is_xplane():
             self.toggle_xp_control()
 
         if self._sim_is_xplane():
-            incidence_vec = Vector(telem_data["VelAcf"])
+            incidence_vec = Vector(telem_data.VelAcf)
         else:
-            incidence_vec = Vector(telem_data["VelWorld"])
-            wind_vec = Vector(telem_data["AmbWind"])
+            incidence_vec = Vector(telem_data.VelWorld)
+            wind_vec = Vector(telem_data.AmbWind)
             incidence_vec = incidence_vec - wind_vec
-            # Rotate the vector from world frame into body frame
-            incidence_vec = incidence_vec.rotY(-(telem_data["Heading"] * rad))
-            incidence_vec = incidence_vec.rotX(-telem_data["Pitch"] * rad)
-            incidence_vec = incidence_vec.rotZ(-telem_data["Roll"] * rad)
+            incidence_vec = incidence_vec.rotY(-(telem_data.Heading * rad))
+            incidence_vec = incidence_vec.rotX(-telem_data.Pitch * rad)
+            incidence_vec = incidence_vec.rotZ(-telem_data.Roll * rad)
 
-        telem_data["Incidence"] = list(incidence_vec)
+        telem_data.Incidence = list(incidence_vec)
 
         #
         ### Generic Aircraft Class Telemetry Handler
         if not "AircraftClass" in telem_data:
-            telem_data["AircraftClass"] = "GenericAircraft"  # inject aircraft class into telemetry
+            telem_data.AircraftClass = "GenericAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
 

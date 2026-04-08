@@ -36,6 +36,7 @@ from telemffb.utils import dbprint
 import telemffb.xmlutils as xmlutils
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim import aircrafts_dcs, aircrafts_il2, aircrafts_msfs_xp
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.telem.SimConnectManager import SimConnectManager
 from telemffb.utils import upload_vpconf_profile
 
@@ -252,10 +253,10 @@ class TelemManager(QObject, threading.Thread):
             self._first_frame_from_sim = True
             self.first_frame_received.emit(parsed_data.get('src', None))
 
-    def _parse_telemetry_data(self, data):
+    def _parse_telemetry_data(self, data) -> BaseTelemetryData:
         """Parse raw telemetry data and calculate frame timing metrics."""
         data = data.split(";")
-        telem_data = {"FFBType": G.device_type}
+        telem_data = BaseTelemetryData({"FFBType": G.device_type})
 
         # Calculate frame timing
         self._update_frame_timing(telem_data)
@@ -275,7 +276,7 @@ class TelemManager(QObject, threading.Thread):
 
         return telem_data
 
-    def _update_frame_timing(self, telem_data):
+    def _update_frame_timing(self, telem_data: BaseTelemetryData):
         """Update frame timing metrics and add to telemetry data."""
         current_frame_time = int((time.perf_counter() - self.last_frame_time) * 1000)
         self.frame_times.append(current_frame_time)
@@ -296,7 +297,7 @@ class TelemManager(QObject, threading.Thread):
 
         self.last_frame_time = time.perf_counter()
 
-    def _merge_ipc_telemetry(self, telem_data):
+    def _merge_ipc_telemetry(self, telem_data: BaseTelemetryData):
         """Merge telemetry data from child instances via IPC."""
         if G.master_instance and G.launched_instances:
             self._ipc_telem_data = G.ipc_instance._ipc_telem
@@ -304,7 +305,7 @@ class TelemManager(QObject, threading.Thread):
                 telem_data.update(self._ipc_telem_data)
                 self._ipc_telem_data.clear()
 
-    def _extract_aircraft_info(self, telem_data) -> AircraftInfo:
+    def _extract_aircraft_info(self, telem_data: BaseTelemetryData) -> AircraftInfo:
         """Extract aircraft information and determine the appropriate module."""
         aircraft_name = telem_data.get("N")
         data_source = telem_data.get("src", None)
@@ -339,7 +340,7 @@ class TelemManager(QObject, threading.Thread):
             sc_engine_type=sc_engine_type
         )
 
-    def _handle_aircraft_changes(self, aircraft_info: AircraftInfo, telem_data):
+    def _handle_aircraft_changes(self, aircraft_info: AircraftInfo, telem_data: BaseTelemetryData):
         """Handle aircraft changes and initialization."""
         aircraft_name = aircraft_info.name
 
@@ -348,7 +349,7 @@ class TelemManager(QObject, threading.Thread):
                 self._initialize_new_aircraft(aircraft_info, telem_data)
             self.currentAircraftName = aircraft_name
 
-    def _initialize_new_aircraft(self, aircraft_info: AircraftInfo, telem_data):
+    def _initialize_new_aircraft(self, aircraft_info: AircraftInfo, telem_data: BaseTelemetryData):
         """Initialize a new aircraft when it changes."""
         aircraft_name = aircraft_info.name
         data_source = aircraft_info.data_source
@@ -510,7 +511,7 @@ class TelemManager(QObject, threading.Thread):
         self.currentAircraft.apply_settings(params)
         self.currentAircraftConfig = params
 
-    def _process_current_aircraft_telemetry(self, telem_data):
+    def _process_current_aircraft_telemetry(self, telem_data: BaseTelemetryData):
         """Process telemetry for the current aircraft."""
         if self.currentAircraft:
             try:
@@ -522,7 +523,7 @@ class TelemManager(QObject, threading.Thread):
             except Exception:
                 logging.exception(".on_telemetry Exception")
 
-    def _handle_ipc_and_plotting(self, telem_data):
+    def _handle_ipc_and_plotting(self, telem_data: BaseTelemetryData):
         """Handle IPC telemetry sending and plotting."""
         # Send locally generated telemetry to master
         if G.child_instance and self.currentAircraft:
@@ -540,7 +541,7 @@ class TelemManager(QObject, threading.Thread):
                     else:
                         utils.teleplot.sendTelemetry(item, telem_data[item])
 
-    def _emit_telemetry(self, telem_data):
+    def _emit_telemetry(self, telem_data: BaseTelemetryData):
         """Emit telemetry signal safely."""
         try:
             self.telemetryReceived.emit(telem_data)

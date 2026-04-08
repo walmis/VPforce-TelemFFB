@@ -11,6 +11,7 @@ from tests.framework.utils import (
     assert_effect_started,
     assert_friction_coefficient_in_range,
 )
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.msfs_xp.MfsfXpSteeringFrictionEffectMixIn import MfsfXpSteeringFrictionEffectMixIn
 
 
@@ -209,12 +210,12 @@ class TestSimulatorMocking(BaseTelemetryEffectTestCase):
         instance = self.create_test_instance(MfsfXpSteeringFrictionEffectMixIn)
         
         # Set as pedals
-        instance._telem_data = {"FFBType": "pedals"}
+        instance._telem_data = BaseTelemetryData({"FFBType": "pedals"})
         assert instance.is_pedals()
         assert not instance.is_joystick()
         
         # Set as joystick
-        instance._telem_data = {"FFBType": "joystick"}
+        instance._telem_data = BaseTelemetryData({"FFBType": "joystick"})
         assert instance.is_joystick()
         assert not instance.is_pedals()
 

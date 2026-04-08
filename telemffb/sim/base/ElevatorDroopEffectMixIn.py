@@ -3,13 +3,14 @@ import logging
 import telemffb.utils as utils
 from telemffb.util.conversions import kt2ms
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class ElevatorDroopEffectMixIn(AircraftEffectUtilsBase):
     elevator_droop_enabled: bool = False
     elevator_droop_force: float = 0.0
 
     '''Mixin for elevator droop effect.'''
-    def ac_override_elevator_droop(self, telem_data):
+    def ac_override_elevator_droop(self, telem_data: BaseTelemetryData):
         if not self.is_joystick():
             return
         if not self.elevator_droop_enabled or not self.elevator_droop_force:
@@ -26,7 +27,7 @@ class ElevatorDroopEffectMixIn(AircraftEffectUtilsBase):
         else:
             self.effects.dispose('elev_droop')
 
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         if self.is_joystick():
             self.ac_override_elevator_droop(telem_data)

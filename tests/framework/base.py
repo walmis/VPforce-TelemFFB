@@ -4,6 +4,7 @@ Base classes and mocks for telemetry effect testing.
 from typing import Dict, List, Optional, Any, TypeVar, Type
 from unittest.mock import MagicMock, Mock
 import telemffb.globals as G
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 T = TypeVar('T')
 
@@ -375,8 +376,8 @@ class BaseTelemetryEffectTestCase:
                 self.stepper_dict = {}
                 self.spring_mode = None
                 self.gforce_effect_mode = None
-                self._telem_data = {}
-                self._last_telem_data = {}
+                self._telem_data = BaseTelemetryData()
+                self._last_telem_data = BaseTelemetryData()
                 self.friction_effect_overridden = False
                 self.telemffb_controls_axes = False
                 self.local_disable_axis_control = False
@@ -524,7 +525,7 @@ class BaseTelemetryEffectTestCase:
         
         # Initialize telemetry data dict if not present
         if not hasattr(instance, '_telem_data'):
-            instance._telem_data = {}
+            instance._telem_data = BaseTelemetryData()
         
         # Setup test helpers for sim detection
         instance._test_sim_is_msfs = test_sim_is_msfs
@@ -550,9 +551,12 @@ class BaseTelemetryEffectTestCase:
         
         return instance
     
-    def set_telemetry(self, instance, telem_data: dict):
+    def set_telemetry(self, instance, telem_data):
         """Set telemetry data on an instance."""
-        instance._telem_data = telem_data.copy()
+        if isinstance(telem_data, BaseTelemetryData):
+            instance._telem_data = telem_data.copy()
+        else:
+            instance._telem_data = BaseTelemetryData(telem_data)
     
     def assert_effect_started(self, effect_name: str, msg: str = ""):
         """Assert that an effect was started."""

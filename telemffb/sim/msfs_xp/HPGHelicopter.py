@@ -27,6 +27,7 @@ from telemffb.utils import clamp, PerformanceTracker
 
 import logging
 import time
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 perftracker = PerformanceTracker()
 
@@ -73,7 +74,7 @@ class HPGHelicopter(Helicopter):
         self.pedals_init = 0
 
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
 
         # self._update_vrs_effect(telem_data)
@@ -149,12 +150,12 @@ class HPGHelicopter(Helicopter):
         return result
 
     @override
-    def msfs_update_heli_controls(self, telem_data):
+    def msfs_update_heli_controls(self, telem_data: BaseTelemetryData):
         super().msfs_update_heli_controls(telem_data)
-        ffb_type = telem_data.get("FFBType", "joystick")
-        ap_active = telem_data.get("APMaster", 0)
+        ffb_type = telem_data.FFBType or "joystick"
+        ap_active = telem_data.APMaster or 0
         if self.cyclic_spring_init:
-            trim_reset = telem_data.get("hpgTrimRelease", 0)
+            trim_reset = telem_data.hpgTrimRelease or 0
         else:
             trim_reset = False
         input_data = HapticEffect.device.get_input()
@@ -167,13 +168,13 @@ class HPGHelicopter(Helicopter):
                 self.flag_error(
                     "Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the cyclic axes in MSFS settings")
                 return
-            sema_x = telem_data.get("hpgSEMAx", 0)
-            sema_y = telem_data.get("hpgSEMAy", 0)
+            sema_x = telem_data.hpgSEMAx or 0
+            sema_y = telem_data.hpgSEMAy or 0
 
             sema_x_avg = self.smoother.get_rolling_average('s_sema_x', sema_x, window_ms=100)
             sema_y_avg = self.smoother.get_rolling_average('s_sema_y', sema_y, window_ms=100)
 
-            if telem_data.get("hpgHandsOnCyclic", 0):
+            if telem_data.hpgHandsOnCyclic:
                 hands_on_dict = self.check_hands_on(self.hands_off_deadzone)
             else:
                 hands_on_dict = self.check_hands_on(self.hands_on_deadzone)
@@ -220,12 +221,12 @@ class HPGHelicopter(Helicopter):
                 self.afcsx_step_size = sx * 0.25
                 self.afcsy_step_size = sy * 0.25
 
-                ias = telem_data.get('IAS', 0) #Indicated Airspeed in m/s
+                ias = telem_data.IAS or 0 #Indicated Airspeed in m/s
 
                 self.afcs_followup_trim_rate = 100
                 dt = perftracker.get_time_delta('hpg_perf_tracker')
 
-                telem_data['hpg_perf_tracker'] = round(dt, 6)
+                telem_data.hpg_perf_tracker = round(dt, 6)
 
                 followup_trim_step_size_raw = self.afcs_followup_trim_rate * dt  # multiply trim rate by frametime to provide reasonably consistent rate regardless of inter-loop timing.
 
@@ -235,9 +236,9 @@ class HPGHelicopter(Helicopter):
 
                 self.followup_trim_accumulator -= followup_trim_step_size  # subtract the applied integer value from the accumulation
 
-                telem_data['hpg_followup_step_size'] = followup_trim_step_size
-                telem_data['hpg_followup_step_size_raw'] = followup_trim_step_size_raw
-                telem_data['hpg_followup_trim_accum'] = self.followup_trim_accumulator
+                telem_data.hpg_followup_step_size = followup_trim_step_size
+                telem_data.hpg_followup_step_size_raw = followup_trim_step_size_raw
+                telem_data.hpg_followup_trim_accum = self.followup_trim_accumulator
 
                 followup_trim_state = telem_data.get('hpgFollowupTrimMode', 1)
 
@@ -308,32 +309,32 @@ class HPGHelicopter(Helicopter):
                     self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
                     self.hands_on_active = False
 
-            telem_data["hands_on"] = int(hands_on_either)
-            telem_data["hands_on_x"] = int(hands_on_x)
-            telem_data["hands_on_y"] = int(hands_on_y)
-            telem_data["deviation_x"] = dev_x
-            telem_data["deviation_y"] = dev_y
+            telem_data.hands_on = int(hands_on_either)
+            telem_data.hands_on_x = int(hands_on_x)
+            telem_data.hands_on_y = int(hands_on_y)
+            telem_data.deviation_x = dev_x
+            telem_data.deviation_y = dev_y
 
             self._spring_handle.start()
 
     @override
-    def _update_cyclic_trim(self, telem_data):
+    def _update_cyclic_trim(self, telem_data: BaseTelemetryData):
         # Trimming is handled by the AFCS integration - override parent class function
         pass
 
     @override
-    def msfs_update_pedals(self, telem_data):
+    def msfs_update_pedals(self, telem_data: BaseTelemetryData):
 
-        if telem_data.get("FFBType") != 'pedals':
+        if telem_data.FFBType != 'pedals':
             return
 
         if self.telemffb_controls_axes and not self.local_disable_axis_control:
             input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
-            telem_data['phys_x'] = phys_x
+            telem_data.phys_x = phys_x
 
 
-            if telem_data.get('hpgFeetOnPedals', 0):
+            if telem_data.hpgFeetOnPedals:
                 feet_on_dict = self.check_feet_on(self.feet_off_deadzone)
             else:
                 feet_on_dict = self.check_feet_on(self.feet_on_deadzone)
@@ -377,7 +378,7 @@ class HPGHelicopter(Helicopter):
                     return
 
 
-            sema_yaw = telem_data.get("hpgSEMAyaw", 0)
+            sema_yaw = telem_data.hpgSEMAyaw or 0
 
             sema_yaw_avg = self.smoother.get_rolling_average('s_sema_yaw', sema_yaw, window_ms=100)
 
@@ -385,8 +386,8 @@ class HPGHelicopter(Helicopter):
 
             self.afcsx_step_size = sx * 0.5
 
-            telem_data['_sx'] = sx
-            telem_data['_afcsx_step_size'] = self.afcsx_step_size
+            telem_data._sx = sx
+            telem_data._afcsx_step_size = self.afcsx_step_size
 
             if not (self.feet_on_active):
                 if sema_yaw > 0:
@@ -394,7 +395,7 @@ class HPGHelicopter(Helicopter):
                 elif sema_yaw < 0:
                     self.cpO_x += self.afcsx_step_size
 
-            telem_data['_cp0_x'] = self.cpO_x
+            telem_data._cp0_x = self.cpO_x
 
             self.spring_x.set_offset(round(self.cpO_x))
             self.spring_x.set_coefficient(self.hpg_pedal_spring_gain, True)
@@ -420,8 +421,8 @@ class HPGHelicopter(Helicopter):
             self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
 
     @override
-    def msfs_update_collective(self, telem_data):
-        if telem_data.get("FFBType") != 'collective':
+    def msfs_update_collective(self, telem_data: BaseTelemetryData):
+        if telem_data.FFBType != 'collective':
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
             self.flag_error("Aircraft is configured as class HPGHelicopter.  For proper integration, TelemFFB must send axis position to MSFS.\n\nPlease enable 'telemffb_controls_axes' in your config and unbind the collective axes in MSFS settings")
@@ -436,14 +437,14 @@ class HPGHelicopter(Helicopter):
             if self._sim_is_msfs() and force_trim_pressed:
                 self._simconnect.send_event_to_msfs("AUTO_THROTTLE_DISCONNECT", 1)
 
-        collective_tr = telem_data.get("hpgCollectiveRelease", 0)
-        afcs_mode = telem_data.get("hpgCollectiveAfcsMode", 0)
-        collective_pos = telem_data.get("CollectivePos", 0)
+        collective_tr = telem_data.hpgCollectiveRelease or 0
+        afcs_mode = telem_data.hpgCollectiveAfcsMode or 0
+        collective_pos = telem_data.CollectivePos or 0
 
 
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
-        telem_data['phys_y'] = phys_y
+        telem_data.phys_y = phys_y
         if not self.collective_init:
 
             self.spring_y.set_coefficient(self.collective_ap_spring_gain, True)
@@ -542,7 +543,7 @@ class HPGHelicopter(Helicopter):
                     self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
 
             else:
-                collective_pos = telem_data.get("CollectivePos", 0)
+                collective_pos = telem_data.CollectivePos or 0
                 self.cpO_y = round(utils.scale(collective_pos,(0, 1), (4096, -4096)))
                 self.spring_y.set_offset(self.cpO_y)
                 # self.damper.damper(coef_y=0).start()
@@ -552,9 +553,9 @@ class HPGHelicopter(Helicopter):
                 self._spring_handle.start(override=True)
 
     @override
-    def ac_update_vrs_effect(self, telem_data):
-        vrs_onset = telem_data.get("hpgVRSDatum", 0)
-        vrs_certain = telem_data.get("hpgVRSIsInVRS", 0)
+    def ac_update_vrs_effect(self, telem_data: BaseTelemetryData):
+        vrs_onset = telem_data.hpgVRSDatum or 0
+        vrs_certain = telem_data.hpgVRSIsInVRS or 0
 
         if vrs_certain:
             vrs_intensity = 1.0

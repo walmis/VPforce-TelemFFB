@@ -30,6 +30,7 @@ from telemffb.sim.base.DynamicSpringMixin import DynamicSpringMixin
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
 from telemffb.sim.base.AoAEffectsMixIn import AoAEffectsMixIn
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
     """Generic Class for Helicopters"""
@@ -97,11 +98,11 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         self.pedals_init = 0
 
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         self.speedbrake_motion_intensity = 0.0
-        if telem_data.get("N") == None:
+        if telem_data.N is None:
             return
-        telem_data["AircraftClass"] = "Helicopter"  # inject aircraft class into telemetry
+        telem_data.AircraftClass = "Helicopter"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
 
@@ -122,11 +123,11 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             self._simconnect.add_simvar(name='ForceTrimSW', var="L:TelemFFBHeliFT", sc_unit="enum")
             self._simconnect._resubscribe()
 
-    def msfs_send_heli_pedal_pos(self, xvar, xpos, telem_data):
+    def msfs_send_heli_pedal_pos(self, xvar, xpos, telem_data: BaseTelemetryData):
         self._simconnect.send_event_to_msfs(xvar, xpos)
 
 
-    def msfs_update_pedals(self, telem_data):
+    def msfs_update_pedals(self, telem_data: BaseTelemetryData):
         if not self.is_pedals(): 
             return
 
@@ -138,10 +139,10 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             self._spring_handle.name = "pedal_spring"
             # self.damper = effects["pedal_damper"].damper()
 
-            pedal_pos = telem_data.get("TailRotorPedalPos")
+            pedal_pos = telem_data.TailRotorPedalPos
             input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
-            telem_data['phys_x'] = phys_x
+            telem_data.phys_x = phys_x
 
             if self._sim_is_msfs():
                 if (self.custom_ft_sw_var_enabled and self.anything_has_changed('custom_ft_sw_var', self.custom_ft_sw_var)) or self.anything_has_changed('custom_ft_sw_var_enabled', self.custom_ft_sw_var_enabled):
@@ -278,10 +279,10 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
                 self.last_pos_x_pos = pos_x_pos
 
-    def msfs_send_heli_collective_pos(self, yvar, ypos, telem_data):
+    def msfs_send_heli_collective_pos(self, yvar, ypos, telem_data: BaseTelemetryData):
         self._simconnect.send_event_to_msfs(yvar, ypos)
 
-    def msfs_update_collective(self, telem_data):
+    def msfs_update_collective(self, telem_data: BaseTelemetryData):
         if not self.is_collective():
             return
         if not self.telemffb_controls_axes and not self.local_disable_axis_control:
@@ -289,7 +290,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         input_data = HapticEffect.device.get_input()
         phys_x, phys_y = input_data.axisXY()
 
-        telem_data['phys_y'] = phys_y
+        telem_data.phys_y = phys_y
 
         if self._sim_is_msfs():
             if self.controls_lock_enable and self.controls_lock_simvar != '':
@@ -297,13 +298,13 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
                 self._simconnect._resubscribe()
 
         # get controls lock status
-        controls_locked = telem_data.get("ControlsLock", 0) if self.controls_lock_enable else False
+        controls_locked = (telem_data.ControlsLock or 0) if self.controls_lock_enable else False
 
         if self.controls_lock_simvar_invert:
             controls_locked = not controls_locked
 
         if controls_locked:
-            telem_data["_controls_locked"] = controls_locked
+            telem_data._controls_locked = controls_locked
             input_data = HapticEffect.device.get_input()
             phys_x, phys_y = input_data.axisXY()
             x = round(phys_x * 4096)
@@ -333,7 +334,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
                     gate_pos_x=0,
                     gate_neg_x=0
                 ).start()
-                telem_data["_controls_locked"] = controls_locked
+                telem_data._controls_locked = controls_locked
                 self._spring_handle.stop()
 
             return

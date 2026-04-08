@@ -49,6 +49,7 @@ from telemffb.telem.DcsIpcThread import DcsIpcThread
 from telemffb.SettingsManager import SpringModeEnum
 
 from telemffb.util.conversions import kt2ms, kmh2ms, ms2kmh, deg
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 LPFs = utils.Dispenser(utils.LowPassFilter)
 perftracker = utils.PerformanceTracker()
@@ -177,24 +178,24 @@ class Aircraft(AircraftBase, DCSCommands):
         self.last_collective_y = None
 
     @override
-    def ac_update_gforce_effect(self, telem_data, adv_spr=False):
+    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr=False):
         # don't run if override is active
         if self.cp_spr_override_active: return
         return super().ac_update_gforce_effect(telem_data, adv_spr)
     
     @override
-    def ac_update_runway_rumble(self, telem_data):
+    def ac_update_runway_rumble(self, telem_data: BaseTelemetryData):
         if self.cp_spr_override_active: return
         return super().ac_update_runway_rumble(telem_data)
 
     @override
-    def ac_update_decel_effect(self, telem_data):
+    def ac_update_decel_effect(self, telem_data: BaseTelemetryData):
         if self.cp_spr_override_active: return
         return super().ac_update_decel_effect(telem_data)
 
 
     @override
-    def on_telemetry(self, telem_data : dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         ## Generic Aircraft Telemetry Handler
         """when telemetry frame is received, aircraft class receives data in dict format
 
@@ -204,14 +205,14 @@ class Aircraft(AircraftBase, DCSCommands):
         input_data = HapticEffect.device.get_input()
 
         cpx, cpy = input_data.CP_XY()
-        telem_data['CP_XY'] = f"{cpx}, {cpy}"
+        telem_data.CP_XY = f"{cpx}, {cpy}"
 
         try:
-            j = json.loads(telem_data["MechInfo"])
+            j = json.loads(telem_data.MechInfo)
             out = utils.flatten_dict(j, "", "_")
             for k, v in out.items():
                 telem_data[k] = v
-            del telem_data["MechInfo"]
+            del telem_data.MechInfo
         except:
             pass
 
@@ -223,10 +224,10 @@ class Aircraft(AircraftBase, DCSCommands):
 
 
         if not "AircraftClass" in telem_data:
-            telem_data["AircraftClass"] = "GenericAircraft"   #inject aircraft class into telemetry
+            telem_data.AircraftClass = "GenericAircraft"   #inject aircraft class into telemetry
 
         self._telem_data = telem_data
-        if telem_data.get("N") == None:
+        if telem_data.N is None:
             return
         
         # call base class telemetry handler
@@ -267,9 +268,9 @@ class Aircraft(AircraftBase, DCSCommands):
 
 
 
-    def dcs_update_damage(self, telem_data):
+    def dcs_update_damage(self, telem_data: BaseTelemetryData):
         if not self.damage_effect_enabled: return
-        damage = telem_data.get("Damage")
+        damage = telem_data.Damage
         damage_freq = 10
         damage_amp = utils.clamp(self.damage_effect_intensity, 0.0, 1.0)
 
@@ -283,7 +284,7 @@ class Aircraft(AircraftBase, DCSCommands):
         elif not self.anything_has_changed("damage", damage, delta_ms=50):
             self.effects.dispose("damage")
 
-    def dcs_override_collective_spring(self, telem_data):
+    def dcs_override_collective_spring(self, telem_data: BaseTelemetryData):
         """
         Overrides the spring on a collective to avoid DCS sending FFB events for the Y Axis.  By default sets gain to 0
         with option to override with gain = 4096
@@ -305,7 +306,7 @@ class Aircraft(AircraftBase, DCSCommands):
             self.spring = self.effects["collective_ap_spring"].spring()
 
             self.spring_y.set_coefficient(1.0)
-            if max(telem_data.get("WeightOnWheels")):
+            if max(telem_data.WeightOnWheels):
                 self.cpO_y = 4096
             elif self.last_collective_y is None:
                 # Air start or new aircraft.  Use current physical position as init point
@@ -343,17 +344,17 @@ class Aircraft(AircraftBase, DCSCommands):
 
 
     @override
-    def ac_update_pedal_trim(self, telem_data):
+    def ac_update_pedal_trim(self, telem_data: BaseTelemetryData):
         return self.dcs_update_pedal_trim(telem_data)
 
-    def dcs_update_pedal_trim(self, telem_data):
+    def dcs_update_pedal_trim(self, telem_data: BaseTelemetryData):
         if not self.is_pedals(): return
 
         input_data = HapticEffect.device.get_input()
         x, y = input_data.axisXY()
-        telem_data["X"] = x
+        telem_data.X = x
 
-        pedal_pos = -telem_data.get('controlsurfaces_rudder_right',0)
+        pedal_pos = -(telem_data.controlsurfaces_rudder_right or 0)
         # trim signal needs to be slow to avoid positive feedback
         lp_x = LPFs.get("x", 5)
         # estimate trim from real stick position and virtual stick position
@@ -365,7 +366,7 @@ class Aircraft(AircraftBase, DCSCommands):
 
         self.dcs_send_commands([f"LoSetCommand(2003, {x - offs_x})"])
 
-    def dcs_update_stick_position(self, telem_data):
+    def dcs_update_stick_position(self, telem_data: BaseTelemetryData):
         if not self.is_joystick(): return
 
         if not self.trim_workaround: return
@@ -374,8 +375,8 @@ class Aircraft(AircraftBase, DCSCommands):
 
         input_data = HapticEffect.device.get_input()
         x, y = input_data.axisXY()
-        telem_data["X"] = x
-        telem_data["Y"] = y
+        telem_data.X = x
+        telem_data.Y = y
 
         self.spring_x.set_coefficient(1.0)
         self.spring_y.set_coefficient(1.0)
@@ -385,8 +386,8 @@ class Aircraft(AircraftBase, DCSCommands):
         lp_x = LPFs.get("x", 5)
 
         # estimate trim from real stick position and virtual stick position
-        offs_x = lp_x.update(telem_data['StickX'] - x + lp_x.value)
-        offs_y = lp_y.update(telem_data['StickY'] - y + lp_y.value)
+        offs_x = lp_x.update(telem_data.StickX - x + lp_x.value)
+        offs_y = lp_y.update(telem_data.StickY - y + lp_y.value)
 
         self.spring_x.set_offset(offs_x)
         self.spring_y.set_offset(offs_y)
@@ -402,13 +403,13 @@ class Aircraft(AircraftBase, DCSCommands):
         self.dcs_send_commands([f"LoSetCommand(2001, {y - offs_y})", 
                             f"LoSetCommand(2002, {x - offs_x})"])
 
-    def dcs_update_stick_shaker(self, telem_data):
+    def dcs_update_stick_shaker(self, telem_data: BaseTelemetryData):
         if not self.enable_stick_shaker:
             self.effects['stick_shaker1'].destroy()
             self.effects['stick_shaker2'].destroy()
             return
 
-        aoa = telem_data.get('AoA', 0)
+        aoa = telem_data.AoA or 0
         on_ground = telem_data.get('SimOnGround', True)
         if aoa > self.stick_shaker_aoa and not on_ground:
             shake = True
@@ -432,7 +433,7 @@ class Aircraft(AircraftBase, DCSCommands):
             self.effects['stick_shaker1'].destroy()
             self.effects['stick_shaker2'].destroy()
 
-    def dcs_update_ap_deadzone(self, telem_data):
+    def dcs_update_ap_deadzone(self, telem_data: BaseTelemetryData):
         """
         Updates the dead-zone when the AP is active.  Useful for aircraft that are sensitive to joystick input when AP is active.
 
@@ -444,7 +445,7 @@ class Aircraft(AircraftBase, DCSCommands):
         """
         if not self.is_joystick(): return
 
-        ap_active = telem_data.get("APEnabled", 0)
+        ap_active = telem_data.APEnabled or 0
 
         if not self.ap_active_deadzone_enabled:
             self.ac_set_deadzone_override(0)
@@ -456,11 +457,11 @@ class Aircraft(AircraftBase, DCSCommands):
             self.ac_set_deadzone_override(0)
 
 
-    def dcs_override_copilot_spring(self, telem_data):
+    def dcs_override_copilot_spring(self, telem_data: BaseTelemetryData):
         if not self.is_joystick():return
 
 
-        seat = telem_data.get("Seat", 0)
+        seat = telem_data.Seat or 0
         if seat == self.cp_spr_override_pilot_seat_id or not self.cp_spr_override_enabled:
             self.effects['cp_ovd_spring'].stop()
             self.cp_spr_override_active = False
@@ -517,7 +518,7 @@ class Aircraft(AircraftBase, DCSCommands):
         spring = self.effects['dcs_spr_override'].spring()
 
         dt = perftracker.get_time_delta('override_spring_perf')
-        self.telem_data['_ovrd_spr_dt'] = dt
+        self.telem_data._ovrd_spr_dt = dt
 
         if self.override_spring_ft_enabled:
             input_data = HapticEffect.device.get_input()
@@ -554,7 +555,7 @@ class Aircraft(AircraftBase, DCSCommands):
             # calculate step size based on configured rate and delta time
             trim_step_size = self.override_spring_trim_rate * dt
 
-            self.telem_data['_ovrd_spr_step'] = trim_step_size
+            self.telem_data._ovrd_spr_step = trim_step_size
 
             # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
             # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
@@ -592,7 +593,7 @@ class Aircraft(AircraftBase, DCSCommands):
                     self.override_spring_cp0_x += trim_step_size
                 self.spring_x.cpOffset = round(self.override_spring_cp0_x)
 
-        self.telem_data['_ovrd_spr_trim_pos'] = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y)]
+        self.telem_data._ovrd_spr_trim_pos = [round(self.override_spring_cp0_x), round(self.override_spring_cp0_y)]
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
         self.spring_x.set_coefficient(self.override_spring_gain)
@@ -609,22 +610,22 @@ class PropellerAircraft(Aircraft):
     engine_max_rpm = 2700                           # Assume engine RPM of 2700 at 'EngRPM' = 1.00 for aircraft not exporting 'ActualRPM' in lua script
     max_aoa_cf_force : float = 0.2 # CF force sent to device at %stall_aoa
 
-    def dcs_update_actual_rpm(self, telem_data):
+    def dcs_update_actual_rpm(self, telem_data: BaseTelemetryData):
         if not "ActualRPM" in telem_data:
-            rpm = telem_data.get("EngRPM", 0)
+            rpm = telem_data.EngRPM or 0
             if isinstance(rpm, list):
                 rpm = [(x / 100) * self.engine_max_rpm for x in rpm]
             else:
                 rpm = (rpm / 100) * self.engine_max_rpm
-            telem_data["ActualRPM"] = rpm # inject ActualRPM into telemetry
+            telem_data.ActualRPM = rpm # inject ActualRPM into telemetry
 
     # run on every telemetry frame
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         ## Propeller Aircraft Telemetry Handler
-        if telem_data.get("N") == None:
+        if telem_data.N is None:
             return
-        telem_data["AircraftClass"] = "PropellerAircraft"   #inject aircraft class into telemetry
+        telem_data.AircraftClass = "PropellerAircraft"   #inject aircraft class into telemetry
         self.dcs_update_actual_rpm(telem_data)
 
         super().on_telemetry(telem_data)
@@ -639,11 +640,11 @@ class JetAircraft(Aircraft):
 
     # run on every telemetry frame
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         ## Jet Aircraft Telemetry Handler
-        if telem_data.get("N")== None:
+        if telem_data.N is None:
             return
-        telem_data["AircraftClass"] = "JetAircraft"   #inject aircraft class into telemetry
+        telem_data.AircraftClass = "JetAircraft"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
 class TurbopropAircraft(PropellerAircraft):
@@ -651,10 +652,10 @@ class TurbopropAircraft(PropellerAircraft):
         super().__init__(name, **kwargs)
 
     @override
-    def on_telemetry(self, telem_data):
-        if telem_data.get("N") == None:
+    def on_telemetry(self, telem_data: BaseTelemetryData):
+        if telem_data.N is None:
             return
-        telem_data["AircraftClass"] = "TurbopropAircraft"  # inject aircraft class into telemetry
+        telem_data.AircraftClass = "TurbopropAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
 
@@ -663,12 +664,12 @@ class Helicopter(Aircraft):
     buffeting_intensity = 0.0
 
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         self.speedbrake_motion_intensity = 0.0
         ## Helicopter Aircraft Telemetry Handler
-        if telem_data.get("N") == None:
+        if telem_data.N is None:
             return
-        telem_data["AircraftClass"] = "Helicopter"   #inject aircraft class into telemetry
+        telem_data.AircraftClass = "Helicopter"   #inject aircraft class into telemetry
         super().on_telemetry(telem_data)
 
         self.dcs_update_trim_damper()

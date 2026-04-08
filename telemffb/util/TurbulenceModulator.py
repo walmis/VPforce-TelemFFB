@@ -2,6 +2,7 @@ import numpy as np
 
 
 import math
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class TurbulenceModulator:
@@ -39,7 +40,7 @@ class TurbulenceModulator:
         self.hpf_z = 0.0
         self.prev_force = 0.0
 
-    def update(self, telem_data,
+    def update(self, telem_data: BaseTelemetryData,
                turbulence_hpf_alpha=0.95,
                turbulence_smoothing_alpha=0.3,
                turbulence_sensitivity=0.5,

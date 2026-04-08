@@ -5,7 +5,7 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 import logging
 import math
-from typing import Dict
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class WindEffectMixIn(AircraftEffectUtilsBase):
@@ -23,14 +23,14 @@ class WindEffectMixIn(AircraftEffectUtilsBase):
         self.__wind_hpf = utils.HighPassFilter(3)
         self.__wind_lpf = utils.LowPassFilter(15)
 
-    def ac_update_wind_effect(self, telem_data):
+    def ac_update_wind_effect(self, telem_data: BaseTelemetryData):
         if not self.is_joystick():
             return
         if not self.wind_effect_enabled:
             self.effects.dispose("wnd")
             return
 
-        wind = telem_data.get("Wind", (0, 0, 0))
+        wind = telem_data.Wind or (0, 0, 0)
         wnd = math.sqrt(wind[0] ** 2 + wind[1] ** 2 + wind[2] ** 2)
 
         v = self.__wind_hpf.update(wnd)
@@ -44,6 +44,6 @@ class WindEffectMixIn(AircraftEffectUtilsBase):
         self.effects["wnd"].constant(v, utils.RandomDirectionModulator, 5).start()
 
     @override
-    def on_telemetry(self, telem_data: Dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.ac_update_wind_effect(telem_data)

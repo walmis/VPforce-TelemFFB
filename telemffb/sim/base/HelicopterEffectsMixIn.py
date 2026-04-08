@@ -4,6 +4,7 @@ import telemffb.utils as utils
 from telemffb.SettingsManager import SpringModeEnum
 from telemffb.hw.ffb_rhino import HapticEffect
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 perftracker = utils.PerformanceTracker()
 
@@ -57,21 +58,22 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
     ######                            ######
     ########################################
 
-    def ac_calc_etl_effect(self, telem_data, blade_ct=None):
+    def ac_calc_etl_effect(self, telem_data: BaseTelemetryData, blade_ct=None):
         #  rotor = 245
-        mod = telem_data.get("N")
-        tas = telem_data.get("TAS", 0)
-        WoW = sum(telem_data.get("WeightOnWheels"))
+        mod = telem_data.N
+        tas = telem_data.TAS or 0
+        WoW = sum(telem_data.WeightOnWheels or [0, 0, 0])
         if mod == "UH-60L":
             # UH60 always shows positive value for tailwheel
-            WoW = telem_data.get("WeightOnWheels")[0] + telem_data.get("WeightOnWheels")[2]
+            wow_list = telem_data.WeightOnWheels or [0, 0, 0]
+            WoW = wow_list[0] + wow_list[2]
 
         if self._sim_is_xplane():
-            rotor = telem_data.get("PropRPM", 0)
+            rotor = telem_data.PropRPM or 0
             if isinstance(rotor, list):
                 rotor = rotor[0]
         else:
-            rotor = telem_data.get("RotorRPM", 0)
+            rotor = telem_data.RotorRPM or 0
             if isinstance(rotor, list):
                 rotor = max(rotor)
         if WoW > 0:
@@ -113,17 +115,17 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         else:
             self.effects.dispose("overspeedX", "overspeedY")
 
-    def ac_update_vrs_effect(self, telem_data):
-        vs = telem_data.get("VerticalSpeed", 0)
+    def ac_update_vrs_effect(self, telem_data: BaseTelemetryData):
+        vs = telem_data.VerticalSpeed or 0
         if self._sim_is_dcs():
-            # spd = abs(telem_data.get("VlctVectors")[0])
-            tas = telem_data.get("TAS")
+            # spd = abs(telem_data.VlctVectors[0])
+            tas = telem_data.TAS
             adj_tas = tas - abs(vs)
             spd = adj_tas
-            telem_data["_adj_TAS"] = adj_tas
+            telem_data._adj_TAS = adj_tas
         else:
-            spd = abs(telem_data.get("TAS", 0))
-        wow = max(telem_data.get("WeightOnWheels", 1))
+            spd = abs(telem_data.TAS or 0)
+        wow = max(telem_data.WeightOnWheels or [1])
         # print(f"tas:{tas}, vs:{vs}, wow:{wow}")
         if not self.vrs_effect_enable or wow or spd > self.vrs_threshold_speed or vs > 0:
             # print("I'm out")
@@ -144,21 +146,21 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         else:
             self.effects.dispose("vrs_buffet", "vrs_buffet2")
 
-    def ac_update_heli_engine_rumble(self, telem_data, blade_ct=None):
+    def ac_update_heli_engine_rumble(self, telem_data: BaseTelemetryData, blade_ct=None):
         if not self.engine_rotor_rumble_enabled or not self.heli_engine_rumble_intensity:
             self.effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
             return
         if self._sim_is_xplane():
-            rrpm = telem_data.get("PropRPM", 0)
+            rrpm = telem_data.PropRPM or 0
             if isinstance(rrpm, list):
                 rrpm = rrpm[0]
         else:
-            rrpm = telem_data.get("RotorRPM", 0)
+            rrpm = telem_data.RotorRPM or 0
             if isinstance(rrpm, list):
                 rrpm = max(rrpm)
-        mod = telem_data.get("N")
-        tas = telem_data.get("TAS", 0)
-        eng_rpm = telem_data.get("EngRPM", 0)
+        mod = telem_data.N
+        tas = telem_data.TAS or 0
+        eng_rpm = telem_data.EngRPM or 0
         if isinstance(eng_rpm, list):
             eng_rpm = max(eng_rpm)
 
@@ -188,7 +190,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         else:
             self.effects.dispose("rotor_rpm0-1", "rotor_rpm1-1")
 
-    def ac_collective_force_trim_override(self, telem_data, spring):
+    def ac_collective_force_trim_override(self, telem_data: BaseTelemetryData, spring):
         """
         Generic effect enabling spring force and hardware trim for collective axis.
         """
@@ -201,15 +203,17 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             return
 
         dt = perftracker.get_time_delta("collective_ft_perf")
-        self.telem_data["_coll_ft_dt"] = dt
+        self.telem_data._coll_ft_dt = dt
 
-        wow = sum(telem_data.get("WeightOnWheels", [1]))
+        wow = sum(telem_data.WeightOnWheels or [1])
 
         input_data = HapticEffect.device.get_input()
         _, y = input_data.axisXY()
         current_buttons = input_data.getPressedButtons()
 
-        force_trim_active = telem_data.get("ForceTrimSW", True)
+        force_trim_active = telem_data.ForceTrimSW
+        if force_trim_active is None:
+            force_trim_active = True
 
         if not force_trim_active:
             # Force trim is enabled, but the 'ForceTrimSW' flag is false, just move
@@ -242,7 +246,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         # calculate step size based on configured rate and delta time
         trim_step_size = self.collective_ft_ovd_trim_rate * dt
 
-        self.telem_data["_coll_ft_step"] = trim_step_size
+        self.telem_data._coll_ft_step = trim_step_size
 
         if self.check_button_press(self.collective_ft_ovd_trim_down, self.collective_ft_use_master_buttons):
             # shift offset based on previously calculated step size.  Ensure value does not exceed limits
@@ -257,7 +261,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
             self.collective_ft_ovd_cp0_y = utils.clamp(self.collective_ft_ovd_cp0_y, -4096, 4096)
             self.spring_y.set_offset(round(self.collective_ft_ovd_cp0_y))
 
-        self.telem_data["_coll_ft_trim_pos"] = round(self.collective_ft_ovd_cp0_y)
+        self.telem_data._coll_ft_trim_pos = round(self.collective_ft_ovd_cp0_y)
 
         # If trim release is not pressed, set spring gain based on user setting and start spring override
         self.spring_y.set_coefficient(self.collective_ft_ovd_spring_gain)
@@ -266,7 +270,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         # ensure spring is started with override = true
         spring.start(override=True)
 
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         if self.is_helicopter():
             self.ac_calc_etl_effect(telem_data, blade_ct=self.rotor_blade_count)

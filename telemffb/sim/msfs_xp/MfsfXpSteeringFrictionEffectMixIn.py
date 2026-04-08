@@ -1,6 +1,7 @@
 import telemffb.utils as utils
 from telemffb.sim.base.FFBForcesMixIn import FFBForcesMixIn
 from telemffb.utils import clamp
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
@@ -17,7 +18,7 @@ class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
         super().__init__()
         self.friction_effect_overridden = False
 
-    def msfs_update_steering_friction_effect(self, telem_data):
+    def msfs_update_steering_friction_effect(self, telem_data: BaseTelemetryData):
         if not self._sim_is_msfs(): return
         if not self.is_pedals(): return
 
@@ -36,12 +37,12 @@ class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
                 "Steering Friction effect enabled but friction override not enabled")
             return
 
-        on_ground = telem_data.get("SimOnGround", 0)
-        wos = telem_data.get("WeightOnWheels", [0])[0]  # center steering wheel only
-        gs = telem_data.get("GroundSpeed", 0)
+        on_ground = telem_data.SimOnGround or 0
+        wos = (telem_data.WeightOnWheels or [0])[0]  # center steering wheel only
+        gs = telem_data.GroundSpeed or 0
         #csa = telem_data.get("CenterSteerAngle", 0)
-        wr = telem_data.get("WaterRudderExt", 0) # percent of rudder extension
-        surface = telem_data.get("SurfaceType", 0)
+        wr = telem_data.WaterRudderExt or 0 # percent of rudder extension
+        surface = telem_data.SurfaceType or 0
 
         if on_ground and (wos or surface == "Water"):
             # scale gs 0-40kt to 1-0
@@ -63,7 +64,7 @@ class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
             if not usable_friction_range:
                 return
 
-            telem_data["_pct_steer_f"] = friction_coeff_add / usable_friction_range
+            telem_data._pct_steer_f = friction_coeff_add / usable_friction_range
             self._ipc_telem["_pct_steer_f"] = friction_coeff_add / usable_friction_range
 
             self.friction_effect_overridden = True
@@ -76,6 +77,6 @@ class MfsfXpSteeringFrictionEffectMixIn(FFBForcesMixIn):
                 self.friction_effect_overridden = False
                 self.effects["friction"].destroy()
 
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.msfs_update_steering_friction_effect(telem_data)

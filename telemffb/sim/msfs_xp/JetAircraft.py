@@ -18,6 +18,7 @@
 
 from .Aircraft import Aircraft
 from typing import override
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class JetAircraft(Aircraft):
@@ -28,11 +29,11 @@ class JetAircraft(Aircraft):
         super().__init__(name, **kwargs)
 
     @override
-    def on_telemetry(self, telem_data):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         ## Jet Aircraft Telemetry Manager
-        if telem_data.get("N") == None:
+        if telem_data.N is None:
             return
 
-        telem_data["AircraftClass"] = "JetAircraft"  # inject aircraft class into telemetry
+        telem_data.AircraftClass = "JetAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)

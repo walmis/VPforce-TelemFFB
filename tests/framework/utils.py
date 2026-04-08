@@ -2,6 +2,7 @@
 Utility functions and helpers for telemetry effect testing.
 """
 from typing import Dict, Any, Optional, Tuple
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class TelemetryDataBuilder:
@@ -140,9 +141,9 @@ class TelemetryDataBuilder:
         self._data[key] = value
         return self
     
-    def build(self) -> Dict[str, Any]:
-        """Build and return the telemetry dictionary."""
-        return self._data.copy()
+    def build(self) -> BaseTelemetryData:
+        """Build and return the telemetry data as BaseTelemetryData."""
+        return BaseTelemetryData(self._data.copy())
 
 
 def assert_effect_started(effect, msg: str = ""):

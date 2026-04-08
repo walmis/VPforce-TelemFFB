@@ -10,6 +10,7 @@ sys.path.insert(0, str(parent_dir))
 
 import pytest
 from tests.framework.base import MockHapticEffect, MockSimConnect, MockFFBDevice
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 import telemffb.globals as G
 
 
@@ -46,7 +47,7 @@ def mock_simconnect():
 @pytest.fixture
 def sample_telem_data():
     """Provide sample telemetry data for testing."""
-    return {
+    return BaseTelemetryData({
         "SimOnGround": 1,
         "WeightOnWheels": [1, 1, 1],
         "GroundSpeed": 10.0,
@@ -59,4 +60,4 @@ def sample_telem_data():
         "ElevTrimPct": 0.0,
         "AileronTrimPct": 0.0,
         "RudderTrimPct": 0.0,
-    }
+    })

@@ -7,6 +7,7 @@ from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 import logging
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class GForceEffectProperties:
     """Separate class to hold GForce effect properties for mixin inheritance to reduce clutter."""
@@ -109,33 +110,33 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
         return mode == self.gforce_effect_mode
     
     @override
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.ac_update_gforce_effect(telem_data)
 
-    def _get_gs_data(self, telem_data: dict) -> tuple:
+    def _get_gs_data(self, telem_data: BaseTelemetryData) -> tuple:
         """Get G-force data based on simulator type."""
         if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
-            accs = telem_data.get("ACCs")
+            accs = telem_data.ACCs
             if not accs:
                 return None, None, None
             gs = accs[1]
             y_gs = accs[0]
-            last_accs = self._last_telem_data.get("ACCs", [0, 0, 0])
+            last_accs = self._last_telem_data.ACCs or [0, 0, 0]
             last_y_gs = last_accs[0]
         elif self._sim_is("MSFS") or self._sim_is('XPLANE'):
-            gs = telem_data.get("G")
-            acc_body = telem_data.get("AccBody")
+            gs = telem_data.G
+            acc_body = telem_data.AccBody
             if not acc_body:
                 return None, None, None
             y_gs = acc_body[2]
-            last_acc_body = self._last_telem_data.get("AccBody", [0, 0, 0])
+            last_acc_body = self._last_telem_data.AccBody or [0, 0, 0]
             last_y_gs = last_acc_body[2]
         else:
             return None, None, None
         return gs, y_gs, last_y_gs
 
-    def _ac_run_new_gforce_effect(self, telem_data):
+    def _ac_run_new_gforce_effect(self, telem_data: BaseTelemetryData):
         """Apply new G-force effects based on aircraft acceleration.
 
         Generates force feedback effects that vary with G-forces experienced by the aircraft.
@@ -143,7 +144,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
         and negative G-forces if configured.
 
         Args:
-            telem_data (dict): Telemetry data containing acceleration information
+            telem_data: Telemetry data containing acceleration information
         """
         if (
             self._should_skip_joystick_effect()
@@ -206,21 +207,21 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
             self.effects["new_gforce"].stop()
             return
 
-        telem_data["g_factor_raw"] = g_factor
-        telem_data["g_deflection"] = deflection_factor
+        telem_data.g_factor_raw = g_factor
+        telem_data.g_deflection = deflection_factor
         # utils.dbprint("blue", f"g_deflection_factor: {deflection_factor}", "joystick")
-        telem_data["g_y"] = y
+        telem_data.g_y = y
 
         g_factor = g_factor * deflection_factor
 
-        telem_data["g_factor"] = g_factor
+        telem_data.g_factor = g_factor
         self.effects["new_gforce"].constant(g_factor, direction).start()
         logging.debug(f"G's = {gs} | gfactor = {g_factor}")
 
     def g_effect_get_adv_mode(self) -> Literal["constant", "offset"]:
         return self.gforce_effect_adv_curve.get("mode", "constant") if self.gforce_effect_adv_curve else "constant"
            
-    def ac_update_gforce_effect(self, telem_data, adv_spr=False):
+    def ac_update_gforce_effect(self, telem_data: BaseTelemetryData, adv_spr=False):
         if not self.is_joystick():
             return
         

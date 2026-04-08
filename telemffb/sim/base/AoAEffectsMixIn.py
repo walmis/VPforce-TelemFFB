@@ -10,6 +10,7 @@ from telemffb.util.conversions import kmh2ms
 from telemffb.sim.base.AircraftParamsMixIn import AircraftParamsMixIn
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.sim.base.AdvancedSpringMixIn import AdvancedSpringMixIn
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class AoAEffectsMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
@@ -34,7 +35,7 @@ class AoAEffectsMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
 
         self.smoother = utils.Smoother()
 
-    def ac_update_aoa_reduction_force_effect(self, telem_data):
+    def ac_update_aoa_reduction_force_effect(self, telem_data: BaseTelemetryData):
         if not self.aoa_reduction_effect_enabled:
             return
         if self._should_skip_joystick_effect():
@@ -47,8 +48,8 @@ class AoAEffectsMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             return
         start_aoa = self.critical_aoa_start
         end_aoa = self.critical_aoa_max
-        aoa = telem_data.get("AoA", 0)
-        tas = telem_data.get("TAS", 0)
+        aoa = telem_data.AoA or 0
+        tas = telem_data.TAS or 0
         avg_aoa = self.smoother.get_average("crit_aoa", aoa, sample_size=8)
         import telemffb.utils as utils
 
@@ -62,17 +63,17 @@ class AoAEffectsMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             self.effects.dispose("crit_aoa")
         return
 
-    def ac_update_aoa_effect(self, telem_data, minspeed=50*kmh2ms, maxspeed=140*kmh2ms):
+    def ac_update_aoa_effect(self, telem_data: BaseTelemetryData, minspeed=50*kmh2ms, maxspeed=140*kmh2ms):
         if not self.aoa_effect_enabled:
             return
         if not self.is_joystick():
             return
         from telemffb.SettingsManager import SpringModeEnum
-        if self.spring_mode_is(SpringModeEnum.FBW) or telem_data.get("ACisFBW"):
+        if self.spring_mode_is(SpringModeEnum.FBW) or telem_data.ACisFBW:
             return
 
-        aoa = telem_data.get("AoA", 0)
-        tas = telem_data.get("TAS", 0)
+        aoa = telem_data.AoA or 0
+        tas = telem_data.TAS or 0
         local_stall_aoa = getattr(self, 'stall_aoa', 0)
 
         if aoa:
@@ -82,13 +83,13 @@ class AoAEffectsMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             mag *= speed_factor
             dir = 0 if (aoa > 0) else 180
 
-            telem_data["aoa_pull"] = mag
+            telem_data.aoa_pull = mag
             logging.debug(f"AOA EFFECT:{mag}")
             self.effects["aoa"].constant(mag, dir).start()
 
             # effects.dispose("ab_rumble_2_2")
 
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.ac_update_aoa_reduction_force_effect(telem_data)
 

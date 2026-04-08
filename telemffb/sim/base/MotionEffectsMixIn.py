@@ -4,6 +4,7 @@ from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 from telemffb.util.conversions import kt2ms
 
 import logging
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 
 class MotionEffectsMixIn(AircraftEffectUtilsBase):
@@ -78,21 +79,21 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         self.center_wheel_hpf = utils.HighPassFilter(cutoff_freq_hz=3)
         self.side_wheels_hpf = utils.HighPassFilter(cutoff_freq_hz=3)
 
-    def _bms_taxi_bumps(self, telem_data):
+    def _bms_taxi_bumps(self, telem_data: BaseTelemetryData):
         """Generates a bump effect in response to bumpIntensity telemetry for Falcon BMS simulator"""
         if not self.runway_rumble_intensity or not self.runway_rumble_enabled:
             self.effects.dispose("runway_bump0", "runway_bump1")
             return
-        bump = telem_data.get("BumpIntensity")
+        bump = telem_data.BumpIntensity
         if bump and self.anything_has_changed("BumpIntensity", bump):
             intensity = utils.clamp(bump * self.runway_rumble_intensity, 0, 1)
             self.effects['runway_bump0'].periodic(15, intensity * .75, direction=0, effect_type=EFFECT_SQUARE, duration=80).start()
             self.effects['runway_bump1'].periodic(15, intensity, direction=0, effect_type=EFFECT_SQUARE, phase=180, duration=160).start()
 
-    def ac_update_flaps(self, telem_data):
-        flapspos = telem_data.get("Flaps")
+    def ac_update_flaps(self, telem_data: BaseTelemetryData):
+        flapspos = telem_data.Flaps
         if flapspos is None:
-            flapspos = telem_data.get("flaps_value")
+            flapspos = telem_data.flaps_value
         if flapspos is None:
             return
 
@@ -105,7 +106,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         else:
             self.effects["flapsmovement"].stop(destroy_after=5000)
 
-    def ac_update_runway_rumble(self, telem_data):
+    def ac_update_runway_rumble(self, telem_data: BaseTelemetryData):
         """Add wheel based rumble effects for immersion
         Generates bumps/etc on touchdown, rolling, field landing etc
         """
@@ -119,7 +120,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             self.effects.dispose("runway0", "runway1")
             return
 
-        WoW = telem_data.get("WeightOnWheels", (0, 0, 0))
+        WoW = telem_data.WeightOnWheels or (0, 0, 0)
 
         v1 = self.center_wheel_hpf.update((WoW[0])) * self.runway_rumble_intensity
         v2 = self.side_wheels_hpf.update(WoW[1] - WoW[2]) * self.runway_rumble_intensity
@@ -142,7 +143,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         else:
             self.effects.dispose("runway0", "runway1")
 
-    def ac_update_touchdown_effect(self, telem_data):
+    def ac_update_touchdown_effect(self, telem_data: BaseTelemetryData):
         """Generates a g-based force upon landing or as a result of large bumps"""
 
         max_force = self.touchdown_effect_max_force
@@ -150,16 +151,16 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         if self.is_collective() or self.is_pedals():
             return
         if self._sim_is("DCS") or self._sim_is("IL2") or self._sim_is('BMS'):
-            gs = round(telem_data.get("ACCs")[1] - 1, 2)
+            gs = round((telem_data.ACCs or [0, 0])[1] - 1, 2)
         elif self._sim_is("MSFS") or self._sim_is("XPLANE"):
-            gs = round(telem_data.get("AccBody")[1], 2)
+            gs = round((telem_data.AccBody or [0, 0])[1], 2)
         else:
             return
 
         if not self.touchdown_effect_enabled:
             self.effects.dispose("touchdown")
             return
-        on_ground = telem_data.get("SimOnGround", 0)
+        on_ground = telem_data.SimOnGround or 0
         if not on_ground:
             self.effects.dispose("touchdown")
             return
@@ -168,10 +169,10 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         logging.debug(f"Touchdown Effect: Realtime Gs: {gs}, Force:{force}")
         self.effects['touchdown'].constant(force, 180).start()
 
-    def ac_update_canopy(self, telem_data):
-        canopypos = telem_data.get("Canopy")
+    def ac_update_canopy(self, telem_data: BaseTelemetryData):
+        canopypos = telem_data.Canopy
         if canopypos is None:
-            canopypos = telem_data.get("canopy_value")
+            canopypos = telem_data.canopy_value
         if canopypos is None:
             return
         if self.anything_has_changed("Canopy", canopypos, delta_ms=100) and self.canopy_motion_intensity > 0 and self.canopy_motion_effect_enabled:
@@ -183,13 +184,13 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
                 self.effects['canopyclunk'].periodic(10, utils.clamp((self.canopy_motion_intensity * 2), 0, 1), 180, effect_type=EFFECT_SQUARE,duration=40).start()
             self.effects["canopymovement"].stop(destroy_after=5000)
 
-    def ac_update_landing_gear(self, telem_data):
-        gearpos = telem_data.get("gear_value", telem_data.get("GearPos", None))
+    def ac_update_landing_gear(self, telem_data: BaseTelemetryData):
+        gearpos = telem_data.gear_value if telem_data.gear_value is not None else telem_data.GearPos
         if isinstance(gearpos, list):
             gearpos = max(gearpos)
 
         if self._sim_is_msfs() or self._sim_is_xplane():
-            retracts = telem_data.get("RetractableGear", 0)
+            retracts = telem_data.RetractableGear or 0
             if isinstance(retracts, list):
                 retracts = max(retracts)
             if (self.gear_motion_intensity > 0) and (retracts):
@@ -198,12 +199,12 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         if gearpos is None:
             return
 
-        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
+        airspd = telem_data.IAS if telem_data.IAS is not None else telem_data.TAS
         if airspd is None:
             return
 
         if self._sim_is_xplane():
-            self.gear_buffet_speed_low = 0.9 * self.telem_data.get("Vle", 10000)
+            self.gear_buffet_speed_low = 0.9 * (self.telem_data.Vle or 10000)
             self.gear_buffet_speed_high = self.gear_buffet_speed_low * 1.3
 
         rumble_freq = self.gear_buffet_freq
@@ -226,19 +227,19 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         else:
             self.effects.dispose("gearbuffet", "gearbuffet2")
 
-    def ac_update_speed_brakes(self, telem_data):
-        if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
+    def ac_update_speed_brakes(self, telem_data: BaseTelemetryData):
+        if (self._telem_data.AircraftClass or "GenericAircraft") == 'Helicopter':
             return
 
         spd_thresh = self.speedbrake_speed_thresh
-        spdbrk = telem_data.get("SpeedbrakePos")
+        spdbrk = telem_data.SpeedbrakePos
         if spdbrk is None:
-            spdbrk = telem_data.get("speedbrakes_value", None)
+            spdbrk = telem_data.speedbrakes_value
 
         if spdbrk is None:
             return
 
-        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
+        airspd = telem_data.IAS if telem_data.IAS is not None else telem_data.TAS
         if airspd is None:
             return
         if self.anything_has_changed("speedbrakes_value", spdbrk, 50) and self.speedbrake_motion_intensity > 0 and self.speedbrake_motion_effect_enabled:
@@ -264,19 +265,19 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         temp_telem['TAS'] = airspd
         self._create_buffeting_effect(temp_telem, config)
 
-    def ac_update_spoilers(self, telem_data):
-        if self._telem_data.get("AircraftClass", "GenericAircraft") == 'Helicopter':
+    def ac_update_spoilers(self, telem_data: BaseTelemetryData):
+        if (self._telem_data.AircraftClass or "GenericAircraft") == 'Helicopter':
             return
 
         spd_thresh_low = self.spoiler_spd_thresh_low
         spd_thresh_hi  = self.spoiler_spd_thresh_hi
 
-        airspd = telem_data.get("IAS", telem_data.get("TAS", None))
+        airspd = telem_data.IAS if telem_data.IAS is not None else telem_data.TAS
         if airspd is None:
             return
 
         tas_intensity = utils.clamp_minmax(utils.scale(airspd, (spd_thresh_low, spd_thresh_hi), (0.0, 1.0)), 1.0)
-        spoiler = telem_data.get("Spoilers")
+        spoiler = telem_data.Spoilers
 
         if spoiler == 0 or spoiler == None:
             self.effects.dispose("spoilermovement", "spoilermovement2")
@@ -305,8 +306,8 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
             for effect in ["spoilerbuffet1-1", "spoilerbuffet1-2", "spoilerbuffet2-1", "spoilerbuffet2-2"]:
                 self.effects[effect].stop(1000)
 
-    def ac_update_tailhook_effect(self, telem_data):
-        hook = telem_data.get('TailHook', None)
+    def ac_update_tailhook_effect(self, telem_data: BaseTelemetryData):
+        hook = telem_data.TailHook
         if hook is None: return
         if not self.is_joystick(): return
 
@@ -324,7 +325,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
                 self.effects['clunk'].periodic(10, utils.clamp((self.tailhook_motion_intensity * 2), 0, 1), dir, effect_type=EFFECT_SQUARE,duration=40).start()
             self.effects.dispose("hookmovement")
 
-    def ac_update_fuelboom_effect(self, telem_data):
+    def ac_update_fuelboom_effect(self, telem_data: BaseTelemetryData):
         config = {
             'telem_key': 'FuelBoom',
             'change_key': 'fuelboom_value',
@@ -340,7 +341,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         }
         self._create_motion_effect(telem_data, config)
 
-    def ac_update_wingfold_effect(self, telem_data):
+    def ac_update_wingfold_effect(self, telem_data: BaseTelemetryData):
         config = {
             'telem_key': 'WingFold',
             'change_key': 'wingfold_value',
@@ -359,7 +360,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         }
         self._create_motion_effect(telem_data, config)
 
-    def _create_motion_effect(self, telem_data: dict, config: dict):
+    def _create_motion_effect(self, telem_data: BaseTelemetryData, config: dict):
         """Generic method for motion effects (tailhook, fuelboom, wingfold, etc.)."""
         value = telem_data.get(config['telem_key'])
         if value is None:
@@ -408,7 +409,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
 
             self.effects.dispose(*config['effect_names'])
 
-    def _create_buffeting_effect(self, telem_data: dict, config: dict):
+    def _create_buffeting_effect(self, telem_data: BaseTelemetryData, config: dict):
         enabled = getattr(self, config['enabled_attr'])
         intensity = getattr(self, config['intensity_attr'])
 
@@ -434,7 +435,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
         tas_intensity = utils.scale_clamp(tas, (speed_low, speed_high), (0.0, 1.0))
 
         if isinstance(deployment, list):
-            if config.get('special_calc') and "F-14" in str(telem_data.get("N", "")):
+            if config.get('special_calc') and "F-14" in str(telem_data.N or ""):
                 inner = (deployment[1], deployment[2])
                 outer = (deployment[0], deployment[3])
                 deployment = (0.85 * sum(inner) + 0.15 * sum(outer)) / 2
@@ -450,7 +451,7 @@ class MotionEffectsMixIn(AircraftEffectUtilsBase):
 
         logging.debug(f"PLAYING {config['effect_name'].upper()} RUMBLE | intensity: {realtime_intensity}")
 
-    def on_telemetry(self, telem_data: dict):
+    def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)
         self.ac_update_tailhook_effect(telem_data)
         self.ac_update_fuelboom_effect(telem_data)
