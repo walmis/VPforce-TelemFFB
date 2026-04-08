@@ -101,11 +101,11 @@ class TestFrameworkBasics(BaseTelemetryEffectTestCase):
 class TestTelemetryDataBuilder(BaseTelemetryEffectTestCase):
     """Tests for the TelemetryDataBuilder."""
     
-    def test_builder_creates_dict(self):
-        """Test that builder creates a dictionary."""
+    def test_builder_creates_base_telemetry_data(self):
+        """Test that builder creates BaseTelemetryData."""
         telem = TelemetryDataBuilder().build()
         
-        assert isinstance(telem, dict)
+        assert isinstance(telem, BaseTelemetryData)
         assert len(telem) > 0
     
     def test_builder_fluent_interface(self):

@@ -121,8 +121,8 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                         virtual_stick_y_offs = elevator_pos - (elevator_pos * self.joystick_trim_follow_gain_virtual_y)
                         phys_stick_y_offs = int(elevator_pos * 4096)
 
-                        if isinstance(aileron_pos, list):
-                            aileron_pos = aileron_pos[0]
+                        if isinstance(aileron_pos, (list, tuple)):
+                            aileron_pos = aileron_pos[0] if aileron_pos else 0
 
                         aileron_pos = clamp(aileron_pos * self.joystick_ap_follow_gain_physical_x, -1, 1)
 

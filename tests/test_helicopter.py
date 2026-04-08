@@ -15,6 +15,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from tests.framework.base import BaseTelemetryEffectTestCase, MockConditionEffect
 from tests.framework.utils import TelemetryDataBuilder
+from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 from telemffb.sim.msfs_xp.Helicopter import Helicopter
 from telemffb.sim.msfs_xp.MsfsXpHeliControlsMixIn import MsfsXpHeliControlsMixIn
 from telemffb.SettingsManager import SpringModeEnum
@@ -735,7 +736,7 @@ class TestHelicopterTelemetryProcessing(BaseTelemetryEffectTestCase):
         instance._test_sim_is_msfs = True
         instance._test_device_type = "joystick"
         
-        telem = {
+        telem = BaseTelemetryData({
             "SimOnGround": 0,
             "FFBType": "joystick",
             "N": 100.0,
@@ -744,31 +745,31 @@ class TestHelicopterTelemetryProcessing(BaseTelemetryEffectTestCase):
             "Heading": 0.0,
             "Pitch": 0.0,
             "Roll": 0.0
-        }
+        })
         self.set_telemetry(instance, telem)
         
         instance.on_telemetry(telem)
         
         # Should inject helicopter class
-        assert telem.get("AircraftClass") == "Helicopter"
+        assert telem.AircraftClass == "Helicopter"
     
     def test_on_telemetry_returns_early_if_no_rotor_rpm(self):
         """Test that on_telemetry returns early if no rotor RPM data."""
         instance = self.create_aircraft_instance(Helicopter, name="TestHeli")
         instance._test_sim_is_msfs = True
         
-        telem = {
+        telem = BaseTelemetryData({
             "SimOnGround": 0,
             "FFBType": "joystick"
             # Missing "N" (rotor RPM)
-        }
+        })
         self.set_telemetry(instance, telem)
         
         # Should return early without processing
         instance.on_telemetry(telem)
         
         # AircraftClass should not be injected
-        assert telem.get("AircraftClass") is None
+        assert telem.AircraftClass is None
     
     def test_on_telemetry_disables_speedbrake_motion(self):
         """Test that helicopter disables speedbrake motion effects."""
@@ -776,7 +777,7 @@ class TestHelicopterTelemetryProcessing(BaseTelemetryEffectTestCase):
         instance._test_sim_is_msfs = True
         instance.speedbrake_motion_intensity = 1.0  # Set non-zero
         
-        telem = {
+        telem = BaseTelemetryData({
             "SimOnGround": 0,
             "FFBType": "joystick",
             "N": 100.0,
@@ -785,7 +786,7 @@ class TestHelicopterTelemetryProcessing(BaseTelemetryEffectTestCase):
             "Heading": 0.0,
             "Pitch": 0.0,
             "Roll": 0.0
-        }
+        })
         self.set_telemetry(instance, telem)
         
         instance.on_telemetry(telem)

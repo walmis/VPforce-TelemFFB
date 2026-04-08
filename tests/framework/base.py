@@ -74,6 +74,8 @@ class MockConditionEffect:
         self.name = name
         self.started = False
         self.effect_type = 0  # Default effect type
+        self._envelope = None
+        self._envelope_once = False
         self._x_coefficient = 0
         self._y_coefficient = 0
         self._x_offset = 0
@@ -99,6 +101,9 @@ class MockConditionEffect:
     def stop(self):
         """Stop the effect."""
         self.started = False
+        if self._envelope_once:
+            self._envelope = None
+            self._envelope_once = False
         self.stop_count += 1
         return self
     
@@ -160,6 +165,29 @@ class MockConditionEffect:
         """Set constant force parameters."""
         self._magnitude = magnitude
         self._direction = direction
+        return self
+
+    def envelope(self, attackFromForce=None, decayToForce=None, attackTime=None, decayTime=None, once=False, **kwargs):
+        """Store envelope parameters and return self for call chaining."""
+        if 'envelope' in kwargs:
+            self._envelope = kwargs['envelope']
+        else:
+            params = {}
+            if attackFromForce is not None:
+                params['attackFromForce'] = attackFromForce
+            if decayToForce is not None:
+                params['decayToForce'] = decayToForce
+            if attackTime is not None:
+                params['attackTime'] = attackTime
+            if decayTime is not None:
+                params['decayTime'] = decayTime
+            self._envelope = params if params else None
+        self._envelope_once = once
+        return self
+
+    def setEnvelope(self, envelope):
+        """Set envelope object directly to mirror production effect API."""
+        self._envelope = envelope
         return self
     
     def get_coefficients(self):
