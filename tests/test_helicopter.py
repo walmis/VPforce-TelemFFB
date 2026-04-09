@@ -792,6 +792,127 @@ class TestHelicopterSimConnectProxy(BaseTelemetryEffectTestCase):
 
 
 @pytest.mark.unit
+@pytest.mark.msfs
+@pytest.mark.helicopter
+class TestHelicopterSimvarSync(BaseTelemetryEffectTestCase):
+    """Tests for simvar subscription sync methods (_sync_msfs_controls_lock_simvar, _sync_msfs_force_trim_simvar)."""
+
+    def _make_pedals_instance(self):
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="pedals")
+        instance.telemffb_controls_axes = True
+        return instance
+
+    def _create_pedal_telem(self):
+        return TelemetryDataBuilder() \
+            .with_sim_on_ground(0) \
+            .with_airspeed(10.0) \
+            .with_field("AircraftClass", "Helicopter") \
+            .with_field("FFBType", "pedals") \
+            .with_field("N", 100.0) \
+            .with_field("TailRotorPedalPos", 0.0) \
+            .build()
+
+    def test_controls_lock_simvar_subscribes_on_first_call(self):
+        """When controls_lock_enable and controls_lock_simvar are set, first call subscribes ControlsLock."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar = "L:PARKING_BRAKE_LOCK"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+
+        assert "ControlsLock" in self.mock_simconnect.sv_dict
+        assert self.mock_simconnect.sv_dict["ControlsLock"]["var"] == "L:PARKING_BRAKE_LOCK"
+        assert self.mock_simconnect._resubscribe_count >= 1
+
+    def test_controls_lock_simvar_does_not_resubscribe_on_repeat(self):
+        """Second call with same config should not add_simvar again."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar = "L:PARKING_BRAKE_LOCK"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+        count_after_first = self.mock_simconnect.add_simvar_count
+
+        instance.msfs_update_pedals(telem)
+        assert self.mock_simconnect.add_simvar_count == count_after_first
+
+    def test_controls_lock_simvar_resubscribes_on_config_change(self):
+        """Changing controls_lock_simvar should trigger a new subscription."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar = "L:PARKING_BRAKE_LOCK"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+        count_after_first = self.mock_simconnect.add_simvar_count
+
+        instance.controls_lock_simvar = "L:NEW_LOCK_VAR"
+        instance.msfs_update_pedals(telem)
+
+        assert self.mock_simconnect.add_simvar_count > count_after_first
+        assert self.mock_simconnect.sv_dict["ControlsLock"]["var"] == "L:NEW_LOCK_VAR"
+
+    def test_controls_lock_simvar_skips_when_disabled(self):
+        """When controls_lock_enable is False, no subscription happens."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = False
+        instance.controls_lock_simvar = "L:PARKING_BRAKE_LOCK"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+
+        assert "ControlsLock" not in self.mock_simconnect.sv_dict
+
+    def test_controls_lock_simvar_skips_when_empty(self):
+        """When controls_lock_simvar is empty, no subscription happens."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar = ""
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+
+        assert "ControlsLock" not in self.mock_simconnect.sv_dict
+
+    def test_force_trim_simvar_subscribes_on_custom_var_change(self):
+        """Enabling custom_ft_sw_var_enabled should trigger ForceTrimSW re-subscription via msfs_update_pedals."""
+        instance = self._make_pedals_instance()
+        instance.custom_ft_sw_var_enabled = False
+        instance.custom_ft_sw_var = "L:CUSTOM_FT_VAR"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        # First call: establishes baseline for anything_has_changed
+        instance.msfs_update_pedals(telem)
+
+        # Enable custom var — should trigger resubscription
+        instance.custom_ft_sw_var_enabled = True
+        instance.msfs_update_pedals(telem)
+
+        ft_calls = [c for c in self.mock_simconnect.simvar_calls if "CUSTOM_FT_VAR" in c]
+        assert len(ft_calls) >= 1
+
+
+@pytest.mark.unit
 @pytest.mark.helicopter
 class TestHelicopterTrimwheel(BaseTelemetryEffectTestCase):
     """Tests for trimwheel device type with helicopters."""

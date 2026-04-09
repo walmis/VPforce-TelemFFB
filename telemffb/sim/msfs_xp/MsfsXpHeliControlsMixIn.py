@@ -46,8 +46,12 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                 self._simconnect.add_simvar(name="ForceTrimSW", var=self.custom_ft_sw_var, sc_unit="enum")
                 self._simconnect._resubscribe()
 
-        if self._sim_is_msfs():
-            if self.controls_lock_enable and self.controls_lock_simvar != '':
+        if self._sim_is_msfs() and self.controls_lock_enable and self.controls_lock_simvar:
+            # Subscribe once on first call, re-subscribe only when the binding changes.
+            # Always call anything_has_changed to initialize tracking state (avoid short-circuit).
+            simvar_changed = self.anything_has_changed('hc_controls_lock_simvar', self.controls_lock_simvar)
+            enable_changed = self.anything_has_changed('hc_controls_lock_enable', self.controls_lock_enable)
+            if 'ControlsLock' not in self._simconnect.sv_dict or simvar_changed or enable_changed:
                 self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
                 self._simconnect._resubscribe()
 

@@ -128,7 +128,16 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             self._simconnect._resubscribe()
 
     def _sync_msfs_controls_lock_simvar(self):
-        if self._sim_is_msfs() and self.controls_lock_enable and self.controls_lock_simvar:
+        if not self._sim_is_msfs() or not self.controls_lock_enable or not self.controls_lock_simvar:
+            return
+
+        # Subscribe once on first call, and re-subscribe only when the binding changes.
+        # Always call anything_has_changed to initialize tracking state (avoid short-circuit).
+        simvar_changed = self.anything_has_changed('controls_lock_simvar', self.controls_lock_simvar)
+        enable_changed = self.anything_has_changed('controls_lock_enable', self.controls_lock_enable)
+        needs_resub = 'ControlsLock' not in self._simconnect.sv_dict or simvar_changed or enable_changed
+
+        if needs_resub:
             self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
             self._simconnect._resubscribe()
 
