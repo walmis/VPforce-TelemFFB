@@ -311,6 +311,13 @@ class AircraftEffectUtilsBase(object):
             return 0.0, 0.0
         return device.get_input().axisXY()
     
+    @staticmethod
+    def _get_device_forces() -> tuple[float, float]:
+        device = HapticEffect.device
+        if device is None:
+            return 0.0, 0.0
+        return device.get_input().forceXY()
+    
     def _get_random_direction(self):
         """Get a random direction for weapon effects based on device type."""
         import random

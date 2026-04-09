@@ -140,7 +140,7 @@ class HPGHelicopter(Helicopter):
             hands_on_either = hands_on_dict["master_result"]
 
             if self.handson_force_mode:
-                force_x, force_y = HapticEffect.device.get_input().forceXY()
+                force_x, force_y = self._get_device_forces()
                 thresh = self.hands_on_force_threshold
 
                 is_hands_on_now = abs(force_x) > thresh or abs(force_y) > thresh
