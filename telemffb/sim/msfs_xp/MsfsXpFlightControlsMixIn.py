@@ -250,6 +250,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         super().on_timeout()
         self.const_force.stop()
+        if self._use_firmware_axis_backend():
+            self._clear_firmware_axis_override()
 
     @override
     def on_telemetry(self, telem_data: BaseTelemetryData):
@@ -282,6 +284,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
     def _calculate_airspeeds(self, telem_data: BaseTelemetryData, incidence_vec):
         """Calculate and store airspeed values in telemetry data."""
+        # TODO: MSFS provides AIRSPEED TRUE via telem_data.TAS but it is discarded here.
+        # IAS is used instead (and written back into TAS), which underestimates propwash
+        # by ~17% at 10,000 ft (TAS ≈ 1.17×IAS there). The actuator-disc formula below
+        # is physically correct only when _airspeed is TAS. Revisit before changing;
+        # this affects all propwash-enhanced elevator and rudder dynamic pressures.
         _airspeed = telem_data.IAS
         telem_data.TAS = _airspeed
         telem_data.TAS_kt = _airspeed * ms2kt
@@ -576,6 +583,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
         rud_force = self.rudder_force_dampener.update(rud_force, derivative_hz=5, derivative_k=0.015)
 
+        # TODO: rud_force is already normalized to q/Qvne (∝ V²). speed_factor (∝ V/Vne)
+        # makes the net response cubic (V³) in the non-clamped regime, diverging from
+        # the physical q∝V² relationship. This may be intentional to suppress pedal
+        # forces at low taxi speeds. If a low-speed fade is desired, a hard deadzone
+        # below ~30 kt (rather than a continuous linear ramp) would be more physically correct.
         IAS = telem_data.IAS
         speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
         rud_force = rud_force * speed_factor
@@ -650,10 +662,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         -------
         None
         """
-        if not (self.telemffb_controls_axes and not self.local_disable_axis_control):
+        if not self._axis_control_enabled():
             return
         assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
-        phys_x, phys_y = self._get_device_axes()
+        phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         telem_data.phys_y = phys_y
 
@@ -662,6 +674,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
         y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+
+        if self._use_firmware_axis_backend():
+            self._send_firmware_fixed_axes(x_pos * x_scale, y_pos * y_scale)
+            return
 
         if self._sim_is_xplane():
             pos_x_pos = x_pos * x_scale
@@ -838,15 +854,19 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
     def _send_rudder_axis_commands(self, telem_data: BaseTelemetryData, virtual_rudder_x_offs):
         """Send axis control commands to the simulator for rudder pedals."""
-        if not (self.telemffb_controls_axes and not self.local_disable_axis_control):
+        if not self._axis_control_enabled():
             return
         
         assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
 
-        phys_x, phys_y = self._get_device_axes()
+        phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         x_pos = phys_x - virtual_rudder_x_offs
         x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+
+        if self._use_firmware_axis_backend():
+            self._send_firmware_fixed_axes(x_value=x_pos * x_scale, watchdog_ms=1000)
+            return
 
         if self._sim_is_xplane():
             pos_x_pos = x_pos * x_scale
