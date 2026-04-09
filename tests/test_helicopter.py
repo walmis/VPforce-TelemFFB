@@ -713,6 +713,370 @@ class TestHelicopterCyclicControls(BaseTelemetryEffectTestCase):
 
 
 @pytest.mark.unit
+@pytest.mark.msfs
+@pytest.mark.helicopter
+class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
+    """Tests for extracted cyclic sub-methods from msfs_update_heli_controls."""
+
+    def _make_instance(self, **kwargs):
+        defaults = dict(
+            name="TestHeli", _test_sim_is_msfs=True, _test_device_type="joystick"
+        )
+        defaults.update(kwargs)
+        inst = self.create_aircraft_instance(Helicopter, **defaults)
+        inst.spring_mode = SpringModeEnum.FORCETRIM
+        inst.force_trim_button = 1
+        inst.cyclic_spring_gain = 4096
+        inst.trim_release_spring_gain = 0.5
+        inst.force_trim_send_reset = True
+        return inst
+
+    def _make_telem(self, **overrides):
+        b = TelemetryDataBuilder() \
+            .on_ground(False) \
+            .with_airspeed(10.0) \
+            .with_field("AircraftClass", "Helicopter") \
+            .with_field("FFBType", "joystick") \
+            .with_field("N", 100.0)
+        for k, v in overrides.items():
+            b = b.with_field(k, v)
+        return b.build()
+
+    # --- _initialize_cyclic_if_needed tests ---
+
+    def test_init_cyclic_already_initialized_returns_false(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 1
+        telem = self._make_telem()
+        assert inst._initialize_cyclic_if_needed(telem) is False
+
+    def test_init_cyclic_on_ground_centers(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 0
+        inst.trim_reset_complete = 1
+        inst.last_device_x = 0.5
+        inst.last_device_y = 0.5
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+        telem = self._make_telem(SimOnGround=1)
+        self.set_telemetry(inst, telem)
+
+        result = inst._initialize_cyclic_if_needed(telem)
+
+        assert inst.cpO_x == 0
+        assert inst.cpO_y == 0
+        assert inst.last_pos_x_pos == 0
+        assert inst.last_pos_y_pos == 0
+        # stick at 0,0 is within gate of target 0,0 → init completes
+        assert result is False
+        assert inst.cyclic_spring_init == 1
+
+    def test_init_cyclic_in_air_restores_last_position(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 0
+        inst.trim_reset_complete = 0  # not on ground path
+        inst.last_device_x = 0.25
+        inst.last_device_y = -0.3
+        self.mock_device._input_data.set_axis(x=0.25, y=-0.3)
+        telem = self._make_telem(SimOnGround=0)
+        self.set_telemetry(inst, telem)
+
+        result = inst._initialize_cyclic_if_needed(telem)
+
+        assert inst.cpO_x == round(0.25 * 4096)
+        assert inst.cpO_y == round(-0.3 * 4096)
+        # stick is at target → completes
+        assert result is False
+        assert inst.cyclic_spring_init == 1
+
+    def test_init_cyclic_stick_outside_gate_returns_true(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 0
+        inst.trim_reset_complete = 1
+        inst.last_device_x = 0.0
+        inst.last_device_y = 0.0
+        inst.last_pos_x_pos = 0
+        inst.last_pos_y_pos = 0
+        # stick is far from target (0,0)
+        self.mock_device._input_data.set_axis(x=0.5, y=0.5)
+        telem = self._make_telem(SimOnGround=1)
+        self.set_telemetry(inst, telem)
+
+        result = inst._initialize_cyclic_if_needed(telem)
+
+        assert result is True
+        assert inst.cyclic_spring_init == 0  # not yet initialized
+
+    def test_init_cyclic_sends_last_pos_to_msfs_while_waiting(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 0
+        inst.trim_reset_complete = 0  # in-air path
+        inst.last_device_x = 0.3
+        inst.last_device_y = -0.2
+        inst.last_pos_x_pos = 1234
+        inst.last_pos_y_pos = 5678
+        self.mock_device._input_data.set_axis(x=0.8, y=0.8)  # far from target
+        telem = self._make_telem(SimOnGround=0)
+        self.set_telemetry(inst, telem)
+
+        inst._initialize_cyclic_if_needed(telem)
+
+        # should send last_pos values via msfs_send_heli_cyclic_pos
+        events = self.mock_simconnect.sent_events
+        assert len(events) == 2
+        assert events[0] == ("AXIS_CYCLIC_LATERAL_SET", 1234)
+        assert events[1] == ("AXIS_CYCLIC_LONGITUDINAL_SET", 5678)
+
+    # --- _handle_cyclic_trim_reset tests ---
+
+    def test_trim_reset_starts_animation(self):
+        inst = self._make_instance()
+        inst.cpO_x = 2000
+        inst.cpO_y = 3000
+        inst.cyclic_spring_gain = 4096
+
+        inst._handle_cyclic_trim_reset()
+
+        # should be in progress
+        assert inst._trim_reset_in_progress is True
+        assert inst.trim_reset_complete == 0
+
+    def test_trim_reset_completes_at_zero(self):
+        inst = self._make_instance()
+        inst.cpO_x = 0
+        inst.cpO_y = 0
+        inst._trim_reset_in_progress = True
+
+        # step_value_over_time returns 0 when already at target
+        inst._handle_cyclic_trim_reset()
+
+        assert inst.trim_reset_complete == 1
+        assert inst._trim_reset_in_progress is False
+
+    def test_trim_reset_sends_msfs_event(self):
+        inst = self._make_instance()
+        inst.cpO_x = 0
+        inst.cpO_y = 0
+        inst._trim_reset_in_progress = True
+
+        inst._handle_cyclic_trim_reset()
+
+        events = self.mock_simconnect.sent_events
+        assert ("ROTOR_TRIM_RESET", 0) in events
+
+    # --- _update_cyclic_force_trim tests ---
+
+    def test_force_trim_returns_true_when_no_button_configured(self):
+        inst = self._make_instance()
+        inst.force_trim_button = 0
+        inst.cyclic_spring_init = 1
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+        input_data = self.mock_device.get_input()
+
+        result = inst._update_cyclic_force_trim(telem, input_data, 0.0, 0.0, True)
+
+        assert result is True
+
+    def test_force_trim_returns_true_during_init(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 0
+        inst.trim_reset_complete = 1
+        # stick far from target → init not complete
+        self.mock_device._input_data.set_axis(x=0.9, y=0.9)
+        inst.last_pos_x_pos = 0
+        inst.last_pos_y_pos = 0
+        inst.last_device_x = 0.0
+        inst.last_device_y = 0.0
+        telem = self._make_telem(SimOnGround=1)
+        self.set_telemetry(inst, telem)
+        input_data = self.mock_device.get_input()
+
+        result = inst._update_cyclic_force_trim(telem, input_data, 0.0, 0.0, True)
+
+        assert result is True
+
+    def test_force_trim_pressed_absorbs_offsets(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 1
+        inst.cpO_x = 1000
+        inst.cpO_y = 2000
+        inst.cyclic_physical_trim_x_offs = 100
+        inst.cyclic_physical_trim_y_offs = 200
+        inst.cyclic_virtual_trim_x_offs = 50.0
+        inst.cyclic_virtual_trim_y_offs = 60.0
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        # Press force trim button
+        self.mock_device._input_data.press_button(1)
+        input_data = self.mock_device.get_input()
+
+        result = inst._update_cyclic_force_trim(telem, input_data, 0.3, 0.4, True)
+
+        assert result is False
+        assert inst.cyclic_trim_release_active == 1
+        assert inst.cyclic_physical_trim_x_offs == 0
+        assert inst.cyclic_physical_trim_y_offs == 0
+        assert inst.cyclic_virtual_trim_x_offs == 0.0
+        assert inst.cyclic_virtual_trim_y_offs == 0.0
+
+    def test_force_trim_released_locks_center(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 1
+        inst.cyclic_trim_release_active = 1
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        # Button NOT pressed
+        input_data = self.mock_device.get_input()
+
+        result = inst._update_cyclic_force_trim(telem, input_data, 0.4, 0.5, True)
+
+        assert result is False
+        assert inst.cyclic_trim_release_active == 0
+        assert inst.cyclic_center == [0.4, 0.5]
+        assert inst.cpO_x == round(0.4 * 4096)
+        assert inst.cpO_y == round(0.5 * 4096)
+
+    def test_force_trim_idle_sets_initial_coefficient(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 1
+        inst.cyclic_trim_release_active = 0
+        inst.trim_reset_complete = 1
+        inst.ft_was_inactive = True
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        input_data = self.mock_device.get_input()
+
+        result = inst._update_cyclic_force_trim(telem, input_data, 0.0, 0.0, True)
+
+        assert result is False
+        assert inst.ft_was_inactive is False
+
+    def test_force_trim_inactive_follows_stick(self):
+        inst = self._make_instance()
+        inst.cyclic_spring_init = 1
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        input_data = self.mock_device.get_input()
+
+        # force_trim_active=False with FORCETRIM mode → inactive following
+        result = inst._update_cyclic_force_trim(telem, input_data, 0.3, -0.2, False)
+
+        assert result is False
+        assert inst.ft_was_inactive is True
+        assert inst.cpO_x == round(0.3 * 4096)
+        assert inst.cpO_y == round(-0.2 * 4096)
+
+    def test_force_trim_non_forcetrim_mode_zeroes_spring(self):
+        inst = self._make_instance()
+        inst.spring_mode = SpringModeEnum.BASIC  # not FORCETRIM
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        input_data = self.mock_device.get_input()
+
+        result = inst._update_cyclic_force_trim(telem, input_data, 0.0, 0.0, True)
+
+        assert result is False
+
+    # --- _send_cyclic_axis_output tests ---
+
+    def test_send_axis_output_disabled_when_controls_axes_off(self):
+        inst = self._make_instance()
+        inst.telemffb_controls_axes = False
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        inst._send_cyclic_axis_output(telem, True)
+
+        assert len(self.mock_simconnect.sent_events) == 0
+
+    def test_send_axis_output_sends_msfs_events(self):
+        inst = self._make_instance()
+        inst.telemffb_controls_axes = True
+        inst.local_disable_axis_control = False
+        inst.cyclic_spring_init = 1
+        inst.joystick_x_axis_scale = 1.0
+        inst.joystick_y_axis_scale = 1.0
+        inst.cyclic_virtual_trim_x_offs = 0.0
+        inst.cyclic_virtual_trim_y_offs = 0.0
+        inst.trim_following = False
+        self.mock_device._input_data.set_axis(x=0.3, y=-0.2)
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        inst._send_cyclic_axis_output(telem, True)
+
+        events = self.mock_simconnect.sent_events
+        event_names = [e[0] for e in events]
+        assert "AXIS_CYCLIC_LATERAL_SET" in event_names
+        assert "AXIS_CYCLIC_LONGITUDINAL_SET" in event_names
+
+    def test_send_axis_output_stores_last_device(self):
+        inst = self._make_instance()
+        inst.telemffb_controls_axes = True
+        inst.local_disable_axis_control = False
+        inst.cyclic_spring_init = 1
+        inst.joystick_x_axis_scale = 1.0
+        inst.joystick_y_axis_scale = 1.0
+        inst.cyclic_virtual_trim_x_offs = 0.0
+        inst.cyclic_virtual_trim_y_offs = 0.0
+        inst.trim_following = False
+        self.mock_device._input_data.set_axis(x=0.35, y=-0.15)
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        inst._send_cyclic_axis_output(telem, True)
+
+        assert inst.last_device_x == 0.35
+        assert inst.last_device_y == -0.15
+
+    def test_send_axis_output_uses_firmware_backend(self):
+        inst = self._make_instance()
+        inst.telemffb_controls_axes = True
+        inst.use_firmware_axis_override = True
+        inst.local_disable_axis_control = False
+        inst.cyclic_spring_init = 1
+        inst.joystick_x_axis_scale = 1.0
+        inst.joystick_y_axis_scale = 1.0
+        inst.cyclic_virtual_trim_x_offs = 0.0
+        inst.cyclic_virtual_trim_y_offs = 0.0
+        inst.trim_following = False
+        self.mock_device._input_data.set_axis(x=0.3, y=-0.2)
+
+        import telemffb.globals as G
+        G.device_firmware_version = "v1.0.18b14"
+
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        inst._send_cyclic_axis_output(telem, True)
+
+        assert len(self.mock_simconnect.sent_events) == 0
+        assert len(self.mock_device.axis_override_commands) > 0
+        last = self.mock_device.axis_override_commands[-1]
+        assert last["x_mode"] == 2
+        assert last["y_mode"] == 2
+
+    def test_helicopter_timeout_clears_firmware_override(self):
+        inst = self._make_instance()
+        inst.use_firmware_axis_override = True
+        inst.telemffb_controls_axes = True
+
+        import telemffb.globals as G
+        G.device_firmware_version = "v1.0.18b14"
+
+        inst.on_timeout()
+
+        assert len(self.mock_device.axis_override_commands) > 0
+        last = self.mock_device.axis_override_commands[-1]
+        assert last["watchdog_ms"] == 0
+
+
+@pytest.mark.unit
 @pytest.mark.xplane
 @pytest.mark.helicopter
 class TestHelicopterXPlane(BaseTelemetryEffectTestCase):
@@ -789,6 +1153,127 @@ class TestHelicopterSimConnectProxy(BaseTelemetryEffectTestCase):
         instance.subscribe_simvars()
         
         # No exception should be raised
+
+
+@pytest.mark.unit
+@pytest.mark.msfs
+@pytest.mark.helicopter
+class TestHelicopterSimvarSync(BaseTelemetryEffectTestCase):
+    """Tests for simvar subscription sync methods (_sync_controls_lock_simvar, _sync_force_trim_simvar)."""
+
+    def _make_pedals_instance(self):
+        instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="pedals")
+        instance.telemffb_controls_axes = True
+        return instance
+
+    def _create_pedal_telem(self):
+        return TelemetryDataBuilder() \
+            .with_sim_on_ground(0) \
+            .with_airspeed(10.0) \
+            .with_field("AircraftClass", "Helicopter") \
+            .with_field("FFBType", "pedals") \
+            .with_field("N", 100.0) \
+            .with_field("TailRotorPedalPos", 0.0) \
+            .build()
+
+    def test_controls_lock_simvar_subscribes_on_first_call(self):
+        """When controls_lock_enable and controls_lock_simvar are set, first call subscribes ControlsLock."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar = "L:PARKING_BRAKE_LOCK"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+
+        assert "ControlsLock" in self.mock_simconnect.sv_dict
+        assert self.mock_simconnect.sv_dict["ControlsLock"]["var"] == "L:PARKING_BRAKE_LOCK"
+        assert self.mock_simconnect._resubscribe_count >= 1
+
+    def test_controls_lock_simvar_does_not_resubscribe_on_repeat(self):
+        """Second call with same config should not add_simvar again."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar = "L:PARKING_BRAKE_LOCK"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+        count_after_first = self.mock_simconnect.add_simvar_count
+
+        instance.msfs_update_pedals(telem)
+        assert self.mock_simconnect.add_simvar_count == count_after_first
+
+    def test_controls_lock_simvar_resubscribes_on_config_change(self):
+        """Changing controls_lock_simvar should trigger a new subscription."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar = "L:PARKING_BRAKE_LOCK"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+        count_after_first = self.mock_simconnect.add_simvar_count
+
+        instance.controls_lock_simvar = "L:NEW_LOCK_VAR"
+        instance.msfs_update_pedals(telem)
+
+        assert self.mock_simconnect.add_simvar_count > count_after_first
+        assert self.mock_simconnect.sv_dict["ControlsLock"]["var"] == "L:NEW_LOCK_VAR"
+
+    def test_controls_lock_simvar_skips_when_disabled(self):
+        """When controls_lock_enable is False, no subscription happens."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = False
+        instance.controls_lock_simvar = "L:PARKING_BRAKE_LOCK"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+
+        assert "ControlsLock" not in self.mock_simconnect.sv_dict
+
+    def test_controls_lock_simvar_skips_when_empty(self):
+        """When controls_lock_simvar is empty, no subscription happens."""
+        instance = self._make_pedals_instance()
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar = ""
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        instance.msfs_update_pedals(telem)
+
+        assert "ControlsLock" not in self.mock_simconnect.sv_dict
+
+    def test_force_trim_simvar_subscribes_on_custom_var_change(self):
+        """Enabling custom_ft_sw_var_enabled should trigger ForceTrimSW re-subscription via msfs_update_pedals."""
+        instance = self._make_pedals_instance()
+        instance.custom_ft_sw_var_enabled = False
+        instance.custom_ft_sw_var = "L:CUSTOM_FT_VAR"
+
+        telem = self._create_pedal_telem()
+        self.set_telemetry(instance, telem)
+        self.mock_device._input_data.set_axis(x=0.5)
+
+        # First call: establishes baseline for anything_has_changed
+        instance.msfs_update_pedals(telem)
+
+        # Enable custom var — should trigger resubscription
+        instance.custom_ft_sw_var_enabled = True
+        instance.msfs_update_pedals(telem)
+
+        ft_calls = [c for c in self.mock_simconnect.simvar_calls if "CUSTOM_FT_VAR" in c]
+        assert len(ft_calls) >= 1
 
 
 @pytest.mark.unit
@@ -955,3 +1440,315 @@ class TestHelicopterParameterConfiguration(BaseTelemetryEffectTestCase):
         assert instance.joystick_trim_follow_gain_virtual_x == 0.3
         assert instance.joystick_trim_follow_gain_physical_y == 0.6
         assert instance.joystick_trim_follow_gain_virtual_y == 0.4
+
+
+@pytest.mark.unit
+@pytest.mark.msfs
+@pytest.mark.helicopter
+class TestMsfsAxisHelpers(BaseTelemetryEffectTestCase):
+    """Tests for shared MSFS axis scaling and config lookup methods."""
+
+    def _make_instance(self):
+        return self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True)
+
+    # -- _get_msfs_axis_config --
+
+    def test_get_msfs_axis_config_returns_defaults(self):
+        instance = self._make_instance()
+        instance.enable_custom_x_axis = False
+        instance.enable_custom_y_axis = False
+
+        var, rng = instance._get_msfs_axis_config('x', "AXIS_AILERONS_SET")
+        assert var == "AXIS_AILERONS_SET"
+        assert rng == 16384
+
+        var, rng = instance._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
+        assert var == "AXIS_ELEVATOR_SET"
+        assert rng == 16384
+
+    def test_get_msfs_axis_config_custom_x(self):
+        instance = self._make_instance()
+        instance.enable_custom_x_axis = True
+        instance.custom_x_axis = "MY_CUSTOM_X"
+        instance.raw_x_axis_scale = 1
+
+        var, rng = instance._get_msfs_axis_config('x', "AXIS_AILERONS_SET")
+        assert var == "MY_CUSTOM_X"
+        assert rng == 1
+
+    def test_get_msfs_axis_config_custom_y(self):
+        instance = self._make_instance()
+        instance.enable_custom_y_axis = True
+        instance.custom_y_axis = "MY_CUSTOM_Y"
+        instance.raw_y_axis_scale = 32768
+
+        var, rng = instance._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
+        assert var == "MY_CUSTOM_Y"
+        assert rng == 32768
+
+    def test_get_msfs_axis_config_custom_x_doesnt_affect_y(self):
+        instance = self._make_instance()
+        instance.enable_custom_x_axis = True
+        instance.custom_x_axis = "MY_CUSTOM_X"
+        instance.raw_x_axis_scale = 1
+        instance.enable_custom_y_axis = False
+
+        var, rng = instance._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
+        assert var == "AXIS_ELEVATOR_SET"
+        assert rng == 16384
+
+    def test_get_msfs_axis_config_custom_default_range(self):
+        instance = self._make_instance()
+        instance.enable_custom_x_axis = False
+
+        var, rng = instance._get_msfs_axis_config('x', "AXIS_RUDDER_SET", 8192)
+        assert var == "AXIS_RUDDER_SET"
+        assert rng == 8192
+
+    # -- _scale_msfs_axis_value --
+
+    def test_scale_msfs_axis_value_integer_range(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(1.0, 16384, 1.0)
+        assert result == -16384
+
+    def test_scale_msfs_axis_value_center_is_zero(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(0.0, 16384, 1.0)
+        assert result == 0
+
+    def test_scale_msfs_axis_value_negative_full(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(-1.0, 16384, 1.0)
+        assert result == 16384
+
+    def test_scale_msfs_axis_value_with_scale_factor(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(1.0, 16384, 0.5)
+        assert result == -8192
+
+    def test_scale_msfs_axis_value_float_range(self):
+        """When axis_range is 1 (float custom axis), result is rounded float, not negated int."""
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(0.5, 1, 1.0)
+        assert result == 0.5
+        assert isinstance(result, float)
+
+    def test_scale_msfs_axis_value_float_range_negative(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(-0.33, 1, 1.0)
+        assert result == -0.33
+
+    # -- _send_msfs_axis_value --
+
+    def test_send_msfs_axis_value_sends_event(self):
+        instance = self._make_instance()
+        self.mock_simconnect.clear_events()
+
+        result = instance._send_msfs_axis_value("AXIS_AILERONS_SET", 0.5, 16384, 1.0)
+
+        assert len(self.mock_simconnect.sent_events) == 1
+        event_name, event_val = self.mock_simconnect.sent_events[0]
+        assert event_name == "AXIS_AILERONS_SET"
+        assert event_val == -8192
+        assert result == -8192
+
+    def test_send_msfs_axis_value_returns_scaled_value(self):
+        instance = self._make_instance()
+        self.mock_simconnect.clear_events()
+
+        result = instance._send_msfs_axis_value("TEST_VAR", 0.0, 16384, 1.0)
+        assert result == 0
+
+    def test_send_msfs_axis_value_float_range(self):
+        instance = self._make_instance()
+        self.mock_simconnect.clear_events()
+
+        result = instance._send_msfs_axis_value("CUSTOM_VAR", 0.75, 1, 1.0)
+        assert result == 0.75
+        assert self.mock_simconnect.sent_events[0] == ("CUSTOM_VAR", 0.75)
+
+
+class TestCheckHandsOn(BaseTelemetryEffectTestCase):
+    """Tests for check_hands_on extracted to parent Helicopter class."""
+
+    def _make_instance(self, **kwargs):
+        defaults = dict(
+            name="TestHeli", _test_sim_is_msfs=True, _test_device_type="joystick"
+        )
+        defaults.update(kwargs)
+        return self.create_aircraft_instance(Helicopter, **defaults)
+
+    def test_hands_on_below_threshold_returns_false(self):
+        instance = self._make_instance()
+        instance.cpO_x = 0
+        instance.cpO_y = 0
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+
+        result = instance.check_hands_on(0.1)
+
+        assert result["master_result"] is False
+        assert result["x_result"] is False
+        assert result["y_result"] is False
+
+    def test_hands_on_x_exceeds_threshold(self):
+        instance = self._make_instance()
+        instance.cpO_x = 0
+        instance.cpO_y = 0
+        self.mock_device._input_data.set_axis(x=0.5, y=0.0)
+
+        result = instance.check_hands_on(0.1)
+
+        assert result["x_result"] is True
+        assert result["master_result"] is True
+        assert result["y_result"] is False
+
+    def test_hands_on_y_exceeds_threshold(self):
+        instance = self._make_instance()
+        instance.cpO_x = 0
+        instance.cpO_y = 0
+        self.mock_device._input_data.set_axis(x=0.0, y=0.5)
+
+        result = instance.check_hands_on(0.1)
+
+        assert result["y_result"] is True
+        assert result["master_result"] is True
+        assert result["x_result"] is False
+
+    def test_hands_on_returns_deviations(self):
+        instance = self._make_instance()
+        instance.cpO_x = 0
+        instance.cpO_y = 0
+        self.mock_device._input_data.set_axis(x=0.25, y=-0.5)
+
+        result = instance.check_hands_on(0.1)
+
+        assert result["x_deviation"] == pytest.approx(0.25, abs=0.01)
+        assert result["y_deviation"] == pytest.approx(0.5, abs=0.01)
+
+    def test_hands_on_returns_raw_deviations(self):
+        instance = self._make_instance()
+        instance.cpO_x = 1000
+        instance.cpO_y = -500
+
+        self.mock_device._input_data.set_axis(x=0.5, y=0.0)
+
+        result = instance.check_hands_on(0.01)
+
+        assert result["x_deviation_raw"] == round(0.5 * 4096) - 1000
+        assert result["y_deviation_raw"] == round(0.0 * 4096) - (-500)
+
+    def test_hands_on_with_offset_reference(self):
+        instance = self._make_instance()
+        instance.cpO_x = 2000
+        instance.cpO_y = 2000
+        self.mock_device._input_data.set_axis(x=0.5, y=0.5)
+
+        result = instance.check_hands_on(0.1)
+
+        assert isinstance(result["master_result"], bool)
+        assert isinstance(result["x_deviation"], float)
+        assert isinstance(result["y_deviation"], float)
+
+
+class TestDispatchHandsOnState(BaseTelemetryEffectTestCase):
+    """Tests for _dispatch_hands_on_state extracted to parent Helicopter class."""
+
+    def _make_instance(self, **kwargs):
+        defaults = dict(
+            name="TestHeli", _test_sim_is_msfs=True, _test_device_type="joystick"
+        )
+        defaults.update(kwargs)
+        inst = self.create_aircraft_instance(Helicopter, **defaults)
+        inst.send_individual_hands_on = 0
+        inst.hands_on_active = 0
+        inst.hands_on_x_active = 0
+        inst.hands_on_y_active = 0
+        return inst
+
+    def _make_telem(self):
+        return TelemetryDataBuilder() \
+            .with_field("FFBType", "joystick") \
+            .build()
+
+    def _make_hands_on_dict(self, x_result=False, y_result=False):
+        return {
+            "master_result": x_result or y_result,
+            "x_result": x_result,
+            "x_deviation": 0.5 if x_result else 0.0,
+            "x_deviation_raw": 2048 if x_result else 0,
+            "y_result": y_result,
+            "y_deviation": 0.3 if y_result else 0.0,
+            "y_deviation_raw": 1228 if y_result else 0,
+        }
+
+    def test_master_hands_on_sets_simvar(self):
+        instance = self._make_instance()
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict(x_result=True)
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, True)
+
+        assert instance.hands_on_active is True
+        simdata = self.mock_simconnect.sim_data_written
+        assert ("L:FFB_HANDS_ON_CYCLIC", 1) in [(k, v) for k, v, _ in simdata]
+
+    def test_master_hands_off_clears_simvar(self):
+        instance = self._make_instance()
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict()
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, False)
+
+        assert instance.hands_on_active is False
+        simdata = self.mock_simconnect.sim_data_written
+        assert ("L:FFB_HANDS_ON_CYCLIC", 0) in [(k, v) for k, v, _ in simdata]
+
+    def test_individual_mode_sets_x_and_y(self):
+        instance = self._make_instance()
+        instance.send_individual_hands_on = 1
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict(x_result=True, y_result=False)
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, True)
+
+        assert instance.hands_on_x_active is True
+        assert instance.hands_on_y_active is False
+        simdata = [(k, v) for k, v, _ in self.mock_simconnect.sim_data_written]
+        assert ("L:FFB_HANDS_ON_CYCLICX", 1) in simdata
+        assert ("L:FFB_HANDS_ON_CYCLICY", 0) in simdata
+
+    def test_individual_mode_both_on(self):
+        instance = self._make_instance()
+        instance.send_individual_hands_on = 1
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict(x_result=True, y_result=True)
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, True)
+
+        assert instance.hands_on_x_active is True
+        assert instance.hands_on_y_active is True
+
+    def test_sets_telem_data_fields(self):
+        instance = self._make_instance()
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict(x_result=True, y_result=False)
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, True)
+
+        assert telem.hands_on == 1
+        assert telem.hands_on_x == 1
+        assert telem.hands_on_y == 0
+        assert telem.deviation_x == 0.5
+        assert telem.deviation_y == 0.0
+
+    def test_hands_off_sets_telem_data_fields(self):
+        instance = self._make_instance()
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict()
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, False)
+
+        assert telem.hands_on == 0
+        assert telem.hands_on_x == 0
+        assert telem.hands_on_y == 0

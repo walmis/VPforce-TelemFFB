@@ -5,3 +5,4 @@ __pycache__
 /xplane-plugin/Debug/
 *.exe
 *dist
+/pyenv

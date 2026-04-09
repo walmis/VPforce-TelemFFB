@@ -64,6 +64,169 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self.rudder_force_dampener = utils.Dampener()
         self.const_force = HapticEffect().constant(0, 0)
 
+    def _sync_controls_lock_simvar(self):
+        """Subscribe the ControlsLock simvar once and re-subscribe only when the binding changes."""
+        if not self._sim_is_msfs() or not self.controls_lock_enable or not self.controls_lock_simvar:
+            return
+        # Always call anything_has_changed to initialize tracking state (avoid short-circuit).
+        simvar_changed = self.anything_has_changed('controls_lock_simvar', self.controls_lock_simvar)
+        enable_changed = self.anything_has_changed('controls_lock_enable', self.controls_lock_enable)
+        if 'ControlsLock' not in self._simconnect.sv_dict or simvar_changed or enable_changed:
+            self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
+            self._simconnect._resubscribe()
+
+    def _get_msfs_axis_config(self, axis: str, default_var: str, default_range: int = 16384) -> tuple[str, int | float]:
+        """Return (var_name, range) for an MSFS axis, respecting custom axis overrides."""
+        if axis == 'x' and self.enable_custom_x_axis:
+            return self.custom_x_axis, self.raw_x_axis_scale
+        if axis == 'y' and self.enable_custom_y_axis:
+            return self.custom_y_axis, self.raw_y_axis_scale
+        return default_var, default_range
+
+    def _scale_msfs_axis_value(self, value: float, axis_range: int | float, scale: float) -> int | float:
+        """Scale a normalized axis value for MSFS and return it."""
+        pos = utils.scale(value, (-1, 1), (-axis_range * scale, axis_range * scale))
+        if axis_range != 1:
+            pos = -int(pos)
+        else:
+            pos = round(pos, 5)
+        return pos
+
+    def _send_msfs_axis_value(self, var: str, value: float, axis_range: int | float, scale: float) -> int | float:
+        """Scale a normalized axis value and send it to MSFS.
+
+        Returns the scaled position that was sent, for callers that need to cache it.
+        """
+        pos = self._scale_msfs_axis_value(value, axis_range, scale)
+        self._simconnect.send_event_to_msfs(var, pos)
+        return pos
+
+    def _get_controls_lock_state(self, telem_data: BaseTelemetryData) -> bool:
+        """Read and normalize the ControlsLock value, applying inversion if configured."""
+        if not self.controls_lock_enable:
+            return False
+        controls_locked = bool(telem_data.get("ControlsLock", 0))
+        if self.controls_lock_simvar_invert:
+            controls_locked = not controls_locked
+        return controls_locked
+
+    def _lock_effects_started(self) -> bool:
+        return self.effects['lock_1'].started or self.effects['lock_2'].started
+
+    def _stop_lock_effects(self):
+        self.effects['lock_1'].stop()
+        self.effects['lock_2'].stop()
+
+    def _prepare_controls_lock(
+        self,
+        telem_data: BaseTelemetryData,
+        controls_locked: bool,
+        *,
+        set_locked_telemetry: bool = False,
+    ) -> bool | None:
+        """Centralize lock-state short-circuit so axis handlers only manage axis-specific setup.
+
+        Returns:
+            False: lock mode inactive, caller should continue normal axis handling
+            True: lock mode fully owns this frame, caller should return immediately
+            None: lock mode active and caller must continue with axis-specific spring/detent setup
+        """
+        if not controls_locked:
+            self._stop_lock_effects()
+            return False
+
+        if set_locked_telemetry:
+            telem_data._controls_locked = True
+
+        if self._lock_effects_started():
+            return True
+
+        return None
+
+    def _engage_controls_lock_detents(
+        self,
+        spring_condition,
+        *,
+        spring_offset: int,
+        detent_1: dict,
+        detent_2: dict,
+        stop_control_weight: bool = False,
+    ):
+        """Share the common lock spring + detent startup sequence; callers provide only axis-specific geometry."""
+        if stop_control_weight:
+            self.effects['control_weight'].stop()
+
+        spring_condition.set_coefficient(4096)
+        spring_condition.cpOffset = spring_offset
+        self._spring_handle.setCondition(spring_condition)
+        self._spring_handle.start()
+        self.effects['lock_1'].detent(**detent_1).start()
+        self.effects['lock_2'].detent(**detent_2).start()
+        self._spring_handle.stop()
+
+    def _apply_joystick_controls_lock(self, telem_data: BaseTelemetryData, controls_locked):
+        """Apply 2D joystick/cyclic controls lock with centering detents.
+
+        Returns True if lock mode consumed the frame, False if normal processing should continue.
+        """
+        lock_result = self._prepare_controls_lock(telem_data, controls_locked, set_locked_telemetry=True)
+        if lock_result is True:
+            return True
+        if lock_result is None:
+            phys_x, phys_y = self._get_device_axes()
+
+            self.spring_y.set_coefficient(4096)
+            self.spring_x.set_coefficient(4096)
+            self.spring_y.cpOffset = 0
+            self.spring_x.cpOffset = 0
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.start()
+
+            if (-0.15 < phys_x < 0.15) and (-0.15 < phys_y < 0.15):
+                detent_params = dict(peak_x=4096, range_x=4096, gate_pos_y=0, gate_neg_y=0,
+                                     peak_y=4096, range_y=4096, gate_pos_x=0, gate_neg_x=0)
+                self._engage_controls_lock_detents(
+                    self.spring_x,
+                    spring_offset=0,
+                    detent_1=dict(position_x=1500, position_y=1500, **detent_params),
+                    detent_2=dict(position_x=-1500, position_y=-1500, **detent_params),
+                    stop_control_weight=True,
+                )
+                telem_data["_controls_locked"] = controls_locked
+
+            return True
+        return False
+
+    def _apply_pedal_controls_lock(self, telem_data: BaseTelemetryData, controls_locked):
+        """Apply 1D pedal controls lock with centering detents.
+
+        Returns True if lock mode consumed the frame, False if normal processing should continue.
+        """
+        lock_result = self._prepare_controls_lock(telem_data, controls_locked)
+        if lock_result is True:
+            return True
+        if lock_result is None:
+            phys_x, _ = self._get_device_axes()
+
+            self.spring_x.set_coefficient(4096)
+            self.spring_x.cpOffset = 0
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.start()
+
+            if -0.15 < phys_x < 0.15:
+                detent_params = dict(peak_x=4096, range_x=4096, gate_pos_y=0, gate_neg_y=0)
+                self._engage_controls_lock_detents(
+                    self.spring_x,
+                    spring_offset=0,
+                    detent_1=dict(position_x=1500, **detent_params),
+                    detent_2=dict(position_x=-1500, **detent_params),
+                )
+                telem_data["_controls_locked"] = controls_locked
+
+            return True
+        return False
+
     @override
     def on_timeout(self):
         """Handle a timeout event from the main loop.
@@ -87,6 +250,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         super().on_timeout()
         self.const_force.stop()
+        if self._use_firmware_axis_backend():
+            self._clear_firmware_axis_override()
 
     @override
     def on_telemetry(self, telem_data: BaseTelemetryData):
@@ -119,6 +284,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
     def _calculate_airspeeds(self, telem_data: BaseTelemetryData, incidence_vec):
         """Calculate and store airspeed values in telemetry data."""
+        # TODO: MSFS provides AIRSPEED TRUE via telem_data.TAS but it is discarded here.
+        # IAS is used instead (and written back into TAS), which underestimates propwash
+        # by ~17% at 10,000 ft (TAS ≈ 1.17×IAS there). The actuator-disc formula below
+        # is physically correct only when _airspeed is TAS. Revisit before changing;
+        # this affects all propwash-enhanced elevator and rudder dynamic pressures.
         _airspeed = telem_data.IAS
         telem_data.TAS = _airspeed
         telem_data.TAS_kt = _airspeed * ms2kt
@@ -328,20 +498,25 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         # Apply expo curve or advanced spring gains
         if self.spring_mode_is(SpringModeEnum.ADVANCED):
-            #print(self.adv_spr_gains)
             adv_spr_stgs = self.adv_spr_gains
-            scale = adv_spr_stgs.get("scale")
-            spd_y = scale * elevator_coeff
-            spd_x = scale * aileron_coeff
-            y_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_y)
-            x_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_x)
-            elevator_coeff = y_gains.get("y")
-            aileron_coeff = x_gains.get("x")
+            if not adv_spr_stgs:
+                self.flag_error("Please open and configure the advanced spring gain settings")
+                elevator_coeff = 0
+                aileron_coeff = 0
+                rudder_coeff = 0
+            else:
+                scale = adv_spr_stgs.get("scale")
+                spd_y = scale * elevator_coeff
+                spd_x = scale * aileron_coeff
+                y_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_y)
+                x_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_x)
+                elevator_coeff = y_gains.get("y")
+                aileron_coeff = x_gains.get("x")
 
-            # Rudder coefficient with advanced spring
-            spd_x_rud = scale * rudder_coeff
-            x_gains_rud = utils.get_gain_from_speed(self.adv_spr_gains, spd_x_rud)
-            rudder_coeff = x_gains_rud.get("x")
+                # Rudder coefficient with advanced spring
+                spd_x_rud = scale * rudder_coeff
+                x_gains_rud = utils.get_gain_from_speed(self.adv_spr_gains, spd_x_rud)
+                rudder_coeff = x_gains_rud.get("x")
         else:
             elevator_coeff = utils.expocurve(elevator_coeff, self.elevator_expo)
             aileron_coeff = utils.expocurve(aileron_coeff, self.aileron_expo)
@@ -408,6 +583,11 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         rud_force = clamp((rud * self.rudder_gain), -1, 1)
         rud_force = self.rudder_force_dampener.update(rud_force, derivative_hz=5, derivative_k=0.015)
 
+        # TODO: rud_force is already normalized to q/Qvne (∝ V²). speed_factor (∝ V/Vne)
+        # makes the net response cubic (V³) in the non-clamped regime, diverging from
+        # the physical q∝V² relationship. This may be intentional to suppress pedal
+        # forces at low taxi speeds. If a low-speed fade is desired, a hard deadzone
+        # below ~30 kt (rather than a continuous linear ramp) would be more physically correct.
         IAS = telem_data.IAS
         speed_factor = utils.scale_clamp(IAS, (0, vne), (0.0, 1.0))
         rud_force = rud_force * speed_factor
@@ -482,11 +662,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         -------
         None
         """
-        if not (self.telemffb_controls_axes and not self.local_disable_axis_control):
+        if not self._axis_control_enabled():
             return
         assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         telem_data.phys_y = phys_y
 
@@ -496,39 +675,20 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
         y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
 
+        if self._use_firmware_axis_backend():
+            self._send_firmware_fixed_axes(x_pos * x_scale, y_pos * y_scale)
+            return
+
         if self._sim_is_xplane():
             pos_x_pos = x_pos * x_scale
             pos_y_pos = y_pos * y_scale
             self.send_xp_command(f"AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}")
 
         if self._sim_is_msfs():
-            if self.enable_custom_x_axis:
-                x_var = self.custom_x_axis
-                x_range = self.raw_x_axis_scale
-            else:
-                x_var = "AXIS_AILERONS_SET"
-                x_range = 16384
-            if self.enable_custom_y_axis:
-                y_var = self.custom_y_axis
-                y_range = self.raw_y_axis_scale
-            else:
-                y_var = "AXIS_ELEVATOR_SET"
-                y_range = 16384
-
-            pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
-            pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
-
-            if x_range != 1:
-                pos_x_pos = -int(pos_x_pos)
-            else:
-                pos_x_pos = round(pos_x_pos, 5)
-            if y_range != 1:
-                pos_y_pos = -int(pos_y_pos)
-            else:
-                pos_y_pos = round(pos_y_pos, 5)
-
-            self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-            self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+            x_var, x_range = self._get_msfs_axis_config('x', "AXIS_AILERONS_SET")
+            y_var, y_range = self._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
+            self._send_msfs_axis_value(x_var, x_pos, x_range, x_scale)
+            self._send_msfs_axis_value(y_var, y_pos, y_range, y_scale)
 
     def _calculate_aoa_offset(self, telem_data: BaseTelemetryData, _aoa, force_trim_y_offset, phys_stick_y_offs, IAS, vne):
         """Calculate Y offset for AoA effect."""
@@ -615,65 +775,13 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self.spring_y.set_coefficient(ec)
         self.spring_x.set_coefficient(ac)
 
-        if controls_locked:
-            telem_data._controls_locked = controls_locked
-            input_data = HapticEffect.device.get_input()
-            phys_x, phys_y = input_data.axisXY()
-            x = round(phys_x * 4096)
-            y = round(phys_y * 4096)
-
-            groove_detent_size: int = 4096
-            groove_detent_range = 4096
-            pos = 1500
-            if self.effects['lock_1'].started or self.effects['lock_2'].started:
-                return
-            self.effects['control_weight'].stop()
-            self.spring_y.set_coefficient(4096)
-            self.spring_x.set_coefficient(4096)
-            self.spring_y.cpOffset = 0
-            self.spring_x.cpOffset = 0
-            self._spring_handle.setCondition(self.spring_y)
-            self._spring_handle.setCondition(self.spring_x)
-            self._spring_handle.start()
-            if (-0.15 < phys_x < 0.15) and (-0.15 < phys_y < 0.15):
-                self.effects['lock_1'].detent(
-                    position_x=pos,
-                    peak_x=groove_detent_size,
-                    range_x=groove_detent_range,
-                    gate_pos_y=0,
-                    gate_neg_y=0,
-                    position_y=pos,
-                    peak_y=groove_detent_size,
-                    range_y=groove_detent_range,
-                    gate_pos_x=0,
-                    gate_neg_x=0
-                ).start()
-                self.effects['lock_2'].detent(
-                    position_x=-pos,
-                    peak_x=groove_detent_size,
-                    range_x=groove_detent_range,
-                    gate_pos_y=0,
-                    gate_neg_y=0,
-                    position_y=-pos,
-                    peak_y=groove_detent_size,
-                    range_y=groove_detent_range,
-                    gate_pos_x=0,
-                    gate_neg_x=0
-                ).start()
-                telem_data["_controls_locked"] = controls_locked
-                self._spring_handle.stop()
-
+        if self._apply_joystick_controls_lock(telem_data, controls_locked):
             return
-        else:
-            self.effects['lock_1'].stop()
-            self.effects['lock_2'].stop()
 
         self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.setCondition(self.spring_x)
 
         self._apply_joystick_constant_forces(telem_data, _elevator_droop_term, _G_term)
-
-
 
         self._spring_handle.start()
 
@@ -746,37 +854,27 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
     def _send_rudder_axis_commands(self, telem_data: BaseTelemetryData, virtual_rudder_x_offs):
         """Send axis control commands to the simulator for rudder pedals."""
-        if not (self.telemffb_controls_axes and not self.local_disable_axis_control):
+        if not self._axis_control_enabled():
             return
         
         assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
 
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         x_pos = phys_x - virtual_rudder_x_offs
         x_scale = clamp(self.rudder_x_axis_scale, 0, 1)
+
+        if self._use_firmware_axis_backend():
+            self._send_firmware_fixed_axes(x_value=x_pos * x_scale, watchdog_ms=1000)
+            return
 
         if self._sim_is_xplane():
             pos_x_pos = x_pos * x_scale
             self.send_xp_command(f"AXIS:px={round(pos_x_pos, 5)}")
 
         if self._sim_is_msfs():
-            if self.enable_custom_x_axis:
-                x_var = self.custom_x_axis
-                x_range = self.raw_x_axis_scale
-            else:
-                x_var = "AXIS_RUDDER_SET"
-                x_range = 16384
-
-            pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
-
-            if x_range != 1:
-                pos_x_pos = -int(pos_x_pos)
-            else:
-                pos_x_pos = round(pos_x_pos, 5)
-
-            self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+            x_var, x_range = self._get_msfs_axis_config('x', "AXIS_RUDDER_SET")
+            self._send_msfs_axis_value(x_var, x_pos, x_range, x_scale)
 
     def _update_pedals_controls(self, telem_data: BaseTelemetryData, rudder_coeff, base_rudder_coeff, rud_force, controls_locked):
         """Handle all pedals-specific FFB updates."""
@@ -789,48 +887,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         self._apply_steering_friction(telem_data, phys_rudder_x_offs, rc)
 
-        if controls_locked:
-            input_data = HapticEffect.device.get_input()
-            phys_x, phys_y = input_data.axisXY()
-            x = round(phys_x * 4096)
-            y = round(phys_y * 4096)
-
-            groove_detent_size: int = 4096
-            groove_detent_range = 4096
-            pos = 1500
-            if self.effects['lock_1'].started or self.effects['lock_2'].started:
-                return
-
-            self.spring_x.set_coefficient(4096)
-
-            self.spring_x.cpOffset = 0
-
-            self._spring_handle.setCondition(self.spring_x)
-            self._spring_handle.start()
-            if -0.15 < phys_x < 0.15:
-                self.effects['lock_1'].detent(
-                    position_x=pos,
-                    peak_x=groove_detent_size,
-                    range_x=groove_detent_range,
-                    gate_pos_y=0,
-                    gate_neg_y=0,
-
-                ).start()
-                self.effects['lock_2'].detent(
-                    position_x=-pos,
-                    peak_x=groove_detent_size,
-                    range_x=groove_detent_range,
-                    gate_pos_y=0,
-                    gate_neg_y=0,
-
-                ).start()
-                telem_data["_controls_locked"] = controls_locked
-                self._spring_handle.stop()
-
+        if self._apply_pedal_controls_lock(telem_data, controls_locked):
             return
-        else:
-            self.effects['lock_1'].stop()
-            self.effects['lock_2'].stop()
 
         self._spring_handle.setCondition(self.spring_x)
 
@@ -863,16 +921,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         ffb_type = telem_data.FFBType or "joystick"
 
 
-        if self._sim_is_msfs():
-            if self.controls_lock_enable and self.controls_lock_simvar != '':
-                self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
-                self._simconnect._resubscribe()
-
-        # get controls lock status
-        controls_locked = (telem_data.ControlsLock or 0) if self.controls_lock_enable else False
-
-        if self.controls_lock_simvar_invert:
-            controls_locked = not controls_locked
+        self._sync_controls_lock_simvar()
+        controls_locked = self._get_controls_lock_state(telem_data)
 
         if ffb_type == "collective":
             return

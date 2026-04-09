@@ -53,7 +53,7 @@ class GliderAircraft(Aircraft):
             trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
         else:
             trim_reset_pressed = False
-        x, y = input_data.axisXY()
+        x, y = self._get_device_axes()
         if force_trim_pressed:
             if x_axis:
                 self.spring_x.set_coefficient(0.5)
@@ -115,15 +115,11 @@ class GliderAircraft(Aircraft):
 
     @override
     def on_telemetry(self, telem_data: BaseTelemetryData):
-        pass
         if telem_data.N is None:
             return
         telem_data.AircraftClass = "GliderAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
-
-        if self.is_trimwheel():
-            return
 
         self.msfs_update_force_trim(telem_data, x_axis=self.aileron_force_trim,
                                                 y_axis=self.elevator_force_trim)

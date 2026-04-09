@@ -364,6 +364,25 @@ class BaseTelemetryData:
     DCS: computed from wind vector — [x, y, z] m/s.  
     """
 
+    RelWind: Optional[List[float]]
+    """Wind velocity in body frame — [x, y, z] m/s.
+
+    **Body-frame axis conventions differ per sim:**
+
+    ===========  =====================  ================  =========================
+    Sim          [0]                    [1]               [2]
+    ===========  =====================  ================  =========================
+    MSFS / XP    lateral (stbd +)       vertical (up +)   longitudinal (fwd +)
+    DCS          longitudinal (fwd +)   vertical (up +)   lateral (stbd +)
+    ===========  =====================  ================  =========================
+
+    MSFS: RELATIVE WIND VELOCITY BODY [X, Y, Z] SimVars — includes aircraft
+    velocity (magnitude ≈ TAS).
+
+    DCS: ambient wind rotated to body frame in TelemFFB.lua — does **not**
+    include aircraft velocity (magnitude ≈ environmental wind speed).
+    """
+
     # -- Weight on wheels / ground state --
 
     WeightOnWheels: Optional[List[float]]

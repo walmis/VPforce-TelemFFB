@@ -28,7 +28,7 @@ from telemffb.hw.ffb_rhino import FFBReport_SetCondition, HapticEffect, EFFECT_S
 from telemffb.sim.aircraft_base import AircraftBase
 from telemffb.util.Vector import Vector
 from telemffb.util.conversions import rad
-from telemffb.util.TurbulenceModulator import TurbulenceModulator
+from telemffb.sim.msfs_xp.TurbulenceMixIn import TurbulenceMixIn
 # removed local 'overrides' helper in favor of typing.override
 
 
@@ -42,7 +42,8 @@ from telemffb.sim.BaseTelemetryData import BaseTelemetryData
 
 class Aircraft(
     AircraftBase,
-    MsfsXpTrimwheelMixIn, 
+    TurbulenceMixIn,
+    MsfsXpTrimwheelMixIn,
     MsfsXpNosewheelShimmyMixIn,
     MsfsXpFlightControlsMixIn
 ):
@@ -83,15 +84,8 @@ class Aircraft(
 
     use_legacy_bindings = False
 
-    turbulence_effect_enable: bool = False
-    turbulence_hpf_alpha: float = 0.0
-    turbulence_smoothing_alpha: float = 0.0
-    turbulence_sensitivity: float = 0.0
-    turbulence_intensity: float = 0.0
-
     def __init__(self, name, **kwargs) -> None:
         super().__init__(name)
-        self.turbulence_modulator = TurbulenceModulator()
 
         # clear any existing effects
         self.effects.clear()
@@ -116,22 +110,6 @@ class Aircraft(
         self.spring_mode = SpringModeEnum.BASIC.name
 
         self.last_pedal_x = 0
-
-    def update_turbulence(self):
-        if self.turbulence_effect_enable:
-            force, dir = self.turbulence_modulator.update(
-                self.telem_data,
-                self.turbulence_hpf_alpha,
-                self.turbulence_smoothing_alpha,
-                self.turbulence_sensitivity,
-                self.turbulence_intensity,
-            )
-            force = round(force, 4)
-            self.effects["turbulence"].constant(force, dir).start()
-
-            # print(f"force:{force} dir:{dir}")
-        else:
-            self.effects["turbulence"].destroy()
 
     def msfs_update_stick_shaker(self, telem_data: BaseTelemetryData):
         if not self.is_joystick():
@@ -210,9 +188,6 @@ class Aircraft(
             telem_data.AircraftClass = "GenericAircraft"  # inject aircraft class into telemetry
 
         super().on_telemetry(telem_data)
-
-        if self.is_joystick():
-            self.update_turbulence()
 
         self.msfs_update_stick_shaker(telem_data)
 

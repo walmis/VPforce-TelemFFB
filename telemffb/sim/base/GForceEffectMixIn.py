@@ -176,7 +176,7 @@ class GForceEffectMixIn(AircraftEffectUtilsBase, GForceEffectProperties):
             return
 
         input_data = HapticEffect.device.get_input()
-        x, y = input_data.axisXY()
+        x, y = self._get_device_axes()
         _, spring_y_center = input_data.CP_XY()
         if spring_y_center is None:
             spring_y_center = 0

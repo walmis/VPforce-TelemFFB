@@ -60,8 +60,7 @@ class HPGHelicopter(Helicopter):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
-        input_data = HapticEffect.device.get_input()
-        self.phys_x, self.phys_y = input_data.axisXY()
+        self.phys_x, self.phys_y = self._get_device_axes()
         self.cpO_y = round(self.phys_y * 4096)
         self.collective_spring_coeff_y = round(4096 * utils.clamp(self.collective_ap_spring_gain, 0, 1))
         self.hands_on_active = 0
@@ -86,8 +85,7 @@ class HPGHelicopter(Helicopter):
         self.pedals_init = 0
 
     def check_feet_on(self, percent):
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
 
         # Convert phys input to +/-4096
         phys_x = round(phys_x * 4096)
@@ -108,45 +106,6 @@ class HPGHelicopter(Helicopter):
             "deviation": deviation_x,
         }
 
-        return result
-
-    def check_hands_on(self, percent):
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
-
-        # Convert phys input to +/-4096
-        phys_x = round(phys_x * 4096)
-        phys_y = round(phys_y * 4096)
-
-        ref_x = self.cpO_x
-        ref_y = self.cpO_y
-
-        # Calculate the threshold values based on the input percentage
-        threshold = 4096 * percent
-
-        # Calculate the deviation percentages in decimal form
-        deviation_x = abs(phys_x - ref_x) / 4096
-        deviation_y = abs(phys_y - ref_y) / 4096
-
-        raw_deviation_x = phys_x - ref_x
-        raw_deviation_y = phys_y - ref_y
-
-        # Check if either phys_x or phys_y exceeds the threshold
-
-        x_exceeds_threshold = abs(phys_x - ref_x) > threshold
-        y_exceeds_threshold = abs(phys_y - ref_y) > threshold
-        master_exceeds_threshold = x_exceeds_threshold or y_exceeds_threshold
-
-        result = {
-            "master_result": master_exceeds_threshold,
-            "x_result": x_exceeds_threshold,
-            "x_deviation": deviation_x,
-            "x_deviation_raw": raw_deviation_x,
-            "y_result": y_exceeds_threshold,
-            "y_deviation": deviation_y,
-            "y_deviation_raw": raw_deviation_y,
-
-        }
         return result
 
     @override
@@ -181,7 +140,7 @@ class HPGHelicopter(Helicopter):
             hands_on_either = hands_on_dict["master_result"]
 
             if self.handson_force_mode:
-                force_x, force_y = HapticEffect.device.get_input().forceXY()
+                force_x, force_y = self._get_device_forces()
                 thresh = self.hands_on_force_threshold
 
                 is_hands_on_now = abs(force_x) > thresh or abs(force_y) > thresh
@@ -286,34 +245,7 @@ class HPGHelicopter(Helicopter):
             self._spring_handle.setCondition(self.spring_x)
             self._spring_handle.setCondition(self.spring_y)
 
-            if self.send_individual_hands_on:
-                if hands_on_x:
-                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 1, units="number")
-                    self.hands_on_x_active = True
-
-                else:
-                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICX", 0, units="number")
-                    self.hands_on_x_active = False
-
-                if hands_on_y:
-                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 1, units="number")
-                    self.hands_on_y_active = True
-                else:
-                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLICY", 0, units="number")
-                    self.hands_on_y_active = False
-            else:
-                if hands_on_either:
-                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 1, units="number")
-                    self.hands_on_active = True
-                else:
-                    self._simconnect.set_simdatum_to_msfs("L:FFB_HANDS_ON_CYCLIC", 0, units="number")
-                    self.hands_on_active = False
-
-            telem_data.hands_on = int(hands_on_either)
-            telem_data.hands_on_x = int(hands_on_x)
-            telem_data.hands_on_y = int(hands_on_y)
-            telem_data.deviation_x = dev_x
-            telem_data.deviation_y = dev_y
+            self._dispatch_hands_on_state(telem_data, hands_on_dict, hands_on_either)
 
             self._spring_handle.start()
 
@@ -329,8 +261,7 @@ class HPGHelicopter(Helicopter):
             return
 
         if self.telemffb_controls_axes and not self.local_disable_axis_control:
-            input_data = HapticEffect.device.get_input()
-            phys_x, phys_y = input_data.axisXY()
+            phys_x, phys_y = self._get_device_axes()
             telem_data.phys_x = phys_x
 
 
@@ -442,8 +373,7 @@ class HPGHelicopter(Helicopter):
         collective_pos = telem_data.CollectivePos or 0
 
 
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
         telem_data.phys_y = phys_y
         if not self.collective_init:
 

@@ -310,6 +310,30 @@ class AircraftEffectUtilsBase(object):
         if device is None:
             return 0.0, 0.0
         return device.get_input().axisXY()
+
+    @staticmethod
+    def _get_device_raw_axes() -> tuple[float, float]:
+        device = HapticEffect.device
+        if device is None:
+            return 0.0, 0.0
+        input_data = device.get_input()
+        if device.supports_axis_override():
+            return input_data.rawAxisXY()
+        return input_data.axisXY()
+
+    @staticmethod
+    def _get_device_report():
+        device = HapticEffect.device
+        if device is None:
+            return None
+        return device.get_input()
+    
+    @staticmethod
+    def _get_device_forces() -> tuple[float, float]:
+        device = HapticEffect.device
+        if device is None:
+            return 0.0, 0.0
+        return device.get_input().forceXY()
     
     def _get_random_direction(self):
         """Get a random direction for weapon effects based on device type."""

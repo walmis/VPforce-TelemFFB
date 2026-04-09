@@ -208,7 +208,7 @@ class HelicopterEffectsMixIn(AdvancedSpringMixIn):
         wow = sum(telem_data.WeightOnWheels or [1])
 
         input_data = HapticEffect.device.get_input()
-        _, y = input_data.axisXY()
+        _, y = self._get_device_axes()
         current_buttons = input_data.getPressedButtons()
 
         force_trim_active = telem_data.ForceTrimSW

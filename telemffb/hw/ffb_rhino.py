@@ -71,6 +71,8 @@ HID_REPORT_ID_DEVICE_CONTROL = 112
 HID_REPORT_ID_DEVICE_GAIN = 113
 HID_REPORT_ID_SET_CUSTOM_FORCE_OUTPUT_DATA = 114
 HID_REPORT_ID_SET_DEADZONE = 115
+HID_REPORT_ID_SET_LEDS = 116
+HID_REPORT_ID_AXIS_OVERRIDE = 117
 
 HID_REPORT_ID_PID_STATE_REPORT = 2
 HID_REPORT_ID_CREATE_EFFECT = 5
@@ -184,6 +186,19 @@ class FFBReport_SetDeadzone(BaseStructure):
             ("deadzone", ctypes.c_uint16),
         ]
     _defaults_ = {"reportId": HID_REPORT_ID_SET_DEADZONE, "deadzone": 0}
+
+
+class FFBReport_AxisOverride_Output(BaseStructure):
+    _pack_ = 1
+    _fields_ = [
+            ("reportId", ctypes.c_uint8),
+            ("x_mode", ctypes.c_uint8),
+            ("x_value", ctypes.c_int16),
+            ("y_mode", ctypes.c_uint8),
+            ("y_value", ctypes.c_int16),
+            ("watchdog_ms", ctypes.c_uint16),
+        ]
+    _defaults_ = {"reportId": HID_REPORT_ID_AXIS_OVERRIDE, "watchdog_ms": 1000}
 
 
 class FFBReport_EffectOperation(BaseStructure):
@@ -392,6 +407,9 @@ class FFBReport_Input(BaseStructure):
     CP_offsetY: int
     ForceX: int # force output (sping + friction), for improved hands-on detection
     ForceY: int
+    RawX: int
+    RawY: int
+    status: int
 
     _pack_ = 1
     _fields_ = [
@@ -411,6 +429,9 @@ class FFBReport_Input(BaseStructure):
                 ("CP_offsetY", ctypes.c_int16), # added in fw v1.0.17
                 ("ForceX", ctypes.c_int16), # added in fw v1.0.17b13
                 ("ForceY", ctypes.c_int16), # added in fw v1.0.17b13
+                ("RawX", ctypes.c_int16), # added for axis override support
+                ("RawY", ctypes.c_int16),
+                ("status", ctypes.c_uint8),
                ]
     _defaults_ = {}
 
@@ -494,6 +515,18 @@ class FFBReport_Input(BaseStructure):
         Returns the main X and Y axis values as a tuple of two floats in the range [-1.0 .. 1.0]
         """
         return (self.X/4096.0, self.Y/4096.0)
+
+    def rawAxisXY(self) -> tuple[float, float]:
+        """
+        Returns the post-curve, pre-override axis values as a tuple of floats.
+        """
+        return (self.RawX/4096.0, self.RawY/4096.0)
+
+    def axisOverrideActive(self) -> bool:
+        """
+        Returns True when either axis is currently overridden by firmware.
+        """
+        return bool(self.status & 0x03)
     
     def CP_XY(self) -> tuple[float, float]:
         """
@@ -516,7 +549,7 @@ class FFBReport_Input(BaseStructure):
         Returns scaled axis x/y values in the range [-1.0 .. 1.0]  using the current CP_offset as a center reference
         Output is scaled 0 to +/-1 in any direction from spring center.
         """
-        X, Y = self.axisXY()
+        X, Y = self.rawAxisXY() if self.axisOverrideActive() else self.axisXY()
         cpX, cpY = self.CP_XY()
         # Scale X based on cpX as the zero reference
         if cpX is None:
@@ -871,6 +904,31 @@ class FFBRhino(QObject):
         data = FFBReport_SetDeadzone(deadzone=deadzone)
         self._dev.write(bytes(data))
 
+    def supports_axis_override(self) -> bool:
+        data = self._in_reports.get(HID_REPORT_ID_INPUT, None)
+        return bool(data and len(data) >= ctypes.sizeof(FFBReport_Input))
+
+    def send_axis_override(
+        self,
+        x_mode: int = 0,
+        x_value: int = 0,
+        y_mode: int = 0,
+        y_value: int = 0,
+        watchdog_ms: int = 1000,
+    ):
+        assert self._dev
+        data = FFBReport_AxisOverride_Output(
+            x_mode=x_mode,
+            x_value=x_value,
+            y_mode=y_mode,
+            y_value=y_value,
+            watchdog_ms=watchdog_ms,
+        )
+        self.write(bytes(data))
+
+    def clear_axis_override(self):
+        self.send_axis_override(watchdog_ms=0)
+
     # runs on mainThread
     @override
     def timerEvent(self, a0: QTimerEvent) -> None:
@@ -1021,7 +1079,11 @@ class FFBRhino(QObject):
         data = self._in_reports.get(report_id, None)
         if data:
             try:
-                return input_report_handlers[report_id].from_buffer_copy(data)
+                report_type = input_report_handlers[report_id]
+                expected_size = ctypes.sizeof(report_type)
+                if len(data) < expected_size:
+                    data = bytes(data) + bytes(expected_size - len(data))
+                return report_type.from_buffer_copy(data)
             except KeyError as err:
                 logging.exception(f'ERROR GETTING HID REPORT: {err}')
                 return data

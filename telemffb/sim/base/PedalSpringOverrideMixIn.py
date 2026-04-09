@@ -59,7 +59,7 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
             False if no action was required.
         Side effects
         ------------
-        - Reads device input via HapticEffect.device.get_input() and input_data.axisXY().
+        - Reads (phys_x, phys_y) from the device; phys_y is not used.
         - May modify:
           - self.spring_x.set_coefficient(...) (spring stiffness/force coefficient).
           - self.spring_x.cpOffset (center-point offset for the spring).
@@ -97,8 +97,7 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         """
         if not self.is_pedals(): return
 
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
 
         force_trim_pressed = self.check_button_press(self.pedal_ft_release_button, self.pedal_ft_use_master_buttons)
         trim_reset_pressed = self.check_button_press(self.pedal_ft_reset_button, self.pedal_ft_use_master_buttons)
@@ -130,9 +129,6 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
         if not self.is_pedals(): return
         if self._sim_is_msfs() or self._sim_is_xplane(): # TODO: override ac_override_pedal_spring with a stub in the child class
             return
-
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
 
         if self.spring_mode_is(SpringModeEnum.NONE):
             if self.effects['pedal_spring'].started:
@@ -182,11 +178,10 @@ class PedalSpringOverrideMixIn(AdvancedSpringMixIn, AircraftParamsMixIn):
     def verify_pedal_axis(self):
         if not self.is_pedals():
             return False
-        
-        if HapticEffect.device:
-            x,y = HapticEffect.device.get_input().axisXY()
-            if y != 0 and x == 0:
-                self.flag_error("Pedal axis mismatch: Y axis used instead of X. Fix by swapping X/Y in VPConfigurator.")
+
+        x, y = self._get_device_axes()
+        if y != 0 and x == 0:
+            self.flag_error("Pedal axis mismatch: Y axis used instead of X. Fix by swapping X/Y in VPConfigurator.")
 
     def on_telemetry(self, telem_data: BaseTelemetryData):
         super().on_telemetry(telem_data)

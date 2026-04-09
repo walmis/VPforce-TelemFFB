@@ -33,7 +33,6 @@ import select
 import logging
 import sys
 
-import winreg
 import socket
 import time
 import zlib
@@ -56,9 +55,7 @@ import stransi
 from enum import Enum, auto
 
 import telemffb.globals as G
-import telemffb.winpaths as winpaths
 import telemffb.xmlutils as xmlutils
-from .namedmutex import NamedMutex
 from .util import conversions as conv
 
 def check_min_firmware_version(dev_firmware_version, min_firmware_version):
@@ -505,6 +502,8 @@ def _create_support_bundle_zip(zip_file_path, userconfig_rootpath, exceptions=No
         exceptions: Optional list of ExceptionRecord objects to include
     """
     from datetime import datetime
+    import telemffb.winpaths as winpaths
+
     
     # Get the system settings
     sys_dict = read_all_system_settings()
@@ -877,6 +876,8 @@ def create_support_bundle(userconfig_rootpath):
 
 
 def read_all_system_settings():
+    import winreg
+
     REG_PATH = r"SOFTWARE\VPForce\TelemFFB"
 
     settings_dict = {}
@@ -1920,6 +1921,8 @@ def get_dcs_variant():
     Returns:
         str | None
     """
+    import winreg
+
     logging.info("DCS Variant Check: Starting variant discovery via registry and dcs_variant.txt")
 
     # Try OpenBeta first, then Stable.
@@ -1975,6 +1978,8 @@ def get_dcs_variant():
 
 
 def _prepare_dcs_export_context():
+    import telemffb.winpaths as winpaths
+
     """Resolve shared paths and targets for DCS export integration."""
     saved_games = winpaths.get_path(winpaths.FOLDERID.SavedGames)
     logging.info(f"DCS Export Installer: Saved Games directory detected: {saved_games}")
@@ -3146,6 +3151,8 @@ def load_custom_userconfig(new_path=""):
 
 
 def upload_vpconf_profile(config_filepath, serial):
+    from .namedmutex import NamedMutex
+
     settings = QSettings("VPforce", "RhinoFFB")
     vpconf_path = settings.value("path")
 
