@@ -108,7 +108,7 @@ class XAW109Helicopter(Helicopter):
         phys_x, phys_y = self._get_device_axes()
         telem_data.phys_x = phys_x
         telem_data.pedal_position = phys_x
-        telem_data.IAS_kt = telem_data.IAS or 0 * ms2kt
+        telem_data.IAS_kt = (telem_data.IAS or 0) * ms2kt
         # if self.pedal_ft_release_button:
         #     state = input_data.isButtonPressed(self.pedal_ft_release_button)
         #     self.trigger_xp_event("SPECIAL/buttons/cmd_ft_ped_rel", state=state, type="track")
