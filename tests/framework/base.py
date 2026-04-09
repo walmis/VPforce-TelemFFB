@@ -289,10 +289,15 @@ class MockSimConnect:
         self.simvar_calls = []
         self.add_simvar_count = 0
         self._resubscribe_count = 0
+        self.sim_data_written = []
     
     def send_event_to_msfs(self, event_name: str, value: Any):
         """Record sent events."""
         self.sent_events.append((event_name, value))
+    
+    def set_simdatum_to_msfs(self, simvar: str, value: Any, units: str = ""):
+        """Record simvar writes."""
+        self.sim_data_written.append((simvar, value, units))
     
     def set_variable(self, var_name: str, value: Any):
         """Set a variable."""

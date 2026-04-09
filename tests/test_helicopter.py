@@ -1526,3 +1526,188 @@ class TestMsfsAxisHelpers(BaseTelemetryEffectTestCase):
         result = instance._send_msfs_axis_value("CUSTOM_VAR", 0.75, 1, 1.0)
         assert result == 0.75
         assert self.mock_simconnect.sent_events[0] == ("CUSTOM_VAR", 0.75)
+
+
+class TestCheckHandsOn(BaseTelemetryEffectTestCase):
+    """Tests for check_hands_on extracted to parent Helicopter class."""
+
+    def _make_instance(self, **kwargs):
+        defaults = dict(
+            name="TestHeli", _test_sim_is_msfs=True, _test_device_type="joystick"
+        )
+        defaults.update(kwargs)
+        return self.create_aircraft_instance(Helicopter, **defaults)
+
+    def test_hands_on_below_threshold_returns_false(self):
+        instance = self._make_instance()
+        instance.cpO_x = 0
+        instance.cpO_y = 0
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+
+        result = instance.check_hands_on(0.1)
+
+        assert result["master_result"] is False
+        assert result["x_result"] is False
+        assert result["y_result"] is False
+
+    def test_hands_on_x_exceeds_threshold(self):
+        instance = self._make_instance()
+        instance.cpO_x = 0
+        instance.cpO_y = 0
+        self.mock_device._input_data.set_axis(x=0.5, y=0.0)
+
+        result = instance.check_hands_on(0.1)
+
+        assert result["x_result"] is True
+        assert result["master_result"] is True
+        assert result["y_result"] is False
+
+    def test_hands_on_y_exceeds_threshold(self):
+        instance = self._make_instance()
+        instance.cpO_x = 0
+        instance.cpO_y = 0
+        self.mock_device._input_data.set_axis(x=0.0, y=0.5)
+
+        result = instance.check_hands_on(0.1)
+
+        assert result["y_result"] is True
+        assert result["master_result"] is True
+        assert result["x_result"] is False
+
+    def test_hands_on_returns_deviations(self):
+        instance = self._make_instance()
+        instance.cpO_x = 0
+        instance.cpO_y = 0
+        self.mock_device._input_data.set_axis(x=0.25, y=-0.5)
+
+        result = instance.check_hands_on(0.1)
+
+        assert result["x_deviation"] == pytest.approx(0.25, abs=0.01)
+        assert result["y_deviation"] == pytest.approx(0.5, abs=0.01)
+
+    def test_hands_on_returns_raw_deviations(self):
+        instance = self._make_instance()
+        instance.cpO_x = 1000
+        instance.cpO_y = -500
+
+        self.mock_device._input_data.set_axis(x=0.5, y=0.0)
+
+        result = instance.check_hands_on(0.01)
+
+        assert result["x_deviation_raw"] == round(0.5 * 4096) - 1000
+        assert result["y_deviation_raw"] == round(0.0 * 4096) - (-500)
+
+    def test_hands_on_with_offset_reference(self):
+        instance = self._make_instance()
+        instance.cpO_x = 2000
+        instance.cpO_y = 2000
+        self.mock_device._input_data.set_axis(x=0.5, y=0.5)
+
+        result = instance.check_hands_on(0.1)
+
+        assert isinstance(result["master_result"], bool)
+        assert isinstance(result["x_deviation"], float)
+        assert isinstance(result["y_deviation"], float)
+
+
+class TestDispatchHandsOnState(BaseTelemetryEffectTestCase):
+    """Tests for _dispatch_hands_on_state extracted to parent Helicopter class."""
+
+    def _make_instance(self, **kwargs):
+        defaults = dict(
+            name="TestHeli", _test_sim_is_msfs=True, _test_device_type="joystick"
+        )
+        defaults.update(kwargs)
+        inst = self.create_aircraft_instance(Helicopter, **defaults)
+        inst.send_individual_hands_on = 0
+        inst.hands_on_active = 0
+        inst.hands_on_x_active = 0
+        inst.hands_on_y_active = 0
+        return inst
+
+    def _make_telem(self):
+        return TelemetryDataBuilder() \
+            .with_field("FFBType", "joystick") \
+            .build()
+
+    def _make_hands_on_dict(self, x_result=False, y_result=False):
+        return {
+            "master_result": x_result or y_result,
+            "x_result": x_result,
+            "x_deviation": 0.5 if x_result else 0.0,
+            "x_deviation_raw": 2048 if x_result else 0,
+            "y_result": y_result,
+            "y_deviation": 0.3 if y_result else 0.0,
+            "y_deviation_raw": 1228 if y_result else 0,
+        }
+
+    def test_master_hands_on_sets_simvar(self):
+        instance = self._make_instance()
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict(x_result=True)
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, True)
+
+        assert instance.hands_on_active is True
+        simdata = self.mock_simconnect.sim_data_written
+        assert ("L:FFB_HANDS_ON_CYCLIC", 1) in [(k, v) for k, v, _ in simdata]
+
+    def test_master_hands_off_clears_simvar(self):
+        instance = self._make_instance()
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict()
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, False)
+
+        assert instance.hands_on_active is False
+        simdata = self.mock_simconnect.sim_data_written
+        assert ("L:FFB_HANDS_ON_CYCLIC", 0) in [(k, v) for k, v, _ in simdata]
+
+    def test_individual_mode_sets_x_and_y(self):
+        instance = self._make_instance()
+        instance.send_individual_hands_on = 1
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict(x_result=True, y_result=False)
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, True)
+
+        assert instance.hands_on_x_active is True
+        assert instance.hands_on_y_active is False
+        simdata = [(k, v) for k, v, _ in self.mock_simconnect.sim_data_written]
+        assert ("L:FFB_HANDS_ON_CYCLICX", 1) in simdata
+        assert ("L:FFB_HANDS_ON_CYCLICY", 0) in simdata
+
+    def test_individual_mode_both_on(self):
+        instance = self._make_instance()
+        instance.send_individual_hands_on = 1
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict(x_result=True, y_result=True)
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, True)
+
+        assert instance.hands_on_x_active is True
+        assert instance.hands_on_y_active is True
+
+    def test_sets_telem_data_fields(self):
+        instance = self._make_instance()
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict(x_result=True, y_result=False)
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, True)
+
+        assert telem.hands_on == 1
+        assert telem.hands_on_x == 1
+        assert telem.hands_on_y == 0
+        assert telem.deviation_x == 0.5
+        assert telem.deviation_y == 0.0
+
+    def test_hands_off_sets_telem_data_fields(self):
+        instance = self._make_instance()
+        telem = self._make_telem()
+        hands_on_dict = self._make_hands_on_dict()
+
+        instance._dispatch_hands_on_state(telem, hands_on_dict, False)
+
+        assert telem.hands_on == 0
+        assert telem.hands_on_x == 0
+        assert telem.hands_on_y == 0
