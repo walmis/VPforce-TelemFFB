@@ -876,6 +876,81 @@ class TestMsfsXpFlightControlsAxisControl(BaseTelemetryEffectTestCase):
         
         # Assert
         assert len(self.mock_simconnect.sent_events) == 0, "No events should be sent when disabled"
+
+    def test_joystick_axis_control_firmware_backend(self):
+        """Test that joystick routes axis manipulation to firmware when enabled."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.telemffb_controls_axes = True
+        instance.use_firmware_axis_override = True
+        instance.local_disable_axis_control = False
+        instance._simconnect = self.mock_simconnect
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.enable_custom_x_axis = False
+        instance.enable_custom_y_axis = False
+        instance.joystick_x_axis_scale = 1.0
+        instance.joystick_y_axis_scale = 1.0
+
+        import telemffb.globals as G
+        G.device_firmware_version = "v1.0.18b14"
+
+        telem = self._create_flight_telem()
+        self.set_telemetry(instance, telem)
+
+        instance.on_telemetry(telem)
+
+        assert len(self.mock_simconnect.sent_events) == 0
+        assert len(self.mock_device.axis_override_commands) > 0
+        last = self.mock_device.axis_override_commands[-1]
+        assert last["x_mode"] == 2
+        assert last["y_mode"] == 2
+
+    def test_pedals_axis_control_firmware_backend(self):
+        """Test that pedals route rudder axis manipulation to firmware when enabled."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.telemffb_controls_axes = True
+        instance.use_firmware_axis_override = True
+        instance.local_disable_axis_control = False
+        instance._simconnect = self.mock_simconnect
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.rudder_x_axis_scale = 1.0
+
+        import telemffb.globals as G
+        G.device_firmware_version = "v1.0.18b14"
+
+        telem = self._create_flight_telem()
+        telem["FFBType"] = "pedals"
+        self.set_telemetry(instance, telem)
+
+        instance.on_telemetry(telem)
+
+        assert len(self.mock_simconnect.sent_events) == 0
+        assert len(self.mock_device.axis_override_commands) > 0
+        last = self.mock_device.axis_override_commands[-1]
+        assert last["x_mode"] == 2
+        assert last["y_mode"] == 0
+
+    def test_firmware_axis_backend_falls_back_when_version_missing(self):
+        """Test that firmware backend request falls back to simulator backend when unsupported."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.telemffb_controls_axes = True
+        instance.use_firmware_axis_override = True
+        instance.local_disable_axis_control = False
+        instance._simconnect = self.mock_simconnect
+        instance.spring_mode = SpringModeEnum.BASIC
+
+        import telemffb.globals as G
+        G.device_firmware_version = "v1.0.18"
+
+        telem = self._create_flight_telem()
+        self.set_telemetry(instance, telem)
+
+        instance.on_telemetry(telem)
+
+        assert_simconnect_event_sent(self.mock_simconnect, "AXIS_AILERONS_SET")
+        assert len(self.mock_device.axis_override_commands) == 0
     
     def _create_flight_telem(self):
         """Helper to create basic flight telemetry."""

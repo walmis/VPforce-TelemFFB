@@ -5,6 +5,8 @@ import socket
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import telemffb.globals as G
+from telemffb.hw.ffb_rhino import HapticEffect
+import telemffb.utils as utils
 from telemffb.sim.base.AircraftEffectUtilsBase import AircraftEffectUtilsBase
 
 if TYPE_CHECKING:
@@ -42,6 +44,7 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     # user parameters
     local_disable_axis_control: bool = False
     telemffb_controls_axes: bool = False
+    use_firmware_axis_override: bool = False
     _xplane_event_states: dict = {}
     # end of user parameters
 
@@ -59,8 +62,73 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
     def send_xp_command(self, cmd):
         if self._socket is None:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
-        self.toggle_xp_control()
+        if self._use_sim_axis_backend():
+            self.toggle_xp_control()
         self._socket.sendto(bytes(cmd, "utf-8"), self.__xplane_addr)
+
+    def _axis_control_enabled(self) -> bool:
+        return self.telemffb_controls_axes and not self.local_disable_axis_control
+
+    def _firmware_axis_override_supported(self) -> bool:
+        if not HapticEffect.device:
+            return False
+        return HapticEffect.device.supports_axis_override()
+
+    def _use_firmware_axis_backend(self) -> bool:
+        if not (self._axis_control_enabled() and self.use_firmware_axis_override):
+            return False
+        supported = self._firmware_axis_override_supported()
+        if not supported:
+            logging.warning("Firmware axis override requested but not supported; falling back to simulator backend")
+        return supported
+
+    def _use_sim_axis_backend(self) -> bool:
+        return self._axis_control_enabled() and not self._use_firmware_axis_backend()
+
+    def _send_firmware_axis_override(self, x_mode=0, x_value=0, y_mode=0, y_value=0, watchdog_ms=1000):
+        if not self._use_firmware_axis_backend():
+            return False
+
+        device = HapticEffect.device
+        if device is None:
+            return False
+        device.send_axis_override(
+            x_mode=x_mode,
+            x_value=int(x_value),
+            y_mode=y_mode,
+            y_value=int(y_value),
+            watchdog_ms=watchdog_ms,
+        )
+        return True
+
+    def _clear_firmware_axis_override(self):
+        device = HapticEffect.device
+        if device is None:
+            return
+        clear = getattr(device, "clear_axis_override", None)
+        if callable(clear):
+            clear()
+
+    def _send_firmware_fixed_axes(
+        self,
+        x_value: float | None = None,
+        y_value: float | None = None,
+        watchdog_ms: int = 1000,
+    ) -> bool:
+        def normalize(value: float | None) -> tuple[int, int]:
+            if value is None:
+                return 0, 0
+            return 2, int(round(max(-1.0, min(1.0, value)) * 4096))
+
+        x_mode, x_fixed = normalize(x_value)
+        y_mode, y_fixed = normalize(y_value)
+        return self._send_firmware_axis_override(
+            x_mode=x_mode,
+            x_value=x_fixed,
+            y_mode=y_mode,
+            y_value=y_fixed,
+            watchdog_ms=watchdog_ms,
+        )
 
     def write_xp_dataref(self, dataref, value, type="int"):
         command = f"WRITE:dataref={dataref},value={value},type={type}"
@@ -91,6 +159,14 @@ class MsfsXpSimConnectMixIn(AircraftEffectUtilsBase):
             # If state matches last_state, do nothing (no change)
 
     def toggle_xp_control(self):
+        if self._use_firmware_axis_backend():
+            if self.__xplane_axis_override_active and self._socket is not None:
+                sendstr = f"OVERRIDE:{self.telem_data.FFBType}=false"
+                self._socket.sendto(bytes(sendstr, "utf-8"), self.__xplane_addr)
+                logging.info(f"Sending to XPLANE: >>{sendstr}<<")
+                self.__xplane_axis_override_active = False
+            return
+
         if self.is_collective():
             # issues with axis override for collectve
             return

@@ -1034,6 +1034,47 @@ class TestCyclicSubMethods(BaseTelemetryEffectTestCase):
         assert inst.last_device_x == 0.35
         assert inst.last_device_y == -0.15
 
+    def test_send_axis_output_uses_firmware_backend(self):
+        inst = self._make_instance()
+        inst.telemffb_controls_axes = True
+        inst.use_firmware_axis_override = True
+        inst.local_disable_axis_control = False
+        inst.cyclic_spring_init = 1
+        inst.joystick_x_axis_scale = 1.0
+        inst.joystick_y_axis_scale = 1.0
+        inst.cyclic_virtual_trim_x_offs = 0.0
+        inst.cyclic_virtual_trim_y_offs = 0.0
+        inst.trim_following = False
+        self.mock_device._input_data.set_axis(x=0.3, y=-0.2)
+
+        import telemffb.globals as G
+        G.device_firmware_version = "v1.0.18b14"
+
+        telem = self._make_telem()
+        self.set_telemetry(inst, telem)
+
+        inst._send_cyclic_axis_output(telem, True)
+
+        assert len(self.mock_simconnect.sent_events) == 0
+        assert len(self.mock_device.axis_override_commands) > 0
+        last = self.mock_device.axis_override_commands[-1]
+        assert last["x_mode"] == 2
+        assert last["y_mode"] == 2
+
+    def test_helicopter_timeout_clears_firmware_override(self):
+        inst = self._make_instance()
+        inst.use_firmware_axis_override = True
+        inst.telemffb_controls_axes = True
+
+        import telemffb.globals as G
+        G.device_firmware_version = "v1.0.18b14"
+
+        inst.on_timeout()
+
+        assert len(self.mock_device.axis_override_commands) > 0
+        last = self.mock_device.axis_override_commands[-1]
+        assert last["watchdog_ms"] == 0
+
 
 @pytest.mark.unit
 @pytest.mark.xplane

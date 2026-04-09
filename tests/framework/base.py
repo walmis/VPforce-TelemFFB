@@ -14,11 +14,21 @@ class MockInputData:
     def __init__(self):
         self._x_axis = 0.0
         self._y_axis = 0.0
+        self._raw_x_axis = 0.0
+        self._raw_y_axis = 0.0
         self._buttons = set()
+        self.status = 0
     
     def axisXY(self):
         """Return current X and Y axis values."""
         return (self._x_axis, self._y_axis)
+
+    def rawAxisXY(self):
+        """Return current raw X and Y axis values."""
+        return (self._raw_x_axis, self._raw_y_axis)
+
+    def axisOverrideActive(self):
+        return bool(self.status & 0x03)
     
     def CP_scaled_axisXY(self):
         """Return current X and Y axis values scaled for center position."""
@@ -32,8 +42,16 @@ class MockInputData:
         """Set axis values for testing."""
         if x is not None:
             self._x_axis = x
+            self._raw_x_axis = x
         if y is not None:
             self._y_axis = y
+            self._raw_y_axis = y
+
+    def set_raw_axis(self, x: float = None, y: float = None):
+        if x is not None:
+            self._raw_x_axis = x
+        if y is not None:
+            self._raw_y_axis = y
     
     def isButtonPressed(self, button: int) -> bool:
         """Check if button is pressed."""
@@ -57,6 +75,7 @@ class MockFFBDevice:
     
     def __init__(self):
         self._input_data = MockInputData()
+        self.axis_override_commands = []
     
     def get_input(self) -> MockInputData:
         """Return mock input data."""
@@ -65,6 +84,29 @@ class MockFFBDevice:
     def create_effect(self, effect_type):
         """Create a mock effect."""
         return MockConditionEffect()
+
+    def supports_axis_override(self):
+        return True
+
+    def send_axis_override(self, x_mode=0, x_value=0, y_mode=0, y_value=0, watchdog_ms=1000):
+        self.axis_override_commands.append(
+            {
+                "x_mode": x_mode,
+                "x_value": x_value,
+                "y_mode": y_mode,
+                "y_value": y_value,
+                "watchdog_ms": watchdog_ms,
+            }
+        )
+
+    def clear_axis_override(self):
+        self.axis_override_commands.append({
+            "x_mode": 0,
+            "x_value": 0,
+            "y_mode": 0,
+            "y_value": 0,
+            "watchdog_ms": 0,
+        })
 
 
 class MockConditionEffect:

@@ -235,6 +235,10 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         self._spring_handle.setCondition(self.spring_x)
 
     def _send_pedal_outputs(self, telem_data: BaseTelemetryData, phys_x: float, x_scale: float, x_var: str, x_range: float):
+        if self._use_firmware_axis_backend():
+            self._send_firmware_fixed_axes(x_value=phys_x * x_scale)
+            return
+
         if self._sim_is_xplane():
             pos_x_pos = phys_x * x_scale
             self.send_xp_command(f'AXIS:px={round(pos_x_pos, 5)}')
@@ -339,6 +343,10 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         self._spring_handle.start(override=True)
 
     def _send_collective_outputs(self, telem_data: BaseTelemetryData, phys_y: float, y_var: str, y_range: float):
+        if self._use_firmware_axis_backend() and self.collective_init:
+            self._send_firmware_fixed_axes(y_value=phys_y)
+            return
+
         if self._sim_is_xplane():
             pos_y_pos = utils.scale(phys_y, (-1, 1), (1, 0))
             if self.collective_init:
@@ -359,7 +367,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         if not self.telemffb_controls_axes or self.local_disable_axis_control:
             return
 
-        phys_x, _ = self._get_device_axes()
+        phys_x, _ = self._get_device_raw_axes()
         x_scale = clamp(self.rudder_x_axis_scale, 0.0, 1.0)
         x_var, x_range = self._get_msfs_pedal_axis_config()
 
@@ -395,7 +403,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
         y_var, y_range = self._get_msfs_collective_axis_config()
 
-        _, phys_y = self._get_device_axes()
+        _, phys_y = self._get_device_raw_axes()
 
         telem_data.phys_y = phys_y
 

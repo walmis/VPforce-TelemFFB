@@ -233,10 +233,10 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
     def _send_cyclic_axis_output(self, telem_data: BaseTelemetryData, force_trim_active):
         """Read physical stick, apply trim offsets and scaling, send axis values to sim."""
-        if not (self.telemffb_controls_axes and not self.local_disable_axis_control):
+        if not self._axis_control_enabled():
             return
 
-        phys_x, phys_y = self._get_device_axes()
+        phys_x, phys_y = self._get_device_raw_axes()
         telem_data.phys_x = phys_x
         telem_data.phys_y = phys_y
         self._update_cyclic_trim(telem_data)
@@ -246,6 +246,11 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
         x_scale = clamp(self.joystick_x_axis_scale, 0, 1)
         y_scale = clamp(self.joystick_y_axis_scale, 0, 1)
+
+        if self._use_firmware_axis_backend():
+            self._send_firmware_fixed_axes(x_pos * x_scale, y_pos * y_scale)
+            self.last_device_x, self.last_device_y = phys_x, phys_y
+            return
 
         if self._sim_is_xplane():
             pos_x_pos = x_pos * x_scale
@@ -287,7 +292,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         )  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
         if ffb_type == "joystick":
             assert HapticEffect.device is not None, "HapticEffect.device is None"
-            x, y = self._get_device_axes()
+            x, y = self._get_device_raw_axes()
             telem_data.phys_x = x
             telem_data.phys_y = y
 

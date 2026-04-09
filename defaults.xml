@@ -1621,6 +1621,23 @@
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
 		<order>2100.2</order>
+		<name>use_firmware_axis_override</name>
+		<displayname>Use Firmware Axis Override</displayname>
+		<prereq>telemffb_controls_axes</prereq>
+		<info>Route TelemFFB axis manipulation through Rhino firmware instead of simulator axis injection</info>
+		<MSFS>true</MSFS>
+		<XPLANE>true</XPLANE>
+		<joystick>true</joystick>
+		<pedals>true</pedals>
+		<collective>true</collective>
+		<trimwheel>true</trimwheel>
+		<value>false</value>
+	</defaults>
+	<defaults>
+		<datatype>bool</datatype>
+		<grouping>Axis Control</grouping>
+		<parentgroup>basic</parentgroup>
+		<order>2100.21</order>
 		<name>local_disable_axis_control</name>
 		<displayname>Disable for this device</displayname>
 		<prereq>telemffb_controls_axes</prereq>

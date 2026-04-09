@@ -576,6 +576,40 @@ class TestFFBRhinoDevice:
         # Verify signal was emitted
         assert 0 in button_released
 
+    def test_supports_axis_override_with_short_report(self, mock_ffb_device):
+        """Short HID input report (old firmware) → axis override not supported."""
+        full_size = ctypes.sizeof(FFBReport_Input)
+        # Old firmware omits RawX(2) + RawY(2) + status(1) = 5 bytes
+        short_data = bytes(full_size - 5)
+        mock_ffb_device._in_reports[HID_REPORT_ID_INPUT] = short_data
+        assert mock_ffb_device.supports_axis_override() is False
+
+    def test_supports_axis_override_with_full_report(self, mock_ffb_device):
+        """Full-size HID input report → axis override supported."""
+        full_size = ctypes.sizeof(FFBReport_Input)
+        full_data = bytes(full_size)
+        mock_ffb_device._in_reports[HID_REPORT_ID_INPUT] = full_data
+        assert mock_ffb_device.supports_axis_override() is True
+
+    def test_supports_axis_override_no_report(self, mock_ffb_device):
+        """No input report received yet → axis override not supported."""
+        mock_ffb_device._in_reports.clear()
+        assert mock_ffb_device.supports_axis_override() is False
+
+    def test_get_report_pads_short_data(self, mock_ffb_device):
+        """Short HID report is zero-padded → RawX/RawY/status default to 0."""
+        full_size = ctypes.sizeof(FFBReport_Input)
+        short_data = bytes(full_size - 5)
+        mock_ffb_device._in_reports[HID_REPORT_ID_INPUT] = short_data
+
+        report = mock_ffb_device.get_report(HID_REPORT_ID_INPUT)
+        assert report is not None
+        assert report.RawX == 0
+        assert report.RawY == 0
+        assert report.status == 0
+        assert report.rawAxisXY() == (0.0, 0.0)
+        assert report.axisOverrideActive() is False
+
 
 # ============================================================================
 # HapticEffect Tests
