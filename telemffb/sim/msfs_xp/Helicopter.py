@@ -174,14 +174,12 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             self.send_xp_command(f'AXIS:px={round(pos_x_pos, 5)}')
 
         if self._sim_is_msfs():
-            pos_x_pos = utils.scale(phys_x, (-1, 1), (-x_range * x_scale, x_range * x_scale))
-            if x_range != 1:
-                pos_x_pos = -int(pos_x_pos)
-            else:
-                pos_x_pos = round(pos_x_pos, 5)
-
+            pos_x_pos = self._scale_msfs_axis_value(phys_x, x_range, x_scale)
             self.msfs_send_heli_pedal_pos(x_var, pos_x_pos, telem_data)
             self.last_pos_x_pos = pos_x_pos
+
+    def msfs_send_heli_pedal_pos(self, xvar, xpos, telem_data: BaseTelemetryData):
+        self._simconnect.send_event_to_msfs(xvar, xpos)
 
     def _handle_collective_controls_lock(self, telem_data: BaseTelemetryData, controls_locked: bool) -> bool:
         # Return True when lock mode owns this frame and normal axis processing must stop.
@@ -280,19 +278,13 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             if self.collective_init:
                 self.send_xp_command(f'AXIS:cy={round(pos_y_pos, 5)}')
 
-        if self._sim_is_msfs():
-            pos_y_pos = utils.scale(phys_y, (-1, 1), (-y_range, y_range))
-            if y_range != 1:
-                pos_y_pos = -int(pos_y_pos)
-            else:
-                pos_y_pos = round(pos_y_pos, 5)
+        if self._sim_is_msfs() and self.collective_init:
+            pos_y_pos = self._scale_msfs_axis_value(phys_y, y_range, 1.0)
+            self.msfs_send_heli_collective_pos(y_var, pos_y_pos, telem_data)
+            self.last_pos_y_pos = pos_y_pos
 
-            if self.collective_init:
-                self.msfs_send_heli_collective_pos(y_var, pos_y_pos, telem_data)
-                self.last_pos_y_pos = pos_y_pos
-
-    def msfs_send_heli_pedal_pos(self, xvar, xpos, telem_data: BaseTelemetryData):
-        self._simconnect.send_event_to_msfs(xvar, xpos)
+    def msfs_send_heli_collective_pos(self, yvar, ypos, telem_data: BaseTelemetryData):
+        self._simconnect.send_event_to_msfs(yvar, ypos)
 
     def msfs_update_pedals(self, telem_data: BaseTelemetryData):
         if not self.is_pedals():
@@ -328,9 +320,6 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
         self.last_pedal_x = phys_x
         self._send_pedal_outputs(telem_data, phys_x, x_scale, x_var, x_range)
-
-    def msfs_send_heli_collective_pos(self, yvar, ypos, telem_data: BaseTelemetryData):
-        self._simconnect.send_event_to_msfs(yvar, ypos)
 
     def msfs_update_collective(self, telem_data: BaseTelemetryData):
         if not self.is_collective():

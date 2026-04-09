@@ -138,18 +138,9 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
                         logging.info("Cyclic Spring Initialized")
                     else:
                         if self._sim_is_msfs():
-                            if self.enable_custom_x_axis:
-                                x_var = self.custom_x_axis
-                            else:
-                                x_var = "AXIS_CYCLIC_LATERAL_SET"
-                            if self.enable_custom_y_axis:
-                                y_var = self.custom_y_axis
-                            else:
-                                y_var = "AXIS_CYCLIC_LONGITUDINAL_SET"
-
+                            x_var, _ = self._get_msfs_axis_config('x', "AXIS_CYCLIC_LATERAL_SET")
+                            y_var, _ = self._get_msfs_axis_config('y', "AXIS_CYCLIC_LONGITUDINAL_SET")
                             self.msfs_send_heli_cyclic_pos(x_var, self.last_pos_x_pos, y_var, self.last_pos_y_pos, telem_data)
-                            # self._simconnect.send_event_to_msfs(x_var, self.last_pos_x_pos)
-                            # self._simconnect.send_event_to_msfs(y_var, self.last_pos_y_pos)
 
                         return
                 elif force_trim_pressed:
@@ -294,35 +285,11 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
                 if self.cyclic_spring_init or not (self.spring_mode_is(SpringModeEnum.FORCETRIM) and force_trim_active):
                     if self._sim_is_msfs():
-                        if self.enable_custom_x_axis:
-                            x_var = self.custom_x_axis
-                            x_range = self.raw_x_axis_scale
-                        else:
-                            x_var = "AXIS_CYCLIC_LATERAL_SET"
-                            x_range = 16384
-                        if self.enable_custom_y_axis:
-                            y_var = self.custom_y_axis
-                            y_range = self.raw_y_axis_scale
-                        else:
-                            y_var = "AXIS_CYCLIC_LONGITUDINAL_SET"
-                            y_range = 16384
-
-                        pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
-                        pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
-
-                        if x_range != 1:
-                            pos_x_pos = -int(pos_x_pos)
-                        else:
-                            pos_x_pos = round(pos_x_pos, 5)
-                        if y_range != 1:
-                            pos_y_pos = -int(pos_y_pos)
-                        else:
-                            pos_y_pos = round(pos_y_pos, 5)
-
+                        x_var, x_range = self._get_msfs_axis_config('x', "AXIS_CYCLIC_LATERAL_SET")
+                        y_var, y_range = self._get_msfs_axis_config('y', "AXIS_CYCLIC_LONGITUDINAL_SET")
+                        pos_x_pos = self._scale_msfs_axis_value(x_pos, x_range, x_scale)
+                        pos_y_pos = self._scale_msfs_axis_value(y_pos, y_range, y_scale)
                         self.msfs_send_heli_cyclic_pos(x_var, pos_x_pos, y_var, pos_y_pos, telem_data)
-                        # self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-                        # self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
-
                         self.last_pos_x_pos = pos_x_pos
                         self.last_pos_y_pos = pos_y_pos
 

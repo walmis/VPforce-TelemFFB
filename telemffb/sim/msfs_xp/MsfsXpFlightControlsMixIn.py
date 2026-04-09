@@ -75,6 +75,32 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
             self._simconnect._resubscribe()
 
+    def _get_msfs_axis_config(self, axis: str, default_var: str, default_range: int = 16384) -> tuple[str, int | float]:
+        """Return (var_name, range) for an MSFS axis, respecting custom axis overrides."""
+        if axis == 'x' and self.enable_custom_x_axis:
+            return self.custom_x_axis, self.raw_x_axis_scale
+        if axis == 'y' and self.enable_custom_y_axis:
+            return self.custom_y_axis, self.raw_y_axis_scale
+        return default_var, default_range
+
+    def _scale_msfs_axis_value(self, value: float, axis_range: int | float, scale: float) -> int | float:
+        """Scale a normalized axis value for MSFS and return it."""
+        pos = utils.scale(value, (-1, 1), (-axis_range * scale, axis_range * scale))
+        if axis_range != 1:
+            pos = -int(pos)
+        else:
+            pos = round(pos, 5)
+        return pos
+
+    def _send_msfs_axis_value(self, var: str, value: float, axis_range: int | float, scale: float) -> int | float:
+        """Scale a normalized axis value and send it to MSFS.
+
+        Returns the scaled position that was sent, for callers that need to cache it.
+        """
+        pos = self._scale_msfs_axis_value(value, axis_range, scale)
+        self._simconnect.send_event_to_msfs(var, pos)
+        return pos
+
     def _get_controls_lock_state(self, telem_data: BaseTelemetryData) -> bool:
         """Read and normalize the ControlsLock value, applying inversion if configured."""
         if not self.controls_lock_enable:
@@ -639,33 +665,10 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             self.send_xp_command(f"AXIS:jx={round(pos_x_pos, 5)},jy={round(pos_y_pos, 5)}")
 
         if self._sim_is_msfs():
-            if self.enable_custom_x_axis:
-                x_var = self.custom_x_axis
-                x_range = self.raw_x_axis_scale
-            else:
-                x_var = "AXIS_AILERONS_SET"
-                x_range = 16384
-            if self.enable_custom_y_axis:
-                y_var = self.custom_y_axis
-                y_range = self.raw_y_axis_scale
-            else:
-                y_var = "AXIS_ELEVATOR_SET"
-                y_range = 16384
-
-            pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
-            pos_y_pos = utils.scale(y_pos, (-1, 1), (-y_range * y_scale, y_range * y_scale))
-
-            if x_range != 1:
-                pos_x_pos = -int(pos_x_pos)
-            else:
-                pos_x_pos = round(pos_x_pos, 5)
-            if y_range != 1:
-                pos_y_pos = -int(pos_y_pos)
-            else:
-                pos_y_pos = round(pos_y_pos, 5)
-
-            self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
-            self._simconnect.send_event_to_msfs(y_var, pos_y_pos)
+            x_var, x_range = self._get_msfs_axis_config('x', "AXIS_AILERONS_SET")
+            y_var, y_range = self._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
+            self._send_msfs_axis_value(x_var, x_pos, x_range, x_scale)
+            self._send_msfs_axis_value(y_var, y_pos, y_range, y_scale)
 
     def _calculate_aoa_offset(self, telem_data: BaseTelemetryData, _aoa, force_trim_y_offset, phys_stick_y_offs, IAS, vne):
         """Calculate Y offset for AoA effect."""
@@ -847,21 +850,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
             self.send_xp_command(f"AXIS:px={round(pos_x_pos, 5)}")
 
         if self._sim_is_msfs():
-            if self.enable_custom_x_axis:
-                x_var = self.custom_x_axis
-                x_range = self.raw_x_axis_scale
-            else:
-                x_var = "AXIS_RUDDER_SET"
-                x_range = 16384
-
-            pos_x_pos = utils.scale(x_pos, (-1, 1), (-x_range * x_scale, x_range * x_scale))
-
-            if x_range != 1:
-                pos_x_pos = -int(pos_x_pos)
-            else:
-                pos_x_pos = round(pos_x_pos, 5)
-
-            self._simconnect.send_event_to_msfs(x_var, pos_x_pos)
+            x_var, x_range = self._get_msfs_axis_config('x', "AXIS_RUDDER_SET")
+            self._send_msfs_axis_value(x_var, x_pos, x_range, x_scale)
 
     def _update_pedals_controls(self, telem_data: BaseTelemetryData, rudder_coeff, base_rudder_coeff, rud_force, controls_locked):
         """Handle all pedals-specific FFB updates."""
