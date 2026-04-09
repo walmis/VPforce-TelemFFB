@@ -54,8 +54,7 @@ class XAW109Helicopter(Helicopter):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
-        input_data = HapticEffect.device.get_input()
-        self.phys_x, self.phys_y = input_data.axisXY()
+        self.phys_x, self.phys_y = self._get_device_axes()
         self.cpO_y = round(self.phys_y * 4096)
 
 
@@ -72,8 +71,7 @@ class XAW109Helicopter(Helicopter):
         ap_active = telem_data.APMaster or 0
 
         if ffb_type == "joystick":
-            input_data = HapticEffect.device.get_input()
-            phys_x, phys_y = input_data.axisXY()
+            phys_x, phys_y = self._get_device_axes()
             telem_data.act_target_roll = phys_x
             telem_data.act_target_pitch = phys_y
             x_rate = telem_data.AW109_aileron_trim_rate or 0
@@ -107,8 +105,7 @@ class XAW109Helicopter(Helicopter):
             return
 
         # if self.telemffb_controls_axes and not self.local_disable_axis_control:
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
         telem_data.phys_x = phys_x
         telem_data.pedal_position = phys_x
         telem_data.IAS_kt = telem_data.IAS or 0 * ms2kt
@@ -227,8 +224,7 @@ class XAW109Helicopter(Helicopter):
         collective_afcs_pos = telem_data.AW109_collective_ratio or 0
         axis_afcs_pos = utils.scale_clamp(collective_afcs_pos, (0,1), (4096, -4096), return_int=True)
 
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
         telem_data.phys_y = phys_y
 
         if not self.collective_init:

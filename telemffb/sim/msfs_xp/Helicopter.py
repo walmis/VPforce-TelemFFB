@@ -119,8 +119,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             self._simconnect._resubscribe()
 
     def check_hands_on(self, percent) -> dict:
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
 
         phys_x = round(phys_x * 4096)
         phys_y = round(phys_y * 4096)

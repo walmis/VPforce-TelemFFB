@@ -60,8 +60,7 @@ class HPGHelicopter(Helicopter):
     def __init__(self, name, **kwargs):
         super().__init__(name, **kwargs)
 
-        input_data = HapticEffect.device.get_input()
-        self.phys_x, self.phys_y = input_data.axisXY()
+        self.phys_x, self.phys_y = self._get_device_axes()
         self.cpO_y = round(self.phys_y * 4096)
         self.collective_spring_coeff_y = round(4096 * utils.clamp(self.collective_ap_spring_gain, 0, 1))
         self.hands_on_active = 0
@@ -86,8 +85,7 @@ class HPGHelicopter(Helicopter):
         self.pedals_init = 0
 
     def check_feet_on(self, percent):
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
 
         # Convert phys input to +/-4096
         phys_x = round(phys_x * 4096)
@@ -263,8 +261,7 @@ class HPGHelicopter(Helicopter):
             return
 
         if self.telemffb_controls_axes and not self.local_disable_axis_control:
-            input_data = HapticEffect.device.get_input()
-            phys_x, phys_y = input_data.axisXY()
+            phys_x, phys_y = self._get_device_axes()
             telem_data.phys_x = phys_x
 
 
@@ -376,8 +373,7 @@ class HPGHelicopter(Helicopter):
         collective_pos = telem_data.CollectivePos or 0
 
 
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
         telem_data.phys_y = phys_y
         if not self.collective_init:
 

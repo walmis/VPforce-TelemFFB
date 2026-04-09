@@ -103,8 +103,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 phys_stick_y_offs = int(elev_trim * 4096)
 
                 if self.ap_following and ap_active:
-                    input_data = HapticEffect.device.get_input()
-                    phys_x, phys_y = input_data.axisXY()
+                    phys_x, phys_y = self._get_device_axes()
                     if self._sim_is_msfs():
                         aileron_pos = telem_data.AileronDeflPctLR or (0, 0)
                         telem_data.phys_x_aileron = aileron_pos[0]
@@ -159,8 +158,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 virtual_stick_y_offs = 0
 
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
-                input_data = HapticEffect.device.get_input()
-                phys_x, phys_y = input_data.axisXY()
+                phys_x, phys_y = self._get_device_axes()
                 telem_data.phys_x = phys_x
                 telem_data.phys_y = phys_y
                 x_pos = phys_x - virtual_stick_x_offs
@@ -239,9 +237,8 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 phys_rudder_x_offs = int(rudder_trim * 4096)
 
                 if self.ap_following and ap_active:
-                    input_data = HapticEffect.device.get_input()
                     # print("I am here")
-                    phys_x, phys_y = input_data.axisXY()
+                    phys_x, phys_y = self._get_device_axes()
                     rudder_pos = None
                     if self._sim_is_msfs():
                         rudder_pos = telem_data.RudderDeflPct or 0
@@ -272,8 +269,7 @@ class MsfsXpFBWFlightControlsMixIn(AdvancedSpringMixIn, MsfsXpSimConnectMixIn):
                 virtual_rudder_x_offs = 0
 
             if self.telemffb_controls_axes and not self.local_disable_axis_control:
-                input_data = HapticEffect.device.get_input()
-                phys_x, phys_y = input_data.axisXY()
+                phys_x, phys_y = self._get_device_axes()
                 telem_data.phys_x = phys_x
 
                 x_pos = phys_x - virtual_rudder_x_offs

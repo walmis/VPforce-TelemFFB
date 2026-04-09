@@ -98,7 +98,7 @@ class AircraftBase(
     def on_telemetry(self, telem_data: BaseTelemetryData):
         fx, fy = HapticEffect.device.get_input().forceXY()
         self.telem_data.ForceXY = [fx, fy]
-        jx, jy = HapticEffect.device.get_input().axisXY()
+        jx, jy = self._get_device_axes()
         self.telem_data.JoyXY = [jx, jy]
 
         super().on_telemetry(telem_data)

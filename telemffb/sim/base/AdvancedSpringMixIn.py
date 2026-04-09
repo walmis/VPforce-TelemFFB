@@ -117,7 +117,7 @@ class AdvancedSpringMixIn(GForceEffectMixIn, DynamicSpringMixin):
             # evaluate UP or DOWN and then LEFT or RIGHT trims.  Allows movement on both axes simultaneously but not
             # accidental confliction of trying to move both directions on a single axis due to bad hat bindings
             input_data = HapticEffect.device.get_input()
-            x, y = input_data.axisXY()
+            x, y = self._get_device_axes()
             current_buttons = input_data.getPressedButtons()
 
             if self.override_spring_trim_down and self.override_spring_trim_down in current_buttons:

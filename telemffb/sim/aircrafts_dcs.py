@@ -173,7 +173,7 @@ class Aircraft(AircraftBase, DCSCommands):
 
         self.damage_enable_cmd_sent = 0
         self.pedals_init = 0
-        self.last_device_x, self.last_device_y = HapticEffect.device.get_input().axisXY()
+        self.last_device_x, self.last_device_y = self._get_device_axes()
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = None
 
@@ -255,8 +255,7 @@ class Aircraft(AircraftBase, DCSCommands):
     @override
     def on_timeout(self):
         super().on_timeout()
-        input_data = HapticEffect.device.get_input()
-        self.last_device_x, self.last_device_y = input_data.axisXY()
+        self.last_device_x, self.last_device_y = self._get_device_axes()
         self.last_pedal_x = self.last_device_x
         self.last_collective_y = self.last_device_y
         self.damage_enable_cmd_sent = 0
@@ -300,7 +299,7 @@ class Aircraft(AircraftBase, DCSCommands):
             return
 
         input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
 
         if not self.collective_init:
             self.spring = self.effects["collective_ap_spring"].spring()
@@ -350,8 +349,7 @@ class Aircraft(AircraftBase, DCSCommands):
     def dcs_update_pedal_trim(self, telem_data: BaseTelemetryData):
         if not self.is_pedals(): return
 
-        input_data = HapticEffect.device.get_input()
-        x, y = input_data.axisXY()
+        x, y = self._get_device_axes()
         telem_data.X = x
 
         pedal_pos = -(telem_data.controlsurfaces_rudder_right or 0)
@@ -373,8 +371,7 @@ class Aircraft(AircraftBase, DCSCommands):
 
         if not ("StickX" in telem_data and "StickY" in telem_data): return
 
-        input_data = HapticEffect.device.get_input()
-        x, y = input_data.axisXY()
+        x, y = self._get_device_axes()
         telem_data.X = x
         telem_data.Y = y
 
@@ -522,7 +519,7 @@ class Aircraft(AircraftBase, DCSCommands):
 
         if self.override_spring_ft_enabled:
             input_data = HapticEffect.device.get_input()
-            x, y = input_data.axisXY()
+            x, y = self._get_device_axes()
             current_buttons = input_data.getPressedButtons()
             # print(f"BUTTONS:>{current_buttons}<")
             # decide what to do depending on which button is pressed
@@ -686,7 +683,7 @@ class Helicopter(Aircraft):
         force_trim_pressed = input_data.isButtonPressed(self.dcs_tr_button)
 
         if force_trim_pressed:
-            x, y = input_data.axisXY()
+            x, y = self._get_device_axes()
             self.spring_x.set_coefficient(self.dcs_tr_damper_force)
             self.spring_y.set_coefficient(self.dcs_tr_damper_force)
             self.spring_x.set_offset(x)

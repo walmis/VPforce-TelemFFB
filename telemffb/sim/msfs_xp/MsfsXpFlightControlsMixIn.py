@@ -648,8 +648,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         if not (self.telemffb_controls_axes and not self.local_disable_axis_control):
             return
         assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
         telem_data.phys_x = phys_x
         telem_data.phys_y = phys_y
 
@@ -839,8 +838,7 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         
         assert HapticEffect.device is not None, "HapticEffect.device is not initialized"
 
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
         telem_data.phys_x = phys_x
         x_pos = phys_x - virtual_rudder_x_offs
         x_scale = clamp(self.rudder_x_axis_scale, 0, 1)

@@ -50,7 +50,7 @@ class MsfsXpTrimwheelMixIn(MsfsXpFlightControlsMixIn):
             ap_active = telem_data.APServos or 0
 
         input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
         self._spring_handle.name = "trimwheel_ap_spring"
         if not self.trimwheel_use_axis:
             trim_pos = telem_data.ElevTrim

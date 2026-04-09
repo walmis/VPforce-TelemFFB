@@ -48,8 +48,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
 
         self.cyclic_center = [0.0, 0.0]
 
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
         telem_data.phys_x = phys_x
         telem_data.phys_y = phys_y
         self.spring_x.set_coefficient(self.cyclic_spring_gain, True)
@@ -237,8 +236,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         if not (self.telemffb_controls_axes and not self.local_disable_axis_control):
             return
 
-        input_data = HapticEffect.device.get_input()
-        phys_x, phys_y = input_data.axisXY()
+        phys_x, phys_y = self._get_device_axes()
         telem_data.phys_x = phys_x
         telem_data.phys_y = phys_y
         self._update_cyclic_trim(telem_data)
@@ -289,8 +287,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         )  # Enable cockpit switch control (if exists) for force trim.  Add LVar as "ForceTrimSW" bool if available for aircraft
         if ffb_type == "joystick":
             assert HapticEffect.device is not None, "HapticEffect.device is None"
-            input_data = HapticEffect.device.get_input()
-            x, y = input_data.axisXY()
+            x, y = self._get_device_axes()
             telem_data.phys_x = x
             telem_data.phys_y = y
 
@@ -299,6 +296,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
             if self._apply_joystick_controls_lock(telem_data, controls_locked):
                 return
 
+            input_data = HapticEffect.device.get_input()
             if self._update_cyclic_force_trim(telem_data, input_data, x, y, force_trim_active):
                 return
 

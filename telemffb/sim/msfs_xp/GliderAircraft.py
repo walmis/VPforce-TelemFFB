@@ -53,7 +53,7 @@ class GliderAircraft(Aircraft):
             trim_reset_pressed = input_data.isButtonPressed(self.force_trim_reset_button)
         else:
             trim_reset_pressed = False
-        x, y = input_data.axisXY()
+        x, y = self._get_device_axes()
         if force_trim_pressed:
             if x_axis:
                 self.spring_x.set_coefficient(0.5)
