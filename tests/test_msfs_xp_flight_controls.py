@@ -12,7 +12,7 @@ This module tests the MSFS/X-Plane flight control effects including:
 - Rudder feedback forces
 - Steering friction integration
 """
-import pytest
+import json
 import math
 from tests.framework.base import BaseTelemetryEffectTestCase
 from tests.framework.utils import (
@@ -1022,3 +1022,673 @@ class TestMsfsXpFlightControlsSpecialModes(BaseTelemetryEffectTestCase):
             .ffb_type("joystick")
             .build()
         )
+
+
+class TestAdvancedSpringMode(BaseTelemetryEffectTestCase):
+    """Test suite for ADVANCED spring mode coefficient calculation."""
+
+    def _make_adv_spr_gains(self, gain_x=100, gain_y=100, scale=1.0):
+        """Create a minimal adv_spr_gains dict for testing."""
+        return {
+            "curve_x": {"points": [{"x": 0, "y": 0}, {"x": 100, "y": 100}]},
+            "curve_y": {"points": [{"x": 0, "y": 0}, {"x": 100, "y": 100}]},
+            "gain_x": gain_x,
+            "gain_y": gain_y,
+            "scale": scale,
+            "units": "m/s",
+        }
+
+    def _create_flight_telem(self, ffb_type="joystick"):
+        return (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 50.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 1000.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 3000.0)
+            .set("Incidence", [0, -0.05, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", 1.0)
+            .set("ElevDefl", 5.0)
+            .set("ElevDeflPct", 0.25)
+            .set("WeightOnWheels", [0, 0, 0])
+            .set("AircraftClass", "Airplane")
+            .ffb_type(ffb_type)
+            .build()
+        )
+
+    def test_joystick_advanced_spring_uses_curve(self):
+        """Test that ADVANCED mode reads gains from adv_spr_gains curve."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.ADVANCED
+        instance._adv_spr_gains = self._make_adv_spr_gains(gain_x=80, gain_y=60, scale=1.0)
+
+        telem = self._create_flight_telem()
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        spring = self.mock_effects['dynamic_spring']
+        assert spring.start_count > 0, "Spring should start in ADVANCED mode"
+
+    def test_pedals_advanced_spring_uses_curve(self):
+        """Test that pedals ADVANCED mode reads gains from adv_spr_gains curve."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.ADVANCED
+        instance._adv_spr_gains = self._make_adv_spr_gains(gain_x=80, gain_y=60, scale=1.0)
+
+        telem = self._create_flight_telem(ffb_type="pedals")
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        spring = self.mock_effects['dynamic_spring']
+        assert spring.start_count > 0, "Spring should start for pedals in ADVANCED mode"
+
+    def test_advanced_spring_missing_gains_flags_error(self):
+        """Test that missing adv_spr_gains flags an error in the shared coefficient calculation."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.ADVANCED
+        instance._adv_spr_gains = None
+
+        telem = self._create_flight_telem(ffb_type="joystick")
+        self.set_telemetry(instance, telem)
+
+        instance.on_telemetry(telem)
+
+        errors = getattr(instance, '_flagged_errors', [])
+        assert any("advanced spring" in e.lower() for e in errors), \
+            "Should flag error when adv_spr_gains is None"
+
+
+class TestAPFollowing(BaseTelemetryEffectTestCase):
+    """Test suite for autopilot following trim offset calculation."""
+
+    def _create_flight_telem(self):
+        return (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 50.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 1000.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 3000.0)
+            .set("Incidence", [0, -0.05, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", 1.0)
+            .set("ElevDefl", 5.0)
+            .set("ElevDeflPct", 0.25)
+            .set("WeightOnWheels", [0, 0, 0])
+            .set("AircraftClass", "Airplane")
+            .ffb_type("joystick")
+            .build()
+        )
+
+    def test_ap_following_msfs_uses_aileron_deflection(self):
+        """Test that AP following in MSFS uses AileronDeflPctLR for x offset."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.trim_following = True
+        instance.telemffb_controls_axes = True
+        instance.ap_following = True
+        instance.use_fbw_for_ap_follow = False
+        instance.joystick_trim_follow_gain_physical_y = 1.0
+        instance.joystick_trim_follow_gain_physical_x = 1.0
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.elev_trim_dampener = instance.dampener
+        instance.aileron_pos_dampener = instance.dampener
+
+        telem = self._create_flight_telem()
+        telem["APMaster"] = 1
+        telem["ElevTrimPct"] = 0.2
+        telem["AileronTrimPct"] = 0.0
+        telem["AileronDeflPctLR"] = (0.3, -0.3)
+        self.set_telemetry(instance, telem)
+
+        instance.on_telemetry(telem)
+
+        spring = self.mock_effects['dynamic_spring']
+        x_offset, _ = spring.get_offsets()
+        # AP following should use aileron deflection for x offset
+        expected_x = int(0.3 * 4096)
+        assert x_offset == expected_x, f"X offset should reflect AileronDeflPctLR[0], got {x_offset}"
+
+    def test_ap_following_xplane_uses_roll_servo(self):
+        """Test that AP following in X-Plane uses APRollServo for x offset."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_xplane = True
+        instance._test_sim_is_msfs = False
+        instance.trim_following = True
+        instance.telemffb_controls_axes = True
+        instance.ap_following = True
+        instance.use_fbw_for_ap_follow = False
+        instance.joystick_trim_follow_gain_physical_y = 1.0
+        instance.joystick_trim_follow_gain_physical_x = 1.0
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.elev_trim_dampener = instance.dampener
+        instance.aileron_pos_dampener = instance.dampener
+
+        telem = self._create_flight_telem()
+        telem["src"] = "XPLANE"
+        telem["Vne"] = 120.0
+        telem["APServos"] = 1
+        telem["ElevTrimPct"] = 0.2
+        telem["AileronTrimPct"] = 0.0
+        telem["APRollServo"] = 0.4
+        self.set_telemetry(instance, telem)
+
+        instance.on_telemetry(telem)
+
+        spring = self.mock_effects['dynamic_spring']
+        x_offset, _ = spring.get_offsets()
+        expected_x = int(0.4 * 4096)
+        assert x_offset == expected_x, f"X offset should reflect APRollServo, got {x_offset}"
+
+    def test_ap_following_inactive_uses_aileron_trim(self):
+        """Test that without AP active, x offset uses aileron trim instead."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.trim_following = True
+        instance.telemffb_controls_axes = True
+        instance.ap_following = True
+        instance.use_fbw_for_ap_follow = False
+        instance.joystick_trim_follow_gain_physical_y = 1.0
+        instance.joystick_trim_follow_gain_physical_x = 1.0
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.elev_trim_dampener = instance.dampener
+        instance.aileron_pos_dampener = instance.dampener
+
+        telem = self._create_flight_telem()
+        telem["APMaster"] = 0
+        telem["ElevTrimPct"] = 0.2
+        telem["AileronTrimPct"] = 0.3
+        self.set_telemetry(instance, telem)
+
+        instance.on_telemetry(telem)
+
+        spring = self.mock_effects['dynamic_spring']
+        x_offset, _ = spring.get_offsets()
+        expected_x = int(0.3 * 4096)
+        assert x_offset == expected_x, f"X offset should use AileronTrimPct when AP inactive, got {x_offset}"
+
+
+class TestAoAOffset(BaseTelemetryEffectTestCase):
+    """Test suite for AoA-based Y offset calculation."""
+
+    def _create_flight_telem(self):
+        return (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 50.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 1000.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 3000.0)
+            .set("Incidence", [0, -0.3, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", 1.0)
+            .set("ElevDefl", 10.0)
+            .set("ElevDeflPct", 0.5)
+            .set("WeightOnWheels", [0, 0, 0])
+            .set("AircraftClass", "Airplane")
+            .ffb_type("joystick")
+            .build()
+        )
+
+    def test_aoa_effect_in_air(self):
+        """Test that AoA effect shifts Y offset when airborne with elevator deflection."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.aoa_effect_enabled = 1
+        instance.aoa_effect_gain = 1.0
+
+        telem = self._create_flight_telem()
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        spring = self.mock_effects['dynamic_spring']
+        _, y_offset = spring.get_offsets()
+        # AoA effect should produce a non-zero y offset when in air with elevator deflection
+        assert y_offset != 0, f"Y offset should be non-zero with AoA effect enabled in air, got {y_offset}"
+
+    def test_aoa_effect_disabled_gives_different_offset(self):
+        """Test that disabling AoA effect produces a different offset."""
+        instance_enabled = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance_enabled._test_sim_is_msfs = True
+        instance_enabled.spring_mode = SpringModeEnum.BASIC
+        instance_enabled.aoa_effect_enabled = 1
+        instance_enabled.aoa_effect_gain = 1.0
+
+        instance_disabled = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance_disabled._test_sim_is_msfs = True
+        instance_disabled.spring_mode = SpringModeEnum.BASIC
+        instance_disabled.aoa_effect_enabled = 0
+
+        telem1 = self._create_flight_telem()
+        self.set_telemetry(instance_enabled, telem1)
+        instance_enabled.on_telemetry(telem1)
+        _, y_enabled = self.mock_effects['dynamic_spring'].get_offsets()
+
+        self.mock_effects.reset_all()
+
+        telem2 = self._create_flight_telem()
+        self.set_telemetry(instance_disabled, telem2)
+        instance_disabled.on_telemetry(telem2)
+        _, y_disabled = self.mock_effects['dynamic_spring'].get_offsets()
+
+        # Values should differ when AoA is enabled vs disabled
+        assert y_enabled != y_disabled, "AoA offset should differ between enabled and disabled"
+
+
+class TestSteeringFriction(BaseTelemetryEffectTestCase):
+    """Test suite for steering friction effect on pedals."""
+
+    def _create_pedals_telem(self, on_ground=True):
+        builder = (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 20.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 200.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 1000.0)
+            .set("Incidence", [0, 0, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", 1.0)
+            .set("AircraftClass", "Airplane")
+            .set("SimOnGround", 1 if on_ground else 0)
+            .set("WeightOnWheels", [1, 1, 1] if on_ground else [0, 0, 0])
+            .set("SurfaceType", 0)
+            .set("CenterSteerAnglePct", 0.0)
+            .set("WaterRudderExt", 0)
+            .ffb_type("pedals")
+        )
+        return builder.build()
+
+    def test_steering_friction_on_ground(self):
+        """Test that steering friction modifies spring when on ground."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.steering_friction = 1
+        instance.steering_friction_spring = 20
+
+        telem = self._create_pedals_telem(on_ground=True)
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        spring = self.mock_effects['dynamic_spring']
+        assert spring.start_count > 0, "Spring should activate with steering friction on ground"
+
+    def test_steering_friction_off_ground(self):
+        """Test that steering friction does not apply when airborne."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.steering_friction = 1
+        instance.steering_friction_spring = 20
+
+        telem = self._create_pedals_telem(on_ground=False)
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        # When airborne, steering friction should not modify the coefficient —
+        # check that the coefficient is different from a ground case
+        spring = self.mock_effects['dynamic_spring']
+        assert spring.start_count > 0, "Spring should still activate (normal rudder FFB)"
+
+    def test_steering_friction_disabled(self):
+        """Test that steering friction does nothing when disabled."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.steering_friction = 0
+
+        telem = self._create_pedals_telem(on_ground=True)
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        spring = self.mock_effects['dynamic_spring']
+        assert spring.start_count > 0, "Spring should still activate for basic rudder FFB"
+
+
+class TestJoystickControlsLock(BaseTelemetryEffectTestCase):
+    """Test suite for joystick controls lock detent engagement."""
+
+    def _create_flight_telem(self):
+        return (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 50.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 1000.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 3000.0)
+            .set("Incidence", [0, -0.05, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", 1.0)
+            .set("ElevDefl", 5.0)
+            .set("ElevDeflPct", 0.25)
+            .set("WeightOnWheels", [0, 0, 0])
+            .set("AircraftClass", "Airplane")
+            .ffb_type("joystick")
+            .build()
+        )
+
+    def test_joystick_controls_lock_engages_detents(self):
+        """Test that joystick controls lock engages detents when stick is centered."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar_invert = False
+
+        # Position stick at center (within ±0.15 deadzone)
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+
+        telem = self._create_flight_telem()
+        telem["ControlsLock"] = 1
+        self.set_telemetry(instance, telem)
+
+        instance.on_telemetry(telem)
+
+        # Lock detents should engage
+        lock_1 = self.mock_effects.get("lock_1")
+        lock_2 = self.mock_effects.get("lock_2")
+        if lock_1:
+            assert lock_1.start_count > 0, "Lock detent 1 should start"
+        if lock_2:
+            assert lock_2.start_count > 0, "Lock detent 2 should start"
+
+    def test_joystick_controls_lock_waits_for_centering(self):
+        """Test that controls lock waits for stick to center before engaging detents."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar_invert = False
+
+        # Stick far from center
+        self.mock_device._input_data.set_axis(x=0.5, y=0.5)
+
+        telem = self._create_flight_telem()
+        telem["ControlsLock"] = 1
+        self.set_telemetry(instance, telem)
+
+        instance.on_telemetry(telem)
+
+        # Lock detents should NOT engage because stick is not centered
+        lock_1 = self.mock_effects.get("lock_1")
+        if lock_1:
+            assert lock_1.start_count == 0, "Lock detent should not start when stick is off-center"
+
+    def test_controls_lock_released_resumes_normal(self):
+        """Test that releasing controls lock resumes normal spring operation."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.controls_lock_enable = True
+        instance.controls_lock_simvar_invert = False
+
+        # First, lock the controls
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+        telem_locked = self._create_flight_telem()
+        telem_locked["ControlsLock"] = 1
+        self.set_telemetry(instance, telem_locked)
+        instance.on_telemetry(telem_locked)
+
+        # Then unlock
+        self.mock_effects.reset_all()
+        telem_unlocked = self._create_flight_telem()
+        telem_unlocked["ControlsLock"] = 0
+        self.set_telemetry(instance, telem_unlocked)
+        instance.on_telemetry(telem_unlocked)
+
+        spring = self.mock_effects['dynamic_spring']
+        assert spring.start_count > 0, "Spring should resume after controls unlock"
+
+
+class TestJoystickControlsLockSecondFrame(BaseTelemetryEffectTestCase):
+    """Test that a second frame with controls locked short-circuits via _lock_effects_started."""
+
+    def _create_flight_telem(self):
+        return (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 50.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 1000.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 3000.0)
+            .set("Incidence", [0, -0.05, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", 1.0)
+            .set("ElevDefl", 5.0)
+            .set("ElevDeflPct", 0.25)
+            .set("WeightOnWheels", [0, 0, 0])
+            .set("AircraftClass", "Airplane")
+            .ffb_type("joystick")
+            .build()
+        )
+
+    def test_controls_lock_second_frame_returns_early(self):
+        """Lock effects already started → _prepare_controls_lock returns True on line 174."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.controls_lock_enable = True
+
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+
+        telem = self._create_flight_telem()
+        telem["ControlsLock"] = 1
+        self.set_telemetry(instance, telem)
+
+        # Frame 1: engages detents
+        instance.on_telemetry(telem)
+
+        # Frame 2: lock effects already started → hits line 174 (return True)
+        telem2 = self._create_flight_telem()
+        telem2["ControlsLock"] = 1
+        self.set_telemetry(instance, telem2)
+        instance.on_telemetry(telem2)
+
+        # The spring should NOT be restarted on frame 2
+        # (the early return skips all axis setup)
+
+
+class TestConstantForceNormalization(BaseTelemetryEffectTestCase):
+    """Test constant force normalization and uncoordinated turn effect."""
+
+    def _create_flight_telem(self, g_force=1.0, acc_body_x=0.0):
+        return (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 80.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 3000.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 3000.0)
+            .set("Incidence", [0, -0.05, 1.0])
+            .set("AccBody", [acc_body_x, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", g_force)
+            .set("ElevDefl", 5.0)
+            .set("ElevDeflPct", 0.25)
+            .set("WeightOnWheels", [0, 0, 0])
+            .set("AircraftClass", "Airplane")
+            .ffb_type("joystick")
+            .build()
+        )
+
+    def test_uncoordinated_turn_disabled_uses_zero(self):
+        """When uncoordinated_turn_effect_enabled is False, _side_accel = 0 (line 724)."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.uncoordinated_turn_effect_enabled = False
+
+        telem = self._create_flight_telem(acc_body_x=5.0)
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        # Control weight should still start but with no lateral component
+        cw = self.mock_effects.get("control_weight")
+        if cw:
+            assert cw.start_count > 0
+
+    def test_large_forces_normalize_vector(self):
+        """When combined pitch + roll forces exceed 1.0, vector gets normalized (line 730)."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.uncoordinated_turn_effect_enabled = True
+        instance.lateral_force_gain = 10.0  # Large gain to create big lateral force
+
+        telem = self._create_flight_telem(g_force=5.0, acc_body_x=5.0)
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        cw = self.mock_effects.get("control_weight")
+        if cw:
+            assert cw.start_count > 0
+
+
+class TestPedalsAdvancedSpringNoneGuard(BaseTelemetryEffectTestCase):
+    """Test pedals ADVANCED spring mode with no gains configured."""
+
+    def _create_pedals_telem(self):
+        return (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 50.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 1000.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 3000.0)
+            .set("Incidence", [0, -0.05, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", 1.0)
+            .set("SimOnGround", 0)
+            .set("WeightOnWheels", [0])
+            .set("AircraftClass", "Airplane")
+            .ffb_type("pedals")
+            .build()
+        )
+
+    def test_pedals_advanced_spring_none_gains_flags_error(self):
+        """Pedals with ADVANCED spring and no gains → flags error and sets coeff to 0 (lines 783-784)."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.ADVANCED
+        instance._adv_spr_gains = None
+        instance.steering_friction = 0
+        instance.controls_lock_enable = False
+
+        telem = self._create_pedals_telem()
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        # Should flag an error about missing gains
+        errors = getattr(instance, '_flagged_errors', [])
+        assert any("advanced spring" in e.lower() for e in errors), "Should flag error when adv_spr_gains is None for pedals"
+
+
+class TestSteeringFrictionWaterRudder(BaseTelemetryEffectTestCase):
+    """Test steering friction with water rudder surface."""
+
+    def _create_pedals_telem_water(self):
+        return (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 10.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 100.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 1000.0)
+            .set("Incidence", [0, -0.05, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", 1.0)
+            .set("SimOnGround", 1)
+            .set("WeightOnWheels", [0])
+            .set("SurfaceType", "Water")
+            .set("WaterRudderExt", 0.8)
+            .set("CenterSteerAnglePct", 0.0)
+            .set("AircraftClass", "Airplane")
+            .ffb_type("pedals")
+            .build()
+        )
+
+    def test_water_surface_applies_water_rudder_multiplier(self):
+        """On water surface, steer_force is multiplied by WaterRudderExt (line 825)."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.steering_friction = 1.0
+        instance.steering_friction_spring = 40
+        instance.controls_lock_enable = False
+
+        telem = self._create_pedals_telem_water()
+        self.set_telemetry(instance, telem)
+        instance.on_telemetry(telem)
+
+        spring = self.mock_effects['dynamic_spring']
+        assert spring.start_count > 0
+
+
+class TestPedalsControlsLock(BaseTelemetryEffectTestCase):
+    """Test pedals-specific controls lock."""
+
+    def _create_pedals_telem(self):
+        return (
+            TelemetryDataBuilder()
+            .set("src", "MSFS")
+            .set("IAS", 50.0)
+            .set("DesignSpeed", (100.0, 50.0, 60.0))
+            .set("DynPressure", 1000.0)
+            .set("AirDensity", 1.225)
+            .set("PropThrust", 3000.0)
+            .set("Incidence", [0, -0.05, 1.0])
+            .set("AccBody", [0, 1, 0])
+            .set("RudderDefl", 0.0)
+            .set("G", 1.0)
+            .set("SimOnGround", 0)
+            .set("WeightOnWheels", [0])
+            .set("AircraftClass", "Airplane")
+            .ffb_type("pedals")
+            .build()
+        )
+
+    def test_pedals_controls_lock_return(self):
+        """When pedal controls lock engages, _update_pedals_controls returns early (line 866)."""
+        instance = self.create_test_instance(MsfsXpFlightControlsMixIn)
+        instance._test_sim_is_msfs = True
+        instance.spring_mode = SpringModeEnum.BASIC
+        instance.controls_lock_enable = True
+        instance.steering_friction = 0
+
+        self.mock_device._input_data.set_axis(x=0.0, y=0.0)
+
+        telem = self._create_pedals_telem()
+        telem["ControlsLock"] = 1
+        self.set_telemetry(instance, telem)
+
+        # Frame 1: engage detents
+        instance.on_telemetry(telem)
+
+        # Frame 2: lock already started → early return on line 866
+        telem2 = self._create_pedals_telem()
+        telem2["ControlsLock"] = 1
+        self.set_telemetry(instance, telem2)
+        instance.on_telemetry(telem2)

@@ -491,20 +491,25 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         # Apply expo curve or advanced spring gains
         if self.spring_mode_is(SpringModeEnum.ADVANCED):
-            #print(self.adv_spr_gains)
             adv_spr_stgs = self.adv_spr_gains
-            scale = adv_spr_stgs.get("scale")
-            spd_y = scale * elevator_coeff
-            spd_x = scale * aileron_coeff
-            y_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_y)
-            x_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_x)
-            elevator_coeff = y_gains.get("y")
-            aileron_coeff = x_gains.get("x")
+            if not adv_spr_stgs:
+                self.flag_error("Please open and configure the advanced spring gain settings")
+                elevator_coeff = 0
+                aileron_coeff = 0
+                rudder_coeff = 0
+            else:
+                scale = adv_spr_stgs.get("scale")
+                spd_y = scale * elevator_coeff
+                spd_x = scale * aileron_coeff
+                y_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_y)
+                x_gains = utils.get_gain_from_speed(self.adv_spr_gains, spd_x)
+                elevator_coeff = y_gains.get("y")
+                aileron_coeff = x_gains.get("x")
 
-            # Rudder coefficient with advanced spring
-            spd_x_rud = scale * rudder_coeff
-            x_gains_rud = utils.get_gain_from_speed(self.adv_spr_gains, spd_x_rud)
-            rudder_coeff = x_gains_rud.get("x")
+                # Rudder coefficient with advanced spring
+                spd_x_rud = scale * rudder_coeff
+                x_gains_rud = utils.get_gain_from_speed(self.adv_spr_gains, spd_x_rud)
+                rudder_coeff = x_gains_rud.get("x")
         else:
             elevator_coeff = utils.expocurve(elevator_coeff, self.elevator_expo)
             aileron_coeff = utils.expocurve(aileron_coeff, self.aileron_expo)
