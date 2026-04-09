@@ -64,6 +64,143 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self.rudder_force_dampener = utils.Dampener()
         self.const_force = HapticEffect().constant(0, 0)
 
+    def _sync_controls_lock_simvar(self):
+        """Subscribe the ControlsLock simvar once and re-subscribe only when the binding changes."""
+        if not self._sim_is_msfs() or not self.controls_lock_enable or not self.controls_lock_simvar:
+            return
+        # Always call anything_has_changed to initialize tracking state (avoid short-circuit).
+        simvar_changed = self.anything_has_changed('controls_lock_simvar', self.controls_lock_simvar)
+        enable_changed = self.anything_has_changed('controls_lock_enable', self.controls_lock_enable)
+        if 'ControlsLock' not in self._simconnect.sv_dict or simvar_changed or enable_changed:
+            self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
+            self._simconnect._resubscribe()
+
+    def _get_controls_lock_state(self, telem_data: BaseTelemetryData) -> bool:
+        """Read and normalize the ControlsLock value, applying inversion if configured."""
+        if not self.controls_lock_enable:
+            return False
+        controls_locked = bool(telem_data.get("ControlsLock", 0))
+        if self.controls_lock_simvar_invert:
+            controls_locked = not controls_locked
+        return controls_locked
+
+    def _lock_effects_started(self) -> bool:
+        return self.effects['lock_1'].started or self.effects['lock_2'].started
+
+    def _stop_lock_effects(self):
+        self.effects['lock_1'].stop()
+        self.effects['lock_2'].stop()
+
+    def _prepare_controls_lock(
+        self,
+        telem_data: BaseTelemetryData,
+        controls_locked: bool,
+        *,
+        set_locked_telemetry: bool = False,
+    ) -> bool | None:
+        """Centralize lock-state short-circuit so axis handlers only manage axis-specific setup.
+
+        Returns:
+            False: lock mode inactive, caller should continue normal axis handling
+            True: lock mode fully owns this frame, caller should return immediately
+            None: lock mode active and caller must continue with axis-specific spring/detent setup
+        """
+        if not controls_locked:
+            self._stop_lock_effects()
+            return False
+
+        if set_locked_telemetry:
+            telem_data._controls_locked = True
+
+        if self._lock_effects_started():
+            return True
+
+        return None
+
+    def _engage_controls_lock_detents(
+        self,
+        spring_condition,
+        *,
+        spring_offset: int,
+        detent_1: dict,
+        detent_2: dict,
+        stop_control_weight: bool = False,
+    ):
+        """Share the common lock spring + detent startup sequence; callers provide only axis-specific geometry."""
+        if stop_control_weight:
+            self.effects['control_weight'].stop()
+
+        spring_condition.set_coefficient(4096)
+        spring_condition.cpOffset = spring_offset
+        self._spring_handle.setCondition(spring_condition)
+        self._spring_handle.start()
+        self.effects['lock_1'].detent(**detent_1).start()
+        self.effects['lock_2'].detent(**detent_2).start()
+        self._spring_handle.stop()
+
+    def _apply_joystick_controls_lock(self, telem_data: BaseTelemetryData, controls_locked):
+        """Apply 2D joystick/cyclic controls lock with centering detents.
+
+        Returns True if lock mode consumed the frame, False if normal processing should continue.
+        """
+        lock_result = self._prepare_controls_lock(telem_data, controls_locked, set_locked_telemetry=True)
+        if lock_result is True:
+            return True
+        if lock_result is None:
+            phys_x, phys_y = self._get_device_axes()
+
+            self.spring_y.set_coefficient(4096)
+            self.spring_x.set_coefficient(4096)
+            self.spring_y.cpOffset = 0
+            self.spring_x.cpOffset = 0
+            self._spring_handle.setCondition(self.spring_y)
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.start()
+
+            if (-0.15 < phys_x < 0.15) and (-0.15 < phys_y < 0.15):
+                detent_params = dict(peak_x=4096, range_x=4096, gate_pos_y=0, gate_neg_y=0,
+                                     peak_y=4096, range_y=4096, gate_pos_x=0, gate_neg_x=0)
+                self._engage_controls_lock_detents(
+                    self.spring_x,
+                    spring_offset=0,
+                    detent_1=dict(position_x=1500, position_y=1500, **detent_params),
+                    detent_2=dict(position_x=-1500, position_y=-1500, **detent_params),
+                    stop_control_weight=True,
+                )
+                telem_data["_controls_locked"] = controls_locked
+
+            return True
+        return False
+
+    def _apply_pedal_controls_lock(self, telem_data: BaseTelemetryData, controls_locked):
+        """Apply 1D pedal controls lock with centering detents.
+
+        Returns True if lock mode consumed the frame, False if normal processing should continue.
+        """
+        lock_result = self._prepare_controls_lock(telem_data, controls_locked)
+        if lock_result is True:
+            return True
+        if lock_result is None:
+            phys_x, _ = self._get_device_axes()
+
+            self.spring_x.set_coefficient(4096)
+            self.spring_x.cpOffset = 0
+            self._spring_handle.setCondition(self.spring_x)
+            self._spring_handle.start()
+
+            if -0.15 < phys_x < 0.15:
+                detent_params = dict(peak_x=4096, range_x=4096, gate_pos_y=0, gate_neg_y=0)
+                self._engage_controls_lock_detents(
+                    self.spring_x,
+                    spring_offset=0,
+                    detent_1=dict(position_x=1500, **detent_params),
+                    detent_2=dict(position_x=-1500, **detent_params),
+                )
+                telem_data["_controls_locked"] = controls_locked
+
+            return True
+        return False
+
     @override
     def on_timeout(self):
         """Handle a timeout event from the main loop.
@@ -615,65 +752,13 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         self.spring_y.set_coefficient(ec)
         self.spring_x.set_coefficient(ac)
 
-        if controls_locked:
-            telem_data._controls_locked = controls_locked
-            input_data = HapticEffect.device.get_input()
-            phys_x, phys_y = input_data.axisXY()
-            x = round(phys_x * 4096)
-            y = round(phys_y * 4096)
-
-            groove_detent_size: int = 4096
-            groove_detent_range = 4096
-            pos = 1500
-            if self.effects['lock_1'].started or self.effects['lock_2'].started:
-                return
-            self.effects['control_weight'].stop()
-            self.spring_y.set_coefficient(4096)
-            self.spring_x.set_coefficient(4096)
-            self.spring_y.cpOffset = 0
-            self.spring_x.cpOffset = 0
-            self._spring_handle.setCondition(self.spring_y)
-            self._spring_handle.setCondition(self.spring_x)
-            self._spring_handle.start()
-            if (-0.15 < phys_x < 0.15) and (-0.15 < phys_y < 0.15):
-                self.effects['lock_1'].detent(
-                    position_x=pos,
-                    peak_x=groove_detent_size,
-                    range_x=groove_detent_range,
-                    gate_pos_y=0,
-                    gate_neg_y=0,
-                    position_y=pos,
-                    peak_y=groove_detent_size,
-                    range_y=groove_detent_range,
-                    gate_pos_x=0,
-                    gate_neg_x=0
-                ).start()
-                self.effects['lock_2'].detent(
-                    position_x=-pos,
-                    peak_x=groove_detent_size,
-                    range_x=groove_detent_range,
-                    gate_pos_y=0,
-                    gate_neg_y=0,
-                    position_y=-pos,
-                    peak_y=groove_detent_size,
-                    range_y=groove_detent_range,
-                    gate_pos_x=0,
-                    gate_neg_x=0
-                ).start()
-                telem_data["_controls_locked"] = controls_locked
-                self._spring_handle.stop()
-
+        if self._apply_joystick_controls_lock(telem_data, controls_locked):
             return
-        else:
-            self.effects['lock_1'].stop()
-            self.effects['lock_2'].stop()
 
         self._spring_handle.setCondition(self.spring_y)
         self._spring_handle.setCondition(self.spring_x)
 
         self._apply_joystick_constant_forces(telem_data, _elevator_droop_term, _G_term)
-
-
 
         self._spring_handle.start()
 
@@ -789,48 +874,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
 
         self._apply_steering_friction(telem_data, phys_rudder_x_offs, rc)
 
-        if controls_locked:
-            input_data = HapticEffect.device.get_input()
-            phys_x, phys_y = input_data.axisXY()
-            x = round(phys_x * 4096)
-            y = round(phys_y * 4096)
-
-            groove_detent_size: int = 4096
-            groove_detent_range = 4096
-            pos = 1500
-            if self.effects['lock_1'].started or self.effects['lock_2'].started:
-                return
-
-            self.spring_x.set_coefficient(4096)
-
-            self.spring_x.cpOffset = 0
-
-            self._spring_handle.setCondition(self.spring_x)
-            self._spring_handle.start()
-            if -0.15 < phys_x < 0.15:
-                self.effects['lock_1'].detent(
-                    position_x=pos,
-                    peak_x=groove_detent_size,
-                    range_x=groove_detent_range,
-                    gate_pos_y=0,
-                    gate_neg_y=0,
-
-                ).start()
-                self.effects['lock_2'].detent(
-                    position_x=-pos,
-                    peak_x=groove_detent_size,
-                    range_x=groove_detent_range,
-                    gate_pos_y=0,
-                    gate_neg_y=0,
-
-                ).start()
-                telem_data["_controls_locked"] = controls_locked
-                self._spring_handle.stop()
-
+        if self._apply_pedal_controls_lock(telem_data, controls_locked):
             return
-        else:
-            self.effects['lock_1'].stop()
-            self.effects['lock_2'].stop()
 
         self._spring_handle.setCondition(self.spring_x)
 
@@ -863,20 +908,8 @@ class MsfsXpFlightControlsMixIn(MfsfXpSteeringFrictionEffectMixIn, MsfsXpFBWFlig
         ffb_type = telem_data.FFBType or "joystick"
 
 
-        if self._sim_is_msfs() and self.controls_lock_enable and self.controls_lock_simvar:
-            # Subscribe once on first call, re-subscribe only when the binding changes.
-            # Always call anything_has_changed to initialize tracking state (avoid short-circuit).
-            simvar_changed = self.anything_has_changed('fc_controls_lock_simvar', self.controls_lock_simvar)
-            enable_changed = self.anything_has_changed('fc_controls_lock_enable', self.controls_lock_enable)
-            if 'ControlsLock' not in self._simconnect.sv_dict or simvar_changed or enable_changed:
-                self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
-                self._simconnect._resubscribe()
-
-        # get controls lock status
-        controls_locked = (telem_data.ControlsLock or 0) if self.controls_lock_enable else False
-
-        if self.controls_lock_simvar_invert:
-            controls_locked = not controls_locked
+        self._sync_controls_lock_simvar()
+        controls_locked = self._get_controls_lock_state(telem_data)
 
         if ffb_type == "collective":
             return

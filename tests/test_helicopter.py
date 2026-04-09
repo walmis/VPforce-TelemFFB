@@ -795,7 +795,7 @@ class TestHelicopterSimConnectProxy(BaseTelemetryEffectTestCase):
 @pytest.mark.msfs
 @pytest.mark.helicopter
 class TestHelicopterSimvarSync(BaseTelemetryEffectTestCase):
-    """Tests for simvar subscription sync methods (_sync_msfs_controls_lock_simvar, _sync_msfs_force_trim_simvar)."""
+    """Tests for simvar subscription sync methods (_sync_controls_lock_simvar, _sync_force_trim_simvar)."""
 
     def _make_pedals_instance(self):
         instance = self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True, _test_device_type="pedals")

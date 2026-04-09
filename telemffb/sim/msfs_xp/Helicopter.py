@@ -118,91 +118,6 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
             self._simconnect.add_simvar(name='ForceTrimSW', var="L:TelemFFBHeliFT", sc_unit="enum")
             self._simconnect._resubscribe()
 
-    def _sync_msfs_force_trim_simvar(self):
-        if not self._sim_is_msfs():
-            return
-
-        # Only resubscribe when the configured LVar binding changes.
-        if (self.custom_ft_sw_var_enabled and self.anything_has_changed('custom_ft_sw_var', self.custom_ft_sw_var)) or self.anything_has_changed('custom_ft_sw_var_enabled', self.custom_ft_sw_var_enabled):
-            self._simconnect.add_simvar(name='ForceTrimSW', var=self.custom_ft_sw_var, sc_unit="enum")
-            self._simconnect._resubscribe()
-
-    def _sync_msfs_controls_lock_simvar(self):
-        if not self._sim_is_msfs() or not self.controls_lock_enable or not self.controls_lock_simvar:
-            return
-
-        # Subscribe once on first call, and re-subscribe only when the binding changes.
-        # Always call anything_has_changed to initialize tracking state (avoid short-circuit).
-        simvar_changed = self.anything_has_changed('controls_lock_simvar', self.controls_lock_simvar)
-        enable_changed = self.anything_has_changed('controls_lock_enable', self.controls_lock_enable)
-        needs_resub = 'ControlsLock' not in self._simconnect.sv_dict or simvar_changed or enable_changed
-
-        if needs_resub:
-            self._simconnect.add_simvar(name="ControlsLock", var=self.controls_lock_simvar, sc_unit="enum")
-            self._simconnect._resubscribe()
-
-    def _get_controls_lock_state(self, telem_data: BaseTelemetryData) -> bool:
-        if not self.controls_lock_enable:
-            return False
-
-        # Normalize simulator value once so pedal/collective lock handlers share the same decision path.
-        controls_locked = bool(telem_data.get("ControlsLock", 0))
-        if self.controls_lock_simvar_invert:
-            controls_locked = not controls_locked
-        return controls_locked
-
-    def _prepare_controls_lock(
-        self,
-        telem_data: BaseTelemetryData,
-        controls_locked: bool,
-        *,
-        set_locked_telemetry: bool = False,
-    ) -> bool | None:
-        # Centralize the shared lock-state short-circuit so axis handlers only manage axis-specific setup.
-        # Return values are tri-state:
-        # - False: lock mode inactive, caller should continue normal axis handling
-        # - True: lock mode fully owns this frame, caller should return immediately
-        # - None: lock mode active and caller must continue with axis-specific spring/detent setup
-        if not controls_locked:
-            self._stop_lock_effects()
-            return False
-
-        if set_locked_telemetry:
-            telem_data._controls_locked = True
-
-        if self._lock_effects_started():
-            return True
-
-        return None
-
-    def _engage_controls_lock_detents(
-        self,
-        spring_condition,
-        *,
-        spring_offset: int,
-        detent_1: dict,
-        detent_2: dict,
-        stop_control_weight: bool = False,
-    ):
-        # Share the common lock spring + detent startup sequence; callers provide only axis-specific geometry.
-        if stop_control_weight:
-            self.effects['control_weight'].stop()
-
-        spring_condition.set_coefficient(4096)
-        spring_condition.cpOffset = spring_offset
-        self._spring_handle.setCondition(spring_condition)
-        self._spring_handle.start()
-        self.effects['lock_1'].detent(**detent_1).start()
-        self.effects['lock_2'].detent(**detent_2).start()
-        self._spring_handle.stop()
-
-    def _lock_effects_started(self) -> bool:
-        return self.effects['lock_1'].started or self.effects['lock_2'].started
-
-    def _stop_lock_effects(self):
-        self.effects['lock_1'].stop()
-        self.effects['lock_2'].stop()
-
     def _get_msfs_pedal_axis_config(self) -> tuple[str, float]:
         if self.enable_custom_x_axis:
             return self.custom_x_axis, self.raw_x_axis_scale
@@ -212,47 +127,6 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         if self.enable_custom_y_axis:
             return self.custom_y_axis, self.raw_y_axis_scale
         return 'AXIS_COLLECTIVE_SET', 16384
-
-    def _handle_pedal_controls_lock(self, telem_data: BaseTelemetryData, controls_locked: bool) -> bool:
-        # Return True when lock mode owns this frame and normal axis processing must stop.
-        lock_result = self._prepare_controls_lock(telem_data, controls_locked)
-        if lock_result is not None:
-            return lock_result
-
-        phys_x, _ = self._get_device_axes()
-
-        detent_1 = {
-            'position_x': 1500,
-            'peak_x': 4096,
-            'range_x': 4096,
-            'gate_pos_y': 0,
-            'gate_neg_y': 0,
-        }
-        detent_2 = {
-            'position_x': -1500,
-            'peak_x': 4096,
-            'range_x': 4096,
-            'gate_pos_y': 0,
-            'gate_neg_y': 0,
-        }
-
-        self.spring_x.set_coefficient(4096)
-        self.spring_x.cpOffset = 0
-        self._spring_handle.setCondition(self.spring_x)
-        self._spring_handle.start()
-
-        # Pedals only advertise `_controls_locked` after the user reaches the centered lock groove.
-        if -0.15 < phys_x < 0.15:
-            self._engage_controls_lock_detents(
-                self.spring_x,
-                spring_offset=0,
-                detent_1=detent_1,
-                detent_2=detent_2,
-                stop_control_weight=True,
-            )
-            telem_data["_controls_locked"] = controls_locked
-
-        return True
 
     def _initialize_pedals_if_needed(self, telem_data: BaseTelemetryData, phys_x: float, x_var: str) -> bool:
         if self.pedals_init:
@@ -434,14 +308,14 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
         self._spring_handle.name = "pedal_spring"
 
         telem_data.phys_x = phys_x
-        self._sync_msfs_force_trim_simvar()
+        self._sync_force_trim_simvar()
         # Enable cockpit switch control (if exists) for force trim. Add LVar as "ForceTrimSW" bool if available for aircraft.
         force_trim_active = telem_data.get('ForceTrimSW', True) if self.custom_ft_sw_var_enabled else True
-        self._sync_msfs_controls_lock_simvar()
+        self._sync_controls_lock_simvar()
         controls_locked = self._get_controls_lock_state(telem_data)
 
         # Lock path intentionally short-circuits all downstream axis updates.
-        if self._handle_pedal_controls_lock(telem_data, controls_locked):
+        if self._apply_pedal_controls_lock(telem_data, controls_locked):
             return
 
         if not self._initialize_pedals_if_needed(telem_data, phys_x, x_var):
@@ -470,7 +344,7 @@ class Helicopter(Aircraft, MsfsXpHeliControlsMixIn):
 
         telem_data.phys_y = phys_y
 
-        self._sync_msfs_controls_lock_simvar()
+        self._sync_controls_lock_simvar()
         controls_locked = self._get_controls_lock_state(telem_data)
 
         # Lock path intentionally short-circuits all downstream axis updates.
