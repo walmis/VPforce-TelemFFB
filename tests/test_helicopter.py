@@ -1076,3 +1076,130 @@ class TestHelicopterParameterConfiguration(BaseTelemetryEffectTestCase):
         assert instance.joystick_trim_follow_gain_virtual_x == 0.3
         assert instance.joystick_trim_follow_gain_physical_y == 0.6
         assert instance.joystick_trim_follow_gain_virtual_y == 0.4
+
+
+@pytest.mark.unit
+@pytest.mark.msfs
+@pytest.mark.helicopter
+class TestMsfsAxisHelpers(BaseTelemetryEffectTestCase):
+    """Tests for shared MSFS axis scaling and config lookup methods."""
+
+    def _make_instance(self):
+        return self.create_aircraft_instance(Helicopter, name="TestHeli", _test_sim_is_msfs=True)
+
+    # -- _get_msfs_axis_config --
+
+    def test_get_msfs_axis_config_returns_defaults(self):
+        instance = self._make_instance()
+        instance.enable_custom_x_axis = False
+        instance.enable_custom_y_axis = False
+
+        var, rng = instance._get_msfs_axis_config('x', "AXIS_AILERONS_SET")
+        assert var == "AXIS_AILERONS_SET"
+        assert rng == 16384
+
+        var, rng = instance._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
+        assert var == "AXIS_ELEVATOR_SET"
+        assert rng == 16384
+
+    def test_get_msfs_axis_config_custom_x(self):
+        instance = self._make_instance()
+        instance.enable_custom_x_axis = True
+        instance.custom_x_axis = "MY_CUSTOM_X"
+        instance.raw_x_axis_scale = 1
+
+        var, rng = instance._get_msfs_axis_config('x', "AXIS_AILERONS_SET")
+        assert var == "MY_CUSTOM_X"
+        assert rng == 1
+
+    def test_get_msfs_axis_config_custom_y(self):
+        instance = self._make_instance()
+        instance.enable_custom_y_axis = True
+        instance.custom_y_axis = "MY_CUSTOM_Y"
+        instance.raw_y_axis_scale = 32768
+
+        var, rng = instance._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
+        assert var == "MY_CUSTOM_Y"
+        assert rng == 32768
+
+    def test_get_msfs_axis_config_custom_x_doesnt_affect_y(self):
+        instance = self._make_instance()
+        instance.enable_custom_x_axis = True
+        instance.custom_x_axis = "MY_CUSTOM_X"
+        instance.raw_x_axis_scale = 1
+        instance.enable_custom_y_axis = False
+
+        var, rng = instance._get_msfs_axis_config('y', "AXIS_ELEVATOR_SET")
+        assert var == "AXIS_ELEVATOR_SET"
+        assert rng == 16384
+
+    def test_get_msfs_axis_config_custom_default_range(self):
+        instance = self._make_instance()
+        instance.enable_custom_x_axis = False
+
+        var, rng = instance._get_msfs_axis_config('x', "AXIS_RUDDER_SET", 8192)
+        assert var == "AXIS_RUDDER_SET"
+        assert rng == 8192
+
+    # -- _scale_msfs_axis_value --
+
+    def test_scale_msfs_axis_value_integer_range(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(1.0, 16384, 1.0)
+        assert result == -16384
+
+    def test_scale_msfs_axis_value_center_is_zero(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(0.0, 16384, 1.0)
+        assert result == 0
+
+    def test_scale_msfs_axis_value_negative_full(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(-1.0, 16384, 1.0)
+        assert result == 16384
+
+    def test_scale_msfs_axis_value_with_scale_factor(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(1.0, 16384, 0.5)
+        assert result == -8192
+
+    def test_scale_msfs_axis_value_float_range(self):
+        """When axis_range is 1 (float custom axis), result is rounded float, not negated int."""
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(0.5, 1, 1.0)
+        assert result == 0.5
+        assert isinstance(result, float)
+
+    def test_scale_msfs_axis_value_float_range_negative(self):
+        instance = self._make_instance()
+        result = instance._scale_msfs_axis_value(-0.33, 1, 1.0)
+        assert result == -0.33
+
+    # -- _send_msfs_axis_value --
+
+    def test_send_msfs_axis_value_sends_event(self):
+        instance = self._make_instance()
+        self.mock_simconnect.clear_events()
+
+        result = instance._send_msfs_axis_value("AXIS_AILERONS_SET", 0.5, 16384, 1.0)
+
+        assert len(self.mock_simconnect.sent_events) == 1
+        event_name, event_val = self.mock_simconnect.sent_events[0]
+        assert event_name == "AXIS_AILERONS_SET"
+        assert event_val == -8192
+        assert result == -8192
+
+    def test_send_msfs_axis_value_returns_scaled_value(self):
+        instance = self._make_instance()
+        self.mock_simconnect.clear_events()
+
+        result = instance._send_msfs_axis_value("TEST_VAR", 0.0, 16384, 1.0)
+        assert result == 0
+
+    def test_send_msfs_axis_value_float_range(self):
+        instance = self._make_instance()
+        self.mock_simconnect.clear_events()
+
+        result = instance._send_msfs_axis_value("CUSTOM_VAR", 0.75, 1, 1.0)
+        assert result == 0.75
+        assert self.mock_simconnect.sent_events[0] == ("CUSTOM_VAR", 0.75)
