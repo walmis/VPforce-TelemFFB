@@ -212,9 +212,6 @@ class XAW109Helicopter(Helicopter):
         self._spring_handle.name = "collective_ap_spring"
         # self.damper = effects["collective_damper"].damper()
 
-        input_data = HapticEffect.device.get_input()
-        # force_trim_pressed = input_data.isButtonPressed(self.force_trim_button)
-
         collective_ft_released = telem_data.AW109_col_force_trim_release_pressed or 0
 
         collective_rate = telem_data.AW109_collective_trim_rate or 0
