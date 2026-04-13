@@ -340,7 +340,7 @@ class MsfsXpHeliControlsMixIn(MsfsXpFlightControlsMixIn):
         if self._sim_is_msfs():
             cyclic_x_trim = telem_data.CyclicTrimX or 0
             cyclic_y_trim = telem_data.CyclicTrimY or 0
-        if self._sim_is_xplane():
+        elif self._sim_is_xplane():
             cyclic_x_trim = telem_data.AileronTrimPct or 0
             cyclic_y_trim = telem_data.ElevTrimPct or 0
         else:
