@@ -1620,7 +1620,7 @@
 		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.2</order>
+		<order>2100.3</order>
 		<name>use_firmware_axis_override</name>
 		<displayname>Use Firmware Axis Override</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1637,7 +1637,7 @@
 		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.21</order>
+		<order>2100.2</order>
 		<name>local_disable_axis_control</name>
 		<displayname>Disable for this device</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1654,7 +1654,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.3</order>
+		<order>2100.4</order>
 		<name>joystick_x_axis_scale</name>
 		<displayname>X Axis Scale</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1669,7 +1669,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.4</order>
+		<order>2100.5</order>
 		<name>joystick_y_axis_scale</name>
 		<displayname>Y Axis Scale</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1685,7 +1685,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.5</order>
+		<order>2100.6</order>
 		<name>rudder_x_axis_scale</name>
 		<displayname>Rudder (X) Axis Scale</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1700,7 +1700,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.62</order>
+		<order>2100.72</order>
 		<name>hands_on_deadzone</name>
 		<displayname>Hands On Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1713,7 +1713,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.63</order>
+		<order>2100.73</order>
 		<name>hands_off_deadzone</name>
 		<displayname>Hands Off Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1726,7 +1726,7 @@
 		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.64</order>
+		<order>2100.74</order>
 		<name>handson_force_mode</name>
 		<displayname>Force Mode ( &lt;b&gt;Experimental&lt;/b&gt;)</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1738,7 +1738,7 @@
 		<datatype>pct_float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.65</order>
+		<order>2100.75</order>
 		<name>hands_on_force_threshold</name>
 		<displayname>Hands On Force Threshold</displayname>
 		<prereq>handson_force_mode</prereq>
@@ -1753,7 +1753,7 @@
 		<datatype>d_int</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.66</order>
+		<order>2100.76</order>
 		<name>handsoff_force_duration</name>
 		<displayname>Hands Off Hysteresis Time (ms)</displayname>
 		<prereq>handson_force_mode</prereq>
@@ -1765,7 +1765,7 @@
 		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.67</order>
+		<order>2100.77</order>
 		<name>handson_force_debug</name>
 		<displayname>Debug Logging</displayname>
 		<prereq>handson_force_mode</prereq>
@@ -1778,7 +1778,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.72</order>
+		<order>2100.82</order>
 		<name>feet_on_deadzone</name>
 		<displayname>Feet On Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1791,7 +1791,7 @@
 		<datatype>float</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.73</order>
+		<order>2100.83</order>
 		<name>feet_off_deadzone</name>
 		<displayname>Feet Off Deadzone</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1804,7 +1804,7 @@
 		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.74</order>
+		<order>2100.84</order>
 		<name>trimwheel_use_axis</name>
 		<displayname>Use Axis instead of Direct</displayname>
 		<prereq>telemffb_controls_axes</prereq>
@@ -1817,7 +1817,7 @@
 		<datatype>bool</datatype>
 		<grouping>Axis Control</grouping>
 		<parentgroup>basic</parentgroup>
-		<order>2100.75</order>
+		<order>2100.85</order>
 		<name>trimwheel_axis_invert</name>
 		<displayname>Elevator Trim Axis Invert</displayname>
 		<prereq>trimwheel_use_axis</prereq>
@@ -16397,6 +16397,69 @@
 		<device>any</device>
 	</models>
 	<models>
+		<name>controls_lock_simvar</name>
+		<model>Black Square Grand Duke.*</model>
+		<value>L:bksq_controlLocks</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Black Square Grand Duke.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Black Square Grand Duke.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Black Square B60 Duke.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Black Square B60 Duke.*</model>
+		<value>L:bksq_controlLocks</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Black Square B60 Duke.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Black Square Turbine Duke.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Black Square Turbine Duke.*</model>
+		<value>L:bksq_controlLocks</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Black Square Turbine Duke.*</model>
+		<value>TurbopropAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
 		<name>type</name>
 		<model>Black Square Baron 58.*</model>
 		<value>PropellerAircraft</value>
@@ -18297,6 +18360,90 @@
 		<value>FlyInsideHelicopter</value>
 		<sim>MSFS</sim>
 		<device>any</device>
+	</models>
+	<models>
+		<name>max_aileron_coeff</name>
+		<model>Flysimware C414AW.*</model>
+		<value>0.41</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>max_elevator_coeff</name>
+		<model>Flysimware C414AW.*</model>
+		<value>0.81</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>type</name>
+		<model>Flysimware C414AW.*</model>
+		<value>PropellerAircraft</value>
+		<sim>MSFS</sim>
+		<device>any</device>
+	</models>
+	<models>
+		<name>ap_following</name>
+		<model>Flysimware C414AW.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Flysimware C414AW.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Flysimware C414AW.*</model>
+		<value>L:Control_Lock</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_ap_x_follow_deadzone</name>
+		<model>Flysimware C414AW.*</model>
+		<value>0.15</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_ap_y_follow_deadzone</name>
+		<model>Flysimware C414AW.*</model>
+		<value>0.15</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>joystick_trim_follow_gain_virtual_y</name>
+		<model>Flysimware C414AW.*</model>
+		<value>-1.1</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>trim_following</name>
+		<model>Flysimware C414AW.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>joystick</device>
+	</models>
+	<models>
+		<name>controls_lock_enable</name>
+		<model>Flysimware C414AW.*</model>
+		<value>true</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
+	</models>
+	<models>
+		<name>controls_lock_simvar</name>
+		<model>Flysimware C414AW.*</model>
+		<value>L:Rudder_Lock_Handle</value>
+		<sim>MSFS</sim>
+		<device>pedals</device>
 	</models>
 	<models>
 		<name>joystick_trim_follow_gain_physical_x</name>
