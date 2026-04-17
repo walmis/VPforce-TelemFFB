@@ -161,7 +161,10 @@ class ExceptionTracker(QObject):
         if len(self.exceptions) > self.max_exceptions:
             self.exceptions.pop(0)
 
-        self.exception_added.emit()
+        try:
+            self.exception_added.emit()
+        except RuntimeError:
+            pass  # Qt object deleted during shutdown; nothing to do
         
     def get_count(self) -> int:
         """Get the number of tracked exceptions."""

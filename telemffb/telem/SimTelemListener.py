@@ -97,6 +97,9 @@ class SimIL2(SimTelemListener):
             logging.warning(
                 "IL2 Config validation is disabled - please ensure the IL2 startup.cfg is configured correctly")
 
+        if self.telem is None:  # stopped during validation (e.g. another sim won the race)
+            return
+
         logging.info("Starting IL2 Telemetry Listener")
         self.telem.start()
         self.started = True
@@ -157,6 +160,10 @@ class SimDCS(SimTelemListener):
         self.telem_ipc = DcsIpcThread(G.telem_manager)
 
         self.do_validate()
+
+        if self.telem_ipc is None or self.telem_udp is None:  # stopped during validation (e.g. another sim won the race)
+            return
+
         logging.info("Starting DCS Telemetry Listener")
         self.telem_ipc.start()
         self.telem_udp.start()
@@ -200,6 +207,10 @@ class SimXPLANE(SimTelemListener):
         self.telem = NetworkThread(G.telem_manager, host='127.0.0.1', port=34390)
 
         self.do_validate()
+
+        if self.telem is None:
+            return
+
         logging.info("Starting XPlane Telemetry Listener")
 
         self.telem.start()
