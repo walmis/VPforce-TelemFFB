@@ -363,6 +363,13 @@ class AppStatusWidget(QWidget):
     def set_profile_name(self, profile_name):
         self.active_profile_label.setText(profile_name)
 
+    def reset_sim_state(self, src: str):
+        """Reset all status labels to their initial (no-sim) default values."""
+        self.cur_craft_label.setText("None Detected")
+        self.cur_pattern_label.setText("(No Match)")
+        self.active_profile_label.setText("(None)")
+        self.set_waiting(src)
+
     @pyqtSlot(str)
     def set_active_vpconf(self, file):
         self.active_vpconf_label.setText(os.path.splitext(os.path.basename(file))[0])

@@ -620,6 +620,14 @@ def _setup_ipc_and_connections():
 def _sim_connected_events():
     G.sim_listeners.allStarted.connect(G.telem_manager.reset_sim_connected)
     G.telem_manager.first_frame_received.connect(G.sim_listeners.stop_inactive)
+    # When the first frame from a (new) sim arrives, flip the status widget to Running.
+    # first_frame_received fires once per restart cycle (reset_sim_connected resets the flag),
+    # so this fires on initial startup AND after each sim_exited → restart_all() cycle.
+    G.telem_manager.first_frame_received.connect(
+        lambda src: G.main_window.update_sim_indicators(src, paused=False)
+    )
+    G.telem_manager.sim_exited.connect(lambda src: G.sim_listeners.restart_all())
+    G.telem_manager.sim_exited.connect(G.main_window.on_sim_exited)
 
 def _handle_window_display(headless_mode):
     """Handle initial window display based on configuration."""

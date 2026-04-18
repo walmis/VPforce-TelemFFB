@@ -1,5 +1,6 @@
 pyqt6==6.9.1
 configobj
+psutil
 pysimconnect @ https://github.com/walmis/pysimconnect/archive/refs/heads/master.zip
 stransi
 libusb1

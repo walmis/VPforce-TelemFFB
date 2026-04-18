@@ -87,6 +87,7 @@ class TelemManager(QObject, threading.Thread):
     telemetryTimeout = pyqtSignal(bool)
 
     first_frame_received = pyqtSignal(str)
+    sim_exited = pyqtSignal(str)   # emitted when a sim exit detected
 
     currentAircraft: Optional['AircraftBase'] = None
     currentAircraftName: Optional[str] = None
@@ -115,13 +116,38 @@ class TelemManager(QObject, threading.Thread):
         self.stop_state = False
         self.pause_state = False
         self._first_frame_from_sim = False
+        self._sim_exit_signaled = False   # True after notify_sim_exited fires; prevents re-entrancy until reset_sim_connected() clears it
+        self._process_check_deadline: Optional[float] = None  # perf_counter() timestamp of the next scheduled process check; None when inactive
 
 
     def set_paused(self, pause_state: bool = False):
         self.pause_state = pause_state
 
     def reset_sim_connected(self):
+        """Called by SimListenerManager.allStarted when all sim listeners have been
+        (re)started.  Clears any leftover timeout / exit state from the previous
+        sim session so the next telemetry frame is treated as a clean connection."""
         self._first_frame_from_sim = False
+        self.timed_out = False
+        self._sim_exit_signaled = False
+        self._process_check_deadline = None
+
+    def notify_sim_exited(self, src: str):
+        """Called by any sim transport when it detects a clean exit.
+        Stops active FFB effects, clears aircraft state, and emits sim_exited
+        so that main.py connections can restart all listeners and reset the UI.
+        Guarded against double-firing; resets automatically via reset_sim_connected()."""
+        if self._sim_exit_signaled:
+            logging.debug(f"notify_sim_exited({src}): already signaled, ignoring duplicate")
+            return
+        self._sim_exit_signaled = True
+        self._process_check_deadline = None  # cancel any pending process check
+        logging.info(f"Sim exit received from {src} - resetting sim listeners")
+        if self.currentAircraft:
+            self.currentAircraft.on_timeout()
+            self.currentAircraft = None
+        self.currentAircraftName = None
+        self.sim_exited.emit(src)
 
     def set_simconnect(self, sc : SimConnectManager):
         self._simconnect = sc
@@ -309,6 +335,11 @@ class TelemManager(QObject, threading.Thread):
         """Extract aircraft information and determine the appropriate module."""
         aircraft_name = telem_data.get("N")
         data_source = telem_data.get("src", None)
+
+        # Defaults — used when data_source is None or unrecognised (e.g. malformed packet)
+        module = None
+        sc_aircraft_type = None
+        sc_engine_type = None
 
         # Determine aircraft module based on data source
         if data_source == "MSFS":
@@ -613,13 +644,96 @@ class TelemManager(QObject, threading.Thread):
             return self.currentAircraft._telem_data.get(key, None)
 
     def on_timeout(self):
+        """Called by the run() loop each time the telemetry condition variable times out
+        without receiving new data.  Fires once per timeout event (guarded by timed_out)
+        to stop active FFB effects and signal the UI.  The run() loop then arms the
+        process-check deadline so _check_sim_process() is called periodically until
+        telemetry resumes or the sim process disappears."""
         if self.currentAircraft and not self.timed_out:
+            src = self.currentAircraft._telem_data.get('src', 'unknown')
+            logging.info(
+                f"Telemetry timeout from {src} — no data received for {self.timeout_sec * 1000:.0f}ms. "
+                f"Process status will be checked every {self._PROCESS_CHECK_INTERVAL:.0f}s."
+            )
             self.currentAircraft.on_timeout()
             self.telemetryTimeout.emit(True)
             self.timed_out = True
             G.settings_mgr.timed_out = True
 
+    # Mapping from the telemetry 'src' tag to the list of known OS process names for
+    # that sim.  Multiple names per entry cover platform variants (Windows .exe vs.
+    # native Linux binary) and multiple sim versions (e.g. MSFS 2020 / 2024).
+    # Matching in _check_sim_process() is case-insensitive via psutil.process_iter().
+    _SIM_PROCESS_NAMES: dict = {
+        'DCS':    ['DCS.exe', 'DCS'],
+        'IL2':    ['IL-2.exe', 'IL-2'],
+        'MSFS':   ['FlightSimulator.exe', 'FlightSimulator2024.exe'],
+        'BMS':    ['Falcon BMS.exe', 'falcon'],
+        'XPLANE': ['X-Plane.exe', 'X-Plane-x86_64', 'X-Plane'],
+    }
+    _PROCESS_CHECK_INTERVAL = 5.0   # seconds between successive process checks while telemetry is timed out
+    _PROCESS_CHECK_DELAY    = 5.0   # grace period (seconds) after the first timeout before the first check fires
+
+    def _check_sim_process(self) -> None:
+        """Universal sim-exit detector, called periodically by the run() loop while
+        telemetry is timed out.
+
+        Rationale: not all sims send an explicit exit signal over their telemetry
+        transport (IL2 being the primary example).  By watching the OS process list
+        after a timeout we can detect a sim exit for any supported sim without
+        requiring per-sim exit handling in each transport.
+
+        Behaviour:
+        - Looks up the active sim's src tag in _SIM_PROCESS_NAMES.
+        - Uses psutil (cross-platform: Windows and Linux) to scan the process list.
+        - If the sim process is still running, logs and returns — no action taken.
+        - If the sim process is gone, calls notify_sim_exited() which stops FFB
+          effects, clears aircraft state, and triggers a full listener restart.
+        - If psutil fails for any reason the check is skipped and the sim is assumed
+          to still be running (fail-safe — we never fire a false exit).
+        """
+        if self._sim_exit_signaled:
+            return
+        src = None
+        if self.currentAircraft:
+            src = self.currentAircraft._telem_data.get('src')
+        if not src:
+            return
+        process_names = self._SIM_PROCESS_NAMES.get(src)
+        if not process_names:
+            return   # sim not in the table — skip check rather than risk a false exit
+        logging.info(f"Process check: looking for {src} process ({', '.join(process_names)})")
+        try:
+            import psutil
+            names_lower = {n.lower() for n in process_names}
+            running = any(
+                p.info['name'].lower() in names_lower
+                for p in psutil.process_iter(['name'])
+            )
+        except Exception as e:
+            logging.warning(f"Process check for {src} failed ({e}); assuming still running")
+            return   # fail-safe: don't fire exit if we can't determine state
+        if running:
+            logging.info(f"Process check: {src} is still running")
+        else:
+            logging.info(f"Process check: {src} process not found — treating as sim exit")
+            self.notify_sim_exited(src)
+
     def run(self):
+        """Main telemetry processing loop.
+
+        Waits on a condition variable for incoming telemetry data or events.
+        If the wait times out (no data received within telemTimeout ms) it:
+          1. Calls on_timeout() once to stop FFB effects and signal the UI.
+          2. Arms a delayed deadline (_PROCESS_CHECK_DELAY seconds after the first
+             timeout) so brief pauses don't trigger a false exit detection.
+          3. Fires _check_sim_process() on each subsequent interval
+             (_PROCESS_CHECK_INTERVAL seconds) until data resumes or the sim
+             process disappears, at which point notify_sim_exited() is called.
+
+        When data arrives after a timeout the timeout state is cleared and the
+        process-check deadline is cancelled — telemetry has resumed normally.
+        """
         self.timeout_sec = int(G.system_settings.get('telemTimeout', 200))/1000.0
         logging.info(f"Telemetry timeout: {self.timeout_sec}")
         self._run = True
@@ -628,12 +742,34 @@ class TelemManager(QObject, threading.Thread):
                 if not self._events and not self._data:
                     if not self._cond.wait(self.timeout_sec):
                         self.on_timeout()
+
+                        # Arm the process-check deadline on the first timeout.
+                        # The _PROCESS_CHECK_DELAY grace period lets us ignore brief
+                        # pauses (e.g. loading screens) before declaring a sim exit.
+                        if self.timed_out and self._process_check_deadline is None:
+                            self._process_check_deadline = (
+                                time.perf_counter() + self._PROCESS_CHECK_DELAY
+                            )
+
+                        # Fire a process check when the deadline is reached, then
+                        # reschedule for the next interval so we keep polling until
+                        # telemetry resumes or the sim process is gone.
+                        if (self._process_check_deadline is not None
+                                and time.perf_counter() >= self._process_check_deadline):
+                            self._process_check_deadline = (
+                                time.perf_counter() + self._PROCESS_CHECK_INTERVAL
+                            )
+                            self._check_sim_process()
+
                         continue
 
                 if self._data:
                     if self.timed_out:
+                        # Data has resumed after a timeout — clear timeout state and
+                        # cancel the process-check so it doesn't fire spuriously.
                         self.telemetryTimeout.emit(False)
                         self.timed_out = False
+                        self._process_check_deadline = None  # sim resumed; cancel check
 
                     G.settings_mgr.timed_out = False
                     data = self._data

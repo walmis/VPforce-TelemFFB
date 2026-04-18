@@ -54,8 +54,7 @@ class SimConnectSock(SimConnectManager):
                 HapticEffect.device.reset_effects()
 
         if event == "Quit":
-            # Restart sim listeners on MSFS quit, TODO: Why?
-            G.sim_listeners.restart_all()
+            pass
 
         args = [str(x) for x in args]
         self._telem.submit_frame(f"Ev={event};" + ";".join(args))

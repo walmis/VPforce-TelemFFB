@@ -2102,6 +2102,17 @@ class MainWindow(QMainWindow):
             self.update_sim_indicators(G.telem_manager.getTelemValue('src'), paused=True)
         self.telemetry_timed_out = True
 
+    def on_sim_exited(self, src: str):
+        """Called when a sim sends a clean exit notification (STATUS=EXIT).
+        Resets the Application Status area and settings tab to the waiting state
+        so stale aircraft info and the 'Paused' badge are cleared before the
+        next sim connects."""
+        logging.info(f"Application Status: clearing display after {src} exit")
+        self.lbl_effects_data.setText("")
+        self.status_container.reset_sim_state(src)
+        self.settings_layout.clear_layout()
+        self.telemetry_timed_out = False
+
     def on_update_telemetry(self, datadict: dict):
         if utils.millis() - self.last_telemetry_refresh < 50:
             return
@@ -2271,7 +2282,7 @@ class MainWindow(QMainWindow):
                 self.new_craft_notification_sent = False
 
             # Update the status labels and profile selection box
-            self.status_container.set_fullname(data['N'])
+            self.status_container.set_fullname(data.get('N', ''))
             ap = G.settings_mgr.active_profile
             active_profile = xmlutils.get_active_profile_for_model(G.settings_mgr.current_sim, G.settings_mgr.current_class, G.settings_mgr.current_pattern)
 
