@@ -225,6 +225,21 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_select_c._tb_box = self.tb_pid_c
         self.cb_select_t._tb_box = self.tb_pid_t
 
+        self.cb_select_j._autolaunch_cb = self.cb_al_enable_j
+        self.cb_select_p._autolaunch_cb = self.cb_al_enable_p
+        self.cb_select_c._autolaunch_cb = self.cb_al_enable_c
+        self.cb_select_t._autolaunch_cb = self.cb_al_enable_t
+
+        self.cb_select_j._startmin_cb = self.cb_min_enable_j
+        self.cb_select_p._startmin_cb = self.cb_min_enable_p
+        self.cb_select_c._startmin_cb = self.cb_min_enable_c
+        self.cb_select_t._startmin_cb = self.cb_min_enable_t
+
+        self.cb_select_j._headless_cb = self.cb_headless_j
+        self.cb_select_p._headless_cb = self.cb_headless_p
+        self.cb_select_c._headless_cb = self.cb_headless_c
+        self.cb_select_t._headless_cb = self.cb_headless_t
+
 
 
 
@@ -396,6 +411,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 role = cb_role_map.get(changed_cb, None)
                 if role:
                     persist_combobox_selection(changed_cb, role)
+                changed_cb._tb_box.setText("")  # update PID textbox
+                changed_cb._autolaunch_cb.setChecked(False)
+                changed_cb._startmin_cb.setChecked(False)
+                changed_cb._headless_cb.setChecked(False)
                 return
 
             # check if any other combobox already has this device
