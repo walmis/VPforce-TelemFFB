@@ -88,7 +88,7 @@ class MainWindow(QMainWindow):
 
         # Get the absolute path of the script's directory
         # script_dir = os.path.dirname(os.path.abspath(__file__))
-        doc_url = 'https://vpforcecontrols.com/downloads/VPforce_Rhino_Manual.pdf'
+        doc_url = 'https://docs.vpforce.eu/telemffb/'
         if G.release_version:
             dl_url = 'https://github.com/walmis/VPforce-TelemFFB/releases'
         else:
