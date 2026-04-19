@@ -24,6 +24,7 @@ import subprocess
 import threading
 import time
 import socket
+import psutil
 
 from dataclasses import dataclass
 
@@ -702,21 +703,20 @@ class TelemManager(QObject, threading.Thread):
         process_names = self._SIM_PROCESS_NAMES.get(src)
         if not process_names:
             return   # sim not in the table — skip check rather than risk a false exit
-        logging.info(f"Process check: looking for {src} process ({', '.join(process_names)})")
+        logging.debug(f"Process check: looking for {src} process ({', '.join(process_names)})")
         try:
-            import psutil
             names_lower = {n.lower() for n in process_names}
             running = any(
                 p.info['name'].lower() in names_lower
                 for p in psutil.process_iter(['name'])
             )
         except Exception as e:
-            logging.warning(f"Process check for {src} failed ({e}); assuming still running")
+            logging.error(f"Process check for {src} failed ({e}); assuming still running")
             return   # fail-safe: don't fire exit if we can't determine state
         if running:
-            logging.info(f"Process check: {src} is still running")
+            logging.debug(f"Process check: {src} is still running")
         else:
-            logging.info(f"Process check: {src} process not found — treating as sim exit")
+            logging.info(f"Process check: {src} process not found ({process_names})— treating as sim exit")
             self.notify_sim_exited(src)
 
     def run(self):
