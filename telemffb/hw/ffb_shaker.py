@@ -89,6 +89,8 @@ SHAKER_EFFECT_WHITELIST = {
     "overspeedX", "overspeedY", "aoa", "crit_aoa",
     # wind
     "wnd",
+    # interactive effect tester (telemffb.EffectTestDialog)
+    "__effect_tester__",
 }
 
 _synth: Optional[ShakerSynth] = None

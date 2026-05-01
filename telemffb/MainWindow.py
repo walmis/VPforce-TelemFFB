@@ -230,6 +230,10 @@ class MainWindow(QMainWindow):
         reset_action.triggered.connect(self.reset_all_effects)
         utilities_menu.addAction(reset_action)
 
+        effect_tester_action = QAction('Effect Tester...', self)
+        effect_tester_action.triggered.connect(self.open_effect_tester)
+        utilities_menu.addAction(effect_tester_action)
+
         self.update_action = QAction('Install Latest TelemFFB', self)
         self.update_action.triggered.connect(self.update_from_menu)
         if not G.release_version:
@@ -1853,6 +1857,13 @@ class MainWindow(QMainWindow):
                 HapticEffect.device.reset_effects()
             except Exception:
                 pass
+
+    def open_effect_tester(self):
+        """Open the interactive effect-tester dialog (non-modal)."""
+        from telemffb.EffectTestDialog import EffectTestDialog
+        dlg = EffectTestDialog(self)
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dlg.show()
 
 
 
