@@ -12,7 +12,7 @@
 - [x] STEP_02 — HapticEffect facade (`telemffb/hw/ffb_shaker.py`)
 - [x] STEP_03 — Device-type integration (`--type shaker` launchable)
 - [x] STEP_04 — Effect routing whitelist
-- [ ] STEP_05 — Soundcard selection UI in System Settings
+- [x] STEP_05 — Soundcard selection UI in System Settings
 - [ ] STEP_06 — MSFS smoke test
 - [ ] STEP_07 — Docs & known limitations
 
@@ -51,3 +51,6 @@
 - (STEP_03) Master-instance check added in `_determine_master_instance_status`: if `device_type == 'shaker'` and `master_instance` would be True (i.e. user configured shaker as master in System Settings), log error + `QMessageBox.critical` + `sys.exit(1)`.
 - (STEP_03) Confidence is bounded by what runs in this Linux container: all six modified files compile clean under py3.12; the `Dispenser`-rebind pattern was verified in isolation; full launch verification (`python main.py --type shaker --child --masterport <port>`) needs Windows + sounddevice + Rhino hardware on the dev machine.
 - (STEP_04) Whitelist set has 46 entries (spec listed exact names; all imported verbatim). `start()` guards on whitelist membership immediately after the synth-bound and name-set guards, before any synth lock is acquired. Dropped names log at debug level. All four acceptance scenarios verified: non-whitelisted name silent-drops with no oscillator created; `runway0.constant().start()` produces 25 Hz; `gunfire.periodic(..., duration=200).start()` plays a 200 ms 80 Hz burst then ramps to 0; whitelist is a public, mutable module-level set so future names can be added without other changes.
+- (STEP_05) New "Shaker" tab added programmatically in `SystemSettingsDialog.__init__` so the Qt-Designer-generated `Ui_SystemDialog.py` does not need to be touched. Three controls: device QComboBox (populated from `ShakerSynth.list_output_devices()`, item 0 = "(System default)" with userData=`""`), master gain QDoubleSpinBox (range 0.0–2.0, step 0.05, default 1.0), test QPushButton (plays 2 s of 35 Hz @ 0.5 on a daemon thread, button re-enables via `QTimer.singleShot(2500, ...)`).
+- (STEP_05) Persistence: `'shakerDevice'` (string) and `'shakerGain'` (float) added to the global settings dict in `save_settings`, restored by a new `_load_shaker_settings` helper that uses exact-name-then-substring matching (mirrors `ShakerSynth._resolve_device`). Defaults `''` / `1.0` added to `SystemSettings.globl_sys_dict` for the reset-settings flow. `main.py`'s shaker branch normalises the empty-string device name to `None` so passing it to `ShakerSynth(device=...)` selects the system default.
+- (STEP_05) If the audio backend (sounddevice / PortAudio) cannot be imported, the tab still opens but combo + test button are disabled and the test button has an explanatory tooltip. Verified the widget structure end-to-end with `QT_QPA_PLATFORM=offscreen`: combo populates, gain spinbox honours the configured range/step, save→load round-trip preserves both fields including string-coerced gain values from QSettings storage.

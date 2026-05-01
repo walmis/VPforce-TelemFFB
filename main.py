@@ -351,7 +351,7 @@ def _initialize_device_connection():
             from telemffb.hw.shaker_synth import ShakerSynth
             from telemffb.hw.ffb_shaker import init_shaker
             from telemffb.sim import aircraft_base
-            device_name = G.system_settings.get('shakerDevice', None)
+            device_name = G.system_settings.get('shakerDevice', None) or None
             gain = float(G.system_settings.get('shakerGain', 1.0))
             synth = ShakerSynth(device=device_name, master_gain=gain)
             synth.start()
