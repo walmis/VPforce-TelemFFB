@@ -9,7 +9,7 @@
 ## Phases
 - [x] STEP_00 — Bootstrap planning artifacts
 - [x] STEP_01 — Audio synth core (`telemffb/hw/shaker_synth.py`)
-- [ ] STEP_02 — HapticEffect facade (`telemffb/hw/ffb_shaker.py`)
+- [x] STEP_02 — HapticEffect facade (`telemffb/hw/ffb_shaker.py`)
 - [ ] STEP_03 — Device-type integration (`--type shaker` launchable)
 - [ ] STEP_04 — Effect routing whitelist
 - [ ] STEP_05 — Soundcard selection UI in System Settings
@@ -44,3 +44,6 @@
 - (STEP_00) `main.py:348` is the Rhino HID open; the shaker branch in STEP_03 wraps **this** call site (not a higher-level one).
 - (STEP_01) `shaker_synth.py` preallocates **all** working buffers (mix, per-oscillator output, indices, phase, sine, amplitude envelope) at construction; `_ensure_capacity` only fires if a render call requests more samples than the configured blocksize. Audio callback path holds a single `threading.Lock` for the whole iteration — set/stop calls are infrequent vs. the audio thread, so contention is negligible.
 - (STEP_01) `requirements.txt` now lists `sounddevice`. CLI verified: `--help`, `--list-devices` (returns empty list cleanly when host has no audio devices). Oscillator math sanity-checked against expected sine values for a 30 Hz / 480-sample render — peaks land where phase analysis predicts.
+- (STEP_02) Whitelist filtering is **deferred to STEP_04 by design** (per the STEP doc). STEP_02's `start()` calls into the synth unconditionally — STEP_04 will add the `if self.name not in SHAKER_EFFECT_WHITELIST: return self` guard.
+- (STEP_02) `start()` and `stop()` consolidate the lookup-or-create + osc.set/stop into a single `_synth._lock` acquisition, avoiding a tiny window where the audio thread could observe partially-updated oscillator state.
+- (STEP_02) Verified all 14 `EFFECT_*` constants in `ffb_shaker.py` match `ffb_rhino.py` value-for-value (parsed regex out of the source so the test doesn't require libusb). Behavioural smoke test exercises `.periodic`, `.constant`, `.start`, `.stop`, `.destroy`, `.started`, `duration` timer, force-only no-ops, and the no-synth-bound graceful drop.
