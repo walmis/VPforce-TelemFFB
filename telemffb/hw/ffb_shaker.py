@@ -59,6 +59,38 @@ EFFECT_SPRING_ADJUSTER = 14
 # to a low-rumble carrier).
 CONSTANT_FORCE_FREQUENCY_HZ = 25.0
 
+# Effect names known to translate usefully to a bass shaker. Effect names not
+# in this set are dropped at HapticEffect.start() with a debug log -- this is
+# how we keep force-only ('spring_adjuster' etc.) and unrelated effects from
+# producing audio. New effects added in aircraft_base.py upstream don't
+# accidentally produce noise on the shaker; they need an explicit opt-in here.
+SHAKER_EFFECT_WHITELIST = {
+    # wheel / runway
+    "runway0", "runway1", "runway_bump0", "runway_bump1", "touchdown",
+    # weapons / countermeasures
+    "gunfire", "cm", "payload_rel",
+    # buffeting
+    "buffeting", "buffeting2", "vrs_buffet",
+    "gearbuffet", "gearbuffet2",
+    "spoilerbuffet1-1", "spoilerbuffet1-2", "spoilerbuffet2-1", "spoilerbuffet2-2",
+    # afterburner / jet
+    "ab_rumble_1_1", "ab_rumble_1_2", "ab_rumble_2_1", "ab_rumble_2_2",
+    "je_rumble_1_1", "je_rumble_1_2", "je_rumble_2_1", "je_rumble_2_2",
+    # prop / rotor
+    "prop_rpm0-1", "prop_rpm0-2", "prop_rpm1-1", "prop_rpm1-2",
+    "rotor_rpm0-1", "rotor_rpm1-1",
+    # ETL
+    "etlX", "etlY",
+    # surface movements
+    "flapsmovement", "gearmovement", "gearmovement2",
+    "speedbrakemovement", "spoilermovement", "spoilermovement2",
+    "canopymovement", "hookmovement",
+    # overspeed / aoa
+    "overspeedX", "overspeedY", "aoa", "crit_aoa",
+    # wind
+    "wnd",
+}
+
 _synth: Optional[ShakerSynth] = None
 
 
@@ -178,6 +210,9 @@ class HapticEffect:
             return self
         if self.name is None:
             logger.warning("HapticEffect.start called with no name; dropping")
+            return self
+        if self.name not in SHAKER_EFFECT_WHITELIST:
+            logger.debug("Shaker start: effect %r not in whitelist; dropping", self.name)
             return self
 
         with _synth._lock:

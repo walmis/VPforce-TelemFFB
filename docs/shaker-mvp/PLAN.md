@@ -11,7 +11,7 @@
 - [x] STEP_01 — Audio synth core (`telemffb/hw/shaker_synth.py`)
 - [x] STEP_02 — HapticEffect facade (`telemffb/hw/ffb_shaker.py`)
 - [x] STEP_03 — Device-type integration (`--type shaker` launchable)
-- [ ] STEP_04 — Effect routing whitelist
+- [x] STEP_04 — Effect routing whitelist
 - [ ] STEP_05 — Soundcard selection UI in System Settings
 - [ ] STEP_06 — MSFS smoke test
 - [ ] STEP_07 — Docs & known limitations
@@ -50,3 +50,4 @@
 - (STEP_03) **Design deviation from STEP doc, taken from the brief's own contingency:** the static `if G.device_type == 'shaker': ...` conditional at `aircraft_base.py:29-31` does not work because `aircraft_base` is imported transitively from `main.py`'s top-level imports (via `MainWindow`), which runs before `main()` sets `G.device_type`. We instead keep the static `from ffb_rhino import ...` and add a `use_shaker_backend()` rebind that `main.py` calls inside the shaker branch of `_initialize_device_connection()`, before any effect is created (effects are lazy via `Dispenser.get`). `STEP_03_device_type.md` updated with the rationale and the concrete change.
 - (STEP_03) Master-instance check added in `_determine_master_instance_status`: if `device_type == 'shaker'` and `master_instance` would be True (i.e. user configured shaker as master in System Settings), log error + `QMessageBox.critical` + `sys.exit(1)`.
 - (STEP_03) Confidence is bounded by what runs in this Linux container: all six modified files compile clean under py3.12; the `Dispenser`-rebind pattern was verified in isolation; full launch verification (`python main.py --type shaker --child --masterport <port>`) needs Windows + sounddevice + Rhino hardware on the dev machine.
+- (STEP_04) Whitelist set has 46 entries (spec listed exact names; all imported verbatim). `start()` guards on whitelist membership immediately after the synth-bound and name-set guards, before any synth lock is acquired. Dropped names log at debug level. All four acceptance scenarios verified: non-whitelisted name silent-drops with no oscillator created; `runway0.constant().start()` produces 25 Hz; `gunfire.periodic(..., duration=200).start()` plays a 200 ms 80 Hz burst then ramps to 0; whitelist is a public, mutable module-level set so future names can be added without other changes.
