@@ -588,6 +588,8 @@ class SystemSettings(QSettings):
         'startHeadlessPedals': False,
         'startHeadlessCollective': False,
         'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
+        'shakerDevice': '',  # bass-shaker output device name; '' = system default
+        'shakerGain': 1.0,
     }
 
     @property

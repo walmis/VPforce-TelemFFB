@@ -115,7 +115,7 @@ class CmdLineArgs:
         parser.add_argument('-c', '--configfile', type=str, help='Config ini file (default config.ini)', default='config.ini')
         parser.add_argument('-o', '--overridefile', type=str, help='User config override file (default = config.user.ini', default='None')
         parser.add_argument('-s', '--sim', type=str, help='Set simulator options DCS|MSFS|IL2 (default DCS', default="None")
-        parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective', default=None)
+        parser.add_argument('-t', '--type', help='FFB Device Type | joystick (default) | pedals | collective | trimwheel | shaker', default=None)
         parser.add_argument('--headless', action='store_true', help='Run in headless mode')
         parser.add_argument('--child', action='store_true', help='Is a child instance')
         parser.add_argument('--masterport', type=str, help='master instance IPC port', default=None)

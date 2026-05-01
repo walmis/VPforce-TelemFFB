@@ -259,6 +259,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.tabBar().setUsesScrollButtons(False)
         self.simTabWidget.tabBar().setDocumentMode(True)
 
+        self._setup_shaker_tab()
+
         self.select_enabled_sim()
 
     def select_enabled_sim(self):
@@ -269,6 +271,150 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 tab_index = getattr(self, f'{sim}_TAB')
                 self.simTabWidget.setCurrentIndex(tab_index)
                 return
+
+    _SHAKER_TEST_BUTTON_TEXT = "Test (2 s, 35 Hz @ 0.5)"
+
+    def _setup_shaker_tab(self):
+        """Add a top-level Shaker tab with output-device / gain / test controls.
+
+        Built programmatically so the Qt-Designer-generated Ui_SystemDialog.py
+        does not need to be touched. If the audio backend can't be imported
+        (e.g. PortAudio not present), the tab still opens with an explanation
+        and disabled controls.
+        """
+        from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
+                                       QLabel, QComboBox, QDoubleSpinBox, QPushButton)
+
+        self.tab_Shaker = QWidget()
+        self.tab_Shaker.setObjectName("tab_Shaker")
+        outer = QVBoxLayout(self.tab_Shaker)
+
+        intro = QLabel(
+            "Bass shaker output. These settings only take effect when a TelemFFB "
+            "instance is launched as <b>--type shaker</b>. After changing the output "
+            "device, restart the shaker child instance.")
+        intro.setWordWrap(True)
+        outer.addWidget(intro)
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        outer.addLayout(form)
+
+        # Output device combobox.
+        self.shaker_device_combo = QComboBox()
+        self.shaker_device_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self.shaker_device_combo.addItem("(System default)", userData="")
+        self._shaker_backend_available = True
+        try:
+            from telemffb.hw.shaker_synth import ShakerSynth
+            for d in ShakerSynth.list_output_devices():
+                self.shaker_device_combo.addItem(
+                    f"{d['index']}: {d['name']} ({d['samplerate']:.0f} Hz)",
+                    userData=d['name'])
+        except Exception:
+            logging.exception("Failed to enumerate audio output devices for shaker")
+            self._shaker_backend_available = False
+            self.shaker_device_combo.setEnabled(False)
+        form.addRow("Output device:", self.shaker_device_combo)
+
+        # Master gain spinbox.
+        self.shaker_gain_spin = QDoubleSpinBox()
+        self.shaker_gain_spin.setRange(0.0, 2.0)
+        self.shaker_gain_spin.setSingleStep(0.05)
+        self.shaker_gain_spin.setDecimals(2)
+        self.shaker_gain_spin.setValue(1.0)
+        form.addRow("Master gain:", self.shaker_gain_spin)
+
+        # Test button.
+        self.shaker_test_button = QPushButton(self._SHAKER_TEST_BUTTON_TEXT)
+        self.shaker_test_button.clicked.connect(self._shaker_test_clicked)
+        if not self._shaker_backend_available:
+            self.shaker_test_button.setEnabled(False)
+            self.shaker_test_button.setToolTip(
+                "Audio backend (sounddevice / PortAudio) is unavailable.")
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.shaker_test_button)
+        btn_row.addStretch(1)
+        outer.addLayout(btn_row)
+
+        outer.addStretch(1)
+
+        self.tabWidget.addTab(self.tab_Shaker, "Shaker")
+
+    def _shaker_test_clicked(self):
+        """Play a short test tone on the currently-selected device.
+
+        Uses a short-lived ``ShakerSynth`` on a daemon thread so the UI does
+        not block. The button is re-enabled via QTimer.singleShot from the
+        main (Qt) thread once the worker is expected to be done.
+        """
+        import threading
+        import time
+        from PyQt6.QtCore import QTimer
+
+        device_name = self.shaker_device_combo.currentData() or None
+        gain = self.shaker_gain_spin.value()
+        self.shaker_test_button.setEnabled(False)
+        self.shaker_test_button.setText("Testing…")
+
+        def _run():
+            try:
+                from telemffb.hw.shaker_synth import ShakerSynth
+                synth = ShakerSynth(device=device_name, master_gain=gain)
+                synth.start()
+                try:
+                    osc = synth.get_oscillator("test")
+                    osc.set(35.0, 0.5, ramp_ms=100)
+                    time.sleep(2.0)
+                    osc.stop(ramp_ms=100)
+                    time.sleep(0.2)
+                finally:
+                    synth.stop()
+            except Exception:
+                logging.exception("Shaker test failed")
+
+        threading.Thread(target=_run, daemon=True).start()
+        QTimer.singleShot(2500, self._shaker_test_finished)
+
+    def _shaker_test_finished(self):
+        self.shaker_test_button.setEnabled(self._shaker_backend_available)
+        self.shaker_test_button.setText(self._SHAKER_TEST_BUTTON_TEXT)
+
+    def _load_shaker_settings(self, settings_dict):
+        """Restore the Shaker tab from persisted settings.
+
+        Device match is exact-name first then case-insensitive substring (the
+        same fallback policy used by ``ShakerSynth._resolve_device``). If the
+        saved device is no longer present, default to "(System default)" at
+        index 0; the actual fallback warning is logged at runtime by the
+        shaker child, not here.
+        """
+        saved_device = (settings_dict.get('shakerDevice', '') or '').strip()
+        idx = 0  # "(System default)"
+        if saved_device:
+            saved_lc = saved_device.lower()
+            exact = None
+            substring = None
+            for i in range(self.shaker_device_combo.count()):
+                data = self.shaker_device_combo.itemData(i)
+                if not data:
+                    continue
+                data_lc = str(data).lower()
+                if data_lc == saved_lc and exact is None:
+                    exact = i
+                elif saved_lc in data_lc and substring is None:
+                    substring = i
+            if exact is not None:
+                idx = exact
+            elif substring is not None:
+                idx = substring
+        self.shaker_device_combo.setCurrentIndex(idx)
+
+        try:
+            gain = float(settings_dict.get('shakerGain', 1.0))
+        except (TypeError, ValueError):
+            gain = 1.0
+        self.shaker_gain_spin.setValue(gain)
 
     def make_icons(self, pixmap, style):
         icon_enabled = QIcon()
@@ -603,6 +749,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'masterStartMin': self.cb_masterStartMin.isChecked(),
             'closeToTray': self.cb_closeToTray.isChecked(),
             'themeId': self.themeButtonGroup.checkedId(),
+            'shakerDevice': self.shaker_device_combo.currentData() or '',
+            'shakerGain': float(self.shaker_gain_spin.value()),
         }
 
         instance_settings_dict = {
@@ -776,6 +924,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
+
+        self._load_shaker_settings(settings_dict)
 
         self.enableVPConfStartup.setChecked(settings_dict.get('enableVPConfStartup', False))
         self.pathVPConfStartup.setText(settings_dict.get('pathVPConfStartup', ''))

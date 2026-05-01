@@ -144,7 +144,7 @@ def _setup_device_configuration():
     3. Set global device variables for use throughout application
     """
     if G.args.device is None:
-        mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel"}
+        mapping = {1: "joystick", 2: "pedals", 3: "collective", 4: "trimwheel", 5: "shaker"}
         master_rb = G.system_settings.get('masterInstance', 1)
 
         try:
@@ -265,13 +265,22 @@ def _determine_master_instance_status():
         'joystick': 1,
         'pedals': 2,
         'collective': 3,
-        'trimwheel': 4
+        'trimwheel': 4,
+        'shaker': 5,
     }
     master_index = G.system_settings.get('masterInstance', 1)
     if index_dict[G.device_type] == master_index:
         G.master_instance = True
     else:
         G.master_instance = False
+
+    if G.device_type == 'shaker' and G.master_instance:
+        msg = ("Shaker device cannot run as the master instance. "
+               "Configure a non-shaker device (joystick / pedals / collective / trimwheel) "
+               "as the master in System Settings.")
+        logging.error(msg)
+        QMessageBox.critical(None, "Invalid configuration", msg)
+        sys.exit(1)
 
 def _setup_config_paths():
     """
@@ -336,6 +345,29 @@ def _initialize_device_connection():
     dev_serial = None
     dev_firmware_version = 'ERROR'
     dev = None
+
+    if G.device_type == 'shaker':
+        try:
+            from telemffb.hw.shaker_synth import ShakerSynth
+            from telemffb.hw.ffb_shaker import init_shaker
+            from telemffb.sim import aircraft_base
+            device_name = G.system_settings.get('shakerDevice', None) or None
+            gain = float(G.system_settings.get('shakerGain', 1.0))
+            synth = ShakerSynth(device=device_name, master_gain=gain)
+            synth.start()
+            init_shaker(synth)
+            G.shaker_synth = synth
+            aircraft_base.use_shaker_backend()
+            G.device_connection_status = True
+            logging.info(f"Shaker device initialised (output={device_name!r}, gain={gain})")
+        except Exception as e:
+            G.device_connection_status = False
+            logging.exception("Failed to initialise shaker audio device")
+            QMessageBox.warning(None, "Shaker initialisation failed",
+                              f"Unable to start audio output for shaker device.\n"
+                              f"Error: {e}\n\n"
+                              "Open System Settings and verify the Shaker output device.")
+        return dev, dev_serial, dev_firmware_version
 
     try:
         vid_pid = [int(x, 16) for x in G.device_usbvidpid.split(":")]
