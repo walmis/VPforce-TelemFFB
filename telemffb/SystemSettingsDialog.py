@@ -188,6 +188,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.themeButtonGroup.setId(self.rb_DarkTheme, 1)
         self.themeButtonGroup.setId(self.rb_SystemTheme, 2)
 
+        self._setup_shaker_tab()
+
         self.load_settings()
 
         int_validator = QIntValidator()
@@ -197,6 +199,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.tb_pid_p.setValidator(int_validator)
         self.tb_pid_c.setValidator(int_validator)
         self.tb_pid_t.setValidator(int_validator)
+        self.tb_pid_s.setValidator(int_validator)
+        self.tb_pid_s.setToolTip("Synthetic ID for the shaker child instance — not a real USB device. "
+                                 "Just needs to be unique vs. other configured PIDs.")
 
         self.cb_min_enable_j.setObjectName('minimize_j')
         self.cb_min_enable_j.clicked.connect(self.toggle_launchmode_cbs)
@@ -206,6 +211,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_min_enable_c.clicked.connect(self.toggle_launchmode_cbs)
         self.cb_min_enable_t.setObjectName('minimize_t')
         self.cb_min_enable_t.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_min_enable_s.setObjectName('minimize_s')
+        self.cb_min_enable_s.clicked.connect(self.toggle_launchmode_cbs)
 
         self.cb_headless_j.setObjectName('headless_j')
         self.cb_headless_j.clicked.connect(self.toggle_launchmode_cbs)
@@ -215,6 +222,8 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_headless_c.clicked.connect(self.toggle_launchmode_cbs)
         self.cb_headless_t.setObjectName('headless_t')
         self.cb_headless_t.clicked.connect(self.toggle_launchmode_cbs)
+        self.cb_headless_s.setObjectName('headless_s')
+        self.cb_headless_s.clicked.connect(self.toggle_launchmode_cbs)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
 
 
@@ -258,8 +267,6 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.simTabWidget.tabBar().setExpanding(False)
         self.simTabWidget.tabBar().setUsesScrollButtons(False)
         self.simTabWidget.tabBar().setDocumentMode(True)
-
-        self._setup_shaker_tab()
 
         self.select_enabled_sim()
 
@@ -466,6 +473,10 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
 
     def change_master_widgets(self, button):
+        # Shaker row is never the master — its checkboxes stay visible regardless.
+        self.cb_al_enable_s.setVisible(True)
+        self.cb_min_enable_s.setVisible(True)
+        self.cb_headless_s.setVisible(True)
         if button == self.rb_master_j:
             self.cb_al_enable_j.setChecked(False)
             self.cb_al_enable_j.setVisible(False)
@@ -553,14 +564,17 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         self.cb_al_enable_p.setEnabled(al_enabled)
         self.cb_al_enable_c.setEnabled(al_enabled)
         self.cb_al_enable_t.setEnabled(al_enabled)
+        self.cb_al_enable_s.setEnabled(al_enabled)
         self.cb_min_enable_j.setEnabled(al_enabled)
         self.cb_min_enable_p.setEnabled(al_enabled)
         self.cb_min_enable_c.setEnabled(al_enabled)
         self.cb_min_enable_t.setEnabled(al_enabled)
+        self.cb_min_enable_s.setEnabled(al_enabled)
         self.cb_headless_j.setEnabled(al_enabled)
         self.cb_headless_p.setEnabled(al_enabled)
         self.cb_headless_c.setEnabled(al_enabled)
         self.cb_headless_t.setEnabled(al_enabled)
+        self.cb_headless_s.setEnabled(al_enabled)
 
     def toggle_msfs_widgets(self):
         msfs_enabled = self.enableMSFS.isChecked()
@@ -650,6 +664,11 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             case 'minimize_t':
                 self.cb_headless_t.setChecked(False)
                 self.cb_startToTray.setChecked(False)
+            case 'headless_s':
+                self.cb_min_enable_s.setChecked(False)
+            case 'minimize_s':
+                self.cb_headless_s.setChecked(False)
+                self.cb_startToTray.setChecked(False)
         logging.debug(f"{sender.objectName()} checked:{sender.isChecked()}")
 
     def validate_settings(self):
@@ -663,7 +682,7 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
                 val_entry = self.tb_pid_c.text()
             case 4:
                 val_entry = self.tb_pid_t.text()
-        if self.cb_al_enable.isChecked() and not (self.cb_al_enable_j.isChecked() or self.cb_al_enable_p.isChecked() or self.cb_al_enable_c.isChecked()  or self.cb_al_enable_t.isChecked()):
+        if self.cb_al_enable.isChecked() and not (self.cb_al_enable_j.isChecked() or self.cb_al_enable_p.isChecked() or self.cb_al_enable_c.isChecked()  or self.cb_al_enable_t.isChecked() or self.cb_al_enable_s.isChecked()):
             QMessageBox.warning(self, "Config Error", "Auto Launching is enabled but no devices are configured for auto launch.  Please enable a device or disable auto launching")
             return False
         if val_entry == '':
@@ -684,6 +703,9 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
         if self.cb_al_enable_t.isChecked() and self.tb_pid_t.text() == '':
             r = self.tb_pid_t.text()
             QMessageBox.warning(self, "Config Error", 'Please enter a valid USB Product ID for the trim wheel device or disable auto-launch')
+            return False
+        if self.cb_al_enable_s.isChecked() and self.tb_pid_s.text() == '':
+            QMessageBox.warning(self, "Config Error", 'Please enter a Product ID for the shaker instance or disable auto-launch (any unique number works — it is not a real USB device)')
             return False
         if self.validateXPLANE.isChecked():
             pth = os.path.join(self.pathXPLANE.text(), 'resources')
@@ -730,18 +752,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'autolaunchPedals': self.cb_al_enable_p.isChecked(),
             'autolaunchCollective': self.cb_al_enable_c.isChecked(),
             'autolaunchTrimWheel': self.cb_al_enable_t.isChecked(),
+            'autolaunchShaker': self.cb_al_enable_s.isChecked(),
             'startMinJoystick': self.cb_min_enable_j.isChecked(),
             'startMinPedals': self.cb_min_enable_p.isChecked(),
             'startMinCollective': self.cb_min_enable_c.isChecked(),
             'startMinTrimWheel': self.cb_min_enable_t.isChecked(),
+            'startMinShaker': self.cb_min_enable_s.isChecked(),
             'startHeadlessJoystick': self.cb_headless_j.isChecked(),
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
             'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
+            'startHeadlessShaker': self.cb_headless_s.isChecked(),
             'pidJoystick': str(self.tb_pid_j.text()),
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
             'pidTrimWheel': str(self.tb_pid_t.text()),
+            'pidShaker': str(self.tb_pid_s.text()),
             'pruneLogs': self.cb_logPrune.isChecked(),
             'pruneLogsNum': self.tb_logPrune.text(),
             'pruneLogsUnit': self.combo_logPrune.currentText(),
@@ -773,18 +799,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'autolaunchPedals',
             'autolaunchCollective',
             'autolaunchTrimWheel',
+            'autolaunchShaker',
             'startMinJoystick',
             'startMinPedals',
             'startMinCollective',
             'startMinTrimWheel',
+            'startMinShaker',
             'startHeadlessJoystick',
             'startHeadlessPedals',
             'startHeadlessCollective',
             'startHeadlessTrimWheel',
+            'startHeadlessShaker',
             'pidJoystick',
             'pidPedals',
             'pidCollective',
             'pidTrimWheel',
+            'pidShaker',
             'themeId'
         ]
         saved_al_dict = {}
@@ -905,22 +935,27 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
 
         self.tb_pid_t.setText(str(settings_dict.get('pidTrimWheel', '')))
 
+        self.tb_pid_s.setText(str(settings_dict.get('pidShaker', '2059')))
+
         self.cb_al_enable.setChecked(settings_dict.get('autolaunchMaster', False))
 
         self.cb_al_enable_j.setChecked(settings_dict.get('autolaunchJoystick', False))
         self.cb_al_enable_p.setChecked(settings_dict.get('autolaunchPedals', False))
         self.cb_al_enable_c.setChecked(settings_dict.get('autolaunchCollective', False))
         self.cb_al_enable_t.setChecked(settings_dict.get('autolaunchTrimWheel', False))
+        self.cb_al_enable_s.setChecked(settings_dict.get('autolaunchShaker', False))
 
         self.cb_min_enable_j.setChecked(settings_dict.get('startMinJoystick', False))
         self.cb_min_enable_p.setChecked(settings_dict.get('startMinPedals', False))
         self.cb_min_enable_c.setChecked(settings_dict.get('startMinCollective', False))
         self.cb_min_enable_t.setChecked(settings_dict.get('startMinTrimWheel', False))
+        self.cb_min_enable_s.setChecked(settings_dict.get('startMinShaker', False))
 
         self.cb_headless_j.setChecked(settings_dict.get('startHeadlessJoystick', False))
         self.cb_headless_p.setChecked(settings_dict.get('startHeadlessPedals', False))
         self.cb_headless_c.setChecked(settings_dict.get('startHeadlessCollective', False))
         self.cb_headless_t.setChecked(settings_dict.get('startHeadlessTrimWheel', False))
+        self.cb_headless_s.setChecked(settings_dict.get('startHeadlessShaker', False))
 
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).setChecked(True)
         self.master_button_group.button(settings_dict.get('masterInstance', 1)).click()
@@ -944,18 +979,22 @@ class SystemSettingsDialog(QDialog, Ui_SystemDialog):
             'autolaunchPedals': self.cb_al_enable_p.isChecked(),
             'autolaunchCollective': self.cb_al_enable_c.isChecked(),
             'autolaunchTrimWheel': self.cb_al_enable_t.isChecked(),
+            'autolaunchShaker': self.cb_al_enable_s.isChecked(),
             'startMinJoystick': self.cb_min_enable_j.isChecked(),
             'startMinPedals': self.cb_min_enable_p.isChecked(),
             'startMinCollective': self.cb_min_enable_c.isChecked(),
             'startMinTrimWheel': self.cb_min_enable_t.isChecked(),
+            'startMinShaker': self.cb_min_enable_s.isChecked(),
             'startHeadlessJoystick': self.cb_headless_j.isChecked(),
             'startHeadlessPedals': self.cb_headless_p.isChecked(),
             'startHeadlessCollective': self.cb_headless_c.isChecked(),
             'startHeadlessTrimWheel': self.cb_headless_t.isChecked(),
+            'startHeadlessShaker': self.cb_headless_s.isChecked(),
             'pidJoystick': str(self.tb_pid_j.text()),
             'pidPedals': str(self.tb_pid_p.text()),
             'pidCollective': str(self.tb_pid_c.text()),
             'pidTrimWheel': str(self.tb_pid_t.text()),
+            'pidShaker': str(self.tb_pid_s.text()),
             'themeId': self.themeButtonGroup.checkedId(),
         }
 

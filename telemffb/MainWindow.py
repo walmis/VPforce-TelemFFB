@@ -134,6 +134,12 @@ class MainWindow(QMainWindow):
             case 'trimwheel':
                 x_pos = 40
                 y_pos = 30
+            case 'shaker':
+                x_pos = 200
+                y_pos = 160
+            case _:
+                x_pos = 100
+                y_pos = 100
 
         self.setGeometry(x_pos, y_pos, 530, 700)
 
@@ -197,6 +203,12 @@ class MainWindow(QMainWindow):
                 case 'trimwheel':
                     x_pos = 40
                     y_pos = 30
+                case 'shaker':
+                    x_pos = 200
+                    y_pos = 160
+                case _:
+                    x_pos = 100
+                    y_pos = 100
             self.setGeometry(x_pos, y_pos, 530, 700)
 
         reset_geometry.triggered.connect(do_reset_window_size)
@@ -1036,7 +1048,7 @@ class MainWindow(QMainWindow):
         if G.launched_instances:
             show_menu = QMenu("Instances", self)
             show_child_window_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
+            for d in ["joystick", "pedals", "collective", 'trimwheel', 'shaker']:
                 if d in G.launched_instances:
                     def do_show_child_window(child=d):
                         G.ipc_instance.send_broadcast_message(f'SHOW WINDOW:{child}')
@@ -1098,7 +1110,7 @@ class MainWindow(QMainWindow):
             self.child_log_menu = self.log_menu.addMenu('Open Child Logs')
 
             self.log_action = {}
-            for d in ["joystick", "pedals", "collective", 'trimwheel']:
+            for d in ["joystick", "pedals", "collective", 'trimwheel', 'shaker']:
                 if d in G.launched_instances:
                     def do_show_child_log(child=d):
                         G.ipc_instance.send_broadcast_message(f'SHOW LOG:{child}')
@@ -1395,6 +1407,9 @@ class MainWindow(QMainWindow):
             elif 'pedals' in _arg: arg = 2
             elif 'collective' in _arg: arg = 3
             elif 'trimwheel' in _arg: arg = 4
+            elif 'shaker' in _arg: arg = 5
+            else:
+                return
         else:
             arg = _arg
 
@@ -1402,7 +1417,8 @@ class MainWindow(QMainWindow):
             1 : "joystick",
             2 : "pedals",
             3 : "collective",
-            4 : "trimwheel"
+            4 : "trimwheel",
+            5 : "shaker",
         }
 
         xmlutils.update_vars(types[arg], G.userconfig_path, G.defaults_path)
@@ -1823,7 +1839,13 @@ class MainWindow(QMainWindow):
             case 'trimwheel':
                 x_pos = 10
                 y_pos = 40
-                
+            case 'shaker':
+                x_pos = 210
+                y_pos = 160
+            case _:
+                x_pos = 100
+                y_pos = 100
+
         self.setGeometry(x_pos, y_pos, 530, 700)
 
     def open_system_settings_dialog(self):

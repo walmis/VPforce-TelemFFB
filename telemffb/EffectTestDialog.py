@@ -232,7 +232,16 @@ class EffectTestDialog(QDialog):
         return self._effect
 
     def _apply_to_effect(self):
+        desired_type = self._get_effect_type_const()
         e = self._ensure_effect()
+        # The underlying _h_effect is created lazily on the first call to
+        # constant()/periodic() and is never re-typed. If the user switches
+        # effect type while playing (e.g. Constant -> Sine, or Sine -> Square),
+        # we must destroy the old effect so the next call recreates it.
+        current_type = getattr(e, 'effect_type', None)
+        if current_type is not None and current_type != desired_type:
+            self._discard_effect()
+            e = self._ensure_effect()
         magnitude = self.mag_spin.value()
         direction = float(self.dir_spin.value())
         if self._is_constant_selected():
@@ -240,9 +249,21 @@ class EffectTestDialog(QDialog):
         else:
             duration = self.dur_spin.value() if self.dur_timed.isChecked() else 0
             e.periodic(self.freq_spin.value(), magnitude, direction,
-                       effect_type=self._get_effect_type_const(),
+                       effect_type=desired_type,
                        duration=duration)
         e.start()
+
+    def _discard_effect(self):
+        if self._effect is not None:
+            try:
+                self._effect.destroy()
+            except Exception:
+                logging.exception("Effect tester: destroy on type change failed")
+        try:
+            self._aircraft_base.effects.dispose(TEST_EFFECT_NAME)
+        except Exception:
+            logging.exception("Effect tester: dispose on type change failed")
+        self._effect = None
 
     def _on_play(self):
         try:

@@ -41,6 +41,36 @@ Application Flow:
 import sys
 # import faulthandler
 # faulthandler.enable()
+
+# When running from source, the local ./simconnect/ folder (which only holds
+# SimConnect.dll and scvars*.json for PyInstaller bundling) is picked up by
+# Python as a namespace package and shadows the installed pysimconnect regular
+# package, leaving `from simconnect import *` empty. Pre-load the real package
+# from site-packages so all later imports see it.
+def _bootstrap_simconnect():
+    import os
+    import importlib.util
+    if 'simconnect' in sys.modules and getattr(sys.modules['simconnect'], '__file__', None):
+        return
+    here = os.path.dirname(os.path.abspath(__file__))
+    local = os.path.normcase(os.path.join(here, 'simconnect'))
+    for entry in sys.path:
+        if not entry:
+            entry = os.getcwd()
+        candidate = os.path.normcase(os.path.join(entry, 'simconnect'))
+        if candidate == local:
+            continue
+        init_py = os.path.join(entry, 'simconnect', '__init__.py')
+        if os.path.isfile(init_py):
+            spec = importlib.util.spec_from_file_location(
+                'simconnect', init_py,
+                submodule_search_locations=[os.path.dirname(init_py)])
+            module = importlib.util.module_from_spec(spec)
+            sys.modules['simconnect'] = module
+            spec.loader.exec_module(module)
+            return
+_bootstrap_simconnect()
+
 from PyQt6.QtGui import QIcon, QColor, QFont
 
 from telemffb.CmdLineArgs import CmdLineArgs
@@ -102,6 +132,7 @@ def _launch_children():
         utils.check_launch_instance("pedals", master_port)
         utils.check_launch_instance("collective", master_port)
         utils.check_launch_instance("trimwheel", master_port)
+        utils.check_launch_instance("shaker", master_port)
 
     except Exception:
         logging.exception("Error during Auto-Launch sequence")
@@ -584,6 +615,10 @@ def _check_system_settings_required():
 
 def _setup_async_initialization(dev, dev_serial):
     """Setup background initialization that doesn't block main window appearance."""
+    # Shaker child has no Rhino device — no configurator gains / vpconf to push.
+    if dev is None:
+        return
+
     @utils.threaded()
     def init_async():
         try:

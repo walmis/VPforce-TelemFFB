@@ -49,8 +49,10 @@ class SimConnectSock(SimConnectManager):
     def emit_event(self, event, *args):
         # special handling of Open event
         if event == "Open":
-            # Reset all FFB effects on device, ensure we have a clean start
-            HapticEffect.device.reset_effects()
+            # Reset all FFB effects on device, ensure we have a clean start.
+            # Shaker child has no Rhino HID open (HapticEffect.device is None).
+            if HapticEffect.device is not None:
+                HapticEffect.device.reset_effects()
 
         if event == "Quit":
             # Restart sim listeners on MSFS quit, TODO: Why?

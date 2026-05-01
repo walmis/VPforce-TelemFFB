@@ -124,10 +124,67 @@ class FFBReport_SetCondition:
         return f"FFBReport_SetCondition(shaker stub, {self.__dict__!r})"
 
 
+class _ZeroInput:
+    """Stub for the FFBReport_Input returned by Rhino's get_input().
+
+    aircraft_base / aircrafts_msfs_xp / aircrafts_dcs read positions, forces,
+    and button state every telemetry frame. The shaker has no such inputs;
+    we return zeros / False so the upstream maths fall through to no-ops.
+    """
+    def forceXY(self):
+        return 0.0, 0.0
+    def axisXY(self):
+        return 0.0, 0.0
+    def CP_XY(self):
+        return 0.0, 0.0
+    def CP_scaled_axisXY(self):
+        return 0.0, 0.0
+    def isButtonPressed(self, _button):
+        return False
+    def getPressedButtons(self):
+        return set()
+
+
+class _StubDevice:
+    """Stand-in for FFBRhino on the shaker child.
+
+    Provides the small subset of FFBRhino methods that aircraft_base.py
+    invokes regardless of device type (input polling, deadzone). All are
+    silent no-ops or zero-returning.
+    """
+    _zero = _ZeroInput()
+
+    def get_input(self):
+        return self._zero
+
+    def set_deadzone(self, _value):
+        pass
+
+    def reset_effects(self):
+        pass
+
+    def get_gains(self):
+        # Return an object with the gain attributes ConfiguratorDialog expects
+        # (all zero — shaker has no FFB gains). Returning None would crash the
+        # dialog with AttributeError on .master_gain etc.
+        class _ZeroGains:
+            master_gain = 0
+            periodic_gain = 0
+            spring_gain = 0
+            damper_gain = 0
+            inertia_gain = 0
+            friction_gain = 0
+            constant_gain = 0
+        return _ZeroGains()
+
+
 class HapticEffect:
     """Mirror of ffb_rhino.HapticEffect for the bass-shaker device type."""
 
-    device = None  # placeholder for compat with ffb_rhino.HapticEffect.device
+    # Stub stand-in for the Rhino device. aircraft_base.on_telemetry calls
+    # HapticEffect.device.get_input() every frame; on the shaker child there
+    # is no real device, so this returns zeros instead of raising.
+    device = _StubDevice()
 
     def __init__(self):
         self.name: Optional[str] = None
@@ -141,6 +198,13 @@ class HapticEffect:
 
     def __repr__(self) -> str:
         return f"HapticEffect(shaker name={self.name!r}, freq={self.frequency:.1f}, mag={self.magnitude:.3f})"
+
+    @property
+    def id(self):
+        # Mirror ffb_rhino.HapticEffect.id (which returns the Rhino effect block
+        # index). The shaker has no such index — return None; UI code that
+        # formats this typically tolerates None or skips the row.
+        return None
 
     # ------------------------------------------------------------------
     # Effect-shape configuration (chainable; do not touch the synth).

@@ -68,7 +68,7 @@ class IPCNetworkThread(QObject, threading.Thread):
         self._ipc_telem_effects = {}
         self._child_keepalive_info = {}
         self._child_addrs = {}
-        self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None}
+        self._child_active = {'joystick': None, 'pedals': None, 'collective': None, 'trimwheel': None, 'shaker': None}
 
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)

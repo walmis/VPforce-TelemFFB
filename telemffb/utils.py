@@ -581,12 +581,16 @@ class SystemSettings(QSettings):
         'autolaunchJoystick': False,
         'autolaunchPedals': False,
         'autolaunchCollective': False,
+        'autolaunchShaker': False,
         'startMinJoystick': False,
         'startMinPedals': False,
         'startMinCollective': False,
+        'startMinShaker': False,
         'startHeadlessJoystick': False,
         'startHeadlessPedals': False,
         'startHeadlessCollective': False,
+        'startHeadlessShaker': False,
+        'pidShaker': '2059',  # synthetic ID; not a real USB PID. Used for IPC port + settings namespace.
         'debug': False,  # debug is False by default.  To permanently enable the debug menu, manually set debug = true (1) in registry
         'shakerDevice': '',  # bass-shaker output device name; '' = system default
         'shakerGain': 1.0,

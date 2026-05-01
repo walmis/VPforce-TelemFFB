@@ -47,7 +47,15 @@ def use_shaker_backend() -> None:
     conditional ``import`` at module load time is that aircraft_base.py is
     imported transitively from main.py's top-level imports (via MainWindow),
     which runs *before* G.device_type is assigned.
+
+    Concrete aircraft modules (aircrafts_msfs_xp / aircrafts_dcs / aircrafts_il2)
+    each `from telemffb.hw.ffb_rhino import HapticEffect` at their own module-load
+    time, so they capture an independent reference. Rebinding the global in this
+    module is not enough — we also reach into ``sys.modules`` and rewrite each
+    sibling's binding so subsequent ``HapticEffect()`` calls use the shaker facade.
     """
+    import sys
+
     global HapticEffect, FFBReport_SetCondition
     from telemffb.hw.ffb_shaker import (
         HapticEffect as _S_HapticEffect,
@@ -56,6 +64,17 @@ def use_shaker_backend() -> None:
     HapticEffect = _S_HapticEffect
     FFBReport_SetCondition = _S_Cond
     effects.cls = _S_HapticEffect
+
+    for mod_name in ('telemffb.sim.aircrafts_msfs_xp',
+                     'telemffb.sim.aircrafts_dcs',
+                     'telemffb.sim.aircrafts_il2'):
+        mod = sys.modules.get(mod_name)
+        if mod is None:
+            continue
+        if hasattr(mod, 'HapticEffect'):
+            mod.HapticEffect = _S_HapticEffect
+        if hasattr(mod, 'FFBReport_SetCondition'):
+            mod.FFBReport_SetCondition = _S_Cond
 
 # Highpass filter dispenser
 HPFs: utils.Dispenser = utils.Dispenser(utils.HighPassFilter)
