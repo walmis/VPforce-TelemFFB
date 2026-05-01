@@ -69,6 +69,9 @@ device_firmware_version : str  # Firmware version as reported by device
 device_connection_status: bool = False # status of HID connection to device
 vpconf_init_pending: bool = False # switch to True when async device init is complete
 
+# Shaker device-type state. None unless device_type == 'shaker'.
+shaker_synth: 'Optional[ShakerSynth]' = None  # populated by main.py when launching as a shaker child
+
 # Gain management
 startup_configurator_gains: Optional[Any] = None  # Gain object direct from 'device.get_gains'.  Gains get read at TelemFFB startup fallback baseline values.
 vpconf_configurator_gains: Optional[Any] = None  # Gain object direct from 'device.get_gains'. Updated every time a configurator profile is pushed to the device to use as revert data

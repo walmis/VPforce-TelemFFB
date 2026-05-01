@@ -37,6 +37,26 @@ from telemffb.util.conversions import kt2ms
 # example: effects["myUniqueName"]
 effects: utils.Dispenser = utils.Dispenser(HapticEffect)
 
+
+def use_shaker_backend() -> None:
+    """Rebind effects.cls (and the module-level HapticEffect / FFBReport_SetCondition)
+    to the bass-shaker facade.
+
+    Called from main.py after _setup_device_configuration() when
+    G.device_type == 'shaker'. The reason this is a runtime swap rather than a
+    conditional ``import`` at module load time is that aircraft_base.py is
+    imported transitively from main.py's top-level imports (via MainWindow),
+    which runs *before* G.device_type is assigned.
+    """
+    global HapticEffect, FFBReport_SetCondition
+    from telemffb.hw.ffb_shaker import (
+        HapticEffect as _S_HapticEffect,
+        FFBReport_SetCondition as _S_Cond,
+    )
+    HapticEffect = _S_HapticEffect
+    FFBReport_SetCondition = _S_Cond
+    effects.cls = _S_HapticEffect
+
 # Highpass filter dispenser
 HPFs: utils.Dispenser = utils.Dispenser(utils.HighPassFilter)
 
@@ -519,6 +539,14 @@ class AircraftBase(object):
             bool: True if device is a trim wheel, False otherwise
         """
         return self._telem_data.get("FFBType") == "trimwheel"
+
+    def is_shaker(self):
+        """Check if the current FFB device is a bass shaker.
+
+        Returns:
+            bool: True if device is a bass shaker, False otherwise
+        """
+        return self._telem_data.get("FFBType") == "shaker"
 
 
     def anything_has_changed(self, item: str, value, delta_ms=0):

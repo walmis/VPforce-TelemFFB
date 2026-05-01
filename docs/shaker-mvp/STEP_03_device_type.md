@@ -37,35 +37,27 @@ def is_shaker(self):
     return self._telem_data.get("FFBType") == "shaker"
 ```
 
-### 5. `telemffb/sim/aircraft_base.py:29-31` — conditional import
+### 5. `telemffb/sim/aircraft_base.py` — runtime rebind (use the contingency, not the conditional)
 
-Replace:
+**Decision after inspecting initialisation order:** the simple `if G.device_type == 'shaker': ...` conditional import does **not** work, because `aircraft_base.py` is imported transitively from `main.py`'s top-level imports (via `from telemffb.MainWindow import MainWindow`, whose own top-level `from telemffb.sim.aircraft_base import effects` triggers `aircraft_base` to execute). That happens **before** `main()` runs and before `_setup_device_configuration()` sets `G.device_type`. At conditional-import time, `G.device_type` is still `""` and the shaker branch would never fire.
 
-```python
-from telemffb.hw.ffb_rhino import EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition
-from telemffb.hw.ffb_rhino import EFFECT_SPRING, EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION, EFFECT_SPRING_ADJUSTER
-from telemffb.hw.ffb_rhino import EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN
-```
+The brief explicitly anticipates this: "If it isn't, fall back to importing both modules and rebinding ... after `G.device_type` is initialised." We take that contingency.
 
-with a conditional binding on `G.device_type`:
+Concrete change in `aircraft_base.py`: keep the existing static import from `ffb_rhino` (so the joystick / pedals / collective / trimwheel paths are byte-for-byte unchanged) and add a small `use_shaker_backend()` function that swaps the `Dispenser`'s factory class and rebinds the module-level `HapticEffect` / `FFBReport_SetCondition` symbols. Effects in `Dispenser` are created lazily on first `effects[name]` access, which only happens during telemetry processing — well after `_setup_device_configuration()` runs.
 
 ```python
-import telemffb.globals as G
-if G.device_type == 'shaker':
+def use_shaker_backend() -> None:
+    global HapticEffect, FFBReport_SetCondition
     from telemffb.hw.ffb_shaker import (
-        EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition,
-        EFFECT_SPRING, EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION,
-        EFFECT_SPRING_ADJUSTER, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN,
+        HapticEffect as _S_HapticEffect,
+        FFBReport_SetCondition as _S_Cond,
     )
-else:
-    from telemffb.hw.ffb_rhino import (
-        EFFECT_TRIANGLE, HapticEffect, FFBReport_SetCondition,
-        EFFECT_SPRING, EFFECT_DAMPER, EFFECT_INERTIA, EFFECT_FRICTION,
-        EFFECT_SPRING_ADJUSTER, EFFECT_SAWTOOTHUP, EFFECT_SAWTOOTHDOWN,
-    )
+    HapticEffect = _S_HapticEffect
+    FFBReport_SetCondition = _S_Cond
+    effects.cls = _S_HapticEffect
 ```
 
-**Verify** at runtime that `G.device_type` is set before `aircraft_base.py` is imported. If it isn't, the fallback is to import both modules and rebind `effects: Dispenser = Dispenser(HapticEffect_shaker if G.device_type == 'shaker' else HapticEffect_rhino)` after `G.device_type` is initialised. **Inspect `main.py` initialisation order before deciding which form to use.**
+`main.py` invokes `aircraft_base.use_shaker_backend()` from inside the shaker branch of `_initialize_device_connection()` (see step 6), right after `init_shaker(synth)`.
 
 ### 6. `main.py` Rhino HID open path (`main.py:348` — `dev = HapticEffect.open(...)`)
 
