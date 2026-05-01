@@ -8,7 +8,7 @@
 
 ## Phases
 - [x] STEP_00 — Bootstrap planning artifacts
-- [ ] STEP_01 — Audio synth core (`telemffb/hw/shaker_synth.py`)
+- [x] STEP_01 — Audio synth core (`telemffb/hw/shaker_synth.py`)
 - [ ] STEP_02 — HapticEffect facade (`telemffb/hw/ffb_shaker.py`)
 - [ ] STEP_03 — Device-type integration (`--type shaker` launchable)
 - [ ] STEP_04 — Effect routing whitelist
@@ -42,3 +42,5 @@
 - (STEP_00) Confirmed `Dispenser.get` at `telemffb/utils.py:1108` already assigns `v.name = name` — STEP_04 will not need a Dispenser fix; just rely on the existing behaviour.
 - (STEP_00) `aircraft_base.py:30` also imports `EFFECT_SPRING/DAMPER/INERTIA/FRICTION/SPRING_ADJUSTER`; line 31 imports `EFFECT_SAWTOOTHUP/DOWN`. The conditional import block in STEP_03 must re-export ALL of those symbols from `ffb_shaker.py` (already listed in the STEP_02 surface).
 - (STEP_00) `main.py:348` is the Rhino HID open; the shaker branch in STEP_03 wraps **this** call site (not a higher-level one).
+- (STEP_01) `shaker_synth.py` preallocates **all** working buffers (mix, per-oscillator output, indices, phase, sine, amplitude envelope) at construction; `_ensure_capacity` only fires if a render call requests more samples than the configured blocksize. Audio callback path holds a single `threading.Lock` for the whole iteration — set/stop calls are infrequent vs. the audio thread, so contention is negligible.
+- (STEP_01) `requirements.txt` now lists `sounddevice`. CLI verified: `--help`, `--list-devices` (returns empty list cleanly when host has no audio devices). Oscillator math sanity-checked against expected sine values for a 30 Hz / 480-sample render — peaks land where phase analysis predicts.
